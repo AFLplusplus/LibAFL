@@ -2,7 +2,7 @@ use crate::inputs::Input;
 
 use std::io::Error;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BytesInput {
     bytes: Vec<u8>,
 }

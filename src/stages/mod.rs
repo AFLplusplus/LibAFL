@@ -1,0 +1,2 @@
+//! Stages
+pub trait Stage {}

@@ -1,16 +1,16 @@
 use std::time;
 
-pub trait RandState {}
-pub trait Executor {}
-pub trait Feedback {}
-pub trait Stage {}
+use crate::utils::Rand;
+use crate::feedbacks::Feedback;
+use crate::stages::Stage;
+use crate::executors::Executor;
+use crate::engines::Engine;
+use crate::monitors::Monitor;
 
-pub trait Monitor {}
+pub struct AflEngine {
 
-pub struct DefaultEngine {
-
-    pub rand: Box<dyn RandState>,
-    pub feedback: Vec<Box<dyn Feedback>>,
+    //pub rand: Box<dyn Rand>,
+    //pub feedback: Vec<Box<dyn Feedback>>,
 
     pub stages: Vec<Box<dyn Stage>>,
     pub current_stage: Box<dyn Stage>,
@@ -24,5 +24,9 @@ pub struct DefaultEngine {
 
     // TODO: Map
     pub monitors: Vec<Box<dyn Monitor>>,
+
+}
+
+impl Engine for AflEngine {
 
 }
