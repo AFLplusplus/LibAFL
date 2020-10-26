@@ -7,13 +7,13 @@ use crate::executors::Executor;
 use crate::engines::Engine;
 use crate::monitors::Monitor;
 
-pub struct AflEngine {
+pub struct AflEngine<'a> {
 
-    //pub rand: Box<dyn Rand>,
-    //pub feedback: Vec<Box<dyn Feedback>>,
+    pub rand: &'a mut dyn Rand,
+    pub feedbacks: Vec<Box<dyn Feedback>>,
 
     pub stages: Vec<Box<dyn Stage>>,
-    pub current_stage: Box<dyn Stage>,
+    pub current_stage: &'a Box<dyn Stage>,
 
     pub executor: Box<dyn Executor>,
 
@@ -27,6 +27,6 @@ pub struct AflEngine {
 
 }
 
-impl Engine for AflEngine {
+impl Engine<'_> for AflEngine<'_> {
 
 }

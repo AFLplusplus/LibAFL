@@ -1,13 +1,12 @@
 //! Utility functions for AFL
 
+use std::fmt::Debug;
 use std::debug_assert;
 use xxhrs::{XXH3_64};
 
 /// Ways to get random around here
-pub trait Rand {
+pub trait Rand: Debug {
 
-    // Returns a new, randomly seeded, rand
-    fn new() -> Self;
     // Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
     // Gets the next 64 bit value
@@ -58,12 +57,7 @@ pub struct AflRand {
 
 impl Rand for AflRand {
 
-    fn new() -> AflRand {
 
-        let mut ret: AflRand = Default::default();
-        ret.set_seed(0); // TODO: Proper random seed?
-        ret
-    }
 
     fn set_seed(&mut self, seed: u64) {
         self.rand_seed[0] = XXH3_64::hash_with_seed(HASH_CONST, &seed.to_le_bytes());
@@ -94,6 +88,17 @@ impl Rand for AflRand {
 
 }
 
+impl AflRand {
+
+    pub fn new() -> AflRand {
+
+        let mut ret: AflRand = Default::default();
+        ret.set_seed(0); // TODO: Proper random seed?
+        ret
+    }
+
+}
+
 /// Get the next higher power of two
 fn next_pow2(val: u64) -> u64 {
     // Early exit so we don't have to do a wrapping subtract;
@@ -115,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_rand() {
-        let mut rand: AflRand = Rand::new();
+        let mut rand = AflRand::new();
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);

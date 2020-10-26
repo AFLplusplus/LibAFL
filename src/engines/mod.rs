@@ -1,5 +1,5 @@
 pub mod aflengine;
 
-pub trait Engine {
+pub trait Engine<'a> {
 
 }
