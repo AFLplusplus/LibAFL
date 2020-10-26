@@ -1,6 +1,5 @@
 pub mod bytes;
 
-use std::io::Error;
 use std::fs::File;
 use std::io::Write;
 use std::io::Read;

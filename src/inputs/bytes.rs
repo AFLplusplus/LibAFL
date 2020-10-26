@@ -1,5 +1,3 @@
-use std::io::Error;
-
 use crate::AflError;
 use crate::inputs::Input;
 

@@ -63,7 +63,6 @@ impl Corpus for DefaultQueue<'_> {
     }
 
     fn add(&mut self, entry: Box<dyn Testcase>) {
-        println!("printing {?entry}")
         self.entries.push(entry);
     }
 
@@ -92,8 +91,11 @@ impl Corpus for DefaultQueue<'_> {
 
     /// Gets the next entry
     fn get(&mut self) -> Result<&Box<dyn Testcase>, AflError> {
+        if self.entries.len() == 0 {
+            return Err(AflError::Unknown)
+        }
         self.pos = self.pos + 1;
-        if self.pos > self.entries.len() {
+        if self.pos >= self.entries.len() {
             self.cycles = self.cycles + 1;
             self.pos = 0;
         }
