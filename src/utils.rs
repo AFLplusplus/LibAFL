@@ -37,7 +37,7 @@ pub trait Rand {
 
     // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     fn between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
-        debug_assert!(lower_bound_incl < upper_bound_incl);
+        debug_assert!(lower_bound_incl <= upper_bound_incl);
         lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
     }
 
@@ -48,7 +48,7 @@ const HASH_CONST: u64 = 0xa5b35705;
 /// XXH3 Based, hopefully speedy, rnd implementation
 /// 
 #[derive(Copy, Clone, Debug, Default)]
-struct AflRand {
+pub struct AflRand {
 
 
     rand_seed: [u64; 4],
@@ -111,11 +111,16 @@ fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{AflRand, next_pow2};
+    use crate::utils::{Rand, AflRand, next_pow2};
 
     #[test]
     fn test_rand() {
-        //let rand: AflRand = AflRand::new();
+        let mut rand: AflRand = Rand::new();
+        assert_ne!(rand.next(), rand.next());
+        assert!(rand.below(100) < 100);
+        assert_eq!(rand.below(1), 0);
+        assert_eq!(rand.between(10, 10), 10);
+        assert!(rand.between(11, 20) > 10);
     }
 
     #[test]
