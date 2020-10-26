@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 xxhrs = { version = "2.0.0", features = [] } #"random_entropy"] }
+thiserror = "1.0"

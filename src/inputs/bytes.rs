@@ -1,6 +1,7 @@
-use crate::inputs::Input;
-
 use std::io::Error;
+
+use crate::AflError;
+use crate::inputs::Input;
 
 #[derive(Clone, Debug, Default)]
 pub struct BytesInput {
@@ -9,10 +10,10 @@ pub struct BytesInput {
 
 impl Input for BytesInput {
 
-    fn serialize(&self) -> Result<&[u8], Error> {
+    fn serialize(&self) -> Result<&[u8], AflError> {
         Ok(&self.bytes)
     }
-    fn deserialize(&mut self, buf: &[u8]) -> Result<(), Error> {
+    fn deserialize(&mut self, buf: &[u8]) -> Result<(), AflError> {
         self.bytes.truncate(0);
         self.bytes.extend_from_slice(buf);
         Ok(())
