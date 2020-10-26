@@ -63,6 +63,7 @@ impl Corpus for DefaultQueue<'_> {
     }
 
     fn add(&mut self, entry: Box<dyn Testcase>) {
+        println!("printing {?entry}")
         self.entries.push(entry);
     }
 
