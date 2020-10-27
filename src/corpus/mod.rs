@@ -31,13 +31,13 @@ pub trait Corpus: Debug {
 }
 
 #[derive(Debug)]
-pub struct RandomCorpus<'a> {
-    rand: &'a mut dyn Rand,
+pub struct RandomCorpus<'a, RandT: Rand> {
+    rand: &'a mut RandT,
     entries: Vec<Box<dyn Testcase>>,
     dir_path: String,
 }
 
-impl Corpus for RandomCorpus<'_> {
+impl<RandT: Rand> Corpus for RandomCorpus<'_, RandT> {
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.entries.len()
@@ -76,8 +76,8 @@ impl Corpus for RandomCorpus<'_> {
     }
 }
 
-impl RandomCorpus<'_> {
-    pub fn new<'a>(rand: &'a mut dyn Rand, dir_path: &str) -> RandomCorpus<'a> {
+impl<RandT: Rand> RandomCorpus<'_, RandT> {
+    pub fn new<'a>(rand: &'a mut RandT, dir_path: &str) -> RandomCorpus<'a, RandT> {
         RandomCorpus {
             dir_path: dir_path.to_owned(),
             entries: vec![],
@@ -88,13 +88,13 @@ impl RandomCorpus<'_> {
 
 /// A queue-like corpus
 #[derive(Debug)]
-pub struct QueueCorpus<'a> {
-    random_corpus: RandomCorpus<'a>,
+pub struct QueueCorpus<'a, RandT: Rand> {
+    random_corpus: RandomCorpus<'a, RandT>,
     pos: usize,
     cycles: u64,
 }
 
-impl Corpus for QueueCorpus<'_> {
+impl<RandT: Rand> Corpus for QueueCorpus<'_, RandT> {
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.random_corpus.count()
@@ -128,8 +128,8 @@ impl Corpus for QueueCorpus<'_> {
     }
 }
 
-impl QueueCorpus<'_> {
-    pub fn new<'a>(rand: &'a mut dyn Rand, dir_path: &str) -> QueueCorpus<'a> {
+impl<RandT: Rand> QueueCorpus<'_, RandT> {
+    pub fn new<'a>(rand: &'a mut RandT, dir_path: &str) -> QueueCorpus<'a, RandT> {
         QueueCorpus {
             random_corpus: RandomCorpus::new(rand, dir_path),
             cycles: 0,
