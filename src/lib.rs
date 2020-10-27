@@ -12,7 +12,7 @@ pub mod stages;
 pub mod utils;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum AflError {
     #[error("Error in Serialization: `{0}`")]
     Serialize(String),
     #[error("File IO failed")]

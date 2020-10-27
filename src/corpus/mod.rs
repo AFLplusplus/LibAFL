@@ -1,13 +1,13 @@
 use crate::inputs::Input;
 use crate::utils::Rand;
-use crate::Error;
+use crate::AflError;
 use hashbrown::HashMap;
 use std::fmt::Debug;
 
 pub trait TestcaseMetadata: Debug {}
 
 pub trait Testcase: Debug {
-    fn load_input(&mut self) -> Result<&Box<dyn Input>, Error>;
+    fn load_input(&mut self) -> Result<&Box<dyn Input>, AflError>;
     fn is_on_disk(&self) -> bool;
     fn get_filename(&self) -> &str;
     fn get_metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>>;
@@ -24,10 +24,10 @@ pub trait Corpus: Debug {
     fn remove(&mut self, entry: &dyn Testcase) -> Option<Box<dyn Testcase>>;
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, Error>;
+    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, AflError>;
 
     /// Gets the next entry
-    fn get(&mut self) -> Result<&Box<dyn Testcase>, Error>;
+    fn get(&mut self) -> Result<&Box<dyn Testcase>, AflError>;
 }
 
 /// A queue-like corpus
@@ -74,15 +74,15 @@ impl Corpus for DefaultQueue<'_> {
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, Error> {
+    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, AflError> {
         let id = self.rand.below(self.entries.len() as u64) as usize;
         Ok(self.entries.get_mut(id).unwrap())
     }
 
     /// Gets the next entry
-    fn get(&mut self) -> Result<&Box<dyn Testcase>, Error> {
+    fn get(&mut self) -> Result<&Box<dyn Testcase>, AflError> {
         if self.entries.len() == 0 {
-            return Err(Error::Unknown);
+            return Err(AflError::Unknown);
         }
         self.pos = self.pos + 1;
         if self.pos >= self.entries.len() {
@@ -123,9 +123,9 @@ struct SimpleTestcase {
 }
 
 impl Testcase for SimpleTestcase {
-    fn load_input(&mut self) -> Result<&Box<dyn Input>, Error> {
+    fn load_input(&mut self) -> Result<&Box<dyn Input>, AflError> {
         // TODO: Implement
-        Err(Error::Unknown)
+        Err(AflError::Unknown)
     }
 
     fn is_on_disk(&self) -> bool {
