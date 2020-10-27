@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 use std::debug_assert;
-use xxhrs::{XXH3_64};
+use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 /// Ways to get random around here
 pub trait Rand: Debug {
@@ -60,7 +60,7 @@ impl Rand for Xoshiro256StarRand {
 
 
     fn set_seed(&mut self, seed: u64) {
-        self.rand_seed[0] = XXH3_64::hash_with_seed(HASH_CONST, &seed.to_le_bytes());
+        self.rand_seed[0] = xxh3_64_with_seed(&HASH_CONST.to_le_bytes(), seed);
         self.rand_seed[1] = self.rand_seed[0] ^ 0x1234567890abcdef;
         self.rand_seed[2] = self.rand_seed[0] & 0x0123456789abcdef;
         self.rand_seed[3] = self.rand_seed[0] | 0x01abcde43f567908;
