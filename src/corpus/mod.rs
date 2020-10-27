@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use std::collections::HashMap;
-use crate::AflError;
+use crate::Error;
 use crate::utils::Rand;
 use crate::inputs::Input;
 
@@ -10,7 +10,7 @@ pub trait TestcaseMetadata: Debug {
 
 pub trait Testcase: Debug {
 
-    fn load_input(&mut self) -> Result<&Box<dyn Input>, AflError>;
+    fn load_input(&mut self) -> Result<&Box<dyn Input>, Error>;
     fn is_on_disk(&self) -> bool;
     fn get_filename(&self) -> &str;
     fn get_metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>>;
@@ -29,10 +29,10 @@ pub trait Corpus: Debug {
     fn remove(&mut self, entry: &dyn Testcase) -> Option<Box<dyn Testcase>>;
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, AflError>;
+    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, Error>;
 
     /// Gets the next entry
-    fn get(&mut self) -> Result<&Box<dyn Testcase>, AflError>;
+    fn get(&mut self) -> Result<&Box<dyn Testcase>, Error>;
 
 }
 
@@ -84,15 +84,15 @@ impl Corpus for DefaultQueue<'_> {
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, AflError> {
+    fn random_entry(&mut self) -> Result<&Box<dyn Testcase>, Error> {
         let id = self.rand.below(self.entries.len() as u64) as usize;
         Ok(self.entries.get_mut(id).unwrap())
     }
 
     /// Gets the next entry
-    fn get(&mut self) -> Result<&Box<dyn Testcase>, AflError> {
+    fn get(&mut self) -> Result<&Box<dyn Testcase>, Error> {
         if self.entries.len() == 0 {
-            return Err(AflError::Unknown)
+            return Err(Error::Unknown)
         }
         self.pos = self.pos + 1;
         if self.pos >= self.entries.len() {
@@ -140,9 +140,9 @@ struct SimpleTestcase {
 
 impl Testcase for SimpleTestcase {
 
-    fn load_input(&mut self) -> Result<&Box<dyn Input>, AflError> {
+    fn load_input(&mut self) -> Result<&Box<dyn Input>, Error> {
         // TODO: Implement
-        Err(AflError::Unknown)
+        Err(Error::Unknown)
     }
 
     fn is_on_disk(&self) -> bool {
@@ -174,11 +174,11 @@ mod tests {
     use crate::corpus::Corpus;
     use crate::corpus::DefaultQueue;
     use crate::corpus::SimpleTestcase;
-    use crate::utils::AflRand;
+    use crate::utils::Xoshiro256StarRand;
 
     #[test]
     fn test_defaultqueue() {
-        let mut rand = AflRand::new();
+        let mut rand = Xoshiro256StarRand::new();
         let mut q = DefaultQueue::new(&mut rand, "fancy/path");
         q.add(Box::new(SimpleTestcase::new("fancyfile")));
         let filename = q.get().unwrap().get_filename().to_owned();

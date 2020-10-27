@@ -47,7 +47,7 @@ const HASH_CONST: u64 = 0xa5b35705;
 /// XXH3 Based, hopefully speedy, rnd implementation
 /// 
 #[derive(Copy, Clone, Debug, Default)]
-pub struct AflRand {
+pub struct Xoshiro256StarRand {
 
 
     rand_seed: [u64; 4],
@@ -55,7 +55,7 @@ pub struct AflRand {
 
 }
 
-impl Rand for AflRand {
+impl Rand for Xoshiro256StarRand {
 
 
 
@@ -88,11 +88,11 @@ impl Rand for AflRand {
 
 }
 
-impl AflRand {
+impl Xoshiro256StarRand {
 
-    pub fn new() -> AflRand {
+    pub fn new() -> Xoshiro256StarRand {
 
-        let mut ret: AflRand = Default::default();
+        let mut ret: Xoshiro256StarRand = Default::default();
         ret.set_seed(0); // TODO: Proper random seed?
         ret
     }
@@ -116,11 +116,11 @@ fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{Rand, AflRand, next_pow2};
+    use crate::utils::{Rand, Xoshiro256StarRand, next_pow2};
 
     #[test]
     fn test_rand() {
-        let mut rand = AflRand::new();
+        let mut rand = Xoshiro256StarRand::new();
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);
