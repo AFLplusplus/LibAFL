@@ -34,14 +34,19 @@ pub struct InMemoryExecutor {
 
 }
 
+static mut CURRENT_INMEMORY_EXECUTOR: Option<&InMemoryExecutor> = None;
+
 impl Executor for InMemoryExecutor {
 
     fn run_target(&mut self) -> Result<ExitKind, AflError> {
         let bytes = self.base.cur_input.serialize();
-        return match bytes {
+        unsafe { CURRENT_INMEMORY_EXECUTOR = Some(self); }
+        let outcome = match bytes {
             Ok(b) => Ok((self.harness)(self, b)),
             Err(e) => Err(e)
-        }
+        };
+        unsafe { CURRENT_INMEMORY_EXECUTOR = None; }
+        outcome
     }
 
     fn place_input(&mut self, input: Box<dyn Input>) -> Result<(), AflError> {
