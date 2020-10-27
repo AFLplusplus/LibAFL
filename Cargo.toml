@@ -6,6 +6,15 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dev-dependencies]
+criterion = "0.3" # Benchmarking
+
+[[bench]]
+name = "rng_hash_benchmark"
+harness = false
+
 [dependencies]
-xxhash-rust = { version = "0.8.0-beta.4", features = ["xxh3"] }
-thiserror = "1.0"
+xxhash-rust = { version = "0.8.0-beta.4", features = ["xxh3"] } # xxh3 hashing for rust
+ahash = "0.5.6" # Fast hashing algorithm
+thiserror = "1.0" # A nicer way to write Errors
+hashbrown = "0.9" # A faster hashmap, nostd compatible

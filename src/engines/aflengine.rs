@@ -1,14 +1,13 @@
 use std::time;
 
-use crate::utils::Rand;
-use crate::feedbacks::Feedback;
-use crate::stages::Stage;
-use crate::executors::Executor;
 use crate::engines::Engine;
+use crate::executors::Executor;
+use crate::feedbacks::Feedback;
 use crate::monitors::Monitor;
+use crate::stages::Stage;
+use crate::utils::Rand;
 
 pub struct AflEngine<'a> {
-
     pub rand: &'a mut dyn Rand,
     pub feedbacks: Vec<Box<dyn Feedback>>,
 
@@ -24,9 +23,6 @@ pub struct AflEngine<'a> {
 
     // TODO: Map
     pub monitors: Vec<Box<dyn Monitor>>,
-
 }
 
-impl Engine<'_> for AflEngine<'_> {
-
-}
+impl Engine<'_> for AflEngine<'_> {}

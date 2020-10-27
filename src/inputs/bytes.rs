@@ -1,5 +1,5 @@
-use crate::Error;
 use crate::inputs::Input;
+use crate::Error;
 
 #[derive(Clone, Debug, Default)]
 pub struct BytesInput {
@@ -7,7 +7,6 @@ pub struct BytesInput {
 }
 
 impl Input for BytesInput {
-
     fn serialize(&self) -> Result<&[u8], Error> {
         Ok(&self.bytes)
     }

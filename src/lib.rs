@@ -23,7 +23,6 @@ pub enum Error {
     Unknown,
 }
 
-
 #[cfg(test)]
 mod tests {
     #[test]

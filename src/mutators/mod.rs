@@ -1,10 +1,9 @@
-use std::io::Error;
 use crate::inputs::Input;
+use std::io::Error;
 
 pub mod scheduled;
 
 pub trait Mutator {
-
     //fn rand(&self) -> &Box<dyn Rand>;
     //fn rand_mut(&self) -> &mut Box<dyn Rand>;
 
@@ -19,5 +18,4 @@ pub trait Mutator {
     }
 
     fn post_exec_at(&mut self, stage_idx: i32, is_interesting: bool) -> Result<(), Error>;
-
 }

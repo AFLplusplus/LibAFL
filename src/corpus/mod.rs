@@ -1,25 +1,20 @@
-use std::fmt::Debug;
-use std::collections::HashMap;
-use crate::Error;
-use crate::utils::Rand;
 use crate::inputs::Input;
+use crate::utils::Rand;
+use crate::Error;
+use hashbrown::HashMap;
+use std::fmt::Debug;
 
-pub trait TestcaseMetadata: Debug {
-
-}
+pub trait TestcaseMetadata: Debug {}
 
 pub trait Testcase: Debug {
-
     fn load_input(&mut self) -> Result<&Box<dyn Input>, Error>;
     fn is_on_disk(&self) -> bool;
     fn get_filename(&self) -> &str;
     fn get_metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>>;
-
 }
 
 /// Corpus with all current testcases
 pub trait Corpus: Debug {
-
     /// Returns the number of elements
     fn count(&self) -> usize;
 
@@ -33,16 +28,13 @@ pub trait Corpus: Debug {
 
     /// Gets the next entry
     fn get(&mut self) -> Result<&Box<dyn Testcase>, Error>;
-
 }
 
 /// A queue-like corpus
 pub trait Queue: Corpus {
-
     fn get_cycles(&self) -> u64;
 
     fn get_pos(&self) -> usize;
-
 }
 
 #[derive(Debug)]
@@ -51,12 +43,10 @@ pub struct DefaultQueue<'a> {
     pos: usize,
     cycles: u64,
     entries: Vec<Box<dyn Testcase>>,
-    dir_path: String
-
+    dir_path: String,
 }
 
 impl Corpus for DefaultQueue<'_> {
-
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.entries.len()
@@ -92,7 +82,7 @@ impl Corpus for DefaultQueue<'_> {
     /// Gets the next entry
     fn get(&mut self) -> Result<&Box<dyn Testcase>, Error> {
         if self.entries.len() == 0 {
-            return Err(Error::Unknown)
+            return Err(Error::Unknown);
         }
         self.pos = self.pos + 1;
         if self.pos >= self.entries.len() {
@@ -104,7 +94,6 @@ impl Corpus for DefaultQueue<'_> {
 }
 
 impl Queue for DefaultQueue<'_> {
-
     fn get_cycles(&self) -> u64 {
         self.cycles
     }
@@ -112,34 +101,28 @@ impl Queue for DefaultQueue<'_> {
     fn get_pos(&self) -> usize {
         self.pos
     }
-
 }
 
 impl DefaultQueue<'_> {
-
     pub fn new<'a>(rand: &'a mut dyn Rand, dir_path: &str) -> DefaultQueue<'a> {
-       DefaultQueue{
-           cycles: 0,
-           dir_path: dir_path.to_owned(),
-           entries: vec![],
-           pos: 0,
-           rand: rand,
-       } 
+        DefaultQueue {
+            cycles: 0,
+            dir_path: dir_path.to_owned(),
+            entries: vec![],
+            pos: 0,
+            rand: rand,
+        }
     }
-
 }
 
 #[derive(Debug, Default)]
 struct SimpleTestcase {
-
     is_on_disk: bool,
     filename: String,
     metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
-
 }
 
 impl Testcase for SimpleTestcase {
-
     fn load_input(&mut self) -> Result<&Box<dyn Input>, Error> {
         // TODO: Implement
         Err(Error::Unknown)
@@ -156,15 +139,14 @@ impl Testcase for SimpleTestcase {
     fn get_metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>> {
         &mut self.metadatas
     }
-
 }
 
 impl SimpleTestcase {
     fn new(filename: &str) -> Self {
-        SimpleTestcase{
+        SimpleTestcase {
             filename: filename.to_owned(),
             is_on_disk: false,
-            metadatas: HashMap::default()
+            metadatas: HashMap::default(),
         }
     }
 }
@@ -184,6 +166,5 @@ mod tests {
         let filename = q.get().unwrap().get_filename().to_owned();
         assert_eq!(filename, q.get().unwrap().get_filename());
         assert_eq!(filename, "fancyfile");
-        
     }
 }
