@@ -3,6 +3,7 @@ use crate::inputs::Input;
 use crate::observers::Observer;
 
 use std::ptr;
+use std::iter;
 
 pub enum ExitKind {
     Ok,
@@ -73,9 +74,7 @@ impl Executor for InMemoryExecutor {
     }
 
     fn post_exec_observers(&mut self) -> Result<(), AflError> {
-        for observer in &mut self.base.observers {
-            observer.post_exec(self)?;
-        }
+        self.base.observers.iter_mut().map(|x| x.post_exec());
         Ok(())
     }
 
