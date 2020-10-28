@@ -2,6 +2,8 @@ use crate::AflError;
 use crate::inputs::Input;
 use crate::observers::Observer;
 
+use std::ptr;
+
 pub enum ExitKind {
     Ok,
     Crash,
@@ -15,13 +17,19 @@ pub trait Executor {
 
     fn place_input(&mut self, input: Box<dyn Input>) -> Result<(), AflError>;
 
+    fn reset_observers(&mut self) -> Result<(), AflError>;
+
+    fn post_exec_observers(&mut self) -> Result<(), AflError>;
+
+    fn add_observer(&mut self, observer: Box<dyn Observer>);
+
 }
 
 // TODO abstract classes? how?
 pub struct ExecutorBase {
 
     observers: Vec<Box<dyn Observer>>,
-    cur_input: Box<dyn Input>
+    cur_input: Option<Box<dyn Input>>
 
 }
 
@@ -34,24 +42,45 @@ pub struct InMemoryExecutor {
 
 }
 
-static mut CURRENT_INMEMORY_EXECUTOR: Option<&InMemoryExecutor> = None;
+static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const InMemoryExecutor = ptr::null();
 
 impl Executor for InMemoryExecutor {
 
     fn run_target(&mut self) -> Result<ExitKind, AflError> {
-        let bytes = self.base.cur_input.serialize();
-        unsafe { CURRENT_INMEMORY_EXECUTOR = Some(self); }
-        let outcome = match bytes {
+        let bytes = match self.base.cur_input.as_ref() {
+            Some(i) => i.serialize(),
+            None => return Err(AflError::Unknown)
+        };
+        unsafe { CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor; }
+        let ret = match bytes {
             Ok(b) => Ok((self.harness)(self, b)),
             Err(e) => Err(e)
         };
-        unsafe { CURRENT_INMEMORY_EXECUTOR = None; }
-        outcome
+        unsafe { CURRENT_INMEMORY_EXECUTOR_PTR = ptr::null(); }
+        ret
     }
 
     fn place_input(&mut self, input: Box<dyn Input>) -> Result<(), AflError> {
-        self.base.cur_input = input;
+        self.base.cur_input = Some(input);
         Ok(())
+    }
+
+    fn reset_observers(&mut self) -> Result<(), AflError> {
+        for observer in &mut self.base.observers {
+            observer.reset()?;
+        }
+        Ok(())
+    }
+
+    fn post_exec_observers(&mut self) -> Result<(), AflError> {
+        for observer in &mut self.base.observers {
+            observer.post_exec(self)?;
+        }
+        Ok(())
+    }
+
+    fn add_observer(&mut self, observer: Box<dyn Observer>) {
+        self.base.observers.push(observer);
     }
 
 }

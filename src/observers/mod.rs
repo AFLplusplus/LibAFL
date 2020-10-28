@@ -1,4 +1,5 @@
 use crate::AflError;
+use crate::executors::Executor;
 
 pub trait Observer {
 
@@ -8,7 +9,7 @@ pub trait Observer {
 
     fn reset(&mut self) -> Result<(), AflError>;
 
-    fn post_exec(&mut self) -> Result<(), AflError> {
+    fn post_exec(&mut self, executor: &mut dyn Executor) -> Result<(), AflError> {
         Ok(())
     }
 
