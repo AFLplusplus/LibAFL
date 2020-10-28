@@ -93,7 +93,7 @@ pub mod unix_signals {
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;
         sa.sa_sigaction = libaflrs_executor_inmem_handle_crash as usize;
-        for (sig, msg) in vec![
+        for (sig, msg) in &[
             (SIGSEGV, "segfault"),
             (SIGBUS, "sigbus"),
             (SIGABRT, "sigabrt"),
@@ -101,7 +101,7 @@ pub mod unix_signals {
             (SIGFPE, "fp exception"),
             (SIGPIPE, "pipe"),
         ] {
-            if sigaction(sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
+            if sigaction(*sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
                 panic!("Could not set up {} handler", &msg);
             }
         }
