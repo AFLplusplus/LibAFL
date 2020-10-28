@@ -8,9 +8,9 @@ pub mod feedbacks;
 pub mod inputs;
 pub mod monitors;
 pub mod mutators;
+pub mod observers;
 pub mod stages;
 pub mod utils;
-pub mod observers;
 
 #[derive(Error, Debug)]
 pub enum AflError {
