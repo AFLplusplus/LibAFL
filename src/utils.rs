@@ -89,13 +89,13 @@ impl Xoshiro256StarRand {
 
 /// Get the next higher power of two
 pub fn next_pow2(val: u64) -> u64 {
-    let mut out: u64 = val.wrapping_sub(1);
+    let mut out = val.wrapping_sub(1);
     out |= out >> 1;
     out |= out >> 2;
     out |= out >> 4;
     out |= out >> 8;
     out |= out >> 16;
-    return out + 1;
+    out.wrapping_add(1)
 }
 
 #[cfg(test)]
@@ -119,5 +119,6 @@ mod tests {
         assert_eq!(next_pow2(2), 2);
         assert_eq!(next_pow2(3), 4);
         assert_eq!(next_pow2(1000), 1024);
+        assert_eq!(next_pow2(u32::MAX as u64), (u32::MAX as u64) + 1);
     }
 }
