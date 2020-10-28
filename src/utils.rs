@@ -89,10 +89,6 @@ impl Xoshiro256StarRand {
 
 /// Get the next higher power of two
 pub fn next_pow2(val: u64) -> u64 {
-    // Early exit so we don't have to do a wrapping subtract;
-    if val <= 2 {
-        return val;
-    }
     let mut out: u64 = val.wrapping_sub(1);
     out |= out >> 1;
     out |= out >> 2;
