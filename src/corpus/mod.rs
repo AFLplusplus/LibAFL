@@ -147,7 +147,7 @@ impl<RandT: Rand> QueueCorpus<'_, RandT> {
 }
 
 #[derive(Debug, Default)]
-struct SimpleTestcase {
+pub struct SimpleTestcase {
     is_on_disk: bool,
     filename: String,
     metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
@@ -173,7 +173,7 @@ impl Testcase for SimpleTestcase {
 }
 
 impl SimpleTestcase {
-    fn new(filename: &str) -> Self {
+    pub fn new(filename: &str) -> Self {
         SimpleTestcase {
             filename: filename.to_owned(),
             is_on_disk: false,
