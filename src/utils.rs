@@ -119,6 +119,6 @@ mod tests {
         assert_eq!(next_pow2(2), 2);
         assert_eq!(next_pow2(3), 4);
         assert_eq!(next_pow2(1000), 1024);
-        assert_eq!(next_pow2(u32::MAX as u64), (u32::MAX as u64) + 1);
+        assert_eq!(next_pow2(0xFFFFFFFF as u64), (0xFFFFFFFF as u64) + 1);
     }
 }
