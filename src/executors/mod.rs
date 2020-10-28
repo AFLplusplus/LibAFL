@@ -113,7 +113,13 @@ pub mod unix_signals {
     }
 }
 
+#[cfg(unix)]
+use unix_signals as os_signals;
+#[cfg(not(unix))]
+compile_error!("InMemoryExecutor not yet supported on this OS");
+
 impl Executor for InMemoryExecutor {
+
     fn run_target(&mut self) -> Result<ExitKind, AflError> {
         let bytes = match self.base.cur_input.as_ref() {
             Some(i) => i.serialize(),
@@ -121,6 +127,7 @@ impl Executor for InMemoryExecutor {
         };
         unsafe {
             CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor;
+            os_signals::setup_crash_handlers();
         }
         let ret = match bytes {
             Ok(b) => Ok((self.harness)(self, b)),
