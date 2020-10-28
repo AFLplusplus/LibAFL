@@ -81,3 +81,46 @@ impl Executor for InMemoryExecutor {
         self.base.observers.push(observer);
     }
 }
+
+impl InMemoryExecutor {
+    fn new(harness_fn: HarnessFunction) -> InMemoryExecutor {
+        InMemoryExecutor {
+            base: ExecutorBase {
+                observers: vec![],
+                cur_input: Option::None,
+            },
+            harness: harness_fn,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::executors::{Executor, ExitKind, InMemoryExecutor};
+    use crate::observers::Observer;
+    use crate::AflError;
+
+    struct Nopserver {}
+
+    impl Observer for Nopserver {
+        fn reset(&mut self) -> Result<(), AflError> {
+            Err(AflError::Unknown)
+        }
+        fn post_exec(&mut self) -> Result<(), AflError> {
+            Err(AflError::Unknown)
+        }
+    }
+
+    fn test_harness_fn_nop(_executor: &dyn Executor, buf: &[u8]) -> ExitKind {
+        println! {"Fake exec with buf of len {}", buf.len()};
+        ExitKind::Ok
+    }
+
+    #[test]
+    fn test_inmem_post_exec() {
+        let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
+        let nopserver = Nopserver {};
+        in_mem_executor.add_observer(Box::new(nopserver));
+        assert_eq!(in_mem_executor.post_exec_observers().is_err(), true);
+    }
+}

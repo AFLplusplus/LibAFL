@@ -88,7 +88,7 @@ impl Xoshiro256StarRand {
 }
 
 /// Get the next higher power of two
-fn next_pow2(val: u64) -> u64 {
+pub fn next_pow2(val: u64) -> u64 {
     // Early exit so we don't have to do a wrapping subtract;
     if val <= 2 {
         return val;
