@@ -21,6 +21,8 @@ pub trait Executor {
     fn post_exec_observers(&mut self) -> Result<(), AflError>;
 
     fn add_observer(&mut self, observer: Box<dyn Observer>);
+
+    fn get_observers(&self) -> &Vec<Box<dyn Observer>>;
 }
 
 // TODO abstract classes? how?
@@ -161,6 +163,10 @@ impl Executor for InMemoryExecutor {
     fn add_observer(&mut self, observer: Box<dyn Observer>) {
         self.base.observers.push(observer);
     }
+
+    fn get_observers(&self) -> &Vec<Box<dyn Observer>> {
+        &self.base.observers
+    }
 }
 
 impl InMemoryExecutor {
@@ -177,6 +183,7 @@ impl InMemoryExecutor {
 
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
     use crate::executors::{Executor, ExitKind, InMemoryExecutor};
     use crate::inputs::Input;
     use crate::observers::Observer;
@@ -200,6 +207,10 @@ mod tests {
         }
         fn post_exec(&mut self) -> Result<(), AflError> {
             Err(AflError::Unknown)
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
         }
     }
 

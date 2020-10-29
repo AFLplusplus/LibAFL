@@ -1,13 +1,14 @@
 extern crate num;
 
-use crate::AflError;
 use std::slice::from_raw_parts_mut;
-
+use std::any::Any;
 use num::Integer;
+
+use crate::AflError;
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer {
+pub trait Observer : Any {
     fn flush(&mut self) -> Result<(), AflError> {
         Ok(())
     }
@@ -17,14 +18,16 @@ pub trait Observer {
     fn post_exec(&mut self) -> Result<(), AflError> {
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any;
 }
 
 /// A staticMapObserver observes the static map, as oftentimes used for afl-like coverage information
-pub struct MapObserver<'a, MapT: Integer + Copy> {
-    map: &'a mut [MapT],
+pub struct MapObserver<MapT: Integer + Copy + 'static + 'static> {
+    map: &'static mut [MapT],
 }
 
-impl<'a, MapT: Integer + Copy> Observer for MapObserver<'a, MapT> {
+impl<MapT: Integer + Copy + 'static> Observer for MapObserver<MapT> {
     fn reset(&mut self) -> Result<(), AflError> {
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         for i in self.map.iter_mut() {
@@ -32,9 +35,13 @@ impl<'a, MapT: Integer + Copy> Observer for MapObserver<'a, MapT> {
         }
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-impl<'a, MapT: Integer + Copy> MapObserver<'a, MapT> {
+impl<MapT: Integer + Copy + 'static> MapObserver<MapT> {
     pub fn get_map(&self) -> &[MapT] {
         self.map
     }
@@ -44,7 +51,7 @@ impl<'a, MapT: Integer + Copy> MapObserver<'a, MapT> {
     }
 }
 
-impl<'a, MapT: Integer + Copy> MapObserver<'a, MapT> {
+impl<MapT: Integer + Copy + 'static> MapObserver<MapT> {
     /// Creates a new MapObserver from a raw pointer.
     pub fn new(map_ptr: *mut MapT, len: usize) -> Self {
         unsafe {
