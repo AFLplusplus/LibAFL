@@ -178,18 +178,19 @@ impl InMemoryExecutor {
 #[cfg(test)]
 mod tests {
     use crate::executors::{Executor, ExitKind, InMemoryExecutor};
-    use crate::observers::Observer;
     use crate::inputs::Input;
+    use crate::observers::Observer;
     use crate::AflError;
 
     struct NopInput {}
-    impl Input for NopInput{
-        fn serialize(&self) -> Result<&[u8], AflError> {Ok("NOP".as_bytes())}
+    impl Input for NopInput {
+        fn serialize(&self) -> Result<&[u8], AflError> {
+            Ok("NOP".as_bytes())
+        }
         fn deserialize(&mut self, _buf: &[u8]) -> Result<(), AflError> {
             Ok(())
         }
     }
-
 
     struct Nopserver {}
 
@@ -218,7 +219,7 @@ mod tests {
     #[test]
     fn test_inmem_exec() {
         let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
-        let input = NopInput{};
+        let input = NopInput {};
         assert!(in_mem_executor.place_input(Box::new(input)).is_ok());
         assert!(in_mem_executor.run_target().is_ok());
     }
