@@ -1,5 +1,9 @@
+extern crate num;
+
 use crate::AflError;
 use std::slice::from_raw_parts_mut;
+
+use num::Integer;
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
@@ -15,42 +19,36 @@ pub trait Observer {
     }
 }
 
-/// A MapObserver contains a map with values, collected from the child.
-pub trait MapObserver<MapT>: Observer {
-    fn get_map(&self) -> &[MapT];
-    fn get_map_mut(&mut self) -> &mut [MapT];
-}
-
 /// A staticMapObserver observes the static map, as oftentimes used for afl-like coverage information
-pub struct StaticMapObserver {
-    map: &'static mut [u8],
+pub struct MapObserver<'a, MapT: Integer + Copy> {
+    map: &'a mut [MapT],
 }
 
-impl Observer for StaticMapObserver {
+impl<'a, MapT: Integer + Copy> Observer for MapObserver<'a, MapT> {
     fn reset(&mut self) -> Result<(), AflError> {
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         for i in self.map.iter_mut() {
-            *i = 0;
+            *i = MapT::zero();
         }
         Ok(())
     }
 }
 
-impl MapObserver<u8> for StaticMapObserver {
-    fn get_map(&self) -> &[u8] {
+impl<'a, MapT: Integer + Copy> MapObserver<'a, MapT> {
+    pub fn get_map(&self) -> &[MapT] {
         self.map
     }
 
-    fn get_map_mut(&mut self) -> &mut [u8] {
+    pub fn get_map_mut(&mut self) -> &mut [MapT] {
         self.map
     }
 }
 
-impl StaticMapObserver {
-    /// Creates a new StaticMapObserver from a raw pointer.
-    pub fn new(map_ptr: *mut u8, len: usize) -> Self {
+impl<'a, MapT: Integer + Copy> MapObserver<'a, MapT> {
+    /// Creates a new MapObserver from a raw pointer.
+    pub fn new(map_ptr: *mut MapT, len: usize) -> Self {
         unsafe {
-            StaticMapObserver {
+            MapObserver {
                 map: from_raw_parts_mut(map_ptr, len),
             }
         }

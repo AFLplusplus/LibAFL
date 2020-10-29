@@ -14,3 +14,4 @@ xxhash-rust = { version = "0.8.0-beta.4", features = ["xxh3"] } # xxh3 hashing f
 thiserror = "1.0" # A nicer way to write Errors
 hashbrown = "0.9" # A faster hashmap, nostd compatible
 libc = "0.2" # For (*nix) libc
+num = "*"

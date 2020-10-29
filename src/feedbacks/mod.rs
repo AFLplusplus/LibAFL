@@ -1,19 +1,22 @@
+extern crate num;
+
 use crate::corpus::Testcase;
 use crate::executors::Executor;
 use crate::observers::MapObserver;
+
+use num::Integer;
 
 pub trait Feedback {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
     fn is_interesting(&mut self, executor: &dyn Executor, entry: &dyn Testcase) -> u8;
 }
 
-use crate::observers::StaticMapObserver;
-pub struct CovFeedback<'a> {
-    virgin_bits: Vec<u8>,
-    smo: &'a StaticMapObserver,
+pub struct CovFeedback<'a, MapT: Integer + Copy> {
+    virgin_bits: Vec<MapT>,
+    smo: &'a MapObserver<'a, MapT>,
 }
 
-impl<'a> Feedback for CovFeedback<'a> {
+impl<'a, MapT: Integer + Copy> Feedback for CovFeedback<'a, MapT> {
     fn is_interesting(&mut self, _executor: &dyn Executor, _entry: &dyn Testcase) -> u8 {
         let mut interesting = 0;
         // TODO: impl. correctly, optimize
@@ -30,12 +33,12 @@ impl<'a> Feedback for CovFeedback<'a> {
     }
 }
 
-impl<'a> CovFeedback<'a> {
+impl<'a, MapT: Integer + Copy> CovFeedback<'a, MapT> {
     /// Create new CovFeedback using a static map observer
-    pub fn new(smo: &'a StaticMapObserver) -> Self {
+    pub fn new(smo: &'a MapObserver<MapT>) -> Self {
         CovFeedback {
             smo: smo,
-            virgin_bits: vec![0; smo.get_map().len()],
+            virgin_bits: vec![MapT::zero(); smo.get_map().len()],
         }
     }
 }
