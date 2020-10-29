@@ -20,9 +20,13 @@ pub enum AflError {
     File(#[from] io::Error),
     #[error("Key `{0}` not in Corpus")]
     KeyNotFound(String),
-    #[error("Unknown error")]
-    Unknown,
-}
+    #[error("No items in {0}")]
+    Empty(String),
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+    #[error("Unknown error: {0}")]
+    Unknown(String),
+   }
 
 #[cfg(test)]
 mod tests {

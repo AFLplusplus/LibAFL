@@ -10,7 +10,7 @@ impl Stage for MutationalStage {
 
     fn Perform(&mut self, input: &Input, entry: &mut Entry) -> Result<(), AflError> {
         // TODO: Implement me
-        Err(AflError::Unknown);
+        Err(AflError::NotImplemented("Stage does not perform yet"));
     }
 
 }

@@ -124,7 +124,7 @@ impl Executor for InMemoryExecutor {
     fn run_target(&mut self) -> Result<ExitKind, AflError> {
         let bytes = match self.base.cur_input.as_ref() {
             Some(i) => i.serialize(),
-            None => return Err(AflError::Unknown),
+            None => return Err(AflError::Empty("cur_input".to_string())),
         };
         unsafe {
             CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor;
@@ -203,10 +203,10 @@ mod tests {
 
     impl Observer for Nopserver {
         fn reset(&mut self) -> Result<(), AflError> {
-            Err(AflError::Unknown)
+            Err(AflError::Unknown("Nop reset, testing only".to_string()))
         }
         fn post_exec(&mut self) -> Result<(), AflError> {
-            Err(AflError::Unknown)
+            Err(AflError::Unknown("Nop exec, testing only".to_string()))
         }
 
         fn as_any(&self) -> &dyn Any {

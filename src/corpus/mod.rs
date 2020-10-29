@@ -117,7 +117,7 @@ impl<RandT: Rand> Corpus for QueueCorpus<'_, RandT> {
     /// Gets the next entry
     fn get(&mut self) -> Result<&Box<dyn Testcase>, AflError> {
         if self.count() == 0 {
-            return Err(AflError::Unknown); // TODO(andrea) why unknown? use EmptyContainerError or similar
+            return Err(AflError::Empty("Testcases".to_string()));
         }
         self.pos = self.pos + 1;
         if self.pos >= self.count() {
@@ -156,7 +156,7 @@ pub struct SimpleTestcase {
 impl Testcase for SimpleTestcase {
     fn load_input(&mut self) -> Result<&Box<dyn Input>, AflError> {
         // TODO: Implement
-        Err(AflError::Unknown)
+        Err(AflError::NotImplemented("load_input".to_string()))
     }
 
     fn is_on_disk(&self) -> bool {
