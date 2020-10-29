@@ -1,5 +1,5 @@
 use crate::AflError;
-use std::cell::RefCell;
+use std::slice::from_raw_parts;
 
 pub trait Observer {
     fn flush(&mut self) -> Result<(), AflError> {
@@ -16,14 +16,14 @@ pub trait Observer {
 pub trait MapObserver<MapT>: Observer {
 
     // TODO: Rust
-    fn get_map(&self) -> &RefCell<Vec<MapT>>;
+    fn get_map(&self) -> &[MapT];
     //fn get_map_mut(&mut self) -> &mut Vec<MapT>;
 
 }
 
 pub struct U8MapObserver {
     
-    map: RefCell<Vec<u8>>,
+    map: &'static [u8],
 
 }
 
@@ -38,15 +38,18 @@ impl Observer for U8MapObserver {
 
 impl MapObserver<u8> for U8MapObserver {
 
-    fn get_map(&self) -> &RefCell<Vec<u8>> {
-        // TODO: Rust this better
-        return &self.map;
+    // TODO: Rust
+    fn get_map(&self) -> &[u8] {
+        return self.map;
     }
+    //fn get_map_mut(&mut self) -> &mut Vec<MapT>;
 
 }
 
 impl U8MapObserver {
-    pub fn new(map: RefCell<Vec<u8>>) -> Self {
-        U8MapObserver{map: map}
+    pub fn new(map_ptr: *const u8, len: usize) -> Self {
+        unsafe {
+            U8MapObserver{map: from_raw_parts(map_ptr, len)}
+        }
     }
 }
