@@ -5,6 +5,7 @@ use crate::executors::Executor;
 use crate::observers::MapObserver;
 
 use num::Integer;
+use std::marker::PhantomData;
 
 pub trait Feedback {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
@@ -27,12 +28,13 @@ pub trait MinReducer<T: Integer + Copy + 'static> {
     }
 }
 
-pub struct MapFeedback<MapT: Integer + Copy + 'static> {
+pub struct MapFeedback<MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> {
     virgin_map: Vec<MapT>,
+    _phantom: PhantomData<ReducerT>,
 }
 
-impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> Feedback for MapFeedback<MapT> {
-    fn is_interesting(&mut self, executor: &dyn Executor, entry: &dyn Testcase) -> u8 {
+impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> Feedback for MapFeedback<MapT, ReducerT> {
+    fn is_interesting(&mut self, executor: &dyn Executor, _entry: &dyn Testcase) -> u8 {
         let mut interesting = 0;
         for observer in executor.get_observers() {
             if let Some(o) = observer.as_any().downcast_ref::<MapObserver<MapT>>() {
@@ -53,11 +55,12 @@ impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> Feedback for M
     }
 }
 
-impl<'a, MapT: Integer + Copy + 'static> MapFeedback<MapT> {
+impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> MapFeedback<MapT, ReducerT> {
     /// Create new MapFeedback using a static map observer
     pub fn new(map_size: usize) -> Self {
         MapFeedback {
             virgin_map: vec![MapT::zero(); map_size],
+            _phantom: PhantomData,
         }
     }
 }
