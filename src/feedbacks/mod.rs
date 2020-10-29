@@ -64,3 +64,8 @@ impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> MapFeedback<Ma
         }
     }
 }
+
+#[allow(dead_code)]
+type MaxMapFeedback<MapT> = MapFeedback<MapT, dyn MaxReducer<MapT>>;
+#[allow(dead_code)]
+type MinMapFeedback<MapT> = MapFeedback<MapT, dyn MinReducer<MapT>>;
