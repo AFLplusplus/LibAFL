@@ -17,6 +17,14 @@ impl Input for BytesInput {
     }
 }
 
+impl BytesInput {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        BytesInput {
+            bytes: bytes
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::utils::{next_pow2, Rand, Xoshiro256StarRand};
