@@ -2,6 +2,7 @@ use crate::inputs::Input;
 use crate::AflError;
 
 use hashbrown::HashMap;
+use std::path::PathBuf;
 
 pub trait TestcaseMetadata {}
 
@@ -13,9 +14,9 @@ pub trait Testcase {
 
     fn is_on_disk(&self) -> bool;
 
-    fn get_filename(&self) -> Option<& String>;
+    fn get_filename(&self) -> Option<& PathBuf>;
 
-    fn set_filename(&mut self, filename: String);
+    fn set_filename(&mut self, filename: PathBuf);
 
     fn get_metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>>;
 
@@ -25,7 +26,7 @@ pub trait Testcase {
 pub struct SimpleTestcase {
     input: Option<Box<dyn Input>>,
     // is_on_disk: bool, // not needed, look at the Option
-    filename: Option<String>,
+    filename: Option<PathBuf>,
     metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
 }
 
@@ -43,11 +44,11 @@ impl Testcase for SimpleTestcase {
         !self.input.is_some() && self.filename.is_some()
     }
 
-    fn get_filename(&self) -> Option<& String> {
+    fn get_filename(&self) -> Option<& PathBuf> {
         self.filename.as_ref()
     }
 
-    fn set_filename(&mut self, filename: String) {
+    fn set_filename(&mut self, filename: PathBuf) {
         self.filename = Some(filename)
     }
 

@@ -4,6 +4,8 @@ pub use testcase::{Testcase, SimpleTestcase};
 use crate::utils::Rand;
 use crate::AflError;
 
+use std::path::PathBuf;
+
 /// Corpus with all current testcases
 pub trait Corpus {
     /// Returns the number of elements
@@ -24,7 +26,7 @@ pub trait Corpus {
 pub struct BaseCorpus<'a, RandT: Rand> {
     rand: &'a mut RandT,
     entries: Vec<Box<dyn Testcase>>,
-    dir_path: String,
+    dir_path: PathBuf,
 }
 
 impl<RandT: Rand> Corpus for BaseCorpus<'_, RandT> {
@@ -33,7 +35,13 @@ impl<RandT: Rand> Corpus for BaseCorpus<'_, RandT> {
         self.entries.len()
     }
 
-    fn add(&mut self, entry: Box<dyn Testcase>) {
+    fn add(&mut self, mut entry: Box<dyn Testcase>) {
+        if entry.get_filename() == None {
+            // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
+            let filename = &(String::from("id:") + &self.entries.len().to_string());
+            let filename = self.dir_path.join(filename);
+            entry.set_filename(filename);
+        }
         self.entries.push(entry);
     }
 
@@ -67,9 +75,9 @@ impl<RandT: Rand> Corpus for BaseCorpus<'_, RandT> {
 }
 
 impl<RandT: Rand> BaseCorpus<'_, RandT> {
-    pub fn new<'a>(rand: &'a mut RandT, dir_path: &str) -> BaseCorpus<'a, RandT> {
+    pub fn new<'a>(rand: &'a mut RandT, dir_path: PathBuf) -> BaseCorpus<'a, RandT> {
         BaseCorpus {
-            dir_path: dir_path.to_owned(),
+            dir_path: dir_path,
             entries: vec![],
             rand: rand,
         }
@@ -118,7 +126,7 @@ impl<RandT: Rand> Corpus for QueueCorpus<'_, RandT> {
 }
 
 impl<RandT: Rand> QueueCorpus<'_, RandT> {
-    pub fn new<'a>(rand: &'a mut RandT, dir_path: &str) -> QueueCorpus<'a, RandT> {
+    pub fn new<'a>(rand: &'a mut RandT, dir_path: PathBuf) -> QueueCorpus<'a, RandT> {
         QueueCorpus {
             base: BaseCorpus::new(rand, dir_path),
             cycles: 0,
@@ -144,16 +152,19 @@ mod tests {
     use crate::inputs::bytes::BytesInput;
     use crate::utils::Xoshiro256StarRand;
 
+    use std::path::PathBuf;
+
     #[test]
+
     fn test_queuecorpus() {
         let mut rand = Xoshiro256StarRand::new();
-        let mut q = QueueCorpus::new(&mut rand, "fancy/path");
+        let mut q = QueueCorpus::new(&mut rand, PathBuf::from("fancy/path"));
         let i = Box::new(BytesInput::new(vec![0; 4]));
         let mut t = Box::new(SimpleTestcase::new(i));
-        t.set_filename("fancyfile".to_string());
+        t.set_filename(PathBuf::from("fancyfile"));
         q.add(t);
         let filename = q.get().unwrap().get_filename().unwrap().to_owned();
         assert_eq!(filename, q.get().unwrap().get_filename().unwrap().to_owned());
-        assert_eq!(filename, "fancyfile".to_string());
+        assert_eq!(filename, PathBuf::from("fancyfile"));
     }
 }
