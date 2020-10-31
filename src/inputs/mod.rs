@@ -4,17 +4,18 @@ pub use bytes::BytesInput;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
+use std::path::PathBuf;
 
 use crate::AflError;
 
 pub trait Input {
-    fn to_file(&self, path: &str) -> Result<(), AflError> {
+    fn to_file(&self, path: &PathBuf) -> Result<(), AflError> {
         let mut file = File::create(path)?;
         file.write_all(self.serialize()?)?;
         Ok(())
     }
 
-    fn from_file(&mut self, path: &str) -> Result<(), AflError> {
+    fn from_file(&mut self, path: &PathBuf) -> Result<(), AflError> {
         let mut file = File::create(path)?;
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
