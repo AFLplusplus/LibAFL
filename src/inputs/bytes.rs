@@ -1,6 +1,11 @@
 use crate::inputs::Input;
 use crate::AflError;
 
+pub trait HasBytesVec {
+    fn bytes(&self) -> &Vec<u8>;
+    fn bytes_mut(&mut self) -> &mut Vec<u8>;
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct BytesInput {
     pub bytes: Vec<u8>,
@@ -14,6 +19,15 @@ impl Input for BytesInput {
         self.bytes.truncate(0);
         self.bytes.extend_from_slice(buf);
         Ok(())
+    }
+}
+
+impl HasBytesVec for BytesInput {
+    fn bytes(&self) -> &Vec<u8> {
+        &self.bytes
+    }
+    fn bytes_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.bytes
     }
 }
 

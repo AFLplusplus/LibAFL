@@ -1,8 +1,10 @@
 use crate::mutators::Mutator;
 use crate::utils::Rand;
 use crate::corpus::Corpus;
-use crate::inputs::{Input, BytesInput};
+use crate::inputs::{Input, HasBytesVec};
 use crate::AflError;
+
+use std::marker::PhantomData;
 
 type MutationFunction<MutatorT, InputT> = fn(&mut MutatorT, &mut InputT) -> Result<(), AflError>;
 
@@ -94,23 +96,24 @@ impl<InputT : Input> DefaultScheduledMutator<InputT> {
     }
 }
 
-pub fn mutation_bitflip<MutatorT: Mutator<BytesInput>>(mutator: &mut MutatorT, input: &mut BytesInput) -> Result<(), AflError> {
-    let bit = mutator.rand().below(input.bytes.len() as u64) as usize;
-    input.bytes[bit >> 3] ^= (128 >> (bit & 7)) as u8;
+pub fn mutation_bitflip<MutatorT: Mutator<InputT>, InputT: Input + HasBytesVec>(mutator: &mut MutatorT, input: &mut InputT) -> Result<(), AflError> {
+    let bit = mutator.rand().below(input.bytes().len() as u64) as usize;
+    input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
     Ok(())
 }
 
-pub struct HavocMutator<ScheduledMutatorT: ScheduledMutator<BytesInput>> {
+pub struct HavocMutator<ScheduledMutatorT: ScheduledMutator<InputT>, InputT: Input + HasBytesVec> {
     scheduled: ScheduledMutatorT,
+    _phantom: PhantomData<InputT>
 }
 
-impl<ScheduledMutatorT: ScheduledMutator<BytesInput>> Mutator<BytesInput> for HavocMutator<ScheduledMutatorT> {
+impl<ScheduledMutatorT: ScheduledMutator<InputT>, InputT: Input + HasBytesVec> Mutator<InputT> for HavocMutator<ScheduledMutatorT, InputT> {
 
     fn rand(&mut self) -> &mut Box<dyn Rand> {
         self.scheduled.rand()
     }
 
-    fn mutate(&mut self, input: &mut BytesInput, stage_idx: i32) -> Result<(), AflError> {
+    fn mutate(&mut self, input: &mut InputT, stage_idx: i32) -> Result<(), AflError> {
         self.scheduled.mutate(input, stage_idx)
     }
 
@@ -120,21 +123,23 @@ impl<ScheduledMutatorT: ScheduledMutator<BytesInput>> Mutator<BytesInput> for Ha
 
 }
 
-impl<ScheduledMutatorT: ScheduledMutator<BytesInput>> HavocMutator<ScheduledMutatorT> {
+impl<ScheduledMutatorT: ScheduledMutator<InputT>, InputT: Input + HasBytesVec> HavocMutator<ScheduledMutatorT, InputT> {
     pub fn new(mut scheduled: ScheduledMutatorT) -> Self {
         scheduled.add_mutation(mutation_bitflip);
         HavocMutator {
-            scheduled: scheduled
+            scheduled: scheduled,
+            _phantom: PhantomData
         }
     }
 }
 
-impl HavocMutator<DefaultScheduledMutator<BytesInput>> {
+impl<InputT: Input + HasBytesVec> HavocMutator<DefaultScheduledMutator<InputT>, InputT> {
     pub fn new_default(rand: Box<dyn Rand>) -> Self {
         let mut scheduled = DefaultScheduledMutator::new(rand);
         scheduled.add_mutation(mutation_bitflip);
         HavocMutator {
-            scheduled: scheduled
+            scheduled: scheduled,
+            _phantom: PhantomData
         }
     }
 }
