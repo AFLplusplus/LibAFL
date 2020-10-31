@@ -1,4 +1,5 @@
 pub mod bytes;
+pub use bytes::BytesInput;
 
 use std::fs::File;
 use std::io::Read;

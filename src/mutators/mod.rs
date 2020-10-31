@@ -1,24 +1,21 @@
 use crate::inputs::Input;
+use crate::utils::Rand;
+use crate::corpus::Corpus;
 use crate::AflError;
 
 pub mod scheduled;
 pub use scheduled::ScheduledMutator;
 
-pub trait Mutator {
-    //fn rand(&self) -> &Box<dyn Rand>;
-    //fn rand_mut(&self) -> &mut Box<dyn Rand>;
+pub trait Mutator<InputT : Input> {
 
-    fn mutate(&mut self, input: &mut dyn Input) -> Result<(), AflError> {
-        self.mutate_at((-1) as i32, input)
-    }
+    fn rand(&mut self) -> &mut Box<dyn Rand>;
 
-    fn mutate_at(&mut self, stage_idx: i32, input: &mut dyn Input) -> Result<(), AflError>;
+    fn mutate(&mut self, input: &mut InputT, stage_idx: i32) -> Result<(), AflError>;
 
-    fn post_exec(&mut self, is_interesting: bool) -> Result<(), AflError> {
-        self.post_exec_at((-1) as i32, is_interesting)
-    }
-
-    fn post_exec_at(&mut self, _stage_idx: i32, _is_interesting: bool) -> Result<(), AflError> {
+    fn post_exec(&mut self, _is_interesting: bool, _stage_idx: i32) -> Result<(), AflError> {
         Ok(())
     }
+
+    fn corpus(&mut self) -> &mut Option<Box<dyn Corpus>>;
+
 }

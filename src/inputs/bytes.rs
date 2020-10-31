@@ -3,7 +3,7 @@ use crate::AflError;
 
 #[derive(Clone, Debug, Default)]
 pub struct BytesInput {
-    bytes: Vec<u8>,
+    pub bytes: Vec<u8>,
 }
 
 impl Input for BytesInput {
