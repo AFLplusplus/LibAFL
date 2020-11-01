@@ -39,6 +39,15 @@ pub trait Rand: Debug {
     }
 }
 
+/// Has a Rand box field
+pub trait HasRand<RandT: Rand> {
+    /// Get the hold Rand instance
+    fn rand(&self) -> &Box<RandT>;
+
+    /// Get the hold Rand instance (mutable)
+    fn rand_mut(&mut self) -> &mut Box<RandT>;
+}
+
 const HASH_CONST: u64 = 0xa5b35705;
 
 /// XXH3 Based, hopefully speedy, rnd implementation

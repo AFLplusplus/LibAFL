@@ -6,62 +6,81 @@ use std::path::PathBuf;
 
 pub trait TestcaseMetadata {}
 
-pub trait Testcase {
+/*
+pub trait TestcaseTrait<InputT: Input> {
+    /// Make sure to return a valid input instance loading it from disk if not in memory
+    fn load_input(&mut self) -> Result<&Box<InputT>, AflError>;
 
-    fn load_input(&mut self) -> Result<&Box<dyn Input>, AflError>;
+    /// Get the input, if any
+    fn input(&self) -> &Option<Box<InputT>>;
 
-    fn get_input(&self) -> Option<& Box<dyn Input>>;
+    /// Get the input, if any (mutable)
+    fn input_mut(&mut self) -> &mut Option<Box<InputT>>;
 
-    fn is_on_disk(&self) -> bool;
+    /// Get the filename, if any
+    fn filename(&self) -> &Option<PathBuf>;
 
-    fn get_filename(&self) -> Option<& PathBuf>;
+    /// Get the filename, if any (mutable)
+    fn filename_mut(&mut self, filename: PathBuf) -> &mut &Option<PathBuf>;
 
-    fn set_filename(&mut self, filename: PathBuf);
-
-    fn get_metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>>;
-
+    /// Get all the metadatas into an HashMap
+    fn metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>>;
 }
+*/
 
 #[derive(Default)]
-pub struct SimpleTestcase {
-    input: Option<Box<dyn Input>>,
-    // is_on_disk: bool, // not needed, look at the Option
+pub struct Testcase<InputT: Input> {
+    input: Option<Box<InputT>>,
     filename: Option<PathBuf>,
     metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
 }
 
-impl Testcase for SimpleTestcase {
-    fn load_input(&mut self) -> Result<&Box<dyn Input>, AflError> {
+impl<InputT: Input> Testcase<InputT> {
+    /// Make sure to return a valid input instance loading it from disk if not in memory
+    pub fn load_input(&mut self) -> Result<&Box<InputT>, AflError> {
         // TODO: Implement cache to disk
         self.input.as_ref().ok_or(AflError::NotImplemented("load_input".to_string()))
     }
 
-    fn get_input(&self) -> Option<& Box<dyn Input>> {
-        self.input.as_ref()
+    /// Get the input, if any
+    pub fn input(&self) -> &Option<Box<InputT>> {
+        &self.input
     }
 
-    fn is_on_disk(&self) -> bool {
-        !self.input.is_some() && self.filename.is_some()
+    /// Get the input, if any (mutable)
+    pub fn input_mut(&mut self) -> &mut Option<Box<InputT>> {
+        &mut self.input
     }
 
-    fn get_filename(&self) -> Option<& PathBuf> {
-        self.filename.as_ref()
+    /// Get the filename, if any
+    pub fn filename(&self) -> &Option<PathBuf> {
+        &self.filename
     }
 
-    fn set_filename(&mut self, filename: PathBuf) {
-        self.filename = Some(filename)
+    /// Get the filename, if any (mutable)
+    pub fn filename_mut(&mut self, filename: PathBuf) -> &mut Option<PathBuf> {
+        &mut self.filename
     }
 
-    fn get_metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>> {
+    /// Get all the metadatas into an HashMap
+    pub fn metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>> {
         &mut self.metadatas
     }
-}
 
-impl SimpleTestcase {
-    pub fn new(input: Box<dyn Input>) -> Self {
-        SimpleTestcase {
+    /// Create a new DefaultTestcase instace given an input
+    pub fn new(input: Box<InputT>) -> Self {
+        Testcase {
             input: Some(input),
             filename: None,
+            metadatas: HashMap::default(),
+        }
+    }
+
+    /// Create a new DefaultTestcase instace given an input and a filename
+    pub fn new_with_filename(input: Box<InputT>, filename: &PathBuf) -> Self {
+        Testcase {
+            input: Some(input),
+            filename: filename,
             metadatas: HashMap::default(),
         }
     }
