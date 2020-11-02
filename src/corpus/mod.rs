@@ -6,29 +6,30 @@ use crate::inputs::Input;
 use crate::AflError;
 
 use std::path::PathBuf;
+use std::marker::PhantomData;
 
-pub trait HasEntriesVec<InputT: Input> {
+pub trait HasEntriesVec<I> where I: Input {
     /// Get the entries vector field
-    fn entries(&self) -> &Vec<Box<Testcase<InputT>>>;
+    fn entries(&self) -> &Vec<Box<Testcase<I>>>;
 
     /// Get the entries vector field (mutable)
-    fn entries_mut(&mut self) -> &mut Vec<Box<Testcase<InputT>>>;
+    fn entries_mut(&mut self) -> &mut Vec<Box<Testcase<I>>>;
 }
 
 /// Corpus with all current testcases
-pub trait Corpus<InputT: Input, RandT: Rand> : HasEntriesVec<InputT> + HasRand<RandT> {
+pub trait Corpus<I> : HasEntriesVec<I> + HasRand where I: Input {
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.entries().len()
     }
 
     /// Add an entry to the corpus
-    fn add(&mut self, mut entry: Box<Testcase<InputT>>) {
+    fn add(&mut self, mut entry: Box<Testcase<I>>) {
         self.entries_mut().push(entry);
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, entry: &Testcase<InputT>) -> Option<Box<Testcase<InputT>>> {
+    fn remove(&mut self, entry: &Testcase<I>) -> Option<Box<Testcase<I>>> {
         let mut i: usize = 0;
         let mut found = false;
         for x in self.entries() {
@@ -45,46 +46,49 @@ pub trait Corpus<InputT: Input, RandT: Rand> : HasEntriesVec<InputT> + HasRand<R
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Box<Testcase<InputT>>, AflError> {
-        let id = self.rand_mut().below(self.entries().len() as u64) as usize;
+    fn random_entry(&mut self) -> Result<&Box<Testcase<I>>, AflError> {
+        let len = { self.entries().len() };
+        let id = self.rand_mut().below(len as u64) as usize;
         Ok(self.entries_mut().get_mut(id).unwrap())
     }
 
     /// Gets the next entry (random by default)
-    fn get(&mut self) -> Result<&Box<Testcase<InputT>>, AflError> {
+    fn get(&mut self) -> Result<&Box<Testcase<I>>, AflError> {
         self.random_entry()
     }
 }
 
-pub struct InMemoryCorpus<'a, InputT: Input, RandT: Rand> {
-    rand: &'a mut RandT,
-    entries: Vec<Box<Testcase<InputT>>>,
+pub struct InMemoryCorpus<'a, I, R> where I: Input, R: Rand {
+    rand: &'a mut R,
+    entries: Vec<Box<Testcase<I>>>
 }
 
-impl<InputT: Input, RandT: Rand> HasEntriesVec<InputT> for InMemoryCorpus<'_, InputT, RandT> {
-    fn entries(&self) -> &Vec<Box<Testcase<InputT>>> {
+impl<I, R> HasEntriesVec<I> for InMemoryCorpus<'_, I, R> where I: Input, R: Rand {
+    fn entries(&self) -> &Vec<Box<Testcase<I>>> {
         &self.entries
     }
-    fn entries_mut(&mut self) -> &mut Vec<Box<Testcase<InputT>>>{
+    fn entries_mut(&mut self) -> &mut Vec<Box<Testcase<I>>>{
         &mut self.entries
     }
 }
 
-impl<InputT: Input, RandT: Rand> HasRand<RandT> for InMemoryCorpus<'_, InputT, RandT> {
-    fn rand(&self) -> &Box<dyn Rand> {
+impl<I, R> HasRand for InMemoryCorpus<'_, I, R> where I: Input, R: Rand {
+    type R = R;
+
+    fn rand(&self) -> &Self::R {
         &self.rand
     }
-    fn rand_mut(&mut self) -> &mut Box<dyn Rand> {
+    fn rand_mut(&mut self) -> &mut Self::R {
         &mut self.rand
     }
 }
 
-impl<InputT: Input, RandT: Rand> Corpus<InputT, RandT> for InMemoryCorpus<'_, InputT, RandT> {
+impl<I, R> Corpus<I> for InMemoryCorpus<'_, I, R> where I: Input, R: Rand {
     // Just use the default implementation
 }
 
-impl<InputT: Input, RandT: Rand> InMemoryCorpus<'_, InputT, RandT> {
-    pub fn new<'a>(rand: &'a mut RandT) -> Self {
+impl<'a, I, R> InMemoryCorpus<'a, I, R> where I: Input, R: Rand {
+    pub fn new(rand: &'a mut R) -> Self {
         InMemoryCorpus {
             rand: rand,
             entries: vec![],
@@ -92,38 +96,40 @@ impl<InputT: Input, RandT: Rand> InMemoryCorpus<'_, InputT, RandT> {
     }
 }
 
-pub struct OnDiskCorpus<'a, InputT: Input, RandT: Rand> {
-    rand: &'a mut RandT,
-    entries: Vec<Box<Testcase<InputT>>>,
+pub struct OnDiskCorpus<'a, I, R> where I: Input, R: Rand {
+    rand: &'a mut R,
+    entries: Vec<Box<Testcase<I>>>,
     dir_path: PathBuf,
 }
 
-impl<InputT: Input, RandT: Rand> HasEntriesVec<InputT> for OnDiskCorpus<'_, InputT, RandT> {
-    fn entries(&self) -> &Vec<Box<Testcase<InputT>>> {
+impl<I, R> HasEntriesVec<I> for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
+    fn entries(&self) -> &Vec<Box<Testcase<I>>> {
         &self.entries
     }
-    fn entries_mut(&mut self) -> &mut Vec<Box<Testcase<InputT>>>{
+    fn entries_mut(&mut self) -> &mut Vec<Box<Testcase<I>>>{
         &mut self.entries
     }
 }
 
-impl<InputT: Input, RandT: Rand> HasRand<RandT> for OnDiskCorpus<'_, InputT, RandT> {
-    fn rand(&self) -> &Box<dyn Rand> {
+impl<I, R> HasRand for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
+    type R = R;
+
+    fn rand(&self) -> &Self::R {
         &self.rand
     }
-    fn rand_mut(&mut self) -> &mut Box<dyn Rand> {
+    fn rand_mut(&mut self) -> &mut Self::R {
         &mut self.rand
     }
 }
 
-impl<InputT: Input, RandT: Rand> Corpus<InputT, RandT> for OnDiskCorpus<'_, InputT, RandT> {
+impl<I, R> Corpus<I> for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
     /// Add an entry and save it to disk
-    fn add(&mut self, mut entry: Box<Testcase<InputT>>) {
-        if entry.filename() == None {
+    fn add(&mut self, mut entry: Box<Testcase<I>>) {
+        if *entry.filename() == None {
             // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
             let filename = &(String::from("id:") + &self.entries.len().to_string());
             let filename = self.dir_path.join(filename);
-            entry.filename_mut() = filename;
+            *entry.filename_mut() = Some(filename);
         }
         self.entries.push(entry);
     }
@@ -131,8 +137,8 @@ impl<InputT: Input, RandT: Rand> Corpus<InputT, RandT> for OnDiskCorpus<'_, Inpu
     // TODO save and remove files, cache, etc..., ATM use just InMemoryCorpus
 }
 
-impl<InputT: Input, RandT: Rand> OnDiskCorpus<'_, InputT, RandT> {
-    pub fn new<'a>(rand: &'a mut RandT, dir_path: PathBuf) -> Self {
+impl<'a, I, R> OnDiskCorpus<'a, I, R> where I: Input, R: Rand {
+    pub fn new(rand: &'a mut R, dir_path: PathBuf) -> Self {
         OnDiskCorpus {
             dir_path: dir_path,
             entries: vec![],
@@ -142,50 +148,72 @@ impl<InputT: Input, RandT: Rand> OnDiskCorpus<'_, InputT, RandT> {
 }
 
 /// A Queue-like corpus, wrapping an existing Corpus instance
-pub struct QueueCorpus<'a, InputT: Input, RandT: Rand, CorpusT: Corpus<InputT, RandT>> {
-    corpus: CorpusT,
+pub struct QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+    corpus: C,
+    phantom: PhantomData<I>,
     pos: usize,
     cycles: u64,
 }
 
-impl<'a, InputT: Input, RandT: Rand, CorpusT: Corpus<InputT, RandT>> Corpus<InputT, RandT> for QueueCorpus<'_, InputT, RandT, CorpusT> {
+impl<'a, I, C> HasEntriesVec<I> for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+    fn entries(&self) -> &Vec<Box<Testcase<I>>> {
+        self.corpus.entries()
+    }
+    fn entries_mut(&mut self) -> &mut Vec<Box<Testcase<I>>>{
+        self.corpus.entries_mut()
+    }
+}
+
+impl<'a, I, C> HasRand for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+    type R = C::R;
+
+    fn rand(&self) -> &Self::R {
+        self.corpus.rand()
+    }
+    fn rand_mut(&mut self) -> &mut Self::R {
+        self.corpus.rand_mut()
+    }
+}
+
+impl<'a, I, C> Corpus<I> for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.corpus.count()
     }
 
-    fn add(&mut self, entry: Box<Testcase<InputT>>) {
+    fn add(&mut self, entry: Box<Testcase<I>>) {
         self.corpus.add(entry);
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, entry: &Testcase<InputT>) -> Option<Box<Testcase<InputT>>> {
+    fn remove(&mut self, entry: &Testcase<I>) -> Option<Box<Testcase<I>>> {
         self.corpus.remove(entry)
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Box<Testcase<InputT>>, AflError> {
+    fn random_entry(&mut self) -> Result<&Box<Testcase<I>>, AflError> {
         self.corpus.random_entry()
     }
 
     /// Gets the next entry
-    fn get(&mut self) -> Result<&Box<Testcase<InputT>>, AflError> {
-        if self.count() == 0 {
+    fn get(&mut self) -> Result<&Box<Testcase<I>>, AflError> {
+        if self.corpus.count() == 0 {
             return Err(AflError::Empty("Testcases".to_string()));
         }
         self.pos = self.pos + 1;
-        if self.pos >= self.count() {
+        if self.pos >= self.corpus.count() {
             self.cycles = self.cycles + 1;
             self.pos = 0;
         }
-        Ok(self.corpus.entries.get_mut(self.pos).unwrap())
+        Ok(self.corpus.entries_mut().get_mut(self.pos).unwrap())
     }
 }
 
-impl<'a, InputT: Input, RandT: Rand, CorpusT: Corpus<InputT, RandT>> QueueCorpus<'_, InputT, RandT, CorpusT> {
-    pub fn new(corpus: CorpusT) -> Self {
-        QueueCorpus {
+impl<'a, I, C> QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+    pub fn new(corpus: C) -> Self {
+        QueueCorpus::<I, C> {
             corpus: corpus,
+            phantom: PhantomData,
             cycles: 0,
             pos: 0,
         }
@@ -217,10 +245,10 @@ mod tests {
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&mut rand, PathBuf::from("fancy/path")));
         let i = Box::new(BytesInput::new(vec![0; 4]));
         let mut t = Box::new(Testcase::new(i));
-        t.set_filename(PathBuf::from("fancyfile"));
+        *t.filename_mut() = Some(PathBuf::from("fancyfile"));
         q.add(t);
-        let filename = q.get().unwrap().get_filename().unwrap().to_owned();
-        assert_eq!(filename, q.get().unwrap().get_filename().unwrap().to_owned());
+        let filename = q.get().unwrap().filename().as_ref().unwrap().to_owned();
+        assert_eq!(filename, q.get().unwrap().filename().as_ref().unwrap().to_owned());
         assert_eq!(filename, PathBuf::from("fancy/path/fancyfile"));
     }
 }

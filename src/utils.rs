@@ -40,12 +40,14 @@ pub trait Rand: Debug {
 }
 
 /// Has a Rand box field
-pub trait HasRand<RandT: Rand> {
+pub trait HasRand {
+    type R : Rand;
+
     /// Get the hold Rand instance
-    fn rand(&self) -> &Box<RandT>;
+    fn rand(&self) -> &Self::R;
 
     /// Get the hold Rand instance (mutable)
-    fn rand_mut(&mut self) -> &mut Box<RandT>;
+    fn rand_mut(&mut self) -> &mut Self::R;
 }
 
 const HASH_CONST: u64 = 0xa5b35705;

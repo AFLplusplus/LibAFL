@@ -1,15 +1,22 @@
 extern crate num;
 
 use crate::corpus::Testcase;
+use crate::inputs::Input;
 use crate::executors::Executor;
 use crate::observers::MapObserver;
 
 use num::Integer;
 use std::marker::PhantomData;
 
+pub trait Feedback<InputT: Input> {
+    /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
+    fn is_interesting(&mut self, executor: &dyn Executor, entry: &Testcase<InputT>) -> u8;
+}
+
+/*
 pub trait Feedback {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, executor: &dyn Executor, entry: &dyn Testcase) -> u8;
+    fn is_interesting(&mut self, executor: &dyn Executor, entry: &Testcase) -> u8;
 }
 
 pub trait Reducer<T: Integer + Copy + 'static> {
@@ -69,3 +76,5 @@ impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> MapFeedback<Ma
 type MaxMapFeedback<MapT> = MapFeedback<MapT, dyn MaxReducer<MapT>>;
 #[allow(dead_code)]
 type MinMapFeedback<MapT> = MapFeedback<MapT, dyn MinReducer<MapT>>;
+
+*/
