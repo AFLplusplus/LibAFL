@@ -2,20 +2,89 @@ use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::AflError;
 
-use crate::executors::{Executor, ExitKind, ExecutorBase};
+use crate::executors::{Executor, ExitKind};
 
 use std::ptr;
+use std::os::raw::c_void;
 
-type HarnessFunction = fn(&dyn Executor, &[u8]) -> ExitKind;
+type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 
-pub struct InMemoryExecutor {
-    base: ExecutorBase,
-    harness: HarnessFunction,
+pub struct InMemoryExecutor<I> where I: Input {
+    cur_input: Option<Box<I>>,
+    observers: Vec<Box<dyn Observer>>,
+    harness: HarnessFunction<I>,
 }
 
-static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const InMemoryExecutor = ptr::null();
+static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
 
-/// TODO move in platform/
+impl<I> Executor<I> for InMemoryExecutor<I> where I: Input {
+    fn run_target(&mut self) -> Result<ExitKind, AflError> {
+        let bytes = match self.cur_input.as_ref() {
+            Some(i) => i.serialize(),
+            None => return Err(AflError::Empty("cur_input".to_string())),
+        };
+        unsafe {
+            CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor<I> as *const c_void;
+        }
+        let ret = match bytes {
+            Ok(b) => Ok((self.harness)(self, b)),
+            Err(e) => Err(e),
+        };
+        unsafe {
+            CURRENT_INMEMORY_EXECUTOR_PTR = ptr::null();
+        }
+        ret
+    }
+
+    fn place_input(&mut self, input: Box<I>) -> Result<(), AflError> {
+        self.cur_input = Some(input);
+        Ok(())
+    }
+
+    fn cur_input(&self) -> &Option<Box<I>> {
+        &self.cur_input
+    }
+
+    fn cur_input_mut(&mut self) -> &mut Option<Box<I>> {
+        &mut self.cur_input
+    }
+
+    fn reset_observers(&mut self) -> Result<(), AflError> {
+        for observer in &mut self.observers {
+            observer.reset()?;
+        }
+        Ok(())
+    }
+
+    fn post_exec_observers(&mut self) -> Result<(), AflError> {
+        self.observers
+            .iter_mut()
+            .map(|x| x.post_exec())
+            .fold(Ok(()), |acc, x| if x.is_err() { x } else { acc })
+    }
+
+    fn add_observer(&mut self, observer: Box<dyn Observer>) {
+        self.observers.push(observer);
+    }
+
+    fn observers(&self) -> &Vec<Box<dyn Observer>> {
+        &self.observers
+    }
+}
+
+impl<I> InMemoryExecutor<I> where I: Input {
+    pub fn new(harness_fn: HarnessFunction<I>) -> Self {
+        unsafe {
+            os_signals::setup_crash_handlers::<I, Self>();
+        }
+        InMemoryExecutor {
+            cur_input: None,
+            observers: vec![],
+            harness: harness_fn,
+        }
+    }
+}
+
 #[cfg(unix)]
 pub mod unix_signals {
 
@@ -29,12 +98,14 @@ pub mod unix_signals {
     use std::{mem, process, ptr};
 
     use crate::executors::inmemory::CURRENT_INMEMORY_EXECUTOR_PTR;
+    use crate::inputs::Input;
+    use crate::executors::Executor;
 
-    pub extern "C" fn libaflrs_executor_inmem_handle_crash(
+    pub extern "C" fn libaflrs_executor_inmem_handle_crash<I, E>(
         _sig: c_int,
         info: siginfo_t,
         _void: c_void,
-    ) {
+    ) where I: Input, E: Executor<I> {
         unsafe {
             if CURRENT_INMEMORY_EXECUTOR_PTR == ptr::null() {
                 println!(
@@ -48,11 +119,11 @@ pub mod unix_signals {
         let _ = stdout().flush();
     }
 
-    pub extern "C" fn libaflrs_executor_inmem_handle_timeout(
+    pub extern "C" fn libaflrs_executor_inmem_handle_timeout<I, E>(
         _sig: c_int,
         _info: siginfo_t,
         _void: c_void,
-    ) {
+    ) where I: Input, E: Executor<I> {
         dbg!("TIMEOUT/SIGUSR2 received");
         unsafe {
             if CURRENT_INMEMORY_EXECUTOR_PTR == ptr::null() {
@@ -66,11 +137,11 @@ pub mod unix_signals {
         process::abort();
     }
 
-    pub unsafe fn setup_crash_handlers() {
+    pub unsafe fn setup_crash_handlers<I, E>() where I: Input, E: Executor<I> {
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_crash as usize;
+        sa.sa_sigaction = libaflrs_executor_inmem_handle_crash::<I, E> as usize;
         for (sig, msg) in &[
             (SIGSEGV, "segfault"),
             (SIGBUS, "sigbus"),
@@ -84,7 +155,7 @@ pub mod unix_signals {
             }
         }
 
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_timeout as usize;
+        sa.sa_sigaction = libaflrs_executor_inmem_handle_timeout::<I, E> as usize;
         if sigaction(SIGUSR2, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up sigusr2 handler for timeouts");
         }
@@ -96,72 +167,6 @@ use unix_signals as os_signals;
 #[cfg(not(unix))]
 compile_error!("InMemoryExecutor not yet supported on this OS");
 
-impl Executor for InMemoryExecutor {
-    fn run_target(&mut self) -> Result<ExitKind, AflError> {
-        let bytes = match self.base.cur_input.as_ref() {
-            Some(i) => i.serialize(),
-            None => return Err(AflError::Empty("cur_input".to_string())),
-        };
-        unsafe {
-            CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor;
-        }
-        let ret = match bytes {
-            Ok(b) => Ok((self.harness)(self, b)),
-            Err(e) => Err(e),
-        };
-        unsafe {
-            CURRENT_INMEMORY_EXECUTOR_PTR = ptr::null();
-        }
-        ret
-    }
-
-    fn place_input(&mut self, input: Box<dyn Input>) -> Result<(), AflError> {
-        self.base.cur_input = Some(input);
-        Ok(())
-    }
-
-    fn get_input(&self) -> Option<& Box<dyn Input>> {
-        self.base.cur_input.as_ref()
-    }
-
-    fn reset_observers(&mut self) -> Result<(), AflError> {
-        for observer in &mut self.base.observers {
-            observer.reset()?;
-        }
-        Ok(())
-    }
-
-    fn post_exec_observers(&mut self) -> Result<(), AflError> {
-        self.base
-            .observers
-            .iter_mut()
-            .map(|x| x.post_exec())
-            .fold(Ok(()), |acc, x| if x.is_err() { x } else { acc })
-    }
-
-    fn add_observer(&mut self, observer: Box<dyn Observer>) {
-        self.base.observers.push(observer);
-    }
-
-    fn get_observers(&self) -> &Vec<Box<dyn Observer>> {
-        &self.base.observers
-    }
-}
-
-impl InMemoryExecutor {
-    pub fn new(harness_fn: HarnessFunction) -> InMemoryExecutor {
-        unsafe {
-            os_signals::setup_crash_handlers();
-        }
-        InMemoryExecutor {
-            base: ExecutorBase {
-                observers: vec![],
-                cur_input: Option::None,
-            },
-            harness: harness_fn,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -197,7 +202,7 @@ mod tests {
         }
     }
 
-    fn test_harness_fn_nop(_executor: &dyn Executor, buf: &[u8]) -> ExitKind {
+    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
         println! {"Fake exec with buf of len {}", buf.len()};
         ExitKind::Ok
     }

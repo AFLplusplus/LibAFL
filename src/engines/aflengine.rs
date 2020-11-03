@@ -8,14 +8,14 @@ use crate::monitors::Monitor;
 use crate::stages::Stage;
 use crate::utils::Rand;
 
-pub struct AflEngine<'a, InputT: Input> {
+pub struct AflEngine<'a, I: Input> {
     pub rand: &'a mut dyn Rand,
-    pub feedbacks: Vec<Box<dyn Feedback<InputT>>>,
+    pub feedbacks: Vec<Box<dyn Feedback<I>>>,
 
-    pub stages: Vec<Box<dyn Stage<InputT>>>,
-    pub current_stage: &'a Box<dyn Stage<InputT>>,
+    pub stages: Vec<Box<dyn Stage<I>>>,
+    pub current_stage: &'a Box<dyn Stage<I>>,
 
-    pub executor: Box<dyn Executor>,
+    pub executor: Box<dyn Executor<dyn Input>>,
 
     pub executions: u64,
 
@@ -26,4 +26,4 @@ pub struct AflEngine<'a, InputT: Input> {
     pub monitors: Vec<Box<dyn Monitor>>,
 }
 
-impl<InputT: Input> Engine<'_> for AflEngine<'_, InputT> {}
+impl<I: Input> Engine<'_> for AflEngine<'_, I> {}

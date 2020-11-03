@@ -8,9 +8,9 @@ use crate::observers::MapObserver;
 use num::Integer;
 use std::marker::PhantomData;
 
-pub trait Feedback<InputT: Input> {
+pub trait Feedback<I> where I: Input {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, executor: &dyn Executor, entry: &Testcase<InputT>) -> u8;
+    fn is_interesting(&mut self, executor: &dyn Executor<I>, entry: &Testcase<I>) -> u8;
 }
 
 /*

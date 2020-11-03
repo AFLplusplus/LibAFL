@@ -24,6 +24,7 @@ pub trait Corpus<I> : HasEntriesVec<I> + HasRand where I: Input {
     }
 
     /// Add an entry to the corpus
+    #[allow(unused_mut)]
     fn add(&mut self, mut entry: Box<Testcase<I>>) {
         self.entries_mut().push(entry);
     }
