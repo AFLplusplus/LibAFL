@@ -177,6 +177,7 @@ mod tests {
     use crate::observers::Observer;
     use crate::AflError;
 
+    #[derive(Clone)]
     struct NopInput {}
     impl Input for NopInput {
         fn serialize(&self) -> Result<&[u8], AflError> {

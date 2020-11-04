@@ -9,13 +9,13 @@ pub trait TestcaseMetadata {}
 /*
 pub trait TestcaseTrait<I: Input> {
     /// Make sure to return a valid input instance loading it from disk if not in memory
-    fn load_input(&mut self) -> Result<&Box<I>, AflError>;
+    fn load_input(&mut self) -> Result<&I, AflError>;
 
     /// Get the input, if any
-    fn input(&self) -> &Option<Box<I>>;
+    fn input(&self) -> &Option<I>;
 
     /// Get the input, if any (mutable)
-    fn input_mut(&mut self) -> &mut Option<Box<I>>;
+    fn input_mut(&mut self) -> &mut Option<I>;
 
     /// Get the filename, if any
     fn filename(&self) -> &Option<PathBuf>;
@@ -30,28 +30,31 @@ pub trait TestcaseTrait<I: Input> {
 
 #[derive(Default)]
 pub struct Testcase<I> where I: Input {
-    input: Option<Box<I>>,
+    input: Option<I>, // TODO remove box
     filename: Option<PathBuf>,
     metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
 }
 
 impl<I> Testcase<I> where I: Input {
     /// Make sure to return a valid input instance loading it from disk if not in memory
-    pub fn load_input(&mut self) -> Result<&Box<I>, AflError> {
+    pub fn load_input(&mut self) -> Result<&I, AflError> {
         // TODO: Implement cache to disk
-        self.input.as_ref().ok_or(AflError::NotImplemented("load_input".to_string()))
+        match self.input.as_ref() {
+            Some(i) => Ok(i),
+            None => Err(AflError::NotImplemented("load_input".to_string()))
+        }
     }
 
     /// Get the input, if any
-    pub fn input(&self) -> &Option<Box<I>> {
+    pub fn input(&self) -> &Option<I> {
         &self.input
     }
     /// Get the input, if any (mutable)
-    pub fn input_mut(&mut self) -> &mut Option<Box<I>> {
+    pub fn input_mut(&mut self) -> &mut Option<I> {
         &mut self.input
     }
     /// Set the input
-    pub fn set_input(&mut self, input: Option<Box<I>>) {
+    pub fn set_input(&mut self, input: Option<I>) {
         self.input = input;
     }
 
@@ -74,7 +77,7 @@ impl<I> Testcase<I> where I: Input {
     }
 
     /// Create a new DefaultTestcase instace given an input
-    pub fn new(input: Box<I>) -> Self {
+    pub fn new(input: I) -> Self {
         Testcase {
             input: Some(input),
             filename: None,
@@ -83,7 +86,7 @@ impl<I> Testcase<I> where I: Input {
     }
 
     /// Create a new DefaultTestcase instace given an input and a filename
-    pub fn new_with_filename(input: Box<I>, filename: PathBuf) -> Self {
+    pub fn new_with_filename(input: I, filename: PathBuf) -> Self {
         Testcase {
             input: Some(input),
             filename: Some(filename),

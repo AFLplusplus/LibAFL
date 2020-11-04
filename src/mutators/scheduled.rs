@@ -20,7 +20,7 @@ pub trait ComposedByMutations<I> where I: Input {
     fn add_mutation(&mut self, mutation: MutationFunction<Self, I>);
 }
 
-pub trait ScheduledMutator<I>: Mutator<I> + ComposedByMutations<I> where I: Input {
+pub trait ScheduledMutator<I>: Mutator<I> + HasOptionCorpus<I> + ComposedByMutations<I> where I: Input {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&mut self, _input: &I) -> u64 {
         1 << (1 + self.rand_mut().below(7))

@@ -7,7 +7,7 @@ use crate::feedbacks::Feedback;
 use crate::monitors::Monitor;
 use crate::stages::Stage;
 use crate::utils::Rand;
-
+/*
 pub struct AflEngine<'a, I: Input> {
     pub rand: &'a mut dyn Rand,
     pub feedbacks: Vec<Box<dyn Feedback<I>>>,
@@ -27,3 +27,4 @@ pub struct AflEngine<'a, I: Input> {
 }
 
 impl<I: Input> Engine<'_> for AflEngine<'_, I> {}
+*/

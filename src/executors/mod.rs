@@ -1,5 +1,4 @@
 pub mod inmemory;
-pub use inmemory::{InMemoryExecutor};
 
 use crate::inputs::Input;
 use crate::observers::Observer;
