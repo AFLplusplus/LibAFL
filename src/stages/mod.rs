@@ -5,6 +5,9 @@ use crate::inputs::Input;
 use crate::engines::Engine;
 use crate::AflError;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 pub trait HasEngine<'a, I> where I: Input {
     type E : Engine<'a, I>;
 
@@ -15,5 +18,5 @@ pub trait HasEngine<'a, I> where I: Input {
 
 pub trait Stage<'a, I> : HasEngine<'a, I> where I: Input {
     /// Run the stage
-    fn perform(&mut self, entry: &mut Testcase<I>) -> Result<(), AflError>;
+    fn perform(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError>;
 }
