@@ -1,14 +1,14 @@
 extern crate num;
 
-use std::slice::from_raw_parts_mut;
-use std::any::Any;
 use num::Integer;
+use std::any::Any;
+use std::slice::from_raw_parts_mut;
 
 use crate::AflError;
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer : Any {
+pub trait Observer: Any {
     fn flush(&mut self) -> Result<(), AflError> {
         Ok(())
     }

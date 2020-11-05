@@ -29,19 +29,25 @@ pub trait TestcaseTrait<I: Input> {
 */
 
 #[derive(Default)]
-pub struct Testcase<I> where I: Input {
+pub struct Testcase<I>
+where
+    I: Input,
+{
     input: Option<I>, // TODO remove box
     filename: Option<PathBuf>,
     metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
 }
 
-impl<I> Testcase<I> where I: Input {
+impl<I> Testcase<I>
+where
+    I: Input,
+{
     /// Make sure to return a valid input instance loading it from disk if not in memory
     pub fn load_input(&mut self) -> Result<&I, AflError> {
         // TODO: Implement cache to disk
         match self.input.as_ref() {
             Some(i) => Ok(i),
-            None => Err(AflError::NotImplemented("load_input".to_string()))
+            None => Err(AflError::NotImplemented("load_input".to_string())),
         }
     }
 

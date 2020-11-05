@@ -1,17 +1,20 @@
-use crate::AflError;
-use crate::mutators::Mutator;
-use crate::inputs::Input;
-use crate::utils::{Rand, HasRand};
-use crate::stages::{Stage, HasEngine};
 use crate::corpus::testcase::Testcase;
 use crate::engines::Engine;
+use crate::inputs::Input;
+use crate::mutators::Mutator;
+use crate::stages::{HasEngine, Stage};
+use crate::utils::{HasRand, Rand};
+use crate::AflError;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 // TODO create HasMutatorsVec trait
 
-pub trait MutationalStage<'a, I> : Stage<'a, I> + HasRand where I: Input {
+pub trait MutationalStage<'a, I>: Stage<'a, I> + HasRand
+where
+    I: Input,
+{
     fn mutators(&self) -> &Vec<Box<dyn Mutator<I, R = Self::R>>>;
 
     fn mutators_mut(&mut self) -> &mut Vec<Box<dyn Mutator<I, R = Self::R>>>;
@@ -41,18 +44,27 @@ pub trait MutationalStage<'a, I> : Stage<'a, I> + HasRand where I: Input {
 
             input = entry.borrow_mut().load_input()?.clone();
         }
-        
         Ok(())
     }
 }
 
-pub struct DefaultMutationalStage<'a, I, R, E> where I: Input, R: Rand, E: Engine<'a, I> {
+pub struct DefaultMutationalStage<'a, I, R, E>
+where
+    I: Input,
+    R: Rand,
+    E: Engine<'a, I>,
+{
     rand: &'a mut R,
     engine: &'a mut E,
-    mutators: Vec<Box<dyn Mutator<I, R = R>>>
+    mutators: Vec<Box<dyn Mutator<I, R = R>>>,
 }
 
-impl<'a, I, R, E> HasRand for DefaultMutationalStage<'a, I, R, E> where I: Input, R: Rand, E: Engine<'a, I> {
+impl<'a, I, R, E> HasRand for DefaultMutationalStage<'a, I, R, E>
+where
+    I: Input,
+    R: Rand,
+    E: Engine<'a, I>,
+{
     type R = R;
 
     fn rand(&self) -> &Self::R {
@@ -63,7 +75,12 @@ impl<'a, I, R, E> HasRand for DefaultMutationalStage<'a, I, R, E> where I: Input
     }
 }
 
-impl<'a, I, R, E> HasEngine<'a, I> for DefaultMutationalStage<'a, I, R, E> where I: Input, R: Rand, E: Engine<'a, I> {
+impl<'a, I, R, E> HasEngine<'a, I> for DefaultMutationalStage<'a, I, R, E>
+where
+    I: Input,
+    R: Rand,
+    E: Engine<'a, I>,
+{
     type E = E;
 
     fn engine(&self) -> &Self::E {
@@ -75,7 +92,12 @@ impl<'a, I, R, E> HasEngine<'a, I> for DefaultMutationalStage<'a, I, R, E> where
     }
 }
 
-impl<'a, I, R, E> MutationalStage<'a, I> for DefaultMutationalStage<'a, I, R, E> where I: Input, R: Rand, E: Engine<'a, I> {
+impl<'a, I, R, E> MutationalStage<'a, I> for DefaultMutationalStage<'a, I, R, E>
+where
+    I: Input,
+    R: Rand,
+    E: Engine<'a, I>,
+{
     fn mutators(&self) -> &Vec<Box<dyn Mutator<I, R = Self::R>>> {
         &self.mutators
     }
@@ -85,18 +107,28 @@ impl<'a, I, R, E> MutationalStage<'a, I> for DefaultMutationalStage<'a, I, R, E>
     }
 }
 
-impl<'a, I, R, E> Stage<'a, I> for DefaultMutationalStage<'a, I, R, E> where I: Input, R: Rand, E: Engine<'a, I> {
+impl<'a, I, R, E> Stage<'a, I> for DefaultMutationalStage<'a, I, R, E>
+where
+    I: Input,
+    R: Rand,
+    E: Engine<'a, I>,
+{
     fn perform(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
         self.perform_mutational(entry)
     }
 }
 
-impl<'a, I, R, E> DefaultMutationalStage<'a, I, R, E> where I: Input, R: Rand, E: Engine<'a, I> {
+impl<'a, I, R, E> DefaultMutationalStage<'a, I, R, E>
+where
+    I: Input,
+    R: Rand,
+    E: Engine<'a, I>,
+{
     pub fn new(rand: &'a mut R, engine: &'a mut E) -> Self {
         DefaultMutationalStage {
             rand: rand,
             engine: engine,
-            mutators: vec![]
+            mutators: vec![],
         }
     }
 }

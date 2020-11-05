@@ -1,80 +1,142 @@
 extern crate num;
 
 use crate::corpus::Testcase;
-use crate::inputs::Input;
 use crate::executors::Executor;
+use crate::inputs::Input;
 use crate::observers::MapObserver;
 
 use num::Integer;
+use std::cell::RefCell;
 use std::marker::PhantomData;
 
-pub trait Feedback<I> where I: Input {
+pub trait Feedback<I>
+where
+    I: Input,
+{
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
     fn is_interesting(&mut self, executor: &dyn Executor<I>, entry: &Testcase<I>) -> u8;
 }
 
-/*
-pub trait Feedback {
-    /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, executor: &dyn Executor, entry: &Testcase) -> u8;
-}
-
-pub trait Reducer<T: Integer + Copy + 'static> {
+pub trait Reducer<T>
+where
+    T: Integer + Copy + 'static,
+{
     fn reduce(first: T, second: T) -> T;
 }
 
-pub trait MaxReducer<T: Integer + Copy + 'static> {
+pub struct MaxReducer<T>
+where
+    T: Integer + Copy + 'static,
+{
+    phantom: PhantomData<T>,
+}
+
+impl<T> Reducer<T> for MaxReducer<T>
+where
+    T: Integer + Copy + 'static,
+{
     fn reduce(first: T, second: T) -> T {
-      if first > second { first } else { second }
+        if first > second {
+            first
+        } else {
+            second
+        }
     }
 }
 
-pub trait MinReducer<T: Integer + Copy + 'static> {
+pub struct MinReducer<T>
+where
+    T: Integer + Copy + 'static,
+{
+    phantom: PhantomData<T>,
+}
+
+impl<T> Reducer<T> for MinReducer<T>
+where
+    T: Integer + Copy + 'static,
+{
     fn reduce(first: T, second: T) -> T {
-      if first < second { first } else { second }
+        if first < second {
+            first
+        } else {
+            second
+        }
     }
 }
 
-pub struct MapFeedback<MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> {
-    virgin_map: Vec<MapT>,
-    _phantom: PhantomData<ReducerT>,
+/// The most common AFL-like feedback type
+pub struct MapFeedback<'a, T, R>
+where
+    T: Integer + Copy + 'static,
+    R: Reducer<T>,
+{
+    /// Contains information about untouched entries
+    history_map: &'a RefCell<Vec<T>>,
+    /// The observer this feedback struct observes
+    map_observer: &'a RefCell<MapObserver</*'a,*/ T>>,
+    /// Phantom Data of Reducer
+    phantom: PhantomData<R>,
 }
 
-impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> Feedback for MapFeedback<MapT, ReducerT> {
-    fn is_interesting(&mut self, executor: &dyn Executor, _entry: &dyn Testcase) -> u8 {
+impl<'a, T, R, I> Feedback<I> for MapFeedback<'a, T, R>
+where
+    T: Integer + Copy + 'static,
+    R: Reducer<T>,
+    I: Input,
+{
+    fn is_interesting(&mut self, _executor: &dyn Executor<I>, entry: &Testcase<I>) -> u8 {
         let mut interesting = 0;
-        for observer in executor.get_observers() {
-            if let Some(o) = observer.as_any().downcast_ref::<MapObserver<MapT>>() {
-                // TODO: impl. correctly, optimize
-                for (virgin, map) in self.virgin_map.iter_mut().zip(o.get_map().iter()) {
-                    let reduced = ReducerT::reduce(*virgin, *map);
-                    if *virgin != reduced {
-                        *virgin = reduced;
-                        if interesting < 250 {
-                            interesting += 25
-                        }
-                    }
+
+        // TODO: impl. correctly, optimize
+        for (history, map) in self
+            .history_map
+            .borrow_mut()
+            .iter_mut()
+            .zip(self.map_observer.borrow().get_map().iter())
+        {
+            let reduced = R::reduce(*history, *map);
+            if *history != reduced {
+                *history = reduced;
+                interesting += 25;
+                if interesting >= 250 {
+                    return 255;
                 }
-                break
             }
         }
         interesting
     }
 }
 
-impl<'a, MapT: Integer + Copy + 'static, ReducerT: Reducer<MapT>> MapFeedback<MapT, ReducerT> {
-    /// Create new MapFeedback using a static map observer
-    pub fn new(map_size: usize) -> Self {
+impl<'a, T, R> MapFeedback<'a, T, R>
+where
+    T: Integer + Copy + 'static,
+    R: Reducer<T>,
+{
+    /// Create new MapFeedback using a map observer, and a map.
+    /// The map can be shared.
+    pub fn new(
+        map_observer: &'a RefCell<MapObserver</*'a, */ T>>,
+        history_map: &'a RefCell<Vec<T>>,
+    ) -> Self {
         MapFeedback {
-            virgin_map: vec![MapT::zero(); map_size],
-            _phantom: PhantomData,
+            map_observer: map_observer,
+            history_map: history_map,
+            phantom: PhantomData,
         }
     }
 }
 
-#[allow(dead_code)]
-type MaxMapFeedback<MapT> = MapFeedback<MapT, dyn MaxReducer<MapT>>;
-#[allow(dead_code)]
-type MinMapFeedback<MapT> = MapFeedback<MapT, dyn MinReducer<MapT>>;
+/// Returns a usable history map of the given size
+pub fn create_history_map<T>(map_size: usize) -> RefCell<Vec<T>>
+where
+    T: Default + Clone,
+{
+    {
+        RefCell::new(vec![T::default(); map_size])
+    }
+}
 
-*/
+#[allow(dead_code)]
+type MaxMapFeedback<'a, T> = MapFeedback<'a, T, MaxReducer<T>>;
+#[allow(dead_code)]
+type MinMapFeedback<'a, T> = MapFeedback<'a, T, MinReducer<T>>;

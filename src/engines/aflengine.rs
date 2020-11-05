@@ -1,12 +1,13 @@
 use std::time;
 
 use crate::engines::Engine;
-use crate::inputs::Input;
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
+use crate::inputs::Input;
 use crate::monitors::Monitor;
 use crate::stages::Stage;
 use crate::utils::Rand;
+
 /*
 pub struct AflEngine<'a, I: Input> {
     pub rand: &'a mut dyn Rand,

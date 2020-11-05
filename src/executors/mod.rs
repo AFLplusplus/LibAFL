@@ -13,7 +13,10 @@ pub enum ExitKind {
 
 // TODO unbox input
 
-pub trait Executor<I> where I: Input {
+pub trait Executor<I>
+where
+    I: Input,
+{
     /// Run the target
     fn run_target(&mut self) -> Result<ExitKind, AflError>;
 

@@ -1,16 +1,19 @@
 pub mod testcase;
 pub use testcase::{Testcase, TestcaseMetadata};
 
-use crate::utils::{Rand, HasRand};
 use crate::inputs::Input;
+use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
-use std::path::PathBuf;
-use std::marker::PhantomData;
 use std::cell::RefCell;
+use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::rc::Rc;
 
-pub trait HasEntriesVec<I> where I: Input {
+pub trait HasEntriesVec<I>
+where
+    I: Input,
+{
     /// Get the entries vector field
     fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>>;
 
@@ -19,7 +22,10 @@ pub trait HasEntriesVec<I> where I: Input {
 }
 
 /// Corpus with all current testcases
-pub trait Corpus<I> : HasEntriesVec<I> + HasRand where I: Input {
+pub trait Corpus<I>: HasEntriesVec<I> + HasRand
+where
+    I: Input,
+{
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.entries().len()
@@ -37,7 +43,8 @@ pub trait Corpus<I> : HasEntriesVec<I> + HasRand where I: Input {
         let mut found = false;
         for x in self.entries() {
             i = i + 1;
-            if &*x.borrow() as *const _ == entry as *const _ { // TODO check if correct
+            if &*x.borrow() as *const _ == entry as *const _ {
+                // TODO check if correct
                 found = true;
                 break;
             }
@@ -61,21 +68,33 @@ pub trait Corpus<I> : HasEntriesVec<I> + HasRand where I: Input {
     }
 }
 
-pub struct InMemoryCorpus<'a, I, R> where I: Input, R: Rand {
+pub struct InMemoryCorpus<'a, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     rand: &'a mut R,
-    entries: Vec<Rc<RefCell<Testcase<I>>>>
+    entries: Vec<Rc<RefCell<Testcase<I>>>>,
 }
 
-impl<I, R> HasEntriesVec<I> for InMemoryCorpus<'_, I, R> where I: Input, R: Rand {
+impl<I, R> HasEntriesVec<I> for InMemoryCorpus<'_, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>> {
         &self.entries
     }
-    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>>{
+    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
         &mut self.entries
     }
 }
 
-impl<I, R> HasRand for InMemoryCorpus<'_, I, R> where I: Input, R: Rand {
+impl<I, R> HasRand for InMemoryCorpus<'_, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     type R = R;
 
     fn rand(&self) -> &Self::R {
@@ -86,11 +105,19 @@ impl<I, R> HasRand for InMemoryCorpus<'_, I, R> where I: Input, R: Rand {
     }
 }
 
-impl<I, R> Corpus<I> for InMemoryCorpus<'_, I, R> where I: Input, R: Rand {
+impl<I, R> Corpus<I> for InMemoryCorpus<'_, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     // Just use the default implementation
 }
 
-impl<'a, I, R> InMemoryCorpus<'a, I, R> where I: Input, R: Rand {
+impl<'a, I, R> InMemoryCorpus<'a, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     pub fn new(rand: &'a mut R) -> Self {
         InMemoryCorpus {
             rand: rand,
@@ -99,22 +126,34 @@ impl<'a, I, R> InMemoryCorpus<'a, I, R> where I: Input, R: Rand {
     }
 }
 
-pub struct OnDiskCorpus<'a, I, R> where I: Input, R: Rand {
+pub struct OnDiskCorpus<'a, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     rand: &'a mut R,
     entries: Vec<Rc<RefCell<Testcase<I>>>>,
     dir_path: PathBuf,
 }
 
-impl<I, R> HasEntriesVec<I> for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
+impl<I, R> HasEntriesVec<I> for OnDiskCorpus<'_, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>> {
         &self.entries
     }
-    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>>{
+    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
         &mut self.entries
     }
 }
 
-impl<I, R> HasRand for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
+impl<I, R> HasRand for OnDiskCorpus<'_, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     type R = R;
 
     fn rand(&self) -> &Self::R {
@@ -125,7 +164,11 @@ impl<I, R> HasRand for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
     }
 }
 
-impl<I, R> Corpus<I> for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
+impl<I, R> Corpus<I> for OnDiskCorpus<'_, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     /// Add an entry and save it to disk
     fn add(&mut self, entry: Rc<RefCell<Testcase<I>>>) {
         if *entry.borrow().filename() == None {
@@ -140,7 +183,11 @@ impl<I, R> Corpus<I> for OnDiskCorpus<'_, I, R> where I: Input, R: Rand {
     // TODO save and remove files, cache, etc..., ATM use just InMemoryCorpus
 }
 
-impl<'a, I, R> OnDiskCorpus<'a, I, R> where I: Input, R: Rand {
+impl<'a, I, R> OnDiskCorpus<'a, I, R>
+where
+    I: Input,
+    R: Rand,
+{
     pub fn new(rand: &'a mut R, dir_path: PathBuf) -> Self {
         OnDiskCorpus {
             dir_path: dir_path,
@@ -151,23 +198,35 @@ impl<'a, I, R> OnDiskCorpus<'a, I, R> where I: Input, R: Rand {
 }
 
 /// A Queue-like corpus, wrapping an existing Corpus instance
-pub struct QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+pub struct QueueCorpus<I, C>
+where
+    I: Input,
+    C: Corpus<I>,
+{
     corpus: C,
     phantom: PhantomData<I>,
     pos: usize,
     cycles: u64,
 }
 
-impl<'a, I, C> HasEntriesVec<I> for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+impl<'a, I, C> HasEntriesVec<I> for QueueCorpus<I, C>
+where
+    I: Input,
+    C: Corpus<I>,
+{
     fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>> {
         self.corpus.entries()
     }
-    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>>{
+    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
         self.corpus.entries_mut()
     }
 }
 
-impl<'a, I, C> HasRand for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+impl<'a, I, C> HasRand for QueueCorpus<I, C>
+where
+    I: Input,
+    C: Corpus<I>,
+{
     type R = C::R;
 
     fn rand(&self) -> &Self::R {
@@ -178,7 +237,11 @@ impl<'a, I, C> HasRand for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
     }
 }
 
-impl<'a, I, C> Corpus<I> for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+impl<'a, I, C> Corpus<I> for QueueCorpus<I, C>
+where
+    I: Input,
+    C: Corpus<I>,
+{
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.corpus.count()
@@ -212,7 +275,11 @@ impl<'a, I, C> Corpus<I> for QueueCorpus<I, C> where I: Input, C: Corpus<I> {
     }
 }
 
-impl<'a, I, C> QueueCorpus<I, C> where I: Input, C: Corpus<I> {
+impl<'a, I, C> QueueCorpus<I, C>
+where
+    I: Input,
+    C: Corpus<I>,
+{
     pub fn new(corpus: C) -> Self {
         QueueCorpus::<I, C> {
             corpus: corpus,
@@ -234,13 +301,13 @@ impl<'a, I, C> QueueCorpus<I, C> where I: Input, C: Corpus<I> {
 #[cfg(test)]
 mod tests {
     use crate::corpus::Corpus;
-    use crate::corpus::{QueueCorpus, OnDiskCorpus};
     use crate::corpus::Testcase;
+    use crate::corpus::{OnDiskCorpus, QueueCorpus};
     use crate::inputs::bytes::BytesInput;
     use crate::utils::Xoshiro256StarRand;
 
-    use std::path::PathBuf;
     use std::cell::RefCell;
+    use std::path::PathBuf;
     use std::rc::Rc;
 
     #[test]
@@ -249,10 +316,29 @@ mod tests {
         let mut rand = Xoshiro256StarRand::new();
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&mut rand, PathBuf::from("fancy/path")));
         let i = BytesInput::new(vec![0; 4]);
-        let t = Rc::new(RefCell::new(Testcase::new_with_filename(i, PathBuf::from("fancyfile"))));
+        let t = Rc::new(RefCell::new(Testcase::new_with_filename(
+            i,
+            PathBuf::from("fancyfile"),
+        )));
         q.add(t);
-        let filename = q.get().unwrap().borrow().filename().as_ref().unwrap().to_owned();
-        assert_eq!(filename, q.get().unwrap().borrow().filename().as_ref().unwrap().to_owned());
+        let filename = q
+            .get()
+            .unwrap()
+            .borrow()
+            .filename()
+            .as_ref()
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            filename,
+            q.get()
+                .unwrap()
+                .borrow()
+                .filename()
+                .as_ref()
+                .unwrap()
+                .to_owned()
+        );
         assert_eq!(filename, PathBuf::from("fancy/path/fancyfile"));
     }
 }

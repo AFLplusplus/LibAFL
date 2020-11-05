@@ -4,12 +4,15 @@ use crate::AflError;
 
 use crate::executors::{Executor, ExitKind};
 
-use std::ptr;
 use std::os::raw::c_void;
+use std::ptr;
 
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 
-pub struct InMemoryExecutor<I> where I: Input {
+pub struct InMemoryExecutor<I>
+where
+    I: Input,
+{
     cur_input: Option<Box<I>>,
     observers: Vec<Box<dyn Observer>>,
     harness: HarnessFunction<I>,
@@ -17,7 +20,10 @@ pub struct InMemoryExecutor<I> where I: Input {
 
 static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
 
-impl<I> Executor<I> for InMemoryExecutor<I> where I: Input {
+impl<I> Executor<I> for InMemoryExecutor<I>
+where
+    I: Input,
+{
     fn run_target(&mut self) -> Result<ExitKind, AflError> {
         let bytes = match self.cur_input.as_ref() {
             Some(i) => i.serialize(),
@@ -72,7 +78,10 @@ impl<I> Executor<I> for InMemoryExecutor<I> where I: Input {
     }
 }
 
-impl<I> InMemoryExecutor<I> where I: Input {
+impl<I> InMemoryExecutor<I>
+where
+    I: Input,
+{
     pub fn new(harness_fn: HarnessFunction<I>) -> Self {
         unsafe {
             os_signals::setup_crash_handlers::<I, Self>();
@@ -98,14 +107,17 @@ pub mod unix_signals {
     use std::{mem, process, ptr};
 
     use crate::executors::inmemory::CURRENT_INMEMORY_EXECUTOR_PTR;
-    use crate::inputs::Input;
     use crate::executors::Executor;
+    use crate::inputs::Input;
 
     pub extern "C" fn libaflrs_executor_inmem_handle_crash<I, E>(
         _sig: c_int,
         info: siginfo_t,
         _void: c_void,
-    ) where I: Input, E: Executor<I> {
+    ) where
+        I: Input,
+        E: Executor<I>,
+    {
         unsafe {
             if CURRENT_INMEMORY_EXECUTOR_PTR == ptr::null() {
                 println!(
@@ -123,7 +135,10 @@ pub mod unix_signals {
         _sig: c_int,
         _info: siginfo_t,
         _void: c_void,
-    ) where I: Input, E: Executor<I> {
+    ) where
+        I: Input,
+        E: Executor<I>,
+    {
         dbg!("TIMEOUT/SIGUSR2 received");
         unsafe {
             if CURRENT_INMEMORY_EXECUTOR_PTR == ptr::null() {
@@ -137,7 +152,11 @@ pub mod unix_signals {
         process::abort();
     }
 
-    pub unsafe fn setup_crash_handlers<I, E>() where I: Input, E: Executor<I> {
+    pub unsafe fn setup_crash_handlers<I, E>()
+    where
+        I: Input,
+        E: Executor<I>,
+    {
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;
@@ -167,15 +186,14 @@ use unix_signals as os_signals;
 #[cfg(not(unix))]
 compile_error!("InMemoryExecutor not yet supported on this OS");
 
-
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
-    use crate::executors::{Executor, ExitKind};
     use crate::executors::inmemory::InMemoryExecutor;
+    use crate::executors::{Executor, ExitKind};
     use crate::inputs::Input;
     use crate::observers::Observer;
     use crate::AflError;
+    use std::any::Any;
 
     #[derive(Clone)]
     struct NopInput {}

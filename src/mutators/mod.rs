@@ -1,12 +1,15 @@
+use crate::corpus::Corpus;
 use crate::inputs::Input;
 use crate::utils::HasRand;
-use crate::corpus::Corpus;
 use crate::AflError;
 
 pub mod scheduled;
 
-pub trait HasOptionCorpus<I> where I: Input {
-    type C : Corpus<I>;
+pub trait HasOptionCorpus<I>
+where
+    I: Input,
+{
+    type C: Corpus<I>;
 
     /// Get the associated corpus, if any
     fn corpus(&self) -> &Option<Box<Self::C>>;
@@ -18,7 +21,10 @@ pub trait HasOptionCorpus<I> where I: Input {
     fn set_corpus(&mut self, corpus: Option<Box<Self::C>>);
 }
 
-pub trait Mutator<I> : HasRand where I: Input {
+pub trait Mutator<I>: HasRand
+where
+    I: Input,
+{
     /// Mutate a given input
     fn mutate(&mut self, input: &mut I, stage_idx: i32) -> Result<(), AflError>;
 

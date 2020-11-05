@@ -41,7 +41,7 @@ pub trait Rand: Debug {
 
 /// Has a Rand box field
 pub trait HasRand {
-    type R : Rand;
+    type R: Rand;
 
     /// Get the hold Rand instance
     fn rand(&self) -> &Self::R;

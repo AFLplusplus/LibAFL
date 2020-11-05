@@ -33,9 +33,7 @@ impl HasBytesVec for BytesInput {
 
 impl BytesInput {
     pub fn new(bytes: Vec<u8>) -> Self {
-        BytesInput {
-            bytes: bytes
-        }
+        BytesInput { bytes: bytes }
     }
 }
 

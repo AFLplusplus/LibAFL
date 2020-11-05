@@ -26,7 +26,7 @@ pub enum AflError {
     NotImplemented(String),
     #[error("Unknown error: {0}")]
     Unknown(String),
-   }
+}
 
 #[cfg(test)]
 mod tests {
