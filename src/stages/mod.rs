@@ -1,25 +1,25 @@
 pub mod mutational;
 
 use crate::corpus::Testcase;
-use crate::engines::Engine;
+use crate::engines::Evaluator;
 use crate::inputs::Input;
 use crate::AflError;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub trait HasEngine<'a, I>
+pub trait HasEvaluator<I>
 where
     I: Input,
 {
-    type E: Engine<'a, I>;
+    type E: Evaluator<I>;
 
-    fn engine(&self) -> &Self::E;
+    fn eval(&self) -> &Self::E;
 
-    fn engine_mut(&mut self) -> &mut Self::E;
+    fn eval_mut(&mut self) -> &mut Self::E;
 }
 
-pub trait Stage<'a, I>: HasEngine<'a, I>
+pub trait Stage<'a, I>: HasEvaluator<I>
 where
     I: Input,
 {

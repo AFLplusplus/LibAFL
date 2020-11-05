@@ -1,8 +1,8 @@
 use crate::corpus::testcase::Testcase;
-use crate::engines::Engine;
+use crate::engines::Evaluator;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
-use crate::stages::{HasEngine, Stage};
+use crate::stages::{HasEvaluator, Stage};
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
@@ -36,7 +36,7 @@ where
                 m.mutate(&mut input, i as i32)?;
             }
 
-            let interesting = self.engine_mut().execute(&mut input, entry.clone())?;
+            let interesting = self.eval_mut().evaluate_input(&mut input, entry.clone())?;
 
             for m in self.mutators_mut() {
                 m.post_exec(interesting, i as i32)?;
@@ -52,10 +52,10 @@ pub struct DefaultMutationalStage<'a, I, R, E>
 where
     I: Input,
     R: Rand,
-    E: Engine<'a, I>,
+    E: Evaluator<I>,
 {
     rand: &'a mut R,
-    engine: &'a mut E,
+    eval: &'a mut E,
     mutators: Vec<Box<dyn Mutator<I, R = R>>>,
 }
 
@@ -63,7 +63,7 @@ impl<'a, I, R, E> HasRand for DefaultMutationalStage<'a, I, R, E>
 where
     I: Input,
     R: Rand,
-    E: Engine<'a, I>,
+    E: Evaluator<I>,
 {
     type R = R;
 
@@ -75,20 +75,20 @@ where
     }
 }
 
-impl<'a, I, R, E> HasEngine<'a, I> for DefaultMutationalStage<'a, I, R, E>
+impl<'a, I, R, E> HasEvaluator<I> for DefaultMutationalStage<'a, I, R, E>
 where
     I: Input,
     R: Rand,
-    E: Engine<'a, I>,
+    E: Evaluator<I>,
 {
     type E = E;
 
-    fn engine(&self) -> &Self::E {
-        self.engine
+    fn eval(&self) -> &Self::E {
+        self.eval
     }
 
-    fn engine_mut(&mut self) -> &mut Self::E {
-        self.engine
+    fn eval_mut(&mut self) -> &mut Self::E {
+        self.eval
     }
 }
 
@@ -96,7 +96,7 @@ impl<'a, I, R, E> MutationalStage<'a, I> for DefaultMutationalStage<'a, I, R, E>
 where
     I: Input,
     R: Rand,
-    E: Engine<'a, I>,
+    E: Evaluator<I>,
 {
     fn mutators(&self) -> &Vec<Box<dyn Mutator<I, R = Self::R>>> {
         &self.mutators
@@ -111,7 +111,7 @@ impl<'a, I, R, E> Stage<'a, I> for DefaultMutationalStage<'a, I, R, E>
 where
     I: Input,
     R: Rand,
-    E: Engine<'a, I>,
+    E: Evaluator<I>,
 {
     fn perform(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
         self.perform_mutational(entry)
@@ -122,12 +122,12 @@ impl<'a, I, R, E> DefaultMutationalStage<'a, I, R, E>
 where
     I: Input,
     R: Rand,
-    E: Engine<'a, I>,
+    E: Evaluator<I>,
 {
-    pub fn new(rand: &'a mut R, engine: &'a mut E) -> Self {
+    pub fn new(rand: &'a mut R, eval: &'a mut E) -> Self {
         DefaultMutationalStage {
             rand: rand,
-            engine: engine,
+            eval: eval,
             mutators: vec![],
         }
     }

@@ -82,6 +82,11 @@ where
         &mut self.metadatas
     }
 
+    /// Add a metadata
+    pub fn add_metadata(&mut self, name: String, meta: Box<dyn TestcaseMetadata>) {
+        self.metadatas.insert(name, meta);
+    }
+
     /// Create a new DefaultTestcase instace given an input
     pub fn new(input: I) -> Self {
         Testcase {

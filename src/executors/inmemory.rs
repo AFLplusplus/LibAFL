@@ -193,7 +193,6 @@ mod tests {
     use crate::inputs::Input;
     use crate::observers::Observer;
     use crate::AflError;
-    use std::any::Any;
 
     #[derive(Clone)]
     struct NopInput {}

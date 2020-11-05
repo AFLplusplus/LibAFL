@@ -1,6 +1,6 @@
 extern crate num;
 
-use crate::corpus::Testcase;
+use crate::corpus::{Testcase, TestcaseMetadata};
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::observers::MapObserver;
@@ -14,9 +14,13 @@ where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, executor: &dyn Executor<I>, entry: &Testcase<I>) -> u8;
+    fn is_interesting(
+        &mut self,
+        executor: &dyn Executor<I>,
+    ) -> (u32, Option<Box<dyn TestcaseMetadata>>);
 }
 
+/// A Reducer function is used to aggregate values for the novelty search
 pub trait Reducer<T>
 where
     T: Integer + Copy + 'static,
@@ -86,7 +90,10 @@ where
     O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting(&mut self, _executor: &dyn Executor<I>, _entry: &Testcase<I>) -> u8 {
+    fn is_interesting(
+        &mut self,
+        _executor: &dyn Executor<I>,
+    ) -> (u32, Option<Box<dyn TestcaseMetadata>>) {
         let mut interesting = 0;
 
         // TODO: impl. correctly, optimize
@@ -101,11 +108,11 @@ where
                 *history = reduced;
                 interesting += 25;
                 if interesting >= 250 {
-                    return 255;
+                    return (255, None);
                 }
             }
         }
-        interesting
+        (interesting, None)
     }
 }
 

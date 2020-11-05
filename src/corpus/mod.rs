@@ -56,14 +56,14 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Rc<RefCell<Testcase<I>>>, AflError> {
+    fn random_entry(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
         let len = { self.entries().len() };
         let id = self.rand_mut().below(len as u64) as usize;
-        Ok(self.entries_mut().get_mut(id).unwrap())
+        Ok(self.entries()[id].clone())
     }
 
     /// Gets the next entry (random by default)
-    fn get(&mut self) -> Result<&Rc<RefCell<Testcase<I>>>, AflError> {
+    fn get(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
         self.random_entry()
     }
 }
@@ -257,12 +257,12 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<&Rc<RefCell<Testcase<I>>>, AflError> {
+    fn random_entry(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
         self.corpus.random_entry()
     }
 
     /// Gets the next entry
-    fn get(&mut self) -> Result<&Rc<RefCell<Testcase<I>>>, AflError> {
+    fn get(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
         if self.corpus.count() == 0 {
             return Err(AflError::Empty("Testcases".to_string()));
         }
@@ -271,7 +271,7 @@ where
             self.cycles = self.cycles + 1;
             self.pos = 0;
         }
-        Ok(self.corpus.entries_mut().get_mut(self.pos).unwrap())
+        Ok(self.corpus.entries()[self.pos].clone())
     }
 }
 

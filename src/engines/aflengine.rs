@@ -1,6 +1,6 @@
 use std::time;
 
-use crate::engines::Engine;
+use crate::engines::Evaluator;
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
