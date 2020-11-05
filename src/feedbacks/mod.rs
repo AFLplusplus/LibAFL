@@ -65,26 +65,28 @@ where
 }
 
 /// The most common AFL-like feedback type
-pub struct MapFeedback<'a, T, R>
+pub struct MapFeedback<'a, T, R, O>
 where
     T: Integer + Copy + 'static,
     R: Reducer<T>,
+    O: MapObserver<T>,
 {
     /// Contains information about untouched entries
     history_map: &'a RefCell<Vec<T>>,
     /// The observer this feedback struct observes
-    map_observer: &'a RefCell<MapObserver</*'a,*/ T>>,
+    map_observer: &'a RefCell<O>,
     /// Phantom Data of Reducer
     phantom: PhantomData<R>,
 }
 
-impl<'a, T, R, I> Feedback<I> for MapFeedback<'a, T, R>
+impl<'a, T, R, O, I> Feedback<I> for MapFeedback<'a, T, R, O>
 where
     T: Integer + Copy + 'static,
     R: Reducer<T>,
+    O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting(&mut self, _executor: &dyn Executor<I>, entry: &Testcase<I>) -> u8 {
+    fn is_interesting(&mut self, _executor: &dyn Executor<I>, _entry: &Testcase<I>) -> u8 {
         let mut interesting = 0;
 
         // TODO: impl. correctly, optimize
@@ -92,7 +94,7 @@ where
             .history_map
             .borrow_mut()
             .iter_mut()
-            .zip(self.map_observer.borrow().get_map().iter())
+            .zip(self.map_observer.borrow().map().iter())
         {
             let reduced = R::reduce(*history, *map);
             if *history != reduced {
@@ -107,17 +109,15 @@ where
     }
 }
 
-impl<'a, T, R> MapFeedback<'a, T, R>
+impl<'a, T, R, O> MapFeedback<'a, T, R, O>
 where
     T: Integer + Copy + 'static,
     R: Reducer<T>,
+    O: MapObserver<T>,
 {
     /// Create new MapFeedback using a map observer, and a map.
     /// The map can be shared.
-    pub fn new(
-        map_observer: &'a RefCell<MapObserver</*'a, */ T>>,
-        history_map: &'a RefCell<Vec<T>>,
-    ) -> Self {
+    pub fn new(map_observer: &'a RefCell<O>, history_map: &'a RefCell<Vec<T>>) -> Self {
         MapFeedback {
             map_observer: map_observer,
             history_map: history_map,
@@ -136,7 +136,5 @@ where
     }
 }
 
-#[allow(dead_code)]
-type MaxMapFeedback<'a, T> = MapFeedback<'a, T, MaxReducer<T>>;
-#[allow(dead_code)]
-type MinMapFeedback<'a, T> = MapFeedback<'a, T, MinReducer<T>>;
+pub type MaxMapFeedback<'a, T, O> = MapFeedback<'a, T, MaxReducer<T>, O>;
+pub type MinMapFeedback<'a, T, O> = MapFeedback<'a, T, MinReducer<T>, O>;

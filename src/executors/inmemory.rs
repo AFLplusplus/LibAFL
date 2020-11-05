@@ -215,10 +215,6 @@ mod tests {
         fn post_exec(&mut self) -> Result<(), AflError> {
             Err(AflError::Unknown("Nop exec, testing only".to_string()))
         }
-
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
     }
 
     fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
