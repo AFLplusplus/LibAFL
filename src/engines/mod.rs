@@ -1,4 +1,4 @@
-use crate::corpus::testcase::Testcase;
+use crate::corpus::testcase::{Testcase, TestcaseMetadata};
 use crate::corpus::Corpus;
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
@@ -61,36 +61,33 @@ where
     fn evaluate_input_engine(
         &mut self,
         input: &mut I,
-        entry: Rc<RefCell<Testcase<I>>>,
+        _entry: Rc<RefCell<Testcase<I>>>,
     ) -> Result<bool, AflError> {
         self.executor_mut().reset_observers()?;
         self.executor_mut().run_target(input)?;
         self.executor_mut().post_exec_observers()?;
 
-        // TODO new method for this shit
-        let mut new_entry: Rc<RefCell<Testcase<I>>> =
-            Rc::new(RefCell::new(Testcase::<I>::default())); // lazy init
+        let mut metadatas: Vec<Box<dyn TestcaseMetadata>> = vec![];
         let mut rate_acc = 0;
         for feedback in self.feedbacks_mut() {
             let (rate, meta) = feedback.is_interesting(input);
             rate_acc += rate;
             if let Some(m) = meta {
-                if let Some(_) = new_entry {
-                } else {
-                    new_entry = Some(Rc::new(RefCell::new(Testcase::<I>::new(input.clone()))));
-                }
-                new_entry
-                    .unwrap()
-                    .borrow_mut()
-                    .add_metadata("test".to_string(), m);
+                metadatas.push(m);
             }
         }
 
         if rate_acc >= 25 {
-            self.corpus_mut().add(new_entry.unwrap().clone());
-        }
+            let new_entry = Rc::new(RefCell::new(Testcase::<I>::new(input.clone())));
+            for meta in metadatas {
+                new_entry.borrow_mut().add_metadata(meta);
+            }
+            self.corpus_mut().add(new_entry);
 
-        Ok(true)
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }
 

@@ -4,7 +4,9 @@ use crate::AflError;
 use hashbrown::HashMap;
 use std::path::PathBuf;
 
-pub trait TestcaseMetadata {}
+pub trait TestcaseMetadata {
+    fn name(&self) -> &'static str;
+}
 
 /*
 pub trait TestcaseTrait<I: Input> {
@@ -35,7 +37,7 @@ where
 {
     input: Option<I>, // TODO remove box
     filename: Option<PathBuf>,
-    metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
+    metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
 }
 
 impl<I> Testcase<I>
@@ -78,13 +80,13 @@ where
     }
 
     /// Get all the metadatas into an HashMap
-    pub fn metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>> {
+    pub fn metadatas(&mut self) -> &mut HashMap<&'static str, Box<dyn TestcaseMetadata>> {
         &mut self.metadatas
     }
 
     /// Add a metadata
-    pub fn add_metadata(&mut self, name: String, meta: Box<dyn TestcaseMetadata>) {
-        self.metadatas.insert(name, meta);
+    pub fn add_metadata(&mut self, meta: Box<dyn TestcaseMetadata>) {
+        self.metadatas.insert(meta.name(), meta);
     }
 
     /// Create a new DefaultTestcase instace given an input
