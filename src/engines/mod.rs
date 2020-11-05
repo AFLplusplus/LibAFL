@@ -63,30 +63,31 @@ where
         input: &mut I,
         entry: Rc<RefCell<Testcase<I>>>,
     ) -> Result<bool, AflError> {
-        {
-            self.executor_mut().reset_observers()?;
-            // self.executor_mut().place_input(Box::new(input))?;
-
-            self.executor_mut().run_target()?;
-
-            self.executor_mut().post_exec_observers()?;
-        }
+        self.executor_mut().reset_observers()?;
+        self.executor_mut().run_target(input)?;
+        self.executor_mut().post_exec_observers()?;
 
         // TODO new method for this shit
-        let mut new_entry: Option<Rc<RefCell<Testcase<I>>>> = None; // lazy init
+        let mut new_entry: Rc<RefCell<Testcase<I>>> =
+            Rc::new(RefCell::new(Testcase::<I>::default())); // lazy init
         let mut rate_acc = 0;
         for feedback in self.feedbacks_mut() {
-            let (rate, meta) = feedback.is_interesting(self.executor_mut());
+            let (rate, meta) = feedback.is_interesting(input);
             rate_acc += rate;
             if let Some(m) = meta {
-                //if new_entry.is_none() {
-                new_entry = Some(Rc::new(RefCell::new(Testcase::<I>::new(input.clone()))));
-                //}
+                if let Some(_) = new_entry {
+                } else {
+                    new_entry = Some(Rc::new(RefCell::new(Testcase::<I>::new(input.clone()))));
+                }
                 new_entry
                     .unwrap()
                     .borrow_mut()
                     .add_metadata("test".to_string(), m);
             }
+        }
+
+        if rate_acc >= 25 {
+            self.corpus_mut().add(new_entry.unwrap().clone());
         }
 
         Ok(true)

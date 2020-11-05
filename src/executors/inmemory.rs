@@ -13,7 +13,6 @@ pub struct InMemoryExecutor<I>
 where
     I: Input,
 {
-    cur_input: Option<Box<I>>,
     observers: Vec<Box<dyn Observer>>,
     harness: HarnessFunction<I>,
 }
@@ -24,35 +23,16 @@ impl<I> Executor<I> for InMemoryExecutor<I>
 where
     I: Input,
 {
-    fn run_target(&mut self) -> Result<ExitKind, AflError> {
-        let bytes = match self.cur_input.as_ref() {
-            Some(i) => i.serialize(),
-            None => return Err(AflError::Empty("cur_input".to_string())),
-        };
+    fn run_target(&mut self, input: &mut I) -> Result<ExitKind, AflError> {
+        let bytes = input.serialize()?;
         unsafe {
             CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor<I> as *const c_void;
         }
-        let ret = match bytes {
-            Ok(b) => Ok((self.harness)(self, b)),
-            Err(e) => Err(e),
-        };
+        let ret = (self.harness)(self, bytes);
         unsafe {
             CURRENT_INMEMORY_EXECUTOR_PTR = ptr::null();
         }
-        ret
-    }
-
-    fn place_input(&mut self, input: Box<I>) -> Result<(), AflError> {
-        self.cur_input = Some(input);
-        Ok(())
-    }
-
-    fn cur_input(&self) -> &Option<Box<I>> {
-        &self.cur_input
-    }
-
-    fn cur_input_mut(&mut self) -> &mut Option<Box<I>> {
-        &mut self.cur_input
+        Ok(ret)
     }
 
     fn reset_observers(&mut self) -> Result<(), AflError> {
@@ -87,7 +67,6 @@ where
             os_signals::setup_crash_handlers::<I, Self>();
         }
         InMemoryExecutor {
-            cur_input: None,
             observers: vec![],
             harness: harness_fn,
         }
@@ -232,8 +211,7 @@ mod tests {
     #[test]
     fn test_inmem_exec() {
         let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
-        let input = NopInput {};
-        assert!(in_mem_executor.place_input(Box::new(input)).is_ok());
-        assert!(in_mem_executor.run_target().is_ok());
+        let mut input = NopInput {};
+        assert!(in_mem_executor.run_target(&mut input).is_ok());
     }
 }
