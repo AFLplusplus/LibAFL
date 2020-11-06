@@ -42,7 +42,7 @@ where
         }
         let idx;
         {
-            idx = self.rand().borrow_mut().below(count) as usize;
+            idx = self.rand_below(count) as usize;
         }
         self.mutation_by_idx(idx)
     }
@@ -180,7 +180,7 @@ where
     M: Mutator<I>,
     I: Input + HasBytesVec,
 {
-    let bit = mutator.rand().borrow_mut().below(input.bytes().len() as u64) as usize;
+    let bit = mutator.rand_below(input.bytes().len() as u64) as usize;
     input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
     Ok(())
 }

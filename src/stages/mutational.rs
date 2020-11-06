@@ -24,7 +24,7 @@ where
     }
 
     fn iterations(&mut self) -> usize {
-        1 + self.rand().borrow_mut().below(128) as usize
+        1 + self.rand_below(128) as usize
     }
 
     fn perform_mutational(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
