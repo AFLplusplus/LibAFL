@@ -4,9 +4,9 @@ use crate::mutators::{HasOptionCorpus, Mutator};
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 /// The generic function type that identifies mutations
 type MutationFunction<M, I> = fn(&mut M, &mut I) -> Result<(), AflError>;

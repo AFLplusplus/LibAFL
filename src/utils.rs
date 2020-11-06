@@ -1,9 +1,9 @@
 //! Utility functions for AFL
 
-use std::debug_assert;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::debug_assert;
 use std::fmt::Debug;
+use std::rc::Rc;
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 /// Ways to get random around here
@@ -59,7 +59,9 @@ pub trait HasRand {
 
     // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     fn rand_between(&self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
-        self.rand().borrow_mut().between(lower_bound_incl, upper_bound_incl)
+        self.rand()
+            .borrow_mut()
+            .between(lower_bound_incl, upper_bound_incl)
     }
 }
 
@@ -128,7 +130,7 @@ pub fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, Rand, HasRand, Xoshiro256StarRand};
+    use crate::utils::{next_pow2, HasRand, Rand, Xoshiro256StarRand};
 
     #[test]
     fn test_rand() {
@@ -140,18 +142,18 @@ mod tests {
         assert!(rand.between(11, 20) > 10);
     }
 
-    use std::rc::Rc;
     use std::cell::RefCell;
+    use std::rc::Rc;
     struct HasRandTest<R>
     where
         R: Rand,
     {
-        rand: Rc<RefCell<R>>
+        rand: Rc<RefCell<R>>,
     }
 
     impl<R> HasRand for HasRandTest<R>
     where
-        R: Rand
+        R: Rand,
     {
         type R = R;
 
@@ -162,11 +164,12 @@ mod tests {
 
     fn test_has_rand() {
         let rand = Xoshiro256StarRand::new_rc();
-        let has_rand = HasRandTest{rand: Rc::clone(&rand)};
+        let has_rand = HasRandTest {
+            rand: Rc::clone(&rand),
+        };
 
         assert!(has_rand.rand_below(100) < 100);
         assert_eq!(has_rand.rand_below(1), 0);
-        
     }
 
     #[test]

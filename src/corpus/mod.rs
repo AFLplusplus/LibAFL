@@ -102,7 +102,7 @@ where
     }
 }
 
-impl<I, R> Corpus<I> for InMemoryCorpus< I, R>
+impl<I, R> Corpus<I> for InMemoryCorpus<I, R>
 where
     I: Input,
     R: Rand,

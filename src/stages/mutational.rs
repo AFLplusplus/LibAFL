@@ -70,7 +70,6 @@ where
     fn rand(&self) -> &Rc<RefCell<R>> {
         &self.rand
     }
-
 }
 
 impl<'a, I, R, E> HasEvaluator<I> for DefaultMutationalStage<'a, I, R, E>
