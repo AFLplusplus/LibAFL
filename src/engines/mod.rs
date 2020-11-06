@@ -175,7 +175,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::corpus::testcase::Testcase;
     use crate::corpus::InMemoryCorpus;
     use crate::engines::{DefaultEngine, Engine};
     use crate::executors::inmemory::InMemoryExecutor;
@@ -185,24 +184,22 @@ mod tests {
     use crate::utils::Xoshiro256StarRand;
 
     use std::cell::RefCell;
-    use std::path::PathBuf;
     use std::rc::Rc;
 
-    fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
+    fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
     }
 
     #[test]
     fn test_engine() {
-        let mut rand = Xoshiro256StarRand::new();
-        let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&mut rand);
+        let rand = Rc::new(RefCell::new(Xoshiro256StarRand::new()));
+        let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let mut executor = InMemoryExecutor::new(harness);
         let mut engine = DefaultEngine::new(&mut corpus, &mut executor);
-        let mut rand1 = Xoshiro256StarRand::new();
-        let mut stage = Box::new(DefaultMutationalStage::new(&mut rand1, &mut engine));
+        let mut stage = Box::new(DefaultMutationalStage::new(&rand, &mut engine));
         engine.add_stage(stage);
         engine.fuzz_one().unwrap();
-        let mut stage1 = Box::new(DefaultMutationalStage::new(&mut rand1, &mut engine));
+        let mut stage1 = Box::new(DefaultMutationalStage::new(&rand, &mut engine));
         engine.fuzz_one().unwrap();
     }
 }

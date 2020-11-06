@@ -58,7 +58,7 @@ where
     /// Gets a random entry
     fn random_entry(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
         let len = { self.entries().len() };
-        let id = self.rand_mut().below(len as u64) as usize;
+        let id = self.rand_below(len as u64) as usize;
         Ok(self.entries()[id].clone())
     }
 
@@ -68,16 +68,16 @@ where
     }
 }
 
-pub struct InMemoryCorpus<'a, I, R>
+pub struct InMemoryCorpus<I, R>
 where
     I: Input,
     R: Rand,
 {
-    rand: &'a mut R,
+    rand: Rc<RefCell<R>>,
     entries: Vec<Rc<RefCell<Testcase<I>>>>,
 }
 
-impl<I, R> HasEntriesVec<I> for InMemoryCorpus<'_, I, R>
+impl<I, R> HasEntriesVec<I> for InMemoryCorpus<I, R>
 where
     I: Input,
     R: Rand,
@@ -90,22 +90,19 @@ where
     }
 }
 
-impl<I, R> HasRand for InMemoryCorpus<'_, I, R>
+impl<I, R> HasRand for InMemoryCorpus<I, R>
 where
     I: Input,
     R: Rand,
 {
     type R = R;
 
-    fn rand(&self) -> &Self::R {
+    fn rand(&self) -> &Rc<RefCell<Self::R>> {
         &self.rand
-    }
-    fn rand_mut(&mut self) -> &mut Self::R {
-        &mut self.rand
     }
 }
 
-impl<I, R> Corpus<I> for InMemoryCorpus<'_, I, R>
+impl<I, R> Corpus<I> for InMemoryCorpus< I, R>
 where
     I: Input,
     R: Rand,
@@ -113,30 +110,30 @@ where
     // Just use the default implementation
 }
 
-impl<'a, I, R> InMemoryCorpus<'a, I, R>
+impl<I, R> InMemoryCorpus<I, R>
 where
     I: Input,
     R: Rand,
 {
-    pub fn new(rand: &'a mut R) -> Self {
+    pub fn new(rand: &Rc<RefCell<R>>) -> Self {
         InMemoryCorpus {
-            rand: rand,
+            rand: Rc::clone(rand),
             entries: vec![],
         }
     }
 }
 
-pub struct OnDiskCorpus<'a, I, R>
+pub struct OnDiskCorpus<I, R>
 where
     I: Input,
     R: Rand,
 {
-    rand: &'a mut R,
+    rand: Rc<RefCell<R>>,
     entries: Vec<Rc<RefCell<Testcase<I>>>>,
     dir_path: PathBuf,
 }
 
-impl<I, R> HasEntriesVec<I> for OnDiskCorpus<'_, I, R>
+impl<I, R> HasEntriesVec<I> for OnDiskCorpus<I, R>
 where
     I: Input,
     R: Rand,
@@ -149,22 +146,19 @@ where
     }
 }
 
-impl<I, R> HasRand for OnDiskCorpus<'_, I, R>
+impl<I, R> HasRand for OnDiskCorpus<I, R>
 where
     I: Input,
     R: Rand,
 {
     type R = R;
 
-    fn rand(&self) -> &Self::R {
+    fn rand(&self) -> &Rc<RefCell<Self::R>> {
         &self.rand
-    }
-    fn rand_mut(&mut self) -> &mut Self::R {
-        &mut self.rand
     }
 }
 
-impl<I, R> Corpus<I> for OnDiskCorpus<'_, I, R>
+impl<I, R> Corpus<I> for OnDiskCorpus<I, R>
 where
     I: Input,
     R: Rand,
@@ -183,16 +177,16 @@ where
     // TODO save and remove files, cache, etc..., ATM use just InMemoryCorpus
 }
 
-impl<'a, I, R> OnDiskCorpus<'a, I, R>
+impl<I, R> OnDiskCorpus<I, R>
 where
     I: Input,
     R: Rand,
 {
-    pub fn new(rand: &'a mut R, dir_path: PathBuf) -> Self {
+    pub fn new(rand: &Rc<RefCell<R>>, dir_path: PathBuf) -> Self {
         OnDiskCorpus {
+            rand: Rc::clone(rand),
             dir_path: dir_path,
             entries: vec![],
-            rand: rand,
         }
     }
 }
@@ -229,11 +223,8 @@ where
 {
     type R = C::R;
 
-    fn rand(&self) -> &Self::R {
+    fn rand(&self) -> &Rc<RefCell<Self::R>> {
         self.corpus.rand()
-    }
-    fn rand_mut(&mut self) -> &mut Self::R {
-        self.corpus.rand_mut()
     }
 }
 
@@ -313,8 +304,8 @@ mod tests {
     #[test]
 
     fn test_queuecorpus() {
-        let mut rand = Xoshiro256StarRand::new();
-        let mut q = QueueCorpus::new(OnDiskCorpus::new(&mut rand, PathBuf::from("fancy/path")));
+        let rand = Xoshiro256StarRand::new_rc();
+        let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
         let i = BytesInput::new(vec![0; 4]);
         let t = Rc::new(RefCell::new(Testcase::new_with_filename(
             i,

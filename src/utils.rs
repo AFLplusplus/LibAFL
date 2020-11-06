@@ -1,6 +1,8 @@
 //! Utility functions for AFL
 
 use std::debug_assert;
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::fmt::Debug;
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
@@ -44,10 +46,21 @@ pub trait HasRand {
     type R: Rand;
 
     /// Get the hold Rand instance
-    fn rand(&self) -> &Self::R;
+    fn rand(&self) -> &Rc<RefCell<Self::R>>;
 
-    /// Get the hold Rand instance (mutable)
-    fn rand_mut(&mut self) -> &mut Self::R;
+    // Gets the next 64 bit value
+    fn rand_next(&self) -> u64 {
+        self.rand().borrow_mut().next()
+    }
+    // Gets a value below the given 64 bit val (inclusive)
+    fn rand_below(&self, upper_bound_excl: u64) -> u64 {
+        self.rand().borrow_mut().below(upper_bound_excl)
+    }
+
+    // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
+    fn rand_between(&self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
+        self.rand().borrow_mut().between(lower_bound_incl, upper_bound_incl)
+    }
 }
 
 const HASH_CONST: u64 = 0xa5b35705;
@@ -96,6 +109,10 @@ impl Xoshiro256StarRand {
         ret.set_seed(0); // TODO: Proper random seed?
         ret
     }
+
+    pub fn new_rc() -> Rc<RefCell<Xoshiro256StarRand>> {
+        Rc::new(RefCell::new(Xoshiro256StarRand::new()))
+    }
 }
 
 /// Get the next higher power of two
@@ -111,7 +128,7 @@ pub fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, Rand, Xoshiro256StarRand};
+    use crate::utils::{next_pow2, Rand, HasRand, Xoshiro256StarRand};
 
     #[test]
     fn test_rand() {
@@ -121,6 +138,35 @@ mod tests {
         assert_eq!(rand.below(1), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
+    }
+
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    struct HasRandTest<R>
+    where
+        R: Rand,
+    {
+        rand: Rc<RefCell<R>>
+    }
+
+    impl<R> HasRand for HasRandTest<R>
+    where
+        R: Rand
+    {
+        type R = R;
+
+        fn rand(&self) -> &Rc<RefCell<R>> {
+            &self.rand
+        }
+    }
+
+    fn test_has_rand() {
+        let rand = Xoshiro256StarRand::new_rc();
+        let has_rand = HasRandTest{rand: Rc::clone(&rand)};
+
+        assert!(has_rand.rand_below(100) < 100);
+        assert_eq!(has_rand.rand_below(1), 0);
+        
     }
 
     #[test]

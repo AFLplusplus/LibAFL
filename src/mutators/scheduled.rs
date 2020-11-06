@@ -5,6 +5,8 @@ use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
 use std::marker::PhantomData;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 /// The generic function type that identifies mutations
 type MutationFunction<M, I> = fn(&mut M, &mut I) -> Result<(), AflError>;
@@ -29,7 +31,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&mut self, _input: &I) -> u64 {
-        1 << (1 + self.rand_mut().below(7))
+        1 << (1 + self.rand_below(7))
     }
 
     /// Get the next mutation to apply
@@ -40,7 +42,7 @@ where
         }
         let idx;
         {
-            idx = self.rand_mut().below(count) as usize;
+            idx = self.rand().borrow_mut().below(count) as usize;
         }
         self.mutation_by_idx(idx)
     }
@@ -62,7 +64,7 @@ where
     R: Rand,
     C: Corpus<I>,
 {
-    rand: &'a mut R,
+    rand: Rc<RefCell<R>>,
     corpus: Option<Box<C>>,
     mutations: Vec<MutationFunction<Self, I>>,
 }
@@ -75,11 +77,8 @@ where
 {
     type R = R;
 
-    fn rand(&self) -> &Self::R {
+    fn rand(&self) -> &Rc<RefCell<Self::R>> {
         &self.rand
-    }
-    fn rand_mut(&mut self) -> &mut Self::R {
-        &mut self.rand
     }
 }
 
@@ -153,9 +152,9 @@ where
     C: Corpus<I>,
 {
     /// Create a new DefaultScheduledMutator instance without mutations and corpus
-    pub fn new(rand: &'a mut R) -> Self {
+    pub fn new(rand: &Rc<RefCell<R>>) -> Self {
         DefaultScheduledMutator {
-            rand: rand,
+            rand: Rc::clone(rand),
             corpus: None,
             mutations: vec![],
         }
@@ -163,12 +162,12 @@ where
 
     /// Create a new DefaultScheduledMutator instance specifying mutations and corpus too
     pub fn new_all(
-        rand: &'a mut R,
+        rand: &Rc<RefCell<R>>,
         corpus: Option<Box<C>>,
         mutations: Vec<MutationFunction<Self, I>>,
     ) -> Self {
         DefaultScheduledMutator {
-            rand: rand,
+            rand: Rc::clone(rand),
             corpus: corpus,
             mutations: mutations,
         }
@@ -181,7 +180,7 @@ where
     M: Mutator<I>,
     I: Input + HasBytesVec,
 {
-    let bit = mutator.rand_mut().below(input.bytes().len() as u64) as usize;
+    let bit = mutator.rand().borrow_mut().below(input.bytes().len() as u64) as usize;
     input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
     Ok(())
 }
@@ -203,11 +202,8 @@ where
 {
     type R = S::R;
 
-    fn rand(&self) -> &Self::R {
-        self.scheduled.rand()
-    }
-    fn rand_mut(&mut self) -> &mut Self::R {
-        self.scheduled.rand_mut()
+    fn rand(&self) -> &Rc<RefCell<Self::R>> {
+        &self.scheduled.rand()
     }
 }
 
@@ -263,7 +259,7 @@ where
     C: Corpus<I>,
 {
     /// Create a new HavocBytesMutator instance wrapping DefaultScheduledMutator
-    pub fn new_default(rand: &'a mut R) -> Self {
+    pub fn new_default(rand: &Rc<RefCell<R>>) -> Self {
         let mut scheduled = DefaultScheduledMutator::<'a, I, R, C>::new(rand);
         scheduled.add_mutation(mutation_bitflip);
         HavocBytesMutator {

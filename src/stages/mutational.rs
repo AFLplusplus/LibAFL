@@ -24,7 +24,7 @@ where
     }
 
     fn iterations(&mut self) -> usize {
-        1 + self.rand_mut().below(128) as usize
+        1 + self.rand().borrow_mut().below(128) as usize
     }
 
     fn perform_mutational(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
@@ -54,7 +54,7 @@ where
     R: Rand,
     E: Evaluator<I>,
 {
-    rand: &'a mut R,
+    rand: Rc<RefCell<R>>,
     eval: &'a mut E,
     mutators: Vec<Box<dyn Mutator<I, R = R>>>,
 }
@@ -67,12 +67,10 @@ where
 {
     type R = R;
 
-    fn rand(&self) -> &Self::R {
+    fn rand(&self) -> &Rc<RefCell<R>> {
         &self.rand
     }
-    fn rand_mut(&mut self) -> &mut Self::R {
-        &mut self.rand
-    }
+
 }
 
 impl<'a, I, R, E> HasEvaluator<I> for DefaultMutationalStage<'a, I, R, E>
@@ -124,9 +122,9 @@ where
     R: Rand,
     E: Evaluator<I>,
 {
-    pub fn new(rand: &'a mut R, eval: &'a mut E) -> Self {
+    pub fn new(rand: &Rc<RefCell<R>>, eval: &'a mut E) -> Self {
         DefaultMutationalStage {
-            rand: rand,
+            rand: Rc::clone(rand),
             eval: eval,
             mutators: vec![],
         }
