@@ -2,33 +2,13 @@ use crate::inputs::Input;
 use crate::AflError;
 
 use hashbrown::HashMap;
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 pub trait TestcaseMetadata {
     fn name(&self) -> &'static str;
 }
-
-/*
-pub trait TestcaseTrait<I: Input> {
-    /// Make sure to return a valid input instance loading it from disk if not in memory
-    fn load_input(&mut self) -> Result<&I, AflError>;
-
-    /// Get the input, if any
-    fn input(&self) -> &Option<I>;
-
-    /// Get the input, if any (mutable)
-    fn input_mut(&mut self) -> &mut Option<I>;
-
-    /// Get the filename, if any
-    fn filename(&self) -> &Option<PathBuf>;
-
-    /// Get the filename, if any (mutable)
-    fn filename_mut(&mut self, filename: PathBuf) -> &mut &Option<PathBuf>;
-
-    /// Get all the metadatas into an HashMap
-    fn metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>>;
-}
-*/
 
 #[derive(Default)]
 pub struct Testcase<I>
@@ -39,6 +19,8 @@ where
     filename: Option<PathBuf>,
     metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
 }
+
+pub type TestcaseRef<I> = Rc<RefCell<Testcase<I>>>;
 
 impl<I> Testcase<I>
 where
@@ -89,7 +71,7 @@ where
         self.metadatas.insert(meta.name(), meta);
     }
 
-    /// Create a new DefaultTestcase instace given an input
+    /// Create a new Testcase instace given an input
     pub fn new(input: I) -> Self {
         Testcase {
             input: Some(input),
@@ -98,12 +80,22 @@ where
         }
     }
 
-    /// Create a new DefaultTestcase instace given an input and a filename
-    pub fn new_with_filename(input: I, filename: PathBuf) -> Self {
+    /// Create a new Testcase instace given an input and a filename
+    pub fn with_filename(input: I, filename: PathBuf) -> Self {
         Testcase {
             input: Some(input),
             filename: Some(filename),
             metadatas: HashMap::default(),
         }
+    }
+
+    /// Create a new Testcase instace given an input behind a Rc RefCell
+    pub fn new_rr(input: I) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(input)))
+    }
+
+    /// Create a new Testcase instace given an input and a filename behind a Rc RefCell
+    pub fn with_filename_rr(input: I, filename: PathBuf) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::with_filename(input, filename)))
     }
 }

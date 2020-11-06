@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 // TODO create HasMutatorsVec trait
 
-pub trait MutationalStage<'a, I>: Stage<'a, I> + HasRand
+pub trait MutationalStage<I>: Stage<I> + HasRand
 where
     I: Input,
 {
@@ -36,7 +36,10 @@ where
                 m.mutate(&mut input, i as i32)?;
             }
 
-            let interesting = self.eval_mut().evaluate_input(&mut input, entry.clone())?;
+            let interesting = self
+                .eval()
+                .borrow_mut()
+                .evaluate_input(&mut input, entry.clone())?;
 
             for m in self.mutators_mut() {
                 m.post_exec(interesting, i as i32)?;
@@ -48,18 +51,18 @@ where
     }
 }
 
-pub struct DefaultMutationalStage<'a, I, R, E>
+pub struct DefaultMutationalStage<I, R, E>
 where
     I: Input,
     R: Rand,
     E: Evaluator<I>,
 {
     rand: Rc<RefCell<R>>,
-    eval: &'a mut E,
+    eval: Rc<RefCell<E>>,
     mutators: Vec<Box<dyn Mutator<I, R = R>>>,
 }
 
-impl<'a, I, R, E> HasRand for DefaultMutationalStage<'a, I, R, E>
+impl<I, R, E> HasRand for DefaultMutationalStage<I, R, E>
 where
     I: Input,
     R: Rand,
@@ -72,7 +75,7 @@ where
     }
 }
 
-impl<'a, I, R, E> HasEvaluator<I> for DefaultMutationalStage<'a, I, R, E>
+impl<I, R, E> HasEvaluator<I> for DefaultMutationalStage<I, R, E>
 where
     I: Input,
     R: Rand,
@@ -80,16 +83,12 @@ where
 {
     type E = E;
 
-    fn eval(&self) -> &Self::E {
-        self.eval
-    }
-
-    fn eval_mut(&mut self) -> &mut Self::E {
-        self.eval
+    fn eval(&self) -> &Rc<RefCell<Self::E>> {
+        &self.eval
     }
 }
 
-impl<'a, I, R, E> MutationalStage<'a, I> for DefaultMutationalStage<'a, I, R, E>
+impl<I, R, E> MutationalStage<I> for DefaultMutationalStage<I, R, E>
 where
     I: Input,
     R: Rand,
@@ -104,7 +103,7 @@ where
     }
 }
 
-impl<'a, I, R, E> Stage<'a, I> for DefaultMutationalStage<'a, I, R, E>
+impl<I, R, E> Stage<I> for DefaultMutationalStage<I, R, E>
 where
     I: Input,
     R: Rand,
@@ -115,16 +114,16 @@ where
     }
 }
 
-impl<'a, I, R, E> DefaultMutationalStage<'a, I, R, E>
+impl<I, R, E> DefaultMutationalStage<I, R, E>
 where
     I: Input,
     R: Rand,
     E: Evaluator<I>,
 {
-    pub fn new(rand: &Rc<RefCell<R>>, eval: &'a mut E) -> Self {
+    pub fn new(rand: &Rc<RefCell<R>>, eval: &Rc<RefCell<E>>) -> Self {
         DefaultMutationalStage {
             rand: Rc::clone(rand),
-            eval: eval,
+            eval: Rc::clone(eval),
             mutators: vec![],
         }
     }

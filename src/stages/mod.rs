@@ -14,12 +14,10 @@ where
 {
     type E: Evaluator<I>;
 
-    fn eval(&self) -> &Self::E;
-
-    fn eval_mut(&mut self) -> &mut Self::E;
+    fn eval(&self) -> &Rc<RefCell<Self::E>>;
 }
 
-pub trait Stage<'a, I>: HasEvaluator<I>
+pub trait Stage<I>: HasEvaluator<I>
 where
     I: Input,
 {

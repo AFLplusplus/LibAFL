@@ -304,13 +304,10 @@ mod tests {
     #[test]
 
     fn test_queuecorpus() {
-        let rand = Xoshiro256StarRand::new_rc();
+        let rand = Xoshiro256StarRand::new_rr();
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
         let i = BytesInput::new(vec![0; 4]);
-        let t = Rc::new(RefCell::new(Testcase::new_with_filename(
-            i,
-            PathBuf::from("fancyfile"),
-        )));
+        let t = Testcase::with_filename_rr(i, PathBuf::from("fancyfile"));
         q.add(t);
         let filename = q
             .get()

@@ -20,7 +20,7 @@ where
     ) -> Result<bool, AflError>;
 }
 
-pub trait Engine<'a, I, C, E>: Evaluator<I>
+pub trait Engine<I, C, E>: Evaluator<I>
 where
     I: Input,
     C: Corpus<I>,
@@ -34,11 +34,11 @@ where
         self.feedbacks_mut().push(feedback);
     }
 
-    fn stages(&self) -> &Vec<Box<dyn Stage<'a, I, E = Self>>>;
+    fn stages(&self) -> &Vec<Box<dyn Stage<I, E = Self>>>;
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<'a, I, E = Self>>>;
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<I, E = Self>>>;
 
-    fn add_stage(&mut self, stage: Box<dyn Stage<'a, I, E = Self>>) {
+    fn add_stage(&mut self, stage: Box<dyn Stage<I, E = Self>>) {
         self.stages_mut().push(stage);
     }
 
@@ -91,19 +91,19 @@ where
     }
 }
 
-pub struct DefaultEngine<'a, I, C, E>
+pub struct DefaultEngine<I, C, E>
 where
     I: Input,
     C: Corpus<I>,
     E: Executor<I>,
 {
     feedbacks: Vec<Box<dyn Feedback<I>>>,
-    stages: Vec<Box<dyn Stage<'a, I, E = Self>>>,
-    executor: &'a mut E,
-    corpus: &'a mut C,
+    stages: Vec<Box<dyn Stage<I, E = Self>>>,
+    executor: E,
+    corpus: C,
 }
 
-impl<'a, I, C, E> Evaluator<I> for DefaultEngine<'a, I, C, E>
+impl<I, C, E> Evaluator<I> for DefaultEngine<I, C, E>
 where
     I: Input,
     C: Corpus<I>,
@@ -118,7 +118,7 @@ where
     }
 }
 
-impl<'a, I, C, E> Engine<'a, I, C, E> for DefaultEngine<'a, I, C, E>
+impl<I, C, E> Engine<I, C, E> for DefaultEngine<I, C, E>
 where
     I: Input,
     C: Corpus<I>,
@@ -132,38 +132,38 @@ where
         &mut self.feedbacks
     }
 
-    fn stages(&self) -> &Vec<Box<dyn Stage<'a, I, E = Self>>> {
+    fn stages(&self) -> &Vec<Box<dyn Stage<I, E = Self>>> {
         &self.stages
     }
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<'a, I, E = Self>>> {
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<I, E = Self>>> {
         &mut self.stages
     }
 
     fn corpus(&self) -> &C {
-        self.corpus
+        &self.corpus
     }
 
     fn corpus_mut(&mut self) -> &mut C {
-        self.corpus
+        &mut self.corpus
     }
 
     fn executor(&self) -> &E {
-        self.executor
+        &self.executor
     }
 
     fn executor_mut(&mut self) -> &mut E {
-        self.executor
+        &mut self.executor
     }
 }
 
-impl<'a, I, C, E> DefaultEngine<'a, I, C, E>
+impl<I, C, E> DefaultEngine<I, C, E>
 where
     I: Input,
     C: Corpus<I>,
     E: Executor<I>,
 {
-    pub fn new(corpus: &'a mut C, executor: &'a mut E) -> Self {
+    pub fn new(corpus: C, executor: E) -> Self {
         DefaultEngine {
             feedbacks: vec![],
             stages: vec![],
@@ -171,11 +171,15 @@ where
             executor: executor,
         }
     }
+
+    pub fn new_rr(corpus: C, executor: E) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(corpus, executor)))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::corpus::InMemoryCorpus;
+    use crate::corpus::{Corpus, InMemoryCorpus};
     use crate::engines::{DefaultEngine, Engine};
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
@@ -192,14 +196,12 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        let rand = Rc::new(RefCell::new(Xoshiro256StarRand::new()));
+        let rand = Xoshiro256StarRand::new_rr();
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let mut executor = InMemoryExecutor::new(harness);
-        let mut engine = DefaultEngine::new(&mut corpus, &mut executor);
-        let stage = Box::new(DefaultMutationalStage::new(&rand, &mut engine));
-        engine.add_stage(stage);
-        engine.fuzz_one().unwrap();
-        let stage1 = Box::new(DefaultMutationalStage::new(&rand, &mut engine));
-        engine.fuzz_one().unwrap();
+        let mut engine = DefaultEngine::new_rr(corpus, executor);
+        let stage = Box::new(DefaultMutationalStage::new(&rand, &engine));
+        engine.borrow_mut().add_stage(stage);
+        engine.borrow_mut().fuzz_one().unwrap();
     }
 }

@@ -41,7 +41,7 @@ pub trait Rand: Debug {
     }
 }
 
-/// Has a Rand box field
+/// Has a Rand Rc RefCell field
 pub trait HasRand {
     type R: Rand;
 
@@ -106,13 +106,13 @@ impl Rand for Xoshiro256StarRand {
 }
 
 impl Xoshiro256StarRand {
-    pub fn new() -> Xoshiro256StarRand {
+    pub fn new() -> Self {
         let mut ret: Xoshiro256StarRand = Default::default();
         ret.set_seed(0); // TODO: Proper random seed?
         ret
     }
 
-    pub fn new_rc() -> Rc<RefCell<Xoshiro256StarRand>> {
+    pub fn new_rr() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Xoshiro256StarRand::new()))
     }
 }
@@ -163,7 +163,7 @@ mod tests {
     }
 
     fn test_has_rand() {
-        let rand = Xoshiro256StarRand::new_rc();
+        let rand = Xoshiro256StarRand::new_rr();
         let has_rand = HasRandTest {
             rand: Rc::clone(&rand),
         };
