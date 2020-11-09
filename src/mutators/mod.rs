@@ -1,9 +1,12 @@
+pub mod scheduled;
+pub use scheduled::ScheduledMutator;
+pub use scheduled::DefaultScheduledMutator;
+pub use scheduled::HavocBytesMutator;
+
 use crate::corpus::Corpus;
 use crate::inputs::Input;
 use crate::utils::HasRand;
 use crate::AflError;
-
-pub mod scheduled;
 
 pub trait HasOptionCorpus<I>
 where

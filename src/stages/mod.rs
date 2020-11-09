@@ -1,4 +1,5 @@
 pub mod mutational;
+pub use mutational::DefaultMutationalStage;
 
 use crate::corpus::Testcase;
 use crate::engines::Evaluator;
@@ -14,7 +15,7 @@ where
 {
     type E: Evaluator<I>;
 
-    fn eval(&self) -> &Rc<RefCell<Self::E>>;
+    fn evaluator(&self) -> &Rc<RefCell<Self::E>>;
 }
 
 pub trait Stage<I>: HasEvaluator<I>

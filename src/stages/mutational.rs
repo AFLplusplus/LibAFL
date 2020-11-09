@@ -8,64 +8,67 @@ use crate::AflError;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::marker::PhantomData;
 
 // TODO create HasMutatorsVec trait
 
-pub trait MutationalStage<I>: Stage<I> + HasRand
+pub trait MutationalStage<I, M>: Stage<I> + HasRand
 where
     I: Input,
+    M: Mutator<I, R = Self::R>,
 {
-    fn mutators(&self) -> &Vec<Box<dyn Mutator<I, R = Self::R>>>;
+    /// The mutator registered for this stage
+    fn mutator(&self) -> &M;
 
-    fn mutators_mut(&mut self) -> &mut Vec<Box<dyn Mutator<I, R = Self::R>>>;
+    /// The mutator registered for this stage (mutable)
+    fn mutator_mut(&mut self) -> &mut M;
 
-    fn add_mutator(&mut self, mutator: Box<dyn Mutator<I, R = Self::R>>) {
-        self.mutators_mut().push(mutator);
-    }
-
+    /// Gets the number of iterations this mutator should run for.
+    /// This call uses internal mutability, so it may change for each call
     fn iterations(&mut self) -> usize {
         1 + self.rand_below(128) as usize
     }
 
-    fn perform_mutational(&mut self, entry: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+    /// Runs this (mutational) stage for the given testcase
+    fn perform_mutational(&mut self, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
         let num = self.iterations();
-        let mut input = entry.borrow_mut().load_input()?.clone();
+        let input = testcase.borrow_mut().load_input()?.clone();
 
         for i in 0..num {
-            for m in self.mutators_mut() {
-                m.mutate(&mut input, i as i32)?;
-            }
+            let mut input_tmp = input.clone();
+            self.mutator_mut().mutate(&mut input_tmp, i as i32)?;
 
             let interesting = self
-                .eval()
+                .evaluator()
                 .borrow_mut()
-                .evaluate_input(&mut input, entry.clone())?;
+                .evaluate_input(&mut input_tmp, testcase.clone())?;
 
-            for m in self.mutators_mut() {
-                m.post_exec(interesting, i as i32)?;
-            }
+            self.mutator_mut().post_exec(interesting, i as i32)?;
 
-            input = entry.borrow_mut().load_input()?.clone();
         }
         Ok(())
     }
 }
 
-pub struct DefaultMutationalStage<I, R, E>
+/// The default mutational stage
+pub struct DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
     R: Rand,
+    M: Mutator<I, R=R>,
     E: Evaluator<I>,
 {
     rand: Rc<RefCell<R>>,
-    eval: Rc<RefCell<E>>,
-    mutators: Vec<Box<dyn Mutator<I, R = R>>>,
+    evaluator: Rc<RefCell<E>>,
+    mutator: M,
+    _phantom_input: PhantomData<I>
 }
 
-impl<I, R, E> HasRand for DefaultMutationalStage<I, R, E>
+impl<I, R, M, E> HasRand for DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
     R: Rand,
+    M: Mutator<I, R=R>,
     E: Evaluator<I>,
 {
     type R = R;
@@ -75,56 +78,66 @@ where
     }
 }
 
-impl<I, R, E> HasEvaluator<I> for DefaultMutationalStage<I, R, E>
+/// Indicate that this stage can eval targets
+impl<I, R, M, E> HasEvaluator<I> for DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
     R: Rand,
+    M: Mutator<I, R=R>,
     E: Evaluator<I>,
 {
     type E = E;
 
-    fn eval(&self) -> &Rc<RefCell<Self::E>> {
-        &self.eval
+    /// Get the evaluator
+    fn evaluator(&self) -> &Rc<RefCell<Self::E>> {
+        &self.evaluator
     }
 }
 
-impl<I, R, E> MutationalStage<I> for DefaultMutationalStage<I, R, E>
+impl<I, R, M, E> MutationalStage<I, M> for DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
     R: Rand,
+    M: Mutator<I, R=R>,
     E: Evaluator<I>,
 {
-    fn mutators(&self) -> &Vec<Box<dyn Mutator<I, R = Self::R>>> {
-        &self.mutators
+    /// The mutator, added to this stage
+    fn mutator(&self) -> &M {
+        &self.mutator
     }
 
-    fn mutators_mut(&mut self) -> &mut Vec<Box<dyn Mutator<I, R = Self::R>>> {
-        &mut self.mutators
-    }
-}
-
-impl<I, R, E> Stage<I> for DefaultMutationalStage<I, R, E>
-where
-    I: Input,
-    R: Rand,
-    E: Evaluator<I>,
-{
-    fn perform(&mut self, entry: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
-        self.perform_mutational(entry)
+    /// The list of mutators, added to this stage (as mutable ref)
+    fn mutator_mut(&mut self) -> &mut M {
+        &mut self.mutator
     }
 }
 
-impl<I, R, E> DefaultMutationalStage<I, R, E>
+impl<I, R, M, E> Stage<I> for DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
     R: Rand,
+    M: Mutator<I, R=R>,
     E: Evaluator<I>,
 {
-    pub fn new(rand: &Rc<RefCell<R>>, eval: &Rc<RefCell<E>>) -> Self {
+    fn perform(&mut self, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+        self.perform_mutational(testcase)
+    }
+}
+
+impl<I, R, M, E> DefaultMutationalStage<I, R, M, E>
+where
+    I: Input,
+    R: Rand,
+    M: Mutator<I, R=R>,
+    E: Evaluator<I>,
+{
+    /// Creates a new default mutational stage
+    pub fn new(rand: &Rc<RefCell<R>>, evaluator: &Rc<RefCell<E>>, mutator: M) -> Self {
         DefaultMutationalStage {
             rand: Rc::clone(rand),
-            eval: Rc::clone(eval),
-            mutators: vec![],
+            evaluator: Rc::clone(evaluator),
+            mutator: mutator,
+            _phantom_input: PhantomData,
         }
     }
 }

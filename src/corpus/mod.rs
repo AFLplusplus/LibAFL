@@ -331,6 +331,6 @@ mod tests {
                 .unwrap()
                 .to_owned()
         );
-        assert_eq!(filename, PathBuf::from("fancy/path/fancyfile"));
+        assert_eq!(filename, PathBuf::from("fancyfile"));
     }
 }

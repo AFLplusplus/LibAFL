@@ -94,6 +94,19 @@ where
     }
 }
 
+/*
+pub struct FuzzState<I, C, E>
+where
+    I: Input,
+    C: Corpus<I>,
+    E: Executor<I>,
+{
+
+}
+*/
+
+
+
 pub struct DefaultEngine<I, C, E>
 where
     I: Input,
@@ -188,6 +201,7 @@ mod tests {
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::bytes::BytesInput;
     use crate::stages::mutational::DefaultMutationalStage;
+    use crate::mutators::DefaultScheduledMutator;
     use crate::stages::Stage;
     use crate::utils::Xoshiro256StarRand;
 
@@ -198,15 +212,17 @@ mod tests {
     #[test]
     fn test_engine() {
         let rand = Xoshiro256StarRand::new_rr();
+
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new_rr(BytesInput::new(vec![0; 4]));
         corpus.add(testcase);
         let executor = InMemoryExecutor::new(harness);
         let engine = DefaultEngine::new_rr(corpus, executor);
-        let mut stage = DefaultMutationalStage::new(&rand, &engine);
-        //engine.borrow_mut().add_stage(stage);
-        //engine.borrow_mut().fuzz_one().unwrap();
+        //let mutator = DefaultScheduledMutator::new_all(rand: &rand, corpus: Option<Box<C>>, mutations: Vec<MutationFunction<Self, I>>)(&rand);
+        //let stage = DefaultMutationalStage::new(&rand, &engine, mutator);
+        //engine.borrow_mut().add_stage(Box::new(stage));
+        engine.borrow_mut().fuzz_one().unwrap();
         let t = { engine.borrow_mut().corpus_mut().next().unwrap() };
-        stage.perform(&t).unwrap();
+        //engine.borrow_mut().stages[0].perform(&t).unwrap();
     }
 }
