@@ -4,6 +4,8 @@ use std::cell::RefCell;
 use std::debug_assert;
 use std::fmt::Debug;
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 /// Ways to get random around here
@@ -106,15 +108,29 @@ impl Rand for Xoshiro256StarRand {
 }
 
 impl Xoshiro256StarRand {
-    pub fn new() -> Self {
+    /// Creates a new Xoshiro rand with the given seed
+    pub fn new(seed: u64) -> Self {
         let mut ret: Xoshiro256StarRand = Default::default();
-        ret.set_seed(0); // TODO: Proper random seed?
+        ret.set_seed(seed); // TODO: Proper random seed?
         ret
     }
 
-    pub fn new_rr() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Xoshiro256StarRand::new()))
+    /// Creates a new Xoshiro rand with the given seed, wrapped in a Rc<RefCell<T>>.
+    pub fn new_rr(seed: u64) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(seed)))
     }
+
+    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+    pub fn preseeded() -> Self {
+        let seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64;
+        Self::new(seed)
+    }
+
+    /// Creates a new rand instance, pre-seeded
+    pub fn preseeded_rr() -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::preseeded()))
+    }
+
 }
 
 /// Get the next higher power of two
@@ -134,13 +150,14 @@ mod tests {
 
     #[test]
     fn test_rand() {
-        let mut rand = Xoshiro256StarRand::new();
+        let mut rand = Xoshiro256StarRand::preseeded();
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }
+
 
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -164,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_has_rand() {
-        let rand = Xoshiro256StarRand::new_rr();
+        let rand = Xoshiro256StarRand::preseeded_rr();
         let has_rand = HasRandTest {
             rand: Rc::clone(&rand),
         };
@@ -172,6 +189,8 @@ mod tests {
         assert!(has_rand.rand_below(100) < 100);
         assert_eq!(has_rand.rand_below(1), 0);
     }
+
+
 
     #[test]
     fn test_next_pow2() {

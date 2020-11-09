@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn test_input() {
-        let mut rand = Xoshiro256StarRand::new();
+        let mut rand = Xoshiro256StarRand::preseeded();
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);

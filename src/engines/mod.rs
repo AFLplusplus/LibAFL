@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        let rand = Xoshiro256StarRand::new_rr();
+        let rand = Xoshiro256StarRand::preseeded_rr();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new_rr(BytesInput::new(vec![0; 4]));
