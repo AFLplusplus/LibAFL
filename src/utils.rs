@@ -41,7 +41,7 @@ pub trait Rand: Debug {
     }
 }
 
-/// Has a Rand Rc RefCell field
+/// Has a Rand Rc RefCell field (internal mutability), that can be used to get random values
 pub trait HasRand {
     type R: Rand;
 
@@ -162,6 +162,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn test_has_rand() {
         let rand = Xoshiro256StarRand::new_rr();
         let has_rand = HasRandTest {

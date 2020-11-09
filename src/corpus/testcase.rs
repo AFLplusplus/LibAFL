@@ -6,22 +6,28 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+// TODO: Give example
+/// Metadata for a testcase
 pub trait TestcaseMetadata {
+    /// The name of this metadata - used to find it in the list of avaliable metadatas
     fn name(&self) -> &'static str;
 }
 
+/// An entry in the Testcase Corpus
 #[derive(Default)]
 pub struct Testcase<I>
 where
     I: Input,
 {
+    /// The input of this testcase
     input: Option<I>, // TODO remove box
+    /// Filename, if this testcase is backed by a file in the filesystem
     filename: Option<PathBuf>,
+    /// Map of metadatas associated with this testcase
     metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
 }
 
-pub type TestcaseRef<I> = Rc<RefCell<Testcase<I>>>;
-
+/// Impl of a testcase
 impl<I> Testcase<I>
 where
     I: Input,

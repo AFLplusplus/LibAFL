@@ -27,7 +27,7 @@ where
         1 + self.rand_below(128) as usize
     }
 
-    fn perform_mutational(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+    fn perform_mutational(&mut self, entry: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
         let num = self.iterations();
         let mut input = entry.borrow_mut().load_input()?.clone();
 
@@ -109,7 +109,7 @@ where
     R: Rand,
     E: Evaluator<I>,
 {
-    fn perform(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+    fn perform(&mut self, entry: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
         self.perform_mutational(entry)
     }
 }

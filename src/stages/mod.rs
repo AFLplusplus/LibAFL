@@ -22,5 +22,5 @@ where
     I: Input,
 {
     /// Run the stage
-    fn perform(&mut self, entry: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError>;
+    fn perform(&mut self, entry: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError>;
 }

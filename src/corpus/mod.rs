@@ -56,14 +56,19 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
-        let len = { self.entries().len() };
-        let id = self.rand_below(len as u64) as usize;
-        Ok(self.entries()[id].clone())
+    fn random_entry(&self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+        if self.count() == 0 {
+            Err(AflError::Empty("No entries in corpus".to_owned()))
+        } else {
+            let len = { self.entries().len() };
+            let id = self.rand_below(len as u64) as usize;
+            Ok(self.entries()[id].clone())
+        }
     }
 
-    /// Gets the next entry (random by default)
-    fn get(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+    // TODO: IntoIter
+    /// Gets the next entry
+    fn next(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
         self.random_entry()
     }
 }
@@ -248,21 +253,22 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+    fn random_entry(&self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
         self.corpus.random_entry()
     }
 
     /// Gets the next entry
-    fn get(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+    fn next(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+        self.pos += 1;
         if self.corpus.count() == 0 {
-            return Err(AflError::Empty("Testcases".to_string()));
+            return Err(AflError::Empty("Corpus".to_owned()));
         }
-        self.pos = self.pos + 1;
-        if self.pos >= self.corpus.count() {
-            self.cycles = self.cycles + 1;
-            self.pos = 0;
+        if self.pos > self.corpus.count() {
+            // TODO: Always loop or return informational error?
+            self.pos = 1;
+            self.cycles += 1;
         }
-        Ok(self.corpus.entries()[self.pos].clone())
+        Ok(self.corpus.entries()[self.pos - 1].clone())
     }
 }
 
@@ -297,9 +303,7 @@ mod tests {
     use crate::inputs::bytes::BytesInput;
     use crate::utils::Xoshiro256StarRand;
 
-    use std::cell::RefCell;
     use std::path::PathBuf;
-    use std::rc::Rc;
 
     #[test]
 
@@ -310,7 +314,7 @@ mod tests {
         let t = Testcase::with_filename_rr(i, PathBuf::from("fancyfile"));
         q.add(t);
         let filename = q
-            .get()
+            .next()
             .unwrap()
             .borrow()
             .filename()
@@ -319,7 +323,7 @@ mod tests {
             .to_owned();
         assert_eq!(
             filename,
-            q.get()
+            q.next()
                 .unwrap()
                 .borrow()
                 .filename()

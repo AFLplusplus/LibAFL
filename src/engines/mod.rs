@@ -51,9 +51,12 @@ where
     fn executor_mut(&mut self) -> &mut E;
 
     fn fuzz_one(&mut self) -> Result<(), AflError> {
-        let entry = self.corpus_mut().get()?;
+        if self.corpus().count() == 0 {
+            return Err(AflError::Empty("No testcases in corpus".to_owned()));
+        }
+        let entry = self.corpus_mut().next()?;
         for stage in self.stages_mut() {
-            stage.perform(entry.clone())?;
+            stage.perform(&entry)?;
         }
         Ok(())
     }
@@ -203,7 +206,7 @@ mod tests {
         let mut stage = DefaultMutationalStage::new(&rand, &engine);
         //engine.borrow_mut().add_stage(stage);
         //engine.borrow_mut().fuzz_one().unwrap();
-        let t = { engine.borrow_mut().corpus_mut().get().unwrap() };
-        stage.perform(t).unwrap();
+        let t = { engine.borrow_mut().corpus_mut().next().unwrap() };
+        stage.perform(&t).unwrap();
     }
 }

@@ -1,11 +1,7 @@
-use crate::inputs::Input;
+use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
 
-pub trait HasBytesVec {
-    fn bytes(&self) -> &Vec<u8>;
-    fn bytes_mut(&mut self) -> &mut Vec<u8>;
-}
-
+/// A bytes input is the basic input
 #[derive(Clone, Debug, Default)]
 pub struct BytesInput {
     pub bytes: Vec<u8>,
@@ -31,7 +27,14 @@ impl HasBytesVec for BytesInput {
     }
 }
 
+impl HasTargetBytes for BytesInput {
+    fn target_bytes(&self) -> &Vec<u8> {
+        &self.bytes
+    }
+}
+
 impl BytesInput {
+    /// Creates a new bytes input using the given bytes
     pub fn new(bytes: Vec<u8>) -> Self {
         BytesInput { bytes: bytes }
     }

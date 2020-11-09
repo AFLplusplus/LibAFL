@@ -18,10 +18,14 @@ pub enum AflError {
     Serialize(String),
     #[error("File IO failed")]
     File(#[from] io::Error),
+    #[error("Optional value `{0}` was not set")]
+    EmptyOptional(String),
     #[error("Key `{0}` not in Corpus")]
     KeyNotFound(String),
     #[error("No items in {0}")]
     Empty(String),
+    #[error("All elements have been processed in {0} iterator")]
+    IteratorEnd(String),
     #[error("Not implemented: {0}")]
     NotImplemented(String),
     #[error("Unknown error: {0}")]
