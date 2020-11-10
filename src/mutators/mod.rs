@@ -1,28 +1,12 @@
 pub mod scheduled;
-pub use scheduled::ScheduledMutator;
 pub use scheduled::DefaultScheduledMutator;
 pub use scheduled::HavocBytesMutator;
+pub use scheduled::ScheduledMutator;
 
 use crate::corpus::Corpus;
 use crate::inputs::Input;
 use crate::utils::HasRand;
 use crate::AflError;
-
-pub trait HasOptionCorpus<I>
-where
-    I: Input,
-{
-    type C: Corpus<I>;
-
-    /// Get the associated corpus, if any
-    fn corpus(&self) -> &Option<Box<Self::C>>;
-
-    /// Get the associated corpus, if any (mutable)
-    fn corpus_mut(&mut self) -> &mut Option<Box<Self::C>>;
-
-    /// Set the associated corpus
-    fn set_corpus(&mut self, corpus: Option<Box<Self::C>>);
-}
 
 pub trait Mutator<I>: HasRand
 where

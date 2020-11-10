@@ -2,23 +2,13 @@ pub mod mutational;
 pub use mutational::DefaultMutationalStage;
 
 use crate::corpus::Testcase;
-use crate::engines::Evaluator;
 use crate::inputs::Input;
 use crate::AflError;
 
-use std::cell::RefCell;
+use core::cell::RefCell;
 use std::rc::Rc;
 
-pub trait HasEvaluator<I>
-where
-    I: Input,
-{
-    type E: Evaluator<I>;
-
-    fn evaluator(&self) -> &Rc<RefCell<Self::E>>;
-}
-
-pub trait Stage<I>: HasEvaluator<I>
+pub trait Stage<I>
 where
     I: Input,
 {

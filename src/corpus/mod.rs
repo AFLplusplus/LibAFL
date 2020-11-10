@@ -5,7 +5,7 @@ use crate::inputs::Input;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
-use std::cell::RefCell;
+use core::cell::RefCell;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::rc::Rc;

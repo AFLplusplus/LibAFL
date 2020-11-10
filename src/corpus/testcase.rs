@@ -2,7 +2,7 @@ use crate::inputs::Input;
 use crate::AflError;
 
 use hashbrown::HashMap;
-use std::cell::RefCell;
+use core::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 

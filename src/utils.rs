@@ -1,6 +1,6 @@
 //! Utility functions for AFL
 
-use std::cell::RefCell;
+use core::cell::RefCell;
 use std::debug_assert;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -122,7 +122,10 @@ impl Xoshiro256StarRand {
 
     /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
     pub fn preseeded() -> Self {
-        let seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64;
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
         Self::new(seed)
     }
 
@@ -130,7 +133,6 @@ impl Xoshiro256StarRand {
     pub fn preseeded_rr() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self::preseeded()))
     }
-
 }
 
 /// Get the next higher power of two
@@ -158,8 +160,7 @@ mod tests {
         assert!(rand.between(11, 20) > 10);
     }
 
-
-    use std::cell::RefCell;
+    use core::cell::RefCell;
     use std::rc::Rc;
     struct HasRandTest<R>
     where
@@ -189,8 +190,6 @@ mod tests {
         assert!(has_rand.rand_below(100) < 100);
         assert_eq!(has_rand.rand_below(1), 0);
     }
-
-
 
     #[test]
     fn test_next_pow2() {

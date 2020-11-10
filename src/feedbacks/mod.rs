@@ -5,7 +5,7 @@ use crate::inputs::Input;
 use crate::observers::MapObserver;
 
 use num::Integer;
-use std::cell::RefCell;
+use core::cell::RefCell;
 use std::marker::PhantomData;
 
 pub trait Feedback<I>
