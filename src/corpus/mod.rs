@@ -1,3 +1,4 @@
+extern crate alloc;
 pub mod testcase;
 pub use testcase::{Testcase, TestcaseMetadata};
 
@@ -5,10 +6,10 @@ use crate::inputs::Input;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
+use alloc::rc::Rc;
 use core::cell::RefCell;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 pub trait HasEntriesVec<I>
 where

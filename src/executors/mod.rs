@@ -1,14 +1,14 @@
+extern crate alloc;
 pub mod inmemory;
 
 use crate::corpus::Testcase;
-use core::cell::RefCell;
-use std::rc::Rc;
-use crate::corpus::Corpus;
 use crate::corpus::TestcaseMetadata;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::AflError;
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 pub enum ExitKind {
     Ok,
@@ -19,13 +19,12 @@ pub enum ExitKind {
 
 // TODO unbox input
 
-pub trait Executor<I, C>
+pub trait Executor<I>
 where
     I: Input,
-    C: Corpus<I>,
 {
     /// Instruct the target about the input and run
-    fn run_target(&mut self, input: &mut I) -> Result<ExitKind, AflError>;
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError>;
 
     /// Reset the state of all the observes linked to this executor
     fn reset_observers(&mut self) -> Result<(), AflError>;
@@ -45,21 +44,20 @@ where
     /// Returns vector of feebacks
     fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>>;
 
+    /// Returns vector of feebacks (mutable)
+    fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>>;
+
     // TODO: Move to another struct, like evaluator?
     // In any case, the dependency on Corpus should probably go
     /// Runs the input and triggers observers and feedback
-    fn evaluate_input(
-        &mut self,
-        corpus: &mut C,
-        input: &mut I,
-    ) -> Result<bool, AflError> {
+    fn evaluate_input(&mut self, input: &I) -> Result<bool, AflError> {
         self.reset_observers()?;
         self.run_target(input)?;
         self.post_exec_observers()?;
 
         let mut metadatas: Vec<Box<dyn TestcaseMetadata>> = vec![];
         let mut rate_acc = 0;
-        for feedback in self.feedbacks() {
+        for feedback in self.feedbacks_mut() {
             let (rate, meta) = feedback.is_interesting(input);
             rate_acc += rate;
             if let Some(m) = meta {
@@ -72,12 +70,11 @@ where
             for meta in metadatas {
                 new_entry.borrow_mut().add_metadata(meta);
             }
-            corpus.add(new_entry);
+            //TODO corpus.add(new_entry);
 
             Ok(true)
         } else {
             Ok(false)
         }
     }
-
 }

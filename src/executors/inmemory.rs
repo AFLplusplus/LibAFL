@@ -1,32 +1,34 @@
-use crate::executors::Corpus;
+extern crate alloc;
+use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::AflError;
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 use crate::executors::{Executor, ExitKind};
 
 use std::os::raw::c_void;
 use std::ptr;
 
-type HarnessFunction<I, C> = fn(&dyn Executor<I, C>, &[u8]) -> ExitKind;
+type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 
-pub struct InMemoryExecutor<I, C>
+pub struct InMemoryExecutor<I>
 where
     I: Input,
-    C: Corpus<I>,
 {
     observers: Vec<Box<dyn Observer>>,
-    harness: HarnessFunction<I, C>,
+    harness: HarnessFunction<I>,
+    feedbacks: Vec<Box<dyn Feedback<I>>>,
 }
 
 static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
 
-impl<I, C> Executor<I, C> for InMemoryExecutor<I, C>
+impl<I> Executor<I> for InMemoryExecutor<I>
 where
     I: Input,
-    C: Corpus<I>,
 {
-    fn run_target(&mut self, input: &mut I) -> Result<ExitKind, AflError> {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
         let bytes = input.serialize()?;
         unsafe {
             CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor<I> as *const c_void;
@@ -59,21 +61,37 @@ where
     fn observers(&self) -> &Vec<Box<dyn Observer>> {
         &self.observers
     }
+
+    fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>> {
+        &self.feedbacks
+    }
+
+    fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>> {
+        &mut self.feedbacks
+    }
+
+    fn add_feedback(&mut self, feedback: Box<dyn Feedback<I>>) {
+        self.feedbacks_mut().push(feedback);
+    }
 }
 
-impl<I, C> InMemoryExecutor<I, C>
+impl<I> InMemoryExecutor<I>
 where
     I: Input,
-    C: Corpus<I>,
 {
-    pub fn new(harness_fn: HarnessFunction<I, C>) -> Self {
+    pub fn new(harness_fn: HarnessFunction<I>) -> Self {
         unsafe {
-            os_signals::setup_crash_handlers::<I, Self>();
+            os_signals::setup_crash_handlers::<I>();
         }
         InMemoryExecutor {
             observers: vec![],
+            feedbacks: vec![],
             harness: harness_fn,
         }
+    }
+
+    pub fn new_rr(harness_fn: HarnessFunction<I>) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(harness_fn)))
     }
 }
 
@@ -167,8 +185,7 @@ compile_error!("InMemoryExecutor not yet supported on this OS");
 
 #[cfg(test)]
 mod tests {
-    use crate::executors::Corpus;
-use crate::executors::inmemory::InMemoryExecutor;
+    use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::Input;
     use crate::observers::Observer;
@@ -196,16 +213,16 @@ use crate::executors::inmemory::InMemoryExecutor;
         }
     }
 
-    /*fn test_harness_fn_nop(_executor: &dyn Executor<Corpus, NopInput>, buf: &[u8]) -> ExitKind {
+    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
         println! {"Fake exec with buf of len {}", buf.len()};
         ExitKind::Ok
-    }*/
+    }
 
     #[test]
     fn test_inmem_post_exec() {
-        //let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
+        let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
         let nopserver = Nopserver {};
-        //in_mem_executor.add_observer(Box::new(nopserver));
+        in_mem_executor.add_observer(Box::new(nopserver));
         assert_eq!(in_mem_executor.post_exec_observers().is_err(), true);
     }
 
@@ -213,6 +230,6 @@ use crate::executors::inmemory::InMemoryExecutor;
     fn test_inmem_exec() {
         let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
         let mut input = NopInput {};
-        //assert!(in_mem_executor.run_target(&mut input).is_ok());
+        assert!(in_mem_executor.run_target(&mut input).is_ok());
     }
 }

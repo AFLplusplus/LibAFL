@@ -1,12 +1,12 @@
-use crate::corpus::Corpus;
+extern crate alloc;
 use crate::inputs::{HasBytesVec, Input};
 use crate::mutators::Mutator;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
+use alloc::rc::Rc;
 use core::cell::RefCell;
-use std::marker::PhantomData;
-use std::rc::Rc;
+use core::marker::PhantomData;
 
 /// The generic function type that identifies mutations
 type MutationFunction<M, I> = fn(&mut M, &mut I) -> Result<(), AflError>;
@@ -58,21 +58,19 @@ where
     }
 }
 
-pub struct DefaultScheduledMutator<'a, I, C, R>
+pub struct DefaultScheduledMutator<'a, I, R>
 where
     I: Input,
-    C: Corpus<I>,
     R: Rand,
 {
     rand: Rc<RefCell<R>>,
     mutations: Vec<MutationFunction<Self, I>>,
 }
 
-impl<'a, I, C, R> HasRand for DefaultScheduledMutator<'_, I, C, R>
+impl<'a, I, R> HasRand for DefaultScheduledMutator<'_, I, R>
 where
     I: Input,
     R: Rand,
-    C: Corpus<I>,
 {
     type R = R;
 
@@ -81,23 +79,20 @@ where
     }
 }
 
-
-impl<'a, I, C, R> Mutator<I> for DefaultScheduledMutator<'_, I, C, R>
+impl<'a, I, R> Mutator<I> for DefaultScheduledMutator<'_, I, R>
 where
     I: Input,
     R: Rand,
-    C: Corpus<I>,
 {
     fn mutate(&mut self, input: &mut I, _stage_idx: i32) -> Result<(), AflError> {
         self.scheduled_mutate(input, _stage_idx)
     }
 }
 
-impl<'a, I, C, R> ComposedByMutations<I> for DefaultScheduledMutator<'_, I, C, R>
+impl<'a, I, R> ComposedByMutations<I> for DefaultScheduledMutator<'_, I, R>
 where
     I: Input,
     R: Rand,
-    C: Corpus<I>,
 {
     fn mutation_by_idx(&self, index: usize) -> Result<MutationFunction<Self, I>, AflError> {
         if index >= self.mutations.len() {
@@ -115,19 +110,17 @@ where
     }
 }
 
-impl<'a, I, C, R> ScheduledMutator<I> for DefaultScheduledMutator<'_, I, C, R>
+impl<'a, I, R> ScheduledMutator<I> for DefaultScheduledMutator<'_, I, R>
 where
     I: Input,
     R: Rand,
-    C: Corpus<I>,
 {
     // Just use the default methods
 }
 
-impl<'a, I, C, R> DefaultScheduledMutator<'a, I, C, R>
+impl<'a, I, R> DefaultScheduledMutator<'a, I, R>
 where
     I: Input,
-    C: Corpus<I>,
     R: Rand,
 {
     /// Create a new DefaultScheduledMutator instance without mutations and corpus
@@ -139,16 +132,12 @@ where
     }
 
     /// Create a new DefaultScheduledMutator instance specifying mutations and corpus too
-    pub fn new_all(
-        rand: &Rc<RefCell<R>>,
-        mutations: Vec<MutationFunction<Self, I>>,
-    ) -> Self {
+    pub fn new_all(rand: &Rc<RefCell<R>>, mutations: Vec<MutationFunction<Self, I>>) -> Self {
         DefaultScheduledMutator {
             rand: Rc::clone(rand),
             mutations: mutations,
         }
     }
-    
 }
 
 /// Bitflip mutation for inputs with a bytes vector
@@ -209,15 +198,14 @@ where
     }
 }
 
-impl<'a, I, C, R> HavocBytesMutator<I, DefaultScheduledMutator<'a, I, C, R>>
+impl<'a, I, R> HavocBytesMutator<I, DefaultScheduledMutator<'a, I, R>>
 where
     I: Input + HasBytesVec,
     R: Rand,
-    C: Corpus<I>,
 {
     /// Create a new HavocBytesMutator instance wrapping DefaultScheduledMutator
     pub fn new_default(rand: &Rc<RefCell<R>>) -> Self {
-        let mut scheduled = DefaultScheduledMutator::<'a, I, C, R>::new(rand);
+        let mut scheduled = DefaultScheduledMutator::<'a, I, R>::new(rand);
         scheduled.add_mutation(mutation_bitflip);
         HavocBytesMutator {
             scheduled: scheduled,

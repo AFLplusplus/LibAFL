@@ -1,9 +1,10 @@
 //! Utility functions for AFL
+extern crate alloc;
 
+use alloc::rc::Rc;
 use core::cell::RefCell;
 use std::debug_assert;
 use std::fmt::Debug;
-use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use xxhash_rust::xxh3::xxh3_64_with_seed;
@@ -160,8 +161,8 @@ mod tests {
         assert!(rand.between(11, 20) > 10);
     }
 
+    use alloc::rc::Rc;
     use core::cell::RefCell;
-    use std::rc::Rc;
     struct HasRandTest<R>
     where
         R: Rand,

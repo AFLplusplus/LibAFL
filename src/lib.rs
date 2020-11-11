@@ -1,3 +1,4 @@
+extern crate alloc;
 use std::io;
 use thiserror::Error;
 

@@ -1,9 +1,10 @@
+extern crate alloc;
 pub mod scheduled;
+pub use scheduled::ComposedByMutations;
 pub use scheduled::DefaultScheduledMutator;
 pub use scheduled::HavocBytesMutator;
 pub use scheduled::ScheduledMutator;
 
-use crate::corpus::Corpus;
 use crate::inputs::Input;
 use crate::utils::HasRand;
 use crate::AflError;

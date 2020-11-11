@@ -1,26 +1,23 @@
-use crate::corpus::Corpus;
-use crate::corpus::TestcaseMetadata;
-use crate::executors::Executor;
+extern crate alloc;
 use crate::corpus::testcase::Testcase;
-use crate::engines::Evaluator;
+use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
 use crate::stages::Stage;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
-use std::cell::RefCell;
-use std::marker::PhantomData;
-use std::rc::Rc;
+use alloc::rc::Rc;
+use core::cell::RefCell;
+use core::marker::PhantomData;
 
 // TODO create HasMutatorsVec trait
 
-pub trait MutationalStage<I, C, M, E>: Stage<I> + HasRand
+pub trait MutationalStage<I, M, E>: Stage<I> + HasRand
 where
     I: Input,
     M: Mutator<I, R = Self::R>,
-    C: Corpus<I>,
-    E: Executor<I, C>,
+    E: Executor<I>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -37,9 +34,9 @@ where
         1 + self.rand_below(128) as usize
     }
 
+    // TODO: We need a way to get testcases for splicing
     /// Runs this (mutational) stage for the given testcase
-    fn perform_mutational(&mut self, corpus: &mut C, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
-        let testcase = corpus.next()?;
+    fn perform_mutational(&mut self, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
         let num = self.iterations();
         let input = testcase.borrow_mut().load_input()?.clone();
 
@@ -47,7 +44,7 @@ where
             let mut input_tmp = input.clone();
             self.mutator_mut().mutate(&mut input_tmp, i as i32)?;
 
-            let interesting = self.executor().borrow_mut().evaluate_input(&corpus)?;
+            let interesting = self.executor().borrow_mut().evaluate_input(&input_tmp)?;
 
             self.mutator_mut().post_exec(interesting, i as i32)?;
         }
@@ -56,28 +53,25 @@ where
 }
 
 /// The default mutational stage
-pub struct DefaultMutationalStage<I, C, R, M, E>
+pub struct DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
-    C: Corpus<I>,
     R: Rand,
     M: Mutator<I, R = R>,
-    E: Executor<I, C>,
+    E: Executor<I>,
 {
     rand: Rc<RefCell<R>>,
     executor: Rc<RefCell<E>>,
     mutator: M,
     _phantom_input: PhantomData<I>,
-    _phantom_corpus: PhantomData<C>,
 }
 
-impl<I, C, R, M, E> HasRand for DefaultMutationalStage<I, C, R, M, E>
+impl<I, R, M, E> HasRand for DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
-    C: Corpus<I>,
     R: Rand,
     M: Mutator<I, R = R>,
-    E: Executor<I, C>,
+    E: Executor<I>,
 {
     type R = R;
 
@@ -86,14 +80,12 @@ where
     }
 }
 
-
-impl<I, C, R, M, E> MutationalStage<I, C, M, E> for DefaultMutationalStage<I, C, R, M, E>
+impl<I, R, M, E> MutationalStage<I, M, E> for DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
-    C: Corpus<I>,
     R: Rand,
     M: Mutator<I, R = R>,
-    E: Executor<I, C>,
+    E: Executor<I>,
 {
     /// The mutator, added to this stage
     fn mutator(&self) -> &M {
@@ -104,28 +96,30 @@ where
     fn mutator_mut(&mut self) -> &mut M {
         &mut self.mutator
     }
-}
 
-impl<I, C, R, M, E> Stage<I> for DefaultMutationalStage<I, C, R, M, E>
-where
-    I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    M: Mutator<I, R = R>,
-    E: Executor<I, C>,
-{
-    fn perform(&mut self, corpus: &mut C) -> Result<(), AflError> {
-        self.perform_mutational(corpus)
+    fn executor(&self) -> &Rc<RefCell<E>> {
+        &self.executor
     }
 }
 
-impl<I, C, R, M, E> DefaultMutationalStage<I, C, R, M, E>
+impl<I, R, M, E> Stage<I> for DefaultMutationalStage<I, R, M, E>
 where
     I: Input,
     R: Rand,
-    C: Corpus<I>,
     M: Mutator<I, R = R>,
-    E: Executor<I, C>,
+    E: Executor<I>,
+{
+    fn perform(&mut self, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+        self.perform_mutational(testcase)
+    }
+}
+
+impl<I, R, M, E> DefaultMutationalStage<I, R, M, E>
+where
+    I: Input,
+    R: Rand,
+    M: Mutator<I, R = R>,
+    E: Executor<I>,
 {
     /// Creates a new default mutational stage
     pub fn new(rand: &Rc<RefCell<R>>, executor: &Rc<RefCell<E>>, mutator: M) -> Self {
@@ -134,7 +128,6 @@ where
             executor: Rc::clone(executor),
             mutator: mutator,
             _phantom_input: PhantomData,
-            _phantom_corpus: PhantomData,
         }
     }
 }

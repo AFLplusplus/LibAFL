@@ -1,10 +1,11 @@
+extern crate alloc;
 use crate::inputs::Input;
 use crate::AflError;
 
-use hashbrown::HashMap;
+use alloc::rc::Rc;
 use core::cell::RefCell;
+use hashbrown::HashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 // TODO: Give example
 /// Metadata for a testcase

@@ -1,3 +1,4 @@
+extern crate alloc;
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
 
