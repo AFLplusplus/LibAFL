@@ -1,5 +1,7 @@
+//! The engine is the core piece of every good fuzzer
 extern crate alloc;
-use crate::corpus::testcase::Testcase;
+
+use crate::corpus::Corpus;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::stages::Stage;
@@ -8,8 +10,9 @@ use crate::AflError;
 use alloc::rc::Rc;
 use core::cell::RefCell;
 
-pub trait Engine<I>
+pub trait Engine<C, I>
 where
+    C: Corpus<I>,
     I: Input,
 {
     fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>>;
@@ -20,32 +23,34 @@ where
         self.feedbacks_mut().push(feedback);
     }
 
-    fn stages(&self) -> &Vec<Box<dyn Stage<I>>>;
+    fn stages(&self) -> &Vec<Box<dyn Stage<C, I>>>;
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<I>>>;
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<C, I>>>;
 
-    fn add_stage(&mut self, stage: Box<dyn Stage<I>>) {
+    fn add_stage(&mut self, stage: Box<dyn Stage<C, I>>) {
         self.stages_mut().push(stage);
     }
 
-    fn fuzz_one(&mut self, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+    fn fuzz_one(&mut self, corpus: &mut C) -> Result<(), AflError> {
         for stage in self.stages_mut() {
-            stage.perform(&testcase)?;
+            stage.perform(corpus)?;
         }
         Ok(())
     }
 }
 
-pub struct DefaultEngine<I>
+pub struct DefaultEngine<C, I>
 where
+    C: Corpus<I>,
     I: Input,
 {
     feedbacks: Vec<Box<dyn Feedback<I>>>,
-    stages: Vec<Box<dyn Stage<I>>>,
+    stages: Vec<Box<dyn Stage<C, I>>>,
 }
 
-impl<I> Engine<I> for DefaultEngine<I>
+impl<C, I> Engine<C, I> for DefaultEngine<C, I>
 where
+    C: Corpus<I>,
     I: Input,
 {
     fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>> {
@@ -56,17 +61,18 @@ where
         &mut self.feedbacks
     }
 
-    fn stages(&self) -> &Vec<Box<dyn Stage<I>>> {
+    fn stages(&self) -> &Vec<Box<dyn Stage<C, I>>> {
         &self.stages
     }
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<I>>> {
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<C, I>>> {
         &mut self.stages
     }
 }
 
-impl<I> DefaultEngine<I>
+impl<C, I> DefaultEngine<C, I>
 where
+    C: Corpus<I>,
     I: Input,
 {
     pub fn new() -> Self {
@@ -92,6 +98,8 @@ mod tests {
         mutation_bitflip, ComposedByMutations, DefaultScheduledMutator,
     };
     use crate::stages::mutational::DefaultMutationalStage;
+    use alloc::rc::Rc;
+    use core::cell::RefCell;
 
     use crate::utils::Xoshiro256StarRand;
 
@@ -106,12 +114,16 @@ mod tests {
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new_rr(BytesInput::new(vec![0; 4]));
         corpus.add(testcase);
-        let executor = InMemoryExecutor::new_rr(harness);
+        let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> = InMemoryExecutor::new_rr(harness);
         let mut engine = DefaultEngine::new();
         let mut mutator = DefaultScheduledMutator::new(&rand);
         mutator.add_mutation(mutation_bitflip);
         let stage = DefaultMutationalStage::new(&rand, &executor, mutator);
         engine.add_stage(Box::new(stage));
-        engine.fuzz_one(&corpus.next().unwrap()).unwrap();
+        for i in 0..1000 {
+            engine
+                .fuzz_one(&mut corpus)
+                .expect(&format!("Error in iter {}", i));
+        }
     }
 }

@@ -1,18 +1,16 @@
 extern crate alloc;
 pub mod mutational;
+use crate::corpus::Corpus;
 pub use mutational::DefaultMutationalStage;
 
-use crate::corpus::Testcase;
 use crate::inputs::Input;
 use crate::AflError;
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
-pub trait Stage<I>
+pub trait Stage<C, I>
 where
+    C: Corpus<I>,
     I: Input,
 {
     /// Run the stage
-    fn perform(&mut self, entry: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError>;
+    fn perform(&mut self, corpus: &mut C) -> Result<(), AflError>;
 }

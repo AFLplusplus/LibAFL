@@ -3,6 +3,7 @@ use crate::corpus::testcase::Testcase;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
+use crate::stages::Corpus;
 use crate::stages::Stage;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
@@ -13,8 +14,9 @@ use core::marker::PhantomData;
 
 // TODO create HasMutatorsVec trait
 
-pub trait MutationalStage<I, M, E>: Stage<I> + HasRand
+pub trait MutationalStage<C, I, M, E>: Stage<C, I> + HasRand
 where
+    C: Corpus<I>,
     I: Input,
     M: Mutator<I, R = Self::R>,
     E: Executor<I>,
@@ -34,9 +36,9 @@ where
         1 + self.rand_below(128) as usize
     }
 
-    // TODO: We need a way to get testcases for splicing
     /// Runs this (mutational) stage for the given testcase
-    fn perform_mutational(&mut self, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+    fn perform_mutational(&mut self, corpus: &mut C) -> Result<(), AflError> {
+        let testcase = corpus.next()?;
         let num = self.iterations();
         let input = testcase.borrow_mut().load_input()?.clone();
 
@@ -47,6 +49,10 @@ where
             let interesting = self.executor().borrow_mut().evaluate_input(&input_tmp)?;
 
             self.mutator_mut().post_exec(interesting, i as i32)?;
+
+            if interesting {
+                corpus.add(Testcase::new_rr(input_tmp));
+            }
         }
         Ok(())
     }
@@ -80,8 +86,9 @@ where
     }
 }
 
-impl<I, R, M, E> MutationalStage<I, M, E> for DefaultMutationalStage<I, R, M, E>
+impl<C, I, R, M, E> MutationalStage<C, I, M, E> for DefaultMutationalStage<I, R, M, E>
 where
+    C: Corpus<I>,
     I: Input,
     R: Rand,
     M: Mutator<I, R = R>,
@@ -102,15 +109,16 @@ where
     }
 }
 
-impl<I, R, M, E> Stage<I> for DefaultMutationalStage<I, R, M, E>
+impl<C, I, R, M, E> Stage<C, I> for DefaultMutationalStage<I, R, M, E>
 where
+    C: Corpus<I>,
     I: Input,
     R: Rand,
     M: Mutator<I, R = R>,
     E: Executor<I>,
 {
-    fn perform(&mut self, testcase: &Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
-        self.perform_mutational(testcase)
+    fn perform(&mut self, corpus: &mut C) -> Result<(), AflError> {
+        self.perform_mutational(corpus)
     }
 }
 
