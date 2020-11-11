@@ -215,7 +215,7 @@ where
 
     let split_at = mutator.rand_between(first_diff as u64, last_diff as u64) as usize;
 
-    Err(AflError::NotImplemented(format!("TODO: fix Splice (would split at {})", counter));
+    Err(AflError::NotImplemented(format!("TODO: fix Splice (would split at {})", split_at)))
 
     //input.bytes_mut().splice(split_at.., other.bytes()[split_at..]).collect();
 
