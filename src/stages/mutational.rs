@@ -44,7 +44,8 @@ where
 
         for i in 0..num {
             let mut input_tmp = input.clone();
-            self.mutator_mut().mutate(corpus, &mut input_tmp, i as i32)?;
+            self.mutator_mut()
+                .mutate(corpus, &mut input_tmp, i as i32)?;
 
             let interesting = self.executor().borrow_mut().evaluate_input(&input_tmp)?;
 

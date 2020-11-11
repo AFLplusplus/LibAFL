@@ -47,9 +47,8 @@ where
     /// Returns vector of feebacks (mutable)
     fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>>;
 
-    // TODO: Move to another struct, like evaluator?
-    // In any case, the dependency on Corpus should probably go
     /// Runs the input and triggers observers and feedback
+    // TODO: Move to another struct, like evaluator?
     fn evaluate_input(&mut self, input: &I) -> Result<bool, AflError> {
         self.reset_observers()?;
         self.run_target(input)?;

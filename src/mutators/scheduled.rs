@@ -1,6 +1,6 @@
 extern crate alloc;
-use crate::mutators::Corpus;
 use crate::inputs::{HasBytesVec, Input};
+use crate::mutators::Corpus;
 use crate::mutators::Mutator;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
@@ -52,7 +52,12 @@ where
 
     /// New default implementation for mutate
     /// Implementations must forward mutate() to this method
-    fn scheduled_mutate(&mut self, corpus: &mut C, input: &mut I, _stage_idx: i32) -> Result<(), AflError> {
+    fn scheduled_mutate(
+        &mut self,
+        corpus: &mut C,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<(), AflError> {
         let num = self.iterations(input);
         for _ in 0..num {
             self.schedule(input)?(self, corpus, input)?;
@@ -150,7 +155,11 @@ where
 }
 
 /// Bitflip mutation for inputs with a bytes vector
-pub fn mutation_bitflip<C, M, I>(mutator: &mut M, _corpus: &mut C, input: &mut I) -> Result<(), AflError>
+pub fn mutation_bitflip<C, M, I>(
+    mutator: &mut M,
+    _corpus: &mut C,
+    input: &mut I,
+) -> Result<(), AflError>
 where
     C: Corpus<I>,
     M: Mutator<C, I>,
@@ -159,6 +168,58 @@ where
     let bit = mutator.rand_below(input.bytes().len() as u64) as usize;
     input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
     Ok(())
+}
+
+/// Returns the first and last diff position between the given vectors, stopping at the min len
+fn locate_diffs(this: &Vec<u8>, other: &Vec<u8>) -> (i64, i64) {
+    let mut first_diff: i64 = -1;
+    let mut last_diff: i64 = -1;
+    for (i, (this_el, other_el)) in this.iter().zip(other.iter()).enumerate() {
+        if this_el != other_el {
+            if first_diff < 0 {
+                first_diff = i as i64;
+            }
+            last_diff = i as i64;
+        }
+    }
+
+    (first_diff, last_diff)
+}
+
+/// Splicing mutator
+pub fn mutation_splice<C, M, I>(
+    mutator: &mut M,
+    corpus: &mut C,
+    input: &mut I,
+) -> Result<(), AflError>
+where
+    C: Corpus<I>,
+    M: Mutator<C, I>,
+    I: Input + HasBytesVec,
+{
+    let other_rr = corpus.random_entry()?;
+    let mut other_testcase = other_rr.borrow_mut();
+    let other = other_testcase.load_input()?;
+
+    let mut counter = 0;
+    let (first_diff, last_diff) = loop {
+        let (f, l) = locate_diffs(input.bytes(), other.bytes());
+        if f != l && f >= 0 && l >= 2 {
+            break (f, l);
+        }
+        if counter == 20 {
+            return Err(AflError::Empty("No valid diff found".to_owned()));
+        }
+        counter += 1;
+    };
+
+    let split_at = mutator.rand_between(first_diff as u64, last_diff as u64) as usize;
+
+    Err(AflError::NotImplemented(format!("TODO: fix Splice (would split at {})", counter));
+
+    //input.bytes_mut().splice(split_at.., other.bytes()[split_at..]).collect();
+
+    //Ok(())
 }
 
 /// Schedule some selected byte level mutations given a ScheduledMutator type
