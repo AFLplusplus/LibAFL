@@ -206,10 +206,12 @@ where
             Ok(_) => found = true,
             Err(_) => {
                 if retry_count == 20 {
-                    return Err(AflError::Empty("No suitable testcase found for splicing".to_owned()));
+                    return Err(AflError::Empty(
+                        "No suitable testcase found for splicing".to_owned(),
+                    ));
                 }
                 retry_count += 1;
-            },
+            }
         };
         if found {
             break other_rr;
@@ -318,7 +320,7 @@ mod tests {
     use crate::corpus::{Corpus, InMemoryCorpus};
     use crate::inputs::BytesInput;
     use crate::mutators::scheduled::mutation_splice;
-    use crate::utils::{Xoshiro256StarRand, DefaultHasRand};
+    use crate::utils::{DefaultHasRand, Xoshiro256StarRand};
 
     #[test]
     fn test_mut_splice() {
