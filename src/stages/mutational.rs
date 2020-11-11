@@ -18,7 +18,7 @@ pub trait MutationalStage<C, I, M, E>: Stage<C, I> + HasRand
 where
     C: Corpus<I>,
     I: Input,
-    M: Mutator<I, R = Self::R>,
+    M: Mutator<C, I, R = Self::R>,
     E: Executor<I>,
 {
     /// The mutator registered for this stage
@@ -44,7 +44,7 @@ where
 
         for i in 0..num {
             let mut input_tmp = input.clone();
-            self.mutator_mut().mutate(&mut input_tmp, i as i32)?;
+            self.mutator_mut().mutate(corpus, &mut input_tmp, i as i32)?;
 
             let interesting = self.executor().borrow_mut().evaluate_input(&input_tmp)?;
 
@@ -59,24 +59,27 @@ where
 }
 
 /// The default mutational stage
-pub struct DefaultMutationalStage<I, R, M, E>
+pub struct DefaultMutationalStage<C, I, R, M, E>
 where
+    C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<I, R = R>,
+    M: Mutator<C, I, R = R>,
     E: Executor<I>,
 {
     rand: Rc<RefCell<R>>,
     executor: Rc<RefCell<E>>,
     mutator: M,
+    _phantom_corpus: PhantomData<C>,
     _phantom_input: PhantomData<I>,
 }
 
-impl<I, R, M, E> HasRand for DefaultMutationalStage<I, R, M, E>
+impl<C, I, R, M, E> HasRand for DefaultMutationalStage<C, I, R, M, E>
 where
+    C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<I, R = R>,
+    M: Mutator<C, I, R = R>,
     E: Executor<I>,
 {
     type R = R;
@@ -86,12 +89,12 @@ where
     }
 }
 
-impl<C, I, R, M, E> MutationalStage<C, I, M, E> for DefaultMutationalStage<I, R, M, E>
+impl<C, I, R, M, E> MutationalStage<C, I, M, E> for DefaultMutationalStage<C, I, R, M, E>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<I, R = R>,
+    M: Mutator<C, I, R = R>,
     E: Executor<I>,
 {
     /// The mutator, added to this stage
@@ -109,12 +112,12 @@ where
     }
 }
 
-impl<C, I, R, M, E> Stage<C, I> for DefaultMutationalStage<I, R, M, E>
+impl<C, I, R, M, E> Stage<C, I> for DefaultMutationalStage<C, I, R, M, E>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<I, R = R>,
+    M: Mutator<C, I, R = R>,
     E: Executor<I>,
 {
     fn perform(&mut self, corpus: &mut C) -> Result<(), AflError> {
@@ -122,11 +125,12 @@ where
     }
 }
 
-impl<I, R, M, E> DefaultMutationalStage<I, R, M, E>
+impl<C, I, R, M, E> DefaultMutationalStage<C, I, R, M, E>
 where
+    C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<I, R = R>,
+    M: Mutator<C, I, R = R>,
     E: Executor<I>,
 {
     /// Creates a new default mutational stage
@@ -135,6 +139,7 @@ where
             rand: Rc::clone(rand),
             executor: Rc::clone(executor),
             mutator: mutator,
+            _phantom_corpus: PhantomData,
             _phantom_input: PhantomData,
         }
     }
