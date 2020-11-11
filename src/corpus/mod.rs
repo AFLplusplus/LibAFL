@@ -38,6 +38,11 @@ where
         self.entries_mut().push(entry);
     }
 
+    /// Add an input to the corpus
+    fn add_input(&mut self, input: I) {
+        self.add(Testcase::new_rr(input));
+    }
+
     /// Removes an entry from the corpus, returning it if it was present.
     fn remove(&mut self, entry: &Testcase<I>) -> Option<Rc<RefCell<Testcase<I>>>> {
         let mut i: usize = 0;

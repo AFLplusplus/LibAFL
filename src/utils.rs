@@ -136,6 +136,40 @@ impl Xoshiro256StarRand {
     }
 }
 
+/// A very basic HasRand
+pub struct DefaultHasRand<R>
+where
+    R: Rand,
+{
+    rand: Rc<RefCell<R>>,
+}
+
+/// A very basic HasRand
+impl<R> HasRand for DefaultHasRand<R>
+where
+    R: Rand,
+{
+    type R = R;
+
+    /// Get the rand rc refcell
+    fn rand(&self) -> &Rc<RefCell<R>> {
+        &self.rand
+    }
+}
+
+/// A very basic HasRand
+impl<R> DefaultHasRand<R>
+where
+    R: Rand,
+{
+    /// Create a new DefaultHasRand, cloning the refcell
+    pub fn new(rand: &Rc<RefCell<R>>) -> Self {
+        Self {
+            rand: Rc::clone(rand),
+        }
+    }
+}
+
 /// Get the next higher power of two
 pub fn next_pow2(val: u64) -> u64 {
     let mut out = val.wrapping_sub(1);
@@ -149,7 +183,7 @@ pub fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, HasRand, Rand, Xoshiro256StarRand};
+    use crate::utils::{next_pow2, DefaultHasRand, HasRand, Rand, Xoshiro256StarRand};
 
     #[test]
     fn test_rand() {
@@ -161,32 +195,10 @@ mod tests {
         assert!(rand.between(11, 20) > 10);
     }
 
-    use alloc::rc::Rc;
-    use core::cell::RefCell;
-    struct HasRandTest<R>
-    where
-        R: Rand,
-    {
-        rand: Rc<RefCell<R>>,
-    }
-
-    impl<R> HasRand for HasRandTest<R>
-    where
-        R: Rand,
-    {
-        type R = R;
-
-        fn rand(&self) -> &Rc<RefCell<R>> {
-            &self.rand
-        }
-    }
-
     #[test]
     fn test_has_rand() {
         let rand = Xoshiro256StarRand::preseeded_rr();
-        let has_rand = HasRandTest {
-            rand: Rc::clone(&rand),
-        };
+        let has_rand = DefaultHasRand::new(&rand);
 
         assert!(has_rand.rand_below(100) < 100);
         assert_eq!(has_rand.rand_below(1), 0);

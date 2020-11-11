@@ -162,7 +162,7 @@ pub fn mutation_bitflip<C, M, I>(
 ) -> Result<(), AflError>
 where
     C: Corpus<I>,
-    M: Mutator<C, I>,
+    M: HasRand,
     I: Input + HasBytesVec,
 {
     let bit = mutator.rand_below(input.bytes().len() as u64) as usize;
@@ -194,10 +194,28 @@ pub fn mutation_splice<C, M, I>(
 ) -> Result<(), AflError>
 where
     C: Corpus<I>,
-    M: Mutator<C, I>,
+    M: HasRand,
     I: Input + HasBytesVec,
 {
-    let other_rr = corpus.random_entry()?;
+    let mut retry_count = 0;
+    // We don't want to use the testcase we're already using for splicing
+    let other_rr = loop {
+        let mut found = false;
+        let other_rr = corpus.random_entry()?.clone();
+        match other_rr.try_borrow_mut() {
+            Ok(_) => found = true,
+            Err(_) => {
+                if retry_count == 20 {
+                    return Err(AflError::Empty("No suitable testcase found for splicing".to_owned()));
+                }
+                retry_count += 1;
+            },
+        };
+        if found {
+            break other_rr;
+        }
+    };
+    // This should work now, as we successfully try_borrow_mut'd before.
     let mut other_testcase = other_rr.borrow_mut();
     let other = other_testcase.load_input()?;
 
@@ -215,11 +233,12 @@ where
 
     let split_at = mutator.rand_between(first_diff as u64, last_diff as u64) as usize;
 
-    Err(AflError::NotImplemented(format!("TODO: fix Splice (would split at {})", split_at)))
+    let _: Vec<_> = input
+        .bytes_mut()
+        .splice(split_at.., other.bytes()[split_at..].iter().cloned())
+        .collect();
 
-    //input.bytes_mut().splice(split_at.., other.bytes()[split_at..]).collect();
-
-    //Ok(())
+    Ok(())
 }
 
 /// Schedule some selected byte level mutations given a ScheduledMutator type
@@ -290,5 +309,31 @@ where
             phantom: PhantomData,
             _phantom_corpus: PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::corpus::{Corpus, InMemoryCorpus};
+    use crate::inputs::BytesInput;
+    use crate::mutators::scheduled::mutation_splice;
+    use crate::utils::{Xoshiro256StarRand, DefaultHasRand};
+
+    #[test]
+    fn test_mut_splice() {
+        let rand = &Xoshiro256StarRand::new_rr(0);
+        let mut has_rand = DefaultHasRand::new(&rand);
+        let mut corpus = InMemoryCorpus::new(&rand);
+        corpus.add_input(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8]));
+        corpus.add_input(BytesInput::new(vec!['d' as u8, 'e' as u8, 'f' as u8]));
+
+        let testcase_rr = corpus.next().expect("Corpus did not contain entries");
+        let mut testcase = testcase_rr.borrow_mut();
+        let mut input = testcase.load_input().expect("No input in testcase").clone();
+
+        mutation_splice(&mut has_rand, &mut corpus, &mut input).unwrap()
+
+        // TODO: Finish testcase
     }
 }
