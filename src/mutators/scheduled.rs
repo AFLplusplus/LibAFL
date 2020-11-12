@@ -220,10 +220,12 @@ where
     // This should work now, as we successfully try_borrow_mut'd before.
     let mut other_testcase = other_rr.borrow_mut();
     let other = other_testcase.load_input()?;
+    // println!("Input: {:?}, other input: {:?}", input.bytes(), other.bytes());
 
     let mut counter = 0;
     let (first_diff, last_diff) = loop {
         let (f, l) = locate_diffs(input.bytes(), other.bytes());
+        // println!("Diffs were between {} and {}", f, l);
         if f != l && f >= 0 && l >= 2 {
             break (f, l);
         }
@@ -235,10 +237,14 @@ where
 
     let split_at = mutator.rand_between(first_diff as u64, last_diff as u64) as usize;
 
+    // println!("Splicing at {}", split_at);
+
     let _: Vec<_> = input
         .bytes_mut()
         .splice(split_at.., other.bytes()[split_at..].iter().cloned())
         .collect();
+
+    // println!("Splice result: {:?}, input is now: {:?}", split_result, input.bytes());
 
     Ok(())
 }
@@ -318,13 +324,14 @@ where
 mod tests {
 
     use crate::corpus::{Corpus, InMemoryCorpus};
-    use crate::inputs::BytesInput;
+    use crate::inputs::{BytesInput, HasBytesVec};
     use crate::mutators::scheduled::mutation_splice;
     use crate::utils::{DefaultHasRand, Xoshiro256StarRand};
 
     #[test]
     fn test_mut_splice() {
-        let rand = &Xoshiro256StarRand::new_rr(0);
+        // With the current impl, seed of 1 will result in a split at pos 2.
+        let rand = &Xoshiro256StarRand::new_rr(1);
         let mut has_rand = DefaultHasRand::new(&rand);
         let mut corpus = InMemoryCorpus::new(&rand);
         corpus.add_input(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8]));
@@ -334,8 +341,12 @@ mod tests {
         let mut testcase = testcase_rr.borrow_mut();
         let mut input = testcase.load_input().expect("No input in testcase").clone();
 
-        mutation_splice(&mut has_rand, &mut corpus, &mut input).unwrap()
+        mutation_splice(&mut has_rand, &mut corpus, &mut input).unwrap();
 
-        // TODO: Finish testcase
+        println!("{:?}", input.bytes());
+
+        // The pre-seeded rand should have spliced at position 2.
+        // TODO: Maybe have a fixed rand for this purpose?
+        assert_eq!(input.bytes(), &vec!['a' as u8, 'b' as u8, 'f' as u8])
     }
 }
