@@ -1,14 +1,15 @@
 extern crate alloc;
 pub mod inmemory;
 
+use alloc::rc::Rc;
+use core::cell::RefCell;
+
 use crate::corpus::Testcase;
 use crate::corpus::TestcaseMetadata;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::AflError;
-use alloc::rc::Rc;
-use core::cell::RefCell;
 
 pub enum ExitKind {
     Ok,

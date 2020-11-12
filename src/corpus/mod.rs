@@ -1,15 +1,16 @@
 extern crate alloc;
+
 pub mod testcase;
 pub use testcase::{Testcase, TestcaseMetadata};
-
-use crate::inputs::Input;
-use crate::utils::{HasRand, Rand};
-use crate::AflError;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use std::path::PathBuf;
+
+use crate::inputs::Input;
+use crate::utils::{HasRand, Rand};
+use crate::AflError;
 
 pub trait HasEntriesVec<I>
 where
@@ -307,14 +308,14 @@ mod tests {
     use crate::corpus::Testcase;
     use crate::corpus::{OnDiskCorpus, QueueCorpus};
     use crate::inputs::bytes::BytesInput;
-    use crate::utils::Xoshiro256StarRand;
+    use crate::utils::DefaultRand;
 
     use std::path::PathBuf;
 
     #[test]
 
     fn test_queuecorpus() {
-        let rand = Xoshiro256StarRand::preseeded_rr();
+        let rand = DefaultRand::preseeded_rr();
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
         let i = BytesInput::new(vec![0; 4]);
         let t = Testcase::with_filename_rr(i, PathBuf::from("fancyfile"));

@@ -1,4 +1,5 @@
 extern crate alloc;
+
 use crate::inputs::{HasBytesVec, Input};
 use crate::mutators::Corpus;
 use crate::mutators::Mutator;
@@ -326,12 +327,12 @@ mod tests {
     use crate::corpus::{Corpus, InMemoryCorpus};
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::mutators::scheduled::mutation_splice;
-    use crate::utils::{DefaultHasRand, Xoshiro256StarRand};
+    use crate::utils::{DefaultHasRand, DefaultRand};
 
     #[test]
     fn test_mut_splice() {
         // With the current impl, seed of 1 will result in a split at pos 2.
-        let rand = &Xoshiro256StarRand::new_rr(1);
+        let rand = &DefaultRand::new_rr(1);
         let mut has_rand = DefaultHasRand::new(&rand);
         let mut corpus = InMemoryCorpus::new(&rand);
         corpus.add_input(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8]));

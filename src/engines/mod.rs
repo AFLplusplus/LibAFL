@@ -1,14 +1,14 @@
 //! The engine is the core piece of every good fuzzer
 extern crate alloc;
 
+use alloc::rc::Rc;
+use core::cell::RefCell;
+
 use crate::corpus::Corpus;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::stages::Stage;
 use crate::AflError;
-
-use alloc::rc::Rc;
-use core::cell::RefCell;
 
 pub trait Engine<C, I>
 where
@@ -89,6 +89,10 @@ where
 
 #[cfg(test)]
 mod tests {
+
+    use alloc::rc::Rc;
+    use core::cell::RefCell;
+
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
     use crate::engines::{DefaultEngine, Engine};
     use crate::executors::inmemory::InMemoryExecutor;
@@ -98,10 +102,7 @@ mod tests {
         mutation_bitflip, ComposedByMutations, DefaultScheduledMutator,
     };
     use crate::stages::mutational::DefaultMutationalStage;
-    use alloc::rc::Rc;
-    use core::cell::RefCell;
-
-    use crate::utils::Xoshiro256StarRand;
+    use crate::utils::DefaultRand;
 
     fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
@@ -109,7 +110,7 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        let rand = Xoshiro256StarRand::preseeded_rr();
+        let rand = DefaultRand::preseeded_rr();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new_rr(BytesInput::new(vec![0; 4]));

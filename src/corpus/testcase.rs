@@ -1,4 +1,5 @@
 extern crate alloc;
+
 use crate::inputs::Input;
 use crate::AflError;
 

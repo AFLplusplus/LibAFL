@@ -1,4 +1,9 @@
 extern crate alloc;
+
+use alloc::rc::Rc;
+use core::cell::RefCell;
+use core::marker::PhantomData;
+
 use crate::corpus::testcase::Testcase;
 use crate::executors::Executor;
 use crate::inputs::Input;
@@ -7,10 +12,6 @@ use crate::stages::Corpus;
 use crate::stages::Stage;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
-
-use alloc::rc::Rc;
-use core::cell::RefCell;
-use core::marker::PhantomData;
 
 // TODO create HasMutatorsVec trait
 

@@ -1,6 +1,4 @@
 extern crate alloc;
-use std::io;
-use thiserror::Error;
 
 pub mod corpus;
 pub mod engines;
@@ -12,6 +10,9 @@ pub mod mutators;
 pub mod observers;
 pub mod stages;
 pub mod utils;
+
+use std::io;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AflError {

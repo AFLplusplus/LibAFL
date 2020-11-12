@@ -1,8 +1,9 @@
 extern crate alloc;
+
 pub mod mutational;
-use crate::corpus::Corpus;
 pub use mutational::DefaultMutationalStage;
 
+use crate::corpus::Corpus;
 use crate::inputs::Input;
 use crate::AflError;
 

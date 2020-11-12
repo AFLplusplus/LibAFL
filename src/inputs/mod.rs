@@ -1,8 +1,9 @@
 extern crate alloc;
+
 pub mod bytes;
 pub use bytes::BytesInput;
 
-use std::clone::Clone;
+use core::clone::Clone;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;

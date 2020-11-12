@@ -1,4 +1,5 @@
 extern crate alloc;
+
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
 
@@ -43,11 +44,11 @@ impl BytesInput {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, Rand, Xoshiro256StarRand};
+    use crate::utils::{next_pow2, DefaultRand, Rand};
 
     #[test]
     fn test_input() {
-        let mut rand = Xoshiro256StarRand::preseeded();
+        let mut rand = DefaultRand::preseeded();
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);

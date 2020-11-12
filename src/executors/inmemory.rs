@@ -1,15 +1,15 @@
 extern crate alloc;
+
+use alloc::rc::Rc;
+use core::cell::RefCell;
+use std::os::raw::c_void;
+use std::ptr;
+
+use crate::executors::{Executor, ExitKind};
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::AflError;
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
-use crate::executors::{Executor, ExitKind};
-
-use std::os::raw::c_void;
-use std::ptr;
 
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 

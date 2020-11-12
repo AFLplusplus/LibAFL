@@ -3,11 +3,12 @@ extern crate alloc;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;
-use std::debug_assert;
-use std::fmt::Debug;
+use core::debug_assert;
+use core::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
-
 use xxhash_rust::xxh3::xxh3_64_with_seed;
+
+pub type DefaultRand = Xoshiro256StarRand;
 
 /// Ways to get random around here
 pub trait Rand: Debug {
@@ -171,7 +172,7 @@ where
 }
 
 /// Get the next higher power of two
-pub fn next_pow2(val: u64) -> u64 {
+pub const fn next_pow2(val: u64) -> u64 {
     let mut out = val.wrapping_sub(1);
     out |= out >> 1;
     out |= out >> 2;
@@ -183,11 +184,11 @@ pub fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, DefaultHasRand, HasRand, Rand, Xoshiro256StarRand};
+    use crate::utils::{next_pow2, DefaultHasRand, DefaultRand, HasRand, Rand};
 
     #[test]
     fn test_rand() {
-        let mut rand = Xoshiro256StarRand::preseeded();
+        let mut rand = DefaultRand::preseeded();
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);
@@ -197,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_has_rand() {
-        let rand = Xoshiro256StarRand::preseeded_rr();
+        let rand = DefaultRand::preseeded_rr();
         let has_rand = DefaultHasRand::new(&rand);
 
         assert!(has_rand.rand_below(100) < 100);

@@ -1,13 +1,13 @@
 extern crate alloc;
 extern crate num;
 
-use crate::corpus::TestcaseMetadata;
-use crate::inputs::Input;
-use crate::observers::MapObserver;
-
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use num::Integer;
+
+use crate::corpus::TestcaseMetadata;
+use crate::inputs::Input;
+use crate::observers::MapObserver;
 
 pub trait Feedback<I>
 where
