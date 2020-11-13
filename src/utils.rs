@@ -109,12 +109,23 @@ impl Rand for Xoshiro256StarRand {
     }
 }
 
+use std::convert::Into;
+impl Into<Rc<RefCell<Self>>> for Xoshiro256StarRand {
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+}
+
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
         let mut ret: Xoshiro256StarRand = Default::default();
         ret.set_seed(seed); // TODO: Proper random seed?
         ret
+    }
+
+    pub fn to_rc_refcell(self) -> Rc<RefCell<Self>> {
+        self.into()
     }
 
     /// Creates a new Xoshiro rand with the given seed, wrapped in a Rc<RefCell<T>>.
@@ -137,8 +148,8 @@ impl Xoshiro256StarRand {
     }
 }
 
-#[cfg(test)]
 /// fake rand, for testing purposes
+#[cfg(test)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct XKCDRand {
     val: u64,

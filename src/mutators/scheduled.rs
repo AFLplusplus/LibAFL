@@ -281,6 +281,7 @@ where
     I: Input + HasBytesVec,
     S: ScheduledMutator<C, I>,
 {
+    /// Mutate bytes
     fn mutate(&mut self, corpus: &mut C, input: &mut I, stage_idx: i32) -> Result<(), AflError> {
         self.scheduled.mutate(corpus, input, stage_idx)
     }

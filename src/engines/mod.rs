@@ -110,10 +110,10 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        let rand = DefaultRand::preseeded_rr();
+        let rand: Rc<_> = DefaultRand::preseeded().into();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
-        let testcase = Testcase::new_rr(BytesInput::new(vec![0; 4]));
+        let testcase = Testcase::new_rr(vec![0; 4]);
         corpus.add(testcase);
         let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> = InMemoryExecutor::new_rr(harness);
         let mut engine = DefaultEngine::new();

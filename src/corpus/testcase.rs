@@ -98,8 +98,11 @@ where
     }
 
     /// Create a new Testcase instace given an input behind a Rc RefCell
-    pub fn new_rr(input: I) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new(input)))
+    pub fn new_rr<T>(input: T) -> Rc<RefCell<Self>>
+    where
+        T: Into<I>,
+    {
+        Rc::new(RefCell::new(Self::new(input.into())))
     }
 
     /// Create a new Testcase instace given an input and a filename behind a Rc RefCell

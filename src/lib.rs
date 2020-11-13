@@ -14,6 +14,7 @@ pub mod utils;
 use std::io;
 use thiserror::Error;
 
+/// Main error struct for AFL
 #[derive(Error, Debug)]
 pub enum AflError {
     #[error("Error in Serialization: `{0}`")]

@@ -1,5 +1,7 @@
 extern crate alloc;
 
+use core::convert::From;
+
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
 
@@ -32,6 +34,18 @@ impl HasBytesVec for BytesInput {
 impl HasTargetBytes for BytesInput {
     fn target_bytes(&self) -> &Vec<u8> {
         &self.bytes
+    }
+}
+
+impl From<Vec<u8>> for BytesInput {
+    fn from(bytes: Vec<u8>) -> Self {
+        Self::new(bytes)
+    }
+}
+
+impl From<&[u8]> for BytesInput {
+    fn from(bytes: &[u8]) -> Self {
+        Self::new(bytes.to_owned())
     }
 }
 
