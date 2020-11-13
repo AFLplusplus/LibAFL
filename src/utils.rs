@@ -128,11 +128,6 @@ impl Xoshiro256StarRand {
         self.into()
     }
 
-    /// Creates a new Xoshiro rand with the given seed, wrapped in a Rc<RefCell<T>>.
-    pub fn new_rr(seed: u64) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new(seed)))
-    }
-
     /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
     pub fn preseeded() -> Self {
         let seed = SystemTime::now()
@@ -140,11 +135,6 @@ impl Xoshiro256StarRand {
             .unwrap()
             .as_nanos() as u64;
         Self::new(seed)
-    }
-
-    /// Creates a new rand instance, pre-seeded
-    pub fn preseeded_rr() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::preseeded()))
     }
 }
 
@@ -167,13 +157,16 @@ impl Rand for XKCDRand {
 }
 
 #[cfg(test)]
+impl Into<Rc<RefCell<Self>>> for XKCDRand {
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+}
+
+#[cfg(test)]
 impl XKCDRand {
     pub fn new() -> Self {
         Self { val: 4 }
-    }
-
-    pub fn new_rr() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new()))
     }
 }
 
@@ -238,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_has_rand() {
-        let rand = DefaultRand::preseeded_rr();
+        let rand = DefaultRand::preseeded().into();
         let has_rand = DefaultHasRand::new(&rand);
 
         assert!(has_rand.rand_below(100) < 100);

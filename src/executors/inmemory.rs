@@ -197,8 +197,8 @@ mod tests {
         fn serialize(&self) -> Result<&[u8], AflError> {
             Ok("NOP".as_bytes())
         }
-        fn deserialize(&mut self, _buf: &[u8]) -> Result<(), AflError> {
-            Ok(())
+        fn deserialize(buf: &[u8]) -> Result<Self, AflError> {
+            Ok(Self {})
         }
     }
 

@@ -4,29 +4,33 @@ pub mod bytes;
 pub use bytes::BytesInput;
 
 use core::clone::Clone;
-use std::fs::File;
-use std::io::Read;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::Path;
+use std::{fs::File, io::Read};
 
 use crate::AflError;
 
 /// An input for the target
 pub trait Input: Clone {
     /// Write this input to the file
-    fn to_file(&self, path: &PathBuf) -> Result<(), AflError> {
+    fn to_file<P>(&self, path: P) -> Result<(), AflError>
+    where
+        P: AsRef<Path>,
+    {
         let mut file = File::create(path)?;
         file.write_all(self.serialize()?)?;
         Ok(())
     }
 
     /// Load the contents of this input from a file
-    fn from_file(&mut self, path: &PathBuf) -> Result<(), AflError> {
-        let mut file = File::create(path)?;
-        let mut buf = vec![];
-        file.read_to_end(&mut buf)?;
-        self.deserialize(&buf)?;
-        Ok(())
+    fn from_file<P>(path: P) -> Result<Self, AflError>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(path).map_err(AflError::File)?;
+        let mut bytes: Vec<u8> = vec![];
+        file.read_to_end(&mut bytes).map_err(AflError::File)?;
+        Self::deserialize(&bytes)
     }
 
     /// Serialize this input, for later deserialization.
@@ -35,7 +39,7 @@ pub trait Input: Clone {
     fn serialize(&self) -> Result<&[u8], AflError>;
 
     /// Deserialize this input, using the bytes serialized before.
-    fn deserialize(&mut self, buf: &[u8]) -> Result<(), AflError>;
+    fn deserialize(buf: &[u8]) -> Result<Self, AflError>;
 }
 
 /// Can be serialized to a bytes representation

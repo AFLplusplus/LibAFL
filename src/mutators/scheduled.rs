@@ -324,16 +324,16 @@ where
 
 #[cfg(test)]
 mod tests {
-
     use crate::corpus::{Corpus, InMemoryCorpus};
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::mutators::scheduled::mutation_splice;
     use crate::utils::{DefaultHasRand, Rand, XKCDRand};
+    use alloc::rc::Rc;
 
     #[test]
     fn test_mut_splice() {
         // With the current impl, seed of 1 will result in a split at pos 2.
-        let rand = &XKCDRand::new_rr();
+        let rand: Rc<_> = XKCDRand::new().into();
         let mut has_rand = DefaultHasRand::new(&rand);
         let mut corpus = InMemoryCorpus::new(&rand);
         corpus.add_input(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8]));

@@ -110,6 +110,7 @@ mod tests {
 
     #[test]
     fn test_engine() {
+        // TODO: Replace _rr with .Into traits
         let rand: Rc<_> = DefaultRand::preseeded().into();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
@@ -121,6 +122,9 @@ mod tests {
         mutator.add_mutation(mutation_bitflip);
         let stage = DefaultMutationalStage::new(&rand, &executor, mutator);
         engine.add_stage(Box::new(stage));
+
+        //
+
         for i in 0..1000 {
             engine
                 .fuzz_one(&mut corpus)

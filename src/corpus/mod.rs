@@ -310,12 +310,13 @@ mod tests {
     use crate::inputs::bytes::BytesInput;
     use crate::utils::DefaultRand;
 
+    use alloc::rc::Rc;
     use std::path::PathBuf;
 
     #[test]
 
     fn test_queuecorpus() {
-        let rand = DefaultRand::preseeded_rr();
+        let rand: Rc<_> = DefaultRand::preseeded().into();
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
         let i = BytesInput::new(vec![0; 4]);
         let t = Testcase::with_filename_rr(i, PathBuf::from("fancyfile"));

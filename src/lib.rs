@@ -31,6 +31,8 @@ pub enum AflError {
     IteratorEnd(String),
     #[error("Not implemented: {0}")]
     NotImplemented(String),
+    #[error("Illegal state: {0}")]
+    IllegalState(String),
     #[error("Unknown error: {0}")]
     Unknown(String),
 }

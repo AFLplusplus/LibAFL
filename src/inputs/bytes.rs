@@ -2,6 +2,10 @@ extern crate alloc;
 
 use core::convert::From;
 
+use core::convert::TryFrom;
+use std::fs::File;
+use std::path::Path;
+
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
 
@@ -15,10 +19,9 @@ impl Input for BytesInput {
     fn serialize(&self) -> Result<&[u8], AflError> {
         Ok(&self.bytes)
     }
-    fn deserialize(&mut self, buf: &[u8]) -> Result<(), AflError> {
-        self.bytes.truncate(0);
-        self.bytes.extend_from_slice(buf);
-        Ok(())
+
+    fn deserialize(buf: &[u8]) -> Result<Self, AflError> {
+        Ok(Self { bytes: buf.into() })
     }
 }
 
