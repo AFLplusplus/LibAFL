@@ -137,6 +137,35 @@ impl Xoshiro256StarRand {
     }
 }
 
+#[cfg(test)]
+/// fake rand, for testing purposes
+#[derive(Copy, Clone, Debug, Default)]
+pub struct XKCDRand {
+    val: u64,
+}
+
+#[cfg(test)]
+impl Rand for XKCDRand {
+    fn set_seed(&mut self, val: u64) {
+        self.val = val
+    }
+
+    fn next(&mut self) -> u64 {
+        self.val
+    }
+}
+
+#[cfg(test)]
+impl XKCDRand {
+    pub fn new() -> Self {
+        Self { val: 4 }
+    }
+
+    pub fn new_rr() -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new()))
+    }
+}
+
 /// A very basic HasRand
 pub struct DefaultHasRand<R>
 where

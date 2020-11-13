@@ -327,12 +327,12 @@ mod tests {
     use crate::corpus::{Corpus, InMemoryCorpus};
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::mutators::scheduled::mutation_splice;
-    use crate::utils::{DefaultHasRand, DefaultRand};
+    use crate::utils::{DefaultHasRand, Rand, XKCDRand};
 
     #[test]
     fn test_mut_splice() {
         // With the current impl, seed of 1 will result in a split at pos 2.
-        let rand = &DefaultRand::new_rr(1);
+        let rand = &XKCDRand::new_rr();
         let mut has_rand = DefaultHasRand::new(&rand);
         let mut corpus = InMemoryCorpus::new(&rand);
         corpus.add_input(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8]));
@@ -342,6 +342,7 @@ mod tests {
         let mut testcase = testcase_rr.borrow_mut();
         let mut input = testcase.load_input().expect("No input in testcase").clone();
 
+        rand.borrow_mut().set_seed(5);
         mutation_splice(&mut has_rand, &mut corpus, &mut input).unwrap();
 
         println!("{:?}", input.bytes());
