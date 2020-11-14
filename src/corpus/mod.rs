@@ -367,8 +367,7 @@ mod tests {
     fn test_queuecorpus() {
         let rand: Rc<_> = DefaultRand::preseeded().into();
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
-        let i = BytesInput::new(vec![0; 4]);
-        let t: Rc<_> = Testcase::with_filename(i, PathBuf::from("fancyfile")).into();
+        let t: Rc<_> = Testcase::with_filename(BytesInput::new(vec![0 as u8; 4]), PathBuf::from("fancyfile")).into();
         q.add(t);
         let filename = q
             .next()

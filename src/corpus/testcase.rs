@@ -18,7 +18,7 @@ pub trait TestcaseMetadata {
     fn name(&self) -> &'static str;
 }
 
-enum FileBackedTestcase<I, P> {
+pub enum FileBackedTestcase<I, P> {
     /// A testcase on disk, not yet loaded
     Stored { filename: P },
 
