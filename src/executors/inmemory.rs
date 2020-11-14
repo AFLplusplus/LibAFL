@@ -22,6 +22,15 @@ where
     feedbacks: Vec<Box<dyn Feedback<I>>>,
 }
 
+impl<I> Into<Rc<RefCell<Self>>> for InMemoryExecutor<I>
+where
+    I: Input,
+{
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+}
+
 static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
 
 impl<I> Executor<I> for InMemoryExecutor<I>
@@ -90,9 +99,6 @@ where
         }
     }
 
-    pub fn new_rr(harness_fn: HarnessFunction<I>) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new(harness_fn)))
-    }
 }
 
 #[cfg(unix)]

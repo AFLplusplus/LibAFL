@@ -2,9 +2,8 @@ extern crate alloc;
 
 use core::convert::From;
 
-use core::convert::TryFrom;
-use std::fs::File;
-use std::path::Path;
+use core::cell::RefCell;
+use alloc::rc::Rc;
 
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
@@ -24,6 +23,14 @@ impl Input for BytesInput {
         Ok(Self { bytes: buf.into() })
     }
 }
+
+/// Rc Ref-cell from Input
+impl Into<Rc<RefCell<Self>>> for BytesInput {
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+}
+
 
 impl HasBytesVec for BytesInput {
     fn bytes(&self) -> &Vec<u8> {

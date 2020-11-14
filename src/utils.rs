@@ -109,7 +109,6 @@ impl Rand for Xoshiro256StarRand {
     }
 }
 
-use std::convert::Into;
 impl Into<Rc<RefCell<Self>>> for Xoshiro256StarRand {
     fn into(self) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(self))

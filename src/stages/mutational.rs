@@ -53,7 +53,7 @@ where
             self.mutator_mut().post_exec(interesting, i as i32)?;
 
             if interesting {
-                corpus.add(Testcase::new_rr(input_tmp));
+                corpus.add(Testcase::new(input_tmp).into());
             }
         }
         Ok(())

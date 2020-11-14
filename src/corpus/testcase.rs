@@ -5,6 +5,7 @@ use crate::AflError;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use core::convert::Into;
 use hashbrown::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -113,6 +114,16 @@ where
     metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
 }
 
+impl<I> Into<Rc<RefCell<Self>>> for Testcase<I>
+where
+    I: Input,
+{
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+}
+
+
 /// Impl of a testcase
 impl<I> Testcase<I>
 where
@@ -181,16 +192,4 @@ where
         }
     }
 
-    /// Create a new Testcase instace given an input behind a Rc RefCell
-    pub fn new_rr<T>(input: T) -> Rc<RefCell<Self>>
-    where
-        T: Into<I>,
-    {
-        Rc::new(RefCell::new(Self::new(input.into())))
-    }
-
-    /// Create a new Testcase instace given an input and a filename behind a Rc RefCell
-    pub fn with_filename_rr(input: I, filename: PathBuf) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::with_filename(input, filename)))
-    }
 }

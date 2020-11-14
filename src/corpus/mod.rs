@@ -35,13 +35,13 @@ where
 
     /// Add an entry to the corpus
     #[allow(unused_mut)]
-    fn add(&mut self, mut entry: Rc<RefCell<Testcase<I>>>) {
-        self.entries_mut().push(entry);
+    fn add(&mut self, mut testcase: Rc<RefCell<Testcase<I>>>) {
+        self.entries_mut().push(testcase);
     }
 
     /// Add an input to the corpus
     fn add_input(&mut self, input: I) {
-        self.add(Testcase::new_rr(input));
+        self.add(Testcase::new(input.into()).into());
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
@@ -368,7 +368,7 @@ mod tests {
         let rand: Rc<_> = DefaultRand::preseeded().into();
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
         let i = BytesInput::new(vec![0; 4]);
-        let t = Testcase::with_filename_rr(i, PathBuf::from("fancyfile"));
+        let t: Rc<_> = Testcase::with_filename(i, PathBuf::from("fancyfile")).into();
         q.add(t);
         let filename = q
             .next()

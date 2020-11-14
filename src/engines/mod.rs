@@ -1,9 +1,6 @@
 //! The engine is the core piece of every good fuzzer
 extern crate alloc;
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
 use crate::corpus::Corpus;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
@@ -81,10 +78,7 @@ where
             stages: vec![],
         }
     }
-
-    pub fn new_rr() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new()))
-    }
+    
 }
 
 #[cfg(test)]
@@ -110,13 +104,12 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        // TODO: Replace _rr with .Into traits
         let rand: Rc<_> = DefaultRand::preseeded().into();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
-        let testcase = Testcase::new_rr(vec![0; 4]);
+        let testcase = Testcase::new(BytesInput::new(vec![0; 4])).into();
         corpus.add(testcase);
-        let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> = InMemoryExecutor::new_rr(harness);
+        let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> = InMemoryExecutor::new(harness).into();
         let mut engine = DefaultEngine::new();
         let mut mutator = DefaultScheduledMutator::new(&rand);
         mutator.add_mutation(mutation_bitflip);
