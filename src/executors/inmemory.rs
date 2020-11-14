@@ -98,7 +98,6 @@ where
             harness: harness_fn,
         }
     }
-
 }
 
 #[cfg(unix)]

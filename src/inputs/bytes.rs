@@ -2,8 +2,8 @@ extern crate alloc;
 
 use core::convert::From;
 
-use core::cell::RefCell;
 use alloc::rc::Rc;
+use core::cell::RefCell;
 
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
@@ -30,7 +30,6 @@ impl Into<Rc<RefCell<Self>>> for BytesInput {
         Rc::new(RefCell::new(self))
     }
 }
-
 
 impl HasBytesVec for BytesInput {
     fn bytes(&self) -> &Vec<u8> {

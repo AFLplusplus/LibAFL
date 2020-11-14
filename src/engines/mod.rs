@@ -78,7 +78,6 @@ where
             stages: vec![],
         }
     }
-    
 }
 
 #[cfg(test)]
@@ -109,7 +108,8 @@ mod tests {
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new(BytesInput::new(vec![0; 4])).into();
         corpus.add(testcase);
-        let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> = InMemoryExecutor::new(harness).into();
+        let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> =
+            InMemoryExecutor::new(harness).into();
         let mut engine = DefaultEngine::new();
         let mut mutator = DefaultScheduledMutator::new(&rand);
         mutator.add_mutation(mutation_bitflip);

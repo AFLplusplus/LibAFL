@@ -123,7 +123,6 @@ where
     }
 }
 
-
 /// Impl of a testcase
 impl<I> Testcase<I>
 where
@@ -191,5 +190,4 @@ where
             metadatas: HashMap::default(),
         }
     }
-
 }
