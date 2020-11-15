@@ -7,6 +7,7 @@ use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 
@@ -42,7 +43,7 @@ where
     fn schedule(&mut self, _input: &I) -> Result<MutationFunction<C, Self, I>, AflError> {
         let count = self.mutations_count() as u64;
         if count == 0 {
-            return Err(AflError::Empty("no mutations".to_string()));
+            return Err(AflError::Empty("no mutations".into()));
         }
         let idx;
         {
@@ -109,7 +110,7 @@ where
 {
     fn mutation_by_idx(&self, index: usize) -> Result<MutationFunction<C, Self, I>, AflError> {
         if index >= self.mutations.len() {
-            return Err(AflError::Unknown("oob".to_string()));
+            return Err(AflError::Unknown("oob".into()));
         }
         Ok(self.mutations[index])
     }
@@ -172,7 +173,7 @@ where
 }
 
 /// Returns the first and last diff position between the given vectors, stopping at the min len
-fn locate_diffs(this: &Vec<u8>, other: &Vec<u8>) -> (i64, i64) {
+fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     let mut first_diff: i64 = -1;
     let mut last_diff: i64 = -1;
     for (i, (this_el, other_el)) in this.iter().zip(other.iter()).enumerate() {
@@ -208,7 +209,7 @@ where
             Err(_) => {
                 if retry_count == 20 {
                     return Err(AflError::Empty(
-                        "No suitable testcase found for splicing".to_owned(),
+                        "No suitable testcase found for splicing".into(),
                     ));
                 }
                 retry_count += 1;
@@ -231,7 +232,7 @@ where
             break (f, l);
         }
         if counter == 20 {
-            return Err(AflError::Empty("No valid diff found".to_owned()));
+            return Err(AflError::Empty("No valid diff found".into()));
         }
         counter += 1;
     };
@@ -324,10 +325,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::corpus::{Corpus, InMemoryCorpus};
-    use crate::inputs::{BytesInput, HasBytesVec};
+    use crate::inputs::BytesInput;
     use crate::mutators::scheduled::mutation_splice;
     use crate::utils::{DefaultHasRand, Rand, XKCDRand};
+    use crate::{
+        corpus::{Corpus, InMemoryCorpus, Testcase},
+        inputs::HasBytesVec,
+    };
     use alloc::rc::Rc;
 
     #[test]
@@ -336,8 +340,8 @@ mod tests {
         let rand: Rc<_> = XKCDRand::new().into();
         let mut has_rand = DefaultHasRand::new(&rand);
         let mut corpus = InMemoryCorpus::new(&rand);
-        corpus.add_input(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8]));
-        corpus.add_input(BytesInput::new(vec!['d' as u8, 'e' as u8, 'f' as u8]));
+        corpus.add(Testcase::new(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8])).into());
+        corpus.add(Testcase::new(BytesInput::new(vec!['d' as u8, 'e' as u8, 'f' as u8])).into());
 
         let testcase_rr = corpus.next().expect("Corpus did not contain entries");
         let mut testcase = testcase_rr.borrow_mut();
@@ -346,10 +350,11 @@ mod tests {
         rand.borrow_mut().set_seed(5);
         mutation_splice(&mut has_rand, &mut corpus, &mut input).unwrap();
 
+        #[cfg(feature = "std")]
         println!("{:?}", input.bytes());
 
         // The pre-seeded rand should have spliced at position 2.
         // TODO: Maybe have a fixed rand for this purpose?
-        assert_eq!(input.bytes(), &vec!['a' as u8, 'b' as u8, 'f' as u8])
+        assert_eq!(input.bytes(), &['a' as u8, 'b' as u8, 'f' as u8])
     }
 }

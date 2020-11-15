@@ -3,9 +3,12 @@ extern crate alloc;
 pub mod testcase;
 pub use testcase::{Testcase, TestcaseMetadata};
 
+use alloc::borrow::ToOwned;
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
+#[cfg(feature = "std")]
 use std::path::PathBuf;
 
 use crate::inputs::Input;
@@ -34,14 +37,8 @@ where
     }
 
     /// Add an entry to the corpus
-    #[allow(unused_mut)]
-    fn add(&mut self, mut testcase: Rc<RefCell<Testcase<I>>>) {
+    fn add(&mut self, testcase: Rc<RefCell<Testcase<I>>>) {
         self.entries_mut().push(testcase);
-    }
-
-    /// Add an input to the corpus
-    fn add_input(&mut self, input: I) {
-        self.add(Testcase::new(input.into()).into());
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
@@ -135,6 +132,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 pub struct OnDiskCorpus<I, R>
 where
     I: Input,
@@ -145,6 +143,7 @@ where
     dir_path: PathBuf,
 }
 
+#[cfg(feature = "std")]
 impl<I, R> HasEntriesVec<I> for OnDiskCorpus<I, R>
 where
     I: Input,
@@ -158,6 +157,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<I, R> HasRand for OnDiskCorpus<I, R>
 where
     I: Input,
@@ -170,6 +170,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<I, R> Corpus<I> for OnDiskCorpus<I, R>
 where
     I: Input,
@@ -179,9 +180,9 @@ where
     fn add(&mut self, entry: Rc<RefCell<Testcase<I>>>) {
         if *entry.borrow().filename() == None {
             // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
-            let filename = &(String::from("id:") + &self.entries.len().to_string());
-            let filename = self.dir_path.join(filename);
-            *entry.borrow_mut().filename_mut() = Some(filename);
+            let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
+            let filename_str = filename.to_str().expect("Invalid Path");
+            *entry.borrow_mut().filename_mut() = Some(filename_str.into());
         }
         self.entries.push(entry);
     }
@@ -189,6 +190,7 @@ where
     // TODO save and remove files, cache, etc..., ATM use just InMemoryCorpus
 }
 
+#[cfg(feature = "std")]
 impl<I, R> OnDiskCorpus<I, R>
 where
     I: Input,
@@ -352,6 +354,7 @@ And then:
 */
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod tests {
     use crate::corpus::Corpus;
     use crate::corpus::Testcase;
@@ -363,11 +366,11 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-
     fn test_queuecorpus() {
-        let rand: Rc<_> = DefaultRand::preseeded().into();
+        let rand: Rc<_> = DefaultRand::new(0).into();
         let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
-        let t: Rc<_> = Testcase::with_filename(BytesInput::new(vec![0 as u8; 4]), PathBuf::from("fancyfile")).into();
+        let t: Rc<_> =
+            Testcase::with_filename(BytesInput::new(vec![0 as u8; 4]), "fancyfile".into()).into();
         q.add(t);
         let filename = q
             .next()
@@ -387,6 +390,6 @@ mod tests {
                 .unwrap()
                 .to_owned()
         );
-        assert_eq!(filename, PathBuf::from("fancyfile"));
+        assert_eq!(filename, "fancyfile");
     }
 }

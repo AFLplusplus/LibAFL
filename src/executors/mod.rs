@@ -1,10 +1,6 @@
 extern crate alloc;
 pub mod inmemory;
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
-use crate::corpus::Testcase;
 use crate::corpus::TestcaseMetadata;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
@@ -37,13 +33,13 @@ where
     fn add_observer(&mut self, observer: Box<dyn Observer>);
 
     /// Get the linked observers
-    fn observers(&self) -> &Vec<Box<dyn Observer>>;
+    fn observers(&self) -> &[Box<dyn Observer>];
 
     /// Adds a feedback
     fn add_feedback(&mut self, feedback: Box<dyn Feedback<I>>);
 
     /// Returns vector of feebacks
-    fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>>;
+    fn feedbacks(&self) -> &[Box<dyn Feedback<I>>];
 
     /// Returns vector of feebacks (mutable)
     fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>>;
@@ -66,12 +62,6 @@ where
         }
 
         if rate_acc >= 25 {
-            let new_entry = Rc::new(RefCell::new(Testcase::<I>::new(input.clone())));
-            for meta in metadatas {
-                new_entry.borrow_mut().add_metadata(meta);
-            }
-            //TODO corpus.add(new_entry);
-
             Ok(true)
         } else {
             Ok(false)

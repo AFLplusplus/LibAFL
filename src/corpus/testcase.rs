@@ -7,9 +7,12 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::convert::Into;
 use hashbrown::HashMap;
+#[cfg(feature = "std")]
 use std::fs::File;
+#[cfg(feature = "std")]
 use std::io::Write;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "std")]
+use std::path::Path;
 
 // TODO: Give example
 /// Metadata for a testcase
@@ -17,6 +20,24 @@ pub trait TestcaseMetadata {
     /// The name of this metadata - used to find it in the list of avaliable metadatas
     fn name(&self) -> &'static str;
 }
+
+/*
+pub trait Testcase<I, T>
+where
+    I: Input,
+    T: TestcaseMetadata,
+{
+
+    fn input(&mut self) -> Option<I>
+
+    input: Option<I>,
+    /// Filename, if this testcase is backed by a file in the filesystem
+    filename: Option<String>,
+    /// Map of metadatas associated with this testcase
+    metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
+
+}
+*/
 
 pub enum FileBackedTestcase<I, P> {
     /// A testcase on disk, not yet loaded
@@ -109,7 +130,7 @@ where
     /// The input of this testcase
     input: Option<I>,
     /// Filename, if this testcase is backed by a file in the filesystem
-    filename: Option<PathBuf>,
+    filename: Option<String>,
     /// Map of metadatas associated with this testcase
     metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
 }
@@ -133,7 +154,7 @@ where
         // TODO: Implement cache to disk
         match self.input.as_ref() {
             Some(i) => Ok(i),
-            None => Err(AflError::NotImplemented("load_input".to_string())),
+            None => Err(AflError::NotImplemented("load_input".into())),
         }
     }
 
@@ -151,15 +172,15 @@ where
     }
 
     /// Get the filename, if any
-    pub fn filename(&self) -> &Option<PathBuf> {
+    pub fn filename(&self) -> &Option<String> {
         &self.filename
     }
     /// Get the filename, if any (mutable)
-    pub fn filename_mut(&mut self) -> &mut Option<PathBuf> {
+    pub fn filename_mut(&mut self) -> &mut Option<String> {
         &mut self.filename
     }
     /// Set the filename
-    pub fn set_filename(&mut self, filename: Option<PathBuf>) {
+    pub fn set_filename(&mut self, filename: Option<String>) {
         self.filename = filename;
     }
 
@@ -183,7 +204,7 @@ where
     }
 
     /// Create a new Testcase instace given an input and a filename
-    pub fn with_filename(input: I, filename: PathBuf) -> Self {
+    pub fn with_filename(input: I, filename: String) -> Self {
         Testcase {
             input: Some(input),
             filename: Some(filename),

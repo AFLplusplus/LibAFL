@@ -3,6 +3,8 @@ extern crate num;
 
 use core::cell::RefCell;
 use core::marker::PhantomData;
+
+use alloc::vec::*;
 use num::Integer;
 
 use crate::corpus::TestcaseMetadata;

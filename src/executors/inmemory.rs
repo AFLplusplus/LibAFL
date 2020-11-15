@@ -67,11 +67,11 @@ where
         self.observers.push(observer);
     }
 
-    fn observers(&self) -> &Vec<Box<dyn Observer>> {
+    fn observers(&self) -> &[Box<dyn Observer>] {
         &self.observers
     }
 
-    fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>> {
+    fn feedbacks(&self) -> &[Box<dyn Feedback<I>>] {
         &self.feedbacks
     }
 
@@ -211,10 +211,10 @@ mod tests {
 
     impl Observer for Nopserver {
         fn reset(&mut self) -> Result<(), AflError> {
-            Err(AflError::Unknown("Nop reset, testing only".to_string()))
+            Err(AflError::Unknown("Nop reset, testing only".into()))
         }
         fn post_exec(&mut self) -> Result<(), AflError> {
-            Err(AflError::Unknown("Nop exec, testing only".to_string()))
+            Err(AflError::Unknown("Nop exec, testing only".into()))
         }
     }
 

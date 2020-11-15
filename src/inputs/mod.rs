@@ -3,15 +3,21 @@ extern crate alloc;
 pub mod bytes;
 pub use bytes::BytesInput;
 
+use alloc::vec::Vec;
 use core::clone::Clone;
-use std::io::Write;
+
+#[cfg(feature = "std")]
+use std::fs::File;
+#[cfg(feature = "std")]
+use std::io::{Read, Write};
+#[cfg(feature = "std")]
 use std::path::Path;
-use std::{fs::File, io::Read};
 
 use crate::AflError;
 
 /// An input for the target
 pub trait Input: Clone {
+    #[cfg(feature = "std")]
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), AflError>
     where
@@ -22,7 +28,15 @@ pub trait Input: Clone {
         Ok(())
     }
 
+    #[cfg(not(feature = "std"))]
+    /// Write this input to the file
+    fn to_file<P>(&self, string: P) -> Result<(), AflError>
+where {
+        Err(AflError::NotImplemented("Not suppored in no_std".into()))
+    }
+
     /// Load the contents of this input from a file
+    #[cfg(feature = "std")]
     fn from_file<P>(path: P) -> Result<Self, AflError>
     where
         P: AsRef<Path>,
@@ -31,6 +45,13 @@ pub trait Input: Clone {
         let mut bytes: Vec<u8> = vec![];
         file.read_to_end(&mut bytes).map_err(AflError::File)?;
         Self::deserialize(&bytes)
+    }
+
+    /// Write this input to the file
+    #[cfg(not(feature = "std"))]
+    fn from_file<P>(string: P) -> Result<Self, AflError>
+where {
+        Err(AflError::NotImplemented("Not suppored in no_std".into()))
     }
 
     /// Serialize this input, for later deserialization.
@@ -47,13 +68,13 @@ pub trait Input: Clone {
 /// Instead, it can be used as bytes input for a target
 pub trait HasTargetBytes {
     /// Target bytes, that can be written to a target
-    fn target_bytes(&self) -> &Vec<u8>;
+    fn target_bytes(&self) -> &[u8];
 }
 
 /// Contains an internal bytes Vector
 pub trait HasBytesVec {
     /// The internal bytes map
-    fn bytes(&self) -> &Vec<u8>;
+    fn bytes(&self) -> &[u8];
     /// The internal bytes map (as mutable borrow)
     fn bytes_mut(&mut self) -> &mut Vec<u8>;
 }

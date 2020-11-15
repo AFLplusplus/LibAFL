@@ -1,9 +1,10 @@
 extern crate alloc;
 
-use core::convert::From;
-
+use alloc::borrow::ToOwned;
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use core::cell::RefCell;
+use core::convert::From;
 
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
@@ -20,7 +21,9 @@ impl Input for BytesInput {
     }
 
     fn deserialize(buf: &[u8]) -> Result<Self, AflError> {
-        Ok(Self { bytes: buf.into() })
+        Ok(Self {
+            bytes: buf.to_owned(),
+        })
     }
 }
 
@@ -32,7 +35,7 @@ impl Into<Rc<RefCell<Self>>> for BytesInput {
 }
 
 impl HasBytesVec for BytesInput {
-    fn bytes(&self) -> &Vec<u8> {
+    fn bytes(&self) -> &[u8] {
         &self.bytes
     }
     fn bytes_mut(&mut self) -> &mut Vec<u8> {
@@ -41,7 +44,7 @@ impl HasBytesVec for BytesInput {
 }
 
 impl HasTargetBytes for BytesInput {
-    fn target_bytes(&self) -> &Vec<u8> {
+    fn target_bytes(&self) -> &[u8] {
         &self.bytes
     }
 }
@@ -71,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_input() {
-        let mut rand = DefaultRand::preseeded();
+        let mut rand = DefaultRand::new(0);
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);

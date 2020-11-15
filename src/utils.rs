@@ -5,8 +5,10 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::debug_assert;
 use core::fmt::Debug;
-use std::time::{SystemTime, UNIX_EPOCH};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
+
+#[cfg(feature = "std")]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub type DefaultRand = Xoshiro256StarRand;
 
@@ -128,6 +130,8 @@ impl Xoshiro256StarRand {
     }
 
     /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+    /// Needs stdlib timer
+    #[cfg(feature = "std")]
     pub fn preseeded() -> Self {
         let seed = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -220,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_rand() {
-        let mut rand = DefaultRand::preseeded();
+        let mut rand = DefaultRand::new(0);
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);
@@ -230,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_has_rand() {
-        let rand = DefaultRand::preseeded().into();
+        let rand = DefaultRand::new(0).into();
         let has_rand = DefaultHasRand::new(&rand);
 
         assert!(has_rand.rand_below(100) < 100);

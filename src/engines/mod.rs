@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        let rand: Rc<_> = DefaultRand::preseeded().into();
+        let rand: Rc<_> = DefaultRand::new(0).into();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new(BytesInput::new(vec![0; 4])).into();
