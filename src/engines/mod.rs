@@ -87,7 +87,7 @@ mod tests {
     use core::cell::RefCell;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
-    use crate::engines::{Engine, DefaultEngine};
+    use crate::engines::{DefaultEngine, Engine};
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::bytes::BytesInput;
@@ -106,7 +106,7 @@ mod tests {
         let rand: Rc<_> = DefaultRand::new(0).into();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
-        let testcase = Testcase::new(BytesInput::new(vec![0; 4])).into();
+        let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
         let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> =
             InMemoryExecutor::new(harness).into();

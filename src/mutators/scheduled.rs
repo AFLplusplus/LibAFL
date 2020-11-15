@@ -339,9 +339,9 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let rand: Rc<_> = XKCDRand::new().into();
         let mut has_rand = DefaultHasRand::new(&rand);
-        let mut corpus = InMemoryCorpus::new(&rand);
-        corpus.add(Testcase::new(BytesInput::new(vec!['a' as u8, 'b' as u8, 'c' as u8])).into());
-        corpus.add(Testcase::new(BytesInput::new(vec!['d' as u8, 'e' as u8, 'f' as u8])).into());
+        let mut corpus: InMemoryCorpus<BytesInput, _> = InMemoryCorpus::new(&rand);
+        corpus.add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into());
+        corpus.add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into());
 
         let testcase_rr = corpus.next().expect("Corpus did not contain entries");
         let mut testcase = testcase_rr.borrow_mut();
