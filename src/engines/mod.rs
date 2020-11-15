@@ -12,7 +12,7 @@ where
     C: Corpus<I>,
     I: Input,
 {
-    fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>>;
+    fn feedbacks(&self) -> &[Box<dyn Feedback<I>>];
 
     fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>>;
 
@@ -20,7 +20,7 @@ where
         self.feedbacks_mut().push(feedback);
     }
 
-    fn stages(&self) -> &Vec<Box<dyn Stage<C, I>>>;
+    fn stages(&self) -> &[Box<dyn Stage<C, I>>];
 
     fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<C, I>>>;
 
@@ -50,7 +50,7 @@ where
     C: Corpus<I>,
     I: Input,
 {
-    fn feedbacks(&self) -> &Vec<Box<dyn Feedback<I>>> {
+    fn feedbacks(&self) -> &[Box<dyn Feedback<I>>] {
         &self.feedbacks
     }
 
@@ -58,7 +58,7 @@ where
         &mut self.feedbacks
     }
 
-    fn stages(&self) -> &Vec<Box<dyn Stage<C, I>>> {
+    fn stages(&self) -> &[Box<dyn Stage<C, I>>] {
         &self.stages
     }
 
@@ -87,7 +87,7 @@ mod tests {
     use core::cell::RefCell;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
-    use crate::engines::{DefaultEngine, Engine};
+    use crate::engines::{Engine, DefaultEngine};
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::bytes::BytesInput;
