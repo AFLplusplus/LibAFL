@@ -24,23 +24,26 @@ pub trait TestcaseMetadata {
     fn name(&self) -> &'static str;
 }
 
-/*
-pub trait Testcase<I, T>
+pub trait TestcaseTraitTODO<I, T>
 where
     I: Input,
     T: TestcaseMetadata,
 {
+    /// The input associated with this testcase
+    fn input(&self) -> &Option<I>;
 
-    fn input(&mut self) -> Option<I>
+    /// The input associated with this testcase (mutable)
+    fn input_mut(&mut self) -> &mut Option<I>;
 
-    input: Option<I>,
     /// Filename, if this testcase is backed by a file in the filesystem
-    filename: Option<String>,
-    /// Map of metadatas associated with this testcase
-    metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
+    fn filename(&self) -> &Option<String>;
 
+    /// Map of metadatas associated with this testcase
+    fn metadatas(&self) -> &HashMap<&'static str, Box<dyn TestcaseMetadata>>;
+
+    /// Map of metadatas associated with this testcase
+    fn metadatas_mut(&mut self) -> &mut HashMap<&'static str, Box<dyn TestcaseMetadata>>;
 }
-*/
 
 #[cfg(feature = "std")]
 pub enum FileBackedTestcase<I, P> {
@@ -49,10 +52,18 @@ pub enum FileBackedTestcase<I, P> {
 
     /// A testcase that has been loaded, and not yet dirtied.
     /// The input should be equal to the on-disk state.
-    Loaded { input: I, filename: P },
+    Loaded {
+        input: I,
+        filename: P,
+        //metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
+    },
 
     /// A testcase that has been mutated, but not yet written to disk
-    Dirty { input: I, filename: P },
+    Dirty {
+        input: I,
+        filename: P,
+        //metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
+    },
 }
 
 #[cfg(feature = "std")]
@@ -69,7 +80,10 @@ where
         match self {
             Self::Stored { filename } => {
                 let input = I::from_file(&filename)?;
-                Ok(Self::Loaded { filename, input })
+                Ok(Self::Loaded {
+                    filename,
+                    input,
+                })
             }
             Self::Loaded {
                 input: _,
@@ -171,25 +185,18 @@ where
     pub fn input_mut(&mut self) -> &mut Option<I> {
         &mut self.input
     }
-    /// Set the input
-    pub fn set_input(&mut self, input: Option<I>) {
-        self.input = input;
-    }
 
     /// Get the filename, if any
     pub fn filename(&self) -> &Option<String> {
         &self.filename
     }
+
     /// Get the filename, if any (mutable)
     pub fn filename_mut(&mut self) -> &mut Option<String> {
         &mut self.filename
     }
-    /// Set the filename
-    pub fn set_filename(&mut self, filename: Option<String>) {
-        self.filename = filename;
-    }
 
-    /// Get all the metadatas into an HashMap
+    /// Get all the metadatas into an HashMap (mutable)
     pub fn metadatas(&mut self) -> &mut HashMap<&'static str, Box<dyn TestcaseMetadata>> {
         &mut self.metadatas
     }

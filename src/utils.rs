@@ -231,6 +231,19 @@ mod tests {
         assert!(rand.between(11, 20) > 10);
     }
 
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_rand_preseeded() {
+        let mut rand_fixed = DefaultRand::new(0);
+        let mut rand = DefaultRand::preseeded();
+        assert_ne!(rand.next(), rand_fixed.next());
+        assert_ne!(rand.next(), rand.next());
+        assert!(rand.below(100) < 100);
+        assert_eq!(rand.below(1), 0);
+        assert_eq!(rand.between(10, 10), 10);
+        assert!(rand.between(11, 20) > 10);
+    }
+
     #[test]
     fn test_has_rand() {
         let rand = DefaultRand::new(0).into();

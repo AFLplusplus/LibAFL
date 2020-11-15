@@ -18,7 +18,7 @@ where
     I: Input,
 {
     /// Get the entries vector field
-    fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>>;
+    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>];
 
     /// Get the entries vector field (mutable)
     fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>>;
@@ -89,7 +89,7 @@ where
     I: Input,
     R: Rand,
 {
-    fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>> {
+    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>] {
         &self.entries
     }
     fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
@@ -147,7 +147,7 @@ where
     I: Input,
     R: Rand,
 {
-    fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>> {
+    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>] {
         &self.entries
     }
     fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
@@ -220,7 +220,7 @@ where
     I: Input,
     C: Corpus<I>,
 {
-    fn entries(&self) -> &Vec<Rc<RefCell<Testcase<I>>>> {
+    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>] {
         self.corpus.entries()
     }
     fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {

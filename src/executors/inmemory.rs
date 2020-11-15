@@ -1,5 +1,3 @@
-extern crate alloc;
-
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
@@ -201,13 +199,13 @@ compile_error!("InMemoryExecutor not yet supported on this OS");
 #[cfg(test)]
 mod tests {
 
-    extern crate alloc;
+    use alloc::boxed::Box;
+
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::Input;
     use crate::observers::Observer;
     use crate::AflError;
-    use alloc::boxed::Box;
 
     #[derive(Clone)]
     struct NopInput {}
@@ -233,7 +231,7 @@ mod tests {
 
     #[cfg(feature = "std")]
     fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
-        println! {"Fake exec with buf of len {}", buf.len()};
+        println!("Fake exec with buf of len {}", buf.len());
         ExitKind::Ok
     }
 

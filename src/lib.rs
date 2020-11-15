@@ -22,15 +22,24 @@ use std::io;
 /// Main error struct for AFL
 #[derive(Debug)]
 pub enum AflError {
+    /// Serialization error
     Serialize(String),
+    /// File related error
     #[cfg(feature = "std")]
     File(io::Error),
+    /// Optional val was supposed to be set, but isn't.
     EmptyOptional(String),
+    /// Key not in Map
     KeyNotFound(String),
+    /// No elements in the current item
     Empty(String),
+    /// End of iteration
     IteratorEnd(String),
+    /// This is not supported (yet)
     NotImplemented(String),
+    /// You're holding it wrong
     IllegalState(String),
+    /// Something else happened
     Unknown(String),
 }
 
@@ -53,6 +62,7 @@ impl fmt::Display for AflError {
     }
 }
 
+/// Create an AFL Error from io Error
 #[cfg(feature = "std")]
 impl From<io::Error> for AflError {
     fn from(err: io::Error) -> Self {
