@@ -1,4 +1,3 @@
-
 use crate::inputs::Input;
 use crate::AflError;
 
@@ -201,8 +200,10 @@ where
     }
 
     /// Create a new Testcase instace given an input
-    pub fn new<T>(input: T) -> Self 
-    where T: Into<I>{
+    pub fn new<T>(input: T) -> Self
+    where
+        T: Into<I>,
+    {
         Testcase {
             input: Some(input.into()),
             filename: None,

@@ -1,4 +1,3 @@
-
 use crate::inputs::{HasBytesVec, Input};
 use crate::mutators::Corpus;
 use crate::mutators::Mutator;
