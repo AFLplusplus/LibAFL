@@ -1,4 +1,3 @@
-extern crate alloc;
 
 pub mod bytes;
 pub use bytes::BytesInput;
@@ -30,7 +29,7 @@ pub trait Input: Clone {
 
     #[cfg(not(feature = "std"))]
     /// Write this input to the file
-    fn to_file<P>(&self, string: P) -> Result<(), AflError>
+    fn to_file<P>(&self, _path: P) -> Result<(), AflError>
 where {
         Err(AflError::NotImplemented("Not suppored in no_std".into()))
     }
@@ -49,7 +48,7 @@ where {
 
     /// Write this input to the file
     #[cfg(not(feature = "std"))]
-    fn from_file<P>(string: P) -> Result<Self, AflError>
+    fn from_file<P>(_path: P) -> Result<Self, AflError>
 where {
         Err(AflError::NotImplemented("Not suppored in no_std".into()))
     }

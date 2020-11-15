@@ -1,5 +1,7 @@
-extern crate alloc;
 pub mod inmemory;
+
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 use crate::corpus::TestcaseMetadata;
 use crate::feedbacks::Feedback;

@@ -1,10 +1,9 @@
-extern crate alloc;
 extern crate num;
 
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
-
-use alloc::vec::*;
 use num::Integer;
 
 use crate::corpus::TestcaseMetadata;

@@ -1,4 +1,3 @@
-extern crate alloc;
 
 use crate::inputs::{HasBytesVec, Input};
 use crate::mutators::Corpus;

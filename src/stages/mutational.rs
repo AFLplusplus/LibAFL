@@ -1,4 +1,3 @@
-extern crate alloc;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;

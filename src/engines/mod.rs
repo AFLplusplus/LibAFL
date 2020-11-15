@@ -1,5 +1,7 @@
 //! The engine is the core piece of every good fuzzer
-extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 use crate::corpus::Corpus;
 use crate::feedbacks::Feedback;
@@ -83,6 +85,7 @@ where
 #[cfg(test)]
 mod tests {
 
+    use alloc::boxed::Box;
     use alloc::rc::Rc;
     use core::cell::RefCell;
 

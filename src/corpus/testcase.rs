@@ -1,12 +1,16 @@
-extern crate alloc;
 
 use crate::inputs::Input;
 use crate::AflError;
 
+use alloc::boxed::Box;
 use alloc::rc::Rc;
+use alloc::string::String;
 use core::cell::RefCell;
 use core::convert::Into;
+use core::default::Default;
+use core::option::Option;
 use hashbrown::HashMap;
+
 #[cfg(feature = "std")]
 use std::fs::File;
 #[cfg(feature = "std")]
@@ -39,6 +43,7 @@ where
 }
 */
 
+#[cfg(feature = "std")]
 pub enum FileBackedTestcase<I, P> {
     /// A testcase on disk, not yet loaded
     Stored { filename: P },
@@ -51,6 +56,7 @@ pub enum FileBackedTestcase<I, P> {
     Dirty { input: I, filename: P },
 }
 
+#[cfg(feature = "std")]
 impl<I, P> FileBackedTestcase<I, P>
 where
     I: Input,

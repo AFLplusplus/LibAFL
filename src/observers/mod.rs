@@ -1,4 +1,3 @@
-extern crate alloc;
 extern crate num;
 
 use core::slice::from_raw_parts_mut;

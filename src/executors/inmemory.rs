@@ -1,9 +1,11 @@
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use core::cell::RefCell;
-use std::os::raw::c_void;
-use std::ptr;
+use core::ffi::c_void;
+use core::ptr;
 
 use crate::executors::{Executor, ExitKind};
 use crate::feedbacks::Feedback;
@@ -89,6 +91,7 @@ where
     I: Input,
 {
     pub fn new(harness_fn: HarnessFunction<I>) -> Self {
+        #[cfg(feature = "std")]
         unsafe {
             os_signals::setup_crash_handlers::<I>();
         }
@@ -100,6 +103,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(unix)]
 pub mod unix_signals {
 
@@ -130,9 +134,13 @@ pub mod unix_signals {
                 );
             }
         }
-        // TODO: LLMP
+
+        #[cfg(feature = "std")]
         println!("Child crashed!");
+        #[cfg(feature = "std")]
         let _ = stdout().flush();
+
+        // TODO: LLMP
     }
 
     pub extern "C" fn libaflrs_executor_inmem_handle_timeout<I>(
@@ -183,13 +191,18 @@ pub mod unix_signals {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(unix)]
 use unix_signals as os_signals;
+#[cfg(feature = "std")]
 #[cfg(not(unix))]
 compile_error!("InMemoryExecutor not yet supported on this OS");
 
 #[cfg(test)]
-mod tests {
+    mod tests {
+
+    extern crate alloc;
+    use alloc::boxed::Box;
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::Input;
@@ -218,8 +231,14 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "std")]
     fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
-        println! {"Fake exec with buf of len {}", buf.len()};
+        println!{"Fake exec with buf of len {}", buf.len()};
+        ExitKind::Ok
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
     }
 

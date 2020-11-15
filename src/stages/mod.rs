@@ -1,4 +1,3 @@
-extern crate alloc;
 
 pub mod mutational;
 pub use mutational::DefaultMutationalStage;

@@ -1,4 +1,3 @@
-extern crate alloc;
 
 pub mod scheduled;
 pub use scheduled::ComposedByMutations;
