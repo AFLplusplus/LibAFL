@@ -36,8 +36,11 @@ where
     }
 
     /// Runs this (mutational) stage for the given testcase
-    fn perform_mutational(&mut self, corpus: &mut C) -> Result<(), AflError> {
-        let testcase = corpus.next()?;
+    fn perform_mutational(
+        &mut self,
+        testcase: Rc<RefCell<Testcase<I>>>,
+        corpus: &mut C,
+    ) -> Result<(), AflError> {
         let num = self.iterations();
         let input = testcase.borrow_mut().load_input()?.clone();
 
@@ -120,8 +123,12 @@ where
     M: Mutator<C, I, R = R>,
     E: Executor<I>,
 {
-    fn perform(&mut self, corpus: &mut C) -> Result<(), AflError> {
-        self.perform_mutational(corpus)
+    fn perform(
+        &mut self,
+        testcase: Rc<RefCell<Testcase<I>>>,
+        corpus: &mut C,
+    ) -> Result<(), AflError> {
+        self.perform_mutational(testcase, corpus)
     }
 }
 

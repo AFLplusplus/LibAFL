@@ -31,8 +31,9 @@ where
     }
 
     fn fuzz_one(&mut self, corpus: &mut C) -> Result<(), AflError> {
+        let testcase = corpus.next()?;
         for stage in self.stages_mut() {
-            stage.perform(corpus)?;
+            stage.perform(testcase.clone(), corpus)?;
         }
         Ok(())
     }
