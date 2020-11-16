@@ -66,7 +66,7 @@ where
     }
 }
 
-pub struct DefaultScheduledMutator<'a, C, I, R>
+pub struct DefaultScheduledMutator<C, I, R>
 where
     C: Corpus<I>,
     I: Input,
@@ -76,7 +76,7 @@ where
     mutations: Vec<MutationFunction<C, Self, I>>,
 }
 
-impl<'a, C, I, R> HasRand for DefaultScheduledMutator<'_, C, I, R>
+impl<C, I, R> HasRand for DefaultScheduledMutator<C, I, R>
 where
     C: Corpus<I>,
     I: Input,
@@ -89,7 +89,7 @@ where
     }
 }
 
-impl<'a, C, I, R> Mutator<C, I> for DefaultScheduledMutator<'_, C, I, R>
+impl<C, I, R> Mutator<C, I> for DefaultScheduledMutator<C, I, R>
 where
     C: Corpus<I>,
     I: Input,
@@ -100,7 +100,7 @@ where
     }
 }
 
-impl<'a, C, I, R> ComposedByMutations<C, I> for DefaultScheduledMutator<'_, C, I, R>
+impl<C, I, R> ComposedByMutations<C, I> for DefaultScheduledMutator<C, I, R>
 where
     C: Corpus<I>,
     I: Input,
@@ -122,7 +122,7 @@ where
     }
 }
 
-impl<'a, C, I, R> ScheduledMutator<C, I> for DefaultScheduledMutator<'_, C, I, R>
+impl<C, I, R> ScheduledMutator<C, I> for DefaultScheduledMutator<C, I, R>
 where
     C: Corpus<I>,
     I: Input,
@@ -131,7 +131,7 @@ where
     // Just use the default methods
 }
 
-impl<'a, C, I, R> DefaultScheduledMutator<'a, C, I, R>
+impl<C, I, R> DefaultScheduledMutator<C, I, R>
 where
     C: Corpus<I>,
     I: Input,
@@ -303,7 +303,7 @@ where
     }
 }
 
-impl<'a, C, I, R> HavocBytesMutator<C, I, DefaultScheduledMutator<'a, C, I, R>>
+impl<C, I, R> HavocBytesMutator<C, I, DefaultScheduledMutator<C, I, R>>
 where
     C: Corpus<I>,
     I: Input + HasBytesVec,
@@ -311,7 +311,7 @@ where
 {
     /// Create a new HavocBytesMutator instance wrapping DefaultScheduledMutator
     pub fn new_default(rand: &Rc<RefCell<R>>) -> Self {
-        let mut scheduled = DefaultScheduledMutator::<'a, C, I, R>::new(rand);
+        let mut scheduled = DefaultScheduledMutator::<C, I, R>::new(rand);
         scheduled.add_mutation(mutation_bitflip);
         HavocBytesMutator {
             scheduled: scheduled,

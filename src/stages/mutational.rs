@@ -11,7 +11,7 @@ use crate::stages::Stage;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
-// TODO create HasMutatorsVec trait
+// TODO multi mutators stage
 
 pub trait MutationalStage<C, I, M, E>: Stage<C, I> + HasRand
 where

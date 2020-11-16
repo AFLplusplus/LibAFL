@@ -11,6 +11,7 @@ pub mod inputs;
 pub mod monitors;
 pub mod mutators;
 pub mod observers;
+pub mod generators;
 pub mod stages;
 pub mod utils;
 

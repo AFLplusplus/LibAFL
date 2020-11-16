@@ -86,8 +86,6 @@ where
 mod tests {
 
     use alloc::boxed::Box;
-    use alloc::rc::Rc;
-    use core::cell::RefCell;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
     use crate::engines::{DefaultEngine, Engine};
@@ -106,13 +104,12 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        let rand: Rc<_> = DefaultRand::new(0).into();
+        let rand = DefaultRand::new(0).into();
 
         let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
-        let executor: Rc<RefCell<InMemoryExecutor<BytesInput>>> =
-            InMemoryExecutor::new(harness).into();
+        let executor = InMemoryExecutor::<BytesInput>::new(harness).into();
         let mut engine = DefaultEngine::new();
         let mut mutator = DefaultScheduledMutator::new(&rand);
         mutator.add_mutation(mutation_bitflip);
