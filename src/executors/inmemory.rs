@@ -1,14 +1,10 @@
-use alloc::boxed::Box;
 use alloc::rc::Rc;
-use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::ffi::c_void;
 use core::ptr;
 
 use crate::executors::{Executor, ExitKind};
-use crate::feedbacks::Feedback;
 use crate::inputs::Input;
-use crate::observers::Observer;
 use crate::AflError;
 
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
@@ -17,9 +13,7 @@ pub struct InMemoryExecutor<I>
 where
     I: Input,
 {
-    observers: Vec<Box<dyn Observer>>,
     harness: HarnessFunction<I>,
-    feedbacks: Vec<Box<dyn Feedback<I>>>,
 }
 
 impl<I> Into<Rc<RefCell<Self>>> for InMemoryExecutor<I>
@@ -48,40 +42,6 @@ where
         }
         Ok(ret)
     }
-
-    fn reset_observers(&mut self) -> Result<(), AflError> {
-        for observer in &mut self.observers {
-            observer.reset()?;
-        }
-        Ok(())
-    }
-
-    fn post_exec_observers(&mut self) -> Result<(), AflError> {
-        self.observers
-            .iter_mut()
-            .map(|x| x.post_exec())
-            .fold(Ok(()), |acc, x| if x.is_err() { x } else { acc })
-    }
-
-    fn add_observer(&mut self, observer: Box<dyn Observer>) {
-        self.observers.push(observer);
-    }
-
-    fn observers(&self) -> &[Box<dyn Observer>] {
-        &self.observers
-    }
-
-    fn feedbacks(&self) -> &[Box<dyn Feedback<I>>] {
-        &self.feedbacks
-    }
-
-    fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>> {
-        &mut self.feedbacks
-    }
-
-    fn add_feedback(&mut self, feedback: Box<dyn Feedback<I>>) {
-        self.feedbacks_mut().push(feedback);
-    }
 }
 
 impl<I> InMemoryExecutor<I>
@@ -94,8 +54,6 @@ where
             os_signals::setup_crash_handlers::<I>();
         }
         InMemoryExecutor {
-            observers: vec![],
-            feedbacks: vec![],
             harness: harness_fn,
         }
     }
@@ -199,12 +157,9 @@ compile_error!("InMemoryExecutor not yet supported on this OS");
 #[cfg(test)]
 mod tests {
 
-    use alloc::boxed::Box;
-
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::Input;
-    use crate::observers::Observer;
     use crate::AflError;
 
     #[derive(Clone)]
@@ -218,17 +173,6 @@ mod tests {
         }
     }
 
-    struct Nopserver {}
-
-    impl Observer for Nopserver {
-        fn reset(&mut self) -> Result<(), AflError> {
-            Err(AflError::Unknown("Nop reset, testing only".into()))
-        }
-        fn post_exec(&mut self) -> Result<(), AflError> {
-            Err(AflError::Unknown("Nop exec, testing only".into()))
-        }
-    }
-
     #[cfg(feature = "std")]
     fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
         println!("Fake exec with buf of len {}", buf.len());
@@ -238,14 +182,6 @@ mod tests {
     #[cfg(not(feature = "std"))]
     fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
-    }
-
-    #[test]
-    fn test_inmem_post_exec() {
-        let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
-        let nopserver = Nopserver {};
-        in_mem_executor.add_observer(Box::new(nopserver));
-        assert_eq!(in_mem_executor.post_exec_observers().is_err(), true);
     }
 
     #[test]
