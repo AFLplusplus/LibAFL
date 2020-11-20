@@ -1,0 +1,10 @@
+[package]
+name = "libfuzzer"
+version = "0.1.0"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+afl = { path = "../../../" }
