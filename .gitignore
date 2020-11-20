@@ -1,4 +1,8 @@
 target
 Cargo.lock
 
+*.o
+*.a
+*.so
+
 .vscode

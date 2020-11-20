@@ -5,17 +5,24 @@ use afl::engines::{DefaultEngine, DefaultState, Engine};
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::inputs::bytes::BytesInput;
-use afl::mutators::scheduled::{
-    mutation_bitflip, ComposedByMutations, DefaultScheduledMutator,
-};
+use afl::mutators::scheduled::{mutation_bitflip, ComposedByMutations, DefaultScheduledMutator};
 use afl::stages::mutational::DefaultMutationalStage;
 use afl::utils::DefaultRand;
 
-fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
+extern "C" {
+    /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
+    fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
+}
+
+fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
+    unsafe {
+        LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len());
+    }
     ExitKind::Ok
 }
 
-pub fn main() {
+#[no_mangle]
+pub extern "C" fn afl_libfuzzer_main() {
     let rand = DefaultRand::new(0).into();
 
     let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
@@ -40,4 +47,3 @@ pub fn main() {
     }
     println!("OK");
 }
-
