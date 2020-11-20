@@ -97,6 +97,8 @@ pub mod unix_signals {
         let _ = stdout().flush();
 
         // TODO: LLMP
+
+        std::process::exit(139);
     }
 
     pub extern "C" fn libaflrs_executor_inmem_handle_timeout<I>(

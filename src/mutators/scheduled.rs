@@ -165,7 +165,7 @@ where
     M: HasRand,
     I: Input + HasBytesVec,
 {
-    let bit = mutator.rand_below(input.bytes().len() as u64) as usize;
+    let bit = mutator.rand_below((input.bytes().len() * 8) as u64) as usize;
     input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
     Ok(())
 }
@@ -313,6 +313,7 @@ where
     pub fn new_default(rand: &Rc<RefCell<R>>) -> Self {
         let mut scheduled = DefaultScheduledMutator::<C, I, R>::new(rand);
         scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
             scheduled: scheduled,
             phantom: PhantomData,

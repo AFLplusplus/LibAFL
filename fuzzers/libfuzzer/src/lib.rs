@@ -8,7 +8,7 @@ use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::{create_history_map, MaxMapFeedback};
 use afl::inputs::bytes::BytesInput;
-use afl::mutators::scheduled::{mutation_bitflip, ComposedByMutations, DefaultScheduledMutator};
+use afl::mutators::scheduled::HavocBytesMutator;
 use afl::observers::DefaultMapObserver;
 use afl::stages::mutational::DefaultMutationalStage;
 use afl::utils::DefaultRand;
@@ -53,12 +53,9 @@ pub extern "C" fn afl_libfuzzer_main() {
     state.add_feedback(Box::new(edges_feedback));
 
     let mut engine = DefaultEngine::new();
-    let mut mutator = DefaultScheduledMutator::new(&rand);
-    mutator.add_mutation(mutation_bitflip);
+    let mutator = HavocBytesMutator::new_default(&rand);
     let stage = DefaultMutationalStage::new(&rand, mutator);
     engine.add_stage(Box::new(stage));
-
-    //
 
     for i in 0..1000 {
         println!("Fuzzer corpus iteration #{}", i);
