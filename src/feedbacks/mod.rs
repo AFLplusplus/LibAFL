@@ -1,21 +1,32 @@
 extern crate num;
 
-use alloc::boxed::Box;
+use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use num::Integer;
 
-use crate::corpus::TestcaseMetadata;
+use crate::corpus::Testcase;
 use crate::inputs::Input;
 use crate::observers::MapObserver;
+use crate::AflError;
 
 pub trait Feedback<I>
 where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, input: &I) -> (u32, Option<Box<dyn TestcaseMetadata>>);
+    fn is_interesting(&mut self, input: &I) -> Result<u32, AflError>;
+
+    /// Append to the testcase the generated metadata in case of a new corpus item
+    fn append_metadata(&mut self, _testcase: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+        Ok(())
+    }
+
+    /// Discard the stored metadata in case that the testcase is not added to the corpus
+    fn discard_metadata(&mut self) -> Result<(), AflError> {
+        Ok(())
+    }
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
@@ -88,7 +99,7 @@ where
     O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting(&mut self, _input: &I) -> (u32, Option<Box<dyn TestcaseMetadata>>) {
+    fn is_interesting(&mut self, _input: &I) -> Result<u32, AflError> {
         let mut interesting = 0;
 
         // TODO: impl. correctly, optimize
@@ -103,11 +114,11 @@ where
                 *history = reduced;
                 interesting += 25;
                 if interesting >= 250 {
-                    return (255, None);
+                    return Ok(255);
                 }
             }
         }
-        (interesting, None)
+        Ok(interesting)
     }
 }
 

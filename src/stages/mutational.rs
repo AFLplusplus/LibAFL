@@ -3,6 +3,7 @@ use core::cell::RefCell;
 use core::marker::PhantomData;
 
 use crate::corpus::testcase::Testcase;
+use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
@@ -13,21 +14,19 @@ use crate::AflError;
 
 // TODO multi mutators stage
 
-pub trait MutationalStage<C, I, M, E>: Stage<C, I> + HasRand
+pub trait MutationalStage<M, S, C, E, I>: Stage<S, C, E, I> + HasRand
 where
+    M: Mutator<C, I, R = Self::R>,
+    S: State<C, E, I>,
+    E: Executor<I>,
     C: Corpus<I>,
     I: Input,
-    M: Mutator<C, I, R = Self::R>,
-    E: Executor<I>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
 
     /// The mutator registered for this stage (mutable)
     fn mutator_mut(&mut self) -> &mut M;
-
-    /// Rc Refcell to the executor
-    fn executor(&self) -> &Rc<RefCell<E>>;
 
     /// Gets the number of iterations this mutator should run for.
     /// This call uses internal mutability, so it may change for each call
@@ -39,7 +38,7 @@ where
     fn perform_mutational(
         &mut self,
         testcase: Rc<RefCell<Testcase<I>>>,
-        corpus: &mut C,
+        state: &mut S,
     ) -> Result<(), AflError> {
         let num = self.iterations();
         let input = testcase.borrow_mut().load_input()?.clone();
@@ -47,14 +46,14 @@ where
         for i in 0..num {
             let mut input_tmp = input.clone();
             self.mutator_mut()
-                .mutate(corpus, &mut input_tmp, i as i32)?;
+                .mutate(state.corpus_mut(), &mut input_tmp, i as i32)?;
 
-            let interesting = self.executor().borrow_mut().evaluate_input(&input_tmp)?;
+            let interesting = state.evaluate_input(&input_tmp)?;
 
             self.mutator_mut().post_exec(interesting, i as i32)?;
 
             if interesting {
-                corpus.add(Testcase::new(input_tmp).into());
+                state.corpus_mut().add(Testcase::new(input_tmp).into());
             }
         }
         Ok(())
@@ -62,28 +61,25 @@ where
 }
 
 /// The default mutational stage
-pub struct DefaultMutationalStage<C, I, R, M, E>
+pub struct DefaultMutationalStage<M, C, I, R>
 where
+    M: Mutator<C, I, R = R>,
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<C, I, R = R>,
-    E: Executor<I>,
 {
     rand: Rc<RefCell<R>>,
-    executor: Rc<RefCell<E>>,
     mutator: M,
     _phantom_corpus: PhantomData<C>,
     _phantom_input: PhantomData<I>,
 }
 
-impl<C, I, R, M, E> HasRand for DefaultMutationalStage<C, I, R, M, E>
+impl<M, C, I, R> HasRand for DefaultMutationalStage<M, C, I, R>
 where
+    M: Mutator<C, I, R = R>,
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<C, I, R = R>,
-    E: Executor<I>,
 {
     type R = R;
 
@@ -92,13 +88,14 @@ where
     }
 }
 
-impl<C, I, R, M, E> MutationalStage<C, I, M, E> for DefaultMutationalStage<C, I, R, M, E>
+impl<M, S, C, E, I, R> MutationalStage<M, S, C, E, I> for DefaultMutationalStage<M, C, I, R>
 where
+    M: Mutator<C, I, R = R>,
+    S: State<C, E, I>,
     C: Corpus<I>,
+    E: Executor<I>,
     I: Input,
     R: Rand,
-    M: Mutator<C, I, R = R>,
-    E: Executor<I>,
 {
     /// The mutator, added to this stage
     fn mutator(&self) -> &M {
@@ -109,42 +106,37 @@ where
     fn mutator_mut(&mut self) -> &mut M {
         &mut self.mutator
     }
-
-    fn executor(&self) -> &Rc<RefCell<E>> {
-        &self.executor
-    }
 }
 
-impl<C, I, R, M, E> Stage<C, I> for DefaultMutationalStage<C, I, R, M, E>
+impl<M, S, C, E, I, R> Stage<S, C, E, I> for DefaultMutationalStage<M, C, I, R>
 where
+    M: Mutator<C, I, R = R>,
+    S: State<C, E, I>,
     C: Corpus<I>,
+    E: Executor<I>,
     I: Input,
     R: Rand,
-    M: Mutator<C, I, R = R>,
-    E: Executor<I>,
 {
     fn perform(
         &mut self,
         testcase: Rc<RefCell<Testcase<I>>>,
-        corpus: &mut C,
+        state: &mut S,
     ) -> Result<(), AflError> {
-        self.perform_mutational(testcase, corpus)
+        self.perform_mutational(testcase, state)
     }
 }
 
-impl<C, I, R, M, E> DefaultMutationalStage<C, I, R, M, E>
+impl<M, C, I, R> DefaultMutationalStage<M, C, I, R>
 where
+    M: Mutator<C, I, R = R>,
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    M: Mutator<C, I, R = R>,
-    E: Executor<I>,
 {
     /// Creates a new default mutational stage
-    pub fn new(rand: &Rc<RefCell<R>>, executor: &Rc<RefCell<E>>, mutator: M) -> Self {
+    pub fn new(rand: &Rc<RefCell<R>>, mutator: M) -> Self {
         DefaultMutationalStage {
             rand: Rc::clone(rand),
-            executor: Rc::clone(executor),
             mutator: mutator,
             _phantom_corpus: PhantomData,
             _phantom_input: PhantomData,

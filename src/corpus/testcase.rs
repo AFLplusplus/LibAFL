@@ -80,10 +80,7 @@ where
         match self {
             Self::Stored { filename } => {
                 let input = I::from_file(&filename)?;
-                Ok(Self::Loaded {
-                    filename,
-                    input,
-                })
+                Ok(Self::Loaded { filename, input })
             }
             Self::Loaded {
                 input: _,
@@ -170,11 +167,13 @@ where
 {
     /// Make sure to return a valid input instance loading it from disk if not in memory
     pub fn load_input(&mut self) -> Result<&I, AflError> {
-        // TODO: Implement cache to disk
-        match self.input.as_ref() {
-            Some(i) => Ok(i),
-            None => Err(AflError::NotImplemented("load_input".into())),
+        if self.input.is_none() {
+            let input = I::from_file(self.filename.as_ref().ok_or(AflError::EmptyOptional(
+                "filename not specified".to_string(),
+            ))?)?;
+            self.input = Some(input);
         }
+        Ok(self.input.as_ref().unwrap())
     }
 
     /// Get the input, if any
@@ -223,6 +222,14 @@ where
         Testcase {
             input: Some(input),
             filename: Some(filename),
+            metadatas: HashMap::default(),
+        }
+    }
+
+    pub fn default() -> Self {
+        Testcase {
+            input: None,
+            filename: None,
             metadatas: HashMap::default(),
         }
     }

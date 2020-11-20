@@ -3,11 +3,13 @@ pub mod inmemory;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use crate::corpus::TestcaseMetadata;
+use crate::corpus::Testcase;
 use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::AflError;
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 pub enum ExitKind {
     Ok,
@@ -53,19 +55,21 @@ where
         self.run_target(input)?;
         self.post_exec_observers()?;
 
-        let mut metadatas: Vec<Box<dyn TestcaseMetadata>> = vec![];
         let mut rate_acc = 0;
         for feedback in self.feedbacks_mut() {
-            let (rate, meta) = feedback.is_interesting(input);
-            rate_acc += rate;
-            if let Some(m) = meta {
-                metadatas.push(m);
-            }
+            rate_acc += feedback.is_interesting(input)?;
         }
 
         if rate_acc >= 25 {
+            let testcase = Rc::new(RefCell::new(Testcase::new(input.clone())));
+            for feedback in self.feedbacks_mut() {
+                feedback.append_metadata(testcase.clone())?;
+            }
             Ok(true)
         } else {
+            for feedback in self.feedbacks_mut() {
+                feedback.discard_metadata()?;
+            }
             Ok(false)
         }
     }
