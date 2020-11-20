@@ -20,29 +20,29 @@ where
     I: Input,
 {
     /// Get the linked observers
-    fn observers(&self) -> &[Box<dyn Observer>];
+    fn observers(&self) -> &[Rc<RefCell<dyn Observer>>];
 
     /// Get the linked observers
-    fn observers_mut(&mut self) -> &mut Vec<Box<dyn Observer>>;
+    fn observers_mut(&mut self) -> &mut Vec<Rc<RefCell<dyn Observer>>>;
 
     /// Add a linked observer
-    fn add_observer(&mut self, observer: Box<dyn Observer>) {
+    fn add_observer(&mut self, observer: Rc<RefCell<dyn Observer>>) {
         self.observers_mut().push(observer);
     }
 
     /// Reset the state of all the observes linked to this executor
     fn reset_observers(&mut self) -> Result<(), AflError> {
-        for observer in self.observers_mut() {
-            observer.reset()?;
+        for observer in self.observers() {
+            observer.borrow_mut().reset()?;
         }
         Ok(())
     }
 
     /// Run the post exec hook for all the observes linked to this executor
     fn post_exec_observers(&mut self) -> Result<(), AflError> {
-        self.observers_mut()
-            .iter_mut()
-            .map(|x| x.post_exec())
+        self.observers()
+            .iter()
+            .map(|x| x.borrow_mut().post_exec())
             .fold(Ok(()), |acc, x| if x.is_err() { x } else { acc })
     }
 
@@ -101,7 +101,7 @@ where
     E: Executor<I>,
     I: Input,
 {
-    observers: Vec<Box<dyn Observer>>,
+    observers: Vec<Rc<RefCell<dyn Observer>>>,
     feedbacks: Vec<Box<dyn Feedback<I>>>,
     corpus: C,
     executor: E,
@@ -113,11 +113,11 @@ where
     E: Executor<I>,
     I: Input,
 {
-    fn observers(&self) -> &[Box<dyn Observer>] {
+    fn observers(&self) -> &[Rc<RefCell<dyn Observer>>] {
         &self.observers
     }
 
-    fn observers_mut(&mut self) -> &mut Vec<Box<dyn Observer>> {
+    fn observers_mut(&mut self) -> &mut Vec<Rc<RefCell<dyn Observer>>> {
         &mut self.observers
     }
 

@@ -1,5 +1,7 @@
 extern crate num;
 
+use alloc::rc::Rc;
+use core::cell::RefCell;
 use core::slice::from_raw_parts_mut;
 use num::Integer;
 
@@ -57,13 +59,19 @@ where
     initial: T,
 }
 
-impl<'a, T: Integer + Copy> Observer for DefaultMapObserver<'a, T> {
+impl<'a, T> Observer for DefaultMapObserver<'a, T>
+where
+    T: Integer + Copy,
+{
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
     }
 }
 
-impl<'a, T: Integer + Copy> MapObserver<T> for DefaultMapObserver<'a, T> {
+impl<'a, T> MapObserver<T> for DefaultMapObserver<'a, T>
+where
+    T: Integer + Copy,
+{
     fn map(&self) -> &[T] {
         &self.map
     }
@@ -85,7 +93,10 @@ impl<'a, T: Integer + Copy> MapObserver<T> for DefaultMapObserver<'a, T> {
     }
 }
 
-impl<'a, T: Integer + Copy> DefaultMapObserver<'a, T> {
+impl<'a, T> DefaultMapObserver<'a, T>
+where
+    T: Integer + Copy,
+{
     /// Creates a new MapObserver
     pub fn new(map: &'a mut [T]) -> Self {
         let initial = if map.len() > 0 { map[0] } else { T::zero() };
@@ -104,5 +115,14 @@ impl<'a, T: Integer + Copy> DefaultMapObserver<'a, T> {
                 initial: initial,
             }
         }
+    }
+}
+
+impl<'a, T> Into<Rc<RefCell<Self>>> for DefaultMapObserver<'a, T>
+where
+    T: Integer + Copy,
+{
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
     }
 }

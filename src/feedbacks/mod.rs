@@ -78,21 +78,21 @@ where
 }
 
 /// The most common AFL-like feedback type
-pub struct MapFeedback<'a, T, R, O>
+pub struct MapFeedback<T, R, O>
 where
     T: Integer + Copy + 'static,
     R: Reducer<T>,
     O: MapObserver<T>,
 {
     /// Contains information about untouched entries
-    history_map: &'a RefCell<Vec<T>>,
+    history_map: Rc<RefCell<Vec<T>>>,
     /// The observer this feedback struct observes
-    map_observer: &'a RefCell<O>,
+    map_observer: Rc<RefCell<O>>,
     /// Phantom Data of Reducer
     phantom: PhantomData<R>,
 }
 
-impl<'a, T, R, O, I> Feedback<I> for MapFeedback<'a, T, R, O>
+impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
 where
     T: Integer + Copy + 'static,
     R: Reducer<T>,
@@ -122,7 +122,7 @@ where
     }
 }
 
-impl<'a, T, R, O> MapFeedback<'a, T, R, O>
+impl<T, R, O> MapFeedback<T, R, O>
 where
     T: Integer + Copy + 'static,
     R: Reducer<T>,
@@ -130,7 +130,7 @@ where
 {
     /// Create new MapFeedback using a map observer, and a map.
     /// The map can be shared.
-    pub fn new(map_observer: &'a RefCell<O>, history_map: &'a RefCell<Vec<T>>) -> Self {
+    pub fn new(map_observer: Rc<RefCell<O>>, history_map: Rc<RefCell<Vec<T>>>) -> Self {
         MapFeedback {
             map_observer: map_observer,
             history_map: history_map,
@@ -140,14 +140,14 @@ where
 }
 
 /// Returns a usable history map of the given size
-pub fn create_history_map<T>(map_size: usize) -> RefCell<Vec<T>>
+pub fn create_history_map<T>(map_size: usize) -> Rc<RefCell<Vec<T>>>
 where
     T: Default + Clone,
 {
     {
-        RefCell::new(vec![T::default(); map_size])
+        Rc::new(RefCell::new(vec![T::default(); map_size]))
     }
 }
 
-pub type MaxMapFeedback<'a, T, O> = MapFeedback<'a, T, MaxReducer<T>, O>;
-pub type MinMapFeedback<'a, T, O> = MapFeedback<'a, T, MinReducer<T>, O>;
+pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
+pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;

@@ -32,6 +32,8 @@ def cc_mode():
     args = common_opts()
     args += sys.argv[1:]
     
+    args += ["-fsanitize-coverage=trace-pc-guard,trace-cmp"]
+    
     if os.getenv("AFL_USE_ASAN"):
         args += ["-fsanitize=address"]
     if os.getenv("AFL_USE_MSAN"):
@@ -53,6 +55,8 @@ def ld_mode():
       os.path.join(script_dir, "runtime", "rt.o"),
       os.path.join(script_dir, "target", "release", "liblibfuzzer.a"),
     ]
+    
+    args += ["-fsanitize-coverage=trace-pc-guard,trace-cmp"]
 
     if os.getenv("AFL_USE_ASAN"):
         args += ["-fsanitize=address"]
