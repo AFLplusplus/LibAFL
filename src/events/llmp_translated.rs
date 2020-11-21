@@ -51,10 +51,12 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 use ::libc;
 
 use core::sync::atomic::{compiler_fence, Ordering};
+use libc::{c_char, c_int, c_uint, c_ulong, c_ushort, c_void};
 use std::process::exit;
-use libc::{c_char, c_int, c_uchar, c_uint, c_ulong, c_ushort, c_void};
 
 use crate::utils::next_pow2;
+
+use super::shmem_translated::{afl_shmem_deinit, afl_shmem_init, afl_shmem_by_str, afl_shmem};
 
 extern "C" {
     #[no_mangle]
@@ -73,16 +75,6 @@ extern "C" {
     fn memmove(_: *mut c_void, _: *const c_void, _: c_ulong) -> *mut c_void;
     #[no_mangle]
     fn memset(_: *mut c_void, _: c_int, _: c_ulong) -> *mut c_void;
-    #[no_mangle]
-    fn strerror(_: c_int) -> *mut c_char;
-    #[no_mangle]
-    fn __errno_location() -> *mut c_int;
-    #[no_mangle]
-    fn afl_shmem_deinit(sharedmem: *mut afl_shmem);
-    #[no_mangle]
-    fn afl_shmem_by_str(shm: *mut afl_shmem, shm_str: *mut c_char, map_size: c_ulong) -> *mut u8;
-    #[no_mangle]
-    fn afl_shmem_init(sharedmem: *mut afl_shmem, map_size: c_ulong) -> *mut u8;
 }
 
 pub type AflRet = c_uint;
@@ -117,15 +109,6 @@ pub struct llmp_client {
 pub struct llmp_hookdata_generic {
     pub func: *mut c_void,
     pub data: *mut c_void,
-}
-
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct afl_shmem {
-    pub shm_str: [c_char; 20],
-    pub shm_id: c_int,
-    pub map: *mut c_uchar,
-    pub map_size: c_ulong,
 }
 
 #[derive(Copy, Clone)]

@@ -1,5 +1,6 @@
 pub mod llmp;
-mod llmp_translated;
+pub mod llmp_translated; // TODO: Abstract away.
+pub mod shmem_translated;
 pub use crate::events::llmp::LLMP;
 
 use core::any::{Any, TypeId};
