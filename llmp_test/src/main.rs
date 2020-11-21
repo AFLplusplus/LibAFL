@@ -1,7 +1,13 @@
+use core::ffi::c_void;
+
 use std::env::args;
 use std::ptr;
 
-use afl::events::llmp_translated;
+use afl::events::llmp_translated::*;
+
+fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) {
+    println!("Client says hi");
+}
 
 fn main() {
 
@@ -9,7 +15,7 @@ fn main() {
 
     /* The main node has a broker, a tcp server, and a few worker threads */
 
-    let mut broker = llmp_translated::llmp_broker_state {
+    let mut broker = llmp_broker_state {
         last_msg_sent: ptr::null_mut(),
         broadcast_map_count: 0,
         broadcast_maps: ptr::null_mut(),
@@ -18,12 +24,11 @@ fn main() {
         llmp_client_count: 0,
         llmp_clients: ptr::null_mut(),
     };
-    unsafe {llmp_translated::llmp_broker_init(&mut broker)};
+    unsafe {llmp_broker_init(&mut broker).expect("Could not init")};
+    
+    unsafe {llmp_broker_register_childprocess_clientloop(&mut broker, llmp_test_clientloop, ptr::null_mut()).expect("could not add child clientloop")};
 
-    /*
-    llmp_broker_register_local_server(broker, port);
-
-    if (!llmp_broker_register_threaded_clientloop(broker, llmp_clientloop_print_u32, NULL)) {
+    /*unsafe {llmp_broker_register_threaded_clientloop(broker, llmp_clientloop_print_u32, NULL)) {
 
       FATAL("error adding threaded client");
 
