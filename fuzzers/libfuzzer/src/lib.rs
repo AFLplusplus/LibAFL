@@ -1,6 +1,11 @@
-use std::boxed::Box;
-use std::cell::RefCell;
-use std::rc::Rc;
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[macro_use]
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 use afl::corpus::{Corpus, InMemoryCorpus, Testcase};
 use afl::engines::{DefaultEngine, DefaultState, Engine, State};
@@ -62,5 +67,7 @@ pub extern "C" fn afl_libfuzzer_main() {
             .fuzz_one(&mut state)
             .expect(&format!("Error in iter {}", i));
     }
+    
+    #[cfg(feature = "std")]
     println!("OK");
 }
