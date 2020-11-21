@@ -7,11 +7,10 @@ pub mod corpus;
 pub mod engines;
 pub mod executors;
 pub mod feedbacks;
+pub mod generators;
 pub mod inputs;
-pub mod monitors;
 pub mod mutators;
 pub mod observers;
-pub mod generators;
 pub mod stages;
 pub mod utils;
 

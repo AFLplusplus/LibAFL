@@ -199,6 +199,7 @@ where
 
     fn fuzz_one(&mut self, state: &mut S) -> Result<usize, AflError> {
         let (testcase, idx) = state.corpus_mut().next()?;
+        println!("Cur entry: {}\tExecutions: {}", idx, state.executions());
         for stage in self.stages_mut() {
             stage.perform(testcase.clone(), state)?;
         }

@@ -58,11 +58,9 @@ pub extern "C" fn afl_libfuzzer_main() {
     engine.add_stage(Box::new(stage));
 
     for i in 0..1000 {
-        println!("Fuzzer corpus iteration #{}", i);
-        let idx = engine
+        engine
             .fuzz_one(&mut state)
             .expect(&format!("Error in iter {}", i));
-        println!("Fuzzed entry #{}", idx);
     }
     println!("OK");
 }
