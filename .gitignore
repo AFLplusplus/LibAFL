@@ -4,5 +4,10 @@ Cargo.lock
 *.o
 *.a
 *.so
+*.out
+*.elf
+*.bin
+*.dll
+*.exe
 
 .vscode

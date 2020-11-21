@@ -177,12 +177,12 @@ where
         self.stages_mut().push(stage);
     }
 
-    fn fuzz_one(&mut self, state: &mut S) -> Result<(), AflError> {
-        let testcase = state.corpus_mut().next()?;
+    fn fuzz_one(&mut self, state: &mut S) -> Result<usize, AflError> {
+        let (testcase, idx) = state.corpus_mut().next()?;
         for stage in self.stages_mut() {
             stage.perform(testcase.clone(), state)?;
         }
-        Ok(())
+        Ok(idx)
     }
 }
 

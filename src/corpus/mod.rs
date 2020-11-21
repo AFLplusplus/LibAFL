@@ -58,19 +58,19 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+    fn random_entry(&self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
         if self.count() == 0 {
             Err(AflError::Empty("No entries in corpus".to_owned()))
         } else {
             let len = { self.entries().len() };
             let id = self.rand_below(len as u64) as usize;
-            Ok(self.entries()[id].clone())
+            Ok((self.entries()[id].clone(), id))
         }
     }
 
     // TODO: IntoIter
     /// Gets the next entry
-    fn next(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+    fn next(&mut self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
         self.random_entry()
     }
 }
@@ -260,12 +260,12 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+    fn random_entry(&self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
         self.corpus.random_entry()
     }
 
     /// Gets the next entry
-    fn next(&mut self) -> Result<Rc<RefCell<Testcase<I>>>, AflError> {
+    fn next(&mut self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
         self.pos += 1;
         if self.corpus.count() == 0 {
             return Err(AflError::Empty("Corpus".to_owned()));
@@ -275,7 +275,7 @@ where
             self.pos = 1;
             self.cycles += 1;
         }
-        Ok(self.corpus.entries()[self.pos - 1].clone())
+        Ok((self.corpus.entries()[self.pos - 1].clone(), self.pos - 1))
     }
 }
 
@@ -373,6 +373,7 @@ mod tests {
         let filename = q
             .next()
             .unwrap()
+            .0
             .borrow()
             .filename()
             .as_ref()
@@ -382,6 +383,7 @@ mod tests {
             filename,
             q.next()
                 .unwrap()
+                .0
                 .borrow()
                 .filename()
                 .as_ref()

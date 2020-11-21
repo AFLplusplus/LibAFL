@@ -59,9 +59,10 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     for i in 0..1000 {
         println!("Fuzzer corpus iteration #{}", i);
-        engine
+        let idx = engine
             .fuzz_one(&mut state)
             .expect(&format!("Error in iter {}", i));
+        println!("Fuzzed entry #{}", idx);
     }
     println!("OK");
 }

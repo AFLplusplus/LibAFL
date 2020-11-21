@@ -9,8 +9,13 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 
+pub enum MutationResult {
+    Mutated,
+    Skipped,
+}
+
 /// The generic function type that identifies mutations
-type MutationFunction<C, M, I> = fn(&mut M, &mut C, &mut I) -> Result<(), AflError>;
+type MutationFunction<C, M, I> = fn(&mut M, &mut C, &mut I) -> Result<MutationResult, AflError>;
 
 pub trait ComposedByMutations<C, I>
 where
@@ -159,7 +164,7 @@ pub fn mutation_bitflip<C, M, I>(
     mutator: &mut M,
     _corpus: &mut C,
     input: &mut I,
-) -> Result<(), AflError>
+) -> Result<MutationResult, AflError>
 where
     C: Corpus<I>,
     M: HasRand,
@@ -167,7 +172,7 @@ where
 {
     let bit = mutator.rand_below((input.bytes().len() * 8) as u64) as usize;
     input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
-    Ok(())
+    Ok(MutationResult::Mutated)
 }
 
 /// Returns the first and last diff position between the given vectors, stopping at the min len
@@ -191,7 +196,7 @@ pub fn mutation_splice<C, M, I>(
     mutator: &mut M,
     corpus: &mut C,
     input: &mut I,
-) -> Result<(), AflError>
+) -> Result<MutationResult, AflError>
 where
     C: Corpus<I>,
     M: HasRand,
@@ -201,14 +206,12 @@ where
     // We don't want to use the testcase we're already using for splicing
     let other_rr = loop {
         let mut found = false;
-        let other_rr = corpus.random_entry()?.clone();
+        let (other_rr, _) = corpus.random_entry()?.clone();
         match other_rr.try_borrow_mut() {
             Ok(_) => found = true,
             Err(_) => {
                 if retry_count == 20 {
-                    return Err(AflError::Empty(
-                        "No suitable testcase found for splicing".into(),
-                    ));
+                    return Ok(MutationResult::Skipped);
                 }
                 retry_count += 1;
             }
@@ -230,7 +233,7 @@ where
             break (f, l);
         }
         if counter == 20 {
-            return Err(AflError::Empty("No valid diff found".into()));
+            return Ok(MutationResult::Skipped);
         }
         counter += 1;
     };
@@ -246,7 +249,7 @@ where
 
     // println!("Splice result: {:?}, input is now: {:?}", split_result, input.bytes());
 
-    Ok(())
+    Ok(MutationResult::Mutated)
 }
 
 /// Schedule some selected byte level mutations given a ScheduledMutator type
@@ -342,7 +345,7 @@ mod tests {
         corpus.add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into());
         corpus.add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into());
 
-        let testcase_rr = corpus.next().expect("Corpus did not contain entries");
+        let (testcase_rr, _) = corpus.next().expect("Corpus did not contain entries");
         let mut testcase = testcase_rr.borrow_mut();
         let mut input = testcase.load_input().expect("No input in testcase").clone();
 
