@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
+use core::fmt::Debug;
 
 use crate::corpus::{Corpus, Testcase};
 use crate::executors::Executor;
@@ -13,12 +14,20 @@ use crate::observers::Observer;
 use crate::stages::Stage;
 use crate::AflError;
 
+pub trait StateMetadata: Debug {}
+
 pub trait State<C, E, I>
 where
     C: Corpus<I>,
     E: Executor<I>,
     I: Input,
 {
+    /// Get executions
+    fn executions(&self) -> usize;
+
+    /// Set executions
+    fn set_executions(&mut self, executions: usize);
+
     /// Get the linked observers
     fn observers(&self) -> &[Rc<RefCell<dyn Observer>>];
 
@@ -73,6 +82,7 @@ where
     fn evaluate_input(&mut self, input: &I) -> Result<bool, AflError> {
         self.reset_observers()?;
         self.executor_mut().run_target(input)?;
+        self.set_executions(self.executions() + 1);
         self.post_exec_observers()?;
 
         let mut rate_acc = 0;
@@ -101,6 +111,7 @@ where
     E: Executor<I>,
     I: Input,
 {
+    executions: usize,
     observers: Vec<Rc<RefCell<dyn Observer>>>,
     feedbacks: Vec<Box<dyn Feedback<I>>>,
     corpus: C,
@@ -113,6 +124,14 @@ where
     E: Executor<I>,
     I: Input,
 {
+    fn executions(&self) -> usize {
+        self.executions
+    }
+
+    fn set_executions(&mut self, executions: usize) {
+        self.executions = executions
+    }
+
     fn observers(&self) -> &[Rc<RefCell<dyn Observer>>] {
         &self.observers
     }
@@ -154,6 +173,7 @@ where
 {
     pub fn new(corpus: C, executor: E) -> Self {
         DefaultState {
+            executions: 0,
             observers: vec![],
             feedbacks: vec![],
             corpus: corpus,
