@@ -1,14 +1,14 @@
-use core::any::TypeId;
-use core::fmt::Debug;
+use core::any::{Any, TypeId};
+use core::fmt::Display;
 
 use crate::AflError;
 
-pub trait Event: Debug {}
+pub trait Event: Display + Any {}
 
 pub trait EventManager {
     /// Check if this EventaManager support a given Event type
     fn enabled<E: Event>(&self) -> bool;
-    /* fn enabled<E: Event>() -> bool {
+    /* fn enabled<E: Event>(&self) -> bool {
         match TypeId::of::<E>() {
             TypeId::of::<MyEvent>() => true,
             _ => false,
@@ -59,3 +59,32 @@ pub fn my_event_test<M: EventManager>(manager: &mut M) {
     fire_event!(manager, MyEvent).unwrap();
 }
 */
+
+pub struct NewTestcaseEvent {}
+impl Event for NewTestcaseEvent {}
+impl Display for NewTestcaseEvent {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "[NewTestcase] idx: ")
+    }
+}
+
+pub struct LoggerEventManager {}
+
+impl EventManager for LoggerEventManager {
+    fn enabled<E: Event>(&self) -> bool {
+        let _new_testcase = TypeId::of::<NewTestcaseEvent>();
+        match TypeId::of::<E>() {
+            _new_testcase => true,
+            //_ => false,
+        }
+    }
+
+    fn fire<E: Event>(&mut self, event: E) -> Result<(), AflError> {
+        println!("{}", event);
+        Ok(())
+    }
+
+    fn lookup(&mut self) -> Result<usize, AflError> {
+        Ok(0)
+    }
+}
