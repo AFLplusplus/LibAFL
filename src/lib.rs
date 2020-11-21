@@ -5,6 +5,7 @@ extern crate alloc;
 
 pub mod corpus;
 pub mod engines;
+pub mod events;
 pub mod executors;
 pub mod feedbacks;
 pub mod generators;
