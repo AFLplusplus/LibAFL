@@ -1,3 +1,7 @@
+pub mod llmp;
+mod llmp_translated;
+pub use crate::events::llmp::LLMP;
+
 use core::any::{Any, TypeId};
 use core::fmt::Display;
 
@@ -80,7 +84,7 @@ impl EventManager for LoggerEventManager {
     }
 
     fn fire<E: Event>(&mut self, _event: E) -> Result<(), AflError> {
-        #[cfg(feature = "std")] 
+        #[cfg(feature = "std")]
         println!("{}", _event);
         Ok(())
     }
