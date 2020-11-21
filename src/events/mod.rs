@@ -79,8 +79,9 @@ impl EventManager for LoggerEventManager {
         }
     }
 
-    fn fire<E: Event>(&mut self, event: E) -> Result<(), AflError> {
-        println!("{}", event);
+    fn fire<E: Event>(&mut self, _event: E) -> Result<(), AflError> {
+        #[cfg(feature = "std")] 
+        println!("{}", _event);
         Ok(())
     }
 

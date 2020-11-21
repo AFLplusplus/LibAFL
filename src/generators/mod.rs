@@ -1,10 +1,12 @@
+use alloc::rc::Rc;
+use alloc::vec::Vec;
+use core::cell::RefCell;
+use core::cmp::min;
+
 use crate::inputs::bytes::BytesInput;
 use crate::inputs::Input;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
-use alloc::rc::Rc;
-use core::cell::RefCell;
-use core::cmp::min;
 
 pub trait Generator<I>: HasRand
 where

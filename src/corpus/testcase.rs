@@ -169,7 +169,7 @@ where
     pub fn load_input(&mut self) -> Result<&I, AflError> {
         if self.input.is_none() {
             let input = I::from_file(self.filename.as_ref().ok_or(AflError::EmptyOptional(
-                "filename not specified".to_string(),
+                "filename not specified".into(),
             ))?)?;
             self.input = Some(input);
         }
