@@ -51,8 +51,9 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 use ::libc;
 
 use core::sync::atomic::{compiler_fence, Ordering};
-use libc::{c_char, c_int, c_uint, c_ulong, c_ushort, c_void};
+use libc::{c_int, c_uint, c_ulong, c_ushort, c_void};
 use std::process::exit;
+use std::str;
 
 use crate::utils::next_pow2;
 
@@ -184,7 +185,7 @@ LLMP_TAG_NEW_PAGE_V1
 #[repr(C, packed)]
 pub struct llmp_payload_new_page {
     pub map_size: c_ulong,
-    pub shm_str: [c_char; 20],
+    pub shm_str: [u8; 20],
 }
 
 /* Returs the container element to this ptr */
@@ -677,9 +678,9 @@ pub unsafe extern "C" fn llmp_broker_alloc_next(
 }
 /* Registers a new client for the given sharedmap str and size.
 Be careful: Intenral realloc may change the location of the client map */
-unsafe extern "C" fn llmp_broker_register_client(
+unsafe fn llmp_broker_register_client(
     mut broker: *mut llmp_broker_state,
-    shm_str: *mut c_char,
+    shm_str: &str,
     map_size: c_ulong,
 ) -> *mut llmp_broker_client_metadata {
     /* make space for a new client and calculate its id */
@@ -726,7 +727,7 @@ unsafe extern "C" fn llmp_broker_register_client(
 }
 /* broker broadcast to its own page for all others to read */
 #[inline]
-unsafe extern "C" fn llmp_broker_handle_new_msgs(
+unsafe fn llmp_broker_handle_new_msgs(
     mut broker: *mut llmp_broker_state,
     mut client: *mut llmp_broker_client_metadata,
 ) {
@@ -779,7 +780,7 @@ unsafe extern "C" fn llmp_broker_handle_new_msgs(
             afl_shmem_deinit(client_map);
             if afl_shmem_by_str(
                 client_map,
-                (*pageinfo).shm_str.as_mut_ptr(),
+                str::from_utf8(&(*pageinfo).shm_str).unwrap(),
                 (*pageinfo).map_size,
             )
             .is_null()
@@ -810,7 +811,7 @@ unsafe extern "C" fn llmp_broker_handle_new_msgs(
             let client_id: u32 = (*(*client).client_state).id;
             if llmp_broker_register_client(
                 broker,
-                (*pageinfo).shm_str.as_mut_ptr(),
+                str::from_utf8(&(*pageinfo).shm_str).unwrap(),
                 (*pageinfo).map_size,
             )
             .is_null()
@@ -1126,7 +1127,7 @@ pub unsafe extern "C" fn llmp_client_recv(mut client: *mut llmp_client) -> *mut 
                 afl_shmem_deinit(broadcast_map);
                 if afl_shmem_by_str(
                     (*client).current_broadcast_map,
-                    (*pageinfo).shm_str.as_mut_ptr(),
+                    str::from_utf8(&(*pageinfo).shm_str).unwrap(),
                     (*pageinfo).map_size,
                 )
                 .is_null()
@@ -1356,7 +1357,7 @@ pub unsafe extern "C" fn llmp_broker_register_childprocess_clientloop(
         return 0 as c_int != 0;
     }
     let mut client: *mut llmp_broker_client_metadata =
-        llmp_broker_register_client(broker, client_map.shm_str.as_mut_ptr(), client_map.map_size);
+        llmp_broker_register_client(broker, str::from_utf8(&client_map.shm_str).unwrap(), client_map.map_size);
     if client.is_null() {
         afl_shmem_deinit(&mut client_map);
         return 0 as c_int != 0;
