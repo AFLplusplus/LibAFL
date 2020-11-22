@@ -15,12 +15,13 @@ use crate::AflError;
 
 // TODO multi mutators stage
 
-pub trait MutationalStage<M, S, C, E, I, R>: Stage<S, C, E, I, R>
+pub trait MutationalStage<M, S, EM, E, C, I, R>: Stage<S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, I, R>,
-    C: Corpus<I, R>,
+    EM: EventManager,
     E: Executor<I>,
+    C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
@@ -41,6 +42,7 @@ where
         &mut self,
         rand: &mut R,
         state: &mut S,
+        events: &mut EM,
         testcase: Rc<RefCell<Testcase<I>>>,
     ) -> Result<(), AflError> {
         let num = self.iterations(rand);
@@ -49,7 +51,7 @@ where
         for i in 0..num {
             let mut input_tmp = input.clone();
             self.mutator_mut()
-                .mutate(rand, state, &mut input_tmp, i as i32)?;
+                .mutate(rand, state.corpus_mut(), &mut input_tmp, i as i32)?;
 
             let interesting = state.evaluate_input(&input_tmp)?;
 
@@ -64,28 +66,28 @@ where
 }
 
 /// The default mutational stage
-pub struct StdMutationalStage<M, S, C, E, EM, I, R>
+pub struct StdMutationalStage<M, S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, EM, I, R>,
-    C: Corpus<I, R>,
-    E: Executor<I>,
+    S: State<C, E, I, R>,
     EM: EventManager,
+    E: Executor<I>,
+    C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
     mutator: M,
-    phantom: PhantomData<(S, C, E, EM, I, R)>,
+    phantom: PhantomData<(S, EM, E, C, I, R)>,
 }
 
-impl<M, S, C, E, EM, I, R> MutationalStage<M, S, C, E, EM, I, R>
-    for StdMutationalStage<M, S, C, E, EM, I, R>
+impl<M, S, EM, E, C, I, R> MutationalStage<M, S, EM, E, C, I, R>
+    for StdMutationalStage<M, S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, EM, I, R>,
-    C: Corpus<I, R>,
-    E: Executor<I>,
+    S: State<C, E, I, R>,
     EM: EventManager,
+    E: Executor<I>,
+    C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
@@ -100,32 +102,34 @@ where
     }
 }
 
-impl<M, S, C, E, EM, I, R> Stage<S, C, E, EM, I, R> for StdMutationalStage<M, S, C, E, EM, I, R>
+impl<M, S, EM, E, C, I, R> Stage<S, EM, E, C, I, R> for StdMutationalStage<M, S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, EM, I, R>,
-    C: Corpus<I, R>,
-    E: Executor<I>,
+    S: State<C, E, I, R>,
     EM: EventManager,
+    E: Executor<I>,
+    C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
     fn perform(
         &mut self,
-        testcase: Rc<RefCell<Testcase<I>>>,
+        rand: &mut R,
         state: &mut S,
+        events: &mut EM,
+        testcase: Rc<RefCell<Testcase<I>>>,
     ) -> Result<(), AflError> {
-        self.perform_mutational(testcase, state)
+        self.perform_mutational(rand, state, events, testcase)
     }
 }
 
-impl<M, S, C, E, EM, I, R> StdMutationalStage<M, S, C, E, EM, I, R>
+impl<M, S, EM, E, C, I, R> StdMutationalStage<M, S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, EM, I, R>,
-    C: Corpus<I, R>,
-    E: Executor<I>,
+    S: State<C, E, I, R>,
     EM: EventManager,
+    E: Executor<I>,
+    C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {

@@ -8,7 +8,8 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 
 use afl::corpus::{Corpus, InMemoryCorpus, Testcase};
-use afl::engines::{StdEngine, StdState, Engine, State};
+use afl::engines::{Engine, State, StdEngine, StdState};
+use afl::events::LoggerEventManager;
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::{create_history_map, MaxMapFeedback};
@@ -39,9 +40,9 @@ fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
 
 #[no_mangle]
 pub extern "C" fn afl_libfuzzer_main() {
-    let rand = StdRand::new(0).into();
+    let mut rand = StdRand::new(0);
 
-    let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
+    let mut corpus = InMemoryCorpus::new();
     let testcase = Testcase::new(vec![0; 4]).into();
     corpus.add(testcase);
 
@@ -58,16 +59,17 @@ pub extern "C" fn afl_libfuzzer_main() {
     state.add_feedback(Box::new(edges_feedback));
 
     let mut engine = StdEngine::new();
-    let mutator = HavocBytesMutator::new_default(&rand);
-    let stage = StdMutationalStage::new(&rand, mutator);
+    let mutator = HavocBytesMutator::new_default();
+    let stage = StdMutationalStage::new(mutator);
     engine.add_stage(Box::new(stage));
+
+    let mut events = LoggerEventManager::new();
 
     for i in 0..1000 {
         engine
-            .fuzz_one(&mut state)
+            .fuzz_one(&mut rand, &mut state, &mut events)
             .expect(&format!("Error in iter {}", i));
     }
-    
     #[cfg(feature = "std")]
     println!("OK");
 }

@@ -200,9 +200,9 @@ where
     R: Rand,
 {
     corpus: C,
-    phantom: PhantomData<(I, R)>,
     pos: usize,
     cycles: u64,
+    phantom: PhantomData<(I, R)>,
 }
 
 impl<C, I, R> HasTestcaseVec<I> for QueueCorpus<C, I, R>
