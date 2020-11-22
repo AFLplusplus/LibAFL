@@ -40,20 +40,27 @@ unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) ->
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
+        let mut msg_counter = 0;
         loop {
             let last_msg = llmp_client_recv(client);
             if last_msg == 0 as *mut llmp_message {
                 break;
             }
+            msg_counter += 1;
             match (*last_msg).tag {
                 TAG_SIMPLE_U32_V1 => {
-                    current_result = last_result.wrapping_add(u32_from_msg(last_msg));
+                    current_result = current_result.wrapping_add(u32_from_msg(last_msg));
                 }
                 _ => println!("Adder Client ignored unknown message {}", (*last_msg).tag),
             };
         }
 
         if current_result != last_result {
+            println!(
+                "Adder handled {} messages, reporting {} to broker",
+                msg_counter, current_result
+            );
+
             let llmp_message = llmp_client_alloc_next(client, size_of::<u32>());
             std::ptr::copy(
                 current_result.to_be_bytes().as_ptr(),
