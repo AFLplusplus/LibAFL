@@ -51,7 +51,7 @@ where
     }
 }
 
-pub struct DefaultMapObserver<'a, T>
+pub struct StdMapObserver<'a, T>
 where
     T: Integer + Copy,
 {
@@ -59,7 +59,7 @@ where
     initial: T,
 }
 
-impl<'a, T> Observer for DefaultMapObserver<'a, T>
+impl<'a, T> Observer for StdMapObserver<'a, T>
 where
     T: Integer + Copy,
 {
@@ -68,7 +68,7 @@ where
     }
 }
 
-impl<'a, T> MapObserver<T> for DefaultMapObserver<'a, T>
+impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
 where
     T: Integer + Copy,
 {
@@ -93,14 +93,14 @@ where
     }
 }
 
-impl<'a, T> DefaultMapObserver<'a, T>
+impl<'a, T> StdMapObserver<'a, T>
 where
     T: Integer + Copy,
 {
     /// Creates a new MapObserver
     pub fn new(map: &'a mut [T]) -> Self {
         let initial = if map.len() > 0 { map[0] } else { T::zero() };
-        DefaultMapObserver {
+        StdMapObserver {
             map: map,
             initial: initial,
         }
@@ -110,7 +110,7 @@ where
     pub fn new_from_ptr(map_ptr: *mut T, len: usize) -> Self {
         unsafe {
             let initial = if len > 0 { *map_ptr } else { T::zero() };
-            DefaultMapObserver {
+            StdMapObserver {
                 map: from_raw_parts_mut(map_ptr, len),
                 initial: initial,
             }
@@ -118,7 +118,7 @@ where
     }
 }
 
-impl<'a, T> Into<Rc<RefCell<Self>>> for DefaultMapObserver<'a, T>
+impl<'a, T> Into<Rc<RefCell<Self>>> for StdMapObserver<'a, T>
 where
     T: Integer + Copy,
 {

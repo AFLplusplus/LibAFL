@@ -79,7 +79,7 @@ where
     }
 }
 
-pub struct DefaultScheduledMutator<S, C, I, R>
+pub struct StdScheduledMutator<S, C, I, R>
 where
     C: Corpus<I, R>,
     I: Input,
@@ -88,7 +88,7 @@ where
     mutations: Vec<MutationFunction<Self, S, I>>,
 }
 
-impl<S, C, I, R> Mutator<S, C, I, R> for DefaultScheduledMutator<S, C, I, R>
+impl<S, C, I, R> Mutator<S, C, I, R> for StdScheduledMutator<S, C, I, R>
 where
     S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
@@ -100,7 +100,7 @@ where
     }
 }
 
-impl<S, C, I, R> ComposedByMutations<S, C, I, R> for DefaultScheduledMutator<S, C, I, R>
+impl<S, C, I, R> ComposedByMutations<S, C, I, R> for StdScheduledMutator<S, C, I, R>
 where
     S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
@@ -140,14 +140,14 @@ where
     I: Input,
     R: Rand,
 {
-    /// Create a new DefaultScheduledMutator instance without mutations and corpus
+    /// Create a new StdScheduledMutator instance without mutations and corpus
     pub fn new() -> Self {
-        DefaultScheduledMutator { mutations: vec![] }
+        StdScheduledMutator { mutations: vec![] }
     }
 
-    /// Create a new DefaultScheduledMutator instance specifying mutations and corpus too
+    /// Create a new StdScheduledMutator instance specifying mutations and corpus too
     pub fn new_all(mutations: Vec<MutationFunction<Self, S, I>>) -> Self {
-        DefaultScheduledMutator {
+        StdScheduledMutator {
             mutations: mutations,
         }
     }
@@ -301,15 +301,15 @@ where
     }
 }
 
-impl<C, I, R> HavocBytesMutator<C, I, DefaultScheduledMutator<C, I, R>, R>
+impl<C, I, R> HavocBytesMutator<C, I, StdScheduledMutator<C, I, R>, R>
 where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
-    /// Create a new HavocBytesMutator instance wrapping DefaultScheduledMutator
+    /// Create a new HavocBytesMutator instance wrapping StdScheduledMutator
     pub fn new_default() -> Self {
-        let mut scheduled = DefaultScheduledMutator::<C, I, R>::new();
+        let mut scheduled = StdScheduledMutator::<C, I, R>::new();
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
@@ -323,7 +323,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::inputs::BytesInput;
-    use crate::mutators::scheduled::{mutation_splice, DefaultScheduledMutator};
+    use crate::mutators::scheduled::{mutation_splice, StdScheduledMutator};
     use crate::utils::{Rand, XKCDRand};
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
@@ -345,8 +345,7 @@ mod tests {
         let mut input = testcase.load_input().expect("No input in testcase").clone();
 
         rand.set_seed(5);
-        let mut mutator =
-            DefaultScheduledMutator::<InMemoryCorpus<_, _>, BytesInput, XKCDRand>::new();
+        let mut mutator = StdScheduledMutator::<InMemoryCorpus<_, _>, BytesInput, XKCDRand>::new();
 
         mutation_splice(&mut mutator, &mut corpus, &mut rand, &mut input).unwrap();
 

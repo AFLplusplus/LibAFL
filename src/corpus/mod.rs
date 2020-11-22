@@ -339,15 +339,15 @@ mod tests {
     use crate::corpus::Testcase;
     use crate::corpus::{OnDiskCorpus, QueueCorpus};
     use crate::inputs::bytes::BytesInput;
-    use crate::utils::DefaultRand;
+    use crate::utils::StdRand;
 
     use alloc::rc::Rc;
     use std::path::PathBuf;
 
     #[test]
     fn test_queuecorpus() {
-        let mut rand = DefaultRand::new(0);
-        let mut q = QueueCorpus::new(OnDiskCorpus::<BytesInput, DefaultRand>::new(PathBuf::from(
+        let mut rand = StdRand::new(0);
+        let mut q = QueueCorpus::new(OnDiskCorpus::<BytesInput, StdRand>::new(PathBuf::from(
             "fancy/path",
         )));
         let t: Rc<_> =

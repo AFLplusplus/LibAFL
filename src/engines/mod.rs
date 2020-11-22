@@ -15,7 +15,6 @@ use crate::feedbacks::Feedback;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::stages::Stage;
-use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
 // TODO FeedbackMetadata to store histroy_map
@@ -27,10 +26,9 @@ pub trait StateMetadata: Debug {
 
 pub trait State<C, E, I, R>: HasCorpus<C, I, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     E: Executor<I>,
     I: Input,
-    R: Rand,
 {
     /// Get executions
     fn executions(&self) -> usize;
@@ -120,12 +118,11 @@ where
     }
 }
 
-pub struct DefaultState<C, E, I, R>
+pub struct StdState<C, E, I, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     E: Executor<I>,
     I: Input,
-    R: Rand,
 {
     executions: usize,
     metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
@@ -153,12 +150,11 @@ where
     }
 }
 
-impl<C, E, I, R> State<C, E, I, R> for DefaultState<C, E, I, R>
+impl<C, E, I, R> State<C, E, I, R> for StdState<C, E, I, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     E: Executor<I>,
     I: Input,
-    R: Rand,
 {
     fn executions(&self) -> usize {
         self.executions
@@ -201,15 +197,14 @@ where
     }
 }
 
-impl<C, E, I, R> DefaultState<C, E, I, R>
+impl<C, E, I, R> StdState<C, E, I, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     E: Executor<I>,
     I: Input,
-    R: Rand,
 {
     pub fn new(corpus: C, executor: E) -> Self {
-        DefaultState {
+        StdState {
             executions: 0,
             metadatas: HashMap::default(),
             observers: vec![],
@@ -220,14 +215,12 @@ where
     }
 }
 
-pub trait Engine<S, C, E, EM, I, R>
+pub trait Engine<S, C, E, I>
 where
     S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
-    R: Rand,
 {
     fn stages(&self) -> &[Box<dyn Stage<S, C, E, I, R>>];
 
@@ -252,26 +245,22 @@ where
     }
 }
 
-pub struct DefaultEngine<S, C, E, EM, I, R>
+pub struct StdEngine<S, C, E, I>
 where
-    S: State<C, E, EM, I, R>,
-    C: Corpus<I, R>,
+    S: State<C, E, I>,
+    C: Corpus<I>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
-    R: Rand,
 {
     stages: Vec<Box<dyn Stage<S, C, E, I, R>>>,
 }
 
-impl<S, C, E, EM, I, R> Engine<S, C, E, EM, I, R> for DefaultEngine<S, C, E, EM, I, R>
+impl<S, C, E, I> Engine<S, C, E, I> for StdEngine<S, C, E, I>
 where
     S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
-    R: Rand,
 {
     fn stages(&self) -> &[Box<dyn Stage<S, C, E, I, R>>] {
         &self.stages
@@ -282,17 +271,15 @@ where
     }
 }
 
-impl<S, C, E, EM, I, R> DefaultEngine<S, C, E, EM, I, R>
+impl<S, C, E, I> StdEngine<S, C, E, I>
 where
     S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
-    R: Rand,
 {
     pub fn new() -> Self {
-        DefaultEngine { stages: vec![] }
+        StdEngine { stages: vec![] }
     }
 }
 
@@ -302,16 +289,13 @@ mod tests {
     use alloc::boxed::Box;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
-    use crate::engines::{DefaultEngine, DefaultState, Engine};
-    use crate::events::LoggerEventManager;
+    use crate::engines::{Engine, StdEngine, StdState};
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::bytes::BytesInput;
-    use crate::mutators::scheduled::{
-        mutation_bitflip, ComposedByMutations, DefaultScheduledMutator,
-    };
-    use crate::stages::mutational::DefaultMutationalStage;
-    use crate::utils::DefaultRand;
+    use crate::mutators::scheduled::{mutation_bitflip, ComposedByMutations, StdScheduledMutator};
+    use crate::stages::mutational::StdMutationalStage;
+    use crate::utils::StdRand;
 
     fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
@@ -319,20 +303,19 @@ mod tests {
 
     #[test]
     fn test_engine() {
-        let mut corpus = InMemoryCorpus::<BytesInput, DefaultRand>::new();
+        let rand = StdRand::new(0).into();
+
+        let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
         let executor = InMemoryExecutor::<BytesInput>::new(harness);
-        let events = LoggerEventManager::new();
-        let rand = DefaultRand::new(0);
+        let mut state = StdState::new(corpus, executor);
 
-        let mut state = DefaultState::new(corpus, executor, events, rand);
-
-        let mut engine = DefaultEngine::new();
-        let mut mutator = DefaultScheduledMutator::new();
+        let mut engine = StdEngine::new();
+        let mut mutator = StdScheduledMutator::new(&rand);
         mutator.add_mutation(mutation_bitflip);
-        let stage = DefaultMutationalStage::new(mutator);
+        let stage = StdMutationalStage::new(&rand, mutator);
         engine.add_stage(Box::new(stage));
 
         //

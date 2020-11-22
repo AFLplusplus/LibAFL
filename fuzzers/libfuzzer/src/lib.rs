@@ -8,15 +8,15 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 
 use afl::corpus::{Corpus, InMemoryCorpus, Testcase};
-use afl::engines::{DefaultEngine, DefaultState, Engine, State};
+use afl::engines::{StdEngine, StdState, Engine, State};
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::{create_history_map, MaxMapFeedback};
 use afl::inputs::bytes::BytesInput;
 use afl::mutators::scheduled::HavocBytesMutator;
-use afl::observers::DefaultMapObserver;
-use afl::stages::mutational::DefaultMutationalStage;
-use afl::utils::DefaultRand;
+use afl::observers::StdMapObserver;
+use afl::stages::mutational::StdMutationalStage;
+use afl::utils::StdRand;
 
 const MAP_SIZE: usize = 65536;
 
@@ -39,13 +39,13 @@ fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
 
 #[no_mangle]
 pub extern "C" fn afl_libfuzzer_main() {
-    let rand = DefaultRand::new(0).into();
+    let rand = StdRand::new(0).into();
 
     let mut corpus = InMemoryCorpus::<BytesInput, _>::new(&rand);
     let testcase = Testcase::new(vec![0; 4]).into();
     corpus.add(testcase);
 
-    let edges_observer = Rc::new(RefCell::new(DefaultMapObserver::new_from_ptr(
+    let edges_observer = Rc::new(RefCell::new(StdMapObserver::new_from_ptr(
         unsafe { __lafl_edges_map },
         unsafe { __lafl_max_edges_size as usize },
     )));
@@ -53,13 +53,13 @@ pub extern "C" fn afl_libfuzzer_main() {
     let edges_feedback = MaxMapFeedback::new(edges_observer.clone(), edges_history_map);
 
     let executor = InMemoryExecutor::<BytesInput>::new(harness);
-    let mut state = DefaultState::new(corpus, executor);
+    let mut state = StdState::new(corpus, executor);
     state.add_observer(edges_observer);
     state.add_feedback(Box::new(edges_feedback));
 
-    let mut engine = DefaultEngine::new();
+    let mut engine = StdEngine::new();
     let mutator = HavocBytesMutator::new_default(&rand);
-    let stage = DefaultMutationalStage::new(&rand, mutator);
+    let stage = StdMutationalStage::new(&rand, mutator);
     engine.add_stage(Box::new(stage));
 
     for i in 0..1000 {

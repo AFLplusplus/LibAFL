@@ -1,5 +1,5 @@
 pub mod mutational;
-pub use mutational::DefaultMutationalStage;
+pub use mutational::StdMutationalStage;
 
 use crate::corpus::testcase::Testcase;
 use crate::corpus::Corpus;
