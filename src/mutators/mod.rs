@@ -1,6 +1,6 @@
 pub mod scheduled;
 pub use scheduled::ComposedByMutations;
-pub use scheduled::DefaultScheduledMutator;
+pub use scheduled::StdScheduledMutator;
 pub use scheduled::HavocBytesMutator;
 pub use scheduled::ScheduledMutator;
 

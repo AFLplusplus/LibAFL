@@ -63,7 +63,7 @@ where
 }
 
 /// The default mutational stage
-pub struct DefaultMutationalStage<M, S, C, E, EM, I, R>
+pub struct StdMutationalStage<M, S, C, E, EM, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, EM, I, R>,
@@ -78,7 +78,7 @@ where
 }
 
 impl<M, S, C, E, EM, I, R> MutationalStage<M, S, C, E, EM, I, R>
-    for DefaultMutationalStage<M, S, C, E, EM, I, R>
+    for StdMutationalStage<M, S, C, E, EM, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, EM, I, R>,
@@ -99,7 +99,7 @@ where
     }
 }
 
-impl<M, S, C, E, EM, I, R> Stage<S, C, E, EM, I, R> for DefaultMutationalStage<M, S, C, E, EM, I, R>
+impl<M, S, C, E, EM, I, R> Stage<S, C, E, EM, I, R> for StdMutationalStage<M, S, C, E, EM, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, EM, I, R>,
@@ -118,7 +118,7 @@ where
     }
 }
 
-impl<M, S, C, E, EM, I, R> DefaultMutationalStage<M, S, C, E, EM, I, R>
+impl<M, S, C, E, EM, I, R> StdMutationalStage<M, S, C, E, EM, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, EM, I, R>,
@@ -130,7 +130,7 @@ where
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
-        DefaultMutationalStage {
+        StdMutationalStage {
             mutator: mutator,
             phantom: PhantomData,
         }

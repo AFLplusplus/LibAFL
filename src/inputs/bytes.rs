@@ -68,11 +68,11 @@ impl BytesInput {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, DefaultRand, Rand};
+    use crate::utils::{next_pow2, StdRand, Rand};
 
     #[test]
     fn test_input() {
-        let mut rand = DefaultRand::new(0);
+        let mut rand = StdRand::new(0);
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);

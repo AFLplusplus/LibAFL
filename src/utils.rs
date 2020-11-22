@@ -9,7 +9,7 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub type DefaultRand = Xoshiro256StarRand;
+pub type StdRand = Xoshiro256StarRand;
 
 /// Ways to get random around here
 pub trait Rand: Debug {
@@ -144,7 +144,7 @@ impl Into<Rc<RefCell<Self>>> for Xoshiro256StarRand {
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
-        let mut ret: Xoshiro256StarRand = Default::default();
+        let mut ret: Self = Default::default();
         ret.set_seed(seed); // TODO: Proper random seed?
         ret
     }
@@ -199,7 +199,7 @@ impl XKCDRand {
 
 /*
 /// A very basic HasRand
-pub struct DefaultHasRand<R>
+pub struct StdHasRand<R>
 where
     R: Rand,
 {
@@ -207,7 +207,7 @@ where
 }
 
 /// A very basic HasRand
-impl<R> HasRand for DefaultHasRand<R>
+impl<R> HasRand for StdHasRand<R>
 where
     R: Rand,
 {
@@ -220,11 +220,11 @@ where
 }
 
 /// A very basic HasRand
-impl<R> DefaultHasRand<R>
+impl<R> StdHasRand<R>
 where
     R: Rand,
 {
-    /// Create a new DefaultHasRand, cloning the refcell
+    /// Create a new StdHasRand, cloning the refcell
     pub fn new(rand: &Rc<RefCell<R>>) -> Self {
         Self {
             rand: Rc::clone(rand),
@@ -246,11 +246,11 @@ pub const fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, DefaultRand, HasRand, Rand};
+    use crate::utils::{next_pow2, StdRand, HasRand, Rand};
 
     #[test]
     fn test_rand() {
-        let mut rand = DefaultRand::new(0);
+        let mut rand = StdRand::new(0);
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);
@@ -261,8 +261,8 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_rand_preseeded() {
-        let mut rand_fixed = DefaultRand::new(0);
-        let mut rand = DefaultRand::preseeded();
+        let mut rand_fixed = StdRand::new(0);
+        let mut rand = StdRand::preseeded();
         assert_ne!(rand.next(), rand_fixed.next());
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
@@ -274,8 +274,8 @@ mod tests {
     /*
     #[test]
     fn test_has_rand() {
-        let rand = DefaultRand::new(0).into();
-        let has_rand = DefaultHasRand::new(&rand);
+        let rand = StdRand::new(0).into();
+        let has_rand = StdHasRand::new(&rand);
 
         assert!(has_rand.rand_below(100) < 100);
         assert_eq!(has_rand.rand_below(1), 0);
