@@ -5,12 +5,13 @@ use std::ptr;
 
 use afl::events::llmp_translated::*;
 
+use std::convert::TryInto;
 use std::{thread, time};
 
 fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> ! {
     let mut counter: u32 = 0;
     loop {
-        counter += 10;
+        counter += 1;
 
         unsafe {
             let llmp_message = llmp_client_alloc_next(client, 10);
@@ -28,34 +29,34 @@ fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> ! {
 }
 
 fn broker_message_hook(
-    broker: *mut llmp_broker_state,
+    _broker: *mut llmp_broker_state,
     client_metadata: *mut llmp_broker_client_metadata,
     message: *mut llmp_message,
     _data: *mut c_void,
 ) -> LlmpMessageHookResult {
-
     unsafe {
-    match (*message).tag {
-        1 => {
-            // TODO: use higher bits
-            let counter_lowest = (std::slice::from_raw_parts((*message).buf.as_ptr(), 4))[3];
-            println!(
-                "Got message {:?} from client {:?}",
-                counter_lowest,
-                (*client_metadata).pid
-            );
-            LlmpMessageHookResult::Handled
-        },
-        _ => {
-            println!("Unknwon message id received!");
-            LlmpMessageHookResult::ForwardToClients
+        match (*message).tag {
+            1 => {
+                println!(
+                    "Client {:?} sent message: {:?}",
+                    (*client_metadata).pid,
+                    u32::from_be_bytes(
+                        std::slice::from_raw_parts((*message).buf.as_ptr(), 4)
+                            .try_into()
+                            .unwrap()
+                    ),
+                );
+                LlmpMessageHookResult::Handled
+            }
+            _ => {
+                println!("Unknwon message id received!");
+                LlmpMessageHookResult::ForwardToClients
+            }
         }
-    }
     }
 }
 
 fn main() {
-
     /* The main node has a broker, a tcp server, and a few worker threads */
 
     let mut broker = llmp_broker_state {
@@ -67,7 +68,7 @@ fn main() {
         llmp_client_count: 0,
         llmp_clients: ptr::null_mut(),
     };
-    let thread_count = 4;
+    let thread_count = 3;
     unsafe {
         llmp_broker_init(&mut broker).expect("Could not init");
         for i in 0..thread_count {

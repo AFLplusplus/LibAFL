@@ -54,10 +54,10 @@ use core::sync::atomic::{compiler_fence, Ordering};
 use libc::{c_int, c_uint, c_ulong, c_ushort, c_void};
 use std::ffi::CStr;
 
-use crate::AflError;
 use crate::utils::next_pow2;
+use crate::AflError;
 
-use super::shmem_translated::{afl_shmem_deinit, afl_shmem_init, afl_shmem_by_str, afl_shmem};
+use super::shmem_translated::{afl_shmem, afl_shmem_by_str, afl_shmem_deinit, afl_shmem_init};
 
 extern "C" {
     #[no_mangle]
@@ -319,10 +319,7 @@ unsafe fn _llmp_next_msg_ptr(last_msg: *mut llmp_message) -> *mut llmp_message {
         .offset((*last_msg).buf_len_padded as isize) as *mut llmp_message;
 }
 /* Read next message. */
-pub unsafe fn llmp_recv(
-    page: *mut llmp_page,
-    last_msg: *mut llmp_message,
-) -> *mut llmp_message {
+pub unsafe fn llmp_recv(page: *mut llmp_page, last_msg: *mut llmp_message) -> *mut llmp_message {
     /* DBG("llmp_recv %p %p\n", page, last_msg); */
     compiler_fence(Ordering::SeqCst);
     if (*page).current_msg_id == 0 {
@@ -894,7 +891,7 @@ pub unsafe fn llmp_broker_once(broker: *mut llmp_broker_state) {
 }
 /* The broker walks all pages and looks for changes, then broadcasts them on
  * its own shared page */
-pub unsafe fn llmp_broker_loop(broker: *mut llmp_broker_state) -> !{
+pub unsafe fn llmp_broker_loop(broker: *mut llmp_broker_state) -> ! {
     loop {
         compiler_fence(Ordering::SeqCst);
         llmp_broker_once(broker);
@@ -922,9 +919,7 @@ unsafe fn llmp_clientrigger_new_out_page_hooks(client: *mut llmp_client) {
     }
 }
 /* A wrapper around unpacking the data, calling through to the loop */
-unsafe fn _llmp_client_wrapped_loop(
-    llmp_client_broker_metadata_ptr: *mut c_void,
-) -> ! {
+unsafe fn _llmp_client_wrapped_loop(llmp_client_broker_metadata_ptr: *mut c_void) -> ! {
     let metadata: *mut llmp_broker_client_metadata =
         llmp_client_broker_metadata_ptr as *mut llmp_broker_client_metadata;
     /* Before doing anything else:, notify registered hooks about the new page we're about to use */
@@ -986,7 +981,9 @@ pub unsafe fn llmp_broker_launch_client(
     //return 1 as c_int != 0;
 }
 
-pub unsafe fn llmp_broker_launch_clientloops(broker: *mut llmp_broker_state) -> Result<(), AflError> {
+pub unsafe fn llmp_broker_launch_clientloops(
+    broker: *mut llmp_broker_state,
+) -> Result<(), AflError> {
     let mut i: c_ulong = 0;
     while i < (*broker).llmp_client_count {
         if (*(*broker).llmp_clients.offset(i as isize)).client_type as c_uint
@@ -994,7 +991,7 @@ pub unsafe fn llmp_broker_launch_clientloops(broker: *mut llmp_broker_state) -> 
         {
             if !llmp_broker_launch_client(broker, &mut *(*broker).llmp_clients.offset(i as isize)) {
                 println!("[!] WARNING: Could not launch all clients");
-                return Err(AflError::Unknown("Failed to launch clients".into()))
+                return Err(AflError::Unknown("Failed to launch clients".into()));
             }
         }
         i = i.wrapping_add(1)
@@ -1154,10 +1151,7 @@ pub unsafe fn llmp_client_recv_blocking(client: *mut llmp_client) -> *mut llmp_m
 }
 /* The current page could have changed in recv (EOP) */
 /* Alloc the next message, internally handling end of page by allocating a new one. */
-pub unsafe fn llmp_client_alloc_next(
-    client: *mut llmp_client,
-    size: c_ulong,
-) -> *mut llmp_message {
+pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: c_ulong) -> *mut llmp_message {
     if client.is_null() {
         panic!("Client is NULL");
     }
@@ -1231,10 +1225,7 @@ pub unsafe fn llmp_client_cancel(client: *mut llmp_client, mut msg: *mut llmp_me
     ) as c_ulong;
 }
 /* Commits a msg to the client's out ringbuf */
-pub unsafe fn llmp_client_send(
-    mut client_state: *mut llmp_client,
-    msg: *mut llmp_message,
-) -> bool {
+pub unsafe fn llmp_client_send(mut client_state: *mut llmp_client, msg: *mut llmp_message) -> bool {
     let page: *mut llmp_page = shmem2page(
         &mut *(*client_state).out_maps.offset(
             (*client_state)
@@ -1334,8 +1325,11 @@ pub unsafe fn llmp_broker_register_childprocess_clientloop(
     {
         return Err(AflError::Unknown("Alloc".into()));
     }
-    let mut client: *mut llmp_broker_client_metadata =
-        llmp_broker_register_client(broker, CStr::from_ptr(&client_map.shm_str as *const i8), client_map.map_size);
+    let mut client: *mut llmp_broker_client_metadata = llmp_broker_register_client(
+        broker,
+        CStr::from_ptr(&client_map.shm_str as *const i8),
+        client_map.map_size,
+    );
     if client.is_null() {
         afl_shmem_deinit(&mut client_map);
         return Err(AflError::Unknown("Something in clients failed".into()));
