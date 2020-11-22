@@ -22,7 +22,7 @@ unsafe fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> 
             size_of::<u32>(),
         );
         (*llmp_message).tag = TAG_SIMPLE_U32_V1;
-        llmp_client_send(client, llmp_message);
+        llmp_client_send(client, llmp_message).unwrap();
 
         thread::sleep(time::Duration::from_millis(100));
     }
@@ -68,7 +68,7 @@ unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) ->
                 size_of::<u32>(),
             );
             (*llmp_message).tag = TAG_MATH_RESULT_V1;
-            llmp_client_send(client, llmp_message);
+            llmp_client_send(client, llmp_message).unwrap();
             last_result = current_result;
         }
 
