@@ -52,13 +52,12 @@ use ::libc;
 
 use core::sync::atomic::{compiler_fence, Ordering};
 use libc::{c_int, c_uint, c_ulong, c_ushort, c_void};
-use std::process::exit;
-use std::str;
+use std::ffi::CStr;
 
-use crate::AflError;
 use crate::utils::next_pow2;
+use crate::AflError;
 
-use super::shmem_translated::{afl_shmem_deinit, afl_shmem_init, afl_shmem_by_str, afl_shmem};
+use super::shmem_translated::{afl_shmem, afl_shmem_by_str, afl_shmem_deinit, afl_shmem_init};
 
 extern "C" {
     #[no_mangle]
@@ -148,7 +147,7 @@ pub struct llmp_broker_client_metadata {
     pub data: *mut c_void,
 }
 
-pub type LlmpClientloopFn = fn(_: *mut llmp_client, _: *mut c_void) -> ();
+pub type LlmpClientloopFn = unsafe fn(_: *mut llmp_client, _: *mut c_void) -> !;
 pub type LlmpClientType = c_uint;
 pub const LLMP_CLIENT_TYPE_FOREIGN_PROCESS: LlmpClientType = 3;
 pub const LLMP_CLIENT_TYPE_CHILD_PROCESS: LlmpClientType = 2;
@@ -166,14 +165,19 @@ pub struct llmp_page {
     pub messages: [llmp_message; 0],
 }
 
-pub type LlmpMessageHookFn = unsafe extern "C" fn(
+pub enum LlmpMessageHookResult {
+    Handled,
+    ForwardToClients,
+}
+
+pub type LlmpMessageHookFn = unsafe fn(
     _: *mut llmp_broker_state,
     _: *mut llmp_broker_client_metadata,
     _: *mut llmp_message,
     _: *mut c_void,
-) -> bool;
+) -> LlmpMessageHookResult;
 pub type LlmpClientNewPageHookFn =
-    unsafe extern "C" fn(_: *mut llmp_client, _: *mut llmp_page, _: *mut c_void) -> ();
+    unsafe fn(_: *mut llmp_client, _: *mut llmp_page, _: *mut c_void) -> ();
 /* Just a random msg */
 /* Message payload when a client got added LLMP_TAG_CLIENT_ADDED_V1 */
 /* A new sharedmap appeared.
@@ -190,7 +194,7 @@ pub struct llmp_payload_new_page {
 
 /* Returs the container element to this ptr */
 #[inline]
-unsafe extern "C" fn afl_alloc_bufptr(buf: *mut c_void) -> *mut afl_alloc_buf {
+unsafe fn afl_alloc_bufptr(buf: *mut c_void) -> *mut afl_alloc_buf {
     return (buf as *mut u8).offset(-(16 as c_ulong as isize)) as *mut afl_alloc_buf;
 }
 /* This function makes sure *size is > size_needed after call.
@@ -200,15 +204,14 @@ https://blog.mozilla.org/nnethercote/2014/11/04/please-grow-your-buffers-exponen
 Will return NULL and free *buf if size_needed is <1 or realloc failed.
 @return For convenience, this function returns *buf.
 */
-#[inline]
-unsafe extern "C" fn afl_realloc(buf: *mut c_void, mut size_needed: c_ulong) -> *mut c_void {
+unsafe fn afl_realloc(buf: *mut c_void, mut size_needed: c_ulong) -> *mut c_void {
     let mut new_buf: *mut afl_alloc_buf = 0 as *mut afl_alloc_buf;
-    let mut current_size: c_ulong = 0 as c_int as c_ulong;
+    let mut current_size: c_ulong = 0 as c_ulong;
     let mut next_size: c_ulong;
     if !buf.is_null() {
         /* the size is always stored at buf - 1*c_ulong */
         new_buf = afl_alloc_bufptr(buf);
-        if (*new_buf).magic != 0xaf1a110c as c_uint as c_ulong {
+        if (*new_buf).magic != 0xaf1a110c as c_ulong {
             panic!(format!(
                 "Illegal, non-null pointer passed to afl_realloc (buf {:?}, magic {:?})",
                 new_buf,
@@ -223,8 +226,8 @@ unsafe extern "C" fn afl_realloc(buf: *mut c_void, mut size_needed: c_ulong) -> 
         return buf;
     }
     /* No initial size was set */
-    if size_needed < 64 as c_int as c_ulong {
-        next_size = 64 as c_int as c_ulong
+    if size_needed < 64 as c_ulong {
+        next_size = 64 as c_ulong
     } else {
         /* grow exponentially */
         next_size = next_pow2(size_needed);
@@ -239,51 +242,46 @@ unsafe extern "C" fn afl_realloc(buf: *mut c_void, mut size_needed: c_ulong) -> 
         return 0 as *mut c_void;
     }
     (*new_buf).complete_size = next_size;
-    (*new_buf).magic = 0xaf1a110c as c_uint as c_ulong;
+    (*new_buf).magic = 0xaf1a110c as c_ulong;
     return (*new_buf).buf.as_mut_ptr() as *mut c_void;
 }
 #[inline]
-unsafe extern "C" fn afl_free(buf: *mut c_void) {
+unsafe fn afl_free(buf: *mut c_void) {
     if !buf.is_null() {
         free(afl_alloc_bufptr(buf) as *mut c_void);
     };
 }
 #[inline]
-unsafe extern "C" fn shmem2page(afl_shmem: *mut afl_shmem) -> *mut llmp_page {
+unsafe fn shmem2page(afl_shmem: *mut afl_shmem) -> *mut llmp_page {
     return (*afl_shmem).map as *mut llmp_page;
 }
 /* If a msg is contained in the current page */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_msg_in_page(page: *mut llmp_page, msg: *mut llmp_message) -> bool {
+pub unsafe fn llmp_msg_in_page(page: *mut llmp_page, msg: *mut llmp_message) -> bool {
     /* DBG("llmp_msg_in_page %p within %p-%p\n", msg, page, page + page->c_ulongotal); */
     return (page as *mut u8) < msg as *mut u8
         && (page as *mut u8).offset((*page).c_ulongotal as isize) > msg as *mut u8;
 }
 /* allign to LLMP_ALIGNNMENT bytes */
 #[inline]
-unsafe extern "C" fn llmp_align(to_align: c_ulong) -> c_ulong {
-    if 64 as c_int == 0 as c_int
-        || to_align.wrapping_rem(64 as c_int as c_ulong) == 0 as c_int as c_ulong
-    {
+unsafe fn llmp_align(to_align: c_ulong) -> c_ulong {
+    if 64 as c_int == 0 as c_int || to_align.wrapping_rem(64 as c_ulong) == 0 as c_int as c_ulong {
         return to_align;
     }
-    return to_align.wrapping_add(
-        (64 as c_int as c_ulong).wrapping_sub(to_align.wrapping_rem(64 as c_int as c_ulong)),
-    );
+    return to_align
+        .wrapping_add((64 as c_ulong).wrapping_sub(to_align.wrapping_rem(64 as c_int as c_ulong)));
 }
 /* In case we don't have enough space, make sure the next page will be large
 enough. For now, we want to have at least enough space to store 2 of the
 largest messages we encountered. */
 #[inline]
-unsafe extern "C" fn new_map_size(max_alloc: c_ulong) -> c_ulong {
+unsafe fn new_map_size(max_alloc: c_ulong) -> c_ulong {
     return next_pow2({
-        let mut _a: c_ulong =
-            max_alloc
-                .wrapping_mul(2 as c_int as c_ulong)
-                .wrapping_add(llmp_align(
-                    (::std::mem::size_of::<llmp_message>() as c_ulong)
-                        .wrapping_add(::std::mem::size_of::<llmp_payload_new_page>() as c_ulong),
-                ));
+        let mut _a: c_ulong = max_alloc
+            .wrapping_mul(2 as c_ulong)
+            .wrapping_add(llmp_align(
+                (::std::mem::size_of::<llmp_message>() as c_ulong)
+                    .wrapping_add(::std::mem::size_of::<llmp_payload_new_page>() as c_ulong),
+            ));
         let mut _b: c_ulong = ((1 as c_int) << 28 as c_int) as c_ulong;
         if _a > _b {
             _a
@@ -294,15 +292,12 @@ unsafe extern "C" fn new_map_size(max_alloc: c_ulong) -> c_ulong {
 }
 /* Initialize a new llmp_page. size should be relative to
  * llmp_page->messages */
-unsafe extern "C" fn _llmp_page_init(mut page: *mut llmp_page, sender: u32, size: c_ulong) {
+unsafe fn _llmp_page_init(mut page: *mut llmp_page, sender: u32, size: c_ulong) {
     (*page).sender = sender;
-    ::std::ptr::write_volatile(
-        &mut (*page).current_msg_id as *mut c_ulong,
-        0 as c_int as c_ulong,
-    );
-    (*page).max_alloc_size = 0 as c_int as c_ulong;
+    ::std::ptr::write_volatile(&mut (*page).current_msg_id as *mut c_ulong, 0 as c_ulong);
+    (*page).max_alloc_size = 0 as c_ulong;
     (*page).c_ulongotal = size;
-    (*page).size_used = 0 as c_int as c_ulong;
+    (*page).size_used = 0 as c_ulong;
     (*(*page).messages.as_mut_ptr()).message_id = 0 as c_uint;
     (*(*page).messages.as_mut_ptr()).tag = 0xdeadaf as c_uint;
     ::std::ptr::write_volatile(&mut (*page).save_to_unmap as *mut u16, 0 as c_int as u16);
@@ -310,18 +305,14 @@ unsafe extern "C" fn _llmp_page_init(mut page: *mut llmp_page, sender: u32, size
 }
 /* Pointer to the message behind the last message */
 #[inline]
-unsafe extern "C" fn _llmp_next_msg_ptr(last_msg: *mut llmp_message) -> *mut llmp_message {
+unsafe fn _llmp_next_msg_ptr(last_msg: *mut llmp_message) -> *mut llmp_message {
     /* DBG("_llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
     return (last_msg as *mut u8)
-        .offset(::std::mem::size_of::<llmp_message>() as c_ulong as isize)
+        .offset(::std::mem::size_of::<llmp_message>() as isize)
         .offset((*last_msg).buf_len_padded as isize) as *mut llmp_message;
 }
 /* Read next message. */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_recv(
-    page: *mut llmp_page,
-    last_msg: *mut llmp_message,
-) -> *mut llmp_message {
+pub unsafe fn llmp_recv(page: *mut llmp_page, last_msg: *mut llmp_message) -> *mut llmp_message {
     /* DBG("llmp_recv %p %p\n", page, last_msg); */
     compiler_fence(Ordering::SeqCst);
     if (*page).current_msg_id == 0 {
@@ -339,15 +330,13 @@ pub unsafe extern "C" fn llmp_recv(
 }
 /* Blocks/spins until the next message gets posted to the page,
 then returns that message. */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_recv_blocking(
+pub unsafe fn llmp_recv_blocking(
     page: *mut llmp_page,
     last_msg: *mut llmp_message,
 ) -> *mut llmp_message {
-    let mut current_msg_id: u32 = 0 as c_int as u32;
+    let mut current_msg_id: u32 = 0 as u32;
     if !last_msg.is_null() {
-        if (*last_msg).tag == 0xaf1e0f1 as c_int as c_uint
-            && llmp_msg_in_page(page, last_msg) as c_int != 0
+        if (*last_msg).tag == 0xaf1e0f1 as c_uint && llmp_msg_in_page(page, last_msg) as c_int != 0
         {
             panic!("BUG: full page passed to await_message_blocking or reset failed");
         }
@@ -369,8 +358,7 @@ pub unsafe extern "C" fn llmp_recv_blocking(
   So if llmp_alloc_next fails, create new page if necessary, use this function,
   place EOP, commit EOP, reset, alloc again on the new space.
 */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_alloc_eop(
+pub unsafe fn llmp_alloc_eop(
     mut page: *mut llmp_page,
     mut last_msg: *mut llmp_message,
 ) -> *mut llmp_message {
@@ -398,7 +386,7 @@ pub unsafe extern "C" fn llmp_alloc_eop(
     } else {
         1 as c_uint
     };
-    (*ret).tag = 0xaf1e0f1 as c_int as u32;
+    (*ret).tag = 0xaf1e0f1 as u32;
     (*page).size_used = ((*page).size_used as c_ulong).wrapping_add(llmp_align(
         (::std::mem::size_of::<llmp_message>() as c_ulong)
             .wrapping_add(::std::mem::size_of::<llmp_payload_new_page>() as c_ulong),
@@ -409,8 +397,7 @@ pub unsafe extern "C" fn llmp_alloc_eop(
 Never call alloc_next without either sending or cancelling the last allocated message for this page!
 There can only ever be up to one message allocated per page at each given time.
 */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_alloc_next(
+pub unsafe fn llmp_alloc_next(
     mut page: *mut llmp_page,
     last_msg: *mut llmp_message,
     buf_len: c_ulong,
@@ -432,7 +419,7 @@ pub unsafe extern "C" fn llmp_alloc_next(
     };
     let mut ret: *mut llmp_message;
     /* DBG("last_msg %p %d (%d)\n", last_msg, last_msg ? (int)last_msg->tag : -1, (int)LLMP_TAG_END_OF_PAGE_V1); */
-    if last_msg.is_null() || (*last_msg).tag == 0xaf1e0f1 as c_int as c_uint {
+    if last_msg.is_null() || (*last_msg).tag == 0xaf1e0f1 as c_uint {
         /* We start fresh */
         ret = (*page).messages.as_mut_ptr();
         /* The initial message may not be alligned, so we at least align the end of
@@ -462,9 +449,9 @@ pub unsafe extern "C" fn llmp_alloc_next(
         /* We need to start with 1 for ids, as current message id is initialized
          * with 0... */
         (*ret).message_id = if !last_msg.is_null() {
-            (*last_msg).message_id.wrapping_add(1 as c_int as c_uint)
+            (*last_msg).message_id.wrapping_add(1 as c_uint)
         } else {
-            1 as c_int as c_uint
+            1 as c_uint
         }
     } else if (*page).current_msg_id != (*last_msg).message_id as c_ulong {
         /* Oops, wrong usage! */
@@ -489,7 +476,7 @@ pub unsafe extern "C" fn llmp_alloc_next(
             return 0 as *mut llmp_message;
         }
         ret = _llmp_next_msg_ptr(last_msg);
-        (*ret).message_id = (*last_msg).message_id.wrapping_add(1 as c_int as c_uint)
+        (*ret).message_id = (*last_msg).message_id.wrapping_add(1 as c_uint)
     }
     /* The beginning of our message should be messages + size_used, else nobody
      * sent the last msg! */
@@ -517,8 +504,7 @@ pub unsafe extern "C" fn llmp_alloc_next(
  After commiting, the msg shall no longer be altered!
  It will be read by the consuming threads (broker->clients or client->broker)
 */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_send(page: *mut llmp_page, msg: *mut llmp_message) -> bool {
+pub unsafe fn llmp_send(page: *mut llmp_page, msg: *mut llmp_message) -> Result<(), AflError> {
     if (*msg).tag == 0xdeadaf as c_uint {
         panic!(format!(
             "No tag set on message with id {}",
@@ -526,7 +512,10 @@ pub unsafe extern "C" fn llmp_send(page: *mut llmp_page, msg: *mut llmp_message)
         ));
     }
     if msg.is_null() || !llmp_msg_in_page(page, msg) {
-        return 0 as c_int != 0;
+        return Err(AflError::Unknown(format!(
+            "Llmp Message {:?} is null or not in current page",
+            msg
+        )));
     }
     compiler_fence(Ordering::SeqCst);
     ::std::ptr::write_volatile(
@@ -535,22 +524,22 @@ pub unsafe extern "C" fn llmp_send(page: *mut llmp_page, msg: *mut llmp_message)
     );
 
     compiler_fence(Ordering::SeqCst);
-    return 1 as c_int != 0;
+    return Ok(());
 }
+
 #[inline]
-unsafe extern "C" fn _llmp_broker_current_broadcast_map(
+unsafe fn _llmp_broker_current_broadcast_map(
     broker_state: *mut llmp_broker_state,
 ) -> *mut afl_shmem {
     return &mut *(*broker_state).broadcast_maps.offset(
         (*broker_state)
             .broadcast_map_count
-            .wrapping_sub(1 as c_int as c_ulong) as isize,
+            .wrapping_sub(1 as c_ulong) as isize,
     ) as *mut afl_shmem;
 }
 /* create a new shard page. Size_requested will be the min size, you may get a
  * larger map. Retruns NULL on error. */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_new_page_shmem(
+pub unsafe fn llmp_new_page_shmem(
     uninited_afl_shmem: *mut afl_shmem,
     sender: c_ulong,
     size_requested: c_ulong,
@@ -576,17 +565,17 @@ pub unsafe extern "C" fn llmp_new_page_shmem(
 }
 /* This function handles EOP by creating a new shared page and informing the
 listener about it using a EOP message. */
-unsafe extern "C" fn llmp_handle_out_eop(
+unsafe fn llmp_handle_out_eop(
     mut maps: *mut afl_shmem,
     map_count_p: *mut c_ulong,
     last_msg_p: *mut *mut llmp_message,
 ) -> *mut afl_shmem {
     let map_count: u32 = *map_count_p as u32;
     let mut old_map: *mut llmp_page =
-        shmem2page(&mut *maps.offset(map_count.wrapping_sub(1 as c_int as c_uint) as isize));
+        shmem2page(&mut *maps.offset(map_count.wrapping_sub(1 as c_uint) as isize));
     maps = afl_realloc(
         maps as *mut c_void,
-        (map_count.wrapping_add(1 as c_int as c_uint) as c_ulong)
+        (map_count.wrapping_add(1 as c_uint) as c_ulong)
             .wrapping_mul(::std::mem::size_of::<afl_shmem>() as c_ulong),
     ) as *mut afl_shmem;
     if maps.is_null() {
@@ -604,8 +593,8 @@ unsafe extern "C" fn llmp_handle_out_eop(
     }
     /* Realloc may have changed the location of maps_p (and old_map) in memory :/
      */
-    old_map = shmem2page(&mut *maps.offset(map_count.wrapping_sub(1 as c_int as c_uint) as isize));
-    *map_count_p = map_count.wrapping_add(1 as c_int as c_uint) as c_ulong;
+    old_map = shmem2page(&mut *maps.offset(map_count.wrapping_sub(1 as c_uint) as isize));
+    *map_count_p = map_count.wrapping_add(1 as c_uint) as c_ulong;
     ::std::ptr::write_volatile(
         &mut (*new_map).current_msg_id as *mut c_ulong,
         (*old_map).current_msg_id,
@@ -622,20 +611,22 @@ unsafe extern "C" fn llmp_handle_out_eop(
     memcpy(
         (*new_page_msg).shm_str.as_mut_ptr() as *mut c_void,
         (*maps.offset(map_count as isize)).shm_str.as_mut_ptr() as *const c_void,
-        20 as c_int as c_ulong,
+        20 as c_ulong,
     );
     // We never sent a msg on the new buf */
     *last_msg_p = 0 as *mut llmp_message;
     /* Send the last msg on the old buf */
-    if !llmp_send(old_map, out) {
-        afl_free(maps as *mut c_void);
-        return 0 as *mut afl_shmem;
+    match llmp_send(old_map, out) {
+        Err(_e) => {
+            afl_free(maps as *mut c_void);
+            println!("Error sending message");
+            0 as *mut afl_shmem
+        }
+        Ok(_) => maps,
     }
-    return maps;
 }
 /* no more space left! We'll have to start a new page */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_handle_out_eop(mut broker: *mut llmp_broker_state) -> AflRet {
+pub unsafe fn llmp_broker_handle_out_eop(mut broker: *mut llmp_broker_state) -> AflRet {
     (*broker).broadcast_maps = llmp_handle_out_eop(
         (*broker).broadcast_maps,
         &mut (*broker).broadcast_map_count,
@@ -647,8 +638,7 @@ pub unsafe extern "C" fn llmp_broker_handle_out_eop(mut broker: *mut llmp_broker
         AFL_RET_ALLOC
     } as AflRet;
 }
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_alloc_next(
+pub unsafe fn llmp_broker_alloc_next(
     broker: *mut llmp_broker_state,
     len: c_ulong,
 ) -> *mut llmp_message {
@@ -680,7 +670,7 @@ pub unsafe extern "C" fn llmp_broker_alloc_next(
 Be careful: Intenral realloc may change the location of the client map */
 unsafe fn llmp_broker_register_client(
     mut broker: *mut llmp_broker_state,
-    shm_str: &str,
+    shm_str: &CStr,
     map_size: c_ulong,
 ) -> *mut llmp_broker_client_metadata {
     /* make space for a new client and calculate its id */
@@ -688,7 +678,7 @@ unsafe fn llmp_broker_register_client(
         (*broker).llmp_clients as *mut c_void,
         (*broker)
             .llmp_client_count
-            .wrapping_add(1 as c_int as c_ulong)
+            .wrapping_add(1 as c_ulong)
             .wrapping_mul(::std::mem::size_of::<llmp_broker_client_metadata>() as c_ulong),
     ) as *mut llmp_broker_client_metadata;
     if (*broker).llmp_clients.is_null() {
@@ -704,17 +694,15 @@ unsafe fn llmp_broker_register_client(
         ::std::mem::size_of::<llmp_broker_client_metadata>() as c_ulong,
     );
     (*client).client_state = calloc(
-        1 as c_int as c_ulong,
+        1 as c_ulong,
         ::std::mem::size_of::<llmp_client>() as c_ulong,
     ) as *mut llmp_client;
     if (*client).client_state.is_null() {
         return 0 as *mut llmp_broker_client_metadata;
     }
     (*(*client).client_state).id = (*broker).llmp_client_count as u32;
-    (*client).cur_client_map = calloc(
-        1 as c_int as c_ulong,
-        ::std::mem::size_of::<afl_shmem>() as c_ulong,
-    ) as *mut afl_shmem;
+    (*client).cur_client_map =
+        calloc(1 as c_ulong, ::std::mem::size_of::<afl_shmem>() as c_ulong) as *mut afl_shmem;
     if (*client).cur_client_map.is_null() {
         return 0 as *mut llmp_broker_client_metadata;
     }
@@ -737,14 +725,14 @@ unsafe fn llmp_broker_handle_new_msgs(
     let mut current_message_id: u32 = if !(*client).last_msg_broker_read.is_null() {
         (*(*client).last_msg_broker_read).message_id
     } else {
-        0 as c_int as c_uint
+        0 as c_uint
     };
     while current_message_id as c_ulong != (*incoming).current_msg_id {
         let msg: *mut llmp_message = llmp_recv(incoming, (*client).last_msg_broker_read);
         if msg.is_null() {
             panic!("No message received but not all message ids receved! Data out of sync?");
         }
-        if (*msg).tag == 0xaf1e0f1 as c_int as c_uint {
+        if (*msg).tag == 0xaf1e0f1 as c_uint {
             let pageinfo: *mut llmp_payload_new_page = {
                 let mut _msg: *mut llmp_message = msg;
                 (if (*_msg).buf_len >= ::std::mem::size_of::<llmp_payload_new_page>() as c_ulong {
@@ -775,12 +763,12 @@ unsafe fn llmp_broker_handle_new_msgs(
             let client_map: *mut afl_shmem = (*client).cur_client_map;
             ::std::ptr::write_volatile(
                 &mut (*shmem2page(client_map)).save_to_unmap as *mut u16,
-                1 as c_int as u16,
+                1 as u16,
             );
             afl_shmem_deinit(client_map);
             if afl_shmem_by_str(
                 client_map,
-                str::from_utf8(&(*pageinfo).shm_str).unwrap(),
+                CStr::from_bytes_with_nul(&(*pageinfo).shm_str).expect("Illegal shm_str"),
                 (*pageinfo).map_size,
             )
             .is_null()
@@ -791,7 +779,7 @@ unsafe fn llmp_broker_handle_new_msgs(
                     (*pageinfo).map_size
                 ));
             }
-        } else if (*msg).tag == 0xc11e471 as c_int as c_uint {
+        } else if (*msg).tag == 0xc11e471 as c_uint {
             /* This client informs us about yet another new client
             add it to the list! Also, no need to forward this msg. */
             let pageinfo: *mut llmp_payload_new_page = {
@@ -811,7 +799,7 @@ unsafe fn llmp_broker_handle_new_msgs(
             let client_id: u32 = (*(*client).client_state).id;
             if llmp_broker_register_client(
                 broker,
-                str::from_utf8(&(*pageinfo).shm_str).unwrap(),
+                CStr::from_bytes_with_nul(&(*pageinfo).shm_str).expect("Illegal shm_str"),
                 (*pageinfo).map_size,
             )
             .is_null()
@@ -871,12 +859,11 @@ unsafe fn llmp_broker_handle_new_msgs(
                 /* We need to replace the message ID with our own */
                 let out_page: *mut llmp_page =
                     shmem2page(_llmp_broker_current_broadcast_map(broker));
-                (*out).message_id = (*out_page)
-                    .current_msg_id
-                    .wrapping_add(1 as c_int as c_ulong) as u32;
-                if !llmp_send(out_page, out) {
-                    panic!("Error sending msg");
-                }
+                (*out).message_id = (*out_page).current_msg_id.wrapping_add(1 as c_ulong) as u32;
+                match llmp_send(out_page, out) {
+                    Err(e) => panic!(format!("Error sending msg: {:?}", e)),
+                    _ => (),
+                };
                 (*broker).last_msg_sent = out
             }
         }
@@ -888,8 +875,7 @@ unsafe fn llmp_broker_handle_new_msgs(
  * its own shared page, once. */
 /* The broker walks all pages and looks for changes, then broadcasts them on
  * its own shared page, once. */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_once(broker: *mut llmp_broker_state) {
+pub unsafe fn llmp_broker_once(broker: *mut llmp_broker_state) {
     compiler_fence(Ordering::SeqCst);
     let mut i: u32 = 0;
     while (i as c_ulong) < (*broker).llmp_client_count {
@@ -901,8 +887,7 @@ pub unsafe extern "C" fn llmp_broker_once(broker: *mut llmp_broker_state) {
 }
 /* The broker walks all pages and looks for changes, then broadcasts them on
  * its own shared page */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_loop(broker: *mut llmp_broker_state) {
+pub unsafe fn llmp_broker_loop(broker: *mut llmp_broker_state) -> ! {
     loop {
         compiler_fence(Ordering::SeqCst);
         llmp_broker_once(broker);
@@ -911,7 +896,7 @@ pub unsafe extern "C" fn llmp_broker_loop(broker: *mut llmp_broker_state) {
     }
 }
 /* A new page will be used. Notify each registered hook in the client about this fact. */
-unsafe extern "C" fn llmp_clientrigger_new_out_page_hooks(client: *mut llmp_client) {
+unsafe fn llmp_clientrigger_new_out_page_hooks(client: *mut llmp_client) {
     let mut i: c_ulong = 0;
     while i < (*client).new_out_page_hook_count {
         ::std::mem::transmute::<*mut c_void, Option<LlmpClientNewPageHookFn>>(
@@ -922,7 +907,7 @@ unsafe extern "C" fn llmp_clientrigger_new_out_page_hooks(client: *mut llmp_clie
             shmem2page(
                 &mut *(*client)
                     .out_maps
-                    .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+                    .offset((*client).out_map_count.wrapping_sub(1 as c_ulong) as isize),
             ),
             (*(*client).new_out_page_hooks.offset(i as isize)).data,
         );
@@ -930,9 +915,7 @@ unsafe extern "C" fn llmp_clientrigger_new_out_page_hooks(client: *mut llmp_clie
     }
 }
 /* A wrapper around unpacking the data, calling through to the loop */
-unsafe extern "C" fn _llmp_client_wrapped_loop(
-    llmp_client_broker_metadata_ptr: *mut c_void,
-) -> *mut c_void {
+unsafe fn _llmp_client_wrapped_loop(llmp_client_broker_metadata_ptr: *mut c_void) -> ! {
     let metadata: *mut llmp_broker_client_metadata =
         llmp_client_broker_metadata_ptr as *mut llmp_broker_client_metadata;
     /* Before doing anything else:, notify registered hooks about the new page we're about to use */
@@ -942,35 +925,28 @@ unsafe extern "C" fn _llmp_client_wrapped_loop(
         (*metadata).client_state,
         (*metadata).data,
     );
-    println!(
-        "Client loop exited for client {}",
-        (*(*metadata).client_state).id
-    );
-    return 0 as *mut c_void;
 }
+
 /* launch a specific client. This function is rarely needed - all registered clients will get launched at broker_run */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_launch_client(
+pub unsafe fn llmp_broker_launch_client(
     broker: *mut llmp_broker_state,
     mut clientdata: *mut llmp_broker_client_metadata,
 ) -> bool {
     if clientdata < (*broker).llmp_clients
         || clientdata
-            > &mut *(*broker).llmp_clients.offset(
-                (*broker)
-                    .llmp_client_count
-                    .wrapping_sub(1 as c_int as c_ulong) as isize,
-            ) as *mut llmp_broker_client_metadata
+            > &mut *(*broker)
+                .llmp_clients
+                .offset((*broker).llmp_client_count.wrapping_sub(1 as c_ulong) as isize)
+                as *mut llmp_broker_client_metadata
     {
         println!(
             "[!] WARNING: Illegal client specified at ptr {:?} (instead of {:?} to {:?})",
             clientdata,
             (*broker).llmp_clients,
-            &mut *(*broker).llmp_clients.offset(
-                (*broker)
-                    .llmp_client_count
-                    .wrapping_sub(1 as c_int as c_ulong) as isize,
-            ) as *mut llmp_broker_client_metadata,
+            &mut *(*broker)
+                .llmp_clients
+                .offset((*broker).llmp_client_count.wrapping_sub(1 as c_ulong) as isize,)
+                as *mut llmp_broker_client_metadata,
         );
         return 0 as c_int != 0;
     }
@@ -986,9 +962,7 @@ pub unsafe extern "C" fn llmp_broker_launch_client(
         } else {
             if child_id == 0 as c_int {
                 /* child */
-                /* in the child, start loop, exit afterwards. */
                 _llmp_client_wrapped_loop(clientdata as *mut c_void);
-                exit(1);
             }
         }
         /* parent */
@@ -1000,22 +974,25 @@ pub unsafe extern "C" fn llmp_broker_launch_client(
     }
     //return 1 as c_int != 0;
 }
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_launch_clientloops(broker: *mut llmp_broker_state) -> bool {
+
+pub unsafe fn llmp_broker_launch_clientloops(
+    broker: *mut llmp_broker_state,
+) -> Result<(), AflError> {
     let mut i: c_ulong = 0;
     while i < (*broker).llmp_client_count {
         if (*(*broker).llmp_clients.offset(i as isize)).client_type as c_uint
-            == LLMP_CLIENT_TYPE_CHILD_PROCESS as c_int as c_uint
+            == LLMP_CLIENT_TYPE_CHILD_PROCESS as c_uint
         {
             if !llmp_broker_launch_client(broker, &mut *(*broker).llmp_clients.offset(i as isize)) {
                 println!("[!] WARNING: Could not launch all clients");
-                return 0 as c_int != 0;
+                return Err(AflError::Unknown("Failed to launch clients".into()));
             }
         }
         i = i.wrapping_add(1)
     }
-    return 1 as c_int != 0;
+    Ok(())
 }
+
 /* The broker walks all pages and looks for changes, then broadcasts them on
 its own shared page.
 Never returns. */
@@ -1023,43 +1000,41 @@ Never returns. */
 Same as llmp_broker_launch_threaded clients();
 Never returns. */
 /* Start all threads and the main broker. Never returns. */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_run(broker: *mut llmp_broker_state) {
-    llmp_broker_launch_clientloops(broker);
+pub unsafe fn llmp_broker_run(broker: *mut llmp_broker_state) -> ! {
+    llmp_broker_launch_clientloops(broker).expect("Failed to launch clients");
     llmp_broker_loop(broker);
 }
+
 /*
  For non zero-copy, we want to get rid of old pages with duplicate messages
  eventually. This function This funtion sees if we can unallocate older pages.
  The broker would have informed us by setting the save_to_unmap-flag.
 */
-unsafe extern "C" fn llmp_client_prune_old_pages(mut client: *mut llmp_client) {
+unsafe fn llmp_client_prune_old_pages(mut client: *mut llmp_client) {
     let current_map: *mut u8 = (*(*client)
         .out_maps
-        .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize))
+        .offset((*client).out_map_count.wrapping_sub(1 as c_ulong) as isize))
     .map;
     /* look for pages that are save_to_unmap, then unmap them. */
-    while (*(*client).out_maps.offset(0 as c_int as isize)).map != current_map
-        && (*shmem2page(&mut *(*client).out_maps.offset(0 as c_int as isize))).save_to_unmap
-            as c_int
-            != 0
+    while (*(*client).out_maps.offset(0 as isize)).map != current_map
+        && (*shmem2page(&mut *(*client).out_maps.offset(0 as isize))).save_to_unmap as c_int != 0
     {
         /* This page is save to unmap. The broker already reads or read it. */
-        afl_shmem_deinit(&mut *(*client).out_maps.offset(0 as c_int as isize));
+        afl_shmem_deinit(&mut *(*client).out_maps.offset(0 as isize));
         /* We remove at the start, move the other pages back. */
         memmove(
             (*client).out_maps as *mut c_void,
-            (*client).out_maps.offset(1 as c_int as isize) as *const c_void,
+            (*client).out_maps.offset(1 as isize) as *const c_void,
             (*client)
                 .out_map_count
-                .wrapping_sub(1 as c_int as c_ulong)
+                .wrapping_sub(1 as c_ulong)
                 .wrapping_mul(::std::mem::size_of::<afl_shmem>() as c_ulong),
         );
         (*client).out_map_count = (*client).out_map_count.wrapping_sub(1)
     }
 }
 /* We don't have any space. Send eop, the reset to beginning of ringbuf */
-unsafe extern "C" fn llmp_client_handle_out_eop(mut client: *mut llmp_client) -> bool {
+unsafe fn llmp_client_handle_out_eop(mut client: *mut llmp_client) -> bool {
     (*client).out_maps = llmp_handle_out_eop(
         (*client).out_maps,
         &mut (*client).out_map_count,
@@ -1079,8 +1054,7 @@ unsafe extern "C" fn llmp_client_handle_out_eop(mut client: *mut llmp_client) ->
 }
 /* A client receives a broadcast message. Returns null if no message is
  * availiable */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_client_recv(mut client: *mut llmp_client) -> *mut llmp_message {
+pub unsafe fn llmp_client_recv(mut client: *mut llmp_client) -> *mut llmp_message {
     loop {
         let msg = llmp_recv(
             shmem2page((*client).current_broadcast_map),
@@ -1093,7 +1067,7 @@ pub unsafe extern "C" fn llmp_client_recv(mut client: *mut llmp_client) -> *mut 
         if (*msg).tag == 0xdeadaf as c_uint {
             panic!("BUG: Read unallocated msg");
         } else {
-            if (*msg).tag == 0xaf1e0f1 as c_int as c_uint {
+            if (*msg).tag == 0xaf1e0f1 as c_uint {
                 /* we reached the end of the current page.
                 We'll init a new page but can reuse the mem are of the current map.
                 However, we cannot use the message if we deinit its page, so let's copy */
@@ -1127,7 +1101,7 @@ pub unsafe extern "C" fn llmp_client_recv(mut client: *mut llmp_client) -> *mut 
                 afl_shmem_deinit(broadcast_map);
                 if afl_shmem_by_str(
                     (*client).current_broadcast_map,
-                    str::from_utf8(&(*pageinfo).shm_str).unwrap(),
+                    CStr::from_bytes_with_nul(&(*pageinfo).shm_str).expect("Illegal shm_str"),
                     (*pageinfo).map_size,
                 )
                 .is_null()
@@ -1155,7 +1129,7 @@ pub unsafe fn llmp_client_recv_blocking(client: *mut llmp_client) -> *mut llmp_m
             != (if !(*client).last_msg_recvd.is_null() {
                 (*(*client).last_msg_recvd).message_id
             } else {
-                0 as c_int as c_uint
+                0 as c_uint
             }) as c_ulong
         {
             let ret: *mut llmp_message = llmp_client_recv(client);
@@ -1169,10 +1143,7 @@ pub unsafe fn llmp_client_recv_blocking(client: *mut llmp_client) -> *mut llmp_m
 }
 /* The current page could have changed in recv (EOP) */
 /* Alloc the next message, internally handling end of page by allocating a new one. */
-pub unsafe fn llmp_client_alloc_next(
-    client: *mut llmp_client,
-    size: c_ulong,
-) -> *mut llmp_message {
+pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: usize) -> *mut llmp_message {
     if client.is_null() {
         panic!("Client is NULL");
     }
@@ -1180,10 +1151,10 @@ pub unsafe fn llmp_client_alloc_next(
         shmem2page(
             &mut *(*client)
                 .out_maps
-                .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+                .offset((*client).out_map_count.wrapping_sub(1) as isize),
         ),
         (*client).last_msg_sent,
-        size,
+        size as c_ulong,
     );
     if msg.is_null() {
         let last_map_count: c_ulong = (*client).out_map_count;
@@ -1196,7 +1167,7 @@ pub unsafe fn llmp_client_alloc_next(
             || (*(*shmem2page(
                 &mut *(*client)
                     .out_maps
-                    .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+                    .offset((*client).out_map_count.wrapping_sub(1) as isize),
             ))
             .messages
             .as_mut_ptr())
@@ -1211,10 +1182,10 @@ pub unsafe fn llmp_client_alloc_next(
             shmem2page(
                 &mut *(*client)
                     .out_maps
-                    .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+                    .offset((*client).out_map_count.wrapping_sub(1) as isize),
             ),
             0 as *mut llmp_message,
-            size,
+            size as c_ulong,
         );
         if msg.is_null() {
             return 0 as *mut llmp_message;
@@ -1224,7 +1195,7 @@ pub unsafe fn llmp_client_alloc_next(
     (*msg).message_id = if !(*client).last_msg_sent.is_null() {
         (*(*client).last_msg_sent).message_id.wrapping_add(1)
     } else {
-        1 as c_int as c_uint
+        1 as c_uint
     };
     /* DBG("Allocated message at loc %p with buflen %ld", msg, msg->buf_len_padded); */
     return msg;
@@ -1236,7 +1207,7 @@ pub unsafe fn llmp_client_cancel(client: *mut llmp_client, mut msg: *mut llmp_me
     let mut page: *mut llmp_page = shmem2page(
         &mut *(*client)
             .out_maps
-            .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+            .offset((*client).out_map_count.wrapping_sub(1 as c_ulong) as isize),
     );
     (*msg).tag = 0xdeadaf as c_uint;
     (*page).size_used = ((*page).size_used as c_ulong).wrapping_sub(
@@ -1249,44 +1220,40 @@ pub unsafe fn llmp_client_cancel(client: *mut llmp_client, mut msg: *mut llmp_me
 pub unsafe fn llmp_client_send(
     mut client_state: *mut llmp_client,
     msg: *mut llmp_message,
-) -> bool {
+) -> Result<(), AflError> {
     let page: *mut llmp_page = shmem2page(
-        &mut *(*client_state).out_maps.offset(
-            (*client_state)
-                .out_map_count
-                .wrapping_sub(1 as c_int as c_ulong) as isize,
-        ),
+        &mut *(*client_state)
+            .out_maps
+            .offset((*client_state).out_map_count.wrapping_sub(1) as isize),
     );
-    let ret: bool = llmp_send(page, msg);
+    llmp_send(page, msg)?;
     (*client_state).last_msg_sent = msg;
-    return ret;
+    Ok(())
 }
 
 /* Creates a new, unconnected, client state */
 pub unsafe fn llmp_client_new_unconnected() -> *mut llmp_client {
     let mut client_state: *mut llmp_client = calloc(
-        1 as c_int as c_ulong,
+        1 as c_ulong,
         ::std::mem::size_of::<llmp_client>() as c_ulong,
     ) as *mut llmp_client;
-    (*client_state).current_broadcast_map = calloc(
-        1 as c_int as c_ulong,
-        ::std::mem::size_of::<afl_shmem>() as c_ulong,
-    ) as *mut afl_shmem;
+    (*client_state).current_broadcast_map =
+        calloc(1 as c_ulong, ::std::mem::size_of::<afl_shmem>() as c_ulong) as *mut afl_shmem;
     if (*client_state).current_broadcast_map.is_null() {
         return 0 as *mut llmp_client;
     }
     (*client_state).out_maps = afl_realloc(
         (*client_state).out_maps as *mut c_void,
-        (1 as c_int as c_ulong).wrapping_mul(::std::mem::size_of::<afl_shmem>() as c_ulong),
+        (1 as c_ulong).wrapping_mul(::std::mem::size_of::<afl_shmem>() as c_ulong),
     ) as *mut afl_shmem;
     if (*client_state).out_maps.is_null() {
         free((*client_state).current_broadcast_map as *mut c_void);
         free(client_state as *mut c_void);
         return 0 as *mut llmp_client;
     }
-    (*client_state).out_map_count = 1 as c_int as c_ulong;
+    (*client_state).out_map_count = 1 as c_ulong;
     if llmp_new_page_shmem(
-        &mut *(*client_state).out_maps.offset(0 as c_int as isize),
+        &mut *(*client_state).out_maps.offset(0 as isize),
         (*client_state).id as c_ulong,
         ((1 as c_int) << 28 as c_int) as c_ulong,
     )
@@ -1297,7 +1264,7 @@ pub unsafe fn llmp_client_new_unconnected() -> *mut llmp_client {
         free(client_state as *mut c_void);
         return 0 as *mut llmp_client;
     }
-    (*client_state).new_out_page_hook_count = 0 as c_int as c_ulong;
+    (*client_state).new_out_page_hook_count = 0 as c_ulong;
     (*client_state).new_out_page_hooks = 0 as *mut llmp_hookdata_generic;
     return client_state;
 }
@@ -1310,10 +1277,10 @@ pub unsafe fn llmp_client_delete(mut client_state: *mut llmp_client) {
     }
     afl_free((*client_state).out_maps as *mut c_void);
     (*client_state).out_maps = 0 as *mut afl_shmem;
-    (*client_state).out_map_count = 0 as c_int as c_ulong;
+    (*client_state).out_map_count = 0 as c_ulong;
     afl_free((*client_state).new_out_page_hooks as *mut c_void);
     (*client_state).new_out_page_hooks = 0 as *mut llmp_hookdata_generic;
-    (*client_state).new_out_page_hook_count = 0 as c_int as c_ulong;
+    (*client_state).new_out_page_hook_count = 0 as c_ulong;
     afl_shmem_deinit((*client_state).current_broadcast_map);
     free((*client_state).current_broadcast_map as *mut c_void);
     (*client_state).current_broadcast_map = 0 as *mut afl_shmem;
@@ -1349,8 +1316,11 @@ pub unsafe fn llmp_broker_register_childprocess_clientloop(
     {
         return Err(AflError::Unknown("Alloc".into()));
     }
-    let mut client: *mut llmp_broker_client_metadata =
-        llmp_broker_register_client(broker, str::from_utf8(&client_map.shm_str).unwrap(), client_map.map_size);
+    let mut client: *mut llmp_broker_client_metadata = llmp_broker_register_client(
+        broker,
+        CStr::from_ptr(&client_map.shm_str as *const i8),
+        client_map.map_size,
+    );
     if client.is_null() {
         afl_shmem_deinit(&mut client_map);
         return Err(AflError::Unknown("Something in clients failed".into()));
@@ -1375,13 +1345,13 @@ pub unsafe fn llmp_broker_register_childprocess_clientloop(
         &mut client_map as *mut afl_shmem as *const c_void,
         ::std::mem::size_of::<afl_shmem>() as c_ulong,
     );
-    (*(*client).client_state).out_map_count = 1 as c_int as c_ulong;
+    (*(*client).client_state).out_map_count = 1 as c_ulong;
     /* Each client starts with the very first map.
     They should then iterate through all maps once and work on all old messages.
     */
     (*(*client).client_state).current_broadcast_map =
-        &mut *(*broker).broadcast_maps.offset(0 as c_int as isize) as *mut afl_shmem;
-    (*(*client).client_state).out_map_count = 1 as c_int as c_ulong;
+        &mut *(*broker).broadcast_maps.offset(0 as isize) as *mut afl_shmem;
+    (*(*client).client_state).out_map_count = 1 as c_ulong;
     return Ok(());
 }
 
@@ -1397,12 +1367,12 @@ pub unsafe fn llmp_add_hook_generic(
     let hooks: *mut llmp_hookdata_generic = afl_realloc(
         *hooks_p as *mut c_void,
         hooks_count
-            .wrapping_add(1 as c_int as c_ulong)
+            .wrapping_add(1 as c_ulong)
             .wrapping_mul(::std::mem::size_of::<llmp_hookdata_generic>() as c_ulong),
     ) as *mut llmp_hookdata_generic;
     if hooks.is_null() {
         *hooks_p = 0 as *mut llmp_hookdata_generic;
-        *hooks_count_p = 0 as c_int as c_ulong;
+        *hooks_count_p = 0 as c_ulong;
         return AFL_RET_ALLOC;
     }
     let ref mut fresh9 = (*hooks.offset(hooks_count as isize)).func;
@@ -1410,7 +1380,7 @@ pub unsafe fn llmp_add_hook_generic(
     let ref mut fresh10 = (*hooks.offset(hooks_count as isize)).data;
     *fresh10 = new_hook_data;
     *hooks_p = hooks;
-    *hooks_count_p = hooks_count.wrapping_add(1 as c_int as c_ulong);
+    *hooks_count_p = hooks_count.wrapping_add(1 as c_ulong);
     return AFL_RET_SUCCESS;
 }
 /* Adds a hook that gets called in the client for each new outgoing page the client creates. */
@@ -1431,13 +1401,13 @@ pub unsafe fn llmp_client_add_new_out_page_hook(
 if the callback returns false, the message is not forwarded to the clients. */
 pub unsafe fn llmp_broker_add_message_hook(
     broker: *mut llmp_broker_state,
-    hook: Option<LlmpMessageHookFn>,
+    hook: LlmpMessageHookFn,
     data: *mut c_void,
 ) -> AflRet {
     return llmp_add_hook_generic(
         &mut (*broker).msg_hooks,
         &mut (*broker).msg_hook_count,
-        ::std::mem::transmute::<Option<LlmpMessageHookFn>, *mut c_void>(hook),
+        ::std::mem::transmute::<Option<LlmpMessageHookFn>, *mut c_void>(Some(hook)),
         data,
     );
 }
@@ -1453,13 +1423,13 @@ pub unsafe fn llmp_broker_init(mut broker: *mut llmp_broker_state) -> Result<(),
     /* let's create some space for outgoing maps */
     (*broker).broadcast_maps = afl_realloc(
         0 as *mut c_void,
-        (1 as c_int as c_ulong).wrapping_mul(::std::mem::size_of::<afl_shmem>() as c_ulong),
+        (1 as c_ulong).wrapping_mul(::std::mem::size_of::<afl_shmem>() as c_ulong),
     ) as *mut afl_shmem;
     if (*broker).broadcast_maps.is_null() {
         return Err(AflError::Unknown("Alloc".into()));
     }
-    (*broker).broadcast_map_count = 1 as c_int as c_ulong;
-    (*broker).llmp_client_count = 0 as c_int as c_ulong;
+    (*broker).broadcast_map_count = 1 as c_ulong;
+    (*broker).llmp_client_count = 0 as c_ulong;
     (*broker).llmp_clients = 0 as *mut llmp_broker_client_metadata;
     if llmp_new_page_shmem(
         _llmp_broker_current_broadcast_map(broker),
@@ -1474,15 +1444,14 @@ pub unsafe fn llmp_broker_init(mut broker: *mut llmp_broker_state) -> Result<(),
     return Ok(());
 }
 /* Clean up the broker instance */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_deinit(mut broker: *mut llmp_broker_state) {
+pub unsafe fn llmp_broker_deinit(mut broker: *mut llmp_broker_state) {
     let mut i: c_ulong;
-    i = 0 as c_int as c_ulong;
+    i = 0 as c_ulong;
     while i < (*broker).broadcast_map_count {
         afl_shmem_deinit(&mut *(*broker).broadcast_maps.offset(i as isize));
         i = i.wrapping_add(1)
     }
-    i = 0 as c_int as c_ulong;
+    i = 0 as c_ulong;
     while i < (*broker).llmp_client_count {
         afl_shmem_deinit((*(*broker).llmp_clients.offset(i as isize)).cur_client_map);
         free((*(*broker).llmp_clients.offset(i as isize)).cur_client_map as *mut c_void);
@@ -1490,7 +1459,7 @@ pub unsafe extern "C" fn llmp_broker_deinit(mut broker: *mut llmp_broker_state) 
         // TODO: Properly clean up the client
     }
     afl_free((*broker).broadcast_maps as *mut c_void);
-    (*broker).broadcast_map_count = 0 as c_int as c_ulong;
+    (*broker).broadcast_map_count = 0 as c_ulong;
     afl_free((*broker).llmp_clients as *mut c_void);
-    (*broker).llmp_client_count = 0 as c_int as c_ulong;
+    (*broker).llmp_client_count = 0 as c_ulong;
 }

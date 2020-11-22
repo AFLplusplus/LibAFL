@@ -1,19 +1,119 @@
+use core::convert::TryInto;
 use core::ffi::c_void;
-
-use std::env::args;
-use std::ptr;
+use core::mem::size_of;
+use core::ptr;
+use std::thread;
+use std::time;
 
 use afl::events::llmp_translated::*;
 
-fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) {
-    println!("Client says hi");
+const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
+const TAG_MATH_RESULT_V1: u32 = 0x77474331;
+
+unsafe fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> ! {
+    let mut counter: u32 = 0;
+    loop {
+        counter += 1;
+
+        let llmp_message = llmp_client_alloc_next(client, size_of::<u32>());
+        std::ptr::copy(
+            counter.to_be_bytes().as_ptr(),
+            (*llmp_message).buf.as_mut_ptr(),
+            size_of::<u32>(),
+        );
+        (*llmp_message).tag = TAG_SIMPLE_U32_V1;
+        llmp_client_send(client, llmp_message).unwrap();
+
+        thread::sleep(time::Duration::from_millis(100));
+    }
+}
+
+unsafe fn u32_from_msg(message: *const llmp_message) -> u32 {
+    u32::from_be_bytes(
+        std::slice::from_raw_parts((*message).buf.as_ptr(), size_of::<u32>())
+            .try_into()
+            .unwrap(),
+    )
+}
+
+unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) -> ! {
+    let mut last_result: u32 = 0;
+    let mut current_result: u32 = 0;
+    loop {
+        let mut msg_counter = 0;
+        loop {
+            let last_msg = llmp_client_recv(client);
+            if last_msg == 0 as *mut llmp_message {
+                break;
+            }
+            msg_counter += 1;
+            match (*last_msg).tag {
+                TAG_SIMPLE_U32_V1 => {
+                    current_result = current_result.wrapping_add(u32_from_msg(last_msg));
+                }
+                _ => println!("Adder Client ignored unknown message {}", (*last_msg).tag),
+            };
+        }
+
+        if current_result != last_result {
+            println!(
+                "Adder handled {} messages, reporting {} to broker",
+                msg_counter, current_result
+            );
+
+            let llmp_message = llmp_client_alloc_next(client, size_of::<u32>());
+            std::ptr::copy(
+                current_result.to_be_bytes().as_ptr(),
+                (*llmp_message).buf.as_mut_ptr(),
+                size_of::<u32>(),
+            );
+            (*llmp_message).tag = TAG_MATH_RESULT_V1;
+            llmp_client_send(client, llmp_message).unwrap();
+            last_result = current_result;
+        }
+
+        thread::sleep(time::Duration::from_millis(100));
+    }
+}
+
+unsafe fn broker_message_hook(
+    _broker: *mut llmp_broker_state,
+    client_metadata: *mut llmp_broker_client_metadata,
+    message: *mut llmp_message,
+    _data: *mut c_void,
+) -> LlmpMessageHookResult {
+    match (*message).tag {
+        TAG_SIMPLE_U32_V1 => {
+            println!(
+                "Client {:?} sent message: {:?}",
+                (*client_metadata).pid,
+                u32_from_msg(message)
+            );
+            LlmpMessageHookResult::ForwardToClients
+        }
+        TAG_MATH_RESULT_V1 => {
+            println!(
+                "Adder Client has this current result: {:?}",
+                u32_from_msg(message)
+            );
+            LlmpMessageHookResult::Handled
+        }
+        _ => {
+            println!("Unknwon message id received!");
+            LlmpMessageHookResult::ForwardToClients
+        }
+    }
 }
 
 fn main() {
+    /* The main node has a broker, and a few worker threads */
+    let threads_total = num_cpus::get();
 
-    let thread_count = 1;
-
-    /* The main node has a broker, a tcp server, and a few worker threads */
+    let counter_thread_count = threads_total - 2;
+    println!(
+        "Running with 1 broker, 1 adder, and {} counter clients",
+        counter_thread_count
+    );
 
     let mut broker = llmp_broker_state {
         last_msg_sent: ptr::null_mut(),
@@ -24,45 +124,29 @@ fn main() {
         llmp_client_count: 0,
         llmp_clients: ptr::null_mut(),
     };
-    unsafe {llmp_broker_init(&mut broker).expect("Could not init")};
-    
-    unsafe {llmp_broker_register_childprocess_clientloop(&mut broker, llmp_test_clientloop, ptr::null_mut()).expect("could not add child clientloop")};
+    unsafe {
+        llmp_broker_init(&mut broker).expect("Could not init");
+        for i in 0..counter_thread_count {
+            println!("Adding client {}", i);
+            llmp_broker_register_childprocess_clientloop(
+                &mut broker,
+                llmp_test_clientloop,
+                ptr::null_mut(),
+            )
+            .expect("could not add child clientloop");
+        }
 
-    /*unsafe {llmp_broker_register_threaded_clientloop(broker, llmp_clientloop_print_u32, NULL)) {
+        llmp_broker_register_childprocess_clientloop(
+            &mut broker,
+            test_adder_clientloop,
+            ptr::null_mut(),
+        )
+        .expect("Error registering childprocess");
 
-      FATAL("error adding threaded client");
+        println!("Spawning broker");
 
+        llmp_broker_add_message_hook(&mut broker, broker_message_hook, ptr::null_mut());
+
+        llmp_broker_run(&mut broker);
     }
-
-    int i;
-    for (i = 0; i < thread_count; i++) {
-
-      if (!llmp_broker_register_threaded_clientloop(broker, llmp_clientloop_rand_u32, NULL)) {
-
-        FATAL("error adding threaded client");
-
-      }
-
-    }
-
-    OKF("Spawning main on port %d", port);
-    llmp_broker_run(broker);
-
-  } else {
-
-    if (thread_count > 1) { WARNF("Multiple threads not supported for clients."); }
-
-    OKF("Client will connect to port %d", port);
-    // Worker only needs to spawn client threads.
-    llmp_client_t *client_state = llmp_client_new(port);
-    if (!client_state) { FATAL("Error connecting to broker at port %d", port); }
-    llmp_clientloop_rand_u32(client_state, NULL);
-
-  }
-
-  FATAL("Unreachable");
-
-
-    println!("Hello, world!");
-    */
 }
