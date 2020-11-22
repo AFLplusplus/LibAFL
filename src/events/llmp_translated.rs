@@ -1151,7 +1151,7 @@ pub unsafe fn llmp_client_recv_blocking(client: *mut llmp_client) -> *mut llmp_m
 }
 /* The current page could have changed in recv (EOP) */
 /* Alloc the next message, internally handling end of page by allocating a new one. */
-pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: c_ulong) -> *mut llmp_message {
+pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: usize) -> *mut llmp_message {
     if client.is_null() {
         panic!("Client is NULL");
     }
@@ -1159,10 +1159,10 @@ pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: c_ulong) ->
         shmem2page(
             &mut *(*client)
                 .out_maps
-                .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+                .offset((*client).out_map_count.wrapping_sub(1) as isize),
         ),
         (*client).last_msg_sent,
-        size,
+        size as c_ulong,
     );
     if msg.is_null() {
         let last_map_count: c_ulong = (*client).out_map_count;
@@ -1175,7 +1175,7 @@ pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: c_ulong) ->
             || (*(*shmem2page(
                 &mut *(*client)
                     .out_maps
-                    .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+                    .offset((*client).out_map_count.wrapping_sub(1) as isize),
             ))
             .messages
             .as_mut_ptr())
@@ -1190,10 +1190,10 @@ pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: c_ulong) ->
             shmem2page(
                 &mut *(*client)
                     .out_maps
-                    .offset((*client).out_map_count.wrapping_sub(1 as c_int as c_ulong) as isize),
+                    .offset((*client).out_map_count.wrapping_sub(1) as isize),
             ),
             0 as *mut llmp_message,
-            size,
+            size as c_ulong,
         );
         if msg.is_null() {
             return 0 as *mut llmp_message;
@@ -1203,7 +1203,7 @@ pub unsafe fn llmp_client_alloc_next(client: *mut llmp_client, size: c_ulong) ->
     (*msg).message_id = if !(*client).last_msg_sent.is_null() {
         (*(*client).last_msg_sent).message_id.wrapping_add(1)
     } else {
-        1 as c_int as c_uint
+        1 as c_uint
     };
     /* DBG("Allocated message at loc %p with buflen %ld", msg, msg->buf_len_padded); */
     return msg;
