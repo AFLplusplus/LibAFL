@@ -10,7 +10,7 @@ use core::marker::PhantomData;
 use std::path::PathBuf;
 
 use crate::inputs::Input;
-use crate::utils::{HasRand, Rand};
+use crate::utils::Rand;
 use crate::AflError;
 
 pub trait HasEntriesVec<I>
@@ -25,9 +25,10 @@ where
 }
 
 /// Corpus with all current testcases
-pub trait Corpus<I>: HasEntriesVec<I> + HasRand
+pub trait Corpus<I, R>: HasEntriesVec<I>
 where
     I: Input,
+    R: Rand,
 {
     /// Returns the number of elements
     fn count(&self) -> usize {
@@ -58,20 +59,20 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
+    fn random_entry(&self, rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
         if self.count() == 0 {
             Err(AflError::Empty("No entries in corpus".to_owned()))
         } else {
             let len = { self.entries().len() };
-            let id = self.rand_below(len as u64) as usize;
+            let id = rand.below(len as u64) as usize;
             Ok((self.entries()[id].clone(), id))
         }
     }
 
     // TODO: IntoIter
     /// Gets the next entry
-    fn next(&mut self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
-        self.random_entry()
+    fn next(&mut self, rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
+        self.random_entry(rand)
     }
 }
 
@@ -80,8 +81,8 @@ where
     I: Input,
     R: Rand,
 {
-    rand: Rc<RefCell<R>>,
     entries: Vec<Rc<RefCell<Testcase<I>>>>,
+    phantom: PhantomData<R>,
 }
 
 impl<I, R> HasEntriesVec<I> for InMemoryCorpus<I, R>
@@ -97,19 +98,7 @@ where
     }
 }
 
-impl<I, R> HasRand for InMemoryCorpus<I, R>
-where
-    I: Input,
-    R: Rand,
-{
-    type R = R;
-
-    fn rand(&self) -> &Rc<RefCell<Self::R>> {
-        &self.rand
-    }
-}
-
-impl<I, R> Corpus<I> for InMemoryCorpus<I, R>
+impl<I, R> Corpus<I, R> for InMemoryCorpus<I, R>
 where
     I: Input,
     R: Rand,
@@ -122,10 +111,10 @@ where
     I: Input,
     R: Rand,
 {
-    pub fn new(rand: &Rc<RefCell<R>>) -> Self {
+    pub fn new() -> Self {
         InMemoryCorpus {
-            rand: Rc::clone(rand),
             entries: vec![],
+            phantom: PhantomData,
         }
     }
 }
@@ -136,9 +125,9 @@ where
     I: Input,
     R: Rand,
 {
-    rand: Rc<RefCell<R>>,
     entries: Vec<Rc<RefCell<Testcase<I>>>>,
     dir_path: PathBuf,
+    phantom: PhantomData<R>,
 }
 
 #[cfg(feature = "std")]
@@ -156,20 +145,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, R> HasRand for OnDiskCorpus<I, R>
-where
-    I: Input,
-    R: Rand,
-{
-    type R = R;
-
-    fn rand(&self) -> &Rc<RefCell<Self::R>> {
-        &self.rand
-    }
-}
-
-#[cfg(feature = "std")]
-impl<I, R> Corpus<I> for OnDiskCorpus<I, R>
+impl<I, R> Corpus<I, R> for OnDiskCorpus<I, R>
 where
     I: Input,
     R: Rand,
@@ -194,31 +170,33 @@ where
     I: Input,
     R: Rand,
 {
-    pub fn new(rand: &Rc<RefCell<R>>, dir_path: PathBuf) -> Self {
+    pub fn new(dir_path: PathBuf) -> Self {
         OnDiskCorpus {
-            rand: Rc::clone(rand),
             dir_path: dir_path,
             entries: vec![],
+            phantom: PhantomData,
         }
     }
 }
 
 /// A Queue-like corpus, wrapping an existing Corpus instance
-pub struct QueueCorpus<I, C>
+pub struct QueueCorpus<C, I, R>
 where
+    C: Corpus<I, R>,
     I: Input,
-    C: Corpus<I>,
+    R: Rand,
 {
     corpus: C,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(I, R)>,
     pos: usize,
     cycles: u64,
 }
 
-impl<'a, I, C> HasEntriesVec<I> for QueueCorpus<I, C>
+impl<C, I, R> HasEntriesVec<I> for QueueCorpus<C, I, R>
 where
+    C: Corpus<I, R>,
     I: Input,
-    C: Corpus<I>,
+    R: Rand,
 {
     fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>] {
         self.corpus.entries()
@@ -228,22 +206,11 @@ where
     }
 }
 
-impl<'a, I, C> HasRand for QueueCorpus<I, C>
+impl<C, I, R> Corpus<I, R> for QueueCorpus<C, I, R>
 where
+    C: Corpus<I, R>,
     I: Input,
-    C: Corpus<I>,
-{
-    type R = C::R;
-
-    fn rand(&self) -> &Rc<RefCell<Self::R>> {
-        self.corpus.rand()
-    }
-}
-
-impl<'a, I, C> Corpus<I> for QueueCorpus<I, C>
-where
-    I: Input,
-    C: Corpus<I>,
+    R: Rand,
 {
     /// Returns the number of elements
     fn count(&self) -> usize {
@@ -260,12 +227,12 @@ where
     }
 
     /// Gets a random entry
-    fn random_entry(&self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
-        self.corpus.random_entry()
+    fn random_entry(&self, rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
+        self.corpus.random_entry(rand)
     }
 
     /// Gets the next entry
-    fn next(&mut self) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
+    fn next(&mut self, _rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
         self.pos += 1;
         if self.corpus.count() == 0 {
             return Err(AflError::Empty("Corpus".to_owned()));
@@ -279,13 +246,14 @@ where
     }
 }
 
-impl<'a, I, C> QueueCorpus<I, C>
+impl<C, I, R> QueueCorpus<C, I, R>
 where
+    C: Corpus<I, R>,
     I: Input,
-    C: Corpus<I>,
+    R: Rand,
 {
     pub fn new(corpus: C) -> Self {
-        QueueCorpus::<I, C> {
+        QueueCorpus {
             corpus: corpus,
             phantom: PhantomData,
             cycles: 0,
@@ -365,13 +333,15 @@ mod tests {
 
     #[test]
     fn test_queuecorpus() {
-        let rand: Rc<_> = DefaultRand::new(0).into();
-        let mut q = QueueCorpus::new(OnDiskCorpus::new(&rand, PathBuf::from("fancy/path")));
+        let mut rand = DefaultRand::new(0);
+        let mut q = QueueCorpus::new(OnDiskCorpus::<BytesInput, DefaultRand>::new(PathBuf::from(
+            "fancy/path",
+        )));
         let t: Rc<_> =
             Testcase::with_filename(BytesInput::new(vec![0 as u8; 4]), "fancyfile".into()).into();
         q.add(t);
         let filename = q
-            .next()
+            .next(&mut rand)
             .unwrap()
             .0
             .borrow()
@@ -381,7 +351,7 @@ mod tests {
             .to_owned();
         assert_eq!(
             filename,
-            q.next()
+            q.next(&mut rand)
                 .unwrap()
                 .0
                 .borrow()

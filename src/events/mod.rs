@@ -94,3 +94,9 @@ impl EventManager for LoggerEventManager {
         Ok(0)
     }
 }
+
+impl LoggerEventManager {
+    pub fn new() -> Self {
+        LoggerEventManager {}
+    }
+}

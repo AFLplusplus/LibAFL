@@ -46,8 +46,33 @@ pub trait Rand: Debug {
     }
 }
 
-/// Has a Rand Rc RefCell field (internal mutability), that can be used to get random values
+/// Has a Rand field, that can be used to get random values
 pub trait HasRand {
+    type R: Rand;
+
+    /// Get the hold Rand instance
+    fn rand(&self) -> &Self::R;
+
+    /// Get the hold Rand instance (mutable)
+    fn rand_mut(&mut self) -> &mut Self::R;
+
+    // Gets the next 64 bit value
+    fn rand_next(&mut self) -> u64 {
+        self.rand_mut().next()
+    }
+    // Gets a value below the given 64 bit val (inclusive)
+    fn rand_below(&mut self, upper_bound_excl: u64) -> u64 {
+        self.rand_mut().below(upper_bound_excl)
+    }
+
+    // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
+    fn rand_between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
+        self.rand_mut().between(lower_bound_incl, upper_bound_incl)
+    }
+}
+
+/// Has a Rand Rc RefCell field (internal mutability), that can be used to get random values
+pub trait HasRandRR {
     type R: Rand;
 
     /// Get the hold Rand instance
@@ -172,6 +197,7 @@ impl XKCDRand {
     }
 }
 
+/*
 /// A very basic HasRand
 pub struct DefaultHasRand<R>
 where
@@ -205,6 +231,7 @@ where
         }
     }
 }
+*/
 
 /// Get the next higher power of two
 pub const fn next_pow2(val: u64) -> u64 {
@@ -219,7 +246,7 @@ pub const fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, DefaultHasRand, DefaultRand, HasRand, Rand};
+    use crate::utils::{next_pow2, DefaultRand, HasRand, Rand};
 
     #[test]
     fn test_rand() {
@@ -244,6 +271,7 @@ mod tests {
         assert!(rand.between(11, 20) > 10);
     }
 
+    /*
     #[test]
     fn test_has_rand() {
         let rand = DefaultRand::new(0).into();
@@ -252,6 +280,7 @@ mod tests {
         assert!(has_rand.rand_below(100) < 100);
         assert_eq!(has_rand.rand_below(1), 0);
     }
+    */
 
     #[test]
     fn test_next_pow2() {
