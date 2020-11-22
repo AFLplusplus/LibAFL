@@ -147,7 +147,7 @@ pub struct llmp_broker_client_metadata {
     pub data: *mut c_void,
 }
 
-pub type LlmpClientloopFn = fn(_: *mut llmp_client, _: *mut c_void) -> !;
+pub type LlmpClientloopFn = unsafe fn(_: *mut llmp_client, _: *mut c_void) -> !;
 pub type LlmpClientType = c_uint;
 pub const LLMP_CLIENT_TYPE_FOREIGN_PROCESS: LlmpClientType = 3;
 pub const LLMP_CLIENT_TYPE_CHILD_PROCESS: LlmpClientType = 2;
@@ -170,7 +170,7 @@ pub enum LlmpMessageHookResult {
     ForwardToClients,
 }
 
-pub type LlmpMessageHookFn = fn(
+pub type LlmpMessageHookFn = unsafe fn(
     _: *mut llmp_broker_state,
     _: *mut llmp_broker_client_metadata,
     _: *mut llmp_message,
@@ -1075,7 +1075,7 @@ pub unsafe fn llmp_client_recv(mut client: *mut llmp_client) -> *mut llmp_messag
         if (*msg).tag == 0xdeadaf as c_uint {
             panic!("BUG: Read unallocated msg");
         } else {
-            if (*msg).tag == 0xaf1e0f1 as c_int as c_uint {
+            if (*msg).tag == 0xaf1e0f1 as c_uint {
                 /* we reached the end of the current page.
                 We'll init a new page but can reuse the mem are of the current map.
                 However, we cannot use the message if we deinit its page, so let's copy */
