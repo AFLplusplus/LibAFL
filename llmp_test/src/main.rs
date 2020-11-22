@@ -5,12 +5,56 @@ use std::ptr;
 
 use afl::events::llmp_translated::*;
 
-fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) {
-    println!("Client says hi");
+use std::{thread, time};
+
+fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> ! {
+    let mut counter: u32 = 0;
+    loop {
+        counter += 10;
+
+        unsafe {
+            let llmp_message = llmp_client_alloc_next(client, 10);
+            std::ptr::copy(
+                counter.to_be_bytes().as_ptr(),
+                (*llmp_message).buf.as_mut_ptr(),
+                4,
+            );
+            (*llmp_message).tag = 1;
+            llmp_client_send(client, llmp_message);
+        }
+
+        thread::sleep(time::Duration::from_millis(100));
+    }
+}
+
+fn broker_message_hook(
+    broker: *mut llmp_broker_state,
+    client_metadata: *mut llmp_broker_client_metadata,
+    message: *mut llmp_message,
+    _data: *mut c_void,
+) -> LlmpMessageHookResult {
+
+    unsafe {
+    match (*message).tag {
+        1 => {
+            // TODO: use higher bits
+            let counter_lowest = (std::slice::from_raw_parts((*message).buf.as_ptr(), 4))[3];
+            println!(
+                "Got message {:?} from client {:?}",
+                counter_lowest,
+                (*client_metadata).pid
+            );
+            LlmpMessageHookResult::Handled
+        },
+        _ => {
+            println!("Unknwon message id received!");
+            LlmpMessageHookResult::ForwardToClients
+        }
+    }
+    }
 }
 
 fn main() {
-    let thread_count = 1;
 
     /* The main node has a broker, a tcp server, and a few worker threads */
 
@@ -37,6 +81,9 @@ fn main() {
         }
 
         println!("Spawning broker");
+
+        llmp_broker_add_message_hook(&mut broker, broker_message_hook, ptr::null_mut());
+
         llmp_broker_run(&mut broker);
     }
 }

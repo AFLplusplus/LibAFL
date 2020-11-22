@@ -166,11 +166,11 @@ pub unsafe fn afl_shmem_by_str(mut shm: *mut afl_shmem,
 
 /* Write sharedmap as env var */
 /* Write sharedmap as env var and the size as name#_SIZE */
-pub unsafe fn afl_shmem_to_env_var(shmem: *mut afl_shmem,
+pub unsafe fn afl_shmem_to_env_var(shmem: &afl_shmem,
                                               env_name: &CStr)
  -> c_uint {
     let env_len = env_name.to_bytes().len();
-    if shmem.is_null() || env_len == 0 || env_len > 200 ||
+    if env_len == 0 || env_len > 200 ||
            (*shmem).shm_str[0 as c_int as usize] == 0 {
         return AFL_RET_NULL_PTR
     }
