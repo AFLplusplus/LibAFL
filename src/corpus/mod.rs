@@ -13,7 +13,7 @@ use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
-pub trait HasEntriesVec<I>
+pub trait HasTestcaseVec<I>
 where
     I: Input,
 {
@@ -25,7 +25,7 @@ where
 }
 
 /// Corpus with all current testcases
-pub trait Corpus<I, R>: HasEntriesVec<I>
+pub trait Corpus<I, R>: HasTestcaseVec<I>
 where
     I: Input,
     R: Rand,
@@ -76,6 +76,19 @@ where
     }
 }
 
+pub trait HasCorpus<C, I, R>
+where
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    /// Get the corpus field
+    fn corpus(&self) -> &C;
+
+    /// Get thecorpus field (mutable)
+    fn corpus_mut(&mut self) -> &mut C;
+}
+
 pub struct InMemoryCorpus<I, R>
 where
     I: Input,
@@ -85,7 +98,7 @@ where
     phantom: PhantomData<R>,
 }
 
-impl<I, R> HasEntriesVec<I> for InMemoryCorpus<I, R>
+impl<I, R> HasTestcaseVec<I> for InMemoryCorpus<I, R>
 where
     I: Input,
     R: Rand,
@@ -131,7 +144,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, R> HasEntriesVec<I> for OnDiskCorpus<I, R>
+impl<I, R> HasTestcaseVec<I> for OnDiskCorpus<I, R>
 where
     I: Input,
     R: Rand,
@@ -192,7 +205,7 @@ where
     cycles: u64,
 }
 
-impl<C, I, R> HasEntriesVec<I> for QueueCorpus<C, I, R>
+impl<C, I, R> HasTestcaseVec<I> for QueueCorpus<C, I, R>
 where
     C: Corpus<I, R>,
     I: Input,

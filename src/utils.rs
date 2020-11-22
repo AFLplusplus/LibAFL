@@ -47,27 +47,27 @@ pub trait Rand: Debug {
 }
 
 /// Has a Rand field, that can be used to get random values
-pub trait HasRand {
-    type R: Rand;
-
-    /// Get the hold Rand instance
-    fn rand(&self) -> &Self::R;
-
-    /// Get the hold Rand instance (mutable)
-    fn rand_mut(&mut self) -> &mut Self::R;
+pub trait HasRand<R>
+where
+    R: Rand,
+{
+    /// Get the hold RefCell Rand instance
+    fn rand(&self) -> &RefCell<R>;
 
     // Gets the next 64 bit value
     fn rand_next(&mut self) -> u64 {
-        self.rand_mut().next()
+        self.rand().borrow_mut().next()
     }
     // Gets a value below the given 64 bit val (inclusive)
     fn rand_below(&mut self, upper_bound_excl: u64) -> u64 {
-        self.rand_mut().below(upper_bound_excl)
+        self.rand().borrow_mut().below(upper_bound_excl)
     }
 
     // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     fn rand_between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
-        self.rand_mut().between(lower_bound_incl, upper_bound_incl)
+        self.rand()
+            .borrow_mut()
+            .between(lower_bound_incl, upper_bound_incl)
     }
 }
 

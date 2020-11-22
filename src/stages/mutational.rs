@@ -15,13 +15,12 @@ use crate::AflError;
 
 // TODO multi mutators stage
 
-pub trait MutationalStage<M, S, C, E, EM, I, R>: Stage<S, C, E, EM, I, R>
+pub trait MutationalStage<M, S, C, E, I, R>: Stage<S, C, E, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, EM, I, R>,
+    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
     R: Rand,
 {
@@ -40,15 +39,17 @@ where
     /// Runs this (mutational) stage for the given testcase
     fn perform_mutational(
         &mut self,
-        testcase: Rc<RefCell<Testcase<I>>>,
+        rand: &mut R,
         state: &mut S,
+        testcase: Rc<RefCell<Testcase<I>>>,
     ) -> Result<(), AflError> {
-        let num = self.iterations(state.rand_mut());
+        let num = self.iterations(rand);
         let input = testcase.borrow_mut().load_input()?.clone();
 
         for i in 0..num {
             let mut input_tmp = input.clone();
-            self.mutator_mut().mutate(state, &mut input_tmp, i as i32)?;
+            self.mutator_mut()
+                .mutate(rand, state, &mut input_tmp, i as i32)?;
 
             let interesting = state.evaluate_input(&input_tmp)?;
 

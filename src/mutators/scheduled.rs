@@ -18,7 +18,7 @@ type MutationFunction<M, S, I> = fn(&mut M, &mut S, &mut I) -> Result<MutationRe
 
 pub trait ComposedByMutations<S, C, I, R>
 where
-    S: HasRand<R = R> + HasCorpus<C>,
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -36,7 +36,7 @@ where
 pub trait ScheduledMutator<S, C, I, R>:
     Mutator<S, C, I, R> + ComposedByMutations<S, C, I, R>
 where
-    S: HasRand<R = R> + HasCorpus<C>,
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -90,23 +90,19 @@ where
 
 impl<S, C, I, R> Mutator<S, C, I, R> for DefaultScheduledMutator<S, C, I, R>
 where
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
-    fn mutate(
-        &mut self,
-        corpus: &mut C,
-        rand: &mut R,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<(), AflError> {
-        self.scheduled_mutate(corpus, rand, input, _stage_idx)
+    fn mutate(&mut self, state: &mut S, input: &mut I, _stage_idx: i32) -> Result<(), AflError> {
+        self.scheduled_mutate(state, input, _stage_idx)
     }
 }
 
 impl<S, C, I, R> ComposedByMutations<S, C, I, R> for DefaultScheduledMutator<S, C, I, R>
 where
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -127,8 +123,9 @@ where
     }
 }
 
-impl<C, I, R> ScheduledMutator<C, I, R> for DefaultScheduledMutator<C, I, R>
+impl<S, C, I, R> ScheduledMutator<S, C, I, R> for DefaultScheduledMutator<S, C, I, R>
 where
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -136,8 +133,9 @@ where
     // Just use the default methods
 }
 
-impl<C, I, R> DefaultScheduledMutator<C, I, R>
+impl<S, C, I, R> DefaultScheduledMutator<S, C, I, R>
 where
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -156,19 +154,19 @@ where
 }
 
 /// Bitflip mutation for inputs with a bytes vector
-pub fn mutation_bitflip<M, C, R, I>(
+pub fn mutation_bitflip<M, S, C, R, I>(
     mutator: &mut M,
-    _corpus: &mut C,
-    rand: &mut R,
+    state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
+    M: Mutator<S, C, I, R>,
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
-    let bit = rand.below((input.bytes().len() * 8) as u64) as usize;
+    let bit = state.rand_mut().below((input.bytes().len() * 8) as u64) as usize;
     input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
     Ok(MutationResult::Mutated)
 }
@@ -190,14 +188,14 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 }
 
 /// Splicing mutator
-pub fn mutation_splice<C, M, R, I>(
+pub fn mutation_splice<M, S, C, R, I>(
     mutator: &mut M,
-    corpus: &mut C,
-    rand: &mut R,
+    state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
+    M: Mutator<S, C, I, R>,
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
@@ -206,7 +204,7 @@ where
     // We don't want to use the testcase we're already using for splicing
     let other_rr = loop {
         let mut found = false;
-        let (other_rr, _) = corpus.random_entry(rand)?.clone();
+        let (other_rr, _) = state.corpus_mut().random_entry(state.rand_mut())?.clone();
         match other_rr.try_borrow_mut() {
             Ok(_) => found = true,
             Err(_) => {

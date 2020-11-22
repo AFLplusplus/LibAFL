@@ -8,7 +8,7 @@ use core::fmt::Debug;
 
 use hashbrown::HashMap;
 
-use crate::corpus::{Corpus, Testcase};
+use crate::corpus::{Corpus, HasCorpus, Testcase};
 use crate::events::EventManager;
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
@@ -18,16 +18,17 @@ use crate::stages::Stage;
 use crate::utils::{HasRand, Rand};
 use crate::AflError;
 
+// TODO FeedbackMetadata to store histroy_map
+
 pub trait StateMetadata: Debug {
     /// The name of this metadata - used to find it in the list of avaliable metadatas
     fn name(&self) -> &'static str;
 }
 
-pub trait State<C, E, EM, I, R>: HasRand<R = R>
+pub trait State<C, E, I, R>: HasCorpus<C, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
     R: Rand,
 {
@@ -36,10 +37,6 @@ where
 
     /// Set executions
     fn set_executions(&mut self, executions: usize);
-
-    fn events_manager(&self) -> &EM;
-
-    fn events_manager_mut(&mut self) -> &mut EM;
 
     /// Get all the metadatas into an HashMap
     fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>>;
@@ -90,12 +87,6 @@ where
         self.feedbacks_mut().push(feedback);
     }
 
-    /// Return the corpus
-    fn corpus(&self) -> &C;
-
-    /// Return the corpus (mutable)
-    fn corpus_mut(&mut self) -> &mut C;
-
     /// Return the executor
     fn executor(&self) -> &E;
 
@@ -129,47 +120,43 @@ where
     }
 }
 
-pub struct DefaultState<C, E, EM, I, R>
+pub struct DefaultState<C, E, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
     R: Rand,
 {
-    rand: R,
     executions: usize,
-    events_manager: EM,
     metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
+    // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
     observers: Vec<Rc<RefCell<dyn Observer>>>,
     feedbacks: Vec<Box<dyn Feedback<I>>>,
     corpus: C,
     executor: E,
 }
 
-impl<C, E, EM, I, R> HasRand for DefaultState<C, E, EM, I, R>
+impl<C, E, I, R> HasCorpus<C, I, R> for DefaultState<C, E, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
     R: Rand,
 {
-    type R = R;
-
-    fn rand(&self) -> &Self::R {
-        &self.rand
+    fn corpus(&self) -> &C {
+        &self.corpus
     }
-    fn rand_mut(&mut self) -> &mut Self::R {
-        &mut self.rand
+
+    /// Get thecorpus field (mutable)
+    fn corpus_mut(&mut self) -> &mut C {
+        &mut self.corpus
     }
 }
 
-impl<C, E, EM, I, R> State<C, E, EM, I, R> for DefaultState<C, E, EM, I, R>
+impl<C, E, I, R> State<C, E, I, R> for DefaultState<C, E, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
     R: Rand,
 {
@@ -179,13 +166,6 @@ where
 
     fn set_executions(&mut self, executions: usize) {
         self.executions = executions
-    }
-
-    fn events_manager(&self) -> &EM {
-        &self.events_manager
-    }
-    fn events_manager_mut(&mut self) -> &mut EM {
-        &mut self.events_manager
     }
 
     fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>> {
@@ -212,14 +192,6 @@ where
         &mut self.feedbacks
     }
 
-    fn corpus(&self) -> &C {
-        &self.corpus
-    }
-
-    fn corpus_mut(&mut self) -> &mut C {
-        &mut self.corpus
-    }
-
     fn executor(&self) -> &E {
         &self.executor
     }
@@ -229,19 +201,16 @@ where
     }
 }
 
-impl<C, E, EM, I, R> DefaultState<C, E, EM, I, R>
+impl<C, E, I, R> DefaultState<C, E, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    EM: EventManager,
     I: Input,
     R: Rand,
 {
-    pub fn new(corpus: C, executor: E, events_manager: EM, rand: R) -> Self {
+    pub fn new(corpus: C, executor: E) -> Self {
         DefaultState {
-            rand: rand,
             executions: 0,
-            events_manager: events_manager,
             metadatas: HashMap::default(),
             observers: vec![],
             feedbacks: vec![],
@@ -253,23 +222,28 @@ where
 
 pub trait Engine<S, C, E, EM, I, R>
 where
-    S: State<C, E, EM, I, R>,
+    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     EM: EventManager,
     I: Input,
     R: Rand,
 {
-    fn stages(&self) -> &[Box<dyn Stage<S, C, E, EM, I, R>>];
+    fn stages(&self) -> &[Box<dyn Stage<S, C, E, I, R>>];
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<S, C, E, EM, I, R>>>;
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<S, C, E, I, R>>>;
 
-    fn add_stage(&mut self, stage: Box<dyn Stage<S, C, E, EM, I, R>>) {
+    fn add_stage(&mut self, stage: Box<dyn Stage<S, C, E, I, R>>) {
         self.stages_mut().push(stage);
     }
 
-    fn fuzz_one(&mut self, state: &mut S) -> Result<usize, AflError> {
-        let (testcase, idx) = state.corpus_mut().next(state.rand_mut())?;
+    fn fuzz_one(
+        &mut self,
+        rand: &mut R,
+        state: &mut S,
+        events_manager: &mut EM,
+    ) -> Result<usize, AflError> {
+        let (testcase, idx) = state.corpus_mut().next(rand)?;
         println!("Cur entry: {}\tExecutions: {}", idx, state.executions());
         for stage in self.stages_mut() {
             stage.perform(testcase.clone(), state)?;
@@ -287,30 +261,30 @@ where
     I: Input,
     R: Rand,
 {
-    stages: Vec<Box<dyn Stage<S, C, E, EM, I, R>>>,
+    stages: Vec<Box<dyn Stage<S, C, E, I, R>>>,
 }
 
 impl<S, C, E, EM, I, R> Engine<S, C, E, EM, I, R> for DefaultEngine<S, C, E, EM, I, R>
 where
-    S: State<C, E, EM, I, R>,
+    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     EM: EventManager,
     I: Input,
     R: Rand,
 {
-    fn stages(&self) -> &[Box<dyn Stage<S, C, E, EM, I, R>>] {
+    fn stages(&self) -> &[Box<dyn Stage<S, C, E, I, R>>] {
         &self.stages
     }
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<S, C, E, EM, I, R>>> {
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<S, C, E, I, R>>> {
         &mut self.stages
     }
 }
 
 impl<S, C, E, EM, I, R> DefaultEngine<S, C, E, EM, I, R>
 where
-    S: State<C, E, EM, I, R>,
+    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     EM: EventManager,

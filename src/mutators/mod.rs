@@ -12,7 +12,7 @@ use crate::AflError;
 
 pub trait Mutator<S, C, I, R>
 where
-    S: HasRand<R = R> + HasCorpus<C>,
+    S: HasRand<R> + HasCorpus<C, I, R>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
