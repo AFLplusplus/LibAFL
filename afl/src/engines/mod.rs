@@ -26,7 +26,7 @@ pub trait StateMetadata: Debug {
 
 pub trait State<C, E, I, R>: HasCorpus<C, I, R>
 where
-    C: Corpus<I>,
+    C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
 {

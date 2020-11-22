@@ -1,17 +1,14 @@
 [package]
-name = "libfuzzer"
+name = "afl_derives"
 version = "0.1.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[features]
-default = ["std"]
-std = []
-
 [dependencies]
-afl = { path = "../../afl/" }
+syn = "0.15"
+quote = "0.6"
 
 [lib]
-crate-type = ["staticlib", "cdylib"]
+proc-macro = true
