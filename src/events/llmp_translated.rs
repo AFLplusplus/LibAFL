@@ -53,7 +53,7 @@ use ::libc;
 use core::sync::atomic::{compiler_fence, Ordering};
 use libc::{c_int, c_uint, c_ulong, c_ushort, c_void};
 use std::process::exit;
-use std::str;
+use std::ffi::CStr;
 
 use crate::AflError;
 use crate::utils::next_pow2;
@@ -680,7 +680,7 @@ pub unsafe extern "C" fn llmp_broker_alloc_next(
 Be careful: Intenral realloc may change the location of the client map */
 unsafe fn llmp_broker_register_client(
     mut broker: *mut llmp_broker_state,
-    shm_str: &str,
+    shm_str: &CStr,
     map_size: c_ulong,
 ) -> *mut llmp_broker_client_metadata {
     /* make space for a new client and calculate its id */
@@ -780,7 +780,7 @@ unsafe fn llmp_broker_handle_new_msgs(
             afl_shmem_deinit(client_map);
             if afl_shmem_by_str(
                 client_map,
-                str::from_utf8(&(*pageinfo).shm_str).unwrap(),
+                CStr::from_bytes_with_nul(&(*pageinfo).shm_str).expect("Illegal shm_str"),
                 (*pageinfo).map_size,
             )
             .is_null()
@@ -811,7 +811,7 @@ unsafe fn llmp_broker_handle_new_msgs(
             let client_id: u32 = (*(*client).client_state).id;
             if llmp_broker_register_client(
                 broker,
-                str::from_utf8(&(*pageinfo).shm_str).unwrap(),
+                CStr::from_bytes_with_nul(&(*pageinfo).shm_str).expect("Illegal shm_str"),
                 (*pageinfo).map_size,
             )
             .is_null()
@@ -901,8 +901,7 @@ pub unsafe extern "C" fn llmp_broker_once(broker: *mut llmp_broker_state) {
 }
 /* The broker walks all pages and looks for changes, then broadcasts them on
  * its own shared page */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_loop(broker: *mut llmp_broker_state) {
+pub unsafe fn llmp_broker_loop(broker: *mut llmp_broker_state) -> !{
     loop {
         compiler_fence(Ordering::SeqCst);
         llmp_broker_once(broker);
@@ -1000,8 +999,8 @@ pub unsafe extern "C" fn llmp_broker_launch_client(
     }
     //return 1 as c_int != 0;
 }
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_launch_clientloops(broker: *mut llmp_broker_state) -> bool {
+
+pub unsafe fn llmp_broker_launch_clientloops(broker: *mut llmp_broker_state) -> Result<(), AflError> {
     let mut i: c_ulong = 0;
     while i < (*broker).llmp_client_count {
         if (*(*broker).llmp_clients.offset(i as isize)).client_type as c_uint
@@ -1009,13 +1008,14 @@ pub unsafe extern "C" fn llmp_broker_launch_clientloops(broker: *mut llmp_broker
         {
             if !llmp_broker_launch_client(broker, &mut *(*broker).llmp_clients.offset(i as isize)) {
                 println!("[!] WARNING: Could not launch all clients");
-                return 0 as c_int != 0;
+                return Err(AflError::Unknown("Failed to launch clients".into()))
             }
         }
         i = i.wrapping_add(1)
     }
-    return 1 as c_int != 0;
+    Ok(())
 }
+
 /* The broker walks all pages and looks for changes, then broadcasts them on
 its own shared page.
 Never returns. */
@@ -1023,11 +1023,11 @@ Never returns. */
 Same as llmp_broker_launch_threaded clients();
 Never returns. */
 /* Start all threads and the main broker. Never returns. */
-#[no_mangle]
-pub unsafe extern "C" fn llmp_broker_run(broker: *mut llmp_broker_state) {
-    llmp_broker_launch_clientloops(broker);
+pub unsafe fn llmp_broker_run(broker: *mut llmp_broker_state) -> ! {
+    llmp_broker_launch_clientloops(broker).expect("Failed to launch clients");
     llmp_broker_loop(broker);
 }
+
 /*
  For non zero-copy, we want to get rid of old pages with duplicate messages
  eventually. This function This funtion sees if we can unallocate older pages.
@@ -1127,7 +1127,7 @@ pub unsafe extern "C" fn llmp_client_recv(mut client: *mut llmp_client) -> *mut 
                 afl_shmem_deinit(broadcast_map);
                 if afl_shmem_by_str(
                     (*client).current_broadcast_map,
-                    str::from_utf8(&(*pageinfo).shm_str).unwrap(),
+                    CStr::from_bytes_with_nul(&(*pageinfo).shm_str).expect("Illegal shm_str"),
                     (*pageinfo).map_size,
                 )
                 .is_null()
@@ -1350,7 +1350,7 @@ pub unsafe fn llmp_broker_register_childprocess_clientloop(
         return Err(AflError::Unknown("Alloc".into()));
     }
     let mut client: *mut llmp_broker_client_metadata =
-        llmp_broker_register_client(broker, str::from_utf8(&client_map.shm_str).unwrap(), client_map.map_size);
+        llmp_broker_register_client(broker, CStr::from_ptr(&client_map.shm_str as *const i8), client_map.map_size);
     if client.is_null() {
         afl_shmem_deinit(&mut client_map);
         return Err(AflError::Unknown("Something in clients failed".into()));

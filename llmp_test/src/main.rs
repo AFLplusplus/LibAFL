@@ -10,7 +10,6 @@ fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) {
 }
 
 fn main() {
-
     let thread_count = 1;
 
     /* The main node has a broker, a tcp server, and a few worker threads */
@@ -24,45 +23,20 @@ fn main() {
         llmp_client_count: 0,
         llmp_clients: ptr::null_mut(),
     };
-    unsafe {llmp_broker_init(&mut broker).expect("Could not init")};
-    
-    unsafe {llmp_broker_register_childprocess_clientloop(&mut broker, llmp_test_clientloop, ptr::null_mut()).expect("could not add child clientloop")};
+    let thread_count = 4;
+    unsafe {
+        llmp_broker_init(&mut broker).expect("Could not init");
+        for i in 0..thread_count {
+            println!("Adding client {}", i);
+            llmp_broker_register_childprocess_clientloop(
+                &mut broker,
+                llmp_test_clientloop,
+                ptr::null_mut(),
+            )
+            .expect("could not add child clientloop");
+        }
 
-    /*unsafe {llmp_broker_register_threaded_clientloop(broker, llmp_clientloop_print_u32, NULL)) {
-
-      FATAL("error adding threaded client");
-
+        println!("Spawning broker");
+        llmp_broker_run(&mut broker);
     }
-
-    int i;
-    for (i = 0; i < thread_count; i++) {
-
-      if (!llmp_broker_register_threaded_clientloop(broker, llmp_clientloop_rand_u32, NULL)) {
-
-        FATAL("error adding threaded client");
-
-      }
-
-    }
-
-    OKF("Spawning main on port %d", port);
-    llmp_broker_run(broker);
-
-  } else {
-
-    if (thread_count > 1) { WARNF("Multiple threads not supported for clients."); }
-
-    OKF("Client will connect to port %d", port);
-    // Worker only needs to spawn client threads.
-    llmp_client_t *client_state = llmp_client_new(port);
-    if (!client_state) { FATAL("Error connecting to broker at port %d", port); }
-    llmp_clientloop_rand_u32(client_state, NULL);
-
-  }
-
-  FATAL("Unreachable");
-
-
-    println!("Hello, world!");
-    */
 }

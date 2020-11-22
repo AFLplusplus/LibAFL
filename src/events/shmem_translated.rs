@@ -1,5 +1,6 @@
 use ::libc;
 use libc::{c_int, c_uint, c_char, c_uchar, c_ushort, c_long, c_ulong, c_void};
+use std::ffi::CStr;
 
 extern "C" {
     #[no_mangle]
@@ -84,7 +85,7 @@ pub const AFL_RET_SUCCESS: c_uint = 0;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct afl_shmem {
-    pub shm_str: [u8; 20],
+    pub shm_str: [c_char; 20],
     pub shm_id: c_int,
     pub map: *mut c_uchar,
     pub map_size: c_ulong,
@@ -96,8 +97,8 @@ pub unsafe fn afl_shmem_deinit(mut shm: *mut afl_shmem) {
         // Not set or not initialized;
         return
     }
-    (*shm).shm_str[0 as c_int as usize] =
-        '\u{0}' as i32 as u8;
+    (*shm).shm_str[0 as usize] =
+        '\u{0}' as c_char;
     shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
     (*shm).map = 0 as *mut c_uchar;
 }
@@ -112,8 +113,8 @@ pub unsafe fn afl_shmem_init(mut shm: *mut afl_shmem,
                0o1000 as c_int | 0o2000 as c_int |
                    0o600 as c_int);
     if (*shm).shm_id < 0 as c_int {
-        (*shm).shm_str[0 as c_int as usize] =
-            '\u{0}' as i32 as u8;
+        (*shm).shm_str[0] =
+            '\u{0}' as c_char;
         return 0 as *mut c_uchar
     }
     snprintf((*shm).shm_str.as_mut_ptr() as *mut i8,
@@ -122,7 +123,7 @@ pub unsafe fn afl_shmem_init(mut shm: *mut afl_shmem,
     (*shm).shm_str[(::std::mem::size_of::<[c_char; 20]>() as
                         c_ulong).wrapping_sub(1 as c_int as
                                                         c_ulong) as
-                       usize] = '\u{0}' as i32 as u8;
+                       usize] = '\u{0}' as c_char;
     (*shm).map =
         shmat((*shm).shm_id, 0 as *const c_void, 0 as c_int) as
             *mut c_uchar;
@@ -131,16 +132,16 @@ pub unsafe fn afl_shmem_init(mut shm: *mut afl_shmem,
         shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
         (*shm).shm_id = -(1 as c_int);
         (*shm).shm_str[0 as c_int as usize] =
-            '\u{0}' as i32 as u8;
+            '\u{0}' as c_char;
         return 0 as *mut c_uchar
     }
     return (*shm).map;
 }
 
 pub unsafe fn afl_shmem_by_str(mut shm: *mut afl_shmem,
-                                          shm_str: &str,
+                                          shm_str: &CStr,
                                           map_size: c_ulong) -> *mut c_uchar {
-    if shm.is_null() || shm_str.len() == 0 || map_size == 0 {
+    if shm.is_null() || shm_str.to_bytes().len() == 0 || map_size == 0 {
         return 0 as *mut c_uchar
     }
     (*shm).map = 0 as *mut c_uchar;
@@ -149,7 +150,7 @@ pub unsafe fn afl_shmem_by_str(mut shm: *mut afl_shmem,
             (::std::mem::size_of::<[c_char; 20]>() as
                  c_ulong).wrapping_sub(1 as c_int as
                                                  c_ulong));
-    (*shm).shm_id = shm_str.parse::<i32>().unwrap();
+    (*shm).shm_id = shm_str.to_str().expect(&format!("illegal shm_str {:?}", shm_str)).parse::<i32>().unwrap();
     (*shm).map =
         shmat((*shm).shm_id, 0 as *const c_void, 0 as c_int) as
             *mut c_uchar;
@@ -157,7 +158,7 @@ pub unsafe fn afl_shmem_by_str(mut shm: *mut afl_shmem,
         (*shm).map = 0 as *mut c_uchar;
         (*shm).map_size = 0 as c_int as c_ulong;
         (*shm).shm_str[0 as c_int as usize] =
-            '\u{0}' as i32 as u8;
+            '\u{0}' as c_char;
         return 0 as *mut c_uchar
     }
     return (*shm).map;
@@ -166,9 +167,10 @@ pub unsafe fn afl_shmem_by_str(mut shm: *mut afl_shmem,
 /* Write sharedmap as env var */
 /* Write sharedmap as env var and the size as name#_SIZE */
 pub unsafe fn afl_shmem_to_env_var(shmem: *mut afl_shmem,
-                                              env_name: &str)
+                                              env_name: &CStr)
  -> c_uint {
-    if shmem.is_null() || env_name.len() == 0 || env_name.len() > 200 ||
+    let env_len = env_name.to_bytes().len();
+    if shmem.is_null() || env_len == 0 || env_len > 200 ||
            (*shmem).shm_str[0 as c_int as usize] == 0 {
         return AFL_RET_NULL_PTR
     }
