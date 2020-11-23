@@ -5,9 +5,13 @@ pub use scheduled::ScheduledMutator;
 pub use scheduled::StdScheduledMutator;
 
 use crate::corpus::Corpus;
+use crate::corpus::Testcase;
 use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
+
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 pub trait Mutator<C, I, R>
 where
@@ -25,7 +29,12 @@ where
     ) -> Result<(), AflError>;
 
     /// Post-process given the outcome of the execution
-    fn post_exec(&mut self, _is_interesting: bool, _stage_idx: i32) -> Result<(), AflError> {
+    fn post_exec(
+        &mut self,
+        _is_interesting: bool,
+        _new_testcase: Option<Rc<RefCell<Testcase<I>>>>,
+        _stage_idx: i32,
+    ) -> Result<(), AflError> {
         Ok(())
     }
 }

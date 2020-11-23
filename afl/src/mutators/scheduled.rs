@@ -156,7 +156,7 @@ where
 
 /// Bitflip mutation for inputs with a bytes vector
 pub fn mutation_bitflip<M, C, I, R>(
-    mutator: &mut M,
+    _mutator: &mut M,
     rand: &mut R,
     _corpus: &mut C,
     input: &mut I,
@@ -190,7 +190,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 
 /// Splicing mutator
 pub fn mutation_splice<M, C, I, R>(
-    mutator: &mut M,
+    _mutator: &mut M,
     rand: &mut R,
     corpus: &mut C,
     input: &mut I,

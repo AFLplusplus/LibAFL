@@ -46,20 +46,15 @@ where
         testcase: Rc<RefCell<Testcase<I>>>,
     ) -> Result<(), AflError> {
         let num = self.iterations(rand);
-        let input = testcase.borrow_mut().load_input()?.clone();
-
         for i in 0..num {
-            let mut input_tmp = input.clone();
+            let mut input = testcase.borrow_mut().load_input()?.clone();
             self.mutator_mut()
-                .mutate(rand, state.corpus_mut(), &mut input_tmp, i as i32)?;
+                .mutate(rand, state.corpus_mut(), &mut input, i as i32)?;
 
-            let interesting = state.evaluate_input(&input_tmp)?;
+            let (interesting, new_testcase) = state.evaluate_input(input)?;
 
-            self.mutator_mut().post_exec(interesting, i as i32)?;
-
-            if interesting {
-                state.corpus_mut().add(Testcase::new(input_tmp).into());
-            }
+            self.mutator_mut()
+                .post_exec(interesting, new_testcase, i as i32)?;
         }
         Ok(())
     }

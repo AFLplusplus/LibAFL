@@ -3,11 +3,11 @@
 
 int target_func(const uint8_t *buf, size_t size) {
 
-  printf("BUF (%ld): ", size);
+  /*printf("BUF (%ld): ", size);
   for (int i = 0; i < size; i++) {
       printf("%02X", buf[i]);
   }
-  printf("\n");
+  printf("\n");*/
   
   switch (buf[0]) {
 

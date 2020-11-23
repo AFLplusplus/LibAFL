@@ -13,6 +13,7 @@ use crate::corpus::{Corpus, HasCorpus, Testcase};
 use crate::events::EventManager;
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
+use crate::generators::Generator;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::stages::Stage;
@@ -95,30 +96,68 @@ where
     fn executor_mut(&mut self) -> &mut E;
 
     /// Runs the input and triggers observers and feedback
-    fn evaluate_input(&mut self, input: &I) -> Result<bool, AflError> {
+    fn evaluate_input(
+        &mut self,
+        input: I,
+    ) -> Result<(bool, Option<Rc<RefCell<Testcase<I>>>>), AflError> {
         self.reset_observers()?;
-        self.executor_mut().run_target(input)?;
+        self.executor_mut().run_target(&input)?;
         self.set_executions(self.executions() + 1);
         self.post_exec_observers()?;
 
-        let mut rate_acc = 0;
+        let mut fitness = 0;
         for feedback in self.feedbacks_mut() {
-            rate_acc += feedback.is_interesting(input)?;
+            fitness += feedback.is_interesting(&input)?;
         }
 
-        if rate_acc >= 25 {
-            let testcase = Rc::new(RefCell::new(Testcase::new(input.clone())));
+        if fitness >= 25 {
+            let testcase: Rc<RefCell<_>> = Testcase::new(input).into();
             for feedback in self.feedbacks_mut() {
                 feedback.append_metadata(testcase.clone())?;
             }
-            Ok(true)
+            testcase.borrow_mut().set_fitness(fitness);
+            self.corpus_mut().add(testcase.clone());
+            Ok((true, Some(testcase)))
         } else {
             for feedback in self.feedbacks_mut() {
                 feedback.discard_metadata()?;
             }
-            Ok(false)
+            Ok((false, None))
         }
     }
+
+    fn load_initial_input(&mut self, input: I) -> Result<(), AflError> {
+        // Inefficent clone, but who cares this is done once at init
+        let (_, testcase) = self.evaluate_input(input.clone())?;
+        if testcase.is_none() {
+            let testcase = Testcase::new(input).into();
+            self.corpus_mut().add(testcase);
+        }
+        Ok(())
+    }
+}
+
+pub fn generate_initial_inputs<S, G, C, E, I, R, EM>(
+    rand: &mut R,
+    state: &mut S,
+    generator: &mut G,
+    _events: &mut EM,
+    num: usize,
+) -> Result<(), AflError>
+where
+    S: State<C, E, I, R>,
+    G: Generator<I, R>,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+    EM: EventManager,
+{
+    for _ in 0..num {
+        let input = generator.generate(rand)?;
+        state.load_initial_input(input)?;
+    }
+    Ok(())
 }
 
 pub struct StdState<C, E, I, R>
@@ -247,11 +286,16 @@ where
         events: &mut EM,
     ) -> Result<usize, AflError> {
         let (testcase, idx) = state.corpus_mut().next(rand)?;
-        println!("Cur entry: {}\tExecutions: {}", idx, state.executions());
         for stage in self.stages_mut() {
             stage.perform(rand, state, events, testcase.clone())?;
         }
         Ok(idx)
+    }
+
+    fn fuzz_loop(&mut self, rand: &mut R, state: &mut S, events: &mut EM) -> Result<(), AflError> {
+        loop {
+            self.fuzz_one(rand, state, events)?;
+        }
     }
 }
 
