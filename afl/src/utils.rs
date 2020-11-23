@@ -9,7 +9,7 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub type StdRand = Xoshiro256StarRand;
+pub type StdRand = XorShift64Rand;
 
 /// Ways to get random around here
 pub trait Rand: Debug {
@@ -142,6 +142,60 @@ impl Into<Rc<RefCell<Self>>> for Xoshiro256StarRand {
 }
 
 impl Xoshiro256StarRand {
+    /// Creates a new Xoshiro rand with the given seed
+    pub fn new(seed: u64) -> Self {
+        let mut ret: Self = Default::default();
+        ret.set_seed(seed); // TODO: Proper random seed?
+        ret
+    }
+
+    pub fn to_rc_refcell(self) -> Rc<RefCell<Self>> {
+        self.into()
+    }
+
+    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+    /// Needs stdlib timer
+    #[cfg(feature = "std")]
+    pub fn preseeded() -> Self {
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        Self::new(seed)
+    }
+}
+
+/// XXH3 Based, hopefully speedy, rnd implementation
+///
+#[derive(Copy, Clone, Debug, Default)]
+pub struct XorShift64Rand {
+    rand_seed: u64,
+    seeded: bool,
+}
+
+impl Rand for XorShift64Rand {
+    fn set_seed(&mut self, seed: u64) {
+        self.rand_seed = seed;
+        self.seeded = true;
+    }
+
+    fn next(&mut self) -> u64 {
+        let mut x = self.rand_seed;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.rand_seed = x;
+        return x;
+    }
+}
+
+impl Into<Rc<RefCell<Self>>> for XorShift64Rand {
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+}
+
+impl XorShift64Rand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
         let mut ret: Self = Default::default();

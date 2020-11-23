@@ -39,7 +39,7 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut rand = StdRand::new(0);
 
     let corpus = InMemoryCorpus::new();
-    let mut generator = RandPrintablesGenerator::new(4096);
+    let mut generator = RandPrintablesGenerator::new(1);
     let mut events = LoggerEventManager::new(stderr());
 
     let edges_observer = Rc::new(RefCell::new(StdMapObserver::new_from_ptr(

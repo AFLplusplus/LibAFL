@@ -167,9 +167,13 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    let bit = rand.below((input.bytes().len() * 8) as u64) as usize;
-    input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
-    Ok(MutationResult::Mutated)
+    if input.bytes().len() == 0 {
+        Ok(MutationResult::Skipped)
+    } else {
+        let bit = rand.below((input.bytes().len() * 8) as u64) as usize;
+        input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
+        Ok(MutationResult::Mutated)
+    }
 }
 
 /// Returns the first and last diff position between the given vectors, stopping at the min len
@@ -292,7 +296,7 @@ where
     /// Create a new HavocBytesMutator instance given a ScheduledMutator to wrap
     pub fn new(mut scheduled: SM) -> Self {
         scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_splice);
+        //scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
             scheduled: scheduled,
             phantom: PhantomData,
@@ -310,7 +314,7 @@ where
     pub fn new_default() -> Self {
         let mut scheduled = StdScheduledMutator::<C, I, R>::new();
         scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_splice);
+        //scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
             scheduled: scheduled,
             phantom: PhantomData,

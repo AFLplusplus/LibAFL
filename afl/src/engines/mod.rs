@@ -321,8 +321,14 @@ where
     }
 
     fn fuzz_loop(&mut self, rand: &mut R, state: &mut S, events: &mut EM) -> Result<(), AflError> {
+        let mut last = current_milliseconds();
         loop {
             self.fuzz_one(rand, state, events)?;
+            let cur = current_milliseconds();
+            if cur - last > 60 * 100 {
+                last = cur;
+                fire_event!(events, LoadInitialEvent)?;
+            }
         }
     }
 }
