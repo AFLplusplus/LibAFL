@@ -126,7 +126,7 @@ where
             fitness += feedback.is_interesting(&input)?;
         }
 
-        if fitness >= 25 {
+        if fitness > 0 {
             let testcase: Rc<RefCell<_>> = Testcase::new(input).into();
             for feedback in self.feedbacks_mut() {
                 feedback.append_metadata(testcase.clone())?;

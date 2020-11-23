@@ -8,7 +8,7 @@ use afl::engines::{generate_initial_inputs, Engine, State, StdEngine, StdState};
 use afl::events::LoggerEventManager;
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
-use afl::feedbacks::{create_history_map, MaxMapFeedback};
+use afl::feedbacks::MaxMapTrackerFeedback;
 use afl::generators::RandPrintablesGenerator;
 use afl::mutators::scheduled::HavocBytesMutator;
 use afl::observers::StdMapObserver;
@@ -39,15 +39,14 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut rand = StdRand::new(0);
 
     let corpus = InMemoryCorpus::new();
-    let mut generator = RandPrintablesGenerator::new(1);
+    let mut generator = RandPrintablesGenerator::new(32);
     let mut events = LoggerEventManager::new(stderr());
 
     let edges_observer = Rc::new(RefCell::new(StdMapObserver::new_from_ptr(
         unsafe { __lafl_edges_map },
         unsafe { __lafl_max_edges_size as usize },
     )));
-    let edges_history_map = create_history_map::<u8>(MAP_SIZE);
-    let edges_feedback = MaxMapFeedback::new(edges_observer.clone(), edges_history_map);
+    let edges_feedback = MaxMapTrackerFeedback::new(edges_observer.clone(), MAP_SIZE);
 
     let executor = InMemoryExecutor::new(harness);
     let mut state = StdState::new(corpus, executor);

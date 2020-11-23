@@ -175,7 +175,7 @@ pub struct XorShift64Rand {
 
 impl Rand for XorShift64Rand {
     fn set_seed(&mut self, seed: u64) {
-        self.rand_seed = seed;
+        self.rand_seed = seed ^ 0x1234567890abcdef;
         self.seeded = true;
     }
 
@@ -196,6 +196,56 @@ impl Into<Rc<RefCell<Self>>> for XorShift64Rand {
 }
 
 impl XorShift64Rand {
+    /// Creates a new Xoshiro rand with the given seed
+    pub fn new(seed: u64) -> Self {
+        let mut ret: Self = Default::default();
+        ret.set_seed(seed); // TODO: Proper random seed?
+        ret
+    }
+
+    pub fn to_rc_refcell(self) -> Rc<RefCell<Self>> {
+        self.into()
+    }
+
+    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+    /// Needs stdlib timer
+    #[cfg(feature = "std")]
+    pub fn preseeded() -> Self {
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        Self::new(seed)
+    }
+}
+
+/// XXH3 Based, hopefully speedy, rnd implementation
+///
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Lehmer64Rand {
+    rand_seed: u128,
+    seeded: bool,
+}
+
+impl Rand for Lehmer64Rand {
+    fn set_seed(&mut self, seed: u64) {
+        self.rand_seed = (seed as u128) ^ 0x1234567890abcdef;
+        self.seeded = true;
+    }
+
+    fn next(&mut self) -> u64 {
+        self.rand_seed *= 0xda942042e4dd58b5;
+        return (self.rand_seed >> 64) as u64;
+    }
+}
+
+impl Into<Rc<RefCell<Self>>> for Lehmer64Rand {
+    fn into(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+}
+
+impl Lehmer64Rand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
         let mut ret: Self = Default::default();
