@@ -1,20 +1,15 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+use std::boxed::Box;
+use std::cell::RefCell;
+use std::io::stderr;
+use std::rc::Rc;
 
-#[macro_use]
-extern crate alloc;
-
-use alloc::boxed::Box;
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
-use afl::corpus::{Corpus, InMemoryCorpus, Testcase};
+use afl::corpus::InMemoryCorpus;
 use afl::engines::{generate_initial_inputs, Engine, State, StdEngine, StdState};
 use afl::events::LoggerEventManager;
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::{create_history_map, MaxMapFeedback};
-use afl::generators::{Generator, RandPrintablesGenerator};
-use afl::inputs::bytes::BytesInput;
+use afl::generators::RandPrintablesGenerator;
 use afl::mutators::scheduled::HavocBytesMutator;
 use afl::observers::StdMapObserver;
 use afl::stages::mutational::StdMutationalStage;
@@ -45,7 +40,7 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     let corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(4096);
-    let mut events = LoggerEventManager::new();
+    let mut events = LoggerEventManager::new(stderr());
 
     let edges_observer = Rc::new(RefCell::new(StdMapObserver::new_from_ptr(
         unsafe { __lafl_edges_map },

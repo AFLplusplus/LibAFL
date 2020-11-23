@@ -15,7 +15,7 @@ use core::cell::RefCell;
 pub trait Stage<S, EM, E, C, I, R>
 where
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,

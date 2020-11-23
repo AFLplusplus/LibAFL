@@ -10,15 +10,15 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 
 use crate::corpus::{Corpus, HasCorpus, Testcase};
-use crate::events::EventManager;
+use crate::events::{EventManager, LoadInitialEvent};
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
 use crate::generators::Generator;
 use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::stages::Stage;
-use crate::utils::Rand;
-use crate::AflError;
+use crate::utils::{current_milliseconds, Rand};
+use crate::{fire_event, AflError};
 
 // TODO FeedbackMetadata to store histroy_map
 
@@ -39,6 +39,22 @@ where
 
     /// Set executions
     fn set_executions(&mut self, executions: usize);
+
+    fn start_time(&self) -> u64;
+    fn set_start_time(&mut self, ms: u64);
+
+    fn executions_over_seconds(&self) -> u64 {
+        let elapsed = current_milliseconds() - self.start_time();
+        if elapsed == 0 {
+            return 0;
+        }
+        let elapsed = elapsed / 1000;
+        if elapsed == 0 {
+            0
+        } else {
+            (self.executions() as u64) / elapsed
+        }
+    }
 
     /// Get all the metadatas into an HashMap
     fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>>;
@@ -141,7 +157,7 @@ pub fn generate_initial_inputs<S, G, C, E, I, R, EM>(
     rand: &mut R,
     state: &mut S,
     generator: &mut G,
-    _events: &mut EM,
+    events: &mut EM,
     num: usize,
 ) -> Result<(), AflError>
 where
@@ -151,12 +167,14 @@ where
     E: Executor<I>,
     I: Input,
     R: Rand,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
 {
     for _ in 0..num {
         let input = generator.generate(rand)?;
         state.load_initial_input(input)?;
+        fire_event!(events, LoadInitialEvent)?;
     }
+    events.process(state)?;
     Ok(())
 }
 
@@ -168,6 +186,7 @@ where
     R: Rand,
 {
     executions: usize,
+    start_time: u64,
     metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
     // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
     observers: Vec<Rc<RefCell<dyn Observer>>>,
@@ -207,6 +226,13 @@ where
 
     fn set_executions(&mut self, executions: usize) {
         self.executions = executions
+    }
+
+    fn start_time(&self) -> u64 {
+        self.start_time
+    }
+    fn set_start_time(&mut self, ms: u64) {
+        self.start_time = ms
     }
 
     fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>> {
@@ -252,6 +278,7 @@ where
     pub fn new(corpus: C, executor: E) -> Self {
         StdState {
             executions: 0,
+            start_time: current_milliseconds(),
             metadatas: HashMap::default(),
             observers: vec![],
             feedbacks: vec![],
@@ -265,7 +292,7 @@ where
 pub trait Engine<S, EM, E, C, I, R>
 where
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -289,6 +316,7 @@ where
         for stage in self.stages_mut() {
             stage.perform(rand, state, events, testcase.clone())?;
         }
+        events.process(state)?;
         Ok(idx)
     }
 
@@ -302,7 +330,7 @@ where
 pub struct StdEngine<S, EM, E, C, I, R>
 where
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -315,7 +343,7 @@ where
 impl<S, EM, E, C, I, R> Engine<S, EM, E, C, I, R> for StdEngine<S, EM, E, C, I, R>
 where
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -333,7 +361,7 @@ where
 impl<S, EM, E, C, I, R> StdEngine<S, EM, E, C, I, R>
 where
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -351,6 +379,7 @@ where
 mod tests {
 
     use alloc::boxed::Box;
+    use std::io::stderr;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
     use crate::engines::{Engine, StdEngine, StdState};
@@ -377,7 +406,7 @@ mod tests {
         let executor = InMemoryExecutor::<BytesInput>::new(harness);
         let mut state = StdState::new(corpus, executor);
 
-        let mut events_manager = LoggerEventManager::new();
+        let mut events_manager = LoggerEventManager::new(stderr());
 
         let mut engine = StdEngine::new();
         let mut mutator = StdScheduledMutator::new();

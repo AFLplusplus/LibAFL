@@ -4,8 +4,9 @@ use core::marker::PhantomData;
 
 use crate::corpus::testcase::Testcase;
 use crate::engines::State;
-use crate::events::EventManager;
+use crate::events::{EventManager, NewTestcaseEvent};
 use crate::executors::Executor;
+use crate::fire_event;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
 use crate::stages::Corpus;
@@ -19,7 +20,7 @@ pub trait MutationalStage<M, S, EM, E, C, I, R>: Stage<S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -52,6 +53,9 @@ where
                 .mutate(rand, state.corpus_mut(), &mut input, i as i32)?;
 
             let (interesting, new_testcase) = state.evaluate_input(input)?;
+            if !new_testcase.is_none() {
+                fire_event!(events, NewTestcaseEvent)?;
+            }
 
             self.mutator_mut()
                 .post_exec(interesting, new_testcase, i as i32)?;
@@ -65,7 +69,7 @@ pub struct StdMutationalStage<M, S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -80,7 +84,7 @@ impl<M, S, EM, E, C, I, R> MutationalStage<M, S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -101,7 +105,7 @@ impl<M, S, EM, E, C, I, R> Stage<S, EM, E, C, I, R> for StdMutationalStage<M, S,
 where
     M: Mutator<C, I, R>,
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -122,7 +126,7 @@ impl<M, S, EM, E, C, I, R> StdMutationalStage<M, S, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
     S: State<C, E, I, R>,
-    EM: EventManager,
+    EM: EventManager<S, C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,

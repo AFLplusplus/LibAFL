@@ -10,12 +10,9 @@ use core::default::Default;
 use core::option::Option;
 use hashbrown::HashMap;
 
-#[cfg(feature = "std")]
-use std::fs::File;
-#[cfg(feature = "std")]
-use std::io::Write;
-#[cfg(feature = "std")]
-use std::path::Path;
+// TODO PathBuf for no_std and change filename to PathBuf
+//#[cfg(feature = "std")]
+//use std::path::PathBuf;
 
 // TODO: Give example
 /// Metadata for a testcase

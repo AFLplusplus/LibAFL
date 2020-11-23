@@ -165,6 +165,19 @@ impl Xoshiro256StarRand {
     }
 }
 
+#[cfg(feature = "std")]
+pub fn current_milliseconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+#[cfg(not(feature = "std"))]
+pub fn current_milliseconds() -> u64 {
+    1000
+}
+
 /// fake rand, for testing purposes
 #[cfg(test)]
 #[derive(Copy, Clone, Debug, Default)]
@@ -197,42 +210,6 @@ impl XKCDRand {
     }
 }
 
-/*
-/// A very basic HasRand
-pub struct StdHasRand<R>
-where
-    R: Rand,
-{
-    rand: Rc<RefCell<R>>,
-}
-
-/// A very basic HasRand
-impl<R> HasRand for StdHasRand<R>
-where
-    R: Rand,
-{
-    type R = R;
-
-    /// Get the rand rc refcell
-    fn rand(&self) -> &Rc<RefCell<R>> {
-        &self.rand
-    }
-}
-
-/// A very basic HasRand
-impl<R> StdHasRand<R>
-where
-    R: Rand,
-{
-    /// Create a new StdHasRand, cloning the refcell
-    pub fn new(rand: &Rc<RefCell<R>>) -> Self {
-        Self {
-            rand: Rc::clone(rand),
-        }
-    }
-}
-*/
-
 /// Get the next higher power of two
 pub const fn next_pow2(val: u64) -> u64 {
     let mut out = val.wrapping_sub(1);
@@ -246,7 +223,7 @@ pub const fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, HasRand, Rand, StdRand};
+    use crate::utils::{next_pow2, Rand, StdRand};
 
     #[test]
     fn test_rand() {
@@ -270,17 +247,6 @@ mod tests {
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }
-
-    /*
-    #[test]
-    fn test_has_rand() {
-        let rand = StdRand::new(0).into();
-        let has_rand = StdHasRand::new(&rand);
-
-        assert!(has_rand.rand_below(100) < 100);
-        assert_eq!(has_rand.rand_below(1), 0);
-    }
-    */
 
     #[test]
     fn test_next_pow2() {

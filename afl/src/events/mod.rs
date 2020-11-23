@@ -3,32 +3,46 @@ pub mod llmp_translated; // TODO: Abstract away.
 pub mod shmem_translated;
 pub use crate::events::llmp::LLMP;
 
-use core::any::{Any, TypeId};
+use core::any::Any;
+//use core::any::TypeId;
 use core::fmt::Display;
+// TODO use core version
+use std::io::Write;
 
+use crate::corpus::Corpus;
+use crate::engines::State;
+use crate::executors::Executor;
+use crate::inputs::Input;
+use crate::utils::Rand;
 use crate::AflError;
 
 pub trait Event: Display + Any {}
 
-pub trait EventManager {
+pub trait EventManager<S, C, E, I, R>
+where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+{
     /// Check if this EventaManager support a given Event type
-    fn enabled<E: Event>(&self) -> bool;
-    /* fn enabled<E: Event>(&self) -> bool {
-        match TypeId::of::<E>() {
-            TypeId::of::<MyEvent>() => true,
-            _ => false,
-        }
-    } */
+    fn enabled<T>(&self) -> bool
+    where
+        T: Event;
 
     /// Fire an Event
-    fn fire<E: Event>(&mut self, event: E) -> Result<(), AflError>;
+    fn fire<T>(&mut self, event: T) -> Result<(), AflError>
+    where
+        T: Event;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn lookup(&mut self) -> Result<usize, AflError>;
+    fn process(&mut self, state: &mut S) -> Result<usize, AflError>;
 }
 
 // e.g. fire_event!(manager, MyEvent, myparam1, ...)
+#[macro_export]
 macro_rules! fire_event {
     ($manager:expr, $event:ty, $( $x:expr ),+ ) => {
         {
@@ -50,53 +64,96 @@ macro_rules! fire_event {
     };
 }
 
-/*
-#[derive(Debug)]
-pub struct MyEvent {}
-impl Event for MyEvent {}
-impl MyEvent {
-    pub fn new() -> Self {
-        MyEvent {}
+pub struct LoadInitialEvent {}
+impl Event for LoadInitialEvent {}
+impl Display for LoadInitialEvent {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Load")
     }
 }
-
-pub fn my_event_test<M: EventManager>(manager: &mut M) {
-    fire_event!(manager, MyEvent).unwrap();
+impl LoadInitialEvent {
+    pub fn new() -> Self {
+        LoadInitialEvent {}
+    }
 }
-*/
 
 pub struct NewTestcaseEvent {}
 impl Event for NewTestcaseEvent {}
 impl Display for NewTestcaseEvent {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "[NewTestcase] idx: ")
+        write!(f, "New")
+    }
+}
+impl NewTestcaseEvent {
+    pub fn new() -> Self {
+        NewTestcaseEvent {}
     }
 }
 
-pub struct LoggerEventManager {}
+pub struct LoggerEventManager<W>
+where
+    W: Write,
+{
+    events: Vec<Box<dyn Event>>,
+    writer: W,
+}
 
-impl EventManager for LoggerEventManager {
-    fn enabled<E: Event>(&self) -> bool {
-        let _new_testcase = TypeId::of::<NewTestcaseEvent>();
-        match TypeId::of::<E>() {
-            _new_testcase => true,
-            //_ => false,
-        }
+impl<S, C, E, I, R, W> EventManager<S, C, E, I, R> for LoggerEventManager<W>
+where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+    W: Write,
+{
+    fn enabled<T>(&self) -> bool
+    where
+        T: Event,
+    {
+        true
+        /*let _load = TypeId::of::<LoadInitialEvent>();
+        let _new = TypeId::of::<NewTestcaseEvent>();
+        match TypeId::of::<T>() {
+            _load => true,
+            _new => true,
+            _ => false,
+        }*/
     }
 
-    fn fire<E: Event>(&mut self, _event: E) -> Result<(), AflError> {
-        #[cfg(feature = "std")]
-        println!("{}", _event);
+    fn fire<T>(&mut self, event: T) -> Result<(), AflError>
+    where
+        T: Event,
+    {
+        self.events.push(Box::new(event));
         Ok(())
     }
 
-    fn lookup(&mut self) -> Result<usize, AflError> {
-        Ok(0)
+    fn process(&mut self, state: &mut S) -> Result<usize, AflError> {
+        let num = self.events.len();
+        for event in &self.events {
+            writeln!(
+                &mut self.writer,
+                "#{}\t[{}] corp: {} exec/s: {}",
+                state.executions(),
+                event,
+                state.corpus().entries().len(),
+                state.executions_over_seconds()
+            )?;
+        }
+        self.events.clear();
+        Ok(num)
     }
 }
 
-impl LoggerEventManager {
-    pub fn new() -> Self {
-        LoggerEventManager {}
+impl<W> LoggerEventManager<W>
+where
+    W: Write,
+{
+    pub fn new(writer: W) -> Self {
+        LoggerEventManager {
+            events: vec![],
+            writer: writer,
+        }
     }
 }
