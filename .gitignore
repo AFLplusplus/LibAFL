@@ -10,4 +10,7 @@ Cargo.lock
 *.dll
 *.exe
 
+perf.data
+perf.data.old
+
 .vscode

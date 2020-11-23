@@ -24,7 +24,7 @@ where
     R: Rand,
 {
     /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> Result<MutationFunction<Self, C, I, R>, AflError>;
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<Self, C, I, R>;
 
     /// Get the number of mutations
     fn mutations_count(&self) -> usize;
@@ -41,7 +41,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&mut self, rand: &mut R, _input: &I) -> u64 {
-        1 << (1 + rand.below(7))
+        1 << (1 + rand.below(6))
     }
 
     /// Get the next mutation to apply
@@ -58,7 +58,7 @@ where
         {
             idx = rand.below(count) as usize;
         }
-        self.mutation_by_idx(idx)
+        Ok(self.mutation_by_idx(idx))
     }
 
     /// New default implementation for mutate
@@ -110,11 +110,8 @@ where
     I: Input,
     R: Rand,
 {
-    fn mutation_by_idx(&self, index: usize) -> Result<MutationFunction<Self, C, I, R>, AflError> {
-        if index >= self.mutations.len() {
-            return Err(AflError::Unknown("oob".into()));
-        }
-        Ok(self.mutations[index])
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<Self, C, I, R> {
+        self.mutations[index]
     }
 
     fn mutations_count(&self) -> usize {
@@ -170,8 +167,83 @@ where
     if input.bytes().len() == 0 {
         Ok(MutationResult::Skipped)
     } else {
-        let bit = rand.below((input.bytes().len() * 8) as u64) as usize;
-        input.bytes_mut()[bit >> 3] ^= (128 >> (bit & 7)) as u8;
+        let bit = rand.below((input.bytes().len() << 3) as u64) as usize;
+        unsafe {
+            // moar speed, no bound check
+            *input.bytes_mut().get_unchecked_mut(bit >> 3) ^= (128 >> (bit & 7)) as u8;
+        }
+        Ok(MutationResult::Mutated)
+    }
+}
+
+pub fn mutation_byteflip<M, C, I, R>(
+    _mutator: &mut M,
+    rand: &mut R,
+    _corpus: &mut C,
+    input: &mut I,
+) -> Result<MutationResult, AflError>
+where
+    M: Mutator<C, I, R>,
+    C: Corpus<I, R>,
+    I: Input + HasBytesVec,
+    R: Rand,
+{
+    if input.bytes().len() == 0 {
+        Ok(MutationResult::Skipped)
+    } else {
+        let idx = rand.below(input.bytes().len() as u64) as usize;
+        unsafe {
+            // moar speed, no bound check
+            *input.bytes_mut().get_unchecked_mut(idx) ^= 0xff;
+        }
+        Ok(MutationResult::Mutated)
+    }
+}
+
+pub fn mutation_byteinc<M, C, I, R>(
+    _mutator: &mut M,
+    rand: &mut R,
+    _corpus: &mut C,
+    input: &mut I,
+) -> Result<MutationResult, AflError>
+where
+    M: Mutator<C, I, R>,
+    C: Corpus<I, R>,
+    I: Input + HasBytesVec,
+    R: Rand,
+{
+    if input.bytes().len() == 0 {
+        Ok(MutationResult::Skipped)
+    } else {
+        let idx = rand.below(input.bytes().len() as u64) as usize;
+        unsafe {
+            // moar speed, no bound check
+            *input.bytes_mut().get_unchecked_mut(idx) += 1;
+        }
+        Ok(MutationResult::Mutated)
+    }
+}
+
+pub fn mutation_bytedec<M, C, I, R>(
+    _mutator: &mut M,
+    rand: &mut R,
+    _corpus: &mut C,
+    input: &mut I,
+) -> Result<MutationResult, AflError>
+where
+    M: Mutator<C, I, R>,
+    C: Corpus<I, R>,
+    I: Input + HasBytesVec,
+    R: Rand,
+{
+    if input.bytes().len() == 0 {
+        Ok(MutationResult::Skipped)
+    } else {
+        let idx = rand.below(input.bytes().len() as u64) as usize;
+        unsafe {
+            // moar speed, no bound check
+            *input.bytes_mut().get_unchecked_mut(idx) -= 1;
+        }
         Ok(MutationResult::Mutated)
     }
 }
@@ -205,26 +277,15 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    let mut retry_count = 0;
     // We don't want to use the testcase we're already using for splicing
-    let other_rr = loop {
-        let mut found = false;
-        let (other_rr, _) = corpus.random_entry(rand)?.clone();
-        match other_rr.try_borrow_mut() {
-            Ok(_) => found = true,
-            Err(_) => {
-                if retry_count == 20 {
-                    return Ok(MutationResult::Skipped);
-                }
-                retry_count += 1;
-            }
-        };
-        if found {
-            break other_rr;
+    let (other_rr, _) = corpus.random_entry(rand)?.clone();
+    let mut other_testcase = match other_rr.try_borrow_mut() {
+        Ok(x) => x,
+        Err(_) => {
+            return Ok(MutationResult::Skipped);
         }
     };
-    // This should work now, as we successfully try_borrow_mut'd before.
-    let mut other_testcase = other_rr.borrow_mut();
+
     let other = other_testcase.load_input()?;
     // println!("Input: {:?}, other input: {:?}", input.bytes(), other.bytes());
 
@@ -235,7 +296,7 @@ where
         if f != l && f >= 0 && l >= 2 {
             break (f, l);
         }
-        if counter == 20 {
+        if counter == 3 {
             return Ok(MutationResult::Skipped);
         }
         counter += 1;
@@ -245,10 +306,9 @@ where
 
     // println!("Splicing at {}", split_at);
 
-    let _: Vec<_> = input
+    input
         .bytes_mut()
-        .splice(split_at.., other.bytes()[split_at..].iter().cloned())
-        .collect();
+        .splice(split_at.., other.bytes()[split_at..].iter().cloned());
 
     // println!("Splice result: {:?}, input is now: {:?}", split_result, input.bytes());
 
@@ -314,7 +374,31 @@ where
     pub fn new_default() -> Self {
         let mut scheduled = StdScheduledMutator::<C, I, R>::new();
         scheduled.add_mutation(mutation_bitflip);
-        //scheduled.add_mutation(mutation_splice);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);
+
+        scheduled.add_mutation(mutation_byteflip);
+        scheduled.add_mutation(mutation_byteinc);
+        scheduled.add_mutation(mutation_bytedec);
+        scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
             scheduled: scheduled,
             phantom: PhantomData,

@@ -8,7 +8,7 @@ use afl::engines::{generate_initial_inputs, Engine, State, StdEngine, StdState};
 use afl::events::LoggerEventManager;
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
-use afl::feedbacks::MaxMapTrackerFeedback;
+use afl::feedbacks::MaxMapFeedback;
 use afl::generators::RandPrintablesGenerator;
 use afl::mutators::scheduled::HavocBytesMutator;
 use afl::observers::StdMapObserver;
@@ -46,7 +46,7 @@ pub extern "C" fn afl_libfuzzer_main() {
         unsafe { __lafl_edges_map },
         unsafe { __lafl_max_edges_size as usize },
     )));
-    let edges_feedback = MaxMapTrackerFeedback::new(edges_observer.clone(), MAP_SIZE);
+    let edges_feedback = MaxMapFeedback::new(edges_observer.clone(), MAP_SIZE);
 
     let executor = InMemoryExecutor::new(harness);
     let mut state = StdState::new(corpus, executor);
