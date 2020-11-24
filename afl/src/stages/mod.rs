@@ -1,10 +1,6 @@
 pub mod mutational;
 pub use mutational::StdMutationalStage;
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
-use crate::corpus::testcase::Testcase;
 use crate::corpus::Corpus;
 use crate::engines::State;
 use crate::events::EventManager;
@@ -27,7 +23,8 @@ where
         &mut self,
         rand: &mut R,
         state: &mut S,
+        corpus: &C,
         events: &mut EM,
-        testcase: Rc<RefCell<Testcase<I>>>,
+        input: &I,
     ) -> Result<(), AflError>;
 }

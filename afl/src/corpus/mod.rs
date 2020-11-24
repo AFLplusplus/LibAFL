@@ -2,10 +2,10 @@ pub mod testcase;
 pub use testcase::{Testcase, TestcaseMetadata};
 
 use alloc::borrow::ToOwned;
-use alloc::rc::Rc;
 use alloc::vec::Vec;
-use core::cell::RefCell;
 use core::marker::PhantomData;
+use core::ptr;
+
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
@@ -18,10 +18,10 @@ where
     I: Input,
 {
     /// Get the entries vector field
-    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>];
+    fn entries(&self) -> &[Testcase<I>];
 
     /// Get the entries vector field (mutable)
-    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>>;
+    fn entries_mut(&mut self) -> &mut Vec<Testcase<I>>;
 }
 
 /// Corpus with all current testcases
@@ -36,57 +36,74 @@ where
     }
 
     /// Add an entry to the corpus
-    fn add(&mut self, testcase: Rc<RefCell<Testcase<I>>>) {
+    fn add(&mut self, testcase: Testcase<I>) {
         self.entries_mut().push(testcase);
     }
 
+    /// Replaces the testcase at the given idx
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), AflError> {
+        if self.entries_mut().len() < idx {
+            return Err(AflError::KeyNotFound(format!(
+                "Index {} out of bounds",
+                idx
+            )));
+        }
+        self.entries_mut()[idx] = testcase;
+        Ok(())
+    }
+
+    /// Get by id
+    fn get(&self, idx: usize) -> &Testcase<I> {
+        &self.entries()[idx]
+    }
+
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, entry: &Testcase<I>) -> Option<Rc<RefCell<Testcase<I>>>> {
-        let mut i: usize = 0;
-        let mut found = false;
-        for x in self.entries() {
-            i = i + 1;
-            if &*x.borrow() as *const _ == entry as *const _ {
-                // TODO check if correct
-                found = true;
-                break;
-            }
+    fn remove(&mut self, entry: &Testcase<I>) -> Option<Testcase<I>> {
+        match self.entries().iter().position(|x| ptr::eq(x, entry)) {
+            Some(i) => Some(self.entries_mut().remove(i)),
+            None => None,
         }
-        if !found {
-            return None;
-        }
-        Some(self.entries_mut().remove(i))
     }
 
     /// Gets a random entry
-    fn random_entry(&self, rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
+    fn random_entry(&self, rand: &mut R) -> Result<(&Testcase<I>, usize), AflError> {
         if self.count() == 0 {
             Err(AflError::Empty("No entries in corpus".to_owned()))
         } else {
             let len = { self.entries().len() };
             let id = rand.below(len as u64) as usize;
-            Ok((self.entries()[id].clone(), id))
+            Ok((self.get(id), id))
         }
+    }
+
+    /// Returns the testcase for the given idx, with loaded input
+    fn load_testcase(&mut self, idx: usize) -> Result<(), AflError> {
+        let testcase = self.get(idx);
+        // Ensure testcase is loaded
+        match testcase.input() {
+            None => {
+                let new_testcase = match testcase.filename() {
+                    Some(filename) => Testcase::load_from_disk(filename)?,
+                    None => {
+                        return Err(AflError::IllegalState(
+                            "Neither input, nor filename specified for testcase".into(),
+                        ))
+                    }
+                };
+
+                self.replace(idx, new_testcase)?;
+            }
+            _ => (),
+        }
+        Ok(())
     }
 
     // TODO: IntoIter
     /// Gets the next entry
-    fn next(&mut self, rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
-        self.random_entry(rand)
-    }
-}
+    fn next(&mut self, rand: &mut R) -> Result<(&Testcase<I>, usize), AflError>;
 
-pub trait HasCorpus<C, I, R>
-where
-    C: Corpus<I, R>,
-    I: Input,
-    R: Rand,
-{
-    /// Get the corpus field
-    fn corpus(&self) -> &C;
-
-    /// Get thecorpus field (mutable)
-    fn corpus_mut(&mut self) -> &mut C;
+    /// Returns the testacase we currently use
+    fn current_testcase(&self) -> (&Testcase<I>, usize);
 }
 
 pub struct InMemoryCorpus<I, R>
@@ -94,7 +111,8 @@ where
     I: Input,
     R: Rand,
 {
-    entries: Vec<Rc<RefCell<Testcase<I>>>>,
+    entries: Vec<Testcase<I>>,
+    pos: usize,
     phantom: PhantomData<R>,
 }
 
@@ -103,10 +121,10 @@ where
     I: Input,
     R: Rand,
 {
-    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>] {
+    fn entries(&self) -> &[Testcase<I>] {
         &self.entries
     }
-    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
+    fn entries_mut(&mut self) -> &mut Vec<Testcase<I>> {
         &mut self.entries
     }
 }
@@ -116,7 +134,22 @@ where
     I: Input,
     R: Rand,
 {
-    // Just use the default implementation
+    /// Gets the next entry
+    fn next(&mut self, rand: &mut R) -> Result<(&Testcase<I>, usize), AflError> {
+        if self.count() == 0 {
+            Err(AflError::Empty("No entries in corpus".to_owned()))
+        } else {
+            let len = { self.entries().len() };
+            let id = rand.below(len as u64) as usize;
+            self.pos = id;
+            Ok((self.get(id), id))
+        }
+    }
+
+    /// Returns the testacase we currently use
+    fn current_testcase(&self) -> (&Testcase<I>, usize) {
+        (self.get(self.pos), self.pos)
+    }
 }
 
 impl<I, R> InMemoryCorpus<I, R>
@@ -127,6 +160,7 @@ where
     pub fn new() -> Self {
         InMemoryCorpus {
             entries: vec![],
+            pos: 0,
             phantom: PhantomData,
         }
     }
@@ -138,8 +172,9 @@ where
     I: Input,
     R: Rand,
 {
-    entries: Vec<Rc<RefCell<Testcase<I>>>>,
+    entries: Vec<Testcase<I>>,
     dir_path: PathBuf,
+    pos: usize,
     phantom: PhantomData<R>,
 }
 
@@ -149,10 +184,10 @@ where
     I: Input,
     R: Rand,
 {
-    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>] {
+    fn entries(&self) -> &[Testcase<I>] {
         &self.entries
     }
-    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
+    fn entries_mut(&mut self) -> &mut Vec<Testcase<I>> {
         &mut self.entries
     }
 }
@@ -164,14 +199,33 @@ where
     R: Rand,
 {
     /// Add an entry and save it to disk
-    fn add(&mut self, entry: Rc<RefCell<Testcase<I>>>) {
-        if *entry.borrow().filename() == None {
-            // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
-            let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
-            let filename_str = filename.to_str().expect("Invalid Path");
-            *entry.borrow_mut().filename_mut() = Some(filename_str.into());
+    fn add(&mut self, mut entry: Testcase<I>) {
+        match entry.filename() {
+            None => {
+                // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
+                let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
+                let filename_str = filename.to_str().expect("Invalid Path");
+                entry.set_filename(filename_str.into());
+            }
+            _ => {}
         }
         self.entries.push(entry);
+    }
+
+    fn current_testcase(&self) -> (&Testcase<I>, usize) {
+        (self.get(self.pos), self.pos)
+    }
+
+    /// Gets the next entry
+    fn next(&mut self, rand: &mut R) -> Result<(&Testcase<I>, usize), AflError> {
+        if self.count() == 0 {
+            Err(AflError::Empty("No entries in corpus".to_owned()))
+        } else {
+            let len = { self.entries().len() };
+            let id = rand.below(len as u64) as usize;
+            self.pos = id;
+            Ok((self.get(id), id))
+        }
     }
 
     // TODO save and remove files, cache, etc..., ATM use just InMemoryCorpus
@@ -187,6 +241,7 @@ where
         OnDiskCorpus {
             dir_path: dir_path,
             entries: vec![],
+            pos: 0,
             phantom: PhantomData,
         }
     }
@@ -211,10 +266,10 @@ where
     I: Input,
     R: Rand,
 {
-    fn entries(&self) -> &[Rc<RefCell<Testcase<I>>>] {
+    fn entries(&self) -> &[Testcase<I>] {
         self.corpus.entries()
     }
-    fn entries_mut(&mut self) -> &mut Vec<Rc<RefCell<Testcase<I>>>> {
+    fn entries_mut(&mut self) -> &mut Vec<Testcase<I>> {
         self.corpus.entries_mut()
     }
 }
@@ -230,22 +285,27 @@ where
         self.corpus.count()
     }
 
-    fn add(&mut self, entry: Rc<RefCell<Testcase<I>>>) {
+    fn add(&mut self, entry: Testcase<I>) {
         self.corpus.add(entry);
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, entry: &Testcase<I>) -> Option<Rc<RefCell<Testcase<I>>>> {
+    fn remove(&mut self, entry: &Testcase<I>) -> Option<Testcase<I>> {
         self.corpus.remove(entry)
     }
 
     /// Gets a random entry
-    fn random_entry(&self, rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
+    fn random_entry(&self, rand: &mut R) -> Result<(&Testcase<I>, usize), AflError> {
         self.corpus.random_entry(rand)
     }
 
+    /// Returns the testacase we currently use
+    fn current_testcase(&self) -> (&Testcase<I>, usize) {
+        (self.get(self.pos - 1), self.pos - 1)
+    }
+
     /// Gets the next entry
-    fn next(&mut self, _rand: &mut R) -> Result<(Rc<RefCell<Testcase<I>>>, usize), AflError> {
+    fn next(&mut self, _rand: &mut R) -> Result<(&Testcase<I>, usize), AflError> {
         self.pos += 1;
         if self.corpus.count() == 0 {
             return Err(AflError::Empty("Corpus".to_owned()));
@@ -255,7 +315,7 @@ where
             self.pos = 1;
             self.cycles += 1;
         }
-        Ok((self.corpus.entries()[self.pos - 1].clone(), self.pos - 1))
+        Ok((&self.corpus.entries()[self.pos - 1], self.pos - 1))
     }
 }
 
@@ -341,7 +401,6 @@ mod tests {
     use crate::inputs::bytes::BytesInput;
     use crate::utils::StdRand;
 
-    use alloc::rc::Rc;
     use std::path::PathBuf;
 
     #[test]
@@ -350,14 +409,12 @@ mod tests {
         let mut q = QueueCorpus::new(OnDiskCorpus::<BytesInput, StdRand>::new(PathBuf::from(
             "fancy/path",
         )));
-        let t: Rc<_> =
-            Testcase::with_filename(BytesInput::new(vec![0 as u8; 4]), "fancyfile".into()).into();
+        let t = Testcase::with_filename(BytesInput::new(vec![0 as u8; 4]), "fancyfile".into());
         q.add(t);
         let filename = q
             .next(&mut rand)
             .unwrap()
             .0
-            .borrow()
             .filename()
             .as_ref()
             .unwrap()
@@ -367,7 +424,6 @@ mod tests {
             q.next(&mut rand)
                 .unwrap()
                 .0
-                .borrow()
                 .filename()
                 .as_ref()
                 .unwrap()

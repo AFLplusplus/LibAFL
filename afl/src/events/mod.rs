@@ -8,8 +8,6 @@ pub mod shmem_translated;
 #[cfg(feature = "std")]
 pub use crate::events::llmp::LLMP;
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
 //use core::any::TypeId;
 #[cfg(feature = "std")]
 use std::io::Write;
@@ -87,7 +85,7 @@ pub struct NewTestcaseEvent<I>
 where
     I: Input,
 {
-    testcase: Rc<RefCell<Testcase<I>>>,
+    testcase: Testcase<I>,
 }
 
 impl<I> Event for NewTestcaseEvent<I>
@@ -103,11 +101,11 @@ impl<I> NewTestcaseEvent<I>
 where
     I: Input,
 {
-    pub fn new(testcase: Rc<RefCell<Testcase<I>>>) -> Self {
+    pub fn new(testcase: Testcase<I>) -> Self {
         NewTestcaseEvent { testcase: testcase }
     }
 
-    pub fn testcase(&self) -> &Rc<RefCell<Testcase<I>>> {
+    pub fn testcase(&self) -> &Testcase<I> {
         &self.testcase
     }
 }
@@ -170,10 +168,10 @@ where
         for event in &self.events {
             writeln!(
                 &mut self.writer,
-                "#{}\t[{}] corp: {} exec/s: {}",
+                "#{}\t[{}] exec/s: {}",
                 state.executions(),
                 event,
-                state.corpus().entries().len(),
+                //TODO: Count corpus.entries().len(),
                 state.executions_over_seconds()
             )?;
         }

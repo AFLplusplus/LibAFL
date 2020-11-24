@@ -18,12 +18,12 @@ where
     fn is_interesting(&mut self, input: &I) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
-    fn append_metadata(&mut self, _testcase: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+    fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self) -> Result<(), AflError> {
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }
 }
@@ -230,16 +230,16 @@ where
         Ok(interesting)
     }
 
-    fn append_metadata(&mut self, testcase: Rc<RefCell<Testcase<I>>>) -> Result<(), AflError> {
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
         let meta = Box::new(MapNoveltiesMetadata::new(core::mem::take(
             &mut self.novelties,
         )));
-        testcase.borrow_mut().add_metadata(meta);
+        testcase.add_metadata(meta);
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self) -> Result<(), AflError> {
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
         self.novelties.clear();
         Ok(())
     }

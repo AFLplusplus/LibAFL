@@ -51,17 +51,10 @@ impl<I> Testcase<I>
 where
     I: Input,
 {
-    /// Make sure to return a valid input instance loading it from disk if not in memory
-    pub fn load_input(&mut self) -> Result<&I, AflError> {
-        if self.input.is_none() {
-            let input = I::from_file(
-                self.filename
-                    .as_ref()
-                    .ok_or(AflError::EmptyOptional("filename not specified".into()))?,
-            )?;
-            self.input = Some(input);
-        }
-        Ok(self.input.as_ref().unwrap())
+    /// Returns this testcase with a loaded input
+    pub fn load_from_disk(filename: &str) -> Result<Self, AflError> {
+        let input = I::from_file(filename)?;
+        Ok(Testcase::new(input))
     }
 
     /// Get the input, if any

@@ -15,7 +15,7 @@ pub enum MutationResult {
 // TODO maybe the mutator arg is not needed
 /// The generic function type that identifies mutations
 type MutationFunction<M, C, I, R> =
-    fn(&mut M, &mut R, &mut C, &mut I) -> Result<MutationResult, AflError>;
+    fn(&mut M, &mut R, &C, &mut I) -> Result<MutationResult, AflError>;
 
 pub trait ComposedByMutations<C, I, R>
 where
@@ -66,7 +66,7 @@ where
     fn scheduled_mutate(
         &mut self,
         rand: &mut R,
-        corpus: &mut C,
+        corpus: &C,
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<(), AflError> {
@@ -96,7 +96,7 @@ where
     fn mutate(
         &mut self,
         rand: &mut R,
-        corpus: &mut C,
+        corpus: &C,
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<(), AflError> {
@@ -155,7 +155,7 @@ where
 pub fn mutation_bitflip<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    _corpus: &mut C,
+    _corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -179,7 +179,7 @@ where
 pub fn mutation_byteflip<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    _corpus: &mut C,
+    _corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -203,7 +203,7 @@ where
 pub fn mutation_byteinc<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    _corpus: &mut C,
+    _corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -227,7 +227,7 @@ where
 pub fn mutation_bytedec<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    _corpus: &mut C,
+    _corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -251,7 +251,7 @@ where
 pub fn mutation_byteneg<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    _corpus: &mut C,
+    _corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -292,7 +292,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 pub fn mutation_splice<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    corpus: &mut C,
+    corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -301,17 +301,15 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    // We don't want to use the testcase we're already using for splicing
-    let (other_rr, _) = corpus.random_entry(rand)?.clone();
-    let mut other_testcase = match other_rr.try_borrow_mut() {
-        Ok(x) => x,
-        Err(_) => {
-            return Ok(MutationResult::Skipped);
-        }
-    };
-
-    let other = other_testcase.load_input()?;
+    // TODO: Don't reuse the current testcase!
+    // (We don't want to use the testcase we're already using for splicing)
+    let (other_testcase, _) = corpus.random_entry(rand)?;
+    // TODO: let other = other_testcase.load_input()?;
     // println!("Input: {:?}, other input: {:?}", input.bytes(), other.bytes());
+    let other = match other_testcase.input() {
+        Some(i) => i,
+        None => return Ok(MutationResult::Skipped), // TODO!!
+    };
 
     let mut counter = 0;
     let (first_diff, last_diff) = loop {
@@ -362,7 +360,7 @@ where
     fn mutate(
         &mut self,
         rand: &mut R,
-        corpus: &mut C,
+        corpus: &C,
         input: &mut I,
         stage_idx: i32,
     ) -> Result<(), AflError> {
@@ -380,7 +378,7 @@ where
     /// Create a new HavocBytesMutator instance given a ScheduledMutator to wrap
     pub fn new(mut scheduled: SM) -> Self {
         scheduled.add_mutation(mutation_bitflip);
-        //scheduled.add_mutation(mutation_splice);
+        scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
             scheduled: scheduled,
             phantom: PhantomData,
@@ -432,12 +430,14 @@ where
 #[cfg(test)]
 mod tests {
     use crate::inputs::BytesInput;
-    use crate::mutators::scheduled::{mutation_splice, StdScheduledMutator};
+    use crate::mutators::scheduled::StdScheduledMutator;
     use crate::utils::{Rand, XKCDRand};
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::HasBytesVec,
     };
+
+    use super::mutation_splice;
 
     #[test]
     fn test_mut_splice() {
@@ -447,11 +447,10 @@ mod tests {
         corpus.add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into());
         corpus.add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into());
 
-        let (testcase_rr, _) = corpus
+        let (testcase, _) = corpus
             .next(&mut rand)
             .expect("Corpus did not contain entries");
-        let mut testcase = testcase_rr.borrow_mut();
-        let mut input = testcase.load_input().expect("No input in testcase").clone();
+        let mut input = testcase.input().as_ref().unwrap().clone();
 
         rand.set_seed(5);
         let mut mutator = StdScheduledMutator::new();

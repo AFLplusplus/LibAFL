@@ -8,7 +8,7 @@ use core::fmt::Debug;
 use core::marker::PhantomData;
 use hashbrown::HashMap;
 
-use crate::corpus::{Corpus, HasCorpus, Testcase};
+use crate::corpus::{Corpus, Testcase};
 use crate::events::{EventManager, LoadInitialEvent, UpdateStatsEvent};
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
@@ -26,7 +26,7 @@ pub trait StateMetadata: Debug {
     fn name(&self) -> &'static str;
 }
 
-pub trait State<C, E, I, R>: HasCorpus<C, I, R>
+pub trait State<C, E, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -111,10 +111,7 @@ where
     fn executor_mut(&mut self) -> &mut E;
 
     /// Runs the input and triggers observers and feedback
-    fn evaluate_input(
-        &mut self,
-        input: I,
-    ) -> Result<(bool, Option<Rc<RefCell<Testcase<I>>>>), AflError> {
+    fn evaluate_input(&mut self, input: &I) -> Result<u32, AflError> {
         self.reset_observers()?;
         self.executor_mut().run_target(&input)?;
         self.set_executions(self.executions() + 1);
@@ -124,29 +121,37 @@ where
         for feedback in self.feedbacks_mut() {
             fitness += feedback.is_interesting(&input)?;
         }
-
-        if fitness > 0 {
-            let testcase: Rc<RefCell<_>> = Testcase::new(input).into();
-            for feedback in self.feedbacks_mut() {
-                feedback.append_metadata(testcase.clone())?;
-            }
-            testcase.borrow_mut().set_fitness(fitness);
-            self.corpus_mut().add(testcase.clone());
-            Ok((true, Some(testcase)))
-        } else {
-            for feedback in self.feedbacks_mut() {
-                feedback.discard_metadata()?;
-            }
-            Ok((false, None))
-        }
+        Ok(fitness)
     }
 
-    fn load_initial_input(&mut self, input: I) -> Result<(), AflError> {
-        // Inefficent clone, but who cares this is done once at init
-        let (_, testcase) = self.evaluate_input(input.clone())?;
-        if testcase.is_none() {
-            let testcase = Testcase::new(input).into();
-            self.corpus_mut().add(testcase);
+    /// Resets all current feedbacks
+    fn discard_input(&mut self, input: &I) -> Result<(), AflError> {
+        // TODO: This could probably be automatic in the feedback somehow?
+        for feedback in self.feedbacks_mut() {
+            feedback.discard_metadata(input)?;
+        }
+        Ok(())
+    }
+
+    /// Creates a new testcase, appending the metadata from each feedback
+    fn input_to_testcase(&mut self, input: I, fitness: u32) -> Result<Testcase<I>, AflError> {
+        let mut testcase = Testcase::new(input);
+        testcase.set_fitness(fitness);
+        for feedback in self.feedbacks_mut() {
+            feedback.append_metadata(&mut testcase)?;
+        }
+
+        Ok(testcase)
+    }
+
+    /// Adds this input to the corpus, if it's intersting
+    fn add_input(&mut self, corpus: &mut C, input: I) -> Result<(), AflError> {
+        let fitness = self.evaluate_input(&input)?;
+        if fitness > 0 {
+            let testcase = self.input_to_testcase(input, fitness)?;
+            corpus.add(testcase);
+        } else {
+            self.discard_input(&input)?;
         }
         Ok(())
     }
@@ -155,6 +160,7 @@ where
 pub fn generate_initial_inputs<S, G, C, E, I, R, EM>(
     rand: &mut R,
     state: &mut S,
+    corpus: &mut C,
     generator: &mut G,
     events: &mut EM,
     num: usize,
@@ -170,7 +176,7 @@ where
 {
     for _ in 0..num {
         let input = generator.generate(rand)?;
-        state.load_initial_input(input)?;
+        state.add_input(corpus, input)?;
         fire_event!(events, LoadInitialEvent)?;
     }
     events.process(state)?;
@@ -190,26 +196,8 @@ where
     // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
     observers: Vec<Rc<RefCell<dyn Observer>>>,
     feedbacks: Vec<Box<dyn Feedback<I>>>,
-    corpus: C,
     executor: E,
-    phantom: PhantomData<R>,
-}
-
-impl<C, E, I, R> HasCorpus<C, I, R> for StdState<C, E, I, R>
-where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    I: Input,
-    R: Rand,
-{
-    fn corpus(&self) -> &C {
-        &self.corpus
-    }
-
-    /// Get thecorpus field (mutable)
-    fn corpus_mut(&mut self) -> &mut C {
-        &mut self.corpus
-    }
+    phantom: PhantomData<(C, R)>,
 }
 
 impl<C, E, I, R> State<C, E, I, R> for StdState<C, E, I, R>
@@ -274,14 +262,13 @@ where
     I: Input,
     R: Rand,
 {
-    pub fn new(corpus: C, executor: E) -> Self {
+    pub fn new(executor: E) -> Self {
         StdState {
             executions: 0,
             start_time: current_milliseconds(),
             metadatas: HashMap::default(),
             observers: vec![],
             feedbacks: vec![],
-            corpus: corpus,
             executor: executor,
             phantom: PhantomData,
         }
@@ -309,20 +296,38 @@ where
         &mut self,
         rand: &mut R,
         state: &mut S,
+        corpus: &mut C,
         events: &mut EM,
     ) -> Result<usize, AflError> {
-        let (testcase, idx) = state.corpus_mut().next(rand)?;
+        let (testcase, idx) = corpus.next(rand)?;
+        match testcase.input() {
+            None => {
+                // Load from disk.
+                corpus.load_testcase(idx)?;
+            }
+            _ => (),
+        };
+
+        let input = corpus.get(idx).input().as_ref().unwrap();
+
         for stage in self.stages_mut() {
-            stage.perform(rand, state, events, testcase.clone())?;
+            stage.perform(rand, state, corpus, events, &input)?;
         }
+
         events.process(state)?;
         Ok(idx)
     }
 
-    fn fuzz_loop(&mut self, rand: &mut R, state: &mut S, events: &mut EM) -> Result<(), AflError> {
+    fn fuzz_loop(
+        &mut self,
+        rand: &mut R,
+        state: &mut S,
+        corpus: &mut C,
+        events: &mut EM,
+    ) -> Result<(), AflError> {
         let mut last = current_milliseconds();
         loop {
-            self.fuzz_one(rand, state, events)?;
+            self.fuzz_one(rand, state, corpus, events)?;
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
@@ -414,7 +419,7 @@ mod tests {
         corpus.add(testcase);
 
         let executor = InMemoryExecutor::<BytesInput>::new(harness);
-        let mut state = StdState::new(corpus, executor);
+        let mut state = StdState::new(executor);
 
         let mut events_manager = LoggerEventManager::new(stderr());
 
@@ -428,7 +433,7 @@ mod tests {
 
         for i in 0..1000 {
             engine
-                .fuzz_one(&mut rand, &mut state, &mut events_manager)
+                .fuzz_one(&mut rand, &mut state, &mut corpus, &mut events_manager)
                 .expect(&format!("Error in iter {}", i));
         }
     }

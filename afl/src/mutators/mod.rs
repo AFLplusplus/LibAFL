@@ -4,11 +4,7 @@ pub use scheduled::HavocBytesMutator;
 pub use scheduled::ScheduledMutator;
 pub use scheduled::StdScheduledMutator;
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
 use crate::corpus::Corpus;
-use crate::corpus::Testcase;
 use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
@@ -23,7 +19,7 @@ where
     fn mutate(
         &mut self,
         rand: &mut R,
-        corpus: &mut C,
+        corpus: &C,
         input: &mut I,
         stage_idx: i32,
     ) -> Result<(), AflError>;
@@ -31,8 +27,8 @@ where
     /// Post-process given the outcome of the execution
     fn post_exec(
         &mut self,
-        _is_interesting: bool,
-        _new_testcase: Option<Rc<RefCell<Testcase<I>>>>,
+        _is_interesting: u32,
+        _input: &I,
         _stage_idx: i32,
     ) -> Result<(), AflError> {
         Ok(())

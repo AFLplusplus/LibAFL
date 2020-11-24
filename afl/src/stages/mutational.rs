@@ -1,17 +1,15 @@
-use alloc::rc::Rc;
-use core::cell::RefCell;
 use core::marker::PhantomData;
 
-use crate::corpus::testcase::Testcase;
 use crate::engines::State;
-use crate::events::{EventManager, NewTestcaseEvent};
+use crate::events::EventManager;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
 use crate::stages::Corpus;
 use crate::stages::Stage;
 use crate::utils::Rand;
-use crate::{fire_event, AflError};
+use crate::AflError;
+use crate::{events::NewTestcaseEvent, fire_event};
 
 // TODO multi mutators stage
 
@@ -42,22 +40,27 @@ where
         &mut self,
         rand: &mut R,
         state: &mut S,
+        corpus: &C,
         events: &mut EM,
-        testcase: Rc<RefCell<Testcase<I>>>,
+        input: &I,
     ) -> Result<(), AflError> {
         let num = self.iterations(rand);
         for i in 0..num {
-            let mut input = testcase.borrow_mut().load_input()?.clone();
+            let mut input_mut = input.clone();
             self.mutator_mut()
-                .mutate(rand, state.corpus_mut(), &mut input, i as i32)?;
+                .mutate(rand, corpus, &mut input_mut, i as i32)?;
 
-            let (interesting, new_testcase) = state.evaluate_input(input)?;
+            let interesting = state.evaluate_input(&input_mut)?;
 
             self.mutator_mut()
-                .post_exec(interesting, new_testcase.clone(), i as i32)?;
+                .post_exec(interesting, &input_mut, i as i32)?;
 
-            if !new_testcase.is_none() {
-                fire_event!(events, NewTestcaseEvent<I>, new_testcase.unwrap())?;
+            if interesting > 0 {
+                let new_testcase = state.input_to_testcase(input_mut, interesting)?;
+                fire_event!(events, NewTestcaseEvent<I>, new_testcase)?;
+            //state.corpus_mut().add(new_testcase); // TODO: Probably no longer needed, once events work
+            } else {
+                state.discard_input(&input_mut)?;
             }
         }
         Ok(())
@@ -115,10 +118,11 @@ where
         &mut self,
         rand: &mut R,
         state: &mut S,
+        corpus: &C,
         events: &mut EM,
-        testcase: Rc<RefCell<Testcase<I>>>,
+        input: &I,
     ) -> Result<(), AflError> {
-        self.perform_mutational(rand, state, events, testcase)
+        self.perform_mutational(rand, state, corpus, events, input)
     }
 }
 
