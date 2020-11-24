@@ -10,7 +10,7 @@ pub use crate::events::llmp::LLMP;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;
-//use core::any::TypeId;
+use core::fmt::Formatter;
 #[cfg(feature = "std")]
 use std::io::Write;
 
@@ -21,8 +21,43 @@ use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
+pub enum EventDestination {
+    Main,
+    Broker,
+    Clients,
+}
+
 pub trait Event {
-    fn name(&self) -> &'static str;
+    fn name() -> &'static str;
+
+    fn destination() -> EventDestination;
+
+    fn log<S, C, E, I, R>(&self, formatter: &mut Formatter, _state: &S) -> Result<(), AflError>
+    where
+        S: State<C, E, I, R>,
+        C: Corpus<I, R>,
+        E: Executor<I>,
+        I: Input,
+        R: Rand,
+    {
+        match write!(formatter, "[{}]", Self::name()) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(AflError::Unknown("write error".to_string())),
+        }
+    }
+
+    fn on_recv<S, C, E, I, R>(&self, _state: &mut S) -> Result<(), AflError>
+    where
+        S: State<C, E, I, R>,
+        C: Corpus<I, R>,
+        E: Executor<I>,
+        I: Input,
+        R: Rand,
+    {
+        Ok(())
+    }
+
+    // TODO serialize and deserialize, defaults to serde
 }
 
 pub trait EventManager<S, C, E, I, R>
@@ -34,6 +69,7 @@ where
     R: Rand,
 {
     /// Check if this EventaManager support a given Event type
+    /// To compare events, use Event::name().as_ptr()
     fn enabled<T>(&self) -> bool
     where
         T: Event;
@@ -73,8 +109,12 @@ macro_rules! fire_event {
 
 pub struct LoadInitialEvent {}
 impl Event for LoadInitialEvent {
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "LOAD"
+    }
+
+    fn destination() -> EventDestination {
+        EventDestination::Broker
     }
 }
 impl LoadInitialEvent {
@@ -94,8 +134,12 @@ impl<I> Event for NewTestcaseEvent<I>
 where
     I: Input,
 {
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "NEW"
+    }
+
+    fn destination() -> EventDestination {
+        EventDestination::Clients
     }
 }
 
@@ -114,13 +158,33 @@ where
 
 pub struct UpdateStatsEvent {}
 impl Event for UpdateStatsEvent {
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "STATS"
+    }
+
+    fn destination() -> EventDestination {
+        EventDestination::Broker
     }
 }
 impl UpdateStatsEvent {
     pub fn new() -> Self {
         UpdateStatsEvent {}
+    }
+}
+
+pub struct CrashEvent {}
+impl Event for CrashEvent {
+    fn name() -> &'static str {
+        "CRASH"
+    }
+
+    fn destination() -> EventDestination {
+        EventDestination::Broker
+    }
+}
+impl CrashEvent {
+    pub fn new() -> Self {
+        CrashEvent {}
     }
 }
 
@@ -148,20 +212,13 @@ where
         T: Event,
     {
         true
-        /*let _load = TypeId::of::<LoadInitialEvent>();
-        let _new = TypeId::of::<NewTestcaseEvent>();
-        match TypeId::of::<T>() {
-            _load => true,
-            _new => true,
-            _ => false,
-        }*/
     }
 
-    fn fire<T>(&mut self, event: T) -> Result<(), AflError>
+    fn fire<T>(&mut self, _event: T) -> Result<(), AflError>
     where
         T: Event,
     {
-        self.events.push(event.name().to_string());
+        self.events.push(T::name().to_string());
         Ok(())
     }
 
