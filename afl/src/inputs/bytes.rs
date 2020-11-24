@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::convert::From;
 
-use crate::AflError;
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
+use crate::AflError;
 
 /// A bytes input is the basic input
 #[derive(Clone, Debug, Default)]
@@ -68,7 +68,7 @@ impl BytesInput {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{next_pow2, StdRand, Rand};
+    use crate::utils::{next_pow2, Rand, StdRand};
 
     #[test]
     fn test_input() {

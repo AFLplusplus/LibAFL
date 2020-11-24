@@ -380,6 +380,8 @@ where
     }
 }
 
+// TODO: no_std test
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
 
@@ -403,7 +405,6 @@ mod tests {
         ExitKind::Ok
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn test_engine() {
         let mut rand = StdRand::new(0);

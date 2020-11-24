@@ -7,8 +7,8 @@ use core::default::Default;
 use core::option::Option;
 use hashbrown::HashMap;
 
-use crate::AflError;
 use crate::inputs::Input;
+use crate::AflError;
 
 // TODO PathBuf for no_std and change filename to PathBuf
 //#[cfg(feature = "std")]

@@ -1,14 +1,14 @@
+use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use num::Integer;
 
-use crate::AflError;
 use crate::corpus::{Testcase, TestcaseMetadata};
 use crate::inputs::Input;
 use crate::observers::MapObserver;
+use crate::AflError;
 
 pub trait Feedback<I>
 where
