@@ -54,7 +54,7 @@ where
 
             let (interesting, new_testcase) = state.evaluate_input(input)?;
             if !new_testcase.is_none() {
-                fire_event!(events, NewTestcaseEvent)?;
+                fire_event!(events, NewTestcaseEvent<I>, new_testcase.unwrap())?;
             }
 
             self.mutator_mut()

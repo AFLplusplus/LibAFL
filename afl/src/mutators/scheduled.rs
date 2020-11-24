@@ -248,6 +248,30 @@ where
     }
 }
 
+pub fn mutation_byteneg<M, C, I, R>(
+    _mutator: &mut M,
+    rand: &mut R,
+    _corpus: &mut C,
+    input: &mut I,
+) -> Result<MutationResult, AflError>
+where
+    M: Mutator<C, I, R>,
+    C: Corpus<I, R>,
+    I: Input + HasBytesVec,
+    R: Rand,
+{
+    if input.bytes().len() == 0 {
+        Ok(MutationResult::Skipped)
+    } else {
+        let idx = rand.below(input.bytes().len() as u64) as usize;
+        unsafe {
+            // moar speed, no bound check
+            *input.bytes_mut().get_unchecked_mut(idx) = !(*input.bytes().get_unchecked(idx));
+        }
+        Ok(MutationResult::Mutated)
+    }
+}
+
 /// Returns the first and last diff position between the given vectors, stopping at the min len
 fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     let mut first_diff: i64 = -1;
@@ -374,9 +398,11 @@ where
     pub fn new_default() -> Self {
         let mut scheduled = StdScheduledMutator::<C, I, R>::new();
         scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_byteflip);
+        scheduled.add_mutation(mutation_byteinc);
+        scheduled.add_mutation(mutation_bytedec);
+        scheduled.add_mutation(mutation_byteneg);
+
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_bitflip);
@@ -395,9 +421,6 @@ where
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_bitflip);
 
-        scheduled.add_mutation(mutation_byteflip);
-        scheduled.add_mutation(mutation_byteinc);
-        scheduled.add_mutation(mutation_bytedec);
         scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
             scheduled: scheduled,

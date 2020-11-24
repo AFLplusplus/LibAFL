@@ -3,20 +3,23 @@ pub mod llmp_translated; // TODO: Abstract away.
 pub mod shmem_translated;
 pub use crate::events::llmp::LLMP;
 
+use alloc::rc::Rc;
 use core::any::Any;
+use core::cell::RefCell;
 //use core::any::TypeId;
-use core::fmt::Display;
 // TODO use core version
 use std::io::Write;
 
-use crate::corpus::Corpus;
+use crate::corpus::{Corpus, Testcase};
 use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
-pub trait Event: Display + Any {}
+pub trait Event: Any {
+    fn name(&self) -> &'static str;
+}
 
 pub trait EventManager<S, C, E, I, R>
 where
@@ -65,10 +68,9 @@ macro_rules! fire_event {
 }
 
 pub struct LoadInitialEvent {}
-impl Event for LoadInitialEvent {}
-impl Display for LoadInitialEvent {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Load")
+impl Event for LoadInitialEvent {
+    fn name(&self) -> &'static str {
+        "LOAD"
     }
 }
 impl LoadInitialEvent {
@@ -77,16 +79,40 @@ impl LoadInitialEvent {
     }
 }
 
-pub struct NewTestcaseEvent {}
-impl Event for NewTestcaseEvent {}
-impl Display for NewTestcaseEvent {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "New")
+pub struct NewTestcaseEvent<I>
+where
+    I: Input,
+{
+    testcase: Rc<RefCell<Testcase<I>>>,
+}
+
+impl<I> Event<I> for NewTestcaseEvent<I>
+where
+    I: Input,
+{
+    fn name(&self) -> &'static str {
+        "NEW"
     }
 }
-impl NewTestcaseEvent {
+
+impl<I> NewTestcaseEvent<I>
+where
+    I: Input,
+{
+    pub fn new(testcase: Rc<RefCell<Testcase<I>>>) -> Self {
+        NewTestcaseEvent { testcase: testcase }
+    }
+}
+
+pub struct UpdateStatsEvent {}
+impl Event for UpdateStatsEvent {
+    fn name(&self) -> &'static str {
+        "STATS"
+    }
+}
+impl UpdateStatsEvent {
     pub fn new() -> Self {
-        NewTestcaseEvent {}
+        UpdateStatsEvent {}
     }
 }
 
@@ -136,7 +162,7 @@ where
                 &mut self.writer,
                 "#{}\t[{}] corp: {} exec/s: {}",
                 state.executions(),
-                event,
+                event.name(),
                 state.corpus().entries().len(),
                 state.executions_over_seconds()
             )?;
