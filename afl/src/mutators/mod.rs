@@ -1,8 +1,7 @@
 pub mod scheduled;
-pub use scheduled::ComposedByMutations;
-pub use scheduled::HavocBytesMutator;
-pub use scheduled::ScheduledMutator;
-pub use scheduled::StdScheduledMutator;
+pub use scheduled::*;
+pub mod mutations;
+pub use mutations::*;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;
@@ -37,4 +36,11 @@ where
     ) -> Result<(), AflError> {
         Ok(())
     }
+}
+
+pub const DEFAULT_MAX_SIZE: usize = 1048576;
+
+pub trait HasMaxSize {
+    fn max_size(&self) -> usize;
+    fn set_max_size(&mut self, max_size: usize);
 }

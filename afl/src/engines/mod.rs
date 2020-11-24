@@ -397,7 +397,7 @@ mod tests {
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::bytes::BytesInput;
-    use crate::mutators::scheduled::{mutation_bitflip, ComposedByMutations, StdScheduledMutator};
+    use crate::mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator};
     use crate::stages::mutational::StdMutationalStage;
     use crate::utils::StdRand;
 
