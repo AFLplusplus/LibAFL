@@ -1,5 +1,6 @@
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use num::Integer;

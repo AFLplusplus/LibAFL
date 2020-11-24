@@ -385,10 +385,13 @@ mod tests {
 
 
     use alloc::boxed::Box;
+
+    #[cfg(feature = "std")]
     use std::io::stderr;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
     use crate::engines::{Engine, StdEngine, StdState};
+    #[cfg(feature = "std")]
     use crate::events::LoggerEventManager;
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
@@ -401,6 +404,7 @@ mod tests {
         ExitKind::Ok
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_engine() {
         let mut rand = StdRand::new(0);

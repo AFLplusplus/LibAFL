@@ -5,13 +5,14 @@ pub mod llmp_translated; // TODO: Abstract away.
 #[cfg(feature = "std")]
 pub mod shmem_translated;
 
+#[cfg(feature = "std")]
 pub use crate::events::llmp::LLMP;
 
 use core::any::Any;
 //use core::any::TypeId;
 use core::fmt::Display;
 
-// TODO use core version
+#[cfg(feature = "std")]
 use std::io::Write;
 
 use crate::AflError;
@@ -95,6 +96,7 @@ impl NewTestcaseEvent {
     }
 }
 
+#[cfg(feature = "std")]
 pub struct LoggerEventManager<W>
 where
     W: Write,
@@ -103,6 +105,7 @@ where
     writer: W,
 }
 
+#[cfg(feature = "std")]
 impl<S, C, E, I, R, W> EventManager<S, C, E, I, R> for LoggerEventManager<W>
 where
     S: State<C, E, I, R>,
@@ -151,6 +154,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<W> LoggerEventManager<W>
 where
     W: Write,
