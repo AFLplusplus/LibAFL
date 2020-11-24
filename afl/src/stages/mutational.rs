@@ -6,13 +6,12 @@ use crate::corpus::testcase::Testcase;
 use crate::engines::State;
 use crate::events::{EventManager, NewTestcaseEvent};
 use crate::executors::Executor;
-use crate::fire_event;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
 use crate::stages::Corpus;
 use crate::stages::Stage;
 use crate::utils::Rand;
-use crate::AflError;
+use crate::{fire_event, AflError};
 
 // TODO multi mutators stage
 
@@ -53,12 +52,13 @@ where
                 .mutate(rand, state.corpus_mut(), &mut input, i as i32)?;
 
             let (interesting, new_testcase) = state.evaluate_input(input)?;
+
+            self.mutator_mut()
+                .post_exec(interesting, new_testcase.clone(), i as i32)?;
+
             if !new_testcase.is_none() {
                 fire_event!(events, NewTestcaseEvent<I>, new_testcase.unwrap())?;
             }
-
-            self.mutator_mut()
-                .post_exec(interesting, new_testcase, i as i32)?;
         }
         Ok(())
     }

@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::convert::From;
 
-use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 use crate::AflError;
+use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 
 /// A bytes input is the basic input
 #[derive(Clone, Debug, Default)]

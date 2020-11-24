@@ -6,11 +6,10 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::fmt::Debug;
 use core::marker::PhantomData;
-
 use hashbrown::HashMap;
 
 use crate::corpus::{Corpus, HasCorpus, Testcase};
-use crate::events::{EventManager, LoadInitialEvent};
+use crate::events::{EventManager, LoadInitialEvent, UpdateStatsEvent};
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
 use crate::generators::Generator;
@@ -327,7 +326,7 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                fire_event!(events, LoadInitialEvent)?;
+                fire_event!(events, UpdateStatsEvent)?;
             }
         }
     }
@@ -385,10 +384,13 @@ where
 mod tests {
 
     use alloc::boxed::Box;
+
+    #[cfg(feature = "std")]
     use std::io::stderr;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
     use crate::engines::{Engine, StdEngine, StdState};
+    #[cfg(feature = "std")]
     use crate::events::LoggerEventManager;
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
@@ -401,6 +403,7 @@ mod tests {
         ExitKind::Ok
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_engine() {
         let mut rand = StdRand::new(0);

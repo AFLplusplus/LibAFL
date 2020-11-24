@@ -2,10 +2,10 @@ use alloc::vec::Vec;
 use core::cmp::min;
 use core::marker::PhantomData;
 
+use crate::AflError;
 use crate::inputs::bytes::BytesInput;
 use crate::inputs::Input;
 use crate::utils::Rand;
-use crate::AflError;
 
 pub trait Generator<I, R>
 where

@@ -1,13 +1,17 @@
+#[cfg(feature = "std")]
 pub mod llmp;
+#[cfg(feature = "std")]
 pub mod llmp_translated; // TODO: Abstract away.
+#[cfg(feature = "std")]
 pub mod shmem_translated;
+
+#[cfg(feature = "std")]
 pub use crate::events::llmp::LLMP;
 
 use alloc::rc::Rc;
-use core::any::Any;
 use core::cell::RefCell;
 //use core::any::TypeId;
-// TODO use core version
+#[cfg(feature = "std")]
 use std::io::Write;
 
 use crate::corpus::{Corpus, Testcase};
@@ -17,7 +21,7 @@ use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
-pub trait Event: Any {
+pub trait Event {
     fn name(&self) -> &'static str;
 }
 
@@ -86,7 +90,7 @@ where
     testcase: Rc<RefCell<Testcase<I>>>,
 }
 
-impl<I> Event<I> for NewTestcaseEvent<I>
+impl<I> Event for NewTestcaseEvent<I>
 where
     I: Input,
 {
@@ -102,6 +106,10 @@ where
     pub fn new(testcase: Rc<RefCell<Testcase<I>>>) -> Self {
         NewTestcaseEvent { testcase: testcase }
     }
+
+    pub fn testcase(&self) -> &Rc<RefCell<Testcase<I>>> {
+        &self.testcase
+    }
 }
 
 pub struct UpdateStatsEvent {}
@@ -116,14 +124,16 @@ impl UpdateStatsEvent {
     }
 }
 
+#[cfg(feature = "std")]
 pub struct LoggerEventManager<W>
 where
     W: Write,
 {
-    events: Vec<Box<dyn Event>>,
+    events: Vec<String>,
     writer: W,
 }
 
+#[cfg(feature = "std")]
 impl<S, C, E, I, R, W> EventManager<S, C, E, I, R> for LoggerEventManager<W>
 where
     S: State<C, E, I, R>,
@@ -151,7 +161,7 @@ where
     where
         T: Event,
     {
-        self.events.push(Box::new(event));
+        self.events.push(event.name().to_string());
         Ok(())
     }
 
@@ -162,7 +172,7 @@ where
                 &mut self.writer,
                 "#{}\t[{}] corp: {} exec/s: {}",
                 state.executions(),
-                event.name(),
+                event,
                 state.corpus().entries().len(),
                 state.executions_over_seconds()
             )?;
@@ -172,6 +182,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<W> LoggerEventManager<W>
 where
     W: Write,
