@@ -1,11 +1,11 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::AflError;
 use crate::inputs::{HasBytesVec, Input};
 use crate::mutators::Corpus;
 use crate::mutators::Mutator;
 use crate::utils::Rand;
+use crate::AflError;
 
 pub enum MutationResult {
     Mutated,

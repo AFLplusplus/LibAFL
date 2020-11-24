@@ -3,9 +3,9 @@ use core::cell::RefCell;
 use core::ffi::c_void;
 use core::ptr;
 
-use crate::AflError;
 use crate::executors::{Executor, ExitKind};
 use crate::inputs::Input;
+use crate::AflError;
 
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 
