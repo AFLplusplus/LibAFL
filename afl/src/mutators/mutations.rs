@@ -174,7 +174,7 @@ where
 pub fn mutation_bytesdelete<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    _corpus: & C,
+    _corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -215,7 +215,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 pub fn mutation_splice<M, C, I, R>(
     _mutator: &mut M,
     rand: &mut R,
-    corpus: & C,
+    corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
