@@ -4,14 +4,14 @@ pub use scheduled::HavocBytesMutator;
 pub use scheduled::ScheduledMutator;
 pub use scheduled::StdScheduledMutator;
 
+use alloc::rc::Rc;
+use core::cell::RefCell;
+
+use crate::AflError;
 use crate::corpus::Corpus;
 use crate::corpus::Testcase;
 use crate::inputs::Input;
 use crate::utils::Rand;
-use crate::AflError;
-
-use alloc::rc::Rc;
-use core::cell::RefCell;
 
 pub trait Mutator<C, I, R>
 where

@@ -71,30 +71,6 @@ where
     }
 }
 
-/// Has a Rand Rc RefCell field (internal mutability), that can be used to get random values
-pub trait HasRandRR {
-    type R: Rand;
-
-    /// Get the hold Rand instance
-    fn rand(&self) -> &Rc<RefCell<Self::R>>;
-
-    // Gets the next 64 bit value
-    fn rand_next(&self) -> u64 {
-        self.rand().borrow_mut().next()
-    }
-    // Gets a value below the given 64 bit val (inclusive)
-    fn rand_below(&self, upper_bound_excl: u64) -> u64 {
-        self.rand().borrow_mut().below(upper_bound_excl)
-    }
-
-    // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
-    fn rand_between(&self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
-        self.rand()
-            .borrow_mut()
-            .between(lower_bound_incl, upper_bound_incl)
-    }
-}
-
 const HASH_CONST: u64 = 0xa5b35705;
 
 /// XXH3 Based, hopefully speedy, rnd implementation

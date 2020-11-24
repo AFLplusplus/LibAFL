@@ -14,9 +14,7 @@ default = ["std"]
 std = []
 
 [dependencies]
-xxhash-rust = { version = "0.8.0-beta.5", features = ["xxh3"] } # xxh3 hashing for rust
 hashbrown = "0.9" # A faster hashmap, nostd compatible
 libc = "0.2" # For (*nix) libc
 num = "*"
-
-#shared_memory = { version = "0.11.3", optional = true } # shared mem for windows and unix
+xxhash-rust = { version = "0.8.0-beta.5", features = ["xxh3"] } # xxh3 hashing for rust

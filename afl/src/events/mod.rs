@@ -1,20 +1,25 @@
+#[cfg(feature = "std")]
 pub mod llmp;
+#[cfg(feature = "std")]
 pub mod llmp_translated; // TODO: Abstract away.
+#[cfg(feature = "std")]
 pub mod shmem_translated;
+
 pub use crate::events::llmp::LLMP;
 
 use core::any::Any;
 //use core::any::TypeId;
 use core::fmt::Display;
+
 // TODO use core version
 use std::io::Write;
 
+use crate::AflError;
 use crate::corpus::Corpus;
 use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::utils::Rand;
-use crate::AflError;
 
 pub trait Event: Display + Any {}
 

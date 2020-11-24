@@ -6,9 +6,9 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::fmt::Debug;
 use core::marker::PhantomData;
-
 use hashbrown::HashMap;
 
+use crate::{fire_event, AflError};
 use crate::corpus::{Corpus, HasCorpus, Testcase};
 use crate::events::{EventManager, LoadInitialEvent};
 use crate::executors::Executor;
@@ -18,7 +18,6 @@ use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::stages::Stage;
 use crate::utils::{current_milliseconds, Rand};
-use crate::{fire_event, AflError};
 
 // TODO FeedbackMetadata to store histroy_map
 
@@ -383,6 +382,7 @@ where
 
 #[cfg(test)]
 mod tests {
+
 
     use alloc::boxed::Box;
     use std::io::stderr;

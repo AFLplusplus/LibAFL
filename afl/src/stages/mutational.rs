@@ -2,17 +2,16 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 
+use crate::{AflError, fire_event};
 use crate::corpus::testcase::Testcase;
 use crate::engines::State;
 use crate::events::{EventManager, NewTestcaseEvent};
 use crate::executors::Executor;
-use crate::fire_event;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
 use crate::stages::Corpus;
 use crate::stages::Stage;
 use crate::utils::Rand;
-use crate::AflError;
 
 // TODO multi mutators stage
 

@@ -1,6 +1,3 @@
-use crate::inputs::Input;
-use crate::AflError;
-
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -9,6 +6,9 @@ use core::convert::Into;
 use core::default::Default;
 use core::option::Option;
 use hashbrown::HashMap;
+
+use crate::AflError;
+use crate::inputs::Input;
 
 // TODO PathBuf for no_std and change filename to PathBuf
 //#[cfg(feature = "std")]
