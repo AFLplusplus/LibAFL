@@ -40,7 +40,7 @@ pub trait Event {
     {
         match write!(formatter, "[{}]", Self::name()) {
             Ok(_) => Ok(()),
-            Err(_) => Err(AflError::Unknown("write error".to_string())),
+            Err(_) => Err(AflError::Unknown("write error".into())),
         }
     }
 
