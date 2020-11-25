@@ -8,9 +8,8 @@ pub mod shmem_translated;
 #[cfg(feature = "std")]
 pub use crate::events::llmp::LLMP;
 
-use core::fmt::Formatter;
 #[cfg(feature = "std")]
-use std::io::Write;
+use std::{marker::PhantomData, io::Write};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::engines::State;
@@ -18,41 +17,127 @@ use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
-
-pub enum EventDestination {
-    Main,
-    Broker,
-    Clients,
+/// Indicate if an event worked or not
+enum BrokerEventResult {
+    /// The broker haneled this. No need to pass it on.
+    Handled,
+    /// Pass this message along to the clients.
+    Forward,
 }
 
-pub trait Event {
-    fn name() -> &'static str;
+/*
 
-    fn destination() -> EventDestination;
+/// A custom event, in case a user wants to extend the features (at compile time)
+pub trait CustomEvent<S, C, E, I, R>
+where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+{
+    /// Returns the name of this event
+    fn name(&self) -> &str;
+    /// This method will be called in the broker
+    fn handle_in_broker(&self, broker: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) -> Result<BrokerEventResult, AflError>;
+    /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
+    fn handle_in_client(&self, client: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) -> Result<(), AflError>;
+}
 
-    fn log<S, C, E, I, R>(&self, formatter: &mut Formatter, _state: &S) -> Result<(), AflError>
-    where
-        S: State<C, E, I, R>,
-        C: Corpus<I, R>,
-        E: Executor<I>,
-        I: Input,
-        R: Rand,
-    {
-        match write!(formatter, "[{}]", Self::name()) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(AflError::Unknown("write error".into())),
+struct UnusedCustomEvent {}
+impl<S, C, E, I, R> CustomEvent<S, C, E, I, R> for UnusedCustomEvent<S, C, E, I, R>
+where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+{
+    fn name(&self) -> &str {"No custom events"}
+    fn handle_in_broker(&self, broker: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) {Ok(BrokerEventResult::Handled)}
+    fn handle_in_client(&self, client: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) {Ok(())}
+}
+*/
+
+/// Events sent around in the library
+pub enum Event<S, C, E, I, R>
+where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+    // CE: CustomEvent<S, C, E, I, R>,
+{
+    LoadInitial {sender_id: u64, _marker: PhantomData<(S, C, E, I, R)>},
+    NewTestcase {sender_id: u64, input: I, fitness: u32, _marker: PhantomData<(S, C, E, I, R)>},
+    UpdateStats {sender_id: u64, new_execs: usize, _marker: PhantomData<(S, C, E, I, R)>},
+    Crash {sender_id: u64, input: I, _marker: PhantomData<(S, C, E, I, R)>},
+    Timeout {sender_id: u64, input: I, _marker: PhantomData<(S, C, E, I, R)>},
+    Log {sender_id: u64, severity_level: u8, message: String, _marker: PhantomData<(S, C, E, I, R)>},
+    //Custom {sender_id: u64, custom_event: CE},
+}
+
+impl<S, C, E, I, R> Event<S, C, E, I, R>
+where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+    //CE: CustomEvent<S, C, E, I, R>,
+{
+    fn name(&self) -> &str {
+        match self {
+            Event::LoadInitial {sender_id, _marker} => "Initial",
+            Event::NewTestcase {sender_id, input, fitness, _marker} => "New Testcase",
+            Event::UpdateStats {sender_id, new_execs, _marker} => "Stats",
+            Event::Crash {sender_id, input, _marker} => "Crash",
+            Event::Timeout {sender_id, input, _marker} => "Timeout",
+            Event::Log {sender_id, severity_level, message, _marker} => "Log",
+            //Event::Custom {sender_id, custom_event} => custom_event.name(),
         }
     }
 
-    fn on_recv<S, C, E, I, R>(&self, _state: &mut S) -> Result<(), AflError>
-    where
-        S: State<C, E, I, R>,
-        C: Corpus<I, R>,
-        E: Executor<I>,
-        I: Input,
-        R: Rand,
-    {
-        Ok(())
+    fn handle_in_broker(&self, /*broker: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S, corpus: &mut C) -> Result<BrokerEventResult, AflError> {
+        match self {
+            Event::LoadInitial {sender_id, _marker} => {
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::NewTestcase {sender_id, input, fitness, _marker} => {
+                Ok(BrokerEventResult::Forward)
+            }
+            Event::UpdateStats {sender_id, new_execs, _marker} => {
+                // TODO
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::Crash {sender_id, input, _marker} => {
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::Timeout {sender_id, input, _marker} => {
+                // TODO
+                Ok(BrokerEventResult::Handled)
+            },
+            Event::Log {sender_id, severity_level, message, _marker} => {
+                //TODO: broker.log()
+                println!("{}[{}]: {}", sender_id, severity_level, message);
+                Ok(BrokerEventResult::Handled)
+            },
+            //Event::Custom {sender_id, custom_event} => custom_event.handle_in_broker(state, corpus),
+            _ => Ok(BrokerEventResult::Forward)
+        }
+    }
+
+    fn handle_in_client(&self, /*client: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S, corpus: &mut C) -> Result<(), AflError> {
+        match self {
+            Event::NewTestcase {sender_id, input, fitness, _marker} => {
+                let mut testcase = Testcase::new(input.to_owned());
+                testcase.set_fitness(*fitness);
+                corpus.add(testcase);
+                Ok(())
+            }
+            _ => Err(AflError::Unknown("Received illegal message that message should not have arrived.".into()))
+        }
     }
 
     // TODO serialize and deserialize, defaults to serde
@@ -65,138 +150,56 @@ where
     E: Executor<I>,
     I: Input,
     R: Rand,
+    //CE: CustomEvent<S, C, E, I, R>,
 {
     /// Check if this EventaManager support a given Event type
     /// To compare events, use Event::name().as_ptr()
-    fn enabled<T>(&self) -> bool
-    where
-        T: Event;
+    fn enabled(&self) -> bool;
 
     /// Fire an Event
-    fn fire<T>(&mut self, event: T) -> Result<(), AflError>
-    where
-        T: Event;
+    fn fire(&mut self, event: Event<S, C, E, I, R>) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, state: &mut S) -> Result<usize, AflError>;
-}
+    fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError>;
 
-// e.g. fire_event!(manager, MyEvent, myparam1, ...)
-#[macro_export]
-macro_rules! fire_event {
-    ($manager:expr, $event:ty, $( $x:expr ),+ ) => {
-        {
-            if $manager.enabled::<$event>() {
-                $manager.fire(<$event>::new($( $x ),*))
-            } else {
-                Ok(())
-            }
-        }
-    };
-    ($manager:expr, $event:ty) => {
-        {
-            if $manager.enabled::<$event>() {
-                $manager.fire(<$event>::new())
-            } else {
-                Ok(())
-            }
-        }
-    };
-}
 
-pub struct LoadInitialEvent {}
-impl Event for LoadInitialEvent {
-    fn name() -> &'static str {
-        "LOAD"
-    }
-
-    fn destination() -> EventDestination {
-        EventDestination::Broker
-    }
-}
-impl LoadInitialEvent {
-    pub fn new() -> Self {
-        LoadInitialEvent {}
+    fn on_recv(&self, _state: &mut S, corpus: &mut C) -> Result<(), AflError> {
+        // TODO: Better way to move out of testcase, or get ref
+        //Ok(corpus.add(self.testcase.take().unwrap()))
+        Ok(())
     }
 }
 
-pub struct NewTestcaseEvent<I>
-where
-    I: Input,
-{
-    testcase: Testcase<I>,
-}
-
-impl<I> Event for NewTestcaseEvent<I>
-where
-    I: Input,
-{
-    fn name() -> &'static str {
-        "NEW"
+/*TODO
+    fn on_recv(&self, state: &mut S, _corpus: &mut C) -> Result<(), AflError> {
+        println!(
+            "#{}\t exec/s: {}",
+            state.executions(),
+            //TODO: Count corpus.entries().len(),
+            state.executions_over_seconds()
+        );
+        Ok(())
     }
-
-    fn destination() -> EventDestination {
-        EventDestination::Clients
-    }
-}
-
-impl<I> NewTestcaseEvent<I>
-where
-    I: Input,
-{
-    pub fn new(testcase: Testcase<I>) -> Self {
-        NewTestcaseEvent { testcase: testcase }
-    }
-
-    pub fn testcase(&self) -> &Testcase<I> {
-        &self.testcase
-    }
-}
-
-pub struct UpdateStatsEvent {}
-impl Event for UpdateStatsEvent {
-    fn name() -> &'static str {
-        "STATS"
-    }
-
-    fn destination() -> EventDestination {
-        EventDestination::Broker
-    }
-}
-impl UpdateStatsEvent {
-    pub fn new() -> Self {
-        UpdateStatsEvent {}
-    }
-}
-
-pub struct CrashEvent {}
-impl Event for CrashEvent {
-    fn name() -> &'static str {
-        "CRASH"
-    }
-
-    fn destination() -> EventDestination {
-        EventDestination::Broker
-    }
-}
-impl CrashEvent {
-    pub fn new() -> Self {
-        CrashEvent {}
-    }
-}
+*/
 
 #[cfg(feature = "std")]
-pub struct LoggerEventManager<W>
+pub struct LoggerEventManager<S, C, E, I, R, W>
 where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    I: Input,
+    E: Executor<I>,
+    R: Rand,
     W: Write,
+    //CE: CustomEvent<S, C, E, I, R>,
 {
-    events: Vec<String>,
+    events: Vec<Event<S, C, E, I, R>>,
     writer: W,
 }
 
 #[cfg(feature = "std")]
-impl<S, C, E, I, R, W> EventManager<S, C, E, I, R> for LoggerEventManager<W>
+impl<S, C, E, I, R, W> EventManager<S, C, E, I, R> for LoggerEventManager<S, C, E, I, R, W>
 where
     S: State<C, E, I, R>,
     C: Corpus<I, R>,
@@ -204,43 +207,58 @@ where
     I: Input,
     R: Rand,
     W: Write,
+    //CE: CustomEvent<S, C, E, I, R>,
 {
-    fn enabled<T>(&self) -> bool
-    where
-        T: Event,
+    fn enabled(&self) -> bool
     {
         true
     }
 
-    fn fire<T>(&mut self, _event: T) -> Result<(), AflError>
-    where
-        T: Event,
+    fn fire(&mut self, event: Event<S, C, E, I, R>) -> Result<(), AflError>
     {
-        self.events.push(T::name().to_string());
+        self.events.push(event);
         Ok(())
     }
 
-    fn process(&mut self, state: &mut S) -> Result<usize, AflError> {
-        let num = self.events.len();
-        for event in &self.events {
-            writeln!(
-                &mut self.writer,
-                "#{}\t[{}] exec/s: {}",
-                state.executions(),
-                event,
-                //TODO: Count corpus.entries().len(),
-                state.executions_over_seconds()
-            )?;
+    fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError> {
+        // TODO: iterators
+        let mut handled = vec!();
+        for x in self.events.iter() {
+            handled.push(x.handle_in_broker(state, corpus)?);
         }
+        handled.iter().zip(self.events.iter()).map(|(x, event)| match x {
+                BrokerEventResult::Forward => {
+                    event.handle_in_client(state, corpus)
+                },
+                // Ignore broker-only events
+                BrokerEventResult::Handled => Ok(()),
+             }
+            ).collect::<Result<(), AflError>>();
+        let count = self.events.len();
+        dbg!("Handled {} events", count);
         self.events.clear();
-        Ok(num)
+
+        /*
+        let num = self.events.len();
+        for event in &self.events {}
+
+        self.events.clear();
+        */
+
+        Ok(count)
     }
 }
 
 #[cfg(feature = "std")]
-impl<W> LoggerEventManager<W>
+impl<S, C, E, I, R, W> LoggerEventManager<S, C, E, I, R, W>
 where
+    S: State<C, E, I, R>,
+    C: Corpus<I, R>,
+    I: Input,
+    E: Executor<I>,
+    R: Rand,
     W: Write,
+    //TODO CE: CustomEvent,
 {
     pub fn new(writer: W) -> Self {
         LoggerEventManager {

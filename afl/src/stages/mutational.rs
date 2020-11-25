@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::engines::State;
+use crate::{events::Event, engines::State};
 use crate::events::EventManager;
 use crate::executors::Executor;
 use crate::inputs::Input;
@@ -9,7 +9,6 @@ use crate::stages::Corpus;
 use crate::stages::Stage;
 use crate::utils::Rand;
 use crate::AflError;
-use crate::{events::NewTestcaseEvent, fire_event};
 
 // TODO multi mutators stage
 
@@ -56,8 +55,8 @@ where
                 .post_exec(interesting, &input_mut, i as i32)?;
 
             if interesting > 0 {
-                let new_testcase = state.input_to_testcase(input_mut, interesting)?;
-                fire_event!(events, NewTestcaseEvent<I>, new_testcase)?;
+                //let new_testcase = state.input_to_testcase(input_mut, interesting)?;
+                events.fire(Event::NewTestcase { sender_id: 0, input: input_mut, fitness: interesting , _marker: PhantomData})?;
             //state.corpus_mut().add(new_testcase); // TODO: Probably no longer needed, once events work
             } else {
                 state.discard_input(&input_mut)?;

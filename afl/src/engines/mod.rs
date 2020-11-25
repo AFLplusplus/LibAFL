@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 
 use crate::corpus::{Corpus, Testcase};
-use crate::events::{EventManager, LoadInitialEvent, UpdateStatsEvent};
+use crate::events::{EventManager, Event};
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
 use crate::generators::Generator;
@@ -17,7 +17,7 @@ use crate::inputs::Input;
 use crate::observers::Observer;
 use crate::stages::Stage;
 use crate::utils::{current_milliseconds, Rand};
-use crate::{fire_event, AflError};
+use crate::AflError;
 
 // TODO FeedbackMetadata to store histroy_map
 
@@ -177,9 +177,10 @@ where
     for _ in 0..num {
         let input = generator.generate(rand)?;
         state.add_input(corpus, input)?;
-        fire_event!(events, LoadInitialEvent)?;
+        let event = Event::LoadInitial {sender_id: 0, _marker: PhantomData};
+        events.fire(event)?;
     }
-    events.process(state)?;
+    events.process(state, corpus)?;
     Ok(())
 }
 
@@ -314,7 +315,7 @@ where
             stage.perform(rand, state, corpus, events, &input)?;
         }
 
-        events.process(state)?;
+        events.process(state, corpus)?;
         Ok(idx)
     }
 
@@ -331,7 +332,7 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                fire_event!(events, UpdateStatsEvent)?;
+                events.fire(Event::UpdateStats {sender_id: 0, new_execs: 1, _marker: PhantomData})?; // TODO self.new_execs});
             }
         }
     }
