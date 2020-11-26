@@ -112,34 +112,37 @@ where
     R: Rand,
     //CE: CustomEvent<S, C, E, I, R>,
 {
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
-            Event::LoadInitial { sender_id, _marker } => "Initial",
+            Event::LoadInitial {
+                sender_id: _,
+                _marker,
+            } => "Initial",
             Event::NewTestcase {
-                sender_id,
-                input,
-                fitness,
+                sender_id: _,
+                input: _,
+                fitness: _,
                 _marker,
             } => "New Testcase",
             Event::UpdateStats {
-                sender_id,
-                new_execs,
+                sender_id: _,
+                new_execs: _,
                 _marker,
             } => "Stats",
             Event::Crash {
-                sender_id,
-                input,
+                sender_id: _,
+                input: _,
                 _marker,
             } => "Crash",
             Event::Timeout {
-                sender_id,
-                input,
+                sender_id: _,
+                input: _,
                 _marker,
             } => "Timeout",
             Event::Log {
-                sender_id,
-                severity_level,
-                message,
+                sender_id: _,
+                severity_level: _,
+                message: _,
                 _marker,
             } => "Log",
             //Event::Custom {sender_id, custom_event} => custom_event.name(),
@@ -148,33 +151,33 @@ where
 
     fn handle_in_broker(
         &self,
-        /*broker: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S,
-        corpus: &mut C,
+        /*broker: &dyn EventManager<S, C, E, I, R>,*/ _state: &mut S,
+        _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
         match self {
-            Event::LoadInitial { sender_id, _marker } => Ok(BrokerEventResult::Handled),
+            Event::LoadInitial { sender_id: _, _marker } => Ok(BrokerEventResult::Handled),
             Event::NewTestcase {
-                sender_id,
-                input,
-                fitness,
+                sender_id: _,
+                input: _,
+                fitness: _,
                 _marker,
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
-                sender_id,
-                new_execs,
+                sender_id: _,
+                new_execs: _,
                 _marker,
             } => {
                 // TODO
                 Ok(BrokerEventResult::Handled)
             }
             Event::Crash {
-                sender_id,
-                input,
+                sender_id: _,
+                input: _,
                 _marker,
             } => Ok(BrokerEventResult::Handled),
             Event::Timeout {
-                sender_id,
-                input,
+                sender_id: _,
+                input: _,
                 _marker,
             } => {
                 // TODO
@@ -191,18 +194,18 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             //Event::Custom {sender_id, custom_event} => custom_event.handle_in_broker(state, corpus),
-            _ => Ok(BrokerEventResult::Forward),
+            //_ => Ok(BrokerEventResult::Forward),
         }
     }
 
     fn handle_in_client(
         &self,
-        /*client: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S,
+        /*client: &dyn EventManager<S, C, E, I, R>,*/ _state: &mut S,
         corpus: &mut C,
     ) -> Result<(), AflError> {
         match self {
             Event::NewTestcase {
-                sender_id,
+                sender_id: _,
                 input,
                 fitness,
                 _marker,
@@ -240,7 +243,7 @@ where
     /// Return the number of processes events or an error
     fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError>;
 
-    fn on_recv(&self, _state: &mut S, corpus: &mut C) -> Result<(), AflError> {
+    fn on_recv(&self, _state: &mut S, _corpus: &mut C) -> Result<(), AflError> {
         // TODO: Better way to move out of testcase, or get ref
         //Ok(corpus.add(self.testcase.take().unwrap()))
         Ok(())
@@ -308,7 +311,7 @@ where
                 // Ignore broker-only events
                 BrokerEventResult::Handled => Ok(()),
             })
-            .collect::<Result<(), AflError>>();
+            .for_each(drop);
         let count = self.events.len();
         dbg!("Handled {} events", count);
         self.events.clear();
