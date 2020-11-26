@@ -209,10 +209,10 @@ where
         scheduled.add_mutation(mutation_byteneg);
 
         //scheduled.add_mutation(mutation_bytesexpand);
-        scheduled.add_mutation(mutation_bytesdelete);
-        scheduled.add_mutation(mutation_bytesdelete);
-        scheduled.add_mutation(mutation_bytesdelete);
-        scheduled.add_mutation(mutation_bytesdelete);
+        //scheduled.add_mutation(mutation_bytesdelete);
+        //scheduled.add_mutation(mutation_bytesdelete);
+        //scheduled.add_mutation(mutation_bytesdelete);
+        //scheduled.add_mutation(mutation_bytesdelete);
 
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_bitflip);
