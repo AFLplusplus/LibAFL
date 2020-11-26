@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 
 use crate::corpus::{Corpus, Testcase};
-use crate::events::{EventManager, Event};
+use crate::events::{Event, EventManager};
 use crate::executors::Executor;
 use crate::feedbacks::Feedback;
 use crate::generators::Generator;
@@ -177,7 +177,10 @@ where
     for _ in 0..num {
         let input = generator.generate(rand)?;
         state.add_input(corpus, input)?;
-        let event = Event::LoadInitial {sender_id: 0, _marker: PhantomData};
+        let event = Event::LoadInitial {
+            sender_id: 0,
+            _marker: PhantomData,
+        };
         events.fire(event)?;
     }
     events.process(state, corpus)?;
@@ -332,7 +335,11 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                events.fire(Event::UpdateStats {sender_id: 0, new_execs: 1, _marker: PhantomData})?; // TODO self.new_execs});
+                events.fire(Event::UpdateStats {
+                    sender_id: 0,
+                    new_execs: 1,
+                    _marker: PhantomData,
+                })?; // TODO self.new_execs});
             }
         }
     }

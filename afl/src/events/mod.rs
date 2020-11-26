@@ -9,7 +9,7 @@ pub mod shmem_translated;
 pub use crate::events::llmp::LLMP;
 
 #[cfg(feature = "std")]
-use std::{marker::PhantomData, io::Write};
+use std::{io::Write, marker::PhantomData};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::engines::State;
@@ -69,12 +69,37 @@ where
     R: Rand,
     // CE: CustomEvent<S, C, E, I, R>,
 {
-    LoadInitial {sender_id: u64, _marker: PhantomData<(S, C, E, I, R)>},
-    NewTestcase {sender_id: u64, input: I, fitness: u32, _marker: PhantomData<(S, C, E, I, R)>},
-    UpdateStats {sender_id: u64, new_execs: usize, _marker: PhantomData<(S, C, E, I, R)>},
-    Crash {sender_id: u64, input: I, _marker: PhantomData<(S, C, E, I, R)>},
-    Timeout {sender_id: u64, input: I, _marker: PhantomData<(S, C, E, I, R)>},
-    Log {sender_id: u64, severity_level: u8, message: String, _marker: PhantomData<(S, C, E, I, R)>},
+    LoadInitial {
+        sender_id: u64,
+        _marker: PhantomData<(S, C, E, I, R)>,
+    },
+    NewTestcase {
+        sender_id: u64,
+        input: I,
+        fitness: u32,
+        _marker: PhantomData<(S, C, E, I, R)>,
+    },
+    UpdateStats {
+        sender_id: u64,
+        new_execs: usize,
+        _marker: PhantomData<(S, C, E, I, R)>,
+    },
+    Crash {
+        sender_id: u64,
+        input: I,
+        _marker: PhantomData<(S, C, E, I, R)>,
+    },
+    Timeout {
+        sender_id: u64,
+        input: I,
+        _marker: PhantomData<(S, C, E, I, R)>,
+    },
+    Log {
+        sender_id: u64,
+        severity_level: u8,
+        message: String,
+        _marker: PhantomData<(S, C, E, I, R)>,
+    },
     //Custom {sender_id: u64, custom_event: CE},
 }
 
@@ -89,54 +114,107 @@ where
 {
     fn name(&self) -> &str {
         match self {
-            Event::LoadInitial {sender_id, _marker} => "Initial",
-            Event::NewTestcase {sender_id, input, fitness, _marker} => "New Testcase",
-            Event::UpdateStats {sender_id, new_execs, _marker} => "Stats",
-            Event::Crash {sender_id, input, _marker} => "Crash",
-            Event::Timeout {sender_id, input, _marker} => "Timeout",
-            Event::Log {sender_id, severity_level, message, _marker} => "Log",
+            Event::LoadInitial { sender_id, _marker } => "Initial",
+            Event::NewTestcase {
+                sender_id,
+                input,
+                fitness,
+                _marker,
+            } => "New Testcase",
+            Event::UpdateStats {
+                sender_id,
+                new_execs,
+                _marker,
+            } => "Stats",
+            Event::Crash {
+                sender_id,
+                input,
+                _marker,
+            } => "Crash",
+            Event::Timeout {
+                sender_id,
+                input,
+                _marker,
+            } => "Timeout",
+            Event::Log {
+                sender_id,
+                severity_level,
+                message,
+                _marker,
+            } => "Log",
             //Event::Custom {sender_id, custom_event} => custom_event.name(),
         }
     }
 
-    fn handle_in_broker(&self, /*broker: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S, corpus: &mut C) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(
+        &self,
+        /*broker: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S,
+        corpus: &mut C,
+    ) -> Result<BrokerEventResult, AflError> {
         match self {
-            Event::LoadInitial {sender_id, _marker} => {
-                Ok(BrokerEventResult::Handled)
-            }
-            Event::NewTestcase {sender_id, input, fitness, _marker} => {
-                Ok(BrokerEventResult::Forward)
-            }
-            Event::UpdateStats {sender_id, new_execs, _marker} => {
+            Event::LoadInitial { sender_id, _marker } => Ok(BrokerEventResult::Handled),
+            Event::NewTestcase {
+                sender_id,
+                input,
+                fitness,
+                _marker,
+            } => Ok(BrokerEventResult::Forward),
+            Event::UpdateStats {
+                sender_id,
+                new_execs,
+                _marker,
+            } => {
                 // TODO
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Crash {sender_id, input, _marker} => {
-                Ok(BrokerEventResult::Handled)
-            }
-            Event::Timeout {sender_id, input, _marker} => {
+            Event::Crash {
+                sender_id,
+                input,
+                _marker,
+            } => Ok(BrokerEventResult::Handled),
+            Event::Timeout {
+                sender_id,
+                input,
+                _marker,
+            } => {
                 // TODO
                 Ok(BrokerEventResult::Handled)
-            },
-            Event::Log {sender_id, severity_level, message, _marker} => {
+            }
+            Event::Log {
+                sender_id,
+                severity_level,
+                message,
+                _marker,
+            } => {
                 //TODO: broker.log()
                 println!("{}[{}]: {}", sender_id, severity_level, message);
                 Ok(BrokerEventResult::Handled)
-            },
+            }
             //Event::Custom {sender_id, custom_event} => custom_event.handle_in_broker(state, corpus),
-            _ => Ok(BrokerEventResult::Forward)
+            _ => Ok(BrokerEventResult::Forward),
         }
     }
 
-    fn handle_in_client(&self, /*client: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S, corpus: &mut C) -> Result<(), AflError> {
+    fn handle_in_client(
+        &self,
+        /*client: &dyn EventManager<S, C, E, I, R>,*/ state: &mut S,
+        corpus: &mut C,
+    ) -> Result<(), AflError> {
         match self {
-            Event::NewTestcase {sender_id, input, fitness, _marker} => {
+            Event::NewTestcase {
+                sender_id,
+                input,
+                fitness,
+                _marker,
+            } => {
                 let mut testcase = Testcase::new(input.to_owned());
                 testcase.set_fitness(*fitness);
                 corpus.add(testcase);
                 Ok(())
             }
-            _ => Err(AflError::Unknown("Received illegal message that message should not have arrived.".into()))
+            _ => Err(AflError::Unknown(
+                "Received illegal message that message should not have arrived.".into(),
+            )),
         }
     }
 
@@ -150,7 +228,6 @@ where
     E: Executor<I>,
     I: Input,
     R: Rand,
-    //CE: CustomEvent<S, C, E, I, R>,
 {
     /// Check if this EventaManager support a given Event type
     /// To compare events, use Event::name().as_ptr()
@@ -162,7 +239,6 @@ where
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError>;
-
 
     fn on_recv(&self, _state: &mut S, corpus: &mut C) -> Result<(), AflError> {
         // TODO: Better way to move out of testcase, or get ref
@@ -209,31 +285,30 @@ where
     W: Write,
     //CE: CustomEvent<S, C, E, I, R>,
 {
-    fn enabled(&self) -> bool
-    {
+    fn enabled(&self) -> bool {
         true
     }
 
-    fn fire(&mut self, event: Event<S, C, E, I, R>) -> Result<(), AflError>
-    {
+    fn fire(&mut self, event: Event<S, C, E, I, R>) -> Result<(), AflError> {
         self.events.push(event);
         Ok(())
     }
 
     fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError> {
         // TODO: iterators
-        let mut handled = vec!();
+        let mut handled = vec![];
         for x in self.events.iter() {
             handled.push(x.handle_in_broker(state, corpus)?);
         }
-        handled.iter().zip(self.events.iter()).map(|(x, event)| match x {
-                BrokerEventResult::Forward => {
-                    event.handle_in_client(state, corpus)
-                },
+        handled
+            .iter()
+            .zip(self.events.iter())
+            .map(|(x, event)| match x {
+                BrokerEventResult::Forward => event.handle_in_client(state, corpus),
                 // Ignore broker-only events
                 BrokerEventResult::Handled => Ok(()),
-             }
-            ).collect::<Result<(), AflError>>();
+            })
+            .collect::<Result<(), AflError>>();
         let count = self.events.len();
         dbg!("Handled {} events", count);
         self.events.clear();
