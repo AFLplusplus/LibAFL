@@ -3,8 +3,8 @@
 cargo build --release
 make -C runtime
 
-./compiler test/test.c -o test_fuzz
+./compiler test/test.c -o test_fuzz.elf
 
-./test_fuzz
+RUST_BACKTRACE=1 ./test_fuzz.elf
 
-rm ./test_fuzz
+rm ./test_fuzz.elf

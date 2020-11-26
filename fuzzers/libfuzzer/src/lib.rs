@@ -38,7 +38,7 @@ fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
 pub extern "C" fn afl_libfuzzer_main() {
     let mut rand = StdRand::new(0);
 
-    let corpus = InMemoryCorpus::new();
+    let mut corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(32);
     let mut events = LoggerEventManager::new(stderr());
 
@@ -49,12 +49,19 @@ pub extern "C" fn afl_libfuzzer_main() {
     let edges_feedback = MaxMapFeedback::new(edges_observer.clone(), MAP_SIZE);
 
     let executor = InMemoryExecutor::new(harness);
-    let mut state = StdState::new(corpus, executor);
+    let mut state = StdState::new(executor);
     state.add_observer(edges_observer);
     state.add_feedback(Box::new(edges_feedback));
 
-    generate_initial_inputs(&mut rand, &mut state, &mut generator, &mut events, 4)
-        .expect("Failed to load initial inputs");
+    generate_initial_inputs(
+        &mut rand,
+        &mut state,
+        &mut corpus,
+        &mut generator,
+        &mut events,
+        4,
+    )
+    .expect("Failed to load initial inputs");
 
     let mut engine = StdEngine::new();
     let mutator = HavocBytesMutator::new_default();
@@ -62,7 +69,7 @@ pub extern "C" fn afl_libfuzzer_main() {
     engine.add_stage(Box::new(stage));
 
     engine
-        .fuzz_loop(&mut rand, &mut state, &mut events)
+        .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut events)
         .expect("Fuzzer fatal error");
     #[cfg(feature = "std")]
     println!("OK");
