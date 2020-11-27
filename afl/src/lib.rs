@@ -79,8 +79,3 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 }
-
-#[no_mangle]
-pub extern "C" fn test_xxh3_hash() -> u64 {
-    xxh3_64_with_seed(b"test", 0)
-}
