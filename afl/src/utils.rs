@@ -4,12 +4,12 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::debug_assert;
 use core::fmt::Debug;
-use xxhash_rust::xxh3::xxh3_64_with_seed;
+use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub type StdRand = XorShift64Rand;
+pub type StdRand = Xoshiro256StarRand;
 
 /// Ways to get random around here
 pub trait Rand: Debug {
@@ -303,6 +303,8 @@ pub const fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use xxhash_rust::const_xxh3::xxh3_64_with_seed;
+
     use crate::utils::{next_pow2, Rand, StdRand};
 
     #[test]
@@ -336,5 +338,10 @@ mod tests {
         assert_eq!(next_pow2(3), 4);
         assert_eq!(next_pow2(1000), 1024);
         assert_eq!(next_pow2(0xFFFFFFFF as u64), (0xFFFFFFFF as u64) + 1);
+    }
+
+    #[test]
+    fn test_xxh3_hash() {
+        assert_eq!(xxh3_64_with_seed(b"test", 0), 0);
     }
 }

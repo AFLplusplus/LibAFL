@@ -19,6 +19,7 @@ use alloc::string::String;
 use core::fmt;
 #[cfg(feature = "std")]
 use std::io;
+use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 /// Main error struct for AFL
 #[derive(Debug)]
@@ -77,4 +78,9 @@ mod tests {
     fn it_works() {
         assert_eq!(2 + 2, 4);
     }
+}
+
+#[no_mangle]
+pub extern "C" fn test_xxh3_hash() -> u64 {
+    xxh3_64_with_seed(b"test", 0)
 }

@@ -160,7 +160,7 @@ const LLMP_CLIENT_TYPE_CHILD_PROCESS: LlmpClientType = 2;
 /// A share mem page, as used by llmp internally
 #[derive(Copy, Clone)]
 #[repr(C, packed)]
-struct llmp_page {
+pub struct llmp_page {
     pub sender: u32,
     pub save_to_unmap: c_ushort,
     pub sender_dead: c_ushort,
@@ -342,7 +342,7 @@ unsafe fn llmp_recv(page: *mut llmp_page, last_msg: *mut llmp_message) -> *mut l
 }
 /* Blocks/spins until the next message gets posted to the page,
 then returns that message. */
-unsafe fn llmp_recv_blocking(
+pub unsafe fn llmp_recv_blocking(
     page: *mut llmp_page,
     last_msg: *mut llmp_message,
 ) -> *mut llmp_message {
