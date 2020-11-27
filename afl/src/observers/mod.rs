@@ -100,7 +100,7 @@ where
     /// Creates a new MapObserver
     pub fn new(map: &'a mut [T]) -> Self {
         let initial = if map.len() > 0 { map[0] } else { T::zero() };
-        StdMapObserver {
+        Self {
             map: map,
             initial: initial,
         }

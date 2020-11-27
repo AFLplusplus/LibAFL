@@ -53,7 +53,7 @@ where
     R: Rand,
 {
     pub fn new(max_size: usize) -> Self {
-        RandBytesGenerator {
+        Self {
             max_size: max_size,
             phantom: PhantomData,
         }
@@ -92,7 +92,7 @@ where
     R: Rand,
 {
     pub fn new(max_size: usize) -> Self {
-        RandPrintablesGenerator {
+        Self {
             max_size: max_size,
             phantom: PhantomData,
         }

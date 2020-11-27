@@ -18,3 +18,5 @@ hashbrown = "0.9" # A faster hashmap, nostd compatible
 libc = "0.2" # For (*nix) libc
 num = "*"
 xxhash-rust = { version = "0.8.0-beta.5", features = ["xxh3"] } # xxh3 hashing for rust
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+postcard = "0.5.1" # no_std compatible serde serialization fromat

@@ -129,7 +129,7 @@ where
 {
     /// Create a new StdScheduledMutator instance without mutations and corpus
     pub fn new() -> Self {
-        StdScheduledMutator {
+        Self {
             mutations: vec![],
             max_size: DEFAULT_MAX_SIZE,
         }
@@ -186,7 +186,7 @@ where
     pub fn new(mut scheduled: SM) -> Self {
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_splice);
-        HavocBytesMutator {
+        Self {
             scheduled: scheduled,
             phantom: PhantomData,
         }

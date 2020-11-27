@@ -53,7 +53,7 @@ where
         unsafe {
             os_signals::setup_crash_handlers::<I>();
         }
-        InMemoryExecutor {
+        Self {
             harness: harness_fn,
         }
     }

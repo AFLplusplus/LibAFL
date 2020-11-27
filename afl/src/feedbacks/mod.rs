@@ -137,7 +137,7 @@ where
 {
     /// Create new MapFeedback using a map observer
     pub fn new(map_observer: Rc<RefCell<O>>, map_size: usize) -> Self {
-        MapFeedback {
+        Self {
             map_observer: map_observer,
             history_map: create_history_map::<T>(map_size),
             phantom: PhantomData,
@@ -157,7 +157,7 @@ where
         map_observer: Rc<RefCell<O>>,
         history_map: Rc<RefCell<Vec<T>>>,
     ) -> Self {
-        MapFeedback {
+        Self {
             map_observer: map_observer,
             history_map: history_map,
             phantom: PhantomData,
@@ -179,7 +179,7 @@ impl MapNoveltiesMetadata {
     }
 
     pub fn new(novelties: Vec<usize>) -> Self {
-        MapNoveltiesMetadata {
+        Self {
             novelties: novelties,
         }
     }
@@ -253,7 +253,7 @@ where
 {
     /// Create new MapFeedback using a map observer
     pub fn new(map_observer: Rc<RefCell<O>>, map_size: usize) -> Self {
-        MapTrackerFeedback {
+        Self {
             map_observer: map_observer,
             history_map: create_history_map::<T>(map_size),
             phantom: PhantomData,

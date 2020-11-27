@@ -267,7 +267,7 @@ where
     R: Rand,
 {
     pub fn new(executor: E) -> Self {
-        StdState {
+        Self {
             executions: 0,
             start_time: current_milliseconds(),
             metadatas: HashMap::default(),
@@ -386,7 +386,7 @@ where
     R: Rand,
 {
     pub fn new() -> Self {
-        StdEngine {
+        Self {
             stages: vec![],
             phantom: PhantomData,
         }

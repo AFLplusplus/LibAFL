@@ -158,7 +158,7 @@ where
     R: Rand,
 {
     pub fn new() -> Self {
-        InMemoryCorpus {
+        Self {
             entries: vec![],
             pos: 0,
             phantom: PhantomData,
@@ -238,7 +238,7 @@ where
     R: Rand,
 {
     pub fn new(dir_path: PathBuf) -> Self {
-        OnDiskCorpus {
+        Self {
             dir_path: dir_path,
             entries: vec![],
             pos: 0,
@@ -326,7 +326,7 @@ where
     R: Rand,
 {
     pub fn new(corpus: C) -> Self {
-        QueueCorpus {
+        Self {
             corpus: corpus,
             phantom: PhantomData,
             cycles: 0,

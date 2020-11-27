@@ -62,7 +62,7 @@ impl From<&[u8]> for BytesInput {
 impl BytesInput {
     /// Creates a new bytes input using the given bytes
     pub fn new(bytes: Vec<u8>) -> Self {
-        BytesInput { bytes: bytes }
+        Self { bytes: bytes }
     }
 }
 
