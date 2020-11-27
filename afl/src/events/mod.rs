@@ -214,22 +214,17 @@ where
     }
 
     fn handle_in_client(
-        &mut self,
+        &self,
         /*client: &dyn EventManager<S, C, E, I, R>,*/ _state: &mut S,
         corpus: &mut C,
     ) -> Result<(), AflError> {
-        match std::mem::replace(
-            self,
-            Event::None {
-                phantom: PhantomData,
-            },
-        ) {
+        match self {
             Event::NewTestcase {
                 sender_id: _,
                 testcase,
                 phantom: _,
             } => {
-                corpus.add(testcase);
+                corpus.add(testcase.clone());
                 Ok(())
             }
             _ => Err(AflError::Unknown(
@@ -322,7 +317,7 @@ where
         }
         handled
             .iter()
-            .zip(self.events.iter_mut())
+            .zip(self.events.iter())
             .map(|(x, event)| match x {
                 BrokerEventResult::Forward => event.handle_in_client(state, corpus),
                 // Ignore broker-only events

@@ -22,10 +22,33 @@ use crate::AflError;
 pub trait TestcaseMetadata: Any {
     /// The name of this metadata - used to find it in the list of avaliable metadatas
     fn name(&self) -> &'static str;
+
+    fn clone(&self) -> Box<dyn TestcaseMetadata>;
+}
+
+/// Just a wrapper of Boxed TestcaseMetadata trait object for Clone
+#[derive(Serialize, Deserialize)]
+pub struct TestcaseMetadataContainer {
+    meta: Box<dyn TestcaseMetadata>,
+}
+impl Clone for TestcaseMetadataContainer {
+    fn clone(&self) -> Self {
+        TestcaseMetadataContainer {
+            meta: self.meta.clone(),
+        }
+    }
+}
+impl TestcaseMetadataContainer {
+    pub fn meta(&self) -> &Box<dyn TestcaseMetadata> {
+        &self.meta
+    }
+    pub fn meta_mut(&mut self) -> &mut Box<dyn TestcaseMetadata> {
+        &mut self.meta
+    }
 }
 
 /// An entry in the Testcase Corpus
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Testcase<I>
 where
     I: Input,
@@ -36,8 +59,9 @@ where
     filename: Option<String>,
     /// Accumulated fitness from all the feedbacks
     fitness: u32,
+    // TODO find a way to use TypeId
     /// Map of metadatas associated with this testcase
-    metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
+    metadatas: HashMap<String, TestcaseMetadataContainer>,
 }
 
 impl<I> Into<Rc<RefCell<Self>>> for Testcase<I>
@@ -100,12 +124,20 @@ where
     }
 
     /// Get all the metadatas into an HashMap (mutable)
-    pub fn metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>> {
+    pub fn metadatas(&mut self) -> &mut HashMap<String, TestcaseMetadataContainer> {
         &mut self.metadatas
     }
     /// Add a metadata
-    pub fn add_metadata(&mut self, meta: Box<dyn TestcaseMetadata>) {
-        self.metadatas.insert(meta.name().to_string(), meta);
+    pub fn add_metadata<TM>(&mut self, meta: TM)
+    where
+        TM: TestcaseMetadata + 'static,
+    {
+        self.metadatas.insert(
+            meta.name().to_string(),
+            TestcaseMetadataContainer {
+                meta: Box::new(meta),
+            },
+        );
     }
 
     /// Create a new Testcase instace given an input

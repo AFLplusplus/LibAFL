@@ -176,6 +176,10 @@ impl TestcaseMetadata for MapNoveltiesMetadata {
     fn name(&self) -> &'static str {
         "MapNoveltiesMetadata"
     }
+
+    fn clone(&self) -> Box<dyn TestcaseMetadata> {
+        Box::new(MapNoveltiesMetadata::new(self.novelties.clone()))
+    }
 }
 impl MapNoveltiesMetadata {
     pub fn novelties(&self) -> &[usize] {
@@ -235,9 +239,7 @@ where
     }
 
     fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
-        let meta = Box::new(MapNoveltiesMetadata::new(core::mem::take(
-            &mut self.novelties,
-        )));
+        let meta = MapNoveltiesMetadata::new(core::mem::take(&mut self.novelties));
         testcase.add_metadata(meta);
         Ok(())
     }
