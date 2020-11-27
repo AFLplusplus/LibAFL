@@ -1,3 +1,5 @@
+//! Compare the speed of rand implementations
+
 use afl::utils::{Rand, XorShift64Rand, Xoshiro256StarRand};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
