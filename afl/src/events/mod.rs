@@ -328,13 +328,6 @@ where
         dbg!("Handled {} events", count);
         self.events.clear();
 
-        /*
-        let num = self.events.len();
-        for event in &self.events {}
-
-        self.events.clear();
-        */
-
         Ok(count)
     }
 }

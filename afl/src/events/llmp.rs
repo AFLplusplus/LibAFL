@@ -22,7 +22,7 @@ where
     //CE: CustomEvent<S, C, E, I, R>,
 {
     // TODO...
-    _marker: PhantomData<(S, C, E, I, R)>,
+    phantom: PhantomData<(S, C, E, I, R)>,
     is_broker: bool,
 }
 

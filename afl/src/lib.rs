@@ -19,7 +19,6 @@ use alloc::string::String;
 use core::fmt;
 #[cfg(feature = "std")]
 use std::io;
-use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 /// Main error struct for AFL
 #[derive(Debug)]

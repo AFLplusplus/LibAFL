@@ -9,6 +9,10 @@ edition = "2018"
 [dev-dependencies]
 criterion = "0.3" # Benchmarking
 
+[[bench]]
+name = "rand_speeds"
+harness = false
+
 [features]
 default = ["std"]
 std = []
