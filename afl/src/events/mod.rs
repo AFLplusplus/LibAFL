@@ -106,6 +106,9 @@ where
         message: String,
         phantom: PhantomData<(S, C, E, I, R)>,
     },
+    None {
+        phantom: PhantomData<(S, C, E, I, R)>,
+    },
     //Custom {sender_id: u64, custom_event: CE},
 }
 
@@ -122,34 +125,35 @@ where
         match self {
             Event::LoadInitial {
                 sender_id: _,
-                phantom,
+                phantom: _,
             } => "Initial",
             Event::NewTestcase {
                 sender_id: _,
                 testcase: _,
-                phantom,
+                phantom: _,
             } => "New Testcase",
             Event::UpdateStats {
                 sender_id: _,
                 new_execs: _,
-                phantom,
+                phantom: _,
             } => "Stats",
             Event::Crash {
                 sender_id: _,
                 input: _,
-                phantom,
+                phantom: _,
             } => "Crash",
             Event::Timeout {
                 sender_id: _,
                 input: _,
-                phantom,
+                phantom: _,
             } => "Timeout",
             Event::Log {
                 sender_id: _,
                 severity_level: _,
                 message: _,
-                phantom,
+                phantom: _,
             } => "Log",
+            Event::None { phantom: _ } => "None",
             //Event::Custom {sender_id, custom_event} => custom_event.name(),
         }
     }
@@ -160,16 +164,19 @@ where
         _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
         match self {
-            Event::LoadInitial { sender_id: _, phantom } => Ok(BrokerEventResult::Handled),
+            Event::LoadInitial {
+                sender_id: _,
+                phantom: _,
+            } => Ok(BrokerEventResult::Handled),
             Event::NewTestcase {
                 sender_id: _,
                 testcase: _,
-                phantom,
+                phantom: _,
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
                 new_execs: _,
-                phantom,
+                phantom: _,
             } => {
                 // TODO
                 Ok(BrokerEventResult::Handled)
@@ -177,12 +184,12 @@ where
             Event::Crash {
                 sender_id: _,
                 input: _,
-                phantom,
+                phantom: _,
             } => Ok(BrokerEventResult::Handled),
             Event::Timeout {
                 sender_id: _,
                 input: _,
-                phantom,
+                phantom: _,
             } => {
                 // TODO
                 Ok(BrokerEventResult::Handled)
@@ -191,30 +198,38 @@ where
                 sender_id,
                 severity_level,
                 message,
-                phantom,
+                phantom: _,
             } => {
                 //TODO: broker.log()
                 #[cfg(feature = "std")]
                 println!("{}[{}]: {}", sender_id, severity_level, message);
                 Ok(BrokerEventResult::Handled)
-            }
+            },
+            Event::None {
+                phantom: _,
+            } => Ok(BrokerEventResult::Handled)
             //Event::Custom {sender_id, custom_event} => custom_event.handle_in_broker(state, corpus),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }
 
     fn handle_in_client(
-        &self,
+        &mut self,
         /*client: &dyn EventManager<S, C, E, I, R>,*/ _state: &mut S,
         corpus: &mut C,
     ) -> Result<(), AflError> {
-        match self {
+        match std::mem::replace(
+            self,
+            Event::None {
+                phantom: PhantomData,
+            },
+        ) {
             Event::NewTestcase {
                 sender_id: _,
                 testcase,
-                phantom,
+                phantom: _,
             } => {
-                corpus.add(*testcase);
+                corpus.add(testcase);
                 Ok(())
             }
             _ => Err(AflError::Unknown(
@@ -307,7 +322,7 @@ where
         }
         handled
             .iter()
-            .zip(self.events.iter())
+            .zip(self.events.iter_mut())
             .map(|(x, event)| match x {
                 BrokerEventResult::Forward => event.handle_in_client(state, corpus),
                 // Ignore broker-only events

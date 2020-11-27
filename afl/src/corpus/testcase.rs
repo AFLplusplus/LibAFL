@@ -1,13 +1,13 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
-use core::any::Any;
+use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use core::convert::Into;
 use core::default::Default;
 use core::option::Option;
 use hashbrown::HashMap;
-use serde_traitobject::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::inputs::Input;
 use crate::AflError;
@@ -18,7 +18,8 @@ use crate::AflError;
 
 // TODO: Give example
 /// Metadata for a testcase
-pub trait TestcaseMetadata: Any + Serialize + Deserialize<'static> {
+#[typetag::serde(tag = "type")]
+pub trait TestcaseMetadata: Any {
     /// The name of this metadata - used to find it in the list of avaliable metadatas
     fn name(&self) -> &'static str;
 }
@@ -36,7 +37,7 @@ where
     /// Accumulated fitness from all the feedbacks
     fitness: u32,
     /// Map of metadatas associated with this testcase
-    metadatas: HashMap<&'static str, Box<dyn TestcaseMetadata>>,
+    metadatas: HashMap<String, Box<dyn TestcaseMetadata>>,
 }
 
 impl<I> Into<Rc<RefCell<Self>>> for Testcase<I>
@@ -99,12 +100,12 @@ where
     }
 
     /// Get all the metadatas into an HashMap (mutable)
-    pub fn metadatas(&mut self) -> &mut HashMap<&'static str, Box<dyn TestcaseMetadata>> {
+    pub fn metadatas(&mut self) -> &mut HashMap<String, Box<dyn TestcaseMetadata>> {
         &mut self.metadatas
     }
     /// Add a metadata
     pub fn add_metadata(&mut self, meta: Box<dyn TestcaseMetadata>) {
-        self.metadatas.insert(meta.name(), meta);
+        self.metadatas.insert(meta.name().to_string(), meta);
     }
 
     /// Create a new Testcase instace given an input

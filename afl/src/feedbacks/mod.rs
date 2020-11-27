@@ -170,6 +170,8 @@ where
 pub struct MapNoveltiesMetadata {
     novelties: Vec<usize>,
 }
+
+#[typetag::serde]
 impl TestcaseMetadata for MapNoveltiesMetadata {
     fn name(&self) -> &'static str {
         "MapNoveltiesMetadata"
