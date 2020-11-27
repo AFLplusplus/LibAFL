@@ -429,7 +429,34 @@ where
     R: Rand,
     //TODO CE: CustomEvent,
 {
-    pub fn new() -> Self {
+    /// Forks n processes, never returns in broker.
+    pub fn spawn(process_count: usize) -> Self {
+        /*
+        llmp_broker_init(&mut broker).expect("Could not init");
+        for i in 0..counter_thread_count {
+            println!("Adding client {}", i);
+            llmp_broker_register_childprocess_clientloop(
+                &mut broker,
+                llmp_test_clientloop,
+                ptr::null_mut(),
+            )
+            .expect("could not add child clientloop");
+        }
+
+        llmp_broker_register_childprocess_clientloop(
+            &mut broker,
+            test_adder_clientloop,
+            ptr::null_mut(),
+        )
+        .expect("Error registering childprocess");
+
+        println!("Spawning broker");
+
+        llmp_broker_add_message_hook(&mut broker, broker_message_hook, ptr::null_mut());
+
+        llmp_broker_run(&mut broker);
+        */
+
         Self {
             _marker: PhantomData,
         }
