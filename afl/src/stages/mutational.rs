@@ -49,22 +49,19 @@ where
             self.mutator_mut()
                 .mutate(rand, corpus, &mut input_mut, i as i32)?;
 
-            let interesting = state.evaluate_input(&input_mut)?;
+            let fitness = state.evaluate_input(&input_mut)?;
 
             self.mutator_mut()
-                .post_exec(interesting, &input_mut, i as i32)?;
+                .post_exec(fitness, &input_mut, i as i32)?;
 
-            if interesting > 0 {
-                //let new_testcase = state.input_to_testcase(input_mut, interesting)?;
+            let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
+            if let Some(testcase) = testcase_maybe {
+                //corpus.entries()[idx]
                 events.fire(Event::NewTestcase {
                     sender_id: 0,
-                    input: input_mut,
-                    fitness: interesting,
-                    _marker: PhantomData,
+                    testcase: testcase,
+                    phantom: PhantomData,
                 })?;
-            //state.corpus_mut().add(new_testcase); // TODO: Probably no longer needed, once events work
-            } else {
-                state.discard_input(&input_mut)?;
             }
         }
         Ok(())

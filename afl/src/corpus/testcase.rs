@@ -6,6 +6,7 @@ use core::convert::Into;
 use core::default::Default;
 use core::option::Option;
 use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
 
 use crate::inputs::Input;
 use crate::AflError;
@@ -22,7 +23,7 @@ pub trait TestcaseMetadata {
 }
 
 /// An entry in the Testcase Corpus
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Testcase<I>
 where
     I: Input,

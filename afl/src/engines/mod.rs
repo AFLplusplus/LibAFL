@@ -144,16 +144,34 @@ where
         Ok(testcase)
     }
 
-    /// Adds this input to the corpus, if it's intersting
-    fn add_input(&mut self, corpus: &mut C, input: I) -> Result<(), AflError> {
-        let fitness = self.evaluate_input(&input)?;
+    /// Create a testcase from this input, if it's intersting
+    fn testcase_if_interesting(
+        &mut self,
+        input: I,
+        fitness: u32,
+    ) -> Result<Option<Testcase<I>>, AflError> {
         if fitness > 0 {
-            let testcase = self.input_to_testcase(input, fitness)?;
-            corpus.add(testcase);
+            Ok(Some(self.input_to_testcase(input, fitness)?))
         } else {
             self.discard_input(&input)?;
+            Ok(None)
         }
-        Ok(())
+    }
+
+    /// Adds this input to the corpus, if it's intersting
+    fn add_if_interesting(
+        &mut self,
+        corpus: &mut C,
+        input: I,
+        fitness: u32,
+    ) -> Result<Option<usize>, AflError> {
+        if fitness > 0 {
+            let testcase = self.input_to_testcase(input, fitness)?;
+            Ok(Some(corpus.add(testcase)))
+        } else {
+            self.discard_input(&input)?;
+            Ok(None)
+        }
     }
 }
 
@@ -176,12 +194,12 @@ where
 {
     for _ in 0..num {
         let input = generator.generate(rand)?;
-        state.add_input(corpus, input)?;
-        let event = Event::LoadInitial {
+        let fitness = state.evaluate_input(&input)?;
+        state.add_if_interesting(corpus, input, fitness)?;
+        events.fire(Event::LoadInitial {
             sender_id: 0,
-            _marker: PhantomData,
-        };
-        events.fire(event)?;
+            phantom: PhantomData,
+        })?;
     }
     events.process(state, corpus)?;
     Ok(())
@@ -338,7 +356,7 @@ where
                 events.fire(Event::UpdateStats {
                     sender_id: 0,
                     new_execs: 1,
-                    _marker: PhantomData,
+                    phantom: PhantomData,
                 })?; // TODO self.new_execs});
             }
         }

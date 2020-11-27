@@ -35,9 +35,10 @@ where
         self.entries().len()
     }
 
-    /// Add an entry to the corpus
-    fn add(&mut self, testcase: Testcase<I>) {
+    /// Add an entry to the corpus and return its index
+    fn add(&mut self, testcase: Testcase<I>) -> usize {
         self.entries_mut().push(testcase);
+        self.entries().len() - 1
     }
 
     /// Replaces the testcase at the given idx
@@ -199,7 +200,7 @@ where
     R: Rand,
 {
     /// Add an entry and save it to disk
-    fn add(&mut self, mut entry: Testcase<I>) {
+    fn add(&mut self, mut entry: Testcase<I>) -> usize {
         match entry.filename() {
             None => {
                 // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
@@ -210,6 +211,7 @@ where
             _ => {}
         }
         self.entries.push(entry);
+        self.entries.len() - 1
     }
 
     fn current_testcase(&self) -> (&Testcase<I>, usize) {
@@ -285,8 +287,8 @@ where
         self.corpus.count()
     }
 
-    fn add(&mut self, entry: Testcase<I>) {
-        self.corpus.add(entry);
+    fn add(&mut self, entry: Testcase<I>) -> usize {
+        self.corpus.add(entry)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.

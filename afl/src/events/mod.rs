@@ -1,7 +1,6 @@
 #[cfg(feature = "std")]
 pub mod llmp;
 
-use alloc::borrow::ToOwned;
 use alloc::string::String;
 use core::marker::PhantomData;
 
@@ -67,7 +66,7 @@ where
 */
 
 /// Events sent around in the library
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub enum Event<S, C, E, I, R>
 where
     S: State<C, E, I, R>,
@@ -79,34 +78,33 @@ where
 {
     LoadInitial {
         sender_id: u64,
-        _marker: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(S, C, E, I, R)>,
     },
     NewTestcase {
         sender_id: u64,
-        input: I,
-        fitness: u32,
-        _marker: PhantomData<(S, C, E, I, R)>,
+        testcase: Testcase<I>,
+        phantom: PhantomData<(S, C, E, I, R)>,
     },
     UpdateStats {
         sender_id: u64,
         new_execs: usize,
-        _marker: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(S, C, E, I, R)>,
     },
     Crash {
         sender_id: u64,
         input: I,
-        _marker: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(S, C, E, I, R)>,
     },
     Timeout {
         sender_id: u64,
         input: I,
-        _marker: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(S, C, E, I, R)>,
     },
     Log {
         sender_id: u64,
         severity_level: u8,
         message: String,
-        _marker: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(S, C, E, I, R)>,
     },
     //Custom {sender_id: u64, custom_event: CE},
 }
@@ -124,34 +122,33 @@ where
         match self {
             Event::LoadInitial {
                 sender_id: _,
-                _marker,
+                phantom,
             } => "Initial",
             Event::NewTestcase {
                 sender_id: _,
-                input: _,
-                fitness: _,
-                _marker,
+                testcase: _,
+                phantom,
             } => "New Testcase",
             Event::UpdateStats {
                 sender_id: _,
                 new_execs: _,
-                _marker,
+                phantom,
             } => "Stats",
             Event::Crash {
                 sender_id: _,
                 input: _,
-                _marker,
+                phantom,
             } => "Crash",
             Event::Timeout {
                 sender_id: _,
                 input: _,
-                _marker,
+                phantom,
             } => "Timeout",
             Event::Log {
                 sender_id: _,
                 severity_level: _,
                 message: _,
-                _marker,
+                phantom,
             } => "Log",
             //Event::Custom {sender_id, custom_event} => custom_event.name(),
         }
@@ -163,17 +160,16 @@ where
         _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
         match self {
-            Event::LoadInitial { sender_id: _, _marker } => Ok(BrokerEventResult::Handled),
+            Event::LoadInitial { sender_id: _, phantom } => Ok(BrokerEventResult::Handled),
             Event::NewTestcase {
                 sender_id: _,
-                input: _,
-                fitness: _,
-                _marker,
+                testcase: _,
+                phantom,
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
                 new_execs: _,
-                _marker,
+                phantom,
             } => {
                 // TODO
                 Ok(BrokerEventResult::Handled)
@@ -181,12 +177,12 @@ where
             Event::Crash {
                 sender_id: _,
                 input: _,
-                _marker,
+                phantom,
             } => Ok(BrokerEventResult::Handled),
             Event::Timeout {
                 sender_id: _,
                 input: _,
-                _marker,
+                phantom,
             } => {
                 // TODO
                 Ok(BrokerEventResult::Handled)
@@ -195,7 +191,7 @@ where
                 sender_id,
                 severity_level,
                 message,
-                _marker,
+                phantom,
             } => {
                 //TODO: broker.log()
                 #[cfg(feature = "std")]
@@ -215,13 +211,10 @@ where
         match self {
             Event::NewTestcase {
                 sender_id: _,
-                input,
-                fitness,
-                _marker,
+                testcase,
+                phantom,
             } => {
-                let mut testcase = Testcase::new(input.to_owned());
-                testcase.set_fitness(*fitness);
-                corpus.add(testcase);
+                corpus.add(*testcase);
                 Ok(())
             }
             _ => Err(AflError::Unknown(
@@ -367,7 +360,7 @@ where
     //CE: CustomEvent<S, C, E, I, R>,
 {
     // TODO...
-    _marker: PhantomData<(S, C, E, I, R)>,
+    phantom: PhantomData<(S, C, E, I, R)>,
 }
 
 #[cfg(feature = "std")]
@@ -431,7 +424,7 @@ where
 {
     pub fn new() -> Self {
         Self {
-            _marker: PhantomData,
+            phantom: PhantomData,
         }
     }
 }
