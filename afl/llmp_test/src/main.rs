@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate alloc;
+
 use core::convert::TryInto;
 use core::ffi::c_void;
 use core::mem::size_of;
@@ -16,7 +19,7 @@ unsafe fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> 
         counter += 1;
 
         let llmp_message = llmp_client_alloc_next(client, size_of::<u32>());
-        std::ptr::copy(
+        core::ptr::copy(
             counter.to_be_bytes().as_ptr(),
             (*llmp_message).buf.as_mut_ptr(),
             size_of::<u32>(),
@@ -30,7 +33,7 @@ unsafe fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> 
 
 unsafe fn u32_from_msg(message: *const llmp_message) -> u32 {
     u32::from_be_bytes(
-        std::slice::from_raw_parts((*message).buf.as_ptr(), size_of::<u32>())
+        alloc::slice::from_raw_parts((*message).buf.as_ptr(), size_of::<u32>())
             .try_into()
             .unwrap(),
     )
@@ -62,7 +65,7 @@ unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) ->
             );
 
             let llmp_message = llmp_client_alloc_next(client, size_of::<u32>());
-            std::ptr::copy(
+            core::ptr::copy(
                 current_result.to_be_bytes().as_ptr(),
                 (*llmp_message).buf.as_mut_ptr(),
                 size_of::<u32>(),

@@ -1,5 +1,10 @@
 #[cfg(feature = "std")]
 pub mod llmp;
+
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use core::marker::PhantomData;
+
 #[cfg(feature = "std")]
 pub mod llmp_translated; // TODO: Abstract away.
 #[cfg(feature = "std")]
@@ -9,7 +14,7 @@ pub mod shmem_translated;
 pub use crate::events::llmp::LLMP;
 
 #[cfg(feature = "std")]
-use std::{io::Write, marker::PhantomData};
+use std::io::Write;
 
 use crate::corpus::{Corpus, Testcase};
 use crate::engines::State;
@@ -190,6 +195,7 @@ where
                 _marker,
             } => {
                 //TODO: broker.log()
+                #[cfg(feature = "std")]
                 println!("{}[{}]: {}", sender_id, severity_level, message);
                 Ok(BrokerEventResult::Handled)
             }

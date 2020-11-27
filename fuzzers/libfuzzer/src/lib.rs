@@ -1,7 +1,14 @@
-use std::boxed::Box;
-use std::cell::RefCell;
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[macro_use]
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use core::cell::RefCell;
+
+#[cfg(feature = "std")]
 use std::io::stderr;
-use std::rc::Rc;
 
 use afl::corpus::InMemoryCorpus;
 use afl::engines::{generate_initial_inputs, Engine, State, StdEngine, StdState};
@@ -40,6 +47,9 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     let mut corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(32);
+
+    // TODO: No_std event manager
+    #[cfg(feature = "std")]
     let mut events = LoggerEventManager::new(stderr());
 
     let edges_observer = Rc::new(RefCell::new(StdMapObserver::new_from_ptr(
