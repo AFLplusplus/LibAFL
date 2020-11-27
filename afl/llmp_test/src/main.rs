@@ -80,7 +80,7 @@ unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) ->
 }
 
 unsafe fn broker_message_hook(
-    _broker: *mut llmp_broker_state,
+    _broker: *mut llmp_broker,
     client_metadata: *mut llmp_broker_client_metadata,
     message: *mut llmp_message,
     _data: *mut c_void,
@@ -118,7 +118,7 @@ fn main() {
         counter_thread_count
     );
 
-    let mut broker = llmp_broker_state {
+    let mut broker = llmp_broker {
         last_msg_sent: ptr::null_mut(),
         broadcast_map_count: 0,
         broadcast_maps: ptr::null_mut(),
@@ -127,20 +127,20 @@ fn main() {
         llmp_client_count: 0,
         llmp_clients: ptr::null_mut(),
     };
+
     unsafe {
+
         llmp_broker_init(&mut broker).expect("Could not init");
         for i in 0..counter_thread_count {
             println!("Adding client {}", i);
-            llmp_broker_register_childprocess_clientloop(
-                &mut broker,
+            broker.register_childprocess_clientloop(
                 llmp_test_clientloop,
                 ptr::null_mut(),
             )
             .expect("could not add child clientloop");
         }
 
-        llmp_broker_register_childprocess_clientloop(
-            &mut broker,
+        broker.register_childprocess_clientloop(
             test_adder_clientloop,
             ptr::null_mut(),
         )
@@ -148,8 +148,8 @@ fn main() {
 
         println!("Spawning broker");
 
-        llmp_broker_add_message_hook(&mut broker, broker_message_hook, ptr::null_mut());
+        broker.add_message_hook(broker_message_hook, ptr::null_mut());
 
-        llmp_broker_run(&mut broker);
+        broker.run();
     }
 }

@@ -12,7 +12,7 @@ pub mod llmp_translated; // TODO: Abstract away.
 pub mod shmem_translated;
 
 #[cfg(feature = "std")]
-pub use crate::events::llmp::LLMP;
+pub use crate::events::llmp::LLMPEventManager;
 
 #[cfg(feature = "std")]
 use std::io::Write;
@@ -344,87 +344,6 @@ where
         Self {
             events: vec![],
             writer: writer,
-        }
-    }
-}
-
-/// Eventmanager for multi-processed application
-#[cfg(feature = "std")]
-pub struct LLMPEventManager<S, C, E, I, R>
-where
-    S: State<C, E, I, R>,
-    C: Corpus<I, R>,
-    I: Input,
-    E: Executor<I>,
-    R: Rand,
-    //CE: CustomEvent<S, C, E, I, R>,
-{
-    // TODO...
-    phantom: PhantomData<(S, C, E, I, R)>,
-}
-
-#[cfg(feature = "std")]
-impl<S, C, E, I, R> EventManager<S, C, E, I, R> for LLMPEventManager<S, C, E, I, R>
-where
-    S: State<C, E, I, R>,
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    I: Input,
-    R: Rand,
-    //CE: CustomEvent<S, C, E, I, R>,
-{
-    fn enabled(&self) -> bool {
-        true
-    }
-
-    fn fire(&mut self, event: Event<S, C, E, I, R>) -> Result<(), AflError> {
-        //self.events.push(event);
-        Ok(())
-    }
-
-    fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError> {
-        // TODO: iterators
-        /*
-        let mut handled = vec![];
-        for x in self.events.iter() {
-            handled.push(x.handle_in_broker(state, corpus)?);
-        }
-        handled
-            .iter()
-            .zip(self.events.iter())
-            .map(|(x, event)| match x {
-                BrokerEventResult::Forward => event.handle_in_client(state, corpus),
-                // Ignore broker-only events
-                BrokerEventResult::Handled => Ok(()),
-            })
-            .for_each(drop);
-        let count = self.events.len();
-        dbg!("Handled {} events", count);
-        self.events.clear();
-
-        let num = self.events.len();
-        for event in &self.events {}
-
-        self.events.clear();
-        */
-
-        Ok(0)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<S, C, E, I, R> LLMPEventManager<S, C, E, I, R>
-where
-    S: State<C, E, I, R>,
-    C: Corpus<I, R>,
-    I: Input,
-    E: Executor<I>,
-    R: Rand,
-    //TODO CE: CustomEvent,
-{
-    pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
         }
     }
 }
