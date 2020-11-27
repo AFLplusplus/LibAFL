@@ -1,12 +1,13 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
+use core::any::Any;
 use core::cell::RefCell;
 use core::convert::Into;
 use core::default::Default;
 use core::option::Option;
 use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
+use serde_traitobject::{Deserialize, Serialize};
 
 use crate::inputs::Input;
 use crate::AflError;
@@ -17,7 +18,7 @@ use crate::AflError;
 
 // TODO: Give example
 /// Metadata for a testcase
-pub trait TestcaseMetadata {
+pub trait TestcaseMetadata: Any + Serialize + Deserialize<'static> {
     /// The name of this metadata - used to find it in the list of avaliable metadatas
     fn name(&self) -> &'static str;
 }

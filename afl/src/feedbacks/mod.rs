@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use num::Integer;
+use serde::{Deserialize, Serialize};
 
 use crate::corpus::{Testcase, TestcaseMetadata};
 use crate::inputs::Input;
@@ -165,6 +166,7 @@ where
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MapNoveltiesMetadata {
     novelties: Vec<usize>,
 }
