@@ -1,7 +1,5 @@
-use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
-use core::any::Any;
 use core::cell::RefCell;
 use core::convert::Into;
 use core::default::Default;
@@ -10,6 +8,7 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::inputs::Input;
+use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
 use crate::AflError;
 
 // TODO PathBuf for no_std and change filename to PathBuf
@@ -18,14 +17,12 @@ use crate::AflError;
 
 // TODO: Give example
 /// Metadata for a testcase
-#[typetag::serde(tag = "type")]
-pub trait TestcaseMetadata: Any {
+pub trait TestcaseMetadata: SerdeAny {
     /// The name of this metadata - used to find it in the list of avaliable metadatas
     fn name(&self) -> &'static str;
-
-    fn clone(&self) -> Box<dyn TestcaseMetadata>;
 }
 
+/*
 /// Just a wrapper of Boxed TestcaseMetadata trait object for Clone
 #[derive(Serialize, Deserialize)]
 pub struct TestcaseMetadataContainer {
@@ -45,10 +42,10 @@ impl TestcaseMetadataContainer {
     pub fn meta_mut(&mut self) -> &mut Box<dyn TestcaseMetadata> {
         &mut self.meta
     }
-}
+}*/
 
 /// An entry in the Testcase Corpus
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Testcase<I>
 where
     I: Input,
@@ -61,7 +58,7 @@ where
     fitness: u32,
     // TODO find a way to use TypeId
     /// Map of metadatas associated with this testcase
-    metadatas: HashMap<String, TestcaseMetadataContainer>,
+    metadatas: SerdeAnyMap,
 }
 
 impl<I> Into<Rc<RefCell<Self>>> for Testcase<I>
@@ -124,7 +121,7 @@ where
     }
 
     /// Get all the metadatas into an HashMap (mutable)
-    pub fn metadatas(&mut self) -> &mut HashMap<String, TestcaseMetadataContainer> {
+    pub fn metadatas(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadatas
     }
     /// Add a metadata
@@ -132,12 +129,7 @@ where
     where
         TM: TestcaseMetadata + 'static,
     {
-        self.metadatas.insert(
-            meta.name().to_string(),
-            TestcaseMetadataContainer {
-                meta: Box::new(meta),
-            },
-        );
+        self.metadatas.insert(meta);
     }
 
     /// Create a new Testcase instace given an input
@@ -149,7 +141,7 @@ where
             input: Some(input.into()),
             filename: None,
             fitness: 0,
-            metadatas: HashMap::default(),
+            metadatas: SerdeAnyMap::new(),
         }
     }
 
@@ -159,7 +151,7 @@ where
             input: Some(input),
             filename: Some(filename),
             fitness: 0,
-            metadatas: HashMap::default(),
+            metadatas: SerdeAnyMap::new(),
         }
     }
 
@@ -168,7 +160,7 @@ where
             input: None,
             filename: None,
             fitness: 0,
-            metadatas: HashMap::default(),
+            metadatas: SerdeAnyMap::new(),
         }
     }
 }

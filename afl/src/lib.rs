@@ -14,6 +14,7 @@ pub mod mutators;
 pub mod observers;
 pub mod stages;
 pub mod utils;
+pub mod serde_anymap;
 
 use alloc::string::String;
 use core::fmt;

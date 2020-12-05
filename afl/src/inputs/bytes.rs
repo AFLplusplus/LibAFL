@@ -10,7 +10,7 @@ use crate::AflError;
 /// A bytes input is the basic input
 #[derive(Clone, Debug, Default)]
 pub struct BytesInput {
-    pub bytes: Vec<u8>,
+    bytes: Vec<u8>,
 }
 
 impl Input for BytesInput {

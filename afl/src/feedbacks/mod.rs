@@ -3,12 +3,14 @@ use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
+use core::any::Any;
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::{Testcase, TestcaseMetadata};
 use crate::inputs::Input;
 use crate::observers::MapObserver;
+use crate::serde_anymap::SerdeAny;
 use crate::AflError;
 
 pub trait Feedback<I>
@@ -171,14 +173,18 @@ pub struct MapNoveltiesMetadata {
     novelties: Vec<usize>,
 }
 
-#[typetag::serde]
+impl SerdeAny for MapNoveltiesMetadata {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
 impl TestcaseMetadata for MapNoveltiesMetadata {
     fn name(&self) -> &'static str {
         "MapNoveltiesMetadata"
-    }
-
-    fn clone(&self) -> Box<dyn TestcaseMetadata> {
-        Box::new(MapNoveltiesMetadata::new(self.novelties.clone()))
     }
 }
 impl MapNoveltiesMetadata {
