@@ -214,7 +214,7 @@ where
     }
 
     fn handle_in_client(
-        &self,
+        self,
         /*client: &dyn EventManager<S, C, E, I, R>,*/ _state: &mut S,
         corpus: &mut C,
     ) -> Result<(), AflError> {
@@ -224,7 +224,7 @@ where
                 testcase,
                 phantom: _,
             } => {
-                corpus.add(testcase.clone());
+                corpus.add(testcase);
                 Ok(())
             }
             _ => Err(AflError::Unknown(
@@ -315,19 +315,16 @@ where
         for x in self.events.iter() {
             handled.push(x.handle_in_broker(state, corpus)?);
         }
-        handled
-            .iter()
-            .zip(self.events.iter())
-            .map(|(x, event)| match x {
-                BrokerEventResult::Forward => event.handle_in_client(state, corpus),
-                // Ignore broker-only events
-                BrokerEventResult::Handled => Ok(()),
-            })
-            .for_each(drop);
         let count = self.events.len();
+        while self.events.len() > 0 {
+            let event = self.events.pop().unwrap();
+            match handled.pop().unwrap() {
+                BrokerEventResult::Forward => event.handle_in_client(state, corpus)?,
+                // Ignore broker-only events
+                BrokerEventResult::Handled => (),
+            }
+        }
         dbg!("Handled {} events", count);
-        self.events.clear();
-
         Ok(count)
     }
 }
