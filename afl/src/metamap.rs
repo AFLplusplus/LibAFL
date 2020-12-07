@@ -240,3 +240,103 @@ impl MetaInstanceMap {
         }
     }
 }
+
+pub struct NamedAnyMap {
+    map: HashMap<TypeId, HashMap<&'static str, Box<dyn Any>>>,
+}
+
+impl NamedAnyMap {
+    pub fn get<T>(&self, name: &'static str) -> Option<&T>
+    where
+        T: Any,
+    {
+        match self.map.get(&TypeId::of::<T>()) {
+            None => None,
+            Some(h) => h
+                .get(&name)
+                .map(|x| x.as_ref().downcast_ref::<T>().unwrap()),
+        }
+    }
+
+    pub fn get_mut<T>(&mut self, name: &'static str) -> Option<&mut T>
+    where
+        T: Any,
+    {
+        match self.map.get_mut(&TypeId::of::<T>()) {
+            None => None,
+            Some(h) => h
+                .get_mut(&name)
+                .map(|x| x.as_mut().downcast_mut::<T>().unwrap()),
+        }
+    }
+
+    pub fn get_all<T>(
+        &self,
+    ) -> Option<core::iter::Map<Values<'_, &'static str, Box<dyn Any>>, fn(&Box<dyn Any>) -> &T>>
+    where
+        T: Any,
+    {
+        match self.map.get(&TypeId::of::<T>()) {
+            None => None,
+            Some(h) => Some(h.values().map(|x| x.as_ref().downcast_ref::<T>().unwrap())),
+        }
+    }
+
+    pub fn get_all_mut<T>(
+        &mut self,
+    ) -> Option<
+        core::iter::Map<ValuesMut<'_, &'static str, Box<dyn Any>>, fn(&mut Box<dyn Any>) -> &mut T>,
+    >
+    where
+        T: Any,
+    {
+        match self.map.get_mut(&TypeId::of::<T>()) {
+            None => None,
+            Some(h) => Some(
+                h.values_mut()
+                    .map(|x| x.as_mut().downcast_mut::<T>().unwrap()),
+            ),
+        }
+    }
+
+    pub fn insert<T>(&mut self, t: T, name: &'static str)
+    where
+        T: Any,
+    {
+        let typeid = TypeId::of::<T>();
+        if !self.map.contains_key(&typeid) {
+            self.map.insert(typeid, HashMap::default());
+        }
+        self.map
+            .get_mut(&typeid)
+            .unwrap()
+            .insert(name, Box::new(t));
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    pub fn contains_type<T>(&self) -> bool
+    where
+        T: Any,
+    {
+        self.map.contains_key(&TypeId::of::<T>())
+    }
+
+    pub fn contains<T>(&self, name: &'static str) -> bool
+    where
+        T: Any,
+    {
+        match self.map.get(&TypeId::of::<T>()) {
+            None => false,
+            Some(h) => h.contains_key(&name),
+        }
+    }
+
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::default(),
+        }
+    }
+}
