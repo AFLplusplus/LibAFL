@@ -1,8 +1,8 @@
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use core::any::Any;
 use core::cell::RefCell;
 use core::marker::PhantomData;
-use core::any::Any;
 use num::Integer;
 use serde::{Deserialize, Serialize};
 

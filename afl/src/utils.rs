@@ -339,5 +339,4 @@ mod tests {
         assert_eq!(next_pow2(1000), 1024);
         assert_eq!(next_pow2(0xFFFFFFFF as u64), (0xFFFFFFFF as u64) + 1);
     }
-    
 }
