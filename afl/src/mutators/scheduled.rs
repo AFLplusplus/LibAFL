@@ -207,25 +207,32 @@ where
         scheduled.add_mutation(mutation_byteinc);
         scheduled.add_mutation(mutation_bytedec);
         scheduled.add_mutation(mutation_byteneg);
+        scheduled.add_mutation(mutation_byterand);
 
-        //scheduled.add_mutation(mutation_bytesexpand);
-        //scheduled.add_mutation(mutation_bytesdelete);
-        //scheduled.add_mutation(mutation_bytesdelete);
-        //scheduled.add_mutation(mutation_bytesdelete);
-        //scheduled.add_mutation(mutation_bytesdelete);
-
+        scheduled.add_mutation(mutation_byteadd);
+        scheduled.add_mutation(mutation_wordadd);
+        scheduled.add_mutation(mutation_dwordadd);
+        scheduled.add_mutation(mutation_qwordadd);
+        scheduled.add_mutation(mutation_byteinteresting);
+        scheduled.add_mutation(mutation_wordinteresting);
+        scheduled.add_mutation(mutation_dwordinteresting);
+        
+        scheduled.add_mutation(mutation_bytesdelete);
+        scheduled.add_mutation(mutation_bytesdelete);
+        scheduled.add_mutation(mutation_bytesdelete);
+        scheduled.add_mutation(mutation_bytesdelete);
+        scheduled.add_mutation(mutation_bytesexpand);
+        scheduled.add_mutation(mutation_bytesinsert);
+        scheduled.add_mutation(mutation_bytesrandinsert);
+        scheduled.add_mutation(mutation_bytesset);
+        scheduled.add_mutation(mutation_bytesrandset);
+        scheduled.add_mutation(mutation_bytescopy);
+        scheduled.add_mutation(mutation_bytesswap);
+    
+        // TODO dictionary and custom dictionary (redqueen etc.)
+        /*scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
+        scheduled.add_mutation(mutation_bitflip);*/
 
         scheduled.add_mutation(mutation_splice);
         HavocBytesMutator {
