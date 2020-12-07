@@ -7,6 +7,7 @@ use num::Integer;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::{Testcase, TestcaseMetadata};
+use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::observers::MapObserver;
 use crate::serde_anymap::SerdeAny;
@@ -17,7 +18,7 @@ where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, input: &I) -> Result<u32, AflError>;
+    fn is_interesting(&mut self, input: &I, executor: &dyn Executor<I>) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
@@ -28,6 +29,8 @@ where
     fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }
+
+    fn name(&self) -> &'static str;
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
@@ -78,16 +81,6 @@ where
     }
 }
 
-/// Returns a usable history map of the given size
-pub fn create_history_map<T>(map_size: usize) -> Rc<RefCell<Vec<T>>>
-where
-    T: Default + Clone,
-{
-    {
-        Rc::new(RefCell::new(vec![T::default(); map_size]))
-    }
-}
-
 /// The most common AFL-like feedback type
 pub struct MapFeedback<T, R, O>
 where
@@ -96,11 +89,11 @@ where
     O: MapObserver<T>,
 {
     /// Contains information about untouched entries
-    history_map: Rc<RefCell<Vec<T>>>,
-    /// The observer this feedback struct observes
-    map_observer: Rc<RefCell<O>>,
+    history_map: Vec<T>,
+    /// Name identifier of this instance
+    name: &'static str,
     /// Phantom Data of Reducer
-    phantom: PhantomData<R>,
+    phantom: PhantomData<(R, O)>,
 }
 
 impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
@@ -110,9 +103,8 @@ where
     O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting(&mut self, _input: &I) -> Result<u32, AflError> {
+    fn is_interesting(&mut self, _input: &I, executor: &dyn Executor<I>) -> Result<u32, AflError> {
         let mut interesting = 0;
-
         // TODO optimize
         let size = self.map_observer.borrow().map().len();
         let mut history_map = self.history_map.borrow_mut();
@@ -129,6 +121,10 @@ where
 
         Ok(interesting)
     }
+
+    fn name(&self) -> &'static str {
+        self.name
+    }
 }
 
 impl<T, R, O> MapFeedback<T, R, O>
@@ -137,11 +133,11 @@ where
     R: Reducer<T>,
     O: MapObserver<T>,
 {
-    /// Create new MapFeedback using a map observer
-    pub fn new(map_observer: Rc<RefCell<O>>, map_size: usize) -> Self {
+    /// Create new MapFeedback
+    pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
-            map_observer: map_observer,
-            history_map: create_history_map::<T>(map_size),
+            history_map: vec![T::default(); map_size],
+            name: name,
             phantom: PhantomData,
         }
     }
@@ -155,13 +151,10 @@ where
 {
     /// Create new MapFeedback using a map observer, and a map.
     /// The map can be shared.
-    pub fn with_history_map(
-        map_observer: Rc<RefCell<O>>,
-        history_map: Rc<RefCell<Vec<T>>>,
-    ) -> Self {
+    pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
-            map_observer: map_observer,
             history_map: history_map,
+            name: name,
             phantom: PhantomData,
         }
     }
@@ -206,11 +199,11 @@ where
     O: MapObserver<T>,
 {
     /// Contains information about untouched entries
-    history_map: Rc<RefCell<Vec<T>>>,
-    /// The observer this feedback struct observes
-    map_observer: Rc<RefCell<O>>,
+    history_map: Vec<T>,
+    /// Name identifier of this instance
+    name: &'static str,
     /// Phantom Data of Reducer
-    phantom: PhantomData<R>,
+    phantom: PhantomData<(R, O)>,
     /// Track novel entries indexes
     novelties: Vec<usize>,
 }
@@ -253,6 +246,10 @@ where
     fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
         self.novelties.clear();
         Ok(())
+    }
+
+    fn name(&self) -> &'static str {
+        self.name
     }
 }
 

@@ -1,16 +1,15 @@
 extern crate num;
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
-use core::slice::from_raw_parts_mut;
 use core::any::Any;
+use core::slice::from_raw_parts_mut;
 use num::Integer;
 
+use crate::metamap::AsAny;
 use crate::AflError;
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer: Any {
+pub trait Observer: Any + AsAny {
     fn flush(&mut self) -> Result<(), AflError> {
         Ok(())
     }
@@ -20,6 +19,8 @@ pub trait Observer: Any {
     fn post_exec(&mut self) -> Result<(), AflError> {
         Ok(())
     }
+
+    fn name(&self) -> &'static str;
 }
 
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
@@ -52,24 +53,41 @@ where
     }
 }
 
-pub struct StdMapObserver<'a, T>
+pub struct StdMapObserver<T>
 where
-    T: Integer + Copy,
+    T: Integer + Copy + 'static,
 {
-    map: &'a mut [T],
+    map: &'static mut [T],
     initial: T,
+    name: &'static str,
 }
 
-impl<'a, T> Observer for StdMapObserver<'a, T>
+impl<T> Observer for StdMapObserver<T>
 where
     T: Integer + Copy,
 {
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
     }
+
+    fn name(&self) -> &'static str {
+        self.name
+    }
 }
 
-impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
+impl<T> AsAny for StdMapObserver<T>
+where
+    T: Integer + Copy,
+{
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+impl<T> MapObserver<T> for StdMapObserver<T>
 where
     T: Integer + Copy,
 {
@@ -94,36 +112,29 @@ where
     }
 }
 
-impl<'a, T> StdMapObserver<'a, T>
+impl<T> StdMapObserver<T>
 where
     T: Integer + Copy,
 {
     /// Creates a new MapObserver
-    pub fn new(map: &'a mut [T]) -> Self {
+    pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
         let initial = if map.len() > 0 { map[0] } else { T::zero() };
         Self {
             map: map,
             initial: initial,
+            name: name,
         }
     }
 
     /// Creates a new MapObserver from a raw pointer
-    pub fn new_from_ptr(map_ptr: *mut T, len: usize) -> Self {
+    pub fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
         unsafe {
             let initial = if len > 0 { *map_ptr } else { T::zero() };
             StdMapObserver {
                 map: from_raw_parts_mut(map_ptr, len),
                 initial: initial,
+                name: name,
             }
         }
-    }
-}
-
-impl<'a, T> Into<Rc<RefCell<Self>>> for StdMapObserver<'a, T>
-where
-    T: Integer + Copy,
-{
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
     }
 }
