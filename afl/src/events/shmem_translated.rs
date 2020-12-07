@@ -1,6 +1,8 @@
 use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
 use std::ffi::CStr;
 
+use crate::AflError;
+
 extern "C" {
     #[no_mangle]
     fn snprintf(_: *mut c_char, _: c_ulong, _: *const c_char, _: ...) -> c_int;
@@ -49,32 +51,14 @@ pub struct shmid_ds {
     pub __glibc_reserved4: c_ulong,
     pub __glibc_reserved5: c_ulong,
 }
-pub const AFL_RET_EMPTY: c_uint = 20;
-pub const AFL_RET_ERROR_INPUT_COPY: c_uint = 19;
-pub const AFL_RET_TRIM_FAIL: c_uint = 18;
-pub const AFL_RET_NO_FUZZ_WORKERS: c_uint = 17;
-pub const AFL_RET_ERROR_INITIALIZE: c_uint = 16;
-pub const AFL_RET_QUEUE_ENDS: c_uint = 15;
-pub const AFL_RET_WRITE_TO_CRASH: c_uint = 14;
-pub const AFL_RET_NULL_QUEUE_ENTRY: c_uint = 13;
-pub const AFL_RET_ERRNO: c_uint = 12;
-pub const AFL_RET_NULL_PTR: c_uint = 11;
-pub const AFL_RET_BROKEN_TARGET: c_uint = 10;
-pub const AFL_RET_EXEC_ERROR: c_uint = 9;
-pub const AFL_RET_ARRAY_END: c_uint = 8;
-pub const AFL_RET_SHORT_WRITE: c_uint = 7;
-pub const AFL_RET_SHORT_READ: c_uint = 6;
-pub const AFL_RET_FILE_SIZE: c_uint = 5;
-pub const AFL_RET_FILE_OPEN_ERROR: c_uint = 4;
-pub const AFL_RET_ALLOC: c_uint = 3;
-pub const AFL_RET_FILE_DUPLICATE: c_uint = 2;
-pub const AFL_RET_UNKNOWN_ERROR: c_uint = 1;
-pub const AFL_RET_SUCCESS: c_uint = 0;
+const AFL_RET_ERRNO: c_uint = 12;
+const AFL_RET_NULL_PTR: c_uint = 11;
+const AFL_RET_SUCCESS: c_uint = 0;
 
 // A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct AflShmem {
     pub shm_str: [u8; 20],
@@ -83,7 +67,68 @@ pub struct AflShmem {
     pub map_size: c_ulong,
 }
 
-pub unsafe fn afl_shmem_deinit(mut shm: *mut AflShmem) {
+/// Deinit on drop
+impl Drop for AflShmem {
+    fn drop(&mut self) {
+        unsafe {
+            afl_shmem_deinit(self);
+        }
+    }
+}
+
+/// Create an uninitialized shmap
+const fn afl_shmem_unitialized() -> AflShmem {
+    AflShmem {
+        shm_str: [0; 20],
+        shm_id: -1,
+        map: 0 as *mut c_uchar,
+        map_size: 0,
+    }
+}
+
+impl AflShmem {
+    fn from_str(shm_str: &CStr, map_size: c_ulong) -> Result<Self, AflError> {
+        let mut ret = afl_shmem_unitialized();
+        let map = unsafe { afl_shmem_init(&mut ret, map_size) };
+        if map != 0 as *mut u8 {
+            Ok(ret)
+        } else {
+            Err(AflError::Unknown(format!(
+                "Could not allocate map with id {:?}",
+                shm_str
+            )))
+        }
+    }
+
+    fn new(map_size: c_ulong) -> Result<Self, AflError> {
+        let mut ret = afl_shmem_unitialized();
+        let map = unsafe { afl_shmem_init(&mut ret, map_size) };
+        if map != 0 as *mut u8 {
+            Ok(ret)
+        } else {
+            Err(AflError::Unknown(format!(
+                "Could not allocate map of size {}",
+                map_size
+            )))
+        }
+    }
+
+    /// Sets this shm id as env variable with the given name
+    /// Also write the map size as name#_SIZE env
+    fn to_env_var(&self, env_name: &CStr) -> Result<(), AflError> {
+        if unsafe { afl_shmem_to_env_var(&self, env_name) } == AFL_RET_SUCCESS {
+            Ok(())
+        } else {
+            Err(AflError::Unknown(format!(
+                "Could not set env variable {:?}",
+                env_name
+            )))
+        }
+    }
+}
+
+/// Deinitialize this shmem instance
+pub unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
     if shm.is_null() || (*shm).map.is_null() {
         /* Serialized map id */
         // Not set or not initialized;
@@ -93,9 +138,10 @@ pub unsafe fn afl_shmem_deinit(mut shm: *mut AflShmem) {
     shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
     (*shm).map = 0 as *mut c_uchar;
 }
-// Functions to create Shared memory region, for observation channels and
-// opening inputs and stuff.
-pub unsafe fn afl_shmem_init(mut shm: *mut AflShmem, map_size: c_ulong) -> *mut c_uchar {
+
+/// Functions to create Shared memory region, for observation channels and
+/// opening inputs and stuff.
+pub unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: c_ulong) -> *mut c_uchar {
     (*shm).map_size = map_size;
     (*shm).map = 0 as *mut c_uchar;
     (*shm).shm_id = shmget(
@@ -125,8 +171,9 @@ pub unsafe fn afl_shmem_init(mut shm: *mut AflShmem, map_size: c_ulong) -> *mut 
     return (*shm).map;
 }
 
+/// Uses a shmap id string to open a shared map
 pub unsafe fn afl_shmem_by_str(
-    mut shm: *mut AflShmem,
+    shm: *mut AflShmem,
     shm_str: &CStr,
     map_size: c_ulong,
 ) -> *mut c_uchar {
@@ -155,8 +202,7 @@ pub unsafe fn afl_shmem_by_str(
     return (*shm).map;
 }
 
-/* Write sharedmap as env var */
-/* Write sharedmap as env var and the size as name#_SIZE */
+/// Write sharedmap as env var and the size as name#_SIZE
 pub unsafe fn afl_shmem_to_env_var(shmem: &AflShmem, env_name: &CStr) -> c_uint {
     let env_len = env_name.to_bytes().len();
     if env_len == 0 || env_len > 200 || (*shmem).shm_str[0 as c_int as usize] == 0 {
