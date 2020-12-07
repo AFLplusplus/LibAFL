@@ -13,40 +13,40 @@ use afl::events::llmp_translated::*;
 const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
 const TAG_MATH_RESULT_V1: u32 = 0x77474331;
 
-unsafe fn llmp_test_clientloop(client: *mut llmp_client, _data: *mut c_void) -> ! {
+unsafe fn llmp_test_clientloop(client: *mut LlmpClient, _data: *mut c_void) -> ! {
     let mut counter: u32 = 0;
     loop {
         counter += 1;
 
-        let llmp_message = llmp_client_alloc_next(client, size_of::<u32>());
+        let msg = llmp_client_alloc_next(client, size_of::<u32>());
         core::ptr::copy(
             counter.to_be_bytes().as_ptr(),
-            (*llmp_message).buf.as_mut_ptr(),
+            (*msg).buf.as_mut_ptr(),
             size_of::<u32>(),
         );
-        (*llmp_message).tag = TAG_SIMPLE_U32_V1;
-        llmp_client_send(client, llmp_message).unwrap();
+        (*msg).tag = TAG_SIMPLE_U32_V1;
+        llmp_client_send(client, msg).unwrap();
 
         thread::sleep(time::Duration::from_millis(100));
     }
 }
 
-unsafe fn u32_from_msg(message: *const llmp_message) -> u32 {
+unsafe fn u32_from_msg(msg: *const LlmpMsg) -> u32 {
     u32::from_be_bytes(
-        alloc::slice::from_raw_parts((*message).buf.as_ptr(), size_of::<u32>())
+        alloc::slice::from_raw_parts((*msg).buf.as_ptr(), size_of::<u32>())
             .try_into()
             .unwrap(),
     )
 }
 
-unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) -> ! {
+unsafe fn test_adder_clientloop(client: *mut LlmpClient, _data: *mut c_void) -> ! {
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
         let mut msg_counter = 0;
         loop {
             let last_msg = llmp_client_recv(client);
-            if last_msg == 0 as *mut llmp_message {
+            if last_msg == 0 as *mut LlmpMsg {
                 break;
             }
             msg_counter += 1;
@@ -64,14 +64,14 @@ unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) ->
                 msg_counter, current_result
             );
 
-            let llmp_message = llmp_client_alloc_next(client, size_of::<u32>());
+            let msg = llmp_client_alloc_next(client, size_of::<u32>());
             core::ptr::copy(
                 current_result.to_be_bytes().as_ptr(),
-                (*llmp_message).buf.as_mut_ptr(),
+                (*msg).buf.as_mut_ptr(),
                 size_of::<u32>(),
             );
-            (*llmp_message).tag = TAG_MATH_RESULT_V1;
-            llmp_client_send(client, llmp_message).unwrap();
+            (*msg).tag = TAG_MATH_RESULT_V1;
+            llmp_client_send(client, msg).unwrap();
             last_result = current_result;
         }
 
@@ -81,10 +81,10 @@ unsafe fn test_adder_clientloop(client: *mut llmp_client, _data: *mut c_void) ->
 
 unsafe fn broker_message_hook(
     _broker: *mut LlmpBroker,
-    client_metadata: *mut llmp_broker_client_metadata,
-    message: *mut llmp_message,
+    client_metadata: *mut LlmpBrokerClientMetadata,
+    message: *mut LlmpMsg,
     _data: *mut c_void,
-) -> LlmpMessageHookResult {
+) -> LlmpMsgHookResult {
     match (*message).tag {
         TAG_SIMPLE_U32_V1 => {
             println!(
@@ -92,18 +92,18 @@ unsafe fn broker_message_hook(
                 (*client_metadata).pid,
                 u32_from_msg(message)
             );
-            LlmpMessageHookResult::ForwardToClients
+            LlmpMsgHookResult::ForwardToClients
         }
         TAG_MATH_RESULT_V1 => {
             println!(
                 "Adder Client has this current result: {:?}",
                 u32_from_msg(message)
             );
-            LlmpMessageHookResult::Handled
+            LlmpMsgHookResult::Handled
         }
         _ => {
             println!("Unknwon message id received!");
-            LlmpMessageHookResult::ForwardToClients
+            LlmpMsgHookResult::ForwardToClients
         }
     }
 }

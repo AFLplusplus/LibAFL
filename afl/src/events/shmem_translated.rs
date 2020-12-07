@@ -76,26 +76,26 @@ pub const AFL_RET_SUCCESS: c_uint = 0;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct afl_shmem {
-    pub shm_str: [c_char; 20],
+pub struct AflShmem {
+    pub shm_str: [u8; 20],
     pub shm_id: c_int,
     pub map: *mut c_uchar,
     pub map_size: c_ulong,
 }
 
-pub unsafe fn afl_shmem_deinit(mut shm: *mut afl_shmem) {
+pub unsafe fn afl_shmem_deinit(mut shm: *mut AflShmem) {
     if shm.is_null() || (*shm).map.is_null() {
         /* Serialized map id */
         // Not set or not initialized;
         return;
     }
-    (*shm).shm_str[0 as usize] = '\u{0}' as c_char;
+    (*shm).shm_str[0 as usize] = '\u{0}' as u8;
     shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
     (*shm).map = 0 as *mut c_uchar;
 }
 // Functions to create Shared memory region, for observation channels and
 // opening inputs and stuff.
-pub unsafe fn afl_shmem_init(mut shm: *mut afl_shmem, map_size: c_ulong) -> *mut c_uchar {
+pub unsafe fn afl_shmem_init(mut shm: *mut AflShmem, map_size: c_ulong) -> *mut c_uchar {
     (*shm).map_size = map_size;
     (*shm).map = 0 as *mut c_uchar;
     (*shm).shm_id = shmget(
@@ -104,7 +104,7 @@ pub unsafe fn afl_shmem_init(mut shm: *mut afl_shmem, map_size: c_ulong) -> *mut
         0o1000 as c_int | 0o2000 as c_int | 0o600 as c_int,
     );
     if (*shm).shm_id < 0 as c_int {
-        (*shm).shm_str[0] = '\u{0}' as c_char;
+        (*shm).shm_str[0] = '\u{0}' as u8;
         return 0 as *mut c_uchar;
     }
     snprintf(
@@ -114,19 +114,19 @@ pub unsafe fn afl_shmem_init(mut shm: *mut afl_shmem, map_size: c_ulong) -> *mut
         (*shm).shm_id,
     );
     (*shm).shm_str[(::std::mem::size_of::<[c_char; 20]>() as c_ulong)
-        .wrapping_sub(1 as c_int as c_ulong) as usize] = '\u{0}' as c_char;
+        .wrapping_sub(1 as c_int as c_ulong) as usize] = '\u{0}' as u8;
     (*shm).map = shmat((*shm).shm_id, 0 as *const c_void, 0 as c_int) as *mut c_uchar;
     if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar || (*shm).map.is_null() {
         shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
         (*shm).shm_id = -(1 as c_int);
-        (*shm).shm_str[0 as c_int as usize] = '\u{0}' as c_char;
+        (*shm).shm_str[0 as c_int as usize] = '\u{0}' as u8;
         return 0 as *mut c_uchar;
     }
     return (*shm).map;
 }
 
 pub unsafe fn afl_shmem_by_str(
-    mut shm: *mut afl_shmem,
+    mut shm: *mut AflShmem,
     shm_str: &CStr,
     map_size: c_ulong,
 ) -> *mut c_uchar {
@@ -149,7 +149,7 @@ pub unsafe fn afl_shmem_by_str(
     if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar {
         (*shm).map = 0 as *mut c_uchar;
         (*shm).map_size = 0 as c_int as c_ulong;
-        (*shm).shm_str[0 as c_int as usize] = '\u{0}' as c_char;
+        (*shm).shm_str[0 as c_int as usize] = '\u{0}' as u8;
         return 0 as *mut c_uchar;
     }
     return (*shm).map;
@@ -157,7 +157,7 @@ pub unsafe fn afl_shmem_by_str(
 
 /* Write sharedmap as env var */
 /* Write sharedmap as env var and the size as name#_SIZE */
-pub unsafe fn afl_shmem_to_env_var(shmem: &afl_shmem, env_name: &CStr) -> c_uint {
+pub unsafe fn afl_shmem_to_env_var(shmem: &AflShmem, env_name: &CStr) -> c_uint {
     let env_len = env_name.to_bytes().len();
     if env_len == 0 || env_len > 200 || (*shmem).shm_str[0 as c_int as usize] == 0 {
         return AFL_RET_NULL_PTR;
