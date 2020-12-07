@@ -1,5 +1,7 @@
 use hashbrown::HashMap;
 use hashbrown::hash_map::{ValuesMut, Values};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::slice::{Iter, IterMut};
 use core::any::{TypeId, Any};
 

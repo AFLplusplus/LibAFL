@@ -1,6 +1,7 @@
 use hashbrown::HashMap;
 use serde::{Serialize, Deserialize};
 
+use alloc::boxed::Box;
 use core::default::Default;
 use core::any::{TypeId, Any};
 use core::fmt;
