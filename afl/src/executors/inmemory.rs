@@ -5,6 +5,7 @@ use core::ptr;
 
 use crate::executors::{Executor, ExitKind};
 use crate::inputs::Input;
+use crate::metamap::NamedAnyMap;
 use crate::AflError;
 
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
@@ -14,15 +15,7 @@ where
     I: Input,
 {
     harness: HarnessFunction<I>,
-}
-
-impl<I> Into<Rc<RefCell<Self>>> for InMemoryExecutor<I>
-where
-    I: Input,
-{
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
-    }
+    observers: NamedAnyMap,
 }
 
 static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();

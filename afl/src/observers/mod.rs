@@ -3,13 +3,14 @@ extern crate num;
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::slice::from_raw_parts_mut;
+use core::any::Any;
 use num::Integer;
 
 use crate::AflError;
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer {
+pub trait Observer: Any {
     fn flush(&mut self) -> Result<(), AflError> {
         Ok(())
     }
