@@ -4,7 +4,7 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::debug_assert;
 use core::fmt::Debug;
-use xxhash_rust::const_xxh3::xxh3_64_with_seed;
+use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -339,5 +339,4 @@ mod tests {
         assert_eq!(next_pow2(1000), 1024);
         assert_eq!(next_pow2(0xFFFFFFFF as u64), (0xFFFFFFFF as u64) + 1);
     }
-    
 }

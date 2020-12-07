@@ -10,12 +10,12 @@ pub mod executors;
 pub mod feedbacks;
 pub mod generators;
 pub mod inputs;
+pub mod metamap;
 pub mod mutators;
 pub mod observers;
+pub mod serde_anymap;
 pub mod stages;
 pub mod utils;
-pub mod serde_anymap;
-pub mod metamap;
 
 use alloc::string::String;
 use core::fmt;
