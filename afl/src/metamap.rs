@@ -307,10 +307,7 @@ impl NamedAnyMap {
         if !self.map.contains_key(&typeid) {
             self.map.insert(typeid, HashMap::default());
         }
-        self.map
-            .get_mut(&typeid)
-            .unwrap()
-            .insert(name, Box::new(t));
+        self.map.get_mut(&typeid).unwrap().insert(name, Box::new(t));
     }
 
     pub fn len(&self) -> usize {

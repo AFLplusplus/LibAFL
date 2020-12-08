@@ -34,3 +34,4 @@ xxhash-rust = { version = "0.8.0", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 erased-serde = "0.3.12"
 postcard = "0.5.1" # no_std compatible serde serialization fromat
+memoffset = "0.6" # for offset_of support
