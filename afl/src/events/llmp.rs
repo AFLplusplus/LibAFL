@@ -1,5 +1,4 @@
 use core::marker::PhantomData;
-use core::ptr;
 use std::{ffi::c_void, io::Read, io::Write, net::TcpListener};
 
 use crate::{
@@ -7,11 +6,12 @@ use crate::{
 };
 
 use super::{
-    llmp_translated::{LlmpBroker, LlmpClient, LlmpClientloopFn, LlmpMsgHookFn},
+    llmp_translated::{LlmpBroker, LlmpClient, LlmpMsgHookFn},
     Event, EventManager,
 };
 
-pub unsafe fn llmp_tcp_server_clientloop(client: *mut LlmpClient, _data: *mut c_void) -> ! {
+/*
+pub unsafe fn llmp_tcp_server_clientloop(client: &mut LlmpClient, _data: *mut c_void) -> ! {
     // Later in the execution, after the initial map filled up,
     // the current broacast map will will point to a different map.
     // However, the original map is (as of now) never freed, new clients will start
@@ -57,6 +57,7 @@ pub unsafe fn llmp_tcp_server_clientloop(client: *mut LlmpClient, _data: *mut c_
         }
     }
 }
+*/
 
 /// Eventmanager for multi-processed application
 #[cfg(feature = "std")]
@@ -126,6 +127,7 @@ where
     }
 }
 
+/*
 #[cfg(feature = "std")]
 impl<S, C, E, I, R> LLMPEventManager<S, C, E, I, R>
 where
@@ -141,20 +143,5 @@ where
         broker_message_hook: LlmpMsgHookFn,
         clientloops: LlmpClientloopFn,
     ) -> ! {
-        unsafe {
-            let mut broker = LlmpBroker::new().expect("Failed to create llmp");
-
-            for i in 0..process_count - 1 {
-                println!("Adding client {}", i);
-                broker
-                    .register_childprocess_clientloop(clientloops, ptr::null_mut())
-                    .expect("could not add child clientloop");
-            }
-
-            println!("Spawning broker");
-            broker.add_message_hook(broker_message_hook, ptr::null_mut());
-
-            broker.run();
-        }
     }
-}
+}*/

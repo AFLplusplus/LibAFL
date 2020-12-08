@@ -94,8 +94,8 @@ impl AflShmem {
             Ok(ret)
         } else {
             Err(AflError::Unknown(format!(
-                "Could not allocate map with id {:?}",
-                shm_str
+                "Could not allocate map with id {:?} and size {}",
+                shm_str, map_size
             )))
         }
     }

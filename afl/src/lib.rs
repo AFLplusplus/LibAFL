@@ -3,10 +3,6 @@
 #[macro_use]
 extern crate alloc;
 
-#[cfg_attr(feature = "std")]
-#[macro_use]
-extern crate memoffset; // for offset_of
-
 pub mod corpus;
 pub mod engines;
 pub mod events;
