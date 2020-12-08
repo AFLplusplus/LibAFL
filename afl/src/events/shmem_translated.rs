@@ -101,9 +101,11 @@ impl AflShmem {
     }
 
     /// Generate a shared map with a fixed byte array of 20
-    pub unsafe fn from_name_slice(shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
-        let str_bytes = shm_str as *const [u8; 20] as *const libc::c_char;
-        Self::from_str(CStr::from_ptr(str_bytes), map_size)
+    pub fn from_name_slice(shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
+        unsafe {
+            let str_bytes = shm_str as *const [u8; 20] as *const libc::c_char;
+            Self::from_str(CStr::from_ptr(str_bytes), map_size)
+        }
     }
 
     pub fn new(map_size: usize) -> Result<Self, AflError> {

@@ -59,30 +59,28 @@ use crate::AflError;
 
 use super::shmem_translated::AflShmem;
 
-/// The header length of a llmp page in a shared map (until messages start)
-const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
-
 /// We'll start off with 256 megabyte maps per fuzzer
-const LLMP_INITIAL_MAP_SIZE: usize = 1 << 28;
-
-/// A msg fresh from the press: No tag got sent by the user yet
-const LLMP_TAG_UNSET: u32 = 0xdeadaf;
-/// This message should not exist yet. Some bug in unsafe code!
-const LLMP_TAG_UNINITIALIZED: u32 = 0xa143af11;
-/// The end of page mesasge
-/// When receiving this, a new sharedmap needs to be allocated.
-const LLMP_TAG_END_OF_PAGE: u32 = 0xaf1e0f1;
-/// A new client for this broekr got added.
-const LLMP_TAG_NEW_SHM_CLIENT: u32 = 0xc11e471;
-
+const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
 /// What byte count to align messages to
 /// LlmpMsg sizes (including header) will always be rounded up to be a multiple of this value
-const LLMP_ALIGNNMENT: usize = 64;
+const LLMP_PREF_ALIGNNMENT: usize = 64;
+
+/// A msg fresh from the press: No tag got sent by the user yet
+const LLMP_TAG_UNSET: u32 = 0xDEADAF;
+/// This message should not exist yet. Some bug in unsafe code!
+const LLMP_TAG_UNINITIALIZED: u32 = 0xA143AF11;
+/// The end of page mesasge
+/// When receiving this, a new sharedmap needs to be allocated.
+const LLMP_TAG_END_OF_PAGE: u32 = 0xAF1E0F1;
+/// A new client for this broekr got added.
+const LLMP_TAG_NEW_SHM_CLIENT: u32 = 0xC11E471;
 
 /// Size of a new page message, header, payload, and alignment
 const EOP_MSG_SIZE: usize = llmp_align(size_of::<LlmpMsg>() + size_of::<LlmpPayloadSharedMap>());
+/// The header length of a llmp page in a shared map (until messages start)
+const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 
-/// Message Hook
+/// Message hook type
 pub type LlmpMsgHookFn = unsafe fn(client_id: u32, msg: *mut LlmpMsg) -> LlmpMsgHookResult;
 
 /// Sending end on a (unidirectional) sharedmap channel
@@ -115,7 +113,9 @@ pub struct LlmpReceiver {
 /// Client side of LLMP
 #[derive(Clone)]
 pub struct LlmpClient {
+    /// Outgoing channel to the broker
     pub llmp_out: LlmpSender,
+    /// Incoming (broker) broadcast map
     pub llmp_in: LlmpReceiver,
 }
 
@@ -144,19 +144,6 @@ pub struct LlmpMsg {
     pub buf: [u8; 0],
 }
 
-/// The broker (node 0)
-#[derive(Clone)]
-#[repr(C)]
-pub struct LlmpBroker {
-    /// Broadcast map from broker to all clients
-    pub llmp_out: LlmpSender,
-    /// Users of Llmp can add message handlers in the broker.
-    /// This allows us to intercept messages right in the broker
-    /// This keeps the out map clean.
-    pub msg_hooks: Vec<LlmpMsgHookFn>,
-    pub llmp_clients: Vec<LlmpReceiver>,
-}
-
 /// Contents of the share mem pages, used by llmp internally
 #[derive(Copy, Clone)]
 #[repr(C, packed)]
@@ -169,6 +156,19 @@ pub struct LlmpPage {
     pub size_used: usize,
     pub max_alloc_size: usize,
     pub messages: [LlmpMsg; 0],
+}
+
+/// The broker (node 0)
+#[derive(Clone)]
+#[repr(C)]
+pub struct LlmpBroker {
+    /// Broadcast map from broker to all clients
+    pub llmp_out: LlmpSender,
+    /// Users of Llmp can add message handlers in the broker.
+    /// This allows us to intercept messages right in the broker
+    /// This keeps the out map clean.
+    pub msg_hooks: Vec<LlmpMsgHookFn>,
+    pub llmp_clients: Vec<LlmpReceiver>,
 }
 
 /// Result of an LLMP Mesasge hook
@@ -202,19 +202,19 @@ unsafe fn llmp_msg_in_page(page: *mut LlmpPage, msg: *mut LlmpMsg) -> bool {
         && (page as *mut u8).offset((*page).size_total as isize) > msg as *mut u8;
 }
 
-/// allign to LLMP_ALIGNNMENT=64 bytes
+/// allign to LLMP_PREF_ALIGNNMENT=64 bytes
 #[inline]
 const fn llmp_align(to_align: usize) -> usize {
     // check if we need to align first
-    if LLMP_ALIGNNMENT == 0 {
+    if LLMP_PREF_ALIGNNMENT == 0 {
         return to_align;
     }
     // Then do the alignment
-    let modulo = to_align % LLMP_ALIGNNMENT;
+    let modulo = to_align % LLMP_PREF_ALIGNNMENT;
     if modulo == 0 {
         to_align
     } else {
-        to_align + LLMP_ALIGNNMENT - modulo
+        to_align + LLMP_PREF_ALIGNNMENT - modulo
     }
 }
 
@@ -225,7 +225,7 @@ const fn llmp_align(to_align: usize) -> usize {
 fn new_map_size(max_alloc: usize) -> usize {
     next_pow2(max(
         max_alloc * 2 + EOP_MSG_SIZE + LLMP_PAGE_HEADER_LEN,
-        LLMP_INITIAL_MAP_SIZE,
+        LLMP_PREF_INITIAL_MAP_SIZE,
     ) as u64) as usize
 }
 
@@ -566,24 +566,26 @@ impl LlmpReceiver {
 
 /// The page struct, placed on a shared mem instance.
 impl LlmpSharedMap {
-    /// Creates a new page with minimum prev_max_alloc_size or LLMP_INITIAL_MAP_SIZE
+    /// Creates a new page with minimum prev_max_alloc_size or LLMP_PREF_INITIAL_MAP_SIZE
     /// returning the initialized shared mem struct
-    pub unsafe fn new(sender: u32, min_size: usize) -> Result<Self, AflError> {
+    pub fn new(sender: u32, min_size: usize) -> Result<Self, AflError> {
         // Create a new shard page.
         let mut shmem = AflShmem::new(new_map_size(min_size))?;
-        _llmp_page_init(&mut shmem, sender);
+        unsafe {
+            _llmp_page_init(&mut shmem, sender);
+        }
         Ok(Self { shmem })
     }
 
     /// Initialize from a 0-terminated sharedmap id string and its size
-    pub unsafe fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, AflError> {
+    pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, AflError> {
         let shmem = AflShmem::from_str(shm_str, map_size)?;
         // Not initializing the page here - the other side should have done it already!
         Ok(Self { shmem })
     }
 
     /// Initialize from a shm_str with fixed len of 20
-    pub unsafe fn from_name_slice(shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
+    pub fn from_name_slice(shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
         let shmem = AflShmem::from_name_slice(shm_str, map_size)?;
         // Not initializing the page here - the other side should have done it already!
         Ok(Self { shmem })
@@ -744,12 +746,12 @@ impl LlmpBroker {
 /// and get incoming messages from the shared broker bus
 impl LlmpClient {
     /// Creates a new LlmpClient
-    pub unsafe fn new(initial_broker_map: LlmpSharedMap) -> Result<Self, AflError> {
+    pub fn new(initial_broker_map: LlmpSharedMap) -> Result<Self, AflError> {
         Ok(Self {
             llmp_out: LlmpSender {
                 id: 0,
                 last_msg_sent: 0 as *mut LlmpMsg,
-                out_maps: vec![LlmpSharedMap::new(0, LLMP_INITIAL_MAP_SIZE)?],
+                out_maps: vec![LlmpSharedMap::new(0, LLMP_PREF_INITIAL_MAP_SIZE)?],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
             },
@@ -764,6 +766,28 @@ impl LlmpClient {
     /// Commits a msg to the client's out map
     pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), AflError> {
         self.llmp_out.send(msg)
+    }
+
+    /// Allocates a message of the given size, tags it, and sends it off.
+    pub fn send_buf(&mut self, tag: u32, buf: &[u8]) -> Result<(), AflError> {
+        // Make sure we don't reuse already allocated tags
+        if tag == LLMP_TAG_NEW_SHM_CLIENT
+            || tag == LLMP_TAG_END_OF_PAGE
+            || tag == LLMP_TAG_UNINITIALIZED
+            || tag == LLMP_TAG_UNSET
+        {
+            return Err(AflError::Unknown(format!(
+                "Reserved tag supplied to send_buf ({:#X})",
+                tag
+            )));
+        }
+        unsafe {
+            let msg = self.alloc_next(buf.len())?;
+            (*msg).tag = tag;
+            buf.as_ptr()
+                .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
+            self.send(msg)
+        }
     }
 
     /// A client receives a broadcast message.
