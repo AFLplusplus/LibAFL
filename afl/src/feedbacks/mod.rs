@@ -4,7 +4,7 @@ use num::Integer;
 
 use crate::corpus::{Testcase, TestcaseMetadata};
 use crate::inputs::Input;
-use crate::observers::{Observer, MapObserver};
+use crate::observers::{MapObserver, Observer};
 use crate::serde_anymap::NamedSerdeAnyMap;
 use crate::AflError;
 
@@ -13,7 +13,11 @@ where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, input: &I, observers: &NamedSerdeAnyMap<dyn Observer>) -> Result<u32, AflError>;
+    fn is_interesting(
+        &mut self,
+        input: &I,
+        observers: &NamedSerdeAnyMap<dyn Observer>,
+    ) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
@@ -98,7 +102,11 @@ where
     O: MapObserver<T> + 'static,
     I: Input,
 {
-    fn is_interesting(&mut self, _input: &I, observers: &NamedSerdeAnyMap<dyn Observer>) -> Result<u32, AflError> {
+    fn is_interesting(
+        &mut self,
+        _input: &I,
+        observers: &NamedSerdeAnyMap<dyn Observer>,
+    ) -> Result<u32, AflError> {
         let mut interesting = 0;
         // TODO optimize
         let observer = observers.get::<O>(self.name).unwrap();

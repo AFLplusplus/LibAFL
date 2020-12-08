@@ -81,8 +81,7 @@ where
     phantom: PhantomData<(EM, E, C, I, R)>,
 }
 
-impl<M, EM, E, C, I, R> MutationalStage<M, EM, E, C, I, R>
-    for StdMutationalStage<M, EM, E, C, I, R>
+impl<M, EM, E, C, I, R> MutationalStage<M, EM, E, C, I, R> for StdMutationalStage<M, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
     EM: EventManager<C, E, I, R>,

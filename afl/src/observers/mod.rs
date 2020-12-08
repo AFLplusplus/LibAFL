@@ -97,14 +97,14 @@ where
     fn map(&self) -> &[T] {
         match &self.map {
             SliceMut::Ref(r) => r,
-            SliceMut::Owned(v) => v.as_slice()
+            SliceMut::Owned(v) => v.as_slice(),
         }
     }
 
     fn map_mut(&mut self) -> &mut [T] {
         match &mut self.map {
             SliceMut::Ref(r) => r,
-            SliceMut::Owned(v) => v.as_mut_slice()
+            SliceMut::Owned(v) => v.as_mut_slice(),
         }
     }
 

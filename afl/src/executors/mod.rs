@@ -1,8 +1,8 @@
 pub mod inmemory;
 
 use crate::inputs::Input;
-use crate::serde_anymap::NamedSerdeAnyMap;
 use crate::observers::Observer;
+use crate::serde_anymap::NamedSerdeAnyMap;
 use crate::AflError;
 
 pub enum ExitKind {
@@ -39,7 +39,8 @@ where
 
     /// Run the post exec hook for all the observes linked to this executor
     fn post_exec_observers(&mut self) -> Result<(), AflError> {
-        self.observers_mut().for_each_mut(|_, x| Ok(x.post_exec()?))?;
+        self.observers_mut()
+            .for_each_mut(|_, x| Ok(x.post_exec()?))?;
         Ok(())
     }
 }

@@ -231,7 +231,9 @@ where
     pub fn by_typeid(&self, name: &'static str, typeid: &TypeId) -> Option<&B> {
         match self.map.get(&unpack_type_id(*typeid)) {
             None => None,
-            Some(h) => h.get(&xxhash_rust::xxh3::xxh3_64(name.as_bytes())).map(|x| x.as_ref()),
+            Some(h) => h
+                .get(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                .map(|x| x.as_ref()),
         }
     }
 
@@ -250,13 +252,13 @@ where
     pub fn by_typeid_mut(&mut self, name: &'static str, typeid: &TypeId) -> Option<&mut B> {
         match self.map.get_mut(&unpack_type_id(*typeid)) {
             None => None,
-            Some(h) => h.get_mut(&xxhash_rust::xxh3::xxh3_64(name.as_bytes())).map(|x| x.as_mut()),
+            Some(h) => h
+                .get_mut(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                .map(|x| x.as_mut()),
         }
     }
 
-    pub fn get_all<T>(
-        &self,
-    ) -> Option<core::iter::Map<Values<'_, u64, Box<B>>, fn(&Box<B>) -> &T>>
+    pub fn get_all<T>(&self) -> Option<core::iter::Map<Values<'_, u64, Box<B>>, fn(&Box<B>) -> &T>>
     where
         T: Any,
     {
@@ -294,19 +296,23 @@ where
     pub fn all_by_typeid_mut(
         &mut self,
         typeid: &TypeId,
-    ) -> Option<core::iter::Map<ValuesMut<'_, u64, Box<B>>, fn(&mut Box<B>) -> &mut B>>
-    {
+    ) -> Option<core::iter::Map<ValuesMut<'_, u64, Box<B>>, fn(&mut Box<B>) -> &mut B>> {
         match self.map.get_mut(&unpack_type_id(*typeid)) {
             None => None,
             Some(h) => Some(h.values_mut().map(|x| x.as_mut())),
         }
     }
 
-    pub fn all_typeids(&self) -> core::iter::Map<Keys<'_, u64, HashMap<u64, Box<B>>>, fn(&u64) -> TypeId> {
+    pub fn all_typeids(
+        &self,
+    ) -> core::iter::Map<Keys<'_, u64, HashMap<u64, Box<B>>>, fn(&u64) -> TypeId> {
         self.map.keys().map(|x| pack_type_id(*x))
     }
 
-    pub fn for_each(&self, func: fn(&TypeId, &Box<B>) -> Result<(), AflError>) -> Result<(), AflError> {
+    pub fn for_each(
+        &self,
+        func: fn(&TypeId, &Box<B>) -> Result<(), AflError>,
+    ) -> Result<(), AflError> {
         for (id, h) in self.map.iter() {
             for x in h.values() {
                 func(&pack_type_id(*id), x)?;
@@ -315,7 +321,10 @@ where
         Ok(())
     }
 
-    pub fn for_each_mut(&mut self, func: fn(&TypeId, &mut Box<B>) -> Result<(), AflError>) -> Result<(), AflError> {
+    pub fn for_each_mut(
+        &mut self,
+        func: fn(&TypeId, &mut Box<B>) -> Result<(), AflError>,
+    ) -> Result<(), AflError> {
         for (id, h) in self.map.iter_mut() {
             for x in h.values_mut() {
                 func(&pack_type_id(*id), x)?;
@@ -329,7 +338,10 @@ where
         if !self.map.contains_key(&id) {
             self.map.insert(id, HashMap::default());
         }
-        self.map.get_mut(&id).unwrap().insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), val);
+        self.map
+            .get_mut(&id)
+            .unwrap()
+            .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), val);
     }
 
     pub fn len(&self) -> usize {
@@ -440,4 +452,3 @@ where
         Deserialize::deserialize(deserializer).map(SliceMut::Owned)
     }
 }
-

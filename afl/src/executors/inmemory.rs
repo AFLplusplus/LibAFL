@@ -3,8 +3,8 @@ use core::ptr;
 
 use crate::executors::{Executor, ExitKind};
 use crate::inputs::Input;
-use crate::serde_anymap::NamedSerdeAnyMap;
 use crate::observers::Observer;
+use crate::serde_anymap::NamedSerdeAnyMap;
 use crate::AflError;
 
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;

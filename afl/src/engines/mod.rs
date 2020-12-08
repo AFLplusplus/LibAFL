@@ -48,11 +48,11 @@ where
     }
 
     /// Set executions
-    pub fn set_executions(&mut self, executions: usize){
+    pub fn set_executions(&mut self, executions: usize) {
         self.executions = executions
     }
 
-    pub fn start_time(&self) -> u64{
+    pub fn start_time(&self) -> u64 {
         self.start_time
     }
     pub fn set_start_time(&mut self, ms: u64) {
@@ -73,12 +73,12 @@ where
     }
 
     /// Get all the metadatas into an HashMap
-    pub fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>>{
+    pub fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>> {
         &self.metadatas
     }
 
     /// Get all the metadatas into an HashMap (mutable)
-    pub fn metadatas_mut(&mut self) -> &mut HashMap<&'static str, Box<dyn StateMetadata>>{
+    pub fn metadatas_mut(&mut self) -> &mut HashMap<&'static str, Box<dyn StateMetadata>> {
         &mut self.metadatas
     }
 
@@ -88,12 +88,12 @@ where
     }
 
     /// Returns vector of feebacks
-    pub fn feedbacks(&self) -> &[Box<dyn Feedback<I>>]{
+    pub fn feedbacks(&self) -> &[Box<dyn Feedback<I>>] {
         &self.feedbacks
     }
 
     /// Returns vector of feebacks (mutable)
-    pub fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>>{
+    pub fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>> {
         &mut self.feedbacks
     }
 
@@ -105,7 +105,11 @@ where
     // TODO move some of these, like evaluate_input, to FuzzingEngine
 
     /// Runs the input and triggers observers and feedback
-    pub fn evaluate_input<C, E, EM>(&mut self, input: &I, engine: &mut Engine<EM, E, C, I, R>) -> Result<u32, AflError> 
+    pub fn evaluate_input<C, E, EM>(
+        &mut self,
+        input: &I,
+        engine: &mut Engine<EM, E, C, I, R>,
+    ) -> Result<u32, AflError>
     where
         C: Corpus<I, R>,
         E: Executor<I>,
@@ -164,9 +168,9 @@ where
         corpus: &mut C,
         input: I,
         fitness: u32,
-    ) -> Result<Option<usize>, AflError> 
+    ) -> Result<Option<usize>, AflError>
     where
-        C: Corpus<I, R>
+        C: Corpus<I, R>,
     {
         if fitness > 0 {
             let testcase = self.input_to_testcase(input, fitness)?;
@@ -225,7 +229,7 @@ where
 {
     manager: EM,
     executor: E,
-    phantom: PhantomData<(C, I, R)>
+    phantom: PhantomData<(C, I, R)>,
 }
 
 impl<EM, E, C, I, R> Engine<EM, E, C, I, R>
@@ -260,7 +264,7 @@ where
         Self {
             executor: executor,
             manager: events_manager,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -328,7 +332,6 @@ where
             }
         }
     }
-
 }
 
 pub struct StdFuzzer<EM, E, C, I, R>
@@ -368,12 +371,9 @@ where
     R: Rand,
 {
     pub fn new() -> Self {
-        Self {
-            stages: vec![]
-        }
+        Self { stages: vec![] }
     }
 }
-
 
 // TODO: no_std test
 #[cfg(feature = "std")]
@@ -386,7 +386,7 @@ mod tests {
     use std::io::stderr;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
-    use crate::engines::{Engine, Fuzzer, StdFuzzer, State};
+    use crate::engines::{Engine, Fuzzer, State, StdFuzzer};
     #[cfg(feature = "std")]
     use crate::events::LoggerEventManager;
     use crate::executors::inmemory::InMemoryExecutor;
