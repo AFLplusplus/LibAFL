@@ -50,7 +50,7 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 
 use core::ptr;
 use core::sync::atomic::{compiler_fence, Ordering};
-use core::time;
+use core::time::Duration;
 use libc::{c_uint, c_ulong, c_ushort};
 use std::{cmp::max, ffi::CStr, mem::size_of, thread};
 
@@ -726,14 +726,16 @@ impl LlmpBroker {
 
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
     /// Never returns. Panics on error.
-    pub unsafe fn loop_forever(&mut self) -> ! {
+    /// 5 millis of sleep can't hurt to keep busywait not at 100%
+    pub unsafe fn loop_forever(&mut self, sleep_time: Option<Duration>) -> ! {
         loop {
             compiler_fence(Ordering::SeqCst);
             self.once()
                 .expect("An error occurred when brokering. Exiting.");
-
-            /* 5 milis of sleep for now to not busywait at 100% */
-            thread::sleep(time::Duration::from_millis(5));
+            match sleep_time {
+                Some(time) => thread::sleep(time),
+                None => (),
+            }
         }
     }
 }

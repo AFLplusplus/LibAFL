@@ -1,5 +1,4 @@
 use core::marker::PhantomData;
-use std::{ffi::c_void, io::Read, io::Write, net::TcpListener};
 
 use crate::{
     corpus::Corpus, engines::State, executors::Executor, inputs::Input, utils::Rand, AflError,
