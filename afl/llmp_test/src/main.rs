@@ -102,7 +102,7 @@ fn main() {
                 client
                     .send_buf(TAG_SIMPLE_U32_V1, &counter.to_le_bytes())
                     .unwrap();
-                prinln!("Writing", counter);
+                println!("CTR Client writing {}", counter);
                 thread::sleep(Duration::from_secs(1))
             }
         }
