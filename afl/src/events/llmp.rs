@@ -52,7 +52,14 @@ use core::ptr;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::time::Duration;
 use libc::{c_uint, c_ulong, c_ushort};
-use std::{cmp::max, ffi::CStr, mem::size_of, thread};
+use std::{
+    cmp::max,
+    ffi::CStr,
+    io::{Read, Write},
+    mem::size_of,
+    net::TcpListener,
+    thread,
+};
 
 use crate::utils::next_pow2;
 use crate::AflError;
@@ -471,6 +478,28 @@ impl LlmpSender {
         (*msg).tag = LLMP_TAG_UNSET;
         (*page).size_used -= (*msg).buf_len_padded as usize + size_of::<LlmpMsg>();
     }
+
+    /// Allocates a message of the given size, tags it, and sends it off.
+    pub fn send_buf(&mut self, tag: u32, buf: &[u8]) -> Result<(), AflError> {
+        // Make sure we don't reuse already allocated tags
+        if tag == LLMP_TAG_NEW_SHM_CLIENT
+            || tag == LLMP_TAG_END_OF_PAGE
+            || tag == LLMP_TAG_UNINITIALIZED
+            || tag == LLMP_TAG_UNSET
+        {
+            return Err(AflError::Unknown(format!(
+                "Reserved tag supplied to send_buf ({:#X})",
+                tag
+            )));
+        }
+        unsafe {
+            let msg = self.alloc_next(buf.len())?;
+            (*msg).tag = tag;
+            buf.as_ptr()
+                .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
+            self.send(msg)
+        }
+    }
 }
 
 /// Receiving end of an llmp channel
@@ -625,7 +654,7 @@ impl LlmpBroker {
 
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in broker.client_map
-    pub unsafe fn register_client(&mut self, client_page: LlmpSharedMap) {
+    pub fn register_client(&mut self, client_page: LlmpSharedMap) {
         let id = self.llmp_clients.len() as u32;
         self.llmp_clients.push(LlmpReceiver {
             id,
@@ -740,6 +769,75 @@ impl LlmpBroker {
             }
         }
     }
+
+    pub fn launch_tcp_listener(&mut self, port: u16) -> Result<thread::JoinHandle<()>, AflError> {
+        // Later in the execution, after the initial map filled up,
+        // the current broacast map will will point to a different map.
+        // However, the original map is (as of now) never freed, new clients will start
+        // to read from the initial map id.
+
+        let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
+        // accept connections and process them, spawning a new thread for each one
+        println!("Server listening on port {}", port);
+
+        let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
+        let broadcast_str_initial = client_out_map_mem.shm_str.clone();
+
+        let llmp_tcp_id = self.llmp_clients.len() as u32;
+
+        // Tcp out map sends messages from background thread tcp server to foreground client
+        let tcp_out_map = LlmpSharedMap::new(llmp_tcp_id, LLMP_PREF_INITIAL_MAP_SIZE)?;
+        let tcp_out_map_str = tcp_out_map.shmem.shm_str;
+        let tcp_out_map_size = tcp_out_map.shmem.map_size;
+        self.register_client(tcp_out_map);
+
+        Ok(thread::spawn(move || {
+            let mut new_client_sender = LlmpSender {
+                id: 0,
+                last_msg_sent: 0 as *mut LlmpMsg,
+                out_maps: vec![
+                    LlmpSharedMap::from_name_slice(&tcp_out_map_str, tcp_out_map_size).unwrap(),
+                ],
+                // drop pages to the broker if it already read them
+                keep_pages_forever: false,
+            };
+
+            loop {
+                let (mut stream, addr) = match listener.accept() {
+                    Ok(res) => res,
+                    Err(e) => {
+                        dbg!("Ignoring failed accept", e);
+                        continue;
+                    }
+                };
+                dbg!("New connection", addr, stream.peer_addr().unwrap());
+                match stream.write(&broadcast_str_initial) {
+                    Ok(_) => {} // fire & forget
+                    Err(e) => {
+                        dbg!("Could not send to shmap to client", e);
+                        continue;
+                    }
+                };
+                let mut new_client_map_str: [u8; 20] = Default::default();
+                let map_str_len = match stream.read(&mut new_client_map_str) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        dbg!("Ignoring failed read from client", e);
+                        continue;
+                    }
+                };
+                if map_str_len < 20 {
+                    dbg!("Didn't receive a complete shmap id str from client. Ignoring.");
+                    continue;
+                }
+
+                match new_client_sender.send_buf(LLMP_TAG_NEW_SHM_CLIENT, &new_client_map_str) {
+                    Ok(()) => (),
+                    Err(e) => println!("Error forwarding client on map: {:?}", e),
+                };
+            }
+        }))
+    }
 }
 
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
@@ -770,24 +868,7 @@ impl LlmpClient {
 
     /// Allocates a message of the given size, tags it, and sends it off.
     pub fn send_buf(&mut self, tag: u32, buf: &[u8]) -> Result<(), AflError> {
-        // Make sure we don't reuse already allocated tags
-        if tag == LLMP_TAG_NEW_SHM_CLIENT
-            || tag == LLMP_TAG_END_OF_PAGE
-            || tag == LLMP_TAG_UNINITIALIZED
-            || tag == LLMP_TAG_UNSET
-        {
-            return Err(AflError::Unknown(format!(
-                "Reserved tag supplied to send_buf ({:#X})",
-                tag
-            )));
-        }
-        unsafe {
-            let msg = self.alloc_next(buf.len())?;
-            (*msg).tag = tag;
-            buf.as_ptr()
-                .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
-            self.send(msg)
-        }
+        self.llmp_out.send_buf(tag, buf)
     }
 
     /// A client receives a broadcast message.

@@ -9,55 +9,6 @@ use super::{
     Event, EventManager,
 };
 
-/*
-pub unsafe fn llmp_tcp_server_clientloop(client: &mut LlmpClient, _data: *mut c_void) -> ! {
-    // Later in the execution, after the initial map filled up,
-    // the current broacast map will will point to a different map.
-    // However, the original map is (as of now) never freed, new clients will start
-    // to read from the initial map id.
-    let initial_broadcasts_map_str = client
-        .as_ref()
-        .unwrap()
-        .current_broadcast_map
-        .as_ref()
-        .unwrap()
-        .shm_str;
-
-    let listener = TcpListener::bind("0.0.0.0:3333").unwrap();
-    // accept connections and process them, spawning a new thread for each one
-    println!("Server listening on port 3333");
-    loop {
-        let (mut stream, addr) = match listener.accept() {
-            Ok(res) => res,
-            Err(e) => {
-                dbg!("Ignoring failed accept", e);
-                continue;
-            }
-        };
-        dbg!("New connection", addr, stream.peer_addr().unwrap());
-        match stream.write(&initial_broadcasts_map_str as &[u8]) {
-            Ok(_) => {} // fire & forget
-            Err(e) => {
-                dbg!("Could not send to shmap to client", e);
-                continue;
-            }
-        };
-        let mut new_client_map_str: [u8; 20] = Default::default();
-        let map_str_len = match stream.read(&mut new_client_map_str) {
-            Ok(res) => res,
-            Err(e) => {
-                dbg!("Ignoring failed read from client", e);
-                continue;
-            }
-        };
-        if map_str_len < 20 {
-            dbg!("Didn't receive a complete shmap id str from client. Ignoring.");
-            continue;
-        }
-    }
-}
-*/
-
 /// Eventmanager for multi-processed application
 #[cfg(feature = "std")]
 pub struct LLMPEventManager<S, C, E, I, R>

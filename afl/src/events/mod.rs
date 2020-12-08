@@ -7,12 +7,10 @@ use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-pub mod llmp_translated; // TODO: Abstract away.
-#[cfg(feature = "std")]
 pub mod shmem_translated;
 
-#[cfg(feature = "std")]
-pub use crate::events::llmp::LLMPEventManager;
+/*#[cfg(feature = "std")]
+pub use crate::events::llmp::LLMPEventManager;*/
 
 #[cfg(feature = "std")]
 use std::io::Write;

@@ -59,7 +59,6 @@ const AFL_RET_SUCCESS: c_uint = 0;
 // too.)
 
 #[derive(Clone)]
-#[repr(C)]
 pub struct AflShmem {
     pub shm_str: [u8; 20],
     pub shm_id: c_int,
