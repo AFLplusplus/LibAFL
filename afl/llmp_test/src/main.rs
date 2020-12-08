@@ -79,7 +79,7 @@ fn main() {
 
     let mode = std::env::args()
         .nth(1)
-        .expect("no mode specified, chose 'broker', 'adder', or 'printer'");
+        .expect("no mode specified, chose 'broker', 'ctr', or 'adder'");
     let port: u16 = std::env::args()
         .nth(2)
         .unwrap_or("1337".into())
@@ -94,7 +94,7 @@ fn main() {
             broker.add_message_hook(broker_message_hook);
             broker.loop_forever(Some(Duration::from_millis(5)))
         }
-        "adder" => {
+        "ctr" => {
             let mut client = llmp::LlmpClient::create_attach_to_tcp(port).unwrap();
             let mut counter: u32 = 0;
             loop {
@@ -104,7 +104,7 @@ fn main() {
                     .unwrap();
             }
         }
-        "printer" => {
+        "adder" => {
             adder_loop(port);
         }
         _ => {
