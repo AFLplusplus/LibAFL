@@ -1,10 +1,10 @@
-use alloc::rc::Rc;
-use core::cell::RefCell;
 use core::ffi::c_void;
 use core::ptr;
 
 use crate::executors::{Executor, ExitKind};
 use crate::inputs::Input;
+use crate::serde_anymap::NamedSerdeAnyMap;
+use crate::observers::Observer;
 use crate::AflError;
 
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
@@ -14,15 +14,7 @@ where
     I: Input,
 {
     harness: HarnessFunction<I>,
-}
-
-impl<I> Into<Rc<RefCell<Self>>> for InMemoryExecutor<I>
-where
-    I: Input,
-{
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
-    }
+    observers: NamedSerdeAnyMap<dyn Observer>,
 }
 
 static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
@@ -42,6 +34,14 @@ where
         }
         Ok(ret)
     }
+
+    fn observers(&self) -> &NamedSerdeAnyMap<dyn Observer> {
+        &self.observers
+    }
+
+    fn observers_mut(&mut self) -> &mut NamedSerdeAnyMap<dyn Observer> {
+        &mut self.observers
+    }
 }
 
 impl<I> InMemoryExecutor<I>
@@ -55,6 +55,7 @@ where
         }
         Self {
             harness: harness_fn,
+            observers: NamedSerdeAnyMap::new(),
         }
     }
 }

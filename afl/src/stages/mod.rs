@@ -2,17 +2,16 @@ pub mod mutational;
 pub use mutational::StdMutationalStage;
 
 use crate::corpus::Corpus;
-use crate::engines::State;
+use crate::engines::{Engine, State};
 use crate::events::EventManager;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
-pub trait Stage<S, EM, E, C, I, R>
+pub trait Stage<EM, E, C, I, R>
 where
-    S: State<C, E, I, R>,
-    EM: EventManager<S, C, E, I, R>,
+    EM: EventManager<C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -22,9 +21,9 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
-        state: &mut S,
+        state: &mut State<I, R>,
         corpus: &C,
-        events: &mut EM,
+        engine: &mut Engine<EM, E, C, I, R>,
         input: &I,
     ) -> Result<(), AflError>;
 }

@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::slice::{Iter, IterMut};
-use hashbrown::hash_map::{Values, ValuesMut};
+use hashbrown::hash_map::{Keys, Values, ValuesMut};
 use hashbrown::HashMap;
 
 pub struct MetaMap {
@@ -241,11 +241,22 @@ impl MetaInstanceMap {
     }
 }
 
-pub struct NamedAnyMap {
-    map: HashMap<TypeId, HashMap<&'static str, Box<dyn Any>>>,
+pub trait AsAny {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-impl NamedAnyMap {
+pub struct NamedAnyMap<B>
+where
+    B: ?Sized + Any + AsAny,
+{
+    map: HashMap<TypeId, HashMap<&'static str, Box<B>>>,
+}
+
+impl<B> NamedAnyMap<B>
+where
+    B: ?Sized + Any + AsAny,
+{
     pub fn get<T>(&self, name: &'static str) -> Option<&T>
     where
         T: Any,
@@ -254,7 +265,14 @@ impl NamedAnyMap {
             None => None,
             Some(h) => h
                 .get(&name)
-                .map(|x| x.as_ref().downcast_ref::<T>().unwrap()),
+                .map(|x| x.as_any().downcast_ref::<T>().unwrap()),
+        }
+    }
+
+    pub fn by_typeid(&self, name: &'static str, typeid: &TypeId) -> Option<&B> {
+        match self.map.get(typeid) {
+            None => None,
+            Some(h) => h.get(&name).map(|x| x.as_ref()),
         }
     }
 
@@ -266,27 +284,42 @@ impl NamedAnyMap {
             None => None,
             Some(h) => h
                 .get_mut(&name)
-                .map(|x| x.as_mut().downcast_mut::<T>().unwrap()),
+                .map(|x| x.as_any_mut().downcast_mut::<T>().unwrap()),
+        }
+    }
+
+    pub fn by_typeid_mut(&mut self, name: &'static str, typeid: &TypeId) -> Option<&mut B> {
+        match self.map.get_mut(typeid) {
+            None => None,
+            Some(h) => h.get_mut(&name).map(|x| x.as_mut()),
         }
     }
 
     pub fn get_all<T>(
         &self,
-    ) -> Option<core::iter::Map<Values<'_, &'static str, Box<dyn Any>>, fn(&Box<dyn Any>) -> &T>>
+    ) -> Option<core::iter::Map<Values<'_, &'static str, Box<B>>, fn(&Box<B>) -> &T>>
     where
         T: Any,
     {
         match self.map.get(&TypeId::of::<T>()) {
             None => None,
-            Some(h) => Some(h.values().map(|x| x.as_ref().downcast_ref::<T>().unwrap())),
+            Some(h) => Some(h.values().map(|x| x.as_any().downcast_ref::<T>().unwrap())),
+        }
+    }
+
+    pub fn all_by_typeid(
+        &self,
+        typeid: &TypeId,
+    ) -> Option<core::iter::Map<Values<'_, &'static str, Box<B>>, fn(&Box<B>) -> &B>> {
+        match self.map.get(typeid) {
+            None => None,
+            Some(h) => Some(h.values().map(|x| x.as_ref())),
         }
     }
 
     pub fn get_all_mut<T>(
         &mut self,
-    ) -> Option<
-        core::iter::Map<ValuesMut<'_, &'static str, Box<dyn Any>>, fn(&mut Box<dyn Any>) -> &mut T>,
-    >
+    ) -> Option<core::iter::Map<ValuesMut<'_, &'static str, Box<B>>, fn(&mut Box<B>) -> &mut T>>
     where
         T: Any,
     {
@@ -294,23 +327,32 @@ impl NamedAnyMap {
             None => None,
             Some(h) => Some(
                 h.values_mut()
-                    .map(|x| x.as_mut().downcast_mut::<T>().unwrap()),
+                    .map(|x| x.as_any_mut().downcast_mut::<T>().unwrap()),
             ),
         }
     }
 
-    pub fn insert<T>(&mut self, t: T, name: &'static str)
-    where
-        T: Any,
+    pub fn all_by_typeid_mut(
+        &mut self,
+        typeid: &TypeId,
+    ) -> Option<core::iter::Map<ValuesMut<'_, &'static str, Box<B>>, fn(&mut Box<B>) -> &mut B>>
     {
-        let typeid = TypeId::of::<T>();
+        match self.map.get_mut(typeid) {
+            None => None,
+            Some(h) => Some(h.values_mut().map(|x| x.as_mut())),
+        }
+    }
+
+    pub fn all_typeids(&self) -> Keys<'_, TypeId, HashMap<&'static str, Box<B>>> {
+        self.map.keys()
+    }
+
+    pub fn insert(&mut self, val: Box<B>, name: &'static str) {
+        let typeid = val.type_id();
         if !self.map.contains_key(&typeid) {
             self.map.insert(typeid, HashMap::default());
         }
-        self.map
-            .get_mut(&typeid)
-            .unwrap()
-            .insert(name, Box::new(t));
+        self.map.get_mut(&typeid).unwrap().insert(name, val);
     }
 
     pub fn len(&self) -> usize {

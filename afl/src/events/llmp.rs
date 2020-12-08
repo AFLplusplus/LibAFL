@@ -60,35 +60,33 @@ pub unsafe fn llmp_tcp_server_clientloop(client: *mut LlmpClient, _data: *mut c_
 
 /// Eventmanager for multi-processed application
 #[cfg(feature = "std")]
-pub struct LLMPEventManager<S, C, E, I, R>
+pub struct LLMPEventManager<C, E, I, R>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,
     R: Rand,
-    //CE: CustomEvent<S, C, E, I, R>,
+    //CE: CustomEvent<C, E, I, R>,
 {
     // TODO...
-    phantom: PhantomData<(S, C, E, I, R)>,
+    phantom: PhantomData<(C, E, I, R)>,
     is_broker: bool,
 }
 
 #[cfg(feature = "std")]
-impl<S, C, E, I, R> EventManager<S, C, E, I, R> for LLMPEventManager<S, C, E, I, R>
+impl<C, E, I, R> EventManager<C, E, I, R> for LLMPEventManager<C, E, I, R>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
     R: Rand,
-    //CE: CustomEvent<S, C, E, I, R>,
+    //CE: CustomEvent<C, E, I, R>,
 {
     fn enabled(&self) -> bool {
         true
     }
 
-    fn fire(&mut self, _event: Event<S, C, E, I, R>) -> Result<(), AflError> {
+    fn fire(&mut self, _event: Event<C, E, I, R>) -> Result<(), AflError> {
         //self.events.push(event);
 
         // TODO: Serde serialize, llmp send
@@ -96,7 +94,7 @@ where
         Ok(())
     }
 
-    fn process(&mut self, _state: &mut S, _corpus: &mut C) -> Result<usize, AflError> {
+    fn process(&mut self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<usize, AflError> {
         // TODO: iterators
         /*
         let mut handled = vec![];
@@ -127,9 +125,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<S, C, E, I, R> LLMPEventManager<S, C, E, I, R>
+impl<C, E, I, R> LLMPEventManager<C, E, I, R>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,
