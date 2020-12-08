@@ -1,60 +1,33 @@
-#[macro_use]
 extern crate alloc;
 
 use core::convert::TryInto;
-use core::ffi::c_void;
-use core::mem::size_of;
-use core::ptr;
+use core::time::Duration;
 use std::thread;
 use std::time;
 
-use afl::events::llmp_translated::*;
+use afl::events::llmp;
 
 const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
 const TAG_MATH_RESULT_V1: u32 = 0x77474331;
 
-unsafe fn llmp_test_clientloop(client: *mut LlmpClient, _data: *mut c_void) -> ! {
-    let mut counter: u32 = 0;
-    loop {
-        counter += 1;
-
-        let msg = llmp_client_alloc_next(client, size_of::<u32>());
-        core::ptr::copy(
-            counter.to_be_bytes().as_ptr(),
-            (*msg).buf.as_mut_ptr(),
-            size_of::<u32>(),
-        );
-        (*msg).tag = TAG_SIMPLE_U32_V1;
-        llmp_client_send(client, msg).unwrap();
-
-        thread::sleep(time::Duration::from_millis(100));
-    }
-}
-
-unsafe fn u32_from_msg(msg: *const LlmpMsg) -> u32 {
-    u32::from_be_bytes(
-        alloc::slice::from_raw_parts((*msg).buf.as_ptr(), size_of::<u32>())
-            .try_into()
-            .unwrap(),
-    )
-}
-
-unsafe fn test_adder_clientloop(client: *mut LlmpClient, _data: *mut c_void) -> ! {
+fn adder_loop(port: u16) -> ! {
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(port).unwrap();
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
         let mut msg_counter = 0;
         loop {
-            let last_msg = llmp_client_recv(client);
-            if last_msg == 0 as *mut LlmpMsg {
-                break;
-            }
+            let (tag, buf) = match client.recv_buf().unwrap() {
+                None => break,
+                Some(msg) => msg,
+            };
             msg_counter += 1;
-            match (*last_msg).tag {
+            match tag {
                 TAG_SIMPLE_U32_V1 => {
-                    current_result = current_result.wrapping_add(u32_from_msg(last_msg));
+                    current_result =
+                        current_result.wrapping_add(u32::from_le_bytes(buf.try_into().unwrap()));
                 }
-                _ => println!("Adder Client ignored unknown message {}", (*last_msg).tag),
+                _ => println!("Adder Client ignored unknown message {}", tag),
             };
         }
 
@@ -64,14 +37,9 @@ unsafe fn test_adder_clientloop(client: *mut LlmpClient, _data: *mut c_void) -> 
                 msg_counter, current_result
             );
 
-            let msg = llmp_client_alloc_next(client, size_of::<u32>());
-            core::ptr::copy(
-                current_result.to_be_bytes().as_ptr(),
-                (*msg).buf.as_mut_ptr(),
-                size_of::<u32>(),
-            );
-            (*msg).tag = TAG_MATH_RESULT_V1;
-            llmp_client_send(client, msg).unwrap();
+            client
+                .send_buf(TAG_MATH_RESULT_V1, &current_result.to_le_bytes())
+                .unwrap();
             last_result = current_result;
         }
 
@@ -80,61 +48,67 @@ unsafe fn test_adder_clientloop(client: *mut LlmpClient, _data: *mut c_void) -> 
 }
 
 unsafe fn broker_message_hook(
-    _broker: *mut LlmpBroker,
-    client_metadata: *mut LlmpBrokerClientMetadata,
-    message: *mut LlmpMsg,
-    _data: *mut c_void,
-) -> LlmpMsgHookResult {
+    client_id: u32,
+    message: *mut llmp::LlmpMsg,
+) -> llmp::LlmpMsgHookResult {
     match (*message).tag {
         TAG_SIMPLE_U32_V1 => {
             println!(
                 "Client {:?} sent message: {:?}",
-                (*client_metadata).pid,
-                u32_from_msg(message)
+                client_id,
+                u32::from_le_bytes((*message).as_slice().try_into().unwrap())
             );
-            LlmpMsgHookResult::ForwardToClients
+            llmp::LlmpMsgHookResult::ForwardToClients
         }
         TAG_MATH_RESULT_V1 => {
             println!(
                 "Adder Client has this current result: {:?}",
-                u32_from_msg(message)
+                u32::from_le_bytes((*message).as_slice().try_into().unwrap())
             );
-            LlmpMsgHookResult::Handled
+            llmp::LlmpMsgHookResult::Handled
         }
         _ => {
             println!("Unknwon message id received!");
-            LlmpMsgHookResult::ForwardToClients
+            llmp::LlmpMsgHookResult::ForwardToClients
         }
     }
 }
 
 fn main() {
     /* The main node has a broker, and a few worker threads */
-    let threads_total = num_cpus::get();
 
-    let counter_thread_count = threads_total - 2;
-    println!(
-        "Running with 1 broker, 1 adder, and {} counter clients",
-        counter_thread_count
-    );
+    let mode = std::env::args()
+        .nth(1)
+        .expect("no mode specified, chose 'broker', 'adder', or 'printer'");
+    let port: u16 = std::env::args()
+        .nth(2)
+        .unwrap_or("1337".into())
+        .parse::<u16>()
+        .unwrap();
+    println!("Launching in mode {} on port {}", mode, port);
 
-    unsafe {
-        let mut broker = LlmpBroker::new().expect("Failed to create llmp broker");
-        for i in 0..counter_thread_count {
-            println!("Adding client {}", i);
-            broker
-                .register_childprocess_clientloop(llmp_test_clientloop, ptr::null_mut())
-                .expect("could not add child clientloop");
+    match mode.as_str() {
+        "broker" => {
+            let mut broker: llmp::LlmpBroker = llmp::LlmpBroker::new().unwrap();
+            broker.launch_tcp_listener(port).unwrap();
+            broker.add_message_hook(broker_message_hook);
+            broker.loop_forever(Some(Duration::from_millis(5)))
         }
-
-        broker
-            .register_childprocess_clientloop(test_adder_clientloop, ptr::null_mut())
-            .expect("Error registering childprocess");
-
-        println!("Spawning broker");
-
-        broker.add_message_hook(broker_message_hook, ptr::null_mut());
-
-        broker.run();
+        "adder" => {
+            let mut client = llmp::LlmpClient::create_attach_to_tcp(port).unwrap();
+            let mut counter: u32 = 0;
+            loop {
+                counter = counter.wrapping_add(1);
+                client
+                    .send_buf(TAG_SIMPLE_U32_V1, &counter.to_le_bytes())
+                    .unwrap();
+            }
+        }
+        "printer" => {
+            adder_loop(port);
+        }
+        _ => {
+            println!("No valid mode supplied");
+        }
     }
 }
