@@ -3,7 +3,7 @@ use core::ptr;
 
 use crate::executors::{Executor, ExitKind};
 use crate::inputs::Input;
-use crate::metamap::NamedAnyMap;
+use crate::serde_anymap::NamedSerdeAnyMap;
 use crate::observers::Observer;
 use crate::AflError;
 
@@ -14,7 +14,7 @@ where
     I: Input,
 {
     harness: HarnessFunction<I>,
-    observers: NamedAnyMap<dyn Observer>,
+    observers: NamedSerdeAnyMap<dyn Observer>,
 }
 
 static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
@@ -35,11 +35,11 @@ where
         Ok(ret)
     }
 
-    fn observers(&self) -> &NamedAnyMap<dyn Observer> {
+    fn observers(&self) -> &NamedSerdeAnyMap<dyn Observer> {
         &self.observers
     }
 
-    fn observers_mut(&mut self) -> &mut NamedAnyMap<dyn Observer> {
+    fn observers_mut(&mut self) -> &mut NamedSerdeAnyMap<dyn Observer> {
         &mut self.observers
     }
 }
@@ -55,7 +55,7 @@ where
         }
         Self {
             harness: harness_fn,
-            observers: NamedAnyMap::new(),
+            observers: NamedSerdeAnyMap::new(),
         }
     }
 }

@@ -3,13 +3,14 @@ extern crate num;
 use core::any::Any;
 use core::slice::from_raw_parts_mut;
 use num::Integer;
+use serde::{Deserialize, Serialize};
 
-use crate::metamap::AsAny;
+use crate::serde_anymap::{SerdeAny, SliceMut};
 use crate::AflError;
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer: Any + AsAny {
+pub trait Observer: SerdeAny + 'static {
     fn flush(&mut self) -> Result<(), AflError> {
         Ok(())
     }
@@ -35,7 +36,7 @@ where
     fn map_mut(&mut self) -> &mut [T];
 
     /// Get the initial value for reset()
-    fn initial(&self) -> &T;
+    fn initial(&self) -> T;
 
     /// Get the initial value for reset()
     fn initial_mut(&mut self) -> &mut T;
@@ -46,25 +47,27 @@ where
     /// Reset the map
     fn reset_map(&mut self) -> Result<(), AflError> {
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
+        let initial = self.initial();
         for i in self.map_mut().iter_mut() {
-            *i = T::zero();
+            *i = initial;
         }
         Ok(())
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct StdMapObserver<T>
 where
     T: Integer + Copy + 'static,
 {
-    map: &'static mut [T],
+    map: SliceMut<'static, T>,
     initial: T,
     name: &'static str,
 }
 
 impl<T> Observer for StdMapObserver<T>
 where
-    T: Integer + Copy,
+    T: Integer + Copy + 'static + serde::Serialize,
 {
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
@@ -75,9 +78,9 @@ where
     }
 }
 
-impl<T> AsAny for StdMapObserver<T>
+impl<T> SerdeAny for StdMapObserver<T>
 where
-    T: Integer + Copy,
+    T: Integer + Copy + 'static + serde::Serialize,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -92,15 +95,21 @@ where
     T: Integer + Copy,
 {
     fn map(&self) -> &[T] {
-        &self.map
+        match &self.map {
+            SliceMut::Ref(r) => r,
+            SliceMut::Owned(v) => v.as_slice()
+        }
     }
 
     fn map_mut(&mut self) -> &mut [T] {
-        &mut self.map
+        match &mut self.map {
+            SliceMut::Ref(r) => r,
+            SliceMut::Owned(v) => v.as_mut_slice()
+        }
     }
 
-    fn initial(&self) -> &T {
-        &self.initial
+    fn initial(&self) -> T {
+        self.initial
     }
 
     fn initial_mut(&mut self) -> &mut T {
@@ -120,7 +129,7 @@ where
     pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
         let initial = if map.len() > 0 { map[0] } else { T::zero() };
         Self {
-            map: map,
+            map: SliceMut::Ref(map),
             initial: initial,
             name: name,
         }
@@ -131,7 +140,7 @@ where
         unsafe {
             let initial = if len > 0 { *map_ptr } else { T::zero() };
             StdMapObserver {
-                map: from_raw_parts_mut(map_ptr, len),
+                map: SliceMut::Ref(from_raw_parts_mut(map_ptr, len)),
                 initial: initial,
                 name: name,
             }

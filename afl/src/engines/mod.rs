@@ -85,14 +85,15 @@ where
 
     /// Runs the input and triggers observers and feedback
     fn evaluate_input(&mut self, input: &I) -> Result<u32, AflError> {
-        self.reset_observers()?;
+        self.executor_mut().reset_observers()?;
         self.executor_mut().run_target(&input)?;
         self.set_executions(self.executions() + 1);
-        self.post_exec_observers()?;
+        self.executor_mut().post_exec_observers()?;
 
         let mut fitness = 0;
+        let observers = self.executor().observers();
         for feedback in self.feedbacks_mut() {
-            fitness += feedback.is_interesting(&input)?;
+            fitness += feedback.is_interesting(&input, observers)?;
         }
         Ok(fitness)
     }
@@ -223,14 +224,6 @@ where
 
     fn metadatas_mut(&mut self) -> &mut HashMap<&'static str, Box<dyn StateMetadata>> {
         &mut self.metadatas
-    }
-
-    fn observers(&self) -> &[Rc<RefCell<dyn Observer>>] {
-        &self.observers
-    }
-
-    fn observers_mut(&mut self) -> &mut Vec<Rc<RefCell<dyn Observer>>> {
-        &mut self.observers
     }
 
     fn feedbacks(&self) -> &[Box<dyn Feedback<I>>] {

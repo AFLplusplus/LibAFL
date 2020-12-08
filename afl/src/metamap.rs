@@ -291,7 +291,7 @@ where
     pub fn by_typeid_mut(&mut self, name: &'static str, typeid: &TypeId) -> Option<&mut B> {
         match self.map.get_mut(typeid) {
             None => None,
-            Some(h) => h.get(&name).map(|x| x.as_mut()),
+            Some(h) => h.get_mut(&name).map(|x| x.as_mut()),
         }
     }
 

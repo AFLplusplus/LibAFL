@@ -1,16 +1,11 @@
-use alloc::rc::Rc;
 use alloc::vec::Vec;
-use core::any::Any;
-use core::cell::RefCell;
 use core::marker::PhantomData;
 use num::Integer;
-use serde::{Deserialize, Serialize};
 
 use crate::corpus::{Testcase, TestcaseMetadata};
-use crate::executors::Executor;
 use crate::inputs::Input;
-use crate::observers::MapObserver;
-use crate::serde_anymap::SerdeAny;
+use crate::observers::{Observer, MapObserver};
+use crate::serde_anymap::NamedSerdeAnyMap;
 use crate::AflError;
 
 pub trait Feedback<I>
@@ -18,7 +13,7 @@ where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, input: &I, executor: &dyn Executor<I>) -> Result<u32, AflError>;
+    fn is_interesting(&mut self, input: &I, observers: &NamedSerdeAnyMap<dyn Observer>) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
@@ -100,21 +95,20 @@ impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
 where
     T: Integer + Copy + 'static,
     R: Reducer<T>,
-    O: MapObserver<T>,
+    O: MapObserver<T> + 'static,
     I: Input,
 {
-    fn is_interesting(&mut self, _input: &I, executor: &dyn Executor<I>) -> Result<u32, AflError> {
+    fn is_interesting(&mut self, _input: &I, observers: &NamedSerdeAnyMap<dyn Observer>) -> Result<u32, AflError> {
         let mut interesting = 0;
         // TODO optimize
-        let size = self.map_observer.borrow().map().len();
-        let mut history_map = self.history_map.borrow_mut();
-        let observer = self.map_observer.borrow();
+        let observer = observers.get::<O>(self.name).unwrap();
+        let size = observer.map().len();
         for i in 0..size {
-            let history = history_map[i];
+            let history = self.history_map[i];
             let item = observer.map()[i];
             let reduced = R::reduce(history, item);
             if history != reduced {
-                history_map[i] = reduced;
+                self.history_map[i] = reduced;
                 interesting += 1;
             }
         }
@@ -160,6 +154,7 @@ where
     }
 }
 
+/*
 #[derive(Serialize, Deserialize)]
 pub struct MapNoveltiesMetadata {
     novelties: Vec<usize>,
@@ -290,9 +285,10 @@ where
         }
     }
 }
+*/
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
 pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
 
-pub type MaxMapTrackerFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
-pub type MinMapTrackerFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
+//pub type MaxMapTrackerFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
+//pub type MinMapTrackerFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
