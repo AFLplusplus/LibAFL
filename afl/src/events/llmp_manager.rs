@@ -85,26 +85,5 @@ where
     E: Executor<I>,
     R: Rand,
 {
-    /// Forks n processes, calls broker handler and client handlers, never returns.
-    pub fn spawn(
-        process_count: usize,
-        broker_message_hook: LlmpMsgHookFn,
-        clientloops: LlmpClientloopFn,
-    ) -> ! {
-        unsafe {
-            let mut broker = LlmpBroker::new().expect("Failed to create llmp");
-
-            for i in 0..process_count - 1 {
-                println!("Adding client {}", i);
-                broker
-                    .register_childprocess_clientloop(clientloops, ptr::null_mut())
-                    .expect("could not add child clientloop");
-            }
-
-            println!("Spawning broker");
-            broker.add_message_hook(broker_message_hook, ptr::null_mut());
-
-            broker.run();
-        }
-    }
+    
 }
