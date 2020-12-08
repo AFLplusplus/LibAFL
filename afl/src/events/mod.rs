@@ -34,9 +34,9 @@ enum BrokerEventResult {
 /*
 
 /// A custom event, in case a user wants to extend the features (at compile time)
-pub trait CustomEvent<S, C, E, I, R>
+pub trait CustomEvent<C, E, I, R>
 where
-    S: State<C, E, I, R>,
+    S: State<I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
@@ -45,81 +45,79 @@ where
     /// Returns the name of this event
     fn name(&self) -> &str;
     /// This method will be called in the broker
-    fn handle_in_broker(&self, broker: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) -> Result<BrokerEventResult, AflError>;
+    fn handle_in_broker(&self, broker: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) -> Result<BrokerEventResult, AflError>;
     /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
-    fn handle_in_client(&self, client: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) -> Result<(), AflError>;
+    fn handle_in_client(&self, client: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) -> Result<(), AflError>;
 }
 
 struct UnusedCustomEvent {}
-impl<S, C, E, I, R> CustomEvent<S, C, E, I, R> for UnusedCustomEvent<S, C, E, I, R>
+impl<C, E, I, R> CustomEvent<C, E, I, R> for UnusedCustomEvent<C, E, I, R>
 where
-    S: State<C, E, I, R>,
+    S: State<I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
     R: Rand,
 {
     fn name(&self) -> &str {"No custom events"}
-    fn handle_in_broker(&self, broker: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) {Ok(BrokerEventResult::Handled)}
-    fn handle_in_client(&self, client: &dyn EventManager<S, C, E, I, R, Self>, state: &mut S, corpus: &mut C) {Ok(())}
+    fn handle_in_broker(&self, broker: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) {Ok(BrokerEventResult::Handled)}
+    fn handle_in_client(&self, client: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) {Ok(())}
 }
 */
 
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
-pub enum Event<S, C, E, I, R>
+pub enum Event<C, E, I, R>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
     R: Rand,
-    // CE: CustomEvent<S, C, E, I, R>,
+    // CE: CustomEvent<C, E, I, R>,
 {
     LoadInitial {
         sender_id: u64,
-        phantom: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(C, E, I, R)>,
     },
     NewTestcase {
         sender_id: u64,
         testcase: Testcase<I>,
-        phantom: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(C, E, I, R)>,
     },
     UpdateStats {
         sender_id: u64,
         new_execs: usize,
-        phantom: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(C, E, I, R)>,
     },
     Crash {
         sender_id: u64,
         input: I,
-        phantom: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(C, E, I, R)>,
     },
     Timeout {
         sender_id: u64,
         input: I,
-        phantom: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(C, E, I, R)>,
     },
     Log {
         sender_id: u64,
         severity_level: u8,
         message: String,
-        phantom: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(C, E, I, R)>,
     },
     None {
-        phantom: PhantomData<(S, C, E, I, R)>,
+        phantom: PhantomData<(C, E, I, R)>,
     },
     //Custom {sender_id: u64, custom_event: CE},
 }
 
-impl<S, C, E, I, R> Event<S, C, E, I, R>
+impl<C, E, I, R> Event<C, E, I, R>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
     R: Rand,
-    //CE: CustomEvent<S, C, E, I, R>,
+    //CE: CustomEvent<C, E, I, R>,
 {
     pub fn name(&self) -> &str {
         match self {
@@ -160,7 +158,7 @@ where
 
     fn handle_in_broker(
         &self,
-        /*broker: &dyn EventManager<S, C, E, I, R>,*/ _state: &mut S,
+        /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
         match self {
@@ -215,7 +213,7 @@ where
 
     fn handle_in_client(
         self,
-        /*client: &dyn EventManager<S, C, E, I, R>,*/ _state: &mut S,
+        /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
         match self {
@@ -236,9 +234,8 @@ where
     // TODO serialize and deserialize, defaults to serde
 }
 
-pub trait EventManager<S, C, E, I, R>
+pub trait EventManager<C, E, I, R>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
@@ -249,13 +246,13 @@ where
     fn enabled(&self) -> bool;
 
     /// Fire an Event
-    fn fire(&mut self, event: Event<S, C, E, I, R>) -> Result<(), AflError>;
+    fn fire(&mut self, event: Event<C, E, I, R>) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError>;
+    fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError>;
 
-    fn on_recv(&self, _state: &mut S, _corpus: &mut C) -> Result<(), AflError> {
+    fn on_recv(&self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
         // TODO: Better way to move out of testcase, or get ref
         //Ok(corpus.add(self.testcase.take().unwrap()))
         Ok(())
@@ -263,7 +260,7 @@ where
 }
 
 /*TODO
-    fn on_recv(&self, state: &mut S, _corpus: &mut C) -> Result<(), AflError> {
+    fn on_recv(&self, state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
         println!(
             "#{}\t exec/s: {}",
             state.executions(),
@@ -275,41 +272,39 @@ where
 */
 
 #[cfg(feature = "std")]
-pub struct LoggerEventManager<S, C, E, I, R, W>
+pub struct LoggerEventManager<C, E, I, R, W>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,
     R: Rand,
     W: Write,
-    //CE: CustomEvent<S, C, E, I, R>,
+    //CE: CustomEvent<C, E, I, R>,
 {
-    events: Vec<Event<S, C, E, I, R>>,
+    events: Vec<Event<C, E, I, R>>,
     writer: W,
 }
 
 #[cfg(feature = "std")]
-impl<S, C, E, I, R, W> EventManager<S, C, E, I, R> for LoggerEventManager<S, C, E, I, R, W>
+impl<C, E, I, R, W> EventManager<C, E, I, R> for LoggerEventManager<C, E, I, R, W>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     E: Executor<I>,
     I: Input,
     R: Rand,
     W: Write,
-    //CE: CustomEvent<S, C, E, I, R>,
+    //CE: CustomEvent<C, E, I, R>,
 {
     fn enabled(&self) -> bool {
         true
     }
 
-    fn fire(&mut self, event: Event<S, C, E, I, R>) -> Result<(), AflError> {
+    fn fire(&mut self, event: Event<C, E, I, R>) -> Result<(), AflError> {
         self.events.push(event);
         Ok(())
     }
 
-    fn process(&mut self, state: &mut S, corpus: &mut C) -> Result<usize, AflError> {
+    fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError> {
         // TODO: iterators
         let mut handled = vec![];
         for x in self.events.iter() {
@@ -330,9 +325,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<S, C, E, I, R, W> LoggerEventManager<S, C, E, I, R, W>
+impl<C, E, I, R, W> LoggerEventManager<C, E, I, R, W>
 where
-    S: State<C, E, I, R>,
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,

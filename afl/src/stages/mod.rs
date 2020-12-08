@@ -2,7 +2,7 @@ pub mod mutational;
 pub use mutational::StdMutationalStage;
 
 use crate::corpus::Corpus;
-use crate::engines::State;
+use crate::engines::{Engine, State};
 use crate::events::EventManager;
 use crate::executors::Executor;
 use crate::inputs::Input;
@@ -21,9 +21,9 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
-        state: &mut State<C, E, I, R>,
+        state: &mut State<I, R>,
         corpus: &C,
-        events: &mut EM,
+        engine: &mut Engine<EM, E, C, I, R>,
         input: &I,
     ) -> Result<(), AflError>;
 }

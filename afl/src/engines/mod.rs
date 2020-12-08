@@ -24,10 +24,8 @@ pub trait StateMetadata: Debug {
     fn name(&self) -> &'static str;
 }
 
-pub struct State<C, E, I, R>
+pub struct State<I, R>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
     I: Input,
     R: Rand,
 {
@@ -35,16 +33,12 @@ where
     start_time: u64,
     metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
     // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
-    observers: Vec<Rc<RefCell<dyn Observer>>>,
     feedbacks: Vec<Box<dyn Feedback<I>>>,
-    executor: E,
-    phantom: PhantomData<(C, R)>,
+    phantom: PhantomData<R>,
 }
 
-impl<C, E, I, R> State<C, E, I, R>
+impl<I, R> State<I, R>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
     I: Input,
     R: Rand,
 {
@@ -108,10 +102,13 @@ where
         self.feedbacks_mut().push(feedback);
     }
 
+    // TODO move some of these, like evaluate_input, to FuzzingEngine
+
     /// Runs the input and triggers observers and feedback
-    pub fn evaluate_input<FE, EM>(&mut self, input: &I, engine: &FE) -> Result<u32, AflError> 
+    pub fn evaluate_input<C, E, EM>(&mut self, input: &I, engine: &mut Engine<EM, E, C, I, R>) -> Result<u32, AflError> 
     where
-        FE: FuzzingEngine<EM, E, C, I, R>,
+        C: Corpus<I, R>,
+        E: Executor<I>,
         EM: EventManager<C, E, I, R>,
     {
         engine.executor_mut().reset_observers()?;
@@ -120,7 +117,7 @@ where
         engine.executor_mut().post_exec_observers()?;
 
         let mut fitness = 0;
-        let observers = self.executor().observers();
+        let observers = engine.executor().observers();
         for feedback in self.feedbacks_mut() {
             fitness += feedback.is_interesting(&input, observers)?;
         }
@@ -162,12 +159,15 @@ where
     }
 
     /// Adds this input to the corpus, if it's intersting
-    pub fn add_if_interesting(
+    pub fn add_if_interesting<C>(
         &mut self,
         corpus: &mut C,
         input: I,
         fitness: u32,
-    ) -> Result<Option<usize>, AflError> {
+    ) -> Result<Option<usize>, AflError> 
+    where
+        C: Corpus<I, R>
+    {
         if fitness > 0 {
             let testcase = self.input_to_testcase(input, fitness)?;
             Ok(Some(corpus.add(testcase)))
@@ -177,45 +177,95 @@ where
         }
     }
 
-    pub fn generate_initial_inputs<G, EM>(
+    pub fn generate_initial_inputs<G, C, E, FE, EM>(
         &mut self,
         rand: &mut R,
         corpus: &mut C,
         generator: &mut G,
-        events: &mut EM,
+        engine: &mut Engine<EM, E, C, I, R>,
         num: usize,
     ) -> Result<(), AflError>
     where
         G: Generator<I, R>,
+        C: Corpus<I, R>,
+        E: Executor<I>,
         EM: EventManager<C, E, I, R>,
     {
         for _ in 0..num {
             let input = generator.generate(rand)?;
-            let fitness = self.evaluate_input(&input)?;
+            let fitness = self.evaluate_input(&input, engine)?;
             self.add_if_interesting(corpus, input, fitness)?;
-            events.fire(Event::LoadInitial {
+            engine.events_manager_mut().fire(Event::LoadInitial {
                 sender_id: 0,
                 phantom: PhantomData,
             })?;
         }
-        events.process(self, corpus)?;
+        engine.events_manager_mut().process(self, corpus)?;
         Ok(())
     }
 
-    pub fn new(executor: E) -> Self {
+    pub fn new() -> Self {
         Self {
             executions: 0,
             start_time: current_milliseconds(),
             metadatas: HashMap::default(),
-            observers: vec![],
             feedbacks: vec![],
-            executor: executor,
             phantom: PhantomData,
         }
     }
 }
 
-pub trait FuzzingEngine<EM, E, C, I, R>
+pub struct Engine<EM, E, C, I, R>
+where
+    EM: EventManager<C, E, I, R>,
+    E: Executor<I>,
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    manager: EM,
+    executor: E,
+    phantom: PhantomData<(C, I, R)>
+}
+
+impl<EM, E, C, I, R> Engine<EM, E, C, I, R>
+where
+    EM: EventManager<C, E, I, R>,
+    E: Executor<I>,
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    pub fn events_manager(&self) -> &EM {
+        &self.manager
+    }
+
+    pub fn events_manager_mut(&mut self) -> &mut EM {
+        &mut self.manager
+    }
+
+    /// Return the executor
+    pub fn executor(&self) -> &E {
+        &self.executor
+    }
+
+    /// Return the executor (mutable)
+    pub fn executor_mut(&mut self) -> &mut E {
+        &mut self.executor
+    }
+
+    // TODO additional executors, Vec<Box<dyn Executor<I>>>
+
+    pub fn new(executor: E, events_manager: EM) -> Self {
+        Self {
+            executor: executor,
+            manager: events_manager,
+            phantom: PhantomData
+        }
+    }
+}
+
+pub trait Fuzzer<EM, E, C, I, R>
 where
     EM: EventManager<C, E, I, R>,
     E: Executor<I>,
@@ -231,24 +281,12 @@ where
         self.stages_mut().push(stage);
     }
 
-    fn events_manager(&self) -> &EM;
-
-    fn events_manager_mut(&mut self) -> &mut EM;
-
-    /// Return the executor
-    fn executor(&self) -> &E;
-
-    /// Return the executor (mutable)
-    fn executor_mut(&mut self) -> &mut E;
-
-    // TODO additional executors, Vec<Box<dyn Executor<I>>>
-
     fn fuzz_one(
         &mut self,
         rand: &mut R,
-        state: &mut State<C, E, I, R>,
+        state: &mut State<I, R>,
         corpus: &mut C,
-        events: &mut EM,
+        engine: &mut Engine<EM, E, C, I, R>,
     ) -> Result<usize, AflError> {
         let (testcase, idx) = corpus.next(rand)?;
         match testcase.input() {
@@ -262,27 +300,27 @@ where
         let input = corpus.get(idx).input().as_ref().unwrap();
 
         for stage in self.stages_mut() {
-            stage.perform(rand, state, corpus, events, &input)?;
+            stage.perform(rand, state, corpus, engine, &input)?;
         }
 
-        events.process(state, corpus)?;
+        engine.events_manager_mut().process(state, corpus)?;
         Ok(idx)
     }
 
     fn fuzz_loop(
         &mut self,
         rand: &mut R,
-        state: &mut State<C, E, I, R>,
+        state: &mut State<I, R>,
         corpus: &mut C,
-        events: &mut EM,
+        engine: &mut Engine<EM, E, C, I, R>,
     ) -> Result<(), AflError> {
         let mut last = current_milliseconds();
         loop {
-            self.fuzz_one(rand, state, corpus, events)?;
+            self.fuzz_one(rand, state, corpus, engine)?;
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                events.fire(Event::UpdateStats {
+                engine.events_manager_mut().fire(Event::UpdateStats {
                     sender_id: 0,
                     new_execs: 1,
                     phantom: PhantomData,
@@ -290,9 +328,10 @@ where
             }
         }
     }
+
 }
 
-pub struct StdFuzzingEngine<EM, E, C, I, R>
+pub struct StdFuzzer<EM, E, C, I, R>
 where
     EM: EventManager<C, E, I, R>,
     E: Executor<I>,
@@ -301,10 +340,9 @@ where
     R: Rand,
 {
     stages: Vec<Box<dyn Stage<EM, E, C, I, R>>>,
-    phantom: PhantomData<EM>,
 }
 
-impl<EM, E, C, I, R> FuzzingEngine<EM, E, C, I, R> for StdFuzzingEngine<EM, E, C, I, R>
+impl<EM, E, C, I, R> Fuzzer<EM, E, C, I, R> for StdFuzzer<EM, E, C, I, R>
 where
     EM: EventManager<C, E, I, R>,
     E: Executor<I>,
@@ -321,7 +359,7 @@ where
     }
 }
 
-impl<EM, E, C, I, R> StdFuzzingEngine<EM, E, C, I, R>
+impl<EM, E, C, I, R> StdFuzzer<EM, E, C, I, R>
 where
     EM: EventManager<C, E, I, R>,
     E: Executor<I>,
@@ -331,11 +369,11 @@ where
 {
     pub fn new() -> Self {
         Self {
-            stages: vec![],
-            phantom: PhantomData,
+            stages: vec![]
         }
     }
 }
+
 
 // TODO: no_std test
 #[cfg(feature = "std")]
@@ -348,7 +386,7 @@ mod tests {
     use std::io::stderr;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
-    use crate::engines::{Engine, StdEngine, StdState};
+    use crate::engines::{Engine, Fuzzer, StdFuzzer, State};
     #[cfg(feature = "std")]
     use crate::events::LoggerEventManager;
     use crate::executors::inmemory::InMemoryExecutor;
@@ -371,21 +409,22 @@ mod tests {
         corpus.add(testcase);
 
         let executor = InMemoryExecutor::<BytesInput>::new(harness);
-        let mut state = StdState::new(executor);
+        let mut state = State::new();
 
         let mut events_manager = LoggerEventManager::new(stderr());
 
-        let mut engine = StdEngine::new();
+        let mut engine = Engine::new(executor, events_manager);
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);
         let stage = StdMutationalStage::new(mutator);
-        engine.add_stage(Box::new(stage));
+        let mut fuzzer = StdFuzzer::new();
+        fuzzer.add_stage(Box::new(stage));
 
         //
 
         for i in 0..1000 {
-            engine
-                .fuzz_one(&mut rand, &mut state, &mut corpus, &mut events_manager)
+            fuzzer
+                .fuzz_one(&mut rand, &mut state, &mut corpus, &mut engine)
                 .expect(&format!("Error in iter {}", i));
         }
     }

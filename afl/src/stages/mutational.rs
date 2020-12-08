@@ -5,18 +5,17 @@ use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
 use crate::stages::Corpus;
-use crate::stages::Stage;
+use crate::stages::{Engine, Stage};
 use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, events::Event};
 
 // TODO multi mutators stage
 
-pub trait MutationalStage<M, S, EM, E, C, I, R>: Stage<S, EM, E, C, I, R>
+pub trait MutationalStage<M, EM, E, C, I, R>: Stage<EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, I, R>,
-    EM: EventManager<S, C, E, I, R>,
+    EM: EventManager<C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -38,9 +37,9 @@ where
     fn perform_mutational(
         &mut self,
         rand: &mut R,
-        state: &mut S,
+        state: &mut State<I, R>,
         corpus: &C,
-        events: &mut EM,
+        engine: &mut Engine<EM, E, C, I, R>,
         input: &I,
     ) -> Result<(), AflError> {
         let num = self.iterations(rand);
@@ -49,7 +48,7 @@ where
             self.mutator_mut()
                 .mutate(rand, corpus, &mut input_mut, i as i32)?;
 
-            let fitness = state.evaluate_input(&input_mut)?;
+            let fitness = state.evaluate_input(&input_mut, engine)?;
 
             self.mutator_mut()
                 .post_exec(fitness, &input_mut, i as i32)?;
@@ -57,7 +56,7 @@ where
             let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
             if let Some(testcase) = testcase_maybe {
                 //corpus.entries()[idx]
-                events.fire(Event::NewTestcase {
+                engine.events_manager_mut().fire(Event::NewTestcase {
                     sender_id: 0,
                     testcase: testcase,
                     phantom: PhantomData,
@@ -69,26 +68,24 @@ where
 }
 
 /// The default mutational stage
-pub struct StdMutationalStage<M, S, EM, E, C, I, R>
+pub struct StdMutationalStage<M, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, I, R>,
-    EM: EventManager<S, C, E, I, R>,
+    EM: EventManager<C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
     mutator: M,
-    phantom: PhantomData<(S, EM, E, C, I, R)>,
+    phantom: PhantomData<(EM, E, C, I, R)>,
 }
 
-impl<M, S, EM, E, C, I, R> MutationalStage<M, S, EM, E, C, I, R>
-    for StdMutationalStage<M, S, EM, E, C, I, R>
+impl<M, EM, E, C, I, R> MutationalStage<M, EM, E, C, I, R>
+    for StdMutationalStage<M, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, I, R>,
-    EM: EventManager<S, C, E, I, R>,
+    EM: EventManager<C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -105,11 +102,10 @@ where
     }
 }
 
-impl<M, S, EM, E, C, I, R> Stage<S, EM, E, C, I, R> for StdMutationalStage<M, S, EM, E, C, I, R>
+impl<M, EM, E, C, I, R> Stage<EM, E, C, I, R> for StdMutationalStage<M, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, I, R>,
-    EM: EventManager<S, C, E, I, R>,
+    EM: EventManager<C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
@@ -118,20 +114,19 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
-        state: &mut S,
+        state: &mut State<I, R>,
         corpus: &C,
-        events: &mut EM,
+        engine: &mut Engine<EM, E, C, I, R>,
         input: &I,
     ) -> Result<(), AflError> {
-        self.perform_mutational(rand, state, corpus, events, input)
+        self.perform_mutational(rand, state, corpus, engine, input)
     }
 }
 
-impl<M, S, EM, E, C, I, R> StdMutationalStage<M, S, EM, E, C, I, R>
+impl<M, EM, E, C, I, R> StdMutationalStage<M, EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
-    S: State<C, E, I, R>,
-    EM: EventManager<S, C, E, I, R>,
+    EM: EventManager<C, E, I, R>,
     E: Executor<I>,
     C: Corpus<I, R>,
     I: Input,
