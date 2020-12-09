@@ -1,5 +1,6 @@
 extern crate num;
 
+use alloc::boxed::Box;
 use core::any::Any;
 use core::slice::from_raw_parts_mut;
 use num::Integer;
@@ -59,6 +60,9 @@ where
     }
 }
 
+/// The Map Observer retrieves the state of a map,
+/// that will get updated by the target.
+/// A well-known example is the AFL-Style coverage map.
 #[derive(Serialize, Deserialize)]
 pub struct StdMapObserver<T>
 where

@@ -21,13 +21,17 @@ pub trait StateMetadata: Debug {
     fn name(&self) -> &'static str;
 }
 
+/// The state a fuzz run.
 pub struct State<I, R>
 where
     I: Input,
     R: Rand,
 {
+    /// How many times the executor ran the harness/target
     executions: usize,
+    /// At what time the fuzzing started
     start_time: u64,
+    /// Metadata stored for this state by one of the components
     metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
     // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
     feedbacks: Vec<Box<dyn Feedback<I>>>,

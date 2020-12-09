@@ -23,7 +23,7 @@ extern "C" {
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct ipc_perm {
+struct ipc_perm {
     pub __key: c_int,
     pub uid: c_uint,
     pub gid: c_uint,
@@ -39,7 +39,7 @@ pub struct ipc_perm {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct shmid_ds {
+struct shmid_ds {
     pub shm_perm: ipc_perm,
     pub shm_segsz: c_ulong,
     pub shm_atime: c_long,
@@ -135,7 +135,7 @@ impl AflShmem {
 }
 
 /// Deinitialize this shmem instance
-pub unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
+unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
     if shm.is_null() || (*shm).map.is_null() {
         /* Serialized map id */
         // Not set or not initialized;
@@ -148,7 +148,7 @@ pub unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
 
 /// Functions to create Shared memory region, for observation channels and
 /// opening inputs and stuff.
-pub unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_uchar {
+unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_uchar {
     (*shm).map_size = map_size;
     (*shm).map = 0 as *mut c_uchar;
     (*shm).shm_id = shmget(
@@ -180,7 +180,7 @@ pub unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_ucha
 }
 
 /// Uses a shmap id string to open a shared map
-pub unsafe fn afl_shmem_by_str(
+unsafe fn afl_shmem_by_str(
     shm: *mut AflShmem,
     shm_str: &CStr,
     map_size: usize,
@@ -211,7 +211,7 @@ pub unsafe fn afl_shmem_by_str(
 }
 
 /// Write sharedmap as env var and the size as name#_SIZE
-pub unsafe fn afl_shmem_to_env_var(shmem: &AflShmem, env_name: &CStr) -> c_uint {
+unsafe fn afl_shmem_to_env_var(shmem: &AflShmem, env_name: &CStr) -> c_uint {
     let env_len = env_name.to_bytes().len();
     if env_len == 0 || env_len > 200 || (*shmem).shm_str[0 as c_int as usize] == 0 {
         return AFL_RET_NULL_PTR;

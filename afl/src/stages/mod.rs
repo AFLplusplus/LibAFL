@@ -9,6 +9,8 @@ use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
+/// A stage is one step in the fuzzing process.
+/// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<EM, E, C, I, R>
 where
     EM: EventManager<C, E, I, R>,

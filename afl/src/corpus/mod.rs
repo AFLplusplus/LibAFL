@@ -14,6 +14,7 @@ use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
+/// A way to obtain the containing testcase entries
 pub trait HasTestcaseVec<I>
 where
     I: Input,
@@ -111,6 +112,7 @@ where
     fn current_testcase(&self) -> (&RefCell<Testcase<I>>, usize);
 }
 
+/// A corpus handling all important fuzzing in memory.
 pub struct InMemoryCorpus<I, R>
 where
     I: Input,
@@ -171,6 +173,7 @@ where
     }
 }
 
+/// A corpus able to store testcases to dis, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
 pub struct OnDiskCorpus<I, R>
 where
