@@ -1,5 +1,7 @@
-//#[cfg(feature = "std")]
-//pub mod llmp;
+#[cfg(feature = "std")]
+mod llmp;
+#[cfg(feature = "std")]
+pub mod shmem_translated;
 
 use alloc::string::String;
 use core::marker::PhantomData;
@@ -7,12 +9,7 @@ use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 //#[cfg(feature = "std")]
-//pub mod llmp_translated; // TODO: Abstract away.
-//#[cfg(feature = "std")]
 //pub mod shmem_translated;
-
-//#[cfg(feature = "std")]
-//pub use crate::events::llmp::LLMPEventManager;
 
 #[cfg(feature = "std")]
 use std::io::Write;
@@ -190,10 +187,6 @@ where
     I: Input,
     R: Rand,
 {
-    /// Check if this EventaManager support a given Event type
-    /// To compare events, use Event::name().as_ptr()
-    fn enabled(&self) -> bool;
-
     /// Fire an Event
     fn fire<'a>(
         &mut self,
@@ -328,10 +321,6 @@ where
     W: Write,
     //CE: CustomEvent<C, E, I, R>,
 {
-    fn enabled(&self) -> bool {
-        true
-    }
-
     fn fire<'a>(
         &mut self,
         event: Event<'a, C, E, I, R>,
@@ -368,6 +357,172 @@ where
             writer: writer,
             count: 0,
             phantom: PhantomData,
+        }
+    }
+}
+
+/// Eventmanager for multi-processed application
+#[cfg(feature = "std")]
+pub struct LlmpBrokerEventManager<C, E, I, R>
+where
+    C: Corpus<I, R>,
+    I: Input,
+    E: Executor<I>,
+    R: Rand,
+    //CE: CustomEvent<C, E, I, R>,
+{
+    llmp_broker: llmp::LlmpBroker,
+    phantom: PhantomData<(C, E, I, R)>,
+}
+
+/// Eventmanager for multi-processed application
+#[cfg(feature = "std")]
+pub struct LlmpClientEventManager<C, E, I, R>
+where
+    C: Corpus<I, R>,
+    I: Input,
+    E: Executor<I>,
+    R: Rand,
+    //CE: CustomEvent<C, E, I, R>,
+{
+    llmp_client: llmp::LlmpClient,
+    phantom: PhantomData<(C, E, I, R)>,
+}
+
+#[cfg(feature = "std")]
+impl<C, E, I, R> EventManager<C, E, I, R> for LlmpBrokerEventManager<C, E, I, R>
+where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+    //CE: CustomEvent<C, E, I, R>,
+{
+    /// Fire an Event
+    fn fire<'a>(
+        &mut self,
+        event: Event<'a, C, E, I, R>,
+        state: &mut State<I, R>,
+        corpus: &mut C,
+    ) -> Result<(), AflError> {
+        // TODO let serialized = postcard::to_vec(&event)?;
+        // self.llmp_broker.send_buf(&serialized)?;
+        Ok(())
+    }
+
+    fn process(&mut self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<usize, AflError> {
+        // TODO: iterators
+        /*
+        let mut handled = vec![];
+        for x in self.events.iter() {
+            handled.push(x.handle_in_broker(state, corpus)?);
+        }
+        handled
+            .iter()
+            .zip(self.events.iter())
+            .map(|(x, event)| match x {
+                BrokerEventResult::Forward => event.handle_in_client(state, corpus),
+                // Ignore broker-only events
+                BrokerEventResult::Handled => Ok(()),
+            })
+            .for_each(drop);
+        let count = self.events.len();
+        dbg!("Handled {} events", count);
+        self.events.clear();
+
+        let num = self.events.len();
+        for event in &self.events {}
+
+        self.events.clear();
+        */
+
+        Ok(0)
+    }
+
+    fn on_recv(&self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
+        // TODO: Better way to move out of testcase, or get ref
+        //Ok(corpus.add(self.testcase.take().unwrap()))
+        Ok(())
+    }
+
+    fn handle_in_broker(
+        &self,
+        event: &Event<C, E, I, R>,
+        /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
+        _corpus: &mut C,
+    ) -> Result<BrokerEventResult, AflError> {
+        match event {
+            Event::LoadInitial {
+                sender_id: _,
+                phantom: _,
+            } => Ok(BrokerEventResult::Handled),
+            Event::NewTestcase {
+                sender_id: _,
+                input: _,
+                observers: _,
+            } => Ok(BrokerEventResult::Forward),
+            Event::UpdateStats {
+                sender_id: _,
+                executions: _,
+                execs_over_sec: _,
+                phantom: _,
+            } => {
+                // TODO
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::Crash {
+                sender_id: _,
+                input: _,
+                phantom: _,
+            } => Ok(BrokerEventResult::Handled),
+            Event::Timeout {
+                sender_id: _,
+                input: _,
+                phantom: _,
+            } => {
+                // TODO
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::Log {
+                sender_id,
+                severity_level,
+                message,
+                phantom: _,
+            } => {
+                //TODO: broker.log()
+                #[cfg(feature = "std")]
+                println!("{}[{}]: {}", sender_id, severity_level, message);
+                Ok(BrokerEventResult::Handled)
+            },
+            Event::None {
+                phantom: _,
+            } => Ok(BrokerEventResult::Handled)
+            //Event::Custom {sender_id, custom_event} => custom_event.handle_in_broker(state, corpus),
+            //_ => Ok(BrokerEventResult::Forward),
+        }
+    }
+
+    fn handle_in_client(
+        &self,
+        event: Event<C, E, I, R>,
+        /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
+        corpus: &mut C,
+    ) -> Result<(), AflError> {
+        match event {
+            Event::NewTestcase {
+                sender_id: _,
+                input: _,
+                observers: _,
+            } => {
+                // here u should match sender_id, if equal to the current one do not re-execute
+                // we need to pass engine to process() too, TODO
+                #[cfg(feature = "std")]
+                println!("PLACEHOLDER: received NewTestcase");
+                Ok(())
+            }
+            _ => Err(AflError::Unknown(
+                "Received illegal message that message should not have arrived.".into(),
+            )),
         }
     }
 }

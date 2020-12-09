@@ -291,6 +291,13 @@ impl RomuDuoJrRand {
         rand.set_seed(seed);
         rand
     }
+
+    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+    /// Needs stdlib timer
+    #[cfg(feature = "std")]
+    pub fn preseeded() -> Self {
+        Self::new(current_nanos())
+    }
 }
 
 impl Rand for RomuDuoJrRand {
