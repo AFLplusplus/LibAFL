@@ -1,5 +1,7 @@
 pub mod inmemory;
 
+use alloc::boxed::Box;
+
 use crate::inputs::Input;
 use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::observers::Observer;

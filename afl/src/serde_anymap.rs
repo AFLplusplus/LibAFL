@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 
 pub fn pack_type_id(id: u64) -> TypeId {

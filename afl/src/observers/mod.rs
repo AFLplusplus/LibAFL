@@ -1,5 +1,6 @@
 extern crate num;
 
+use alloc::boxed::Box;
 use core::any::Any;
 use core::slice::from_raw_parts_mut;
 use num::Integer;

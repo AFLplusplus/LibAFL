@@ -226,6 +226,7 @@ where
             } => {
                 // here u should match sender_id, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
+                #[cfg(feature = "std")]
                 println!("PLACEHOLDER: received NewTestcase");
                 Ok(())
             }
