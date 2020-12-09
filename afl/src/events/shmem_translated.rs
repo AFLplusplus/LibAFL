@@ -1,5 +1,5 @@
 use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
-use std::ffi::CStr;
+use std::{ffi::CStr, mem::size_of};
 
 use crate::AflError;
 
@@ -59,12 +59,11 @@ const AFL_RET_SUCCESS: c_uint = 0;
 // too.)
 
 #[derive(Clone)]
-#[repr(C)]
 pub struct AflShmem {
     pub shm_str: [u8; 20],
     pub shm_id: c_int,
     pub map: *mut c_uchar,
-    pub map_size: c_ulong,
+    pub map_size: usize,
 }
 
 /// Deinit on drop
@@ -87,20 +86,28 @@ const fn afl_shmem_unitialized() -> AflShmem {
 }
 
 impl AflShmem {
-    fn from_str(shm_str: &CStr, map_size: c_ulong) -> Result<Self, AflError> {
+    pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, AflError> {
         let mut ret = afl_shmem_unitialized();
-        let map = unsafe { afl_shmem_init(&mut ret, map_size) };
+        let map = unsafe { afl_shmem_by_str(&mut ret, shm_str, map_size) };
         if map != 0 as *mut u8 {
             Ok(ret)
         } else {
             Err(AflError::Unknown(format!(
-                "Could not allocate map with id {:?}",
-                shm_str
+                "Could not allocate map with id {:?} and size {}",
+                shm_str, map_size
             )))
         }
     }
 
-    fn new(map_size: c_ulong) -> Result<Self, AflError> {
+    /// Generate a shared map with a fixed byte array of 20
+    pub fn from_name_slice(shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
+        unsafe {
+            let str_bytes = shm_str as *const [u8; 20] as *const libc::c_char;
+            Self::from_str(CStr::from_ptr(str_bytes), map_size)
+        }
+    }
+
+    pub fn new(map_size: usize) -> Result<Self, AflError> {
         let mut ret = afl_shmem_unitialized();
         let map = unsafe { afl_shmem_init(&mut ret, map_size) };
         if map != 0 as *mut u8 {
@@ -115,7 +122,7 @@ impl AflShmem {
 
     /// Sets this shm id as env variable with the given name
     /// Also write the map size as name#_SIZE env
-    fn to_env_var(&self, env_name: &CStr) -> Result<(), AflError> {
+    pub fn to_env_var(&self, env_name: &CStr) -> Result<(), AflError> {
         if unsafe { afl_shmem_to_env_var(&self, env_name) } == AFL_RET_SUCCESS {
             Ok(())
         } else {
@@ -141,12 +148,12 @@ pub unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
 
 /// Functions to create Shared memory region, for observation channels and
 /// opening inputs and stuff.
-pub unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: c_ulong) -> *mut c_uchar {
+pub unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_uchar {
     (*shm).map_size = map_size;
     (*shm).map = 0 as *mut c_uchar;
     (*shm).shm_id = shmget(
         0 as c_int,
-        map_size,
+        map_size as c_ulong,
         0o1000 as c_int | 0o2000 as c_int | 0o600 as c_int,
     );
     if (*shm).shm_id < 0 as c_int {
@@ -155,12 +162,13 @@ pub unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: c_ulong) -> *mut c_uc
     }
     snprintf(
         (*shm).shm_str.as_mut_ptr() as *mut i8,
-        ::std::mem::size_of::<[c_char; 20]>() as c_ulong,
+        size_of::<[c_char; 20]>() as c_ulong,
         b"%d\x00" as *const u8 as *const c_char,
         (*shm).shm_id,
     );
-    (*shm).shm_str[(::std::mem::size_of::<[c_char; 20]>() as c_ulong)
-        .wrapping_sub(1 as c_int as c_ulong) as usize] = '\u{0}' as u8;
+    (*shm).shm_str
+        [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_int as c_ulong) as usize] =
+        '\u{0}' as u8;
     (*shm).map = shmat((*shm).shm_id, 0 as *const c_void, 0 as c_int) as *mut c_uchar;
     if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar || (*shm).map.is_null() {
         shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
@@ -175,7 +183,7 @@ pub unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: c_ulong) -> *mut c_uc
 pub unsafe fn afl_shmem_by_str(
     shm: *mut AflShmem,
     shm_str: &CStr,
-    map_size: c_ulong,
+    map_size: usize,
 ) -> *mut c_uchar {
     if shm.is_null() || shm_str.to_bytes().len() == 0 || map_size == 0 {
         return 0 as *mut c_uchar;
@@ -185,7 +193,7 @@ pub unsafe fn afl_shmem_by_str(
     strncpy(
         (*shm).shm_str.as_mut_ptr() as *mut c_char,
         shm_str.as_ptr() as *const c_char,
-        (::std::mem::size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_int as c_ulong),
+        (size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_int as c_ulong),
     );
     (*shm).shm_id = shm_str
         .to_str()
@@ -195,8 +203,8 @@ pub unsafe fn afl_shmem_by_str(
     (*shm).map = shmat((*shm).shm_id, 0 as *const c_void, 0 as c_int) as *mut c_uchar;
     if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar {
         (*shm).map = 0 as *mut c_uchar;
-        (*shm).map_size = 0 as c_int as c_ulong;
-        (*shm).shm_str[0 as c_int as usize] = '\u{0}' as u8;
+        (*shm).map_size = 0;
+        (*shm).shm_str[0] = '\u{0}' as u8;
         return 0 as *mut c_uchar;
     }
     return (*shm).map;
@@ -211,7 +219,7 @@ pub unsafe fn afl_shmem_to_env_var(shmem: &AflShmem, env_name: &CStr) -> c_uint 
     let mut shm_str: [c_char; 256] = [0; 256];
     snprintf(
         shm_str.as_mut_ptr(),
-        ::std::mem::size_of::<[c_char; 256]>() as c_ulong,
+        size_of::<[c_char; 256]>() as c_ulong,
         b"%d\x00" as *const u8 as *const c_char,
         (*shmem).shm_id,
     );
@@ -227,13 +235,13 @@ pub unsafe fn afl_shmem_to_env_var(shmem: &AflShmem, env_name: &CStr) -> c_uint 
     let mut size_env_name: [c_char; 256] = [0; 256];
     snprintf(
         size_env_name.as_mut_ptr(),
-        ::std::mem::size_of::<[c_char; 256]>() as c_ulong,
+        size_of::<[c_char; 256]>() as c_ulong,
         b"%s_SIZE\x00" as *const u8 as *const c_char,
         env_name,
     );
     snprintf(
         shm_str.as_mut_ptr(),
-        ::std::mem::size_of::<[c_char; 256]>() as c_ulong,
+        size_of::<[c_char; 256]>() as c_ulong,
         b"%d\x00" as *const u8 as *const c_char,
         (*shmem).shm_id,
     );
