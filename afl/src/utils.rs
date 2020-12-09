@@ -303,7 +303,7 @@ pub const fn next_pow2(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use xxhash_rust::xxh3::xxh3_64_with_seed;
+    //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
     use crate::utils::{next_pow2, Rand, StdRand};
 

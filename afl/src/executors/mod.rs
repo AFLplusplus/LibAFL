@@ -1,8 +1,8 @@
 pub mod inmemory;
 
 use crate::inputs::Input;
-use crate::observers::Observer;
 use crate::observers::observer_serde::NamedSerdeAnyMap;
+use crate::observers::Observer;
 use crate::AflError;
 
 pub enum ExitKind {

@@ -27,18 +27,17 @@ pub trait Observer: SerdeAny + 'static {
 crate::create_serde_registry_for_trait!(observer_serde, crate::observers::Observer);
 
 #[derive(Serialize, Deserialize)]
-pub struct NopObserver {
-
-}
+pub struct NopObserver {}
 impl Observer for NopObserver {
     fn name(&self) -> &'static str {
         "aa"
     }
-    
-    fn reset(&mut self) -> Result<(), AflError> { Ok(()) }
+
+    fn reset(&mut self) -> Result<(), AflError> {
+        Ok(())
+    }
 }
-impl SerdeAny for NopObserver
-{
+impl SerdeAny for NopObserver {
     fn as_any(&self) -> &dyn Any {
         self
     }

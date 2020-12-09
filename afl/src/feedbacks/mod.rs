@@ -2,10 +2,10 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 use num::Integer;
 
-use crate::corpus::{Testcase, TestcaseMetadata};
+use crate::corpus::Testcase;
 use crate::inputs::Input;
-use crate::observers::{MapObserver, Observer};
 use crate::observers::observer_serde::NamedSerdeAnyMap;
+use crate::observers::MapObserver;
 use crate::AflError;
 
 pub trait Feedback<I>
@@ -13,11 +13,7 @@ where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(
-        &mut self,
-        input: &I,
-        observers: &NamedSerdeAnyMap,
-    ) -> Result<u32, AflError>;
+    fn is_interesting(&mut self, input: &I, observers: &NamedSerdeAnyMap) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {

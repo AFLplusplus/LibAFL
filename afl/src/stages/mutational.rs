@@ -56,11 +56,15 @@ where
             let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
             if let Some(testcase) = testcase_maybe {
                 //corpus.entries()[idx]
-                engine.events_manager_mut().fire(Event::NewTestcase {
-                    sender_id: 0,
-                    testcase: testcase,
-                    phantom: PhantomData,
-                }, state, corpus)?;
+                engine.events_manager_mut().fire(
+                    Event::NewTestcase {
+                        sender_id: 0,
+                        testcase: testcase,
+                        phantom: PhantomData,
+                    },
+                    state,
+                    corpus,
+                )?;
             }
         }
         Ok(())

@@ -1,9 +1,7 @@
 //! The engine is the core piece of every good fuzzer
 
 use alloc::boxed::Box;
-use alloc::rc::Rc;
 use alloc::vec::Vec;
-use core::cell::RefCell;
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use hashbrown::HashMap;
@@ -14,7 +12,6 @@ use crate::executors::Executor;
 use crate::feedbacks::Feedback;
 use crate::generators::Generator;
 use crate::inputs::Input;
-use crate::observers::Observer;
 use crate::stages::Stage;
 use crate::utils::{current_milliseconds, Rand};
 use crate::AflError;
@@ -199,10 +196,14 @@ where
             let input = generator.generate(rand)?;
             let fitness = self.evaluate_input(&input, engine)?;
             self.add_if_interesting(corpus, input, fitness)?;
-            engine.events_manager_mut().fire(Event::LoadInitial {
-                sender_id: 0,
-                phantom: PhantomData,
-            }, self, corpus)?;
+            engine.events_manager_mut().fire(
+                Event::LoadInitial {
+                    sender_id: 0,
+                    phantom: PhantomData,
+                },
+                self,
+                corpus,
+            )?;
         }
         engine.events_manager_mut().process(self, corpus)?;
         Ok(())
@@ -324,11 +325,15 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                engine.events_manager_mut().fire(Event::UpdateStats {
-                    sender_id: 0,
-                    new_execs: 1,
-                    phantom: PhantomData,
-                }, state, corpus)?; // TODO self.new_execs});
+                engine.events_manager_mut().fire(
+                    Event::UpdateStats {
+                        sender_id: 0,
+                        new_execs: 1,
+                        phantom: PhantomData,
+                    },
+                    state,
+                    corpus,
+                )?; // TODO self.new_execs});
             }
         }
     }
@@ -411,7 +416,7 @@ mod tests {
         let executor = InMemoryExecutor::<BytesInput>::new(harness);
         let mut state = State::new();
 
-        let mut events_manager = LoggerEventManager::new(stderr());
+        let events_manager = LoggerEventManager::new(stderr());
 
         let mut engine = Engine::new(executor, events_manager);
         let mut mutator = StdScheduledMutator::new();

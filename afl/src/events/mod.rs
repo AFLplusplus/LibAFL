@@ -21,8 +21,8 @@ use crate::corpus::{Corpus, Testcase};
 use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
-use crate::utils::Rand;
 use crate::serde_anymap::{Ptr, PtrMut};
+use crate::utils::Rand;
 use crate::AflError;
 /// Indicate if an event worked or not
 enum BrokerEventResult {
@@ -88,7 +88,7 @@ where
     NewTestcase2 {
         sender_id: u64,
         input: Ptr<'a, I>,
-        observers: PtrMut<'a, crate::observers::observer_serde::NamedSerdeAnyMap>
+        observers: PtrMut<'a, crate::observers::observer_serde::NamedSerdeAnyMap>,
     },
     UpdateStats {
         sender_id: u64,
@@ -262,7 +262,12 @@ where
     fn enabled(&self) -> bool;
 
     /// Fire an Event
-    fn fire<'a>(&mut self, event: Event<'a, C, E, I, R>, state: &mut State<I, R>, corpus: &mut C) -> Result<(), AflError>;
+    fn fire<'a>(
+        &mut self,
+        event: Event<'a, C, E, I, R>,
+        state: &mut State<I, R>,
+        corpus: &mut C,
+    ) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
@@ -295,7 +300,7 @@ where
 {
     writer: W,
     count: usize,
-    phantom: PhantomData<(C, E, I, R)>
+    phantom: PhantomData<(C, E, I, R)>,
 }
 
 #[cfg(feature = "std")]
@@ -312,7 +317,12 @@ where
         true
     }
 
-    fn fire<'a>(&mut self, event: Event<'a, C, E, I, R>, state: &mut State<I, R>, corpus: &mut C) -> Result<(), AflError> {
+    fn fire<'a>(
+        &mut self,
+        event: Event<'a, C, E, I, R>,
+        state: &mut State<I, R>,
+        corpus: &mut C,
+    ) -> Result<(), AflError> {
         match event.handle_in_broker(state, corpus)? {
             BrokerEventResult::Forward => event.handle_in_client(state, corpus)?,
             // Ignore broker-only events
@@ -321,7 +331,7 @@ where
         Ok(())
     }
 
-    fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError> {
+    fn process(&mut self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<usize, AflError> {
         let c = self.count;
         self.count = 0;
         Ok(c)
@@ -342,7 +352,7 @@ where
         Self {
             writer: writer,
             count: 0,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }

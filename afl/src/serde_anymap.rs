@@ -1,12 +1,7 @@
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
-use core::default::Default;
-use hashbrown::hash_map::{Keys, Values, ValuesMut};
-
-use crate::AflError;
 
 pub fn pack_type_id(id: u64) -> TypeId {
     unsafe { *(&id as *const u64 as *const TypeId) }
@@ -37,11 +32,17 @@ where
 pub type DeserializeCallback<B> =
     fn(&mut dyn erased_serde::Deserializer) -> Result<Box<B>, erased_serde::Error>;
 
-pub struct DeserializeCallbackSeed<B> where B: ?Sized {
+pub struct DeserializeCallbackSeed<B>
+where
+    B: ?Sized,
+{
     pub cb: DeserializeCallback<B>,
 }
 
-impl<'de, B> serde::de::DeserializeSeed<'de> for DeserializeCallbackSeed<B> where B: ?Sized {
+impl<'de, B> serde::de::DeserializeSeed<'de> for DeserializeCallbackSeed<B>
+where
+    B: ?Sized,
+{
     type Value = Box<B>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -56,20 +57,21 @@ impl<'de, B> serde::de::DeserializeSeed<'de> for DeserializeCallbackSeed<B> wher
 #[macro_export]
 macro_rules! create_serde_registry_for_trait {
     ($mod_name:ident, $trait_name:path) => {
-        
         pub mod $mod_name {
-        
-            use alloc::boxed::Box;
-            use core::fmt;
-            use core::any::{Any, TypeId};
-            use serde::{Deserialize, Serialize};
-          
-            use hashbrown::HashMap;
-            use hashbrown::hash_map::{Keys, Values, ValuesMut};
 
+            use alloc::boxed::Box;
+            use core::any::{Any, TypeId};
+            use core::fmt;
+            use serde::{Deserialize, Serialize};
+
+            use hashbrown::hash_map::{Keys, Values, ValuesMut};
+            use hashbrown::HashMap;
+
+            use $crate::serde_anymap::{
+                pack_type_id, unpack_type_id, DeserializeCallback, DeserializeCallbackSeed,
+            };
             use $crate::AflError;
-            use $crate::serde_anymap::{DeserializeCallback, DeserializeCallbackSeed, pack_type_id, unpack_type_id};
-          
+
             pub struct BoxDynVisitor {}
             impl<'de> serde::de::Visitor<'de> for BoxDynVisitor {
                 type Value = Box<dyn $trait_name>;
@@ -82,7 +84,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     V: serde::de::SeqAccess<'de>,
                 {
-                    /*let id: u64 = visitor.next_element()?.unwrap();
+                    let id: u64 = visitor.next_element()?.unwrap();
                     let cb = unsafe {
                         *REGISTRY
                             .deserializers
@@ -90,14 +92,13 @@ macro_rules! create_serde_registry_for_trait {
                             .unwrap()
                             .get(&id)
                             .expect("Cannot deserialize an unregistered type")
-                    };*/
-                    //let seed = DeserializeCallbackSeed::<dyn $trait_name> { cb: cb };
-                    //let obj: Self::Value = visitor.next_element_seed(seed)?.unwrap();
-                    let obj = Box::new(crate::observers::NopObserver::new());
+                    };
+                    let seed = DeserializeCallbackSeed::<dyn $trait_name> { cb: cb };
+                    let obj: Self::Value = visitor.next_element_seed(seed)?.unwrap();
                     Ok(obj)
                 }
             }
-          
+
             struct Registry {
                 deserializers: Option<HashMap<u64, DeserializeCallback<dyn $trait_name>>>,
                 finalized: bool,
@@ -112,7 +113,8 @@ macro_rules! create_serde_registry_for_trait {
                         panic!("Registry is already finalized!");
                     }
 
-                    let deserializers = self.deserializers.get_or_insert_with(|| HashMap::default());
+                    let deserializers =
+                        self.deserializers.get_or_insert_with(|| HashMap::default());
                     deserializers.insert(unpack_type_id(TypeId::of::<T>()), |de| {
                         Ok(Box::new(erased_serde::deserialize::<T>(de)?))
                     });
@@ -145,15 +147,13 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
             }
-              
+
             #[derive(Serialize, Deserialize)]
-            pub struct SerdeAnyMap
-            {
+            pub struct SerdeAnyMap {
                 map: HashMap<u64, Box<dyn $trait_name>>,
             }
 
-            impl SerdeAnyMap
-            {
+            impl SerdeAnyMap {
                 pub fn get<T>(&self) -> Option<&T>
                 where
                     T: $trait_name,
@@ -198,22 +198,18 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
-            impl Default for SerdeAnyMap
-            {
+            impl Default for SerdeAnyMap {
                 fn default() -> Self {
                     Self::new()
                 }
             }
 
-
             #[derive(Serialize, Deserialize)]
-            pub struct NamedSerdeAnyMap
-            {
+            pub struct NamedSerdeAnyMap {
                 map: HashMap<u64, HashMap<u64, Box<dyn $trait_name>>>,
             }
 
-            impl NamedSerdeAnyMap
-            {
+            impl NamedSerdeAnyMap {
                 pub fn get<T>(&self, name: &'static str) -> Option<&T>
                 where
                     T: Any,
@@ -226,7 +222,11 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
-                pub fn by_typeid(&self, name: &'static str, typeid: &TypeId) -> Option<&dyn $trait_name> {
+                pub fn by_typeid(
+                    &self,
+                    name: &'static str,
+                    typeid: &TypeId,
+                ) -> Option<&dyn $trait_name> {
                     match self.map.get(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => h
@@ -247,7 +247,11 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
-                pub fn by_typeid_mut(&mut self, name: &'static str, typeid: &TypeId) -> Option<&mut dyn $trait_name> {
+                pub fn by_typeid_mut(
+                    &mut self,
+                    name: &'static str,
+                    typeid: &TypeId,
+                ) -> Option<&mut dyn $trait_name> {
                     match self.map.get_mut(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => h
@@ -256,20 +260,34 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
-                pub fn get_all<T>(&self) -> Option<core::iter::Map<Values<'_, u64, Box<dyn $trait_name>>, fn(&Box<dyn $trait_name>) -> &T>>
+                pub fn get_all<T>(
+                    &self,
+                ) -> Option<
+                    core::iter::Map<
+                        Values<'_, u64, Box<dyn $trait_name>>,
+                        fn(&Box<dyn $trait_name>) -> &T,
+                    >,
+                >
                 where
                     T: Any,
                 {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
-                        Some(h) => Some(h.values().map(|x| x.as_any().downcast_ref::<T>().unwrap())),
+                        Some(h) => {
+                            Some(h.values().map(|x| x.as_any().downcast_ref::<T>().unwrap()))
+                        }
                     }
                 }
 
                 pub fn all_by_typeid(
                     &self,
                     typeid: &TypeId,
-                ) -> Option<core::iter::Map<Values<'_, u64, Box<dyn $trait_name>>, fn(&Box<dyn $trait_name>) -> &dyn $trait_name>> {
+                ) -> Option<
+                    core::iter::Map<
+                        Values<'_, u64, Box<dyn $trait_name>>,
+                        fn(&Box<dyn $trait_name>) -> &dyn $trait_name,
+                    >,
+                > {
                     match self.map.get(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => Some(h.values().map(|x| x.as_ref())),
@@ -278,7 +296,12 @@ macro_rules! create_serde_registry_for_trait {
 
                 pub fn get_all_mut<T>(
                     &mut self,
-                ) -> Option<core::iter::Map<ValuesMut<'_, u64, Box<dyn $trait_name>>, fn(&mut Box<dyn $trait_name>) -> &mut T>>
+                ) -> Option<
+                    core::iter::Map<
+                        ValuesMut<'_, u64, Box<dyn $trait_name>>,
+                        fn(&mut Box<dyn $trait_name>) -> &mut T,
+                    >,
+                >
                 where
                     T: Any,
                 {
@@ -294,7 +317,12 @@ macro_rules! create_serde_registry_for_trait {
                 pub fn all_by_typeid_mut(
                     &mut self,
                     typeid: &TypeId,
-                ) -> Option<core::iter::Map<ValuesMut<'_, u64, Box<dyn $trait_name>>, fn(&mut Box<dyn $trait_name>) -> &mut dyn $trait_name>> {
+                ) -> Option<
+                    core::iter::Map<
+                        ValuesMut<'_, u64, Box<dyn $trait_name>>,
+                        fn(&mut Box<dyn $trait_name>) -> &mut dyn $trait_name,
+                    >,
+                > {
                     match self.map.get_mut(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => Some(h.values_mut().map(|x| x.as_mut())),
@@ -303,7 +331,10 @@ macro_rules! create_serde_registry_for_trait {
 
                 pub fn all_typeids(
                     &self,
-                ) -> core::iter::Map<Keys<'_, u64, HashMap<u64, Box<dyn $trait_name>>>, fn(&u64) -> TypeId> {
+                ) -> core::iter::Map<
+                    Keys<'_, u64, HashMap<u64, Box<dyn $trait_name>>>,
+                    fn(&u64) -> TypeId,
+                > {
                     self.map.keys().map(|x| pack_type_id(*x))
                 }
 
@@ -370,15 +401,13 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
-            impl Default for NamedSerdeAnyMap
-            {
+            impl Default for NamedSerdeAnyMap {
                 fn default() -> Self {
                     Self::new()
                 }
             }
-
         }
-        
+
         impl<'a> serde::Serialize for dyn $trait_name {
             fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
             where
@@ -393,7 +422,7 @@ macro_rules! create_serde_registry_for_trait {
                 seq.end()
             }
         }
-        
+
         impl<'de> serde::Deserialize<'de> for Box<dyn $trait_name> {
             fn deserialize<D>(deserializer: D) -> Result<Box<dyn $trait_name>, D::Error>
             where
@@ -402,7 +431,6 @@ macro_rules! create_serde_registry_for_trait {
                 deserializer.deserialize_seq($mod_name::BoxDynVisitor {})
             }
         }
-        
     };
 }
 
