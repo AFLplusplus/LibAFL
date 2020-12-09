@@ -6,8 +6,14 @@ use crate::inputs::Input;
 use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::AflError;
 
+/// The (unsafe) pointer to the current inmem executor, for the current run.
+/// This is neede for certain non-rust side effects, as well as unix signal handling.
+static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
+
+/// The inmem executor harness
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 
+/// The inmem executor simply calls a target function, then returns afterwards.
 pub struct InMemoryExecutor<I>
 where
     I: Input,
@@ -15,8 +21,6 @@ where
     harness: HarnessFunction<I>,
     observers: NamedSerdeAnyMap,
 }
-
-static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
 
 impl<I> Executor<I> for InMemoryExecutor<I>
 where

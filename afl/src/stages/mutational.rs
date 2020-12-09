@@ -14,6 +14,9 @@ use crate::serde_anymap::{Ptr, PtrMut};
 
 // TODO multi mutators stage
 
+/// A Mutational stage is the stage in a fuzzing run that mutates inputs.
+/// Mutational stages will usually have a range of mutations that are
+/// being applied to the input one by one.
 pub trait MutationalStage<M, EM, E, C, I, R>: Stage<EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,

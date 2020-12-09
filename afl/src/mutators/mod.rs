@@ -8,6 +8,8 @@ use crate::inputs::Input;
 use crate::utils::Rand;
 use crate::AflError;
 
+/// A mutator takes input, and mutates it.
+/// Simple as that.
 pub trait Mutator<C, I, R>
 where
     C: Corpus<I, R>,
@@ -34,9 +36,13 @@ where
     }
 }
 
+/// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1048576;
 
+/// Interact with the maximum size
 pub trait HasMaxSize {
+    /// The maximum size of the contents returned
     fn max_size(&self) -> usize;
+    /// Sets the maximum size of the contents returned
     fn set_max_size(&mut self, max_size: usize);
 }

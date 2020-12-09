@@ -7,6 +7,7 @@ use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::observers::Observer;
 use crate::AflError;
 
+/// How an execution finished.
 pub enum ExitKind {
     Ok,
     Crash,
@@ -14,6 +15,7 @@ pub enum ExitKind {
     Timeout,
 }
 
+/// An executor takes the given inputs, and runs the harness/target.
 pub trait Executor<I>
 where
     I: Input,

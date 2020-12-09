@@ -8,6 +8,15 @@ use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::observers::MapObserver;
 use crate::AflError;
 
+pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
+pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
+
+//pub type MaxMapTrackerFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
+//pub type MinMapTrackerFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
+
+/// Feedbacks evaluate the observers.
+/// Basically, they reduce the information provided by an observer to a value,
+/// indicating the "interestingness" of the last run.
 pub trait Feedback<I>
 where
     I: Input,
@@ -25,6 +34,7 @@ where
         Ok(())
     }
 
+    /// The name of this feedback
     fn name(&self) -> &'static str;
 }
 
@@ -291,8 +301,3 @@ where
 }
 */
 
-pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
-pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
-
-//pub type MaxMapTrackerFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
-//pub type MinMapTrackerFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;

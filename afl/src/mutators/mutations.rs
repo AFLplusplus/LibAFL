@@ -4,6 +4,9 @@ use crate::mutators::*;
 use crate::utils::Rand;
 use crate::AflError;
 
+/// The result of a mutation.
+/// If the mutation got skipped, the target
+/// will not be executed with the returned input.
 pub enum MutationResult {
     Mutated,
     Skipped,
