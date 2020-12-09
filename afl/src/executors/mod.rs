@@ -2,7 +2,7 @@ pub mod inmemory;
 
 use crate::inputs::Input;
 use crate::observers::Observer;
-use crate::serde_anymap::NamedSerdeAnyMap;
+use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::AflError;
 
 pub enum ExitKind {
@@ -20,10 +20,10 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError>;
 
     /// Get the linked observers
-    fn observers(&self) -> &NamedSerdeAnyMap<dyn Observer>;
+    fn observers(&self) -> &NamedSerdeAnyMap;
 
     /// Get the linked observers
-    fn observers_mut(&mut self) -> &mut NamedSerdeAnyMap<dyn Observer>;
+    fn observers_mut(&mut self) -> &mut NamedSerdeAnyMap;
 
     /// Add a linked observer
     fn add_observer(&mut self, observer: Box<dyn Observer>) {

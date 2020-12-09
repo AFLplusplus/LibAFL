@@ -5,7 +5,7 @@ use num::Integer;
 use crate::corpus::{Testcase, TestcaseMetadata};
 use crate::inputs::Input;
 use crate::observers::{MapObserver, Observer};
-use crate::serde_anymap::NamedSerdeAnyMap;
+use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::AflError;
 
 pub trait Feedback<I>
@@ -16,7 +16,7 @@ where
     fn is_interesting(
         &mut self,
         input: &I,
-        observers: &NamedSerdeAnyMap<dyn Observer>,
+        observers: &NamedSerdeAnyMap,
     ) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
@@ -105,7 +105,7 @@ where
     fn is_interesting(
         &mut self,
         _input: &I,
-        observers: &NamedSerdeAnyMap<dyn Observer>,
+        observers: &NamedSerdeAnyMap,
     ) -> Result<u32, AflError> {
         let mut interesting = 0;
         // TODO optimize

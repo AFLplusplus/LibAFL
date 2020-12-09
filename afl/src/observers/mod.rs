@@ -24,6 +24,34 @@ pub trait Observer: SerdeAny + 'static {
     fn name(&self) -> &'static str;
 }
 
+crate::create_serde_registry_for_trait!(observer_serde, crate::observers::Observer);
+
+#[derive(Serialize, Deserialize)]
+pub struct NopObserver {
+
+}
+impl Observer for NopObserver {
+    fn name(&self) -> &'static str {
+        "aa"
+    }
+    
+    fn reset(&mut self) -> Result<(), AflError> { Ok(()) }
+}
+impl SerdeAny for NopObserver
+{
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+impl NopObserver {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>
 where

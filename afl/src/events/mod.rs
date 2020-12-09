@@ -1,18 +1,18 @@
-#[cfg(feature = "std")]
-pub mod llmp;
+//#[cfg(feature = "std")]
+//pub mod llmp;
 
 use alloc::string::String;
 use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "std")]
-pub mod llmp_translated; // TODO: Abstract away.
-#[cfg(feature = "std")]
-pub mod shmem_translated;
+//#[cfg(feature = "std")]
+//pub mod llmp_translated; // TODO: Abstract away.
+//#[cfg(feature = "std")]
+//pub mod shmem_translated;
 
-#[cfg(feature = "std")]
-pub use crate::events::llmp::LLMPEventManager;
+//#[cfg(feature = "std")]
+//pub use crate::events::llmp::LLMPEventManager;
 
 #[cfg(feature = "std")]
 use std::io::Write;
@@ -22,6 +22,7 @@ use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::utils::Rand;
+use crate::serde_anymap::{Ptr, PtrMut};
 use crate::AflError;
 /// Indicate if an event worked or not
 enum BrokerEventResult {
@@ -67,7 +68,7 @@ where
 
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
-pub enum Event<C, E, I, R>
+pub enum Event<'a, C, E, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -83,6 +84,11 @@ where
         sender_id: u64,
         testcase: Testcase<I>,
         phantom: PhantomData<(C, E, I, R)>,
+    },
+    NewTestcase2 {
+        sender_id: u64,
+        input: Ptr<'a, I>,
+        observers: PtrMut<'a, crate::observers::observer_serde::NamedSerdeAnyMap>
     },
     UpdateStats {
         sender_id: u64,
@@ -111,7 +117,7 @@ where
     //Custom {sender_id: u64, custom_event: CE},
 }
 
-impl<C, E, I, R> Event<C, E, I, R>
+impl<'a, C, E, I, R> Event<'a, C, E, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -130,6 +136,11 @@ where
                 testcase: _,
                 phantom: _,
             } => "New Testcase",
+            Event::NewTestcase2 {
+                sender_id: _,
+                input: _,
+                observers: _,
+            } => "New Testcase 2",
             Event::UpdateStats {
                 sender_id: _,
                 new_execs: _,
@@ -170,6 +181,11 @@ where
                 sender_id: _,
                 testcase: _,
                 phantom: _,
+            } => Ok(BrokerEventResult::Forward),
+            Event::NewTestcase2 {
+                sender_id: _,
+                input: _,
+                observers: _,
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
@@ -246,7 +262,7 @@ where
     fn enabled(&self) -> bool;
 
     /// Fire an Event
-    fn fire(&mut self, event: Event<C, E, I, R>) -> Result<(), AflError>;
+    fn fire<'a>(&mut self, event: Event<'a, C, E, I, R>, state: &mut State<I, R>, corpus: &mut C) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
@@ -274,15 +290,12 @@ where
 #[cfg(feature = "std")]
 pub struct LoggerEventManager<C, E, I, R, W>
 where
-    C: Corpus<I, R>,
-    I: Input,
-    E: Executor<I>,
-    R: Rand,
     W: Write,
     //CE: CustomEvent<C, E, I, R>,
 {
-    events: Vec<Event<C, E, I, R>>,
     writer: W,
+    count: usize,
+    phantom: PhantomData<(C, E, I, R)>
 }
 
 #[cfg(feature = "std")]
@@ -299,28 +312,19 @@ where
         true
     }
 
-    fn fire(&mut self, event: Event<C, E, I, R>) -> Result<(), AflError> {
-        self.events.push(event);
+    fn fire<'a>(&mut self, event: Event<'a, C, E, I, R>, state: &mut State<I, R>, corpus: &mut C) -> Result<(), AflError> {
+        match event.handle_in_broker(state, corpus)? {
+            BrokerEventResult::Forward => event.handle_in_client(state, corpus)?,
+            // Ignore broker-only events
+            BrokerEventResult::Handled => (),
+        }
         Ok(())
     }
 
     fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError> {
-        // TODO: iterators
-        let mut handled = vec![];
-        for x in self.events.iter() {
-            handled.push(x.handle_in_broker(state, corpus)?);
-        }
-        let count = self.events.len();
-        while self.events.len() > 0 {
-            let event = self.events.pop().unwrap();
-            match handled.pop().unwrap() {
-                BrokerEventResult::Forward => event.handle_in_client(state, corpus)?,
-                // Ignore broker-only events
-                BrokerEventResult::Handled => (),
-            }
-        }
-        dbg!("Handled {} events", count);
-        Ok(count)
+        let c = self.count;
+        self.count = 0;
+        Ok(c)
     }
 }
 
@@ -336,8 +340,9 @@ where
 {
     pub fn new(writer: W) -> Self {
         Self {
-            events: vec![],
             writer: writer,
+            count: 0,
+            phantom: PhantomData
         }
     }
 }

@@ -22,7 +22,7 @@ where
         &mut self,
         rand: &mut R,
         state: &mut State<I, R>,
-        corpus: &C,
+        corpus: &mut C,
         engine: &mut Engine<EM, E, C, I, R>,
         input: &I,
     ) -> Result<(), AflError>;

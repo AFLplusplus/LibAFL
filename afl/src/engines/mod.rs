@@ -202,7 +202,7 @@ where
             engine.events_manager_mut().fire(Event::LoadInitial {
                 sender_id: 0,
                 phantom: PhantomData,
-            })?;
+            }, self, corpus)?;
         }
         engine.events_manager_mut().process(self, corpus)?;
         Ok(())
@@ -328,7 +328,7 @@ where
                     sender_id: 0,
                     new_execs: 1,
                     phantom: PhantomData,
-                })?; // TODO self.new_execs});
+                }, state, corpus)?; // TODO self.new_execs});
             }
         }
     }

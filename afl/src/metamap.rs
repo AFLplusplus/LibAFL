@@ -5,6 +5,7 @@ use core::slice::{Iter, IterMut};
 use hashbrown::hash_map::{Keys, Values, ValuesMut};
 use hashbrown::HashMap;
 
+#[derive(Default)]
 pub struct MetaMap {
     map: HashMap<TypeId, Box<dyn Any>>,
 }
