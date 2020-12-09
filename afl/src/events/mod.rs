@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::io::Write;
 
-use crate::corpus::{Corpus, Testcase};
+use crate::corpus::Corpus;
 use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
@@ -82,11 +82,6 @@ where
     },
     NewTestcase {
         sender_id: u64,
-        testcase: Testcase<I>,
-        phantom: PhantomData<(C, E, I, R)>,
-    },
-    NewTestcase2 {
-        sender_id: u64,
         input: Ptr<'a, I>,
         observers: PtrMut<'a, crate::observers::observer_serde::NamedSerdeAnyMap>,
     },
@@ -133,14 +128,9 @@ where
             } => "Initial",
             Event::NewTestcase {
                 sender_id: _,
-                testcase: _,
-                phantom: _,
-            } => "New Testcase",
-            Event::NewTestcase2 {
-                sender_id: _,
                 input: _,
                 observers: _,
-            } => "New Testcase 2",
+            } => "New Testcase",
             Event::UpdateStats {
                 sender_id: _,
                 new_execs: _,
@@ -167,6 +157,7 @@ where
         }
     }
 
+    // TODO the broker has a state? do we need to pass state and corpus?
     fn handle_in_broker(
         &self,
         /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
@@ -178,11 +169,6 @@ where
                 phantom: _,
             } => Ok(BrokerEventResult::Handled),
             Event::NewTestcase {
-                sender_id: _,
-                testcase: _,
-                phantom: _,
-            } => Ok(BrokerEventResult::Forward),
-            Event::NewTestcase2 {
                 sender_id: _,
                 input: _,
                 observers: _,
@@ -235,10 +221,12 @@ where
         match self {
             Event::NewTestcase {
                 sender_id: _,
-                testcase,
-                phantom: _,
+                input: _,
+                observers: _,
             } => {
-                corpus.add(testcase);
+                // here u should match sender_id, if equal to the current one do not re-execute
+                // we need to pass engine to process() too, TODO
+                println!("PLACEHOLDER: received NewTestcase");
                 Ok(())
             }
             _ => Err(AflError::Unknown(

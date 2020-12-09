@@ -3,8 +3,8 @@ pub use testcase::{Testcase, TestcaseMetadata};
 
 use alloc::borrow::ToOwned;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
 use core::cell::RefCell;
+use core::marker::PhantomData;
 use core::ptr;
 
 #[cfg(feature = "std")]
@@ -61,7 +61,11 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     fn remove(&mut self, entry: &Testcase<I>) -> Option<Testcase<I>> {
-        match self.entries().iter().position(|x| ptr::eq(x.as_ptr(), entry)) {
+        match self
+            .entries()
+            .iter()
+            .position(|x| ptr::eq(x.as_ptr(), entry))
+        {
             Some(i) => Some(self.entries_mut().remove(i).into_inner()),
             None => None,
         }
@@ -99,7 +103,6 @@ where
         }
         Ok(())
     }*/
-
     // TODO: IntoIter
     /// Gets the next entry
     fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError>;

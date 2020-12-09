@@ -102,11 +102,7 @@ where
     // TODO move some of these, like evaluate_input, to FuzzingEngine
 
     /// Runs the input and triggers observers and feedback
-    pub fn evaluate_input<E>(
-        &mut self,
-        input: &I,
-        executor: &mut E,
-    ) -> Result<u32, AflError>
+    pub fn evaluate_input<E>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
     where
         E: Executor<I>,
     {
@@ -404,7 +400,13 @@ mod tests {
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut rand, &mut state, &mut corpus, &mut engine, &mut events_manager)
+                .fuzz_one(
+                    &mut rand,
+                    &mut state,
+                    &mut corpus,
+                    &mut engine,
+                    &mut events_manager,
+                )
                 .expect(&format!("Error in iter {}", i));
         }
     }

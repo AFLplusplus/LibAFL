@@ -65,7 +65,7 @@ where
             if let Some(mut testcase) = testcase_maybe {
                 // TODO decouple events manager and engine
                 manager.fire(
-                    Event::NewTestcase2 {
+                    Event::NewTestcase {
                         sender_id: 0,
                         input: Ptr::Ref(testcase.load_input()?),
                         observers: PtrMut::Ref(engine.executor_mut().observers_mut()),
