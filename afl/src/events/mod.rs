@@ -33,9 +33,7 @@ pub enum BrokerEventResult {
     Forward,
 }
 
-pub trait ShowStats {
-
-}
+pub trait ShowStats {}
 
 /*
 

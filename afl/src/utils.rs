@@ -9,14 +9,16 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub type StdRand = Xoshiro256StarRand;
+pub type StdRand = RomuTrioRand;
 
 /// Ways to get random around here
 pub trait Rand: Debug {
     // Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
+
     // Gets the next 64 bit value
     fn next(&mut self) -> u64;
+
     // Gets a value below the given 64 bit val (inclusive)
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
         if upper_bound_excl <= 1 {
@@ -73,6 +75,15 @@ where
 
 const HASH_CONST: u64 = 0xa5b35705;
 
+#[cfg(feature = "std")]
+/// Gets current nanoseconds since UNIX_EPOCH
+pub fn current_nanos() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64
+}
+
 /// XXH3 Based, hopefully speedy, rnd implementation
 ///
 #[derive(Copy, Clone, Debug, Default)]
@@ -91,6 +102,7 @@ impl Rand for Xoshiro256StarRand {
         self.seeded = true;
     }
 
+    #[inline]
     fn next(&mut self) -> u64 {
         let ret: u64 = self.rand_seed[0]
             .wrapping_add(self.rand_seed[3])
@@ -125,19 +137,11 @@ impl Xoshiro256StarRand {
         ret
     }
 
-    pub fn to_rc_refcell(self) -> Rc<RefCell<Self>> {
-        self.into()
-    }
-
     /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
     /// Needs stdlib timer
     #[cfg(feature = "std")]
     pub fn preseeded() -> Self {
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-        Self::new(seed)
+        Self::new(current_nanos())
     }
 }
 
@@ -155,6 +159,7 @@ impl Rand for XorShift64Rand {
         self.seeded = true;
     }
 
+    #[inline]
     fn next(&mut self) -> u64 {
         let mut x = self.rand_seed;
         x ^= x << 13;
@@ -179,19 +184,11 @@ impl XorShift64Rand {
         ret
     }
 
-    pub fn to_rc_refcell(self) -> Rc<RefCell<Self>> {
-        self.into()
-    }
-
     /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
     /// Needs stdlib timer
     #[cfg(feature = "std")]
     pub fn preseeded() -> Self {
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-        Self::new(seed)
+        Self::new(current_nanos())
     }
 }
 
@@ -209,6 +206,7 @@ impl Rand for Lehmer64Rand {
         self.seeded = true;
     }
 
+    #[inline]
     fn next(&mut self) -> u64 {
         self.rand_seed *= 0xda942042e4dd58b5;
         return (self.rand_seed >> 64) as u64;
@@ -222,26 +220,91 @@ impl Into<Rc<RefCell<Self>>> for Lehmer64Rand {
 }
 
 impl Lehmer64Rand {
-    /// Creates a new Xoshiro rand with the given seed
+    /// Creates a new Lehmer rand with the given seed
     pub fn new(seed: u64) -> Self {
         let mut ret: Self = Default::default();
-        ret.set_seed(seed); // TODO: Proper random seed?
+        ret.set_seed(seed);
         ret
-    }
-
-    pub fn to_rc_refcell(self) -> Rc<RefCell<Self>> {
-        self.into()
     }
 
     /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
     /// Needs stdlib timer
     #[cfg(feature = "std")]
     pub fn preseeded() -> Self {
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-        Self::new(seed)
+        Self::new(current_nanos())
+    }
+}
+
+/// Extremely quick rand implementation
+/// see https://arxiv.org/pdf/2002.11331.pdf
+#[derive(Copy, Clone, Debug, Default)]
+pub struct RomuTrioRand {
+    x_state: u64,
+    y_state: u64,
+    z_state: u64,
+}
+
+impl RomuTrioRand {
+    pub fn new(seed: u64) -> Self {
+        let mut rand = Self::default();
+        rand.set_seed(seed);
+        rand
+    }
+
+    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+    /// Needs stdlib timer
+    #[cfg(feature = "std")]
+    pub fn preseeded() -> Self {
+        Self::new(current_nanos())
+    }
+}
+
+impl Rand for RomuTrioRand {
+    fn set_seed(&mut self, seed: u64) {
+        self.x_state = seed ^ 0x12345;
+        self.y_state = seed ^ 0x6789A;
+        self.z_state = seed ^ 0xBCDEF;
+    }
+
+    #[inline]
+    fn next(&mut self) -> u64 {
+        let xp = self.x_state;
+        let yp = self.y_state;
+        let zp = self.z_state;
+        self.x_state = 15241094284759029579u64.wrapping_mul(zp);
+        self.y_state = yp.wrapping_sub(xp).rotate_left(12);
+        self.z_state = zp.wrapping_sub(yp).rotate_left(44);
+        xp
+    }
+}
+
+/// see https://arxiv.org/pdf/2002.11331.pdf
+#[derive(Copy, Clone, Debug, Default)]
+pub struct RomuDuoJrRand {
+    x_state: u64,
+    y_state: u64,
+}
+
+impl RomuDuoJrRand {
+    pub fn new(seed: u64) -> Self {
+        let mut rand = Self::default();
+        rand.set_seed(seed);
+        rand
+    }
+}
+
+impl Rand for RomuDuoJrRand {
+    fn set_seed(&mut self, seed: u64) {
+        self.x_state = seed ^ 0x12345;
+        self.y_state = seed ^ 0x6789A;
+    }
+
+    #[inline]
+    fn next(&mut self) -> u64 {
+        let xp = self.x_state;
+        self.x_state = 15241094284759029579u64.wrapping_mul(self.y_state);
+        self.y_state = self.y_state.wrapping_sub(xp).rotate_left(27);
+        xp
     }
 }
 

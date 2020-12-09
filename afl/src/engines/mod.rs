@@ -301,7 +301,8 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.fire(Event::update_stats(state.executions(), state.executions_over_seconds()),
+                manager.fire(
+                    Event::update_stats(state.executions(), state.executions_over_seconds()),
                     state,
                     corpus,
                 )?; // TODO self.new_execs});
