@@ -53,6 +53,7 @@ where
 
             let fitness = state.evaluate_input(&input_mut, engine.executor_mut())?;
 
+            // TODO post exec on the testcase, like post_exec(testcase_maybe, i as i32)
             self.mutator_mut()
                 .post_exec(fitness, &input_mut, i as i32)?;
 
@@ -63,7 +64,6 @@ where
             // if needed by particular cases
             let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
             if let Some(mut testcase) = testcase_maybe {
-                // TODO decouple events manager and engine
                 manager.fire(
                     Event::NewTestcase {
                         sender_id: 0,

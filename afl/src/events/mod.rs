@@ -24,12 +24,17 @@ use crate::inputs::Input;
 use crate::serde_anymap::{Ptr, PtrMut};
 use crate::utils::Rand;
 use crate::AflError;
+
 /// Indicate if an event worked or not
-enum BrokerEventResult {
+pub enum BrokerEventResult {
     /// The broker haneled this. No need to pass it on.
     Handled,
     /// Pass this message along to the clients.
     Forward,
+}
+
+pub trait ShowStats {
+
 }
 
 /*
@@ -87,7 +92,8 @@ where
     },
     UpdateStats {
         sender_id: u64,
-        new_execs: usize,
+        executions: usize,
+        execs_over_sec: u64,
         phantom: PhantomData<(C, E, I, R)>,
     },
     Crash {
@@ -133,7 +139,8 @@ where
             } => "New Testcase",
             Event::UpdateStats {
                 sender_id: _,
-                new_execs: _,
+                executions: _,
+                execs_over_sec: _,
                 phantom: _,
             } => "Stats",
             Event::Crash {
@@ -157,13 +164,64 @@ where
         }
     }
 
+    pub fn log(severity_level: u8, message: String) -> Self {
+        Event::Log {
+            sender_id: 0,
+            severity_level: severity_level,
+            message: message,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn update_stats(executions: usize, execs_over_sec: u64) -> Self {
+        Event::UpdateStats {
+            sender_id: 0,
+            executions: executions,
+            execs_over_sec: execs_over_sec,
+            phantom: PhantomData,
+        }
+    }
+
+    // TODO serialize and deserialize, defaults to serde
+}
+
+pub trait EventManager<C, E, I, R>
+where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    I: Input,
+    R: Rand,
+{
+    /// Check if this EventaManager support a given Event type
+    /// To compare events, use Event::name().as_ptr()
+    fn enabled(&self) -> bool;
+
+    /// Fire an Event
+    fn fire<'a>(
+        &mut self,
+        event: Event<'a, C, E, I, R>,
+        state: &mut State<I, R>,
+        corpus: &mut C,
+    ) -> Result<(), AflError>;
+
+    /// Lookup for incoming events and process them.
+    /// Return the number of processes events or an error
+    fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError>;
+
+    fn on_recv(&self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
+        // TODO: Better way to move out of testcase, or get ref
+        //Ok(corpus.add(self.testcase.take().unwrap()))
+        Ok(())
+    }
+
     // TODO the broker has a state? do we need to pass state and corpus?
     fn handle_in_broker(
         &self,
+        event: &Event<C, E, I, R>,
         /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
-        match self {
+        match event {
             Event::LoadInitial {
                 sender_id: _,
                 phantom: _,
@@ -175,7 +233,8 @@ where
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
-                new_execs: _,
+                executions: _,
+                execs_over_sec: _,
                 phantom: _,
             } => {
                 // TODO
@@ -214,11 +273,12 @@ where
     }
 
     fn handle_in_client(
-        self,
+        &self,
+        event: Event<C, E, I, R>,
         /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
-        match self {
+        match event {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
@@ -233,38 +293,6 @@ where
                 "Received illegal message that message should not have arrived.".into(),
             )),
         }
-    }
-
-    // TODO serialize and deserialize, defaults to serde
-}
-
-pub trait EventManager<C, E, I, R>
-where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    I: Input,
-    R: Rand,
-{
-    /// Check if this EventaManager support a given Event type
-    /// To compare events, use Event::name().as_ptr()
-    fn enabled(&self) -> bool;
-
-    /// Fire an Event
-    fn fire<'a>(
-        &mut self,
-        event: Event<'a, C, E, I, R>,
-        state: &mut State<I, R>,
-        corpus: &mut C,
-    ) -> Result<(), AflError>;
-
-    /// Lookup for incoming events and process them.
-    /// Return the number of processes events or an error
-    fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError>;
-
-    fn on_recv(&self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
-        // TODO: Better way to move out of testcase, or get ref
-        //Ok(corpus.add(self.testcase.take().unwrap()))
-        Ok(())
     }
 }
 
@@ -311,8 +339,8 @@ where
         state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
-        match event.handle_in_broker(state, corpus)? {
-            BrokerEventResult::Forward => (), //event.handle_in_client(state, corpus)?,
+        match self.handle_in_broker(&event, state, corpus)? {
+            BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
             // Ignore broker-only events
             BrokerEventResult::Handled => (),
         }

@@ -297,12 +297,7 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.fire(
-                    Event::UpdateStats {
-                        sender_id: 0,
-                        new_execs: 1,
-                        phantom: PhantomData,
-                    },
+                manager.fire(Event::update_stats(state.executions(), state.executions_over_seconds()),
                     state,
                     corpus,
                 )?; // TODO self.new_execs});
