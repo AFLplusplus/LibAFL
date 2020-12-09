@@ -23,7 +23,8 @@ where
         rand: &mut R,
         state: &mut State<I, R>,
         corpus: &mut C,
-        engine: &mut Engine<EM, E, C, I, R>,
+        engine: &mut Engine<E, I>,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError>;
 }

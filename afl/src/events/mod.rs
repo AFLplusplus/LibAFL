@@ -324,7 +324,7 @@ where
         corpus: &mut C,
     ) -> Result<(), AflError> {
         match event.handle_in_broker(state, corpus)? {
-            BrokerEventResult::Forward => event.handle_in_client(state, corpus)?,
+            BrokerEventResult::Forward => (), //event.handle_in_client(state, corpus)?,
             // Ignore broker-only events
             BrokerEventResult::Handled => (),
         }

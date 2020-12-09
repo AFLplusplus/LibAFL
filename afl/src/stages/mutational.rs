@@ -10,6 +10,8 @@ use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, events::Event};
 
+use crate::serde_anymap::{Ptr, PtrMut};
+
 // TODO multi mutators stage
 
 pub trait MutationalStage<M, EM, E, C, I, R>: Stage<EM, E, C, I, R>
@@ -39,7 +41,8 @@ where
         rand: &mut R,
         state: &mut State<I, R>,
         corpus: &mut C,
-        engine: &mut Engine<EM, E, C, I, R>,
+        engine: &mut Engine<E, I>,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
         let num = self.iterations(rand);
@@ -48,23 +51,29 @@ where
             self.mutator_mut()
                 .mutate(rand, corpus, &mut input_mut, i as i32)?;
 
-            let fitness = state.evaluate_input(&input_mut, engine)?;
+            let fitness = state.evaluate_input(&input_mut, engine.executor_mut())?;
 
             self.mutator_mut()
                 .post_exec(fitness, &input_mut, i as i32)?;
 
+            // put all this shit in some overridable function in engine maybe? or in corpus.
+            // consider a corpus that strores new testcases in a temporary queue, for later processing
+            // in a late stage, NewTestcase should be triggere donly after the processing in the later stage
+            // So by default we shoudl trigger it in corpus.add, so that the user can override it and remove
+            // if needed by particular cases
             let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
-            if let Some(testcase) = testcase_maybe {
-                //corpus.entries()[idx]
-                engine.events_manager_mut().fire(
-                    Event::NewTestcase {
+            if let Some(mut testcase) = testcase_maybe {
+                // TODO decouple events manager and engine
+                manager.fire(
+                    Event::NewTestcase2 {
                         sender_id: 0,
-                        testcase: testcase,
-                        phantom: PhantomData,
+                        input: Ptr::Ref(testcase.load_input()?),
+                        observers: PtrMut::Ref(engine.executor_mut().observers_mut()),
                     },
                     state,
                     corpus,
                 )?;
+                let _ = corpus.add(testcase);
             }
         }
         Ok(())
@@ -119,10 +128,11 @@ where
         rand: &mut R,
         state: &mut State<I, R>,
         corpus: &mut C,
-        engine: &mut Engine<EM, E, C, I, R>,
+        engine: &mut Engine<E, I>,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
-        self.perform_mutational(rand, state, corpus, engine, corpus_idx)
+        self.perform_mutational(rand, state, corpus, engine, manager, corpus_idx)
     }
 }
 
