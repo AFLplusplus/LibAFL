@@ -686,13 +686,13 @@ where
     R: Rand,
 {
     // We don't want to use the testcase we're already using for splicing
-    let (other_testcase, _) = corpus.random_entry(rand)?.clone();
-    // TODO: Load let other = Testcase::load_from_disk(other_test)?;
+    let (other_testcase, idx) = corpus.random_entry(rand)?;
+    if idx == corpus.current_testcase().1 {
+        return Ok(MutationResult::Skipped);
+    }
     // println!("Input: {:?}, other input: {:?}", input.bytes(), other.bytes());
-    let other = match other_testcase.input() {
-        Some(i) => i,
-        None => return Ok(MutationResult::Skipped), //TODO
-    };
+    let mut other_ref = other_testcase.borrow_mut();
+    let other = other_ref.load_input()?;
 
     let mut counter = 0;
     let (first_diff, last_diff) = loop {

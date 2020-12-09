@@ -40,11 +40,11 @@ where
         state: &mut State<I, R>,
         corpus: &mut C,
         engine: &mut Engine<EM, E, C, I, R>,
-        input: &I,
+        corpus_idx: usize,
     ) -> Result<(), AflError> {
         let num = self.iterations(rand);
         for i in 0..num {
-            let mut input_mut = input.clone();
+            let mut input_mut = corpus.get(corpus_idx).borrow_mut().load_input()?.clone();
             self.mutator_mut()
                 .mutate(rand, corpus, &mut input_mut, i as i32)?;
 
@@ -120,9 +120,9 @@ where
         state: &mut State<I, R>,
         corpus: &mut C,
         engine: &mut Engine<EM, E, C, I, R>,
-        input: &I,
+        corpus_idx: usize,
     ) -> Result<(), AflError> {
-        self.perform_mutational(rand, state, corpus, engine, input)
+        self.perform_mutational(rand, state, corpus, engine, corpus_idx)
     }
 }
 

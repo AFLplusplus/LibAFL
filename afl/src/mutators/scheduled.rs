@@ -265,7 +265,7 @@ mod tests {
         let (testcase, _) = corpus
             .next(&mut rand)
             .expect("Corpus did not contain entries");
-        let mut input = testcase.input().as_ref().unwrap().clone();
+        let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
         rand.set_seed(5);
         let mut mutator = StdScheduledMutator::new();

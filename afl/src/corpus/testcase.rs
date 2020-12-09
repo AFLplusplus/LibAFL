@@ -75,9 +75,11 @@ where
     I: Input,
 {
     /// Returns this testcase with a loaded input
-    pub fn load_from_disk(filename: &str) -> Result<Self, AflError> {
-        let input = I::from_file(filename)?;
-        Ok(Testcase::new(input))
+    pub fn load_input(&mut self) -> Result<&I, AflError> {
+        if self.input.is_none() {
+            self.input = Some(I::from_file(self.filename.as_ref().unwrap())?);
+        }
+        Ok(self.input.as_ref().unwrap())
     }
 
     /// Get the input, if any

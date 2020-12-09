@@ -24,6 +24,6 @@ where
         state: &mut State<I, R>,
         corpus: &mut C,
         engine: &mut Engine<EM, E, C, I, R>,
-        input: &I,
+        corpus_idx: usize,
     ) -> Result<(), AflError>;
 }

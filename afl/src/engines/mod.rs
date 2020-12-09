@@ -293,19 +293,10 @@ where
         corpus: &mut C,
         engine: &mut Engine<EM, E, C, I, R>,
     ) -> Result<usize, AflError> {
-        let (testcase, idx) = corpus.next(rand)?;
-        match testcase.input() {
-            None => {
-                // Load from disk.
-                corpus.load_testcase(idx)?;
-            }
-            _ => (),
-        };
-
-        let input = corpus.get(idx).input().as_ref().unwrap();
+        let (_, idx) = corpus.next(rand)?;
 
         for stage in self.stages_mut() {
-            stage.perform(rand, state, corpus, engine, &input)?;
+            stage.perform(rand, state, corpus, engine, idx)?;
         }
 
         engine.events_manager_mut().process(state, corpus)?;
