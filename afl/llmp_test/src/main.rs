@@ -56,14 +56,14 @@ unsafe fn broker_message_hook(
             println!(
                 "Client {:?} sent message: {:?}",
                 client_id,
-                u32::from_le_bytes((*message).as_slice().try_into().unwrap())
+                u32::from_le_bytes((*message).as_slice_unsafe().try_into().unwrap())
             );
             llmp::LlmpMsgHookResult::ForwardToClients
         }
         TAG_MATH_RESULT_V1 => {
             println!(
                 "Adder Client has this current result: {:?}",
-                u32::from_le_bytes((*message).as_slice().try_into().unwrap())
+                u32::from_le_bytes((*message).as_slice_unsafe().try_into().unwrap())
             );
             llmp::LlmpMsgHookResult::Handled
         }

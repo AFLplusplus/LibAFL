@@ -158,8 +158,38 @@ pub struct LlmpMsg {
 /// The message we receive
 impl LlmpMsg {
     /// Gets the buffer from this message as slice, with the corrent length.
-    pub fn as_slice(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize) }
+    /// This is unsafe if somebody has access to shared mem pages on the system.
+    pub unsafe fn as_slice_unsafe(&self) -> &[u8] {
+        slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize)
+    }
+
+    /// Gets the buffer from this message as slice, with the corrent length.
+    pub fn as_slice(&self, map: &LlmpSharedMap) -> Result<&[u8], AflError> {
+        unsafe {
+            if self.in_map(map) {
+                Ok(self.as_slice_unsafe())
+            } else {
+                Err(AflError::IllegalState("Current message not in page. The sharedmap get tampered with or we have a BUG.".into()))
+            }
+        }
+    }
+
+    /// Returns true, if the pointer is, indeed, in the page of this shared map.
+    pub fn in_map(&self, map: &LlmpSharedMap) -> bool {
+        unsafe {
+            let buf_ptr = self.buf.as_ptr();
+            if buf_ptr > (map.page() as *const u8).offset(size_of::<LlmpPage>() as isize)
+                && buf_ptr
+                    <= (map.page() as *const u8)
+                        .offset((map.shmem.map_size - size_of::<LlmpMsg>() as usize) as isize)
+            {
+                // The message header is in the page. Continue with checking the body.
+                let len = self.buf_len_padded as usize + size_of::<LlmpMsg>();
+                buf_ptr <= (map.page() as *const u8).offset((map.shmem.map_size - len) as isize)
+            } else {
+                false
+            }
+        }
     }
 }
 
@@ -264,6 +294,29 @@ unsafe fn _llmp_page_init(shmem: &mut AflShmem, sender: u32) {
     ptr::write_volatile(&mut (*page).sender_dead, 0);
 }
 
+/// Get the next pointer and make sure it's in the current page, and has enough space.
+#[inline]
+unsafe fn llmp_next_msg_ptr_checked(
+    map: &LlmpSharedMap,
+    last_msg: *const LlmpMsg,
+    alloc_size: usize,
+) -> Result<*mut LlmpMsg, AflError> {
+    let page = map.page();
+    let msg_begin_min = (page as *const u8).offset(size_of::<LlmpPage>() as isize);
+    // We still need space for this msg (alloc_size).
+    let msg_begin_max = (page as *const u8).offset((map.shmem.map_size - alloc_size) as isize);
+    let next = _llmp_next_msg_ptr(last_msg);
+    let next_ptr = next as *const u8;
+    if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
+        Ok(next)
+    } else {
+        Err(AflError::IllegalState(format!(
+            "Inconsistent data on sharedmap, or Bug (next_ptr was {:x}, sharedmap page was {:x})",
+            next_ptr as usize, page as usize
+        )))
+    }
+}
+
 /// Pointer to the message behind the last message
 #[inline]
 unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
@@ -297,15 +350,16 @@ impl LlmpSender {
     /// The normal alloc will fail if there is not enough space for buf_len_padded + EOP
     /// So if alloc_next fails, create new page if necessary, use this function,
     /// place EOP, commit EOP, reset, alloc again on the new space.
-    unsafe fn alloc_eop(&mut self) -> *mut LlmpMsg {
-        let page = self.out_maps.last().unwrap().page();
+    unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, AflError> {
+        let map = self.out_maps.last().unwrap();
+        let page = map.page();
         let last_msg = self.last_msg_sent;
         if (*page).size_used + EOP_MSG_SIZE > (*page).size_total {
             panic!(format!("PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
                 (*page).size_used, (*page).size_total));
         }
         let mut ret: *mut LlmpMsg = if !last_msg.is_null() {
-            _llmp_next_msg_ptr(last_msg)
+            llmp_next_msg_ptr_checked(&map, last_msg, EOP_MSG_SIZE)?
         } else {
             (*page).messages.as_mut_ptr()
         };
@@ -320,7 +374,7 @@ impl LlmpSender {
         };
         (*ret).tag = LLMP_TAG_END_OF_PAGE;
         (*page).size_used += EOP_MSG_SIZE;
-        ret
+        Ok(ret)
     }
 
     /// Intern: Will return a ptr to the next msg buf, or None if map is full.
@@ -329,7 +383,8 @@ impl LlmpSender {
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
         let mut buf_len_padded = buf_len;
         let mut complete_msg_size = llmp_align(size_of::<LlmpMsg>() + buf_len_padded);
-        let page = self.out_maps.last().unwrap().page();
+        let map = self.out_maps.last().unwrap();
+        let page = map.page();
         let last_msg = self.last_msg_sent;
         /* DBG("XXX complete_msg_size %lu (h: %lu)\n", complete_msg_size, sizeof(llmp_message)); */
         /* In case we don't have enough space, make sure the next page will be large
@@ -376,7 +431,13 @@ impl LlmpSender {
                 /* We're full. */
                 return None;
             }
-            ret = _llmp_next_msg_ptr(last_msg);
+            ret = match llmp_next_msg_ptr_checked(map, last_msg, complete_msg_size) {
+                Ok(msg) => msg,
+                Err(e) => {
+                    dbg!("Unexpected error allocing new msg", e);
+                    return None;
+                }
+            };
             (*ret).message_id = (*last_msg).message_id + 1
         }
 
@@ -441,7 +502,7 @@ impl LlmpSender {
         (*new_map).max_alloc_size = (*old_map).max_alloc_size;
         /* On the old map, place a last message linking to the new map for the clients
          * to consume */
-        let mut out: *mut LlmpMsg = self.alloc_eop();
+        let mut out: *mut LlmpMsg = self.alloc_eop()?;
         (*out).sender = (*old_map).sender;
 
         let mut end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
@@ -535,12 +596,20 @@ impl LlmpReceiver {
             /* Oops! No new message! */
             None
         } else {
-            Some(_llmp_next_msg_ptr(last_msg))
+            // We don't know how big the msg wants to be, assert at least the header has space.
+            Some(llmp_next_msg_ptr_checked(
+                &self.current_recv_map,
+                last_msg,
+                size_of::<LlmpMsg>(),
+            )?)
         };
 
         // Let's see what we go here.
         match ret {
             Some(msg) => {
+                if !(*msg).in_map(&self.current_recv_map) {
+                    return Err(AflError::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
+                }
                 // Handle special, LLMP internal, messages.
                 match (*msg).tag {
                     LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
@@ -561,11 +630,16 @@ impl LlmpReceiver {
                         Clone the contents first to be safe (probably fine in rust eitner way). */
                         let pageinfo_cpy = (*pageinfo).clone();
 
+                        // Mark the old page save to unmap, in case we didn't so earlier.
                         ptr::write_volatile(&mut (*page).save_to_unmap, 1);
+                        // Map the new page. The old one should be unmapped by Drop
                         self.current_recv_map = LlmpSharedMap::from_name_slice(
                             &pageinfo_cpy.shm_str,
                             pageinfo_cpy.map_size,
                         )?;
+                        // Mark the new page save to unmap also (it's mapped by us, the broker now)
+                        ptr::write_volatile(&mut (*page).save_to_unmap, 1);
+
                         dbg!("Got a new recv map", self.current_recv_map.shmem.shm_str);
                         // After we mapped the new page, return the next message, if available
                         return self.recv();
@@ -608,7 +682,7 @@ impl LlmpReceiver {
     pub fn recv_buf(&mut self) -> Result<Option<(u32, &[u8])>, AflError> {
         unsafe {
             Ok(match self.recv()? {
-                Some(msg) => Some(((*msg).tag, (*msg).as_slice())),
+                Some(msg) => Some(((*msg).tag, (*msg).as_slice(&self.current_recv_map)?)),
                 None => None,
             })
         }
@@ -618,7 +692,7 @@ impl LlmpReceiver {
     pub fn recv_buf_blocking(&mut self) -> Result<(u32, &[u8]), AflError> {
         unsafe {
             let msg = self.recv_blocking()?;
-            Ok(((*msg).tag, (*msg).as_slice()))
+            Ok(((*msg).tag, (*msg).as_slice(&self.current_recv_map)?))
         }
     }
 }

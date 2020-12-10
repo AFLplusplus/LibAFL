@@ -1,5 +1,5 @@
 #[cfg(feature = "std")]
-mod llmp;
+pub mod llmp;
 #[cfg(feature = "std")]
 pub mod shmem_translated;
 
@@ -534,10 +534,10 @@ where
 mod tests {
 
     use crate::events::Event;
-    use crate::serde_anymap::{Ptr, PtrMut};
     use crate::inputs::bytes::BytesInput;
-    use crate::observers::{Observer, StdMapObserver};
     use crate::observers::observer_serde::NamedSerdeAnyMap;
+    use crate::observers::{Observer, StdMapObserver};
+    use crate::serde_anymap::{Ptr, PtrMut};
 
     static mut MAP: [u32; 4] = [0; 4];
 
@@ -563,10 +563,13 @@ mod tests {
                 input: _,
                 observers: obs,
             } => {
-                let o = obs.as_ref().get::<StdMapObserver<u32>>(&"key".to_string()).unwrap();
+                let o = obs
+                    .as_ref()
+                    .get::<StdMapObserver<u32>>(&"key".to_string())
+                    .unwrap();
                 assert_eq!("test".to_string(), *o.name());
-            },
-            _ => panic!("mistmatch".to_string())
+            }
+            _ => panic!("mistmatch".to_string()),
         };
     }
 }

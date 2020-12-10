@@ -450,7 +450,7 @@ impl<'a, T: 'a + ?Sized + serde::Serialize> serde::Serialize for Ptr<'a, T> {
     {
         match *self {
             Ptr::Ref(ref r) => se.serialize_some(r),
-            Ptr::Owned(ref b) => se.serialize_some(b.as_ref())
+            Ptr::Owned(ref b) => se.serialize_some(b.as_ref()),
         }
     }
 }
@@ -474,7 +474,6 @@ impl<'a, T: Sized> Ptr<'a, T> {
             Ptr::Owned(v) => v.as_ref(),
         }
     }
-
 }
 
 pub enum PtrMut<'a, T: 'a + ?Sized> {
@@ -489,7 +488,7 @@ impl<'a, T: 'a + ?Sized + serde::Serialize> serde::Serialize for PtrMut<'a, T> {
     {
         match *self {
             PtrMut::Ref(ref r) => se.serialize_some(r),
-            PtrMut::Owned(ref b) => se.serialize_some(b.as_ref())
+            PtrMut::Owned(ref b) => se.serialize_some(b.as_ref()),
         }
     }
 }
@@ -522,7 +521,6 @@ impl<'a, T: Sized> PtrMut<'a, T> {
     }
 }
 
-
 pub enum Slice<'a, T: 'a + Sized> {
     Ref(&'a [T]),
     Owned(Vec<T>),
@@ -535,7 +533,7 @@ impl<'a, T: 'a + Sized + serde::Serialize> serde::Serialize for Slice<'a, T> {
     {
         match *self {
             Slice::Ref(ref r) => se.serialize_some(r),
-            Slice::Owned(ref b) => se.serialize_some(b.as_slice())
+            Slice::Owned(ref b) => se.serialize_some(b.as_slice()),
         }
     }
 }
@@ -573,7 +571,7 @@ impl<'a, T: 'a + Sized + serde::Serialize> serde::Serialize for SliceMut<'a, T> 
     {
         match *self {
             SliceMut::Ref(ref r) => se.serialize_some(r),
-            SliceMut::Owned(ref b) => se.serialize_some(b.as_slice())
+            SliceMut::Owned(ref b) => se.serialize_some(b.as_slice()),
         }
     }
 }

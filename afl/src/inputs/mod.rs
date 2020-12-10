@@ -24,7 +24,7 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned {
     {
         let mut file = File::create(path)?;
         let serialized = postcard::to_allocvec(self)?;
-        file.write_all(&serialized);
+        file.write_all(&serialized)?;
         Ok(())
     }
 
