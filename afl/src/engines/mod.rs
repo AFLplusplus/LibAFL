@@ -176,7 +176,7 @@ where
         }
     }
 
-    pub fn generate_initial_inputs<G, C, E, FE, EM>(
+    pub fn generate_initial_inputs<G, C, E, EM>(
         &mut self,
         rand: &mut R,
         corpus: &mut C,

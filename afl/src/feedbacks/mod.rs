@@ -2,11 +2,11 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 use num::Integer;
 
-use crate::corpus::Testcase;
 use crate::inputs::Input;
 use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::observers::MapObserver;
 use crate::AflError;
+use crate::{corpus::Testcase, observers::Observer};
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
 pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
@@ -139,13 +139,21 @@ impl<T, R, O> MapFeedback<T, R, O>
 where
     T: Integer + Default + Copy + 'static,
     R: Reducer<T>,
-    O: MapObserver<T>,
+    O: MapObserver<T> + Observer,
 {
     /// Create new MapFeedback
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
             name: name.to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn new_with_observer(map_observer: &O) -> Self {
+        Self {
+            history_map: vec![T::default(); map_observer.map().len()],
+            name: map_observer.name().into(),
             phantom: PhantomData,
         }
     }

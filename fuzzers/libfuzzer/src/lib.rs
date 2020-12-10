@@ -10,7 +10,10 @@ use core::cell::RefCell;
 use std::io::stderr;
 
 use afl::corpus::InMemoryCorpus;
-use afl::engines::{generate_initial_inputs, Engine, State, StdEngine, StdState};
+use afl::engines::Engine;
+use afl::engines::Fuzzer;
+use afl::engines::State;
+use afl::engines::StdFuzzer;
 use afl::events::LoggerEventManager;
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
@@ -40,6 +43,8 @@ fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
     ExitKind::Ok
 }
 
+const NAME_COV_MAP: &str = "cov_map";
+
 #[no_mangle]
 pub extern "C" fn afl_libfuzzer_main() {
     let mut rand = StdRand::new(0);
@@ -51,34 +56,39 @@ pub extern "C" fn afl_libfuzzer_main() {
     #[cfg(feature = "std")]
     let mut events = LoggerEventManager::new(stderr());
 
-    let edges_observer = Rc::new(RefCell::new(StdMapObserver::new_from_ptr(
-        unsafe { __lafl_edges_map },
-        unsafe { __lafl_max_edges_size as usize },
-    )));
-    let edges_feedback = MaxMapFeedback::new(edges_observer.clone(), MAP_SIZE);
+    let edges_observer =
+        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
+            __lafl_max_edges_size as usize
+        });
+    let edges_feedback = MaxMapFeedback::new_with_observer(&edges_observer);
 
-    let executor = InMemoryExecutor::new(harness);
-    let mut state = StdState::new(executor);
-    state.add_observer(edges_observer);
+    let mut executor = InMemoryExecutor::new(harness);
+    let mut state = State::new();
+    executor.add_observer(Box::new(edges_observer));
     state.add_feedback(Box::new(edges_feedback));
 
-    generate_initial_inputs(
-        &mut rand,
-        &mut state,
-        &mut corpus,
-        &mut generator,
-        &mut events,
-        4,
-    )
-    .expect("Failed to load initial inputs");
-
-    let mut engine = StdEngine::new();
+    let mut engine = Engine::new(executor);
     let mutator = HavocBytesMutator::new_default();
-    let stage = StdMutationalStage::new(mutator);
-    engine.add_stage(Box::new(stage));
 
-    engine
-        .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut events)
+    let stage = StdMutationalStage::new(mutator);
+
+    state
+        .generate_initial_inputs(
+            &mut rand,
+            &mut corpus,
+            &mut generator,
+            &mut engine,
+            &mut events,
+            4,
+        )
+        .expect("Failed to load initial inputs");
+
+    let mut fuzzer = StdFuzzer::new();
+
+    fuzzer.add_stage(Box::new(stage));
+
+    fuzzer
+        .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut events)
         .expect("Fuzzer fatal error");
     #[cfg(feature = "std")]
     println!("OK");
