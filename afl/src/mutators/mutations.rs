@@ -467,7 +467,7 @@ where
 
     let off = rand.below(size as u64) as usize;
     let len = rand.below((size - off) as u64) as usize;
-    input.bytes_mut().drain(off..len);
+    input.bytes_mut().drain(off..off + len);
 
     Ok(MutationResult::Mutated)
 }
