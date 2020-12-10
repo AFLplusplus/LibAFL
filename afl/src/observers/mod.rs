@@ -24,7 +24,7 @@ pub trait Observer: SerdeAny + 'static {
         Ok(())
     }
 
-    fn name(&self) -> &'static str;
+    fn name(&self) -> &String;
 }
 
 crate::create_serde_registry_for_trait!(observer_serde, crate::observers::Observer);
@@ -63,14 +63,15 @@ where
 /// The Map Observer retrieves the state of a map,
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: ArrayMut<T>,
     initial: T,
-    name: &'static str,
+    name: String,
 }
 
 impl<T> Observer for StdMapObserver<T>
@@ -81,8 +82,8 @@ where
         self.reset_map()
     }
 
-    fn name(&self) -> &'static str {
-        self.name
+    fn name(&self) -> &String {
+        &self.name
     }
 }
 
@@ -123,19 +124,6 @@ where
     }
 }
 
-impl<'de, T> Deserialize<'de> for StdMapObserver<T>
-where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-{
-    fn deserialize<D>(de: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let mut erased = erased_serde::Deserializer::erase(de);
-        erased_serde::deserialize(&mut erased).map_err(serde::de::Error::custom)
-    }
-}
-
 impl<T> StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
@@ -147,7 +135,7 @@ where
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
             initial: initial,
-            name: name,
+            name: name.to_string(),
         }
     }
 
@@ -159,8 +147,25 @@ where
             StdMapObserver {
                 map: ArrayMut::Cptr((map_ptr, len)),
                 initial: initial,
-                name: name,
+                name: name.to_string(),
             }
         }
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg(test)]
+mod tests {
+
+    use crate::observers::{Observer, StdMapObserver};
+    static mut map: [u32; 4] = [0; 4];
+
+    #[test]
+    fn test_observer_serde() {
+        let o: Box<dyn Observer> = Box::new(StdMapObserver::<u32>::new("test", unsafe { &mut map }));
+        let s = serde_json::to_string(&o).unwrap();
+        println!("{}", s);
+        let d: Box<dyn Observer> = serde_json::from_str(&s).unwrap();
+        assert_eq!(d.name(), o.name());
     }
 }

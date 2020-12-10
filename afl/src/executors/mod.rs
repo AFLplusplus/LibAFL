@@ -31,8 +31,8 @@ where
 
     /// Add a linked observer
     fn add_observer(&mut self, observer: Box<dyn Observer>) {
-        let name = observer.name();
-        self.observers_mut().insert(observer, name);
+        let name = observer.name().clone();
+        self.observers_mut().insert(observer, &name);
     }
 
     /// Reset the state of all the observes linked to this executor

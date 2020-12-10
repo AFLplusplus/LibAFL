@@ -211,7 +211,7 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             impl NamedSerdeAnyMap {
-                pub fn get<T>(&self, name: &'static str) -> Option<&T>
+                pub fn get<T>(&self, name: &String) -> Option<&T>
                 where
                     T: Any,
                 {
@@ -225,7 +225,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 pub fn by_typeid(
                     &self,
-                    name: &'static str,
+                    name: &String,
                     typeid: &TypeId,
                 ) -> Option<&dyn $trait_name> {
                     match self.map.get(&unpack_type_id(*typeid)) {
@@ -236,7 +236,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
-                pub fn get_mut<T>(&mut self, name: &'static str) -> Option<&mut T>
+                pub fn get_mut<T>(&mut self, name: &String) -> Option<&mut T>
                 where
                     T: Any,
                 {
@@ -250,7 +250,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 pub fn by_typeid_mut(
                     &mut self,
-                    name: &'static str,
+                    name: &String,
                     typeid: &TypeId,
                 ) -> Option<&mut dyn $trait_name> {
                     match self.map.get_mut(&unpack_type_id(*typeid)) {
@@ -363,7 +363,7 @@ macro_rules! create_serde_registry_for_trait {
                     Ok(())
                 }
 
-                pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &'static str) {
+                pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &String) {
                     let id = unpack_type_id(val.type_id());
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
@@ -385,7 +385,7 @@ macro_rules! create_serde_registry_for_trait {
                     self.map.contains_key(&unpack_type_id(TypeId::of::<T>()))
                 }
 
-                pub fn contains<T>(&self, name: &'static str) -> bool
+                pub fn contains<T>(&self, name: &String) -> bool
                 where
                     T: Any,
                 {

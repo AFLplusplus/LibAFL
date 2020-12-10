@@ -35,7 +35,7 @@ where
     }
 
     /// The name of this feedback
-    fn name(&self) -> &'static str;
+    fn name(&self) -> &String;
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
@@ -96,7 +96,7 @@ where
     /// Contains information about untouched entries
     history_map: Vec<T>,
     /// Name identifier of this instance
-    name: &'static str,
+    name: String,
     /// Phantom Data of Reducer
     phantom: PhantomData<(R, O)>,
 }
@@ -115,7 +115,7 @@ where
     ) -> Result<u32, AflError> {
         let mut interesting = 0;
         // TODO optimize
-        let observer = observers.get::<O>(self.name).unwrap();
+        let observer = observers.get::<O>(&self.name).unwrap();
         let size = observer.map().len();
         for i in 0..size {
             let history = self.history_map[i];
@@ -130,8 +130,8 @@ where
         Ok(interesting)
     }
 
-    fn name(&self) -> &'static str {
-        self.name
+    fn name(&self) -> &String {
+        &self.name
     }
 }
 
@@ -145,7 +145,7 @@ where
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
-            name: name,
+            name: name.to_string(),
             phantom: PhantomData,
         }
     }
@@ -162,7 +162,7 @@ where
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
             history_map: history_map,
-            name: name,
+            name: name.to_string(),
             phantom: PhantomData,
         }
     }
