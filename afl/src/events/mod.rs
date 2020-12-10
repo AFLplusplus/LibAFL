@@ -35,7 +35,7 @@ pub trait ShowStats {}
 /*
 
 /// A custom event, in case a user wants to extend the features (at compile time)
-pub trait CustomEvent<C, E, I, R>
+pub trait CustomEvent<I>
 where
     S: State<I, R>,
     C: Corpus<I, R>,
@@ -52,7 +52,7 @@ where
 }
 
 struct UnusedCustomEvent {}
-impl<C, E, I, R> CustomEvent<C, E, I, R> for UnusedCustomEvent<C, E, I, R>
+impl<C, E, I, R> CustomEvent<I> for UnusedCustomEvent<I>
 where
     S: State<I, R>,
     C: Corpus<I, R>,
@@ -69,17 +69,14 @@ where
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum Event<'a, C, E, I, R>
+pub enum Event<'a, I>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
     I: Input,
-    R: Rand,
-    // CE: CustomEvent<C, E, I, R>,
+    // CE: CustomEvent<I>,
 {
     LoadInitial {
         sender_id: u64,
-        phantom: PhantomData<(C, E, I, R)>,
+        phantom: PhantomData<I>,
     },
     NewTestcase {
         sender_id: u64,
@@ -90,37 +87,34 @@ where
         sender_id: u64,
         executions: usize,
         execs_over_sec: u64,
-        phantom: PhantomData<(C, E, I, R)>,
+        phantom: PhantomData<I>,
     },
     Crash {
         sender_id: u64,
         input: I,
-        phantom: PhantomData<(C, E, I, R)>,
+        phantom: PhantomData<I>,
     },
     Timeout {
         sender_id: u64,
         input: I,
-        phantom: PhantomData<(C, E, I, R)>,
+        phantom: PhantomData<I>,
     },
     Log {
         sender_id: u64,
         severity_level: u8,
         message: String,
-        phantom: PhantomData<(C, E, I, R)>,
+        phantom: PhantomData<I>,
     },
     None {
-        phantom: PhantomData<(C, E, I, R)>,
+        phantom: PhantomData<I>,
     },
     //Custom {sender_id: u64, custom_event: CE},
 }
 
-impl<'a, C, E, I, R> Event<'a, C, E, I, R>
+impl<'a, I> Event<'a, I>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
     I: Input,
-    R: Rand,
-    //CE: CustomEvent<C, E, I, R>,
+    //CE: CustomEvent<I>,
 {
     pub fn name(&self) -> &str {
         match self {
@@ -191,7 +185,7 @@ where
     /// Fire an Event
     fn fire<'a>(
         &mut self,
-        event: Event<'a, C, E, I, R>,
+        event: Event<'a, I>,
         state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError>;
@@ -209,7 +203,7 @@ where
     // TODO the broker has a state? do we need to pass state and corpus?
     fn handle_in_broker(
         &self,
-        event: &Event<C, E, I, R>,
+        event: &Event<I>,
         /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
@@ -266,7 +260,7 @@ where
 
     fn handle_in_client(
         &self,
-        event: Event<C, E, I, R>,
+        event: Event<I>,
         /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
@@ -305,7 +299,7 @@ where
 pub struct LoggerEventManager<C, E, I, R, W>
 where
     W: Write,
-    //CE: CustomEvent<C, E, I, R>,
+    //CE: CustomEvent<I>,
 {
     writer: W,
     count: usize,
@@ -320,11 +314,11 @@ where
     I: Input,
     R: Rand,
     W: Write,
-    //CE: CustomEvent<C, E, I, R>,
+    //CE: CustomEvent<I>,
 {
     fn fire<'a>(
         &mut self,
-        event: Event<'a, C, E, I, R>,
+        event: Event<'a, I>,
         state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
@@ -370,7 +364,7 @@ where
     I: Input,
     E: Executor<I>,
     R: Rand,
-    //CE: CustomEvent<C, E, I, R>,
+    //CE: CustomEvent<I>,
 {
     llmp_broker: llmp::LlmpBroker,
     phantom: PhantomData<(C, E, I, R)>,
@@ -390,7 +384,7 @@ where
     I: Input,
     E: Executor<I>,
     R: Rand,
-    //CE: CustomEvent<C, E, I, R>,
+    //CE: CustomEvent<I>,
 {
     llmp_client: llmp::LlmpClient,
     phantom: PhantomData<(C, E, I, R)>,
@@ -403,12 +397,12 @@ where
     E: Executor<I>,
     I: Input,
     R: Rand,
-    //CE: CustomEvent<C, E, I, R>,
+    //CE: CustomEvent<I>,
 {
     /// Fire an Event
     fn fire<'a>(
         &mut self,
-        event: Event<'a, C, E, I, R>,
+        event: Event<'a, I>,
         state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
@@ -455,7 +449,7 @@ where
 
     fn handle_in_broker(
         &self,
-        event: &Event<C, E, I, R>,
+        event: &Event<I>,
         /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
@@ -512,7 +506,7 @@ where
 
     fn handle_in_client(
         &self,
-        event: Event<C, E, I, R>,
+        event: Event<I>,
         /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
@@ -532,5 +526,47 @@ where
                 "Received illegal message that message should not have arrived.".into(),
             )),
         }
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg(test)]
+mod tests {
+
+    use crate::events::Event;
+    use crate::serde_anymap::{Ptr, PtrMut};
+    use crate::inputs::bytes::BytesInput;
+    use crate::observers::{Observer, StdMapObserver};
+    use crate::observers::observer_serde::NamedSerdeAnyMap;
+
+    static mut MAP: [u32; 4] = [0; 4];
+
+    #[test]
+    fn test_event_serde() {
+        let mut map = NamedSerdeAnyMap::new();
+        let obv = StdMapObserver::new("test", unsafe { &mut MAP });
+        map.insert(Box::new(obv), &"key".to_string());
+
+        let i = BytesInput::new(vec![0]);
+        let e = Event::NewTestcase {
+            sender_id: 0,
+            input: Ptr::Ref(&i),
+            observers: PtrMut::Ref(&mut map),
+        };
+
+        let j = serde_json::to_string(&e).unwrap();
+
+        let d: Event<BytesInput> = serde_json::from_str(&j).unwrap();
+        match d {
+            Event::NewTestcase {
+                sender_id: _,
+                input: _,
+                observers: obs,
+            } => {
+                let o = obs.as_ref().get::<StdMapObserver<u32>>(&"key".to_string()).unwrap();
+                assert_eq!("test".to_string(), *o.name());
+            },
+            _ => panic!("mistmatch".to_string())
+        };
     }
 }

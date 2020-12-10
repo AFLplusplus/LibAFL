@@ -364,7 +364,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &String) {
-                    let id = unpack_type_id(val.type_id());
+                    let id = unpack_type_id((*val).type_id());
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
                     }
@@ -438,10 +438,21 @@ macro_rules! create_serde_registry_for_trait {
 create_serde_registry_for_trait!(serdeany_serde, crate::serde_anymap::SerdeAny);
 pub use serdeany_serde::*;
 
-#[derive(Serialize)]
 pub enum Ptr<'a, T: 'a + ?Sized> {
     Ref(&'a T),
     Owned(Box<T>),
+}
+
+impl<'a, T: 'a + ?Sized + serde::Serialize> serde::Serialize for Ptr<'a, T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            Ptr::Ref(ref r) => se.serialize_some(r),
+            Ptr::Owned(ref b) => se.serialize_some(b.as_ref())
+        }
+    }
 }
 
 impl<'de, 'a, T: 'a + ?Sized> Deserialize<'de> for Ptr<'a, T>
@@ -456,10 +467,31 @@ where
     }
 }
 
-#[derive(Serialize)]
+impl<'a, T: Sized> Ptr<'a, T> {
+    pub fn as_ref(&self) -> &T {
+        match self {
+            Ptr::Ref(r) => r,
+            Ptr::Owned(v) => v.as_ref(),
+        }
+    }
+
+}
+
 pub enum PtrMut<'a, T: 'a + ?Sized> {
     Ref(&'a mut T),
     Owned(Box<T>),
+}
+
+impl<'a, T: 'a + ?Sized + serde::Serialize> serde::Serialize for PtrMut<'a, T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            PtrMut::Ref(ref r) => se.serialize_some(r),
+            PtrMut::Owned(ref b) => se.serialize_some(b.as_ref())
+        }
+    }
 }
 
 impl<'de, 'a, T: 'a + ?Sized> Deserialize<'de> for PtrMut<'a, T>
@@ -474,10 +506,38 @@ where
     }
 }
 
-#[derive(Serialize)]
+impl<'a, T: Sized> PtrMut<'a, T> {
+    pub fn as_ref(&self) -> &T {
+        match self {
+            PtrMut::Ref(r) => r,
+            PtrMut::Owned(v) => v.as_ref(),
+        }
+    }
+
+    pub fn as_mut(&mut self) -> &T {
+        match self {
+            PtrMut::Ref(r) => r,
+            PtrMut::Owned(v) => v.as_mut(),
+        }
+    }
+}
+
+
 pub enum Slice<'a, T: 'a + Sized> {
     Ref(&'a [T]),
     Owned(Vec<T>),
+}
+
+impl<'a, T: 'a + Sized + serde::Serialize> serde::Serialize for Slice<'a, T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            Slice::Ref(ref r) => se.serialize_some(r),
+            Slice::Owned(ref b) => se.serialize_some(b.as_slice())
+        }
+    }
 }
 
 impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for Slice<'a, T>
@@ -492,10 +552,30 @@ where
     }
 }
 
-#[derive(Serialize)]
+impl<'a, T: Sized> Slice<'a, T> {
+    pub fn as_slice(&self) -> &[T] {
+        match self {
+            Slice::Ref(r) => r,
+            Slice::Owned(v) => v.as_slice(),
+        }
+    }
+}
+
 pub enum SliceMut<'a, T: 'a + Sized> {
     Ref(&'a mut [T]),
     Owned(Vec<T>),
+}
+
+impl<'a, T: 'a + Sized + serde::Serialize> serde::Serialize for SliceMut<'a, T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            SliceMut::Ref(ref r) => se.serialize_some(r),
+            SliceMut::Owned(ref b) => se.serialize_some(b.as_slice())
+        }
+    }
 }
 
 impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for SliceMut<'a, T>
@@ -507,6 +587,22 @@ where
         D: serde::Deserializer<'de>,
     {
         Deserialize::deserialize(deserializer).map(SliceMut::Owned)
+    }
+}
+
+impl<'a, T: Sized> SliceMut<'a, T> {
+    pub fn as_slice(&self) -> &[T] {
+        match self {
+            SliceMut::Ref(r) => r,
+            SliceMut::Owned(v) => v.as_slice(),
+        }
+    }
+
+    pub fn as_mut_slice(&mut self) -> &[T] {
+        match self {
+            SliceMut::Ref(r) => r,
+            SliceMut::Owned(v) => v.as_mut_slice(),
+        }
     }
 }
 
