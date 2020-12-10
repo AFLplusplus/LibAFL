@@ -35,4 +35,3 @@ xxhash-rust = { version = "0.8.0", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 erased-serde = "0.3.12"
 postcard = { version = "0.5.1", features = ["alloc"] } # no_std compatible serde serialization fromat
-bincode = "1.3.1"
