@@ -2,8 +2,6 @@ extern crate num;
 
 use alloc::boxed::Box;
 use core::any::Any;
-use core::slice::from_raw_parts_mut;
-use num::Integer;
 use serde::{Deserialize, Serialize};
 
 use crate::serde_anymap::{ArrayMut, SerdeAny};
@@ -158,11 +156,11 @@ where
 mod tests {
 
     use crate::observers::{Observer, StdMapObserver};
-    static mut map: [u32; 4] = [0; 4];
+    static mut MAP: [u32; 4] = [0; 4];
 
     #[test]
     fn test_observer_serde() {
-        let o: Box<dyn Observer> = Box::new(StdMapObserver::<u32>::new("test", unsafe { &mut map }));
+        let o: Box<dyn Observer> = Box::new(StdMapObserver::<u32>::new("test", unsafe { &mut MAP }));
         let s = serde_json::to_string(&o).unwrap();
         println!("{}", s);
         let d: Box<dyn Observer> = serde_json::from_str(&s).unwrap();
