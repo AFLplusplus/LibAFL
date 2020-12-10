@@ -89,7 +89,7 @@ where
 /// The most common AFL-like feedback type
 pub struct MapFeedback<T, R, O>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static,
     R: Reducer<T>,
     O: MapObserver<T>,
 {
@@ -103,7 +103,7 @@ where
 
 impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static,
     R: Reducer<T>,
     O: MapObserver<T> + 'static,
     I: Input,
@@ -137,7 +137,7 @@ where
 
 impl<T, R, O> MapFeedback<T, R, O>
 where
-    T: Integer + Copy + Default + 'static,
+    T: Integer + Default + Copy + 'static,
     R: Reducer<T>,
     O: MapObserver<T>,
 {
@@ -153,7 +153,7 @@ where
 
 impl<T, R, O> MapFeedback<T, R, O>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static,
     R: Reducer<T>,
     O: MapObserver<T>,
 {

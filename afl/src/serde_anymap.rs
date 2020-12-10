@@ -509,3 +509,92 @@ where
         Deserialize::deserialize(deserializer).map(SliceMut::Owned)
     }
 }
+
+pub enum Array<T: Sized + serde::Serialize> {
+    Cptr((*const T, usize)),
+    Owned(Vec<T>),
+}
+
+impl<T: Sized + serde::Serialize> serde::Serialize for Array<T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_slice().serialize(se)
+    }
+}
+
+impl<'de, T: Sized + serde::Serialize> Deserialize<'de> for Array<T>
+where
+    Vec<T>: Deserialize<'de>,
+{
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Deserialize::deserialize(de).map(Array::Owned)
+    }
+}
+
+impl<T: Sized + serde::Serialize> Array<T> {
+    pub fn as_slice(&self) -> &[T] {
+        match self {
+            Array::Cptr(p) => {
+                unsafe { core::slice::from_raw_parts(p.0, p.1) }
+            },
+            Array::Owned(v) => {
+                v.as_slice()
+            }
+        }
+    }
+}
+
+pub enum ArrayMut<T: Sized + serde::Serialize> {
+    Cptr((*mut T, usize)),
+    Owned(Vec<T>),
+}
+
+impl<T: Sized + serde::Serialize> serde::Serialize for ArrayMut<T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_slice().serialize(se)
+    }
+}
+
+impl<'de, T: Sized + serde::Serialize> Deserialize<'de> for ArrayMut<T>
+where
+    Vec<T>: Deserialize<'de>,
+{
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Deserialize::deserialize(de).map(ArrayMut::Owned)
+    }
+}
+
+impl<T: Sized + serde::Serialize> ArrayMut<T> {
+    pub fn as_slice(&self) -> &[T] {
+        match self {
+            ArrayMut::Cptr(p) => {
+                unsafe { core::slice::from_raw_parts(p.0, p.1) }
+            },
+            ArrayMut::Owned(v) => {
+                v.as_slice()
+            }
+        }
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        match self {
+            ArrayMut::Cptr(p) => {
+                unsafe { core::slice::from_raw_parts_mut(p.0, p.1) }
+            },
+            ArrayMut::Owned(v) => {
+                v.as_mut_slice()
+            }
+        }
+    }
+}

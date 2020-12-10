@@ -6,7 +6,7 @@ use core::slice::from_raw_parts_mut;
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
-use crate::serde_anymap::{SerdeAny, SliceMut};
+use crate::serde_anymap::{SerdeAny, ArrayMut};
 use crate::AflError;
 
 // TODO register each observer in the Registry in new()
@@ -29,10 +29,12 @@ pub trait Observer: SerdeAny + 'static {
 
 crate::create_serde_registry_for_trait!(observer_serde, crate::observers::Observer);
 
+
+
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>
 where
-    T: Integer + Copy,
+    T: Default + Copy,
 {
     /// Get the map
     fn map(&self) -> &[T];
@@ -63,19 +65,19 @@ where
 /// The Map Observer retrieves the state of a map,
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct StdMapObserver<T>
 where
-    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
+    T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    map: SliceMut<'static, T>,
+    map: ArrayMut<T>,
     initial: T,
     name: &'static str,
 }
 
 impl<T> Observer for StdMapObserver<T>
 where
-    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
+T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
@@ -88,7 +90,7 @@ where
 
 impl<T> SerdeAny for StdMapObserver<T>
 where
-    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
+    T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -100,20 +102,14 @@ where
 
 impl<T> MapObserver<T> for StdMapObserver<T>
 where
-    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
+T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn map(&self) -> &[T] {
-        match &self.map {
-            SliceMut::Ref(r) => r,
-            SliceMut::Owned(v) => v.as_slice(),
-        }
+        self.map.as_slice()
     }
 
     fn map_mut(&mut self) -> &mut [T] {
-        match &mut self.map {
-            SliceMut::Ref(r) => r,
-            SliceMut::Owned(v) => v.as_mut_slice(),
-        }
+        self.map.as_mut_slice()
     }
 
     fn initial(&self) -> T {
@@ -129,16 +125,29 @@ where
     }
 }
 
+impl<'de, T> Deserialize<'de> for StdMapObserver<T>
+where
+   T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut erased = erased_serde::Deserializer::erase(de);
+        erased_serde::deserialize(&mut erased).map_err(serde::de::Error::custom)
+    }
+}
+
 impl<T> StdMapObserver<T>
 where
-    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
+T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
     pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
         observer_serde::RegistryBuilder::register::<Self>();
-        let initial = if map.len() > 0 { map[0] } else { T::zero() };
+        let initial = if map.len() > 0 { map[0] } else { T::default() };
         Self {
-            map: SliceMut::Ref(map),
+            map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
             initial: initial,
             name: name,
         }
@@ -146,10 +155,11 @@ where
 
     /// Creates a new MapObserver from a raw pointer
     pub fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
+        observer_serde::RegistryBuilder::register::<Self>();
         unsafe {
-            let initial = if len > 0 { *map_ptr } else { T::zero() };
+            let initial = if len > 0 { *map_ptr } else { T::default() };
             StdMapObserver {
-                map: SliceMut::Ref(from_raw_parts_mut(map_ptr, len)),
+                map: ArrayMut::Cptr((map_ptr, len)),
                 initial: initial,
                 name: name,
             }
