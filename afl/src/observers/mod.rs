@@ -66,7 +66,7 @@ where
 #[derive(Serialize, Deserialize)]
 pub struct StdMapObserver<T>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
 {
     map: SliceMut<'static, T>,
     initial: T,
@@ -75,7 +75,7 @@ where
 
 impl<T> Observer for StdMapObserver<T>
 where
-    T: Integer + Copy + 'static + serde::Serialize,
+    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
 {
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
@@ -88,7 +88,7 @@ where
 
 impl<T> SerdeAny for StdMapObserver<T>
 where
-    T: Integer + Copy + 'static + serde::Serialize,
+    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -100,7 +100,7 @@ where
 
 impl<T> MapObserver<T> for StdMapObserver<T>
 where
-    T: Integer + Copy,
+    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
 {
     fn map(&self) -> &[T] {
         match &self.map {
@@ -131,10 +131,11 @@ where
 
 impl<T> StdMapObserver<T>
 where
-    T: Integer + Copy,
+    T: Integer + Copy + 'static + serde::Serialize + serde::Deserialize<'static>,
 {
     /// Creates a new MapObserver
     pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
+        observer_serde::RegistryBuilder::register::<Self>();
         let initial = if map.len() > 0 { map[0] } else { T::zero() };
         Self {
             map: SliceMut::Ref(map),
