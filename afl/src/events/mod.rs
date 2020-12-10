@@ -14,13 +14,13 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::io::Write;
 
-use crate::{corpus::Corpus, serde_anymap::SerdeAny};
 use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
 use crate::serde_anymap::{Ptr, PtrMut};
 use crate::utils::Rand;
 use crate::AflError;
+use crate::{corpus::Corpus, serde_anymap::SerdeAny};
 
 /// Indicate if an event worked or not
 pub enum BrokerEventResult {
@@ -132,7 +132,9 @@ where
                 phantom: _,
             } => "Log",
             Event::None { phantom: _ } => "None",
-            Event::Custom {sender_id, /*custom_event} => custom_event.name()*/} => "todo",
+            Event::Custom {
+                sender_id, /*custom_event} => custom_event.name()*/
+            } => "todo",
         }
     }
 
@@ -153,7 +155,6 @@ where
             phantom: PhantomData,
         }
     }
-
 }
 
 pub trait EventManager<C, E, I, R>
@@ -230,11 +231,11 @@ where
                 #[cfg(feature = "std")]
                 println!("{}[{}]: {}", sender_id, severity_level, message);
                 Ok(BrokerEventResult::Handled)
-            },
-            Event::None {
-                phantom: _,
-            } => Ok(BrokerEventResult::Handled),
-            Event::Custom {sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/} => Ok(BrokerEventResult::Forward),
+            }
+            Event::None { phantom: _ } => Ok(BrokerEventResult::Handled),
+            Event::Custom {
+                sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/
+            } => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }
@@ -475,11 +476,11 @@ where
                 #[cfg(feature = "std")]
                 println!("{}[{}]: {}", sender_id, severity_level, message);
                 Ok(BrokerEventResult::Handled)
-            },
-            Event::None {
-                phantom: _,
-            } => Ok(BrokerEventResult::Handled),
-            Event::Custom {sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/} => Ok(BrokerEventResult::Forward),
+            }
+            Event::None { phantom: _ } => Ok(BrokerEventResult::Handled),
+            Event::Custom {
+                sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/
+            } => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }
