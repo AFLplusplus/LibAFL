@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::io::Write;
 
-use crate::corpus::Corpus;
+use crate::{corpus::Corpus, serde_anymap::SerdeAny};
 use crate::engines::State;
 use crate::executors::Executor;
 use crate::inputs::Input;
@@ -32,39 +32,18 @@ pub enum BrokerEventResult {
 
 pub trait ShowStats {}
 
-/*
-
-/// A custom event, in case a user wants to extend the features (at compile time)
-pub trait CustomEvent<I>
+/// A custom event, for own messages, with own handler.
+pub trait CustomEvent<I>: SerdeAny + Serialize
 where
-    S: State<I, R>,
-    C: Corpus<I, R>,
-    E: Executor<I>,
     I: Input,
-    R: Rand,
 {
     /// Returns the name of this event
     fn name(&self) -> &str;
     /// This method will be called in the broker
-    fn handle_in_broker(&self, broker: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) -> Result<BrokerEventResult, AflError>;
+    fn handle_in_broker(&self) -> Result<BrokerEventResult, AflError>;
     /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
-    fn handle_in_client(&self, client: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) -> Result<(), AflError>;
+    fn handle_in_client(&self) -> Result<(), AflError>;
 }
-
-struct UnusedCustomEvent {}
-impl<C, E, I, R> CustomEvent<I> for UnusedCustomEvent<I>
-where
-    S: State<I, R>,
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    I: Input,
-    R: Rand,
-{
-    fn name(&self) -> &str {"No custom events"}
-    fn handle_in_broker(&self, broker: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) {Ok(BrokerEventResult::Handled)}
-    fn handle_in_client(&self, client: &dyn EventManager<C, E, I, R, Self>, state: &mut State<I, R>, corpus: &mut C) {Ok(())}
-}
-*/
 
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
@@ -72,7 +51,6 @@ where
 pub enum Event<'a, I>
 where
     I: Input,
-    // CE: CustomEvent<I>,
 {
     LoadInitial {
         sender_id: u64,
@@ -108,7 +86,11 @@ where
     None {
         phantom: PhantomData<I>,
     },
-    //Custom {sender_id: u64, custom_event: CE},
+    Custom {
+        sender_id: u64,
+        // TODO: Allow custom events
+        // custom_event: Box<dyn CustomEvent<I>>,
+    },
 }
 
 impl<'a, I> Event<'a, I>
@@ -150,7 +132,7 @@ where
                 phantom: _,
             } => "Log",
             Event::None { phantom: _ } => "None",
-            //Event::Custom {sender_id, custom_event} => custom_event.name(),
+            Event::Custom {sender_id, /*custom_event} => custom_event.name()*/} => "todo",
         }
     }
 
@@ -172,7 +154,6 @@ where
         }
     }
 
-    // TODO serialize and deserialize, defaults to serde
 }
 
 pub trait EventManager<C, E, I, R>
@@ -252,8 +233,8 @@ where
             },
             Event::None {
                 phantom: _,
-            } => Ok(BrokerEventResult::Handled)
-            //Event::Custom {sender_id, custom_event} => custom_event.handle_in_broker(state, corpus),
+            } => Ok(BrokerEventResult::Handled),
+            Event::Custom {sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/} => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }
@@ -397,7 +378,6 @@ where
     E: Executor<I>,
     I: Input,
     R: Rand,
-    //CE: CustomEvent<I>,
 {
     /// Fire an Event
     fn fire<'a>(
@@ -498,8 +478,8 @@ where
             },
             Event::None {
                 phantom: _,
-            } => Ok(BrokerEventResult::Handled)
-            //Event::Custom {sender_id, custom_event} => custom_event.handle_in_broker(state, corpus),
+            } => Ok(BrokerEventResult::Handled),
+            Event::Custom {sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/} => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }
