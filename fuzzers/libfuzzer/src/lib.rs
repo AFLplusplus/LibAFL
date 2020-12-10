@@ -3,8 +3,6 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use alloc::rc::Rc;
-use core::cell::RefCell;
 
 #[cfg(feature = "std")]
 use std::io::stderr;

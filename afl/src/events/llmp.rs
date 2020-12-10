@@ -193,6 +193,47 @@ impl LlmpMsg {
     }
 }
 
+/// An Llmp instance
+pub enum LlmpConnection {
+    /// A broker and a thread using this tcp background thread
+    IsBroker {
+        broker: LlmpBroker,
+        listener_thread: thread::JoinHandle<()>,
+    },
+    /// A client, connected to the port
+    IsClient { client: LlmpClient },
+}
+
+impl LlmpConnection {
+    /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
+    pub fn on_port(port: u16) -> Result<Self, AflError> {
+        match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+            Ok(listener) => {
+                // We got the port. We are the broker! :)
+                dbg!("We're the broker");
+                let mut broker = LlmpBroker::new()?;
+                let listener_thread = broker.launch_tcp_listener(listener)?;
+                Ok(LlmpConnection::IsBroker {
+                    broker,
+                    listener_thread,
+                })
+            }
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::AddrInUse => {
+                        // We are the client :)
+                        dbg!("We're the client", e);
+                        Ok(LlmpConnection::IsClient {
+                            client: LlmpClient::create_attach_to_tcp(port)?,
+                        })
+                    }
+                    _ => Err(AflError::File(e)),
+                }
+            }
+        }
+    }
+}
+
 /// Contents of the share mem pages, used by llmp internally
 #[derive(Copy, Clone)]
 #[repr(C, packed)]
@@ -869,15 +910,27 @@ impl LlmpBroker {
         }
     }
 
-    pub fn launch_tcp_listener(&mut self, port: u16) -> Result<thread::JoinHandle<()>, AflError> {
+    /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
+    /// Does so on the given port.
+    pub fn launch_tcp_listener_on(
+        &mut self,
+        port: u16,
+    ) -> Result<thread::JoinHandle<()>, AflError> {
+        let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
+        // accept connections and process them, spawning a new thread for each one
+        println!("Server listening on port {}", port);
+        return self.launch_tcp_listener(listener);
+    }
+
+    /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
+    pub fn launch_tcp_listener(
+        &mut self,
+        listener: TcpListener,
+    ) -> Result<thread::JoinHandle<()>, AflError> {
         // Later in the execution, after the initial map filled up,
         // the current broacast map will will point to a different map.
         // However, the original map is (as of now) never freed, new clients will start
         // to read from the initial map id.
-
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
-        // accept connections and process them, spawning a new thread for each one
-        println!("Server listening on port {}", port);
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
         let broadcast_str_initial = client_out_map_mem.shm_str.clone();
