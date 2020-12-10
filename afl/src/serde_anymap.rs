@@ -539,12 +539,8 @@ where
 impl<T: Sized + serde::Serialize> Array<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
-            Array::Cptr(p) => {
-                unsafe { core::slice::from_raw_parts(p.0, p.1) }
-            },
-            Array::Owned(v) => {
-                v.as_slice()
-            }
+            Array::Cptr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
+            Array::Owned(v) => v.as_slice(),
         }
     }
 }
@@ -578,23 +574,15 @@ where
 impl<T: Sized + serde::Serialize> ArrayMut<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
-            ArrayMut::Cptr(p) => {
-                unsafe { core::slice::from_raw_parts(p.0, p.1) }
-            },
-            ArrayMut::Owned(v) => {
-                v.as_slice()
-            }
+            ArrayMut::Cptr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
+            ArrayMut::Owned(v) => v.as_slice(),
         }
     }
 
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match self {
-            ArrayMut::Cptr(p) => {
-                unsafe { core::slice::from_raw_parts_mut(p.0, p.1) }
-            },
-            ArrayMut::Owned(v) => {
-                v.as_mut_slice()
-            }
+            ArrayMut::Cptr(p) => unsafe { core::slice::from_raw_parts_mut(p.0, p.1) },
+            ArrayMut::Owned(v) => v.as_mut_slice(),
         }
     }
 }

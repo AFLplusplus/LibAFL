@@ -6,7 +6,7 @@ use core::slice::from_raw_parts_mut;
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
-use crate::serde_anymap::{SerdeAny, ArrayMut};
+use crate::serde_anymap::{ArrayMut, SerdeAny};
 use crate::AflError;
 
 // TODO register each observer in the Registry in new()
@@ -28,8 +28,6 @@ pub trait Observer: SerdeAny + 'static {
 }
 
 crate::create_serde_registry_for_trait!(observer_serde, crate::observers::Observer);
-
-
 
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>
@@ -68,7 +66,7 @@ where
 #[derive(Serialize)]
 pub struct StdMapObserver<T>
 where
-    T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: ArrayMut<T>,
     initial: T,
@@ -77,7 +75,7 @@ where
 
 impl<T> Observer for StdMapObserver<T>
 where
-T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
@@ -90,7 +88,7 @@ T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
 
 impl<T> SerdeAny for StdMapObserver<T>
 where
-    T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -102,7 +100,7 @@ where
 
 impl<T> MapObserver<T> for StdMapObserver<T>
 where
-T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn map(&self) -> &[T] {
         self.map.as_slice()
@@ -127,7 +125,7 @@ T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
 
 impl<'de, T> Deserialize<'de> for StdMapObserver<T>
 where
-   T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn deserialize<D>(de: D) -> Result<Self, D::Error>
     where
@@ -140,7 +138,7 @@ where
 
 impl<T> StdMapObserver<T>
 where
-T: Default + Copy+ 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
     pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
