@@ -865,6 +865,11 @@ impl LlmpBroker {
             }
         }))
     }
+
+    /// Broadcasts the given buf to all lients
+    fn send_buf(&mut self, tag: u32, buf: &[u8]) -> Result<(), AflError> {
+        self.llmp_out.send_buf(tag, buf)
+    }
 }
 
 /// `n` clients connect to a broker. They share an outgoing map with the broker,

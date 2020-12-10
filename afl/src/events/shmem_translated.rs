@@ -180,11 +180,7 @@ unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_uchar {
 }
 
 /// Uses a shmap id string to open a shared map
-unsafe fn afl_shmem_by_str(
-    shm: *mut AflShmem,
-    shm_str: &CStr,
-    map_size: usize,
-) -> *mut c_uchar {
+unsafe fn afl_shmem_by_str(shm: *mut AflShmem, shm_str: &CStr, map_size: usize) -> *mut c_uchar {
     if shm.is_null() || shm_str.to_bytes().len() == 0 || map_size == 0 {
         return 0 as *mut c_uchar;
     }
