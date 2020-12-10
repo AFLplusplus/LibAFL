@@ -160,7 +160,8 @@ mod tests {
 
     #[test]
     fn test_observer_serde() {
-        let o: Box<dyn Observer> = Box::new(StdMapObserver::<u32>::new("test", unsafe { &mut MAP }));
+        let o: Box<dyn Observer> =
+            Box::new(StdMapObserver::<u32>::new("test", unsafe { &mut MAP }));
         let s = serde_json::to_string(&o).unwrap();
         println!("{}", s);
         let d: Box<dyn Observer> = serde_json::from_str(&s).unwrap();

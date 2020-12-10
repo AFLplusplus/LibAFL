@@ -68,6 +68,7 @@ where
 
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum Event<'a, C, E, I, R>
 where
     C: Corpus<I, R>,

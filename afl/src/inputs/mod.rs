@@ -14,7 +14,7 @@ use std::path::Path;
 use crate::AflError;
 
 /// An input for the target
-pub trait Input: Clone {
+pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned {
     #[cfg(feature = "std")]
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), AflError>
@@ -22,7 +22,9 @@ pub trait Input: Clone {
         P: AsRef<Path>,
     {
         let mut file = File::create(path)?;
-        file.write_all(self.serialize()?)?;
+        let v = bincode::serialize(&self)
+            .map_err(|_| AflError::Unknown("cannot serialize".to_string()))?;
+        file.write_all(v.as_slice())?;
         Ok(())
     }
 
@@ -42,7 +44,8 @@ where {
         let mut file = File::open(path).map_err(AflError::File)?;
         let mut bytes: Vec<u8> = vec![];
         file.read_to_end(&mut bytes).map_err(AflError::File)?;
-        Self::deserialize(&bytes)
+        bincode::deserialize::<Self>(&bytes)
+            .map_err(|_| AflError::Unknown("cannot deserialize".to_string()))
     }
 
     /// Write this input to the file
@@ -51,22 +54,28 @@ where {
 where {
         Err(AflError::NotImplemented("Not suppored in no_std".into()))
     }
-
-    /// Serialize this input, for later deserialization.
-    /// This is not necessarily the representation to be used by the target
-    /// Instead, to get bytes for a target, use [HasTargetBytes](afl::inputs::HasTargetBytes).
-    fn serialize(&self) -> Result<&[u8], AflError>;
-
-    /// Deserialize this input, using the bytes serialized before.
-    fn deserialize(buf: &[u8]) -> Result<Self, AflError>;
 }
 
-/// Can be serialized to a bytes representation
+pub enum TargetBytes<'a> {
+    Ref(&'a [u8]),
+    Owned(Vec<u8>),
+}
+
+impl<'a> TargetBytes<'a> {
+    pub fn as_slice(&self) -> &[u8] {
+        match self {
+            TargetBytes::Ref(r) => r,
+            TargetBytes::Owned(v) => v.as_slice(),
+        }
+    }
+}
+
+/// Can be represented with a vector of bytes
 /// This representation is not necessarily deserializable
 /// Instead, it can be used as bytes input for a target
 pub trait HasTargetBytes {
     /// Target bytes, that can be written to a target
-    fn target_bytes(&self) -> &[u8];
+    fn target_bytes(&self) -> TargetBytes;
 }
 
 /// Contains an internal bytes Vector

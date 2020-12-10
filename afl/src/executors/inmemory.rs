@@ -2,7 +2,7 @@ use core::ffi::c_void;
 use core::ptr;
 
 use crate::executors::{Executor, ExitKind};
-use crate::inputs::Input;
+use crate::inputs::{HasTargetBytes, Input};
 use crate::observers::observer_serde::NamedSerdeAnyMap;
 use crate::AflError;
 
@@ -16,7 +16,7 @@ type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 /// The inmem executor simply calls a target function, then returns afterwards.
 pub struct InMemoryExecutor<I>
 where
-    I: Input,
+    I: Input + HasTargetBytes,
 {
     harness: HarnessFunction<I>,
     observers: NamedSerdeAnyMap,
@@ -24,14 +24,14 @@ where
 
 impl<I> Executor<I> for InMemoryExecutor<I>
 where
-    I: Input,
+    I: Input + HasTargetBytes,
 {
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
-        let bytes = input.serialize()?;
+        let bytes = input.target_bytes();
         unsafe {
             CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor<I> as *const c_void;
         }
-        let ret = (self.harness)(self, bytes);
+        let ret = (self.harness)(self, bytes.as_slice());
         unsafe {
             CURRENT_INMEMORY_EXECUTOR_PTR = ptr::null();
         }
@@ -49,7 +49,7 @@ where
 
 impl<I> InMemoryExecutor<I>
 where
-    I: Input,
+    I: Input + HasTargetBytes,
 {
     pub fn new(harness_fn: HarnessFunction<I>) -> Self {
         #[cfg(feature = "std")]
@@ -165,17 +165,17 @@ mod tests {
 
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
-    use crate::inputs::Input;
+    use crate::inputs::{HasTargetBytes, Input, TargetBytes};
     use crate::AflError;
 
-    #[derive(Clone)]
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Serialize, Deserialize)]
     struct NopInput {}
-    impl Input for NopInput {
-        fn serialize(&self) -> Result<&[u8], AflError> {
-            Ok("NOP".as_bytes())
-        }
-        fn deserialize(_buf: &[u8]) -> Result<Self, AflError> {
-            Ok(Self {})
+    impl Input for NopInput {}
+    impl HasTargetBytes for NopInput {
+        fn target_bytes(&self) -> TargetBytes {
+            TargetBytes::Owned(vec![0])
         }
     }
 

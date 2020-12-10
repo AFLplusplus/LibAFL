@@ -45,6 +45,7 @@ impl TestcaseMetadataContainer {
 
 /// An entry in the Testcase Corpus
 #[derive(Default, Serialize, Deserialize)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct Testcase<I>
 where
     I: Input,

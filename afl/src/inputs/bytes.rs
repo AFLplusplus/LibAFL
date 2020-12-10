@@ -3,27 +3,17 @@ use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::convert::From;
+use serde::{Deserialize, Serialize};
 
-use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
-use crate::AflError;
+use crate::inputs::{HasBytesVec, HasTargetBytes, Input, TargetBytes};
 
 /// A bytes input is the basic input
-#[derive(Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct BytesInput {
     bytes: Vec<u8>,
 }
 
-impl Input for BytesInput {
-    fn serialize(&self) -> Result<&[u8], AflError> {
-        Ok(&self.bytes)
-    }
-
-    fn deserialize(buf: &[u8]) -> Result<Self, AflError> {
-        Ok(Self {
-            bytes: buf.to_owned(),
-        })
-    }
-}
+impl Input for BytesInput {}
 
 /// Rc Ref-cell from Input
 impl Into<Rc<RefCell<Self>>> for BytesInput {
@@ -42,8 +32,8 @@ impl HasBytesVec for BytesInput {
 }
 
 impl HasTargetBytes for BytesInput {
-    fn target_bytes(&self) -> &[u8] {
-        &self.bytes
+    fn target_bytes(&self) -> TargetBytes {
+        TargetBytes::Ref(&self.bytes)
     }
 }
 
