@@ -16,7 +16,7 @@ use crate::serde_anymap::{Ptr, PtrMut};
 
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
-/// being applied to the input one by one.
+/// being applied to the input one by one, between executions.
 pub trait MutationalStage<M, EM, E, C, I, R>: Stage<EM, E, C, I, R>
 where
     M: Mutator<C, I, R>,
@@ -56,7 +56,6 @@ where
 
             let fitness = state.evaluate_input(&input_mut, engine.executor_mut())?;
 
-            // TODO post exec on the testcase, like post_exec(testcase_maybe, i as i32)
             self.mutator_mut()
                 .post_exec(fitness, &input_mut, i as i32)?;
 
@@ -67,6 +66,7 @@ where
             // if needed by particular cases
             let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
             if let Some(mut testcase) = testcase_maybe {
+                // TODO decouple events manager and engine
                 manager.fire(
                     Event::NewTestcase {
                         sender_id: 0,

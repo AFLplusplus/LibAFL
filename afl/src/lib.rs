@@ -69,6 +69,13 @@ impl fmt::Display for AflError {
     }
 }
 
+/// Stringify the postcard serializer error
+impl From<postcard::Error> for AflError {
+    fn from(err: postcard::Error) -> Self {
+        Self::Serialize(err.to_string())
+    }
+}
+
 /// Create an AFL Error from io Error
 #[cfg(feature = "std")]
 impl From<io::Error> for AflError {

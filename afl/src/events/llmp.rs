@@ -91,6 +91,9 @@ const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 /// Message hook type
 pub type LlmpMsgHookFn = unsafe fn(client_id: u32, msg: *mut LlmpMsg) -> LlmpMsgHookResult;
 
+/// TAGs used thorughout llmp
+pub type Tag = u32;
+
 /// Sending end on a (unidirectional) sharedmap channel
 #[derive(Clone)]
 pub struct LlmpSender {
@@ -139,7 +142,7 @@ pub struct LlmpSharedMap {
 #[repr(C, packed)]
 pub struct LlmpMsg {
     /// A tag
-    pub tag: u32,
+    pub tag: Tag,
     /// Sender of this messge
     pub sender: u32,
     /// The message ID, unique per page
@@ -489,7 +492,7 @@ impl LlmpSender {
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: u32, buf: &[u8]) -> Result<(), AflError> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
         // Make sure we don't reuse already allocated tags
         if tag == LLMP_TAG_NEW_SHM_CLIENT
             || tag == LLMP_TAG_END_OF_PAGE
@@ -867,7 +870,7 @@ impl LlmpBroker {
     }
 
     /// Broadcasts the given buf to all lients
-    fn send_buf(&mut self, tag: u32, buf: &[u8]) -> Result<(), AflError> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
         self.llmp_out.send_buf(tag, buf)
     }
 }
@@ -915,7 +918,7 @@ impl LlmpClient {
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: u32, buf: &[u8]) -> Result<(), AflError> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
         self.llmp_out.send_buf(tag, buf)
     }
 

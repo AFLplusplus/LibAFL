@@ -376,6 +376,12 @@ where
     phantom: PhantomData<(C, E, I, R)>,
 }
 
+/// Forward this to the client
+const LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
+/// Only handle this in the broker
+const LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
+const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
+
 /// Eventmanager for multi-processed application
 #[cfg(feature = "std")]
 pub struct LlmpClientEventManager<C, E, I, R>
@@ -406,8 +412,9 @@ where
         state: &mut State<I, R>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
-        // TODO let serialized = postcard::to_vec(&event)?;
-        // self.llmp_broker.send_buf(&serialized)?;
+        let serialized = postcard::to_allocvec(&event)?;
+        self.llmp_broker
+            .send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
         Ok(())
     }
 

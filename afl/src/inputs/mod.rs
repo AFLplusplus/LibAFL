@@ -3,6 +3,7 @@ pub use bytes::BytesInput;
 
 use alloc::vec::Vec;
 use core::clone::Clone;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use std::fs::File;
@@ -22,9 +23,8 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned {
         P: AsRef<Path>,
     {
         let mut file = File::create(path)?;
-        let v = bincode::serialize(&self)
-            .map_err(|_| AflError::Unknown("cannot serialize".to_string()))?;
-        file.write_all(v.as_slice())?;
+        let serialized = postcard::to_allocvec(self)?;
+        file.write_all(&serialized);
         Ok(())
     }
 
@@ -41,11 +41,10 @@ where {
     where
         P: AsRef<Path>,
     {
-        let mut file = File::open(path).map_err(AflError::File)?;
+        let mut file = File::open(path)?;
         let mut bytes: Vec<u8> = vec![];
-        file.read_to_end(&mut bytes).map_err(AflError::File)?;
-        bincode::deserialize::<Self>(&bytes)
-            .map_err(|_| AflError::Unknown("cannot deserialize".to_string()))
+        file.read_to_end(&mut bytes)?;
+        Ok(postcard::from_bytes(&bytes)?)
     }
 
     /// Write this input to the file
