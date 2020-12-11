@@ -72,7 +72,7 @@ impl fmt::Display for AflError {
 /// Stringify the postcard serializer error
 impl From<postcard::Error> for AflError {
     fn from(err: postcard::Error) -> Self {
-        Self::Serialize(err.to_string())
+        Self::Serialize(format!("{:?}", err))
     }
 }
 

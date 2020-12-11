@@ -352,10 +352,14 @@ where
     phantom: PhantomData<(C, E, I, R)>,
 }
 
+#[cfg(feature = "std")]
 /// Forward this to the client
 const LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
+#[cfg(feature = "std")]
 /// Only handle this in the broker
 const LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
+#[cfg(feature = "std")]
+/// Handle in both
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 /// Eventmanager for multi-processed application

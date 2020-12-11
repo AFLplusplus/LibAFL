@@ -61,6 +61,7 @@ macro_rules! create_serde_registry_for_trait {
         pub mod $mod_name {
 
             use alloc::boxed::Box;
+            use alloc::string::String;
             use core::any::{Any, TypeId};
             use core::fmt;
             use serde::{Deserialize, Serialize};

@@ -1,6 +1,7 @@
 extern crate num;
 
 use alloc::boxed::Box;
+use alloc::string::String;
 use core::any::Any;
 use serde::{Deserialize, Serialize};
 
@@ -133,7 +134,7 @@ where
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
             initial: initial,
-            name: name.to_string(),
+            name: name.into(),
         }
     }
 
@@ -145,7 +146,7 @@ where
             StdMapObserver {
                 map: ArrayMut::Cptr((map_ptr, len)),
                 initial: initial,
-                name: name.to_string(),
+                name: name.into(),
             }
         }
     }
