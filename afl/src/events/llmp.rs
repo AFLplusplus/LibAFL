@@ -95,7 +95,7 @@ pub type LlmpMsgHookFn = unsafe fn(client_id: u32, msg: *mut LlmpMsg) -> LlmpMsg
 pub type Tag = u32;
 
 /// Sending end on a (unidirectional) sharedmap channel
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LlmpSender {
     /// ID of this sender. Only used in the broker.
     pub id: u32,
@@ -112,7 +112,7 @@ pub struct LlmpSender {
 }
 
 /// Receiving end on a (unidirectional) sharedmap channel
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LlmpReceiver {
     pub id: u32,
     /// Pointer to the last meg this received
@@ -122,7 +122,7 @@ pub struct LlmpReceiver {
 }
 
 /// Client side of LLMP
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LlmpClient {
     /// Outgoing channel to the broker
     pub llmp_out: LlmpSender,
@@ -131,14 +131,14 @@ pub struct LlmpClient {
 }
 
 /// A page wrapper
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LlmpSharedMap {
     /// Shmem containg the actual (unsafe) page,
     /// shared between one LlmpSender and one LlmpReceiver
     shmem: AflShmem,
 }
 /// Message sent over the "wire"
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 pub struct LlmpMsg {
     /// A tag
@@ -622,7 +622,9 @@ impl LlmpSender {
 
 /// Receiving end of an llmp channel
 impl LlmpReceiver {
+    // Never inline, to not get some strange effects
     /// Read next message.
+    #[inline(never)]
     unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, AflError> {
         /* DBG("recv %p %p\n", page, last_msg); */
         compiler_fence(Ordering::SeqCst);
@@ -1107,5 +1109,53 @@ impl LlmpClient {
     #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(u32, &[u8]), AflError> {
         self.llmp_in.recv_buf_blocking()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::{thread::sleep, time::Duration};
+
+    use super::{
+        LlmpConnection::{self, IsBroker, IsClient},
+        Tag,
+    };
+
+    #[test]
+    pub fn llmp_connection() {
+        let mut broker = match LlmpConnection::on_port(1337).unwrap() {
+            IsClient { client: _ } => panic!("Could not bind to port as broker"),
+            IsBroker {
+                broker,
+                listener_thread: _,
+            } => broker,
+        };
+
+        // Add the first client (2nd, actually, because of the tcp listener client)
+        let mut client = match LlmpConnection::on_port(1337).unwrap() {
+            IsBroker {
+                broker: _,
+                listener_thread: _,
+            } => panic!("Second connect should be a client!"),
+            IsClient { client } => client,
+        };
+
+        // Give the (background) tcp thread a few millis to post the message
+        sleep(Duration::from_millis(100));
+        broker.once().unwrap();
+
+        let tag: Tag = 0x1337;
+        let arr: [u8; 1] = [1u8];
+        // Send stuff
+        client.send_buf(tag, &arr).unwrap();
+        // Forward stuff to clients
+        broker.once().unwrap();
+        let (tag2, arr2) = client.recv_buf_blocking().unwrap();
+        assert_eq!(tag, tag2);
+        assert_eq!(arr[0], arr2[0]);
+
+        // We want at least the tcp and sender clients.
+        assert_eq!(broker.llmp_clients.len(), 2);
     }
 }

@@ -169,7 +169,6 @@ mod tests {
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::{HasTargetBytes, Input, TargetBytes};
-    use crate::AflError;
 
     use serde::{Deserialize, Serialize};
 

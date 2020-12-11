@@ -58,7 +58,7 @@ const AFL_RET_SUCCESS: c_uint = 0;
 // A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AflShmem {
     pub shm_str: [u8; 20],
     pub shm_id: c_int,

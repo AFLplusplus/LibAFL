@@ -173,6 +173,7 @@ where
     /// Return the number of processes events or an error
     fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError>;
 
+    #[inline]
     fn on_recv(&self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
         // TODO: Better way to move out of testcase, or get ref
         //Ok(corpus.add(self.testcase.take().unwrap()))
@@ -223,6 +224,8 @@ where
                 //TODO: broker.log()
                 #[cfg(feature = "std")]
                 println!("{}[{}]: {}", sender_id, severity_level, message);
+                // Silence warnings for no_std
+                let (_, _, _) = (sender_id, severity_level, message);
                 Ok(BrokerEventResult::Handled)
             }
             Event::None { phantom: _ } => Ok(BrokerEventResult::Handled),
@@ -298,6 +301,7 @@ where
     W: Write,
     //CE: CustomEvent<I>,
 {
+    #[inline]
     fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
         match self.handle_in_broker(&event)? {
             BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
@@ -566,15 +570,11 @@ where
 #[cfg(test)]
 mod tests {
 
-    use std::{thread, time::Duration};
-
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
     use crate::observers::observer_serde::NamedSerdeAnyMap;
     use crate::observers::{Observer, StdMapObserver};
     use crate::serde_anymap::{Ptr, PtrMut};
-
-    use super::llmp::{LlmpConnection, Tag};
 
     static mut MAP: [u32; 4] = [0; 4];
 
@@ -610,39 +610,5 @@ mod tests {
             }
             _ => panic!("mistmatch".to_string()),
         };
-    }
-
-    use crate::events::tests::LlmpConnection::{IsBroker, IsClient};
-
-    #[test]
-    pub fn llmp_connection() {
-        let mut broker = match LlmpConnection::on_port(1337).unwrap() {
-            IsClient { client } => panic!("Could not bind to port as broker"),
-            IsBroker {
-                broker,
-                listener_thread,
-            } => broker,
-        };
-        let mut client = match LlmpConnection::on_port(1337).unwrap() {
-            IsBroker {
-                broker,
-                listener_thread,
-            } => panic!("Second connect should be a client!"),
-            IsClient { client } => client,
-        };
-        // Add the first client (2nd, actually, because of the tcp listener client)
-        broker.once().unwrap();
-        assert_eq!(broker.llmp_clients.len(), 2);
-
-        let tag: Tag = 0x1337;
-        let arr: [u8; 1] = [1u8];
-        // Send stuff
-        client.send_buf(tag, &arr).unwrap();
-        // Forward stuff to clients
-        broker.once().unwrap();
-        broker.once().unwrap();
-        let (tag2, arr2) = client.recv_buf_blocking().unwrap();
-        assert_eq!(tag, tag2);
-        assert_eq!(arr[0], arr2[0]);
     }
 }
