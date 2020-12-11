@@ -23,15 +23,19 @@ impl Into<Rc<RefCell<Self>>> for BytesInput {
 }
 
 impl HasBytesVec for BytesInput {
+    #[inline]
     fn bytes(&self) -> &[u8] {
         &self.bytes
     }
+
+    #[inline]
     fn bytes_mut(&mut self) -> &mut Vec<u8> {
         &mut self.bytes
     }
 }
 
 impl HasTargetBytes for BytesInput {
+    #[inline]
     fn target_bytes(&self) -> TargetBytes {
         TargetBytes::Ref(&self.bytes)
     }

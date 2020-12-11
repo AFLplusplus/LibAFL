@@ -59,7 +59,6 @@ impl<T> Reducer<T> for MaxReducer<T>
 where
     T: Integer + Copy + 'static,
 {
-
     #[inline]
     fn reduce(first: T, second: T) -> T {
         if first > second {
@@ -81,7 +80,6 @@ impl<T> Reducer<T> for MinReducer<T>
 where
     T: Integer + Copy + 'static,
 {
-
     #[inline]
     fn reduce(first: T, second: T) -> T {
         if first < second {
