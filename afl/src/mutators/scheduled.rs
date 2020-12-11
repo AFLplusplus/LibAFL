@@ -21,12 +21,7 @@ where
 
     /// Get the next mutation to apply
     #[inline]
-    fn schedule(
-        &mut self,
-        mutations_count: usize,
-        rand: &mut R,
-        _input: &I,
-    ) -> usize {
+    fn schedule(&mut self, mutations_count: usize, rand: &mut R, _input: &I) -> usize {
         debug_assert!(mutations_count > 0);
         rand.below(mutations_count as u64) as usize
     }
@@ -179,21 +174,21 @@ where
         for _ in 0..num {
             let idx = self.scheduled.schedule(13, rand, input);
             match idx {
-                0=> mutation_bitflip(self, rand, corpus, input)?,
-                1=> mutation_byteflip(self, rand, corpus, input)?,
-                2=> mutation_byteinc(self, rand, corpus, input)?,
-                3=> mutation_bytedec(self, rand, corpus, input)?,
-                4=> mutation_byteneg(self, rand, corpus, input)?,
-                5=> mutation_byterand(self, rand, corpus, input)?,
-    
-                6=> mutation_byteadd(self, rand, corpus, input)?,
-                7=> mutation_wordadd(self, rand, corpus, input)?,
-                8=> mutation_dwordadd(self, rand, corpus, input)?,
-                9=> mutation_byteinteresting(self, rand, corpus, input)?,
-                10=> mutation_wordinteresting(self, rand, corpus, input)?,
-                11=> mutation_dwordinteresting(self, rand, corpus, input)?,
+                0 => mutation_bitflip(self, rand, corpus, input)?,
+                1 => mutation_byteflip(self, rand, corpus, input)?,
+                2 => mutation_byteinc(self, rand, corpus, input)?,
+                3 => mutation_bytedec(self, rand, corpus, input)?,
+                4 => mutation_byteneg(self, rand, corpus, input)?,
+                5 => mutation_byterand(self, rand, corpus, input)?,
 
-                _=> mutation_splice(self, rand, corpus, input)?,
+                6 => mutation_byteadd(self, rand, corpus, input)?,
+                7 => mutation_wordadd(self, rand, corpus, input)?,
+                8 => mutation_dwordadd(self, rand, corpus, input)?,
+                9 => mutation_byteinteresting(self, rand, corpus, input)?,
+                10 => mutation_wordinteresting(self, rand, corpus, input)?,
+                11 => mutation_dwordinteresting(self, rand, corpus, input)?,
+
+                _ => mutation_splice(self, rand, corpus, input)?,
             };
         }
         Ok(())
