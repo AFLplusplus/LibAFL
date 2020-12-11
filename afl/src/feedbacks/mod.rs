@@ -27,11 +27,13 @@ where
     fn is_interesting(&mut self, input: &I, observers: &NamedSerdeAnyMap) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
+    #[inline]
     fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
+    #[inline]
     fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }

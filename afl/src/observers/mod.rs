@@ -13,12 +13,16 @@ use crate::AflError;
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
 pub trait Observer: SerdeAny + 'static {
+
+    /// The testcase finished execution, calculate any changes.
+    #[inline]
     fn flush(&mut self) -> Result<(), AflError> {
         Ok(())
     }
 
     fn reset(&mut self) -> Result<(), AflError>;
 
+    #[inline]
     fn post_exec(&mut self) -> Result<(), AflError> {
         Ok(())
     }
@@ -49,6 +53,7 @@ where
     fn set_initial(&mut self, initial: T);
 
     /// Reset the map
+    #[inline]
     fn reset_map(&mut self) -> Result<(), AflError> {
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();

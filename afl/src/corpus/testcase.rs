@@ -84,49 +84,67 @@ where
     }
 
     /// Get the input, if any
+    #[inline]
     pub fn input(&self) -> &Option<I> {
         &self.input
     }
+
     /// Get the input, if any (mutable)
+    #[inline]
     pub fn input_mut(&mut self) -> &mut Option<I> {
         &mut self.input
     }
+
     /// Set the input
+    #[inline]
     pub fn set_input(&mut self, input: I) {
         self.input = Some(input);
     }
 
     /// Get the filename, if any
+    #[inline]
     pub fn filename(&self) -> &Option<String> {
         &self.filename
     }
+
     /// Get the filename, if any (mutable)
+    #[inline]
     pub fn filename_mut(&mut self) -> &mut Option<String> {
         &mut self.filename
     }
+
     /// Set the filename
+    #[inline]
     pub fn set_filename(&mut self, filename: String) {
         self.filename = Some(filename);
     }
 
     /// Get the fitness
+    #[inline]
     pub fn fitness(&self) -> u32 {
         self.fitness
     }
+
     /// Get the fitness (mutable)
+    #[inline]
     pub fn fitness_mut(&mut self) -> &mut u32 {
         &mut self.fitness
     }
+
     /// Set the fitness
+    #[inline]
     pub fn set_fitness(&mut self, fitness: u32) {
         self.fitness = fitness;
     }
 
     /// Get all the metadatas into an HashMap (mutable)
+    #[inline]
     pub fn metadatas(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadatas
     }
+
     /// Add a metadata
+    #[inline]
     pub fn add_metadata<TM>(&mut self, meta: TM)
     where
         TM: TestcaseMetadata + 'static,
@@ -135,6 +153,7 @@ where
     }
 
     /// Create a new Testcase instace given an input
+    #[inline]
     pub fn new<T>(input: T) -> Self
     where
         T: Into<I>,
@@ -148,6 +167,7 @@ where
     }
 
     /// Create a new Testcase instace given an input and a filename
+    #[inline]
     pub fn with_filename(input: I, filename: String) -> Self {
         Testcase {
             input: Some(input),
@@ -157,6 +177,7 @@ where
         }
     }
 
+    #[inline]
     pub fn default() -> Self {
         Testcase {
             input: None,

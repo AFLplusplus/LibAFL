@@ -164,6 +164,7 @@ impl LlmpMsg {
     }
 
     /// Gets the buffer from this message as slice, with the corrent length.
+    #[inline]
     pub fn as_slice(&self, map: &LlmpSharedMap) -> Result<&[u8], AflError> {
         unsafe {
             if self.in_map(map) {
@@ -175,6 +176,7 @@ impl LlmpMsg {
     }
 
     /// Returns true, if the pointer is, indeed, in the page of this shared map.
+    #[inline]
     pub fn in_map(&self, map: &LlmpSharedMap) -> bool {
         unsafe {
             let buf_ptr = self.buf.as_ptr();
@@ -286,6 +288,7 @@ unsafe fn shmem2page(afl_shmem: &AflShmem) -> *mut LlmpPage {
 }
 
 /// Return, if a msg is contained in the current page
+#[inline]
 unsafe fn llmp_msg_in_page(page: *mut LlmpPage, msg: *mut LlmpMsg) -> bool {
     /* DBG("llmp_msg_in_page %p within %p-%p\n", msg, page, page + page->size_total); */
     return (page as *mut u8) < msg as *mut u8
@@ -506,6 +509,7 @@ impl LlmpSender {
     /// Commit the message last allocated by alloc_next to the queue.
     /// After commiting, the msg shall no longer be altered!
     /// It will be read by the consuming threads (broker->clients or client->broker)
+    #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
     unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), AflError> {
         if self.last_msg_sent == msg {
             panic!("Message sent twice!");
@@ -720,6 +724,7 @@ impl LlmpReceiver {
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, &[u8])>, AflError> {
         unsafe {
             Ok(match self.recv()? {
@@ -730,6 +735,7 @@ impl LlmpReceiver {
     }
 
     /// Returns the next message, tag, buf, looping until it becomes available
+    #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(u32, &[u8]), AflError> {
         unsafe {
             let msg = self.recv_blocking()?;
@@ -827,6 +833,7 @@ impl LlmpBroker {
     }
 
     /// broker broadcast to its own page for all others to read */
+    #[inline]
     unsafe fn handle_new_msgs(&mut self, client_id: u32) -> Result<(), AflError> {
         let mut next_id = self.llmp_clients.len() as u32;
 
@@ -885,6 +892,7 @@ impl LlmpBroker {
 
     /// The broker walks all pages and looks for changes, then broadcasts them on
     /// its own shared page, once.
+    #[inline]
     pub fn once(&mut self) -> Result<(), AflError> {
         compiler_fence(Ordering::SeqCst);
         for i in 0..self.llmp_clients.len() {
@@ -1070,28 +1078,33 @@ impl LlmpClient {
 
     /// A client receives a broadcast message.
     /// Returns null if no message is availiable
+    #[inline]
     pub unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, AflError> {
         self.llmp_in.recv()
     }
 
     /// A client blocks/spins until the next message gets posted to the page,
     /// then returns that message.
+    #[inline]
     pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, AflError> {
         self.llmp_in.recv_blocking()
     }
 
     /// The current page could have changed in recv (EOP)
     /// Alloc the next message, internally handling end of page by allocating a new one.
+    #[inline]
     pub unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, AflError> {
         self.llmp_out.alloc_next(buf_len)
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, &[u8])>, AflError> {
         self.llmp_in.recv_buf()
     }
 
     /// Receives a buf from the broker, looping until a messages becomes avaliable
+    #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(u32, &[u8]), AflError> {
         self.llmp_in.recv_buf_blocking()
     }

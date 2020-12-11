@@ -44,22 +44,27 @@ where
     R: Rand,
 {
     /// Get executions
+    #[inline]
     pub fn executions(&self) -> usize {
         self.executions
     }
 
     /// Set executions
+    #[inline]
     pub fn set_executions(&mut self, executions: usize) {
         self.executions = executions
     }
 
+    #[inline]
     pub fn start_time(&self) -> u64 {
         self.start_time
     }
+    #[inline]
     pub fn set_start_time(&mut self, ms: u64) {
         self.start_time = ms
     }
 
+    #[inline]
     pub fn executions_over_seconds(&self) -> u64 {
         let elapsed = current_milliseconds() - self.start_time();
         if elapsed == 0 {
@@ -74,31 +79,37 @@ where
     }
 
     /// Get all the metadatas into an HashMap
+    #[inline]
     pub fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>> {
         &self.metadatas
     }
 
     /// Get all the metadatas into an HashMap (mutable)
+    #[inline]
     pub fn metadatas_mut(&mut self) -> &mut HashMap<&'static str, Box<dyn StateMetadata>> {
         &mut self.metadatas
     }
 
     /// Add a metadata
+    #[inline]
     pub fn add_metadata(&mut self, meta: Box<dyn StateMetadata>) {
         self.metadatas_mut().insert(meta.name(), meta);
     }
 
     /// Returns vector of feebacks
+    #[inline]
     pub fn feedbacks(&self) -> &[Box<dyn Feedback<I>>] {
         &self.feedbacks
     }
 
     /// Returns vector of feebacks (mutable)
+    #[inline]
     pub fn feedbacks_mut(&mut self) -> &mut Vec<Box<dyn Feedback<I>>> {
         &mut self.feedbacks
     }
 
     /// Adds a feedback
+    #[inline]
     pub fn add_feedback(&mut self, feedback: Box<dyn Feedback<I>>) {
         self.feedbacks_mut().push(feedback);
     }
@@ -124,6 +135,7 @@ where
     }
 
     /// Resets all current feedbacks
+    #[inline]
     pub fn discard_input(&mut self, input: &I) -> Result<(), AflError> {
         // TODO: This could probably be automatic in the feedback somehow?
         for feedback in self.feedbacks_mut() {
@@ -133,6 +145,7 @@ where
     }
 
     /// Creates a new testcase, appending the metadata from each feedback
+    #[inline]
     pub fn input_to_testcase(&mut self, input: I, fitness: u32) -> Result<Testcase<I>, AflError> {
         let mut testcase = Testcase::new(input);
         testcase.set_fitness(fitness);
@@ -144,6 +157,7 @@ where
     }
 
     /// Create a testcase from this input, if it's intersting
+    #[inline]
     pub fn testcase_if_interesting(
         &mut self,
         input: I,
@@ -158,6 +172,7 @@ where
     }
 
     /// Adds this input to the corpus, if it's intersting
+    #[inline]
     pub fn add_if_interesting<C>(
         &mut self,
         corpus: &mut C,

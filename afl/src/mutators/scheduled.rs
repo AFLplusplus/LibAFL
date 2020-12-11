@@ -14,6 +14,7 @@ where
     R: Rand,
 {
     /// Compute the number of iterations used to apply stacked mutations
+    #[inline]
     fn iterations(&mut self, rand: &mut R, _input: &I) -> u64 {
         1 << (1 + rand.below(6))
     }
@@ -113,9 +114,12 @@ where
     I: Input,
     R: Rand,
 {
+    #[inline]
     fn max_size(&self) -> usize {
         self.max_size
     }
+
+    #[inline]
     fn set_max_size(&mut self, max_size: usize) {
         self.max_size = max_size;
     }
