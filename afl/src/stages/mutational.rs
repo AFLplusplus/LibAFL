@@ -80,7 +80,7 @@ where
                     observers: PtrMut::Ref(engine.executor_mut().observers_mut()),
                     corpus_count: corpus.count() + 1,
                 })?;
-                let _ = corpus.add(testcase);
+                // let _ = corpus.add(testcase);
             }
         }
         Ok(())

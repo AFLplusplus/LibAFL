@@ -113,6 +113,21 @@ where
 
     // TODO move some of these, like evaluate_input, to Engine
 
+    /// Adds a feedback
+    #[inline]
+    pub fn add_feedback(&mut self, feedback: Box<dyn Feedback<I>>) {
+        self.feedbacks_mut().push(feedback);
+    }
+
+    // TODO move some of these, like evaluate_input, to FuzzingEngine
+    pub fn is_interesting(&mut self, input: &I, observers: &crate::observers::observer_serde::NamedSerdeAnyMap) -> Result<u32, AflError> {
+        let mut fitness;
+        for feedback in self.feedbacks_mut() {
+            fitness += feedback.is_interesting(&input, observers)?;
+        }
+        Ok(fitness)
+    }
+
     /// Runs the input and triggers observers and feedback
     pub fn evaluate_input<E, OT>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
     where

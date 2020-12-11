@@ -234,6 +234,39 @@ impl LlmpConnection {
             }
         }
     }
+
+    /// Sends the given buffer over this connection, no matter if client or broker.
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
+        match self {
+            LlmpConnection::IsBroker {broker, listener_thread: _} => {
+                broker.send_buf(tag, buf)
+            },
+            LlmpConnection::IsClient {client} => {
+                client.send_buf(tag, buf)
+            }
+        }
+    }
+
+    /// Returns the next message, tag, buf, if avaliable, else None
+    #[inline]
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, &[u8])>, AflError> {
+        match self {
+            LlmpConnection::IsBroker {broker, listener_thread: _} => {
+                broker.recv_buf()
+            },
+            LlmpConnection::IsClient {client} => {
+                client.recv_buf()
+            }
+        }
+    }
+
+    /// A client blocks/spins until the next message gets posted to the page,
+    /// then returns that message.
+    #[inline]
+    pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, AflError> {
+        self.llmp_in.recv_blocking()
+    }
+    
 }
 
 /// Contents of the share mem pages, used by llmp internally

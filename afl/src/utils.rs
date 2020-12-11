@@ -1,7 +1,7 @@
 //! Utility functions for AFL
 
 use alloc::rc::Rc;
-use core::cell::RefCell;
+use core::{cell::RefCell, time};
 use core::debug_assert;
 use core::fmt::Debug;
 use xxhash_rust::xxh3::xxh3_64_with_seed;
@@ -75,7 +75,21 @@ where
 
 const HASH_CONST: u64 = 0xa5b35705;
 
+/// Current time
 #[cfg(feature = "std")]
+#[inline]
+pub fn current_time() -> time::Duration {
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+}
+/// Current time (fixed fallback for no_std)
+#[cfg(not(feature = "std"))]
+#[inline]
+fn current_time() -> time::Duration {
+    self.start_time()
+}
+
+#[cfg(feature = "std")]
+#[inline]
 /// Gets current nanoseconds since UNIX_EPOCH
 pub fn current_nanos() -> u64 {
     SystemTime::now()
@@ -361,6 +375,7 @@ impl XKCDRand {
 }
 
 /// Get the next higher power of two
+#[inline]
 pub const fn next_pow2(val: u64) -> u64 {
     let mut out = val.wrapping_sub(1);
     out |= out >> 1;
