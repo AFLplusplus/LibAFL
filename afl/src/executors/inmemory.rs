@@ -1,9 +1,9 @@
 use core::ffi::c_void;
 use core::ptr;
 
-use crate::executors::{Executor, ExitKind};
+use crate::executors::{Executor, HasObservers, ExitKind};
 use crate::inputs::{HasTargetBytes, Input};
-use crate::observers::observer_serde::NamedSerdeAnyMap;
+use crate::observers::{ObserversTuple};
 use crate::AflError;
 
 /// The (unsafe) pointer to the current inmem executor, for the current run.
@@ -14,23 +14,25 @@ static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InMemoryExecutor<I>
+pub struct InMemoryExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
+    OT: ObserversTuple
 {
     harness: HarnessFunction<I>,
-    observers: NamedSerdeAnyMap,
+    observers: OT,
 }
 
-impl<I> Executor<I> for InMemoryExecutor<I>
+impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
+    OT: ObserversTuple
 {
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
         let bytes = input.target_bytes();
         unsafe {
-            CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor<I> as *const c_void;
+            CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor<I, OT> as *const c_void;
         }
         let ret = (self.harness)(self, bytes.as_slice());
         unsafe {
@@ -38,30 +40,35 @@ where
         }
         Ok(ret)
     }
+}
 
+impl<I, OT> HasObservers<OT> for InMemoryExecutor<I, OT> where
+I: Input + HasTargetBytes,
+OT: ObserversTuple {
     #[inline]
-    fn observers(&self) -> &NamedSerdeAnyMap {
+    fn observers(&self) -> &OT {
         &self.observers
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut NamedSerdeAnyMap {
+    fn observers_mut(&mut self) -> &mut OT {
         &mut self.observers
     }
 }
 
-impl<I> InMemoryExecutor<I>
+impl<I, OT> InMemoryExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
+    OT: ObserversTuple
 {
-    pub fn new(harness_fn: HarnessFunction<I>) -> Self {
+    pub fn new(harness_fn: HarnessFunction<I>, observers: OT) -> Self {
         #[cfg(feature = "std")]
         unsafe {
             os_signals::setup_crash_handlers::<I>();
         }
         Self {
             harness: harness_fn,
-            observers: NamedSerdeAnyMap::new(),
+            observers: observers,
         }
     }
 }
@@ -169,6 +176,7 @@ mod tests {
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::{HasTargetBytes, Input, TargetBytes};
+    use crate::tuples::{tuple_list, tuple_list_type};
 
     use serde::{Deserialize, Serialize};
 
@@ -182,7 +190,7 @@ mod tests {
     }
 
     #[cfg(feature = "std")]
-    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
+    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput, tuple_list_type!()>, buf: &[u8]) -> ExitKind {
         println!("Fake exec with buf of len {}", buf.len());
         ExitKind::Ok
     }
@@ -194,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop);
+        let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop, tuple_list!());
         let mut input = NopInput {};
         assert!(in_mem_executor.run_target(&mut input).is_ok());
     }

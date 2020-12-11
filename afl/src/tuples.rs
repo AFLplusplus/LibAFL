@@ -1,6 +1,8 @@
-use tuple_list::TupleList;
-use tuple_list::tuple_list;
-use core::any::{TypeId, Any};
+pub use tuple_list::TupleList;
+pub use tuple_list::tuple_list;
+pub use tuple_list::tuple_list_type;
+
+use core::any::TypeId;
 
 pub trait HasLen {
     fn len(&self) -> usize;
@@ -20,10 +22,12 @@ impl<Head, Tail> HasLen for (Head, Tail) where
 
 pub trait MatchFirstType {
     fn match_first_type<T: 'static>(&self) -> Option<&T>;
+    fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T>;
 }
 
 impl MatchFirstType for () {
     fn match_first_type<T: 'static>(&self) -> Option<&T> { None }
+    fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> { None }
 }
  
 impl<Head, Tail> MatchFirstType for (Head, Tail) where
@@ -37,14 +41,24 @@ impl<Head, Tail> MatchFirstType for (Head, Tail) where
             self.1.match_first_type::<T>()
         }
     }
+
+    fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        if TypeId::of::<T>() == TypeId::of::<Head>() {
+            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+        } else {
+            self.1.match_first_type_mut::<T>()
+        }
+    }
 }
 
 pub trait MatchType {
     fn match_type<T: 'static>(&self, f: fn(t: &T));
+    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T));
 }
 
 impl MatchType for () {
     fn match_type<T: 'static>(&self, f: fn(t: &T)) { () }
+    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) { () }
 }
  
 impl<Head, Tail> MatchType for (Head, Tail) where
@@ -57,6 +71,13 @@ impl<Head, Tail> MatchType for (Head, Tail) where
         }
         self.1.match_type::<T>(f);
     }
+
+    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) {
+        if TypeId::of::<T>() == TypeId::of::<Head>() {
+            f(unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }.unwrap());
+        }
+        self.1.match_type_mut::<T>(f);
+    }
 }
 
 pub trait Named {
@@ -65,10 +86,12 @@ pub trait Named {
 
 pub trait MatchNameAndType {
     fn match_name_type<T: 'static>(&self, name: &'static str) -> Option<&T>;
+    fn match_name_type_mut<T: 'static>(&mut self, name: &'static str) -> Option<&mut T>;
 }
 
 impl MatchNameAndType for () {
     fn match_name_type<T: 'static>(&self, name: &'static str) -> Option<&T> { None }
+    fn match_name_type_mut<T: 'static>(&mut self, name: &'static str) -> Option<&mut T> { None }
 }
  
 impl<Head, Tail> MatchNameAndType for (Head, Tail) where
@@ -80,6 +103,14 @@ impl<Head, Tail> MatchNameAndType for (Head, Tail) where
             unsafe { (&self.0 as *const _ as *const T).as_ref() }
         } else {
             self.1.match_name_type::<T>(name)
+        }
+    }
+
+    fn match_name_type_mut<T: 'static>(&mut self, name: &'static str) -> Option<&mut T> {
+        if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
+            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+        } else {
+            self.1.match_name_type_mut::<T>(name)
         }
     }
 }
