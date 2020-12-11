@@ -194,7 +194,7 @@ where
         C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        EM: EventManager<C, E, I, R>,
+        EM: EventManager<C, E, OT, FT, I, R>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -234,7 +234,7 @@ where
     I: Input,
 {
     executor: E,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(OT, I)>,
 }
 
 impl<E, OT, I> Engine<E, OT, I>
@@ -263,24 +263,25 @@ where
     }
 }
 
-pub trait Fuzzer<EM, E, OT, C, I, R>
+pub trait Fuzzer<EM, E, OT, FT, C, I, R>
 where
-    EM: EventManager<C, E, I, R>,
+    EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
-    fn stages(&self) -> &[Box<dyn Stage<EM, E, OT, C, I, R>>];
+    fn stages(&self) -> &[Box<dyn Stage<EM, E, OT, FT, C, I, R>>];
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<EM, E, OT, C, I, R>>>;
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<EM, E, OT, FT, C, I, R>>>;
 
-    fn add_stage(&mut self, stage: Box<dyn Stage<EM, E, OT, C, I, R>>) {
+    fn add_stage(&mut self, stage: Box<dyn Stage<EM, E, OT, FT, C, I, R>>) {
         self.stages_mut().push(stage);
     }
 
-    fn fuzz_one<FT>(
+    fn fuzz_one(
         &mut self,
         rand: &mut R,
         state: &mut State<I, R, FT>,
@@ -288,8 +289,6 @@ where
         engine: &mut Engine<E, OT, I>,
         manager: &mut EM,
     ) -> Result<usize, AflError>
-    where
-        FT: FeedbacksTuple<I>
     {
         let (_, idx) = corpus.next(rand)?;
 
@@ -301,15 +300,15 @@ where
         Ok(idx)
     }
 
-    fn fuzz_loop<FT>(
+    fn fuzz_loop(
         &mut self,
         rand: &mut R,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, I>,
         manager: &mut EM,
-    ) -> Result<(), AflError> where
-    FT: FeedbacksTuple<I>{
+    ) -> Result<(), AflError>
+    {
         let mut last = current_milliseconds();
         loop {
             self.fuzz_one(rand, state, corpus, engine, manager)?;
@@ -325,41 +324,44 @@ where
     }
 }
 
-pub struct StdFuzzer<EM, E, OT, C, I, R>
+pub struct StdFuzzer<EM, E, OT, FT, C, I, R>
 where
-    EM: EventManager<C, E, I, R>,
+    EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
-    stages: Vec<Box<dyn Stage<EM, E, OT, C, I, R>>>,
+    stages: Vec<Box<dyn Stage<EM, E, OT, FT, C, I, R>>>,
 }
 
-impl<EM, E, OT, C, I, R> Fuzzer<EM, E, OT, C, I, R> for StdFuzzer<EM, E, OT, C, I, R>
+impl<EM, E, OT, FT, C, I, R> Fuzzer<EM, E, OT, FT, C, I, R> for StdFuzzer<EM, E, OT, FT, C, I, R>
 where
-    EM: EventManager<C, E, I, R>,
+    EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
-    fn stages(&self) -> &[Box<dyn Stage<EM, E, OT, C, I, R>>] {
+    fn stages(&self) -> &[Box<dyn Stage<EM, E, OT, FT, C, I, R>>] {
         &self.stages
     }
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<EM, E, OT, C, I, R>>> {
+    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<EM, E, OT, FT, C, I, R>>> {
         &mut self.stages
     }
 }
 
-impl<EM, E, OT, C, I, R> StdFuzzer<EM, E, OT, C, I, R>
+impl<EM, E, OT, FT, C, I, R> StdFuzzer<EM, E, OT, FT, C, I, R>
 where
-    EM: EventManager<C, E, I, R>,
+    EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -403,8 +405,8 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
-        let executor = InMemoryExecutor::<BytesInput, _>::new(harness, tuple_list!());
-        let mut state = State::new();
+        let executor = InMemoryExecutor::new(harness, tuple_list!());
+        let mut state = State::<BytesInput, _, _>::new();
 
         let mut events_manager = LoggerEventManager::new(stderr());
         let mut engine = Engine::new(executor);

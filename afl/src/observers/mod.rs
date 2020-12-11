@@ -1,8 +1,5 @@
 extern crate num;
 
-use alloc::boxed::Box;
-use alloc::string::String;
-use core::any::Any;
 use serde::{Deserialize, Serialize};
 
 use crate::serde_anymap::ArrayMut;
@@ -26,21 +23,23 @@ pub trait Observer: Named + 'static {
     }
 }
 
-pub trait ObserversTuple: TupleList + MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned {
+pub trait ObserversTuple: MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned {
     fn reset_all(&mut self) -> Result<(), AflError>;
     fn post_exec_all(&mut self) -> Result<(), AflError>;
-    fn for_each(&self, f: fn(&dyn Observer));
+    //fn for_each(&self, f: fn(&dyn Observer));
+    //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
 }
 
 impl ObserversTuple for () {
     fn reset_all(&mut self) -> Result<(), AflError> { Ok(()) }
     fn post_exec_all(&mut self) -> Result<(), AflError> { Ok(()) }
-    fn for_each(&self, f: fn(&dyn Observer)) { }
+    //fn for_each(&self, f: fn(&dyn Observer)) { }
+    //fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) { }
 }
 
 impl<Head, Tail> ObserversTuple for (Head, Tail) where
-    Head: Observer,
-    Tail: ObserversTuple,
+    Head: Observer + serde::Serialize + serde::de::DeserializeOwned,
+    Tail: ObserversTuple + TupleList,
 {
     fn reset_all(&mut self) -> Result<(), AflError> {
         self.0.reset()?;
@@ -52,10 +51,15 @@ impl<Head, Tail> ObserversTuple for (Head, Tail) where
         self.1.post_exec_all() 
     }
 
-    fn for_each(&self, f: fn(&dyn Observer)) {
-        f(self.0);
+    /*fn for_each(&self, f: fn(&dyn Observer)) {
+        f(&self.0);
         self.1.for_each(f)
     }
+
+    fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) {
+        f(&mut self.0);
+        self.1.for_each_mut(f)
+    }*/
 }
 
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information

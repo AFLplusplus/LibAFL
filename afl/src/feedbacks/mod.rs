@@ -19,7 +19,7 @@ pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I>: Named
+pub trait Feedback<I>: Named + 'static
 where
     I: Input,
 {
@@ -39,7 +39,7 @@ where
     }
 }
 
-pub trait FeedbacksTuple<I>: TupleList + MatchType + MatchNameAndType
+pub trait FeedbacksTuple<I>: MatchType + MatchNameAndType
 where
     I: Input
 {
@@ -61,7 +61,7 @@ I: Input{
 
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail) where
     Head: Feedback<I>,
-    Tail: FeedbacksTuple<I>,
+    Tail: FeedbacksTuple<I> + TupleList,
     I: Input
 {
     fn is_interesting_all<OT: ObserversTuple>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError> {
@@ -90,7 +90,7 @@ impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail) where
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
-pub trait Reducer<T>
+pub trait Reducer<T>: 'static
 where
     T: Integer + Copy + 'static,
 {
