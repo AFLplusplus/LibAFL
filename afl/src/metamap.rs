@@ -12,7 +12,6 @@ pub struct MetaMap {
 }
 
 impl MetaMap {
-
     #[inline]
     pub fn get<T>(&self) -> Option<&T>
     where
@@ -132,7 +131,6 @@ pub struct MetaInstanceMap {
 }
 
 impl MetaInstanceMap {
-
     #[inline]
     pub fn get<T, U>(&self, instance: &U) -> Option<&T>
     where
