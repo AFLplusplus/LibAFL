@@ -13,7 +13,6 @@ use crate::AflError;
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
 pub trait Observer: SerdeAny + 'static {
-
     /// The testcase finished execution, calculate any changes.
     #[inline]
     fn flush(&mut self) -> Result<(), AflError> {
@@ -82,10 +81,12 @@ impl<T> Observer for StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
+    #[inline]
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
     }
 
+    #[inline]
     fn name(&self) -> &String {
         &self.name
     }
@@ -95,9 +96,12 @@ impl<T> SerdeAny for StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
+    #[inline]
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    #[inline]
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -107,22 +111,27 @@ impl<T> MapObserver<T> for StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
+    #[inline]
     fn map(&self) -> &[T] {
         self.map.as_slice()
     }
 
+    #[inline]
     fn map_mut(&mut self) -> &mut [T] {
         self.map.as_mut_slice()
     }
 
+    #[inline]
     fn initial(&self) -> T {
         self.initial
     }
 
+    #[inline]
     fn initial_mut(&mut self) -> &mut T {
         &mut self.initial
     }
 
+    #[inline]
     fn set_initial(&mut self, initial: T) {
         self.initial = initial
     }

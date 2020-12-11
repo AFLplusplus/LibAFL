@@ -69,6 +69,7 @@ const INTERESTING_32: [i32; 27] = [
     2147483647,
 ];
 
+#[inline]
 fn self_mem_move(data: &mut [u8], from: usize, to: usize, len: usize) {
     debug_assert!(from + len <= data.len());
     debug_assert!(to + len <= data.len());
@@ -76,6 +77,7 @@ fn self_mem_move(data: &mut [u8], from: usize, to: usize, len: usize) {
     unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
 }
 
+#[inline]
 fn mem_move(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
     debug_assert!(from + len <= src.len());
     debug_assert!(to + len <= dst.len());
@@ -90,6 +92,7 @@ fn mem_move(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
     }
 }
 
+#[inline]
 fn mem_set(data: &mut [u8], from: usize, len: usize, val: u8) {
     debug_assert!(from + len <= data.len());
     let ptr = data.as_mut_ptr();

@@ -34,6 +34,7 @@ where
 
     /// Gets the number of iterations this mutator should run for.
     /// This call uses internal mutability, so it may change for each call
+    #[inline]
     fn iterations(&mut self, rand: &mut R) -> usize {
         1 + rand.below(128) as usize
     }
@@ -107,11 +108,13 @@ where
     R: Rand,
 {
     /// The mutator, added to this stage
+    #[inline]
     fn mutator(&self) -> &M {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
+    #[inline]
     fn mutator_mut(&mut self) -> &mut M {
         &mut self.mutator
     }
@@ -126,6 +129,7 @@ where
     I: Input,
     R: Rand,
 {
+    #[inline]
     fn perform(
         &mut self,
         rand: &mut R,
