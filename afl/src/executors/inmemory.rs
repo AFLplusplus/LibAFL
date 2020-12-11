@@ -26,6 +26,8 @@ impl<I> Executor<I> for InMemoryExecutor<I>
 where
     I: Input + HasTargetBytes,
 {
+
+    #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
         let bytes = input.target_bytes();
         unsafe {
@@ -38,10 +40,12 @@ where
         Ok(ret)
     }
 
+    #[inline]
     fn observers(&self) -> &NamedSerdeAnyMap {
         &self.observers
     }
 
+    #[inline]
     fn observers_mut(&mut self) -> &mut NamedSerdeAnyMap {
         &mut self.observers
     }

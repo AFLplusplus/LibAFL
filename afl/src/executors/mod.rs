@@ -36,12 +36,14 @@ where
     }
 
     /// Reset the state of all the observes linked to this executor
+    #[inline]
     fn reset_observers(&mut self) -> Result<(), AflError> {
         self.observers_mut().for_each_mut(|_, x| Ok(x.reset()?))?;
         Ok(())
     }
 
     /// Run the post exec hook for all the observes linked to this executor
+    #[inline]
     fn post_exec_observers(&mut self) -> Result<(), AflError> {
         self.observers_mut()
             .for_each_mut(|_, x| Ok(x.post_exec()?))?;
