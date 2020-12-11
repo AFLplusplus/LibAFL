@@ -10,6 +10,7 @@ Cargo.lock
 *.dll
 *.exe
 
+callgrind.out.*
 perf.data
 perf.data.old
 

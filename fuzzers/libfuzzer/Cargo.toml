@@ -15,3 +15,8 @@ afl = { path = "../../afl/" }
 
 [lib]
 crate-type = ["staticlib", "cdylib"]
+
+[profile.release]
+lto = true
+opt-level = 3
+

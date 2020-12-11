@@ -18,6 +18,7 @@ use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::MaxMapFeedback;
 use afl::generators::RandPrintablesGenerator;
 use afl::mutators::scheduled::HavocBytesMutator;
+use afl::mutators::HasMaxSize;
 use afl::observers::StdMapObserver;
 use afl::stages::mutational::StdMutationalStage;
 use afl::utils::StdRand;
@@ -66,7 +67,8 @@ pub extern "C" fn afl_libfuzzer_main() {
     state.add_feedback(Box::new(edges_feedback));
 
     let mut engine = Engine::new(executor);
-    let mutator = HavocBytesMutator::new_default();
+    let mut mutator = HavocBytesMutator::new_default();
+    mutator.set_max_size(4096);
 
     let stage = StdMutationalStage::new(mutator);
 

@@ -20,20 +20,15 @@ where
     }
 
     /// Get the next mutation to apply
+    #[inline]
     fn schedule(
         &mut self,
+        mutations_count: usize,
         rand: &mut R,
         _input: &I,
-    ) -> Result<MutationFunction<Self, C, I, R>, AflError> {
-        let count = self.mutations_count() as u64;
-        if count == 0 {
-            return Err(AflError::Empty("no mutations".into()));
-        }
-        let idx;
-        {
-            idx = rand.below(count) as usize;
-        }
-        Ok(self.mutation_by_idx(idx))
+    ) -> usize {
+        debug_assert!(mutations_count > 0);
+        rand.below(mutations_count as u64) as usize
     }
 
     /// New default implementation for mutate
@@ -47,7 +42,8 @@ where
     ) -> Result<(), AflError> {
         let num = self.iterations(rand, input);
         for _ in 0..num {
-            self.schedule(rand, input)?(self, rand, corpus, input)?;
+            let idx = self.schedule(self.mutations_count(), rand, input);
+            self.mutation_by_idx(idx)(self, rand, corpus, input)?;
         }
         Ok(())
     }
@@ -86,14 +82,17 @@ where
     I: Input,
     R: Rand,
 {
+    #[inline]
     fn mutation_by_idx(&self, index: usize) -> MutationFunction<Self, C, I, R> {
         self.mutations[index]
     }
 
+    #[inline]
     fn mutations_count(&self) -> usize {
         self.mutations.len()
     }
 
+    #[inline]
     fn add_mutation(&mut self, mutation: MutationFunction<Self, C, I, R>) {
         self.mutations.push(mutation)
     }
@@ -151,7 +150,7 @@ where
 /// Schedule some selected byte level mutations given a ScheduledMutator type
 pub struct HavocBytesMutator<SM, C, I, R>
 where
-    SM: ScheduledMutator<C, I, R>,
+    SM: ScheduledMutator<C, I, R> + HasMaxSize,
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
@@ -162,7 +161,7 @@ where
 
 impl<SM, C, I, R> Mutator<C, I, R> for HavocBytesMutator<SM, C, I, R>
 where
-    SM: ScheduledMutator<C, I, R>,
+    SM: ScheduledMutator<C, I, R> + HasMaxSize,
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
@@ -173,15 +172,55 @@ where
         rand: &mut R,
         corpus: &C,
         input: &mut I,
-        stage_idx: i32,
+        _stage_idx: i32,
     ) -> Result<(), AflError> {
-        self.scheduled.mutate(rand, corpus, input, stage_idx)
+        //self.scheduled.mutate(rand, corpus, input, stage_idx);
+        let num = self.scheduled.iterations(rand, input);
+        for _ in 0..num {
+            let idx = self.scheduled.schedule(13, rand, input);
+            match idx {
+                0=> mutation_bitflip(self, rand, corpus, input)?,
+                1=> mutation_byteflip(self, rand, corpus, input)?,
+                2=> mutation_byteinc(self, rand, corpus, input)?,
+                3=> mutation_bytedec(self, rand, corpus, input)?,
+                4=> mutation_byteneg(self, rand, corpus, input)?,
+                5=> mutation_byterand(self, rand, corpus, input)?,
+    
+                6=> mutation_byteadd(self, rand, corpus, input)?,
+                7=> mutation_wordadd(self, rand, corpus, input)?,
+                8=> mutation_dwordadd(self, rand, corpus, input)?,
+                9=> mutation_byteinteresting(self, rand, corpus, input)?,
+                10=> mutation_wordinteresting(self, rand, corpus, input)?,
+                11=> mutation_dwordinteresting(self, rand, corpus, input)?,
+
+                _=> mutation_splice(self, rand, corpus, input)?,
+            };
+        }
+        Ok(())
+    }
+}
+
+impl<SM, C, I, R> HasMaxSize for HavocBytesMutator<SM, C, I, R>
+where
+    SM: ScheduledMutator<C, I, R> + HasMaxSize,
+    C: Corpus<I, R>,
+    I: Input + HasBytesVec,
+    R: Rand,
+{
+    #[inline]
+    fn max_size(&self) -> usize {
+        self.scheduled.max_size()
+    }
+
+    #[inline]
+    fn set_max_size(&mut self, max_size: usize) {
+        self.scheduled.set_max_size(max_size);
     }
 }
 
 impl<SM, C, I, R> HavocBytesMutator<SM, C, I, R>
 where
-    SM: ScheduledMutator<C, I, R>,
+    SM: ScheduledMutator<C, I, R> + HasMaxSize,
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
@@ -239,6 +278,7 @@ where
         scheduled.add_mutation(mutation_bitflip);*/
 
         scheduled.add_mutation(mutation_splice);
+
         HavocBytesMutator {
             scheduled: scheduled,
             phantom: PhantomData,
