@@ -5,12 +5,15 @@ use core::slice::{Iter, IterMut};
 use hashbrown::hash_map::{Keys, Values, ValuesMut};
 use hashbrown::HashMap;
 
+/// A map, storing any trait object by TypeId
 #[derive(Default)]
 pub struct MetaMap {
     map: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl MetaMap {
+
+    #[inline]
     pub fn get<T>(&self) -> Option<&T>
     where
         T: Any,
@@ -20,6 +23,7 @@ impl MetaMap {
             .map(|x| x.as_ref().downcast_ref::<T>().unwrap())
     }
 
+    #[inline]
     pub fn get_mut<T>(&mut self) -> Option<&mut T>
     where
         T: Any,
@@ -29,6 +33,7 @@ impl MetaMap {
             .map(|x| x.as_mut().downcast_mut::<T>().unwrap())
     }
 
+    #[inline]
     pub fn insert<T>(&mut self, t: T)
     where
         T: Any,
@@ -36,10 +41,12 @@ impl MetaMap {
         self.map.insert(TypeId::of::<T>(), Box::new(t));
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
+    #[inline]
     pub fn contains<T>(&self) -> bool
     where
         T: Any,
@@ -54,11 +61,13 @@ impl MetaMap {
     }
 }
 
+/// A map, allowing to store multiple elements of any given type, by TypeId.
 pub struct MultiMetaMap {
     map: HashMap<TypeId, Vec<Box<dyn Any>>>,
 }
 
 impl MultiMetaMap {
+    #[inline]
     pub fn get<T>(&self) -> Option<core::iter::Map<Iter<'_, Box<dyn Any>>, fn(&Box<dyn Any>) -> &T>>
     where
         T: Any,
@@ -69,6 +78,7 @@ impl MultiMetaMap {
         }
     }
 
+    #[inline]
     pub fn get_mut<T>(
         &mut self,
     ) -> Option<core::iter::Map<IterMut<'_, Box<dyn Any>>, fn(&mut Box<dyn Any>) -> &mut T>>
@@ -84,6 +94,7 @@ impl MultiMetaMap {
         }
     }
 
+    #[inline]
     pub fn insert<T>(&mut self, t: T)
     where
         T: Any,
@@ -96,10 +107,12 @@ impl MultiMetaMap {
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
+    #[inline]
     pub fn contains<T>(&self) -> bool
     where
         T: Any,
@@ -119,6 +132,8 @@ pub struct MetaInstanceMap {
 }
 
 impl MetaInstanceMap {
+
+    #[inline]
     pub fn get<T, U>(&self, instance: &U) -> Option<&T>
     where
         T: Any,
@@ -138,6 +153,7 @@ impl MetaInstanceMap {
         }
     }
 
+    #[inline]
     pub fn get_mut<T, U>(&mut self, instance: &U) -> Option<&mut T>
     where
         T: Any,
@@ -186,6 +202,7 @@ impl MetaInstanceMap {
         }
     }
 
+    #[inline]
     pub fn insert<T, U>(&mut self, t: T, instance: &U)
     where
         T: Any,
@@ -207,10 +224,12 @@ impl MetaInstanceMap {
             .insert(instance, Box::new(t));
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
+    #[inline]
     pub fn contains_type<T>(&self) -> bool
     where
         T: Any,
@@ -218,6 +237,7 @@ impl MetaInstanceMap {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
+    #[inline]
     pub fn contains<T, U>(&self, instance: &U) -> bool
     where
         T: Any,
@@ -247,6 +267,7 @@ pub trait AsAny {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
+/// A map, allowing to store and get any object by type and name
 pub struct NamedAnyMap<B>
 where
     B: ?Sized + Any + AsAny,
@@ -344,6 +365,7 @@ where
         }
     }
 
+    #[inline]
     pub fn all_typeids(&self) -> Keys<'_, TypeId, HashMap<&'static str, Box<B>>> {
         self.map.keys()
     }
@@ -356,10 +378,12 @@ where
         self.map.get_mut(&typeid).unwrap().insert(name, val);
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
+    #[inline]
     pub fn contains_type<T>(&self) -> bool
     where
         T: Any,
@@ -367,6 +391,7 @@ where
         self.map.contains_key(&TypeId::of::<T>())
     }
 
+    #[inline]
     pub fn contains<T>(&self, name: &'static str) -> bool
     where
         T: Any,
