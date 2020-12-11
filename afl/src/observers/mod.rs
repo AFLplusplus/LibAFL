@@ -1,18 +1,14 @@
 extern crate num;
 
-use alloc::boxed::Box;
-use alloc::string::String;
-use core::any::Any;
 use serde::{Deserialize, Serialize};
 
-use crate::serde_anymap::{ArrayMut, SerdeAny};
+use crate::serde_anymap::ArrayMut;
+use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
 use crate::AflError;
-
-// TODO register each observer in the Registry in new()
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer: SerdeAny + 'static {
+pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'static {
     /// The testcase finished execution, calculate any changes.
     #[inline]
     fn flush(&mut self) -> Result<(), AflError> {
@@ -25,11 +21,53 @@ pub trait Observer: SerdeAny + 'static {
     fn post_exec(&mut self) -> Result<(), AflError> {
         Ok(())
     }
-
-    fn name(&self) -> &String;
 }
 
-crate::create_serde_registry_for_trait!(observer_serde, crate::observers::Observer);
+pub trait ObserversTuple:
+    MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned
+{
+    fn reset_all(&mut self) -> Result<(), AflError>;
+    fn post_exec_all(&mut self) -> Result<(), AflError>;
+    //fn for_each(&self, f: fn(&dyn Observer));
+    //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
+}
+
+impl ObserversTuple for () {
+    fn reset_all(&mut self) -> Result<(), AflError> {
+        Ok(())
+    }
+    fn post_exec_all(&mut self) -> Result<(), AflError> {
+        Ok(())
+    }
+    //fn for_each(&self, f: fn(&dyn Observer)) { }
+    //fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) { }
+}
+
+impl<Head, Tail> ObserversTuple for (Head, Tail)
+where
+    Head: Observer,
+    Tail: ObserversTuple + TupleList,
+{
+    fn reset_all(&mut self) -> Result<(), AflError> {
+        self.0.reset()?;
+        self.1.reset_all()
+    }
+
+    fn post_exec_all(&mut self) -> Result<(), AflError> {
+        self.0.post_exec()?;
+        self.1.post_exec_all()
+    }
+
+    /*fn for_each(&self, f: fn(&dyn Observer)) {
+        f(&self.0);
+        self.1.for_each(f)
+    }
+
+    fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) {
+        f(&mut self.0);
+        self.1.for_each_mut(f)
+    }*/
+}
 
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>
@@ -85,25 +123,15 @@ where
     fn reset(&mut self) -> Result<(), AflError> {
         self.reset_map()
     }
-
-    #[inline]
-    fn name(&self) -> &String {
-        &self.name
-    }
 }
 
-impl<T> SerdeAny for StdMapObserver<T>
+impl<T> Named for StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    #[inline]
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
+    fn name(&self) -> &str {
+        self.name.as_str()
     }
 }
 
@@ -143,7 +171,6 @@ where
 {
     /// Creates a new MapObserver
     pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
-        observer_serde::RegistryBuilder::register::<Self>();
         let initial = if map.len() > 0 { map[0] } else { T::default() };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
@@ -154,7 +181,6 @@ where
 
     /// Creates a new MapObserver from a raw pointer
     pub fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
-        observer_serde::RegistryBuilder::register::<Self>();
         unsafe {
             let initial = if len > 0 { *map_ptr } else { T::default() };
             StdMapObserver {
@@ -166,6 +192,7 @@ where
     }
 }
 
+/*
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
@@ -183,3 +210,4 @@ mod tests {
         assert_eq!(d.name(), o.name());
     }
 }
+*/

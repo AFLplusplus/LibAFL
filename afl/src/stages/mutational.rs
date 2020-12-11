@@ -1,9 +1,11 @@
 use core::marker::PhantomData;
 
 use crate::events::EventManager;
-use crate::executors::Executor;
+use crate::executors::{Executor, HasObservers};
+use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
+use crate::observers::ObserversTuple;
 use crate::stages::Corpus;
 use crate::stages::{Engine, Stage};
 use crate::utils::Rand;
@@ -17,11 +19,13 @@ use crate::serde_anymap::{Ptr, PtrMut};
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<M, EM, E, C, I, R>: Stage<EM, E, C, I, R>
+pub trait MutationalStage<M, EM, E, OT, FT, C, I, R>: Stage<EM, E, OT, FT, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, I, R>,
-    E: Executor<I>,
+    EM: EventManager<C, E, OT, FT, I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -43,9 +47,9 @@ where
     fn perform_mutational(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, I>,
+        engine: &mut Engine<E, OT, I>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -82,24 +86,29 @@ where
 }
 
 /// The default mutational stage
-pub struct StdMutationalStage<M, EM, E, C, I, R>
+pub struct StdMutationalStage<M, EM, E, OT, FT, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, I, R>,
-    E: Executor<I>,
+    EM: EventManager<C, E, OT, FT, I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
     mutator: M,
-    phantom: PhantomData<(EM, E, C, I, R)>,
+    phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
 }
 
-impl<M, EM, E, C, I, R> MutationalStage<M, EM, E, C, I, R> for StdMutationalStage<M, EM, E, C, I, R>
+impl<M, EM, E, OT, FT, C, I, R> MutationalStage<M, EM, E, OT, FT, C, I, R>
+    for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, I, R>,
-    E: Executor<I>,
+    EM: EventManager<C, E, OT, FT, I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -117,11 +126,14 @@ where
     }
 }
 
-impl<M, EM, E, C, I, R> Stage<EM, E, C, I, R> for StdMutationalStage<M, EM, E, C, I, R>
+impl<M, EM, E, OT, FT, C, I, R> Stage<EM, E, OT, FT, C, I, R>
+    for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, I, R>,
-    E: Executor<I>,
+    EM: EventManager<C, E, OT, FT, I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -130,9 +142,9 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, I>,
+        engine: &mut Engine<E, OT, I>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -140,11 +152,13 @@ where
     }
 }
 
-impl<M, EM, E, C, I, R> StdMutationalStage<M, EM, E, C, I, R>
+impl<M, EM, E, OT, FT, C, I, R> StdMutationalStage<M, EM, E, OT, FT, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, I, R>,
-    E: Executor<I>,
+    EM: EventManager<C, E, OT, FT, I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,

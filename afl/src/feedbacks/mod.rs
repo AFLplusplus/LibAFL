@@ -4,11 +4,11 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 use num::Integer;
 
+use crate::corpus::Testcase;
 use crate::inputs::Input;
-use crate::observers::observer_serde::NamedSerdeAnyMap;
-use crate::observers::MapObserver;
+use crate::observers::{MapObserver, Observer, ObserversTuple};
+use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
 use crate::AflError;
-use crate::{corpus::Testcase, observers::Observer};
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
 pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
@@ -19,12 +19,16 @@ pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I>
+pub trait Feedback<I>: Named + 'static
 where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting(&mut self, input: &I, observers: &NamedSerdeAnyMap) -> Result<u32, AflError>;
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
@@ -37,13 +41,82 @@ where
     fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }
+}
 
-    /// The name of this feedback
-    fn name(&self) -> &String;
+pub trait FeedbacksTuple<I>: MatchType + MatchNameAndType
+where
+    I: Input,
+{
+    fn is_interesting_all<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError>;
+    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError>;
+    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError>;
+    //fn for_each(&self, f: fn(&dyn Feedback<I>));
+    //fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>));
+}
+
+impl<I> FeedbacksTuple<I> for ()
+where
+    I: Input,
+{
+    fn is_interesting_all<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError> {
+        Ok(0)
+    }
+    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
+        Ok(())
+    }
+    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError> {
+        Ok(())
+    }
+    //fn for_each(&self, f: fn(&dyn Feedback<I>)) {}
+    //fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>)) {}
+}
+
+impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
+where
+    Head: Feedback<I>,
+    Tail: FeedbacksTuple<I> + TupleList,
+    I: Input,
+{
+    fn is_interesting_all<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError> {
+        Ok(self.0.is_interesting(input, observers)?
+            + self.1.is_interesting_all(input, observers)?)
+    }
+
+    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
+        self.0.append_metadata(testcase)?;
+        self.1.append_metadata_all(testcase)
+    }
+
+    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError> {
+        self.0.discard_metadata(input)?;
+        self.1.discard_metadata_all(input)
+    }
+
+    /*fn for_each(&self, f: fn(&dyn Feedback<I>)) {
+        f(&self.0);
+        self.1.for_each(f)
+    }
+
+    fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>)) {
+        f(self.0);
+        self.1.for_each_mut(f)
+    }*/
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
-pub trait Reducer<T>
+pub trait Reducer<T>: 'static
 where
     T: Integer + Copy + 'static,
 {
@@ -102,7 +175,7 @@ where
     /// Contains information about untouched entries
     history_map: Vec<T>,
     /// Name identifier of this instance
-    name: String,
+    name: &'static str,
     /// Phantom Data of Reducer
     phantom: PhantomData<(R, O)>,
 }
@@ -114,14 +187,14 @@ where
     O: MapObserver<T> + 'static,
     I: Input,
 {
-    fn is_interesting(
+    fn is_interesting<OT: ObserversTuple>(
         &mut self,
         _input: &I,
-        observers: &NamedSerdeAnyMap,
+        observers: &OT,
     ) -> Result<u32, AflError> {
         let mut interesting = 0;
         // TODO optimize
-        let observer = observers.get::<O>(&self.name).unwrap();
+        let observer = observers.match_name_type::<O>(&self.name).unwrap();
         let size = observer.map().len();
         for i in 0..size {
             let history = self.history_map[i];
@@ -135,10 +208,17 @@ where
 
         Ok(interesting)
     }
+}
 
+impl<T, R, O> Named for MapFeedback<T, R, O>
+where
+    T: Integer + Default + Copy + 'static,
+    R: Reducer<T>,
+    O: MapObserver<T> + 'static,
+{
     #[inline]
-    fn name(&self) -> &String {
-        &self.name
+    fn name(&self) -> &str {
+        self.name
     }
 }
 
@@ -152,18 +232,18 @@ where
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
-            name: name.to_string(),
+            name: name,
             phantom: PhantomData,
         }
     }
 
-    pub fn new_with_observer(map_observer: &O) -> Self {
+    /*pub fn new_with_observer(map_observer: &O) -> Self {
         Self {
             history_map: vec![T::default(); map_observer.map().len()],
-            name: map_observer.name().to_string(),
+            name: map_observer.name(),
             phantom: PhantomData,
         }
-    }
+    }*/
 }
 
 impl<T, R, O> MapFeedback<T, R, O>

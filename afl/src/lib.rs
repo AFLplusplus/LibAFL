@@ -19,6 +19,7 @@ pub mod mutators;
 pub mod observers;
 pub mod serde_anymap;
 pub mod stages;
+pub mod tuples;
 pub mod utils;
 
 use alloc::string::String;

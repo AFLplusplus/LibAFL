@@ -14,13 +14,15 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::io::Write;
 
+use crate::corpus::Corpus;
 use crate::engines::State;
 use crate::executors::Executor;
+use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
-use crate::serde_anymap::{Ptr, PtrMut};
+use crate::observers::ObserversTuple;
+use crate::serde_anymap::{Ptr, PtrMut, SerdeAny};
 use crate::utils::Rand;
 use crate::AflError;
-use crate::{corpus::Corpus, serde_anymap::SerdeAny};
 
 /// Indicate if an event worked or not
 pub enum BrokerEventResult {
@@ -33,7 +35,7 @@ pub enum BrokerEventResult {
 pub trait ShowStats {}
 
 /// A custom event, for own messages, with own handler.
-pub trait CustomEvent<I>: SerdeAny + Serialize
+pub trait CustomEvent<I, OT>: SerdeAny + Serialize
 where
     I: Input,
 {
@@ -48,9 +50,10 @@ where
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum Event<'a, I>
+pub enum Event<'a, I, OT>
 where
     I: Input,
+    OT: ObserversTuple,
 {
     LoadInitial {
         sender_id: u64,
@@ -59,7 +62,7 @@ where
     NewTestcase {
         sender_id: u64,
         input: Ptr<'a, I>,
-        observers: PtrMut<'a, crate::observers::observer_serde::NamedSerdeAnyMap>,
+        observers: PtrMut<'a, OT>,
         corpus_count: usize,
     },
     UpdateStats {
@@ -90,14 +93,14 @@ where
     Custom {
         sender_id: u64,
         // TODO: Allow custom events
-        // custom_event: Box<dyn CustomEvent<I>>,
+        // custom_event: Box<dyn CustomEvent<I, OT>>,
     },
 }
 
-impl<'a, I> Event<'a, I>
+impl<'a, I, OT> Event<'a, I, OT>
 where
     I: Input,
-    //CE: CustomEvent<I>,
+    OT: ObserversTuple, //CE: CustomEvent<I, OT>,
 {
     pub fn name(&self) -> &str {
         match self {
@@ -159,29 +162,31 @@ where
     }
 }
 
-pub trait EventManager<C, E, I, R>
+pub trait EventManager<C, E, OT, FT, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
 {
     /// Fire an Event
-    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError>;
+    fn fire<'a>(&mut self, event: Event<'a, I, OT>) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, state: &mut State<I, R>, corpus: &mut C) -> Result<usize, AflError>;
+    fn process(&mut self, state: &mut State<I, R, FT>, corpus: &mut C) -> Result<usize, AflError>;
 
     #[inline]
-    fn on_recv(&self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
+    fn on_recv(&self, _state: &mut State<I, R, FT>, _corpus: &mut C) -> Result<(), AflError> {
         // TODO: Better way to move out of testcase, or get ref
         //Ok(corpus.add(self.testcase.take().unwrap()))
         Ok(())
     }
 
     // TODO the broker has a state? do we need to pass state and corpus?
-    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I, OT>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::LoadInitial {
                 sender_id: _,
@@ -238,8 +243,8 @@ where
 
     fn handle_in_client(
         &mut self,
-        event: Event<I>,
-        _state: &mut State<I, R>,
+        event: Event<I, OT>,
+        _state: &mut State<I, R, FT>,
         _corpus: &mut C,
     ) -> Result<(), AflError> {
         match event {
@@ -263,7 +268,7 @@ where
 }
 
 /*TODO
-    fn on_recv(&self, state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
+    fn on_recv(&self, state: &mut State<I, R, FT>, _corpus: &mut C) -> Result<(), AflError> {
         println!(
             "#{}\t exec/s: {}",
             state.executions(),
@@ -275,10 +280,16 @@ where
 */
 
 #[cfg(feature = "std")]
-pub struct LoggerEventManager<C, E, I, R, W>
+pub struct LoggerEventManager<C, E, OT, FT, I, R, W>
 where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
     W: Write,
-    //CE: CustomEvent<I>,
+    //CE: CustomEvent<I, OT>,
 {
     writer: W,
     count: usize,
@@ -288,21 +299,24 @@ where
     execs_over_sec: u64,
     corpus_count: usize,
 
-    phantom: PhantomData<(C, E, I, R)>,
+    phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
 #[cfg(feature = "std")]
-impl<C, E, I, R, W> EventManager<C, E, I, R> for LoggerEventManager<C, E, I, R, W>
+impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R>
+    for LoggerEventManager<C, E, OT, FT, I, R, W>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
     W: Write,
-    //CE: CustomEvent<I>,
+    //CE: CustomEvent<I, OT>,
 {
     #[inline]
-    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<'a, I, OT>) -> Result<(), AflError> {
         match self.handle_in_broker(&event)? {
             BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
             // Ignore broker-only events
@@ -311,13 +325,17 @@ where
         Ok(())
     }
 
-    fn process(&mut self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<usize, AflError> {
+    fn process(
+        &mut self,
+        _state: &mut State<I, R, FT>,
+        _corpus: &mut C,
+    ) -> Result<usize, AflError> {
         let c = self.count;
         self.count = 0;
         Ok(c)
     }
 
-    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I, OT>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::NewTestcase {
                 sender_id: _,
@@ -377,11 +395,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, E, I, R, W> LoggerEventManager<C, E, I, R, W>
+impl<C, E, OT, FT, I, R, W> LoggerEventManager<C, E, OT, FT, I, R, W>
 where
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     R: Rand,
     W: Write,
     //TODO CE: CustomEvent,
@@ -400,16 +420,18 @@ where
 
 /// Eventmanager for multi-processed application
 #[cfg(feature = "std")]
-pub struct LlmpBrokerEventManager<C, E, I, R>
+pub struct LlmpBrokerEventManager<C, E, OT, FT, I, R>
 where
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     R: Rand,
-    //CE: CustomEvent<I>,
+    //CE: CustomEvent<I, OT>,
 {
     llmp_broker: llmp::LlmpBroker,
-    phantom: PhantomData<(C, E, I, R)>,
+    phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
 #[cfg(feature = "std")]
@@ -424,35 +446,44 @@ const _LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 /// Eventmanager for multi-processed application
 #[cfg(feature = "std")]
-pub struct LlmpClientEventManager<C, E, I, R>
+pub struct LlmpClientEventManager<C, E, OT, FT, I, R>
 where
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     R: Rand,
-    //CE: CustomEvent<I>,
+    //CE: CustomEvent<I, OT>,
 {
     _llmp_client: llmp::LlmpClient,
-    phantom: PhantomData<(C, E, I, R)>,
+    phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
 #[cfg(feature = "std")]
-impl<C, E, I, R> EventManager<C, E, I, R> for LlmpBrokerEventManager<C, E, I, R>
+impl<C, E, OT, FT, I, R> EventManager<C, E, OT, FT, I, R>
+    for LlmpBrokerEventManager<C, E, OT, FT, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
 {
     /// Fire an Event
-    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<'a, I, OT>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp_broker
             .send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
         Ok(())
     }
 
-    fn process(&mut self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<usize, AflError> {
+    fn process(
+        &mut self,
+        _state: &mut State<I, R, FT>,
+        _corpus: &mut C,
+    ) -> Result<usize, AflError> {
         // TODO: iterators
         /*
         let mut handled = vec![];
@@ -481,13 +512,13 @@ where
         Ok(0)
     }
 
-    fn on_recv(&self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<(), AflError> {
+    fn on_recv(&self, _state: &mut State<I, R, FT>, _corpus: &mut C) -> Result<(), AflError> {
         // TODO: Better way to move out of testcase, or get ref
         //Ok(corpus.add(self.testcase.take().unwrap()))
         Ok(())
     }
 
-    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I, OT>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::LoadInitial {
                 sender_id: _,
@@ -542,8 +573,8 @@ where
 
     fn handle_in_client(
         &mut self,
-        event: Event<I>,
-        /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
+        event: Event<I, OT>,
+        _state: &mut State<I, R, FT>,
         _corpus: &mut C,
     ) -> Result<(), AflError> {
         match event {
@@ -572,17 +603,16 @@ mod tests {
 
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
-    use crate::observers::observer_serde::NamedSerdeAnyMap;
-    use crate::observers::{Observer, StdMapObserver};
+    use crate::observers::{Observer, ObserversTuple, StdMapObserver};
     use crate::serde_anymap::{Ptr, PtrMut};
+    use crate::tuples::{tuple_list, tuple_list_type, MatchNameAndType, Named};
 
     static mut MAP: [u32; 4] = [0; 4];
 
     #[test]
     fn test_event_serde() {
-        let mut map = NamedSerdeAnyMap::new();
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
-        map.insert(Box::new(obv), &"key".to_string());
+        let mut map = tuple_list!(obv);
 
         let i = BytesInput::new(vec![0]);
         let e = Event::NewTestcase {
@@ -594,19 +624,20 @@ mod tests {
 
         let j = serde_json::to_string(&e).unwrap();
 
-        let d: Event<BytesInput> = serde_json::from_str(&j).unwrap();
+        let d: Event<BytesInput, tuple_list_type!(StdMapObserver<u32>)> =
+            serde_json::from_str(&j).unwrap();
         match d {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
-                observers: obs,
+                observers,
                 corpus_count: _,
             } => {
-                let o = obs
+                let o = observers
                     .as_ref()
-                    .get::<StdMapObserver<u32>>(&"key".to_string())
+                    .match_name_type::<StdMapObserver<u32>>("test")
                     .unwrap();
-                assert_eq!("test".to_string(), *o.name());
+                assert_eq!("test", o.name());
             }
             _ => panic!("mistmatch".to_string()),
         };
