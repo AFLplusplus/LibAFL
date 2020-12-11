@@ -1,9 +1,9 @@
 //! Utility functions for AFL
 
 use alloc::rc::Rc;
-use core::{cell::RefCell, time};
 use core::debug_assert;
 use core::fmt::Debug;
+use core::{cell::RefCell, time};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]

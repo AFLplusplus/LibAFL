@@ -12,10 +12,12 @@ use serde::{Deserialize, Serialize};
 //pub mod shmem_translated;
 
 #[cfg(feature = "std")]
-use std::{io::Write, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    io::Write,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::corpus::Corpus;
-use crate::{engines::State, utils};
 use crate::executors::Executor;
 use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
@@ -23,6 +25,7 @@ use crate::observers::ObserversTuple;
 use crate::serde_anymap::{Ptr, PtrMut, SerdeAny};
 use crate::utils::Rand;
 use crate::AflError;
+use crate::{engines::State, utils};
 
 /// Indicate if an event worked or not
 pub enum BrokerEventResult {
@@ -201,14 +204,18 @@ where
     /// Total executions
     #[inline]
     fn total_execs(&mut self) -> u64 {
-        self.client_stats().iter().fold(0u64, |acc, x| acc + x.executions)
+        self.client_stats()
+            .iter()
+            .fold(0u64, |acc, x| acc + x.executions)
     }
 
     /// Executions per second
     #[inline]
     fn execs_per_sec(&mut self) -> u64 {
         let time_since_start = (utils::current_time() - self.start_time()).as_secs();
-        if time_since_start == 0 { 0 } else {
+        if time_since_start == 0 {
+            0
+        } else {
             self.total_execs() / time_since_start
         }
     }
@@ -225,7 +232,9 @@ where
                 self.corpus_size_inc();
                 println!(
                     "[NEW] corpus: {} execs: {} execs/s: {}",
-                    self.corpus_size(), self.total_execs(), self.execs_per_sec()
+                    self.corpus_size(),
+                    self.total_execs(),
+                    self.execs_per_sec()
                 );
                 Ok(BrokerEventResult::Forward)
             }
@@ -242,13 +251,15 @@ where
                         id: client_stat_count + i,
                         corpus_size: 0,
                         execs_over_sec: 0,
-                        executions: 0
+                        executions: 0,
                     })
                 }
                 let mut stat = &mut self.client_stats_mut()[*sender_id as usize];
                 println!(
                     "[UPDATE] corpus: {} execs: {} execs/s: {}",
-                    self.corpus_size(), self.total_execs(), self.execs_per_sec()
+                    self.corpus_size(),
+                    self.total_execs(),
+                    self.execs_per_sec()
                 );
                 Ok(BrokerEventResult::Handled)
             }
@@ -385,7 +396,6 @@ where
     fn start_time(&mut self) -> time::Duration {
         self.start_time
     }
-
 }
 
 #[cfg(feature = "std")]
@@ -414,7 +424,6 @@ where
     }
 }
 
-
 #[cfg(feature = "std")]
 /// Forward this to the client
 const LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
@@ -424,8 +433,6 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 #[cfg(feature = "std")]
 /// Handle in both
 const _LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-
-
 
 #[cfg(feature = "std")]
 pub struct LlmpEventManager<C, E, I, R, W>
@@ -451,7 +458,6 @@ impl<C, E, I, R, W> EventManager<C, E, I, R> for LlmpEventManager<C, E, I, R, W>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
@@ -461,12 +467,15 @@ where
     #[inline]
     fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
-        self
-            .send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
+        self.send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
         Ok(())
     }
 
-    fn process(&mut self, _state: &mut State<I, R>, _corpus: &mut C) -> Result<usize, AflError> {
+    fn process(
+        &mut self,
+        _state: &mut State<I, R, FT>,
+        _corpus: &mut C,
+    ) -> Result<usize, AflError> {
         let c = self.count;
         self.count = 0;
         Ok(c)
@@ -492,7 +501,6 @@ where
     fn start_time(&mut self) -> time::Duration {
         self.start_time
     }
-
 }
 
 #[cfg(feature = "std")]
