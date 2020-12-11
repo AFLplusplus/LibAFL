@@ -60,7 +60,7 @@ where
         sender_id: u64,
         input: Ptr<'a, I>,
         observers: PtrMut<'a, crate::observers::observer_serde::NamedSerdeAnyMap>,
-        corpus_count: usize
+        corpus_count: usize,
     },
     UpdateStats {
         sender_id: u64,
@@ -109,7 +109,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
-                corpus_count: _
+                corpus_count: _,
             } => "New Testcase",
             Event::UpdateStats {
                 sender_id: _,
@@ -135,7 +135,7 @@ where
             } => "Log",
             Event::None { phantom: _ } => "None",
             Event::Custom {
-                sender_id, /*custom_event} => custom_event.name()*/
+                sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",
         }
     }
@@ -167,10 +167,7 @@ where
     R: Rand,
 {
     /// Fire an Event
-    fn fire<'a>(
-        &mut self,
-        event: Event<'a, I>
-    ) -> Result<(), AflError>;
+    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
@@ -183,10 +180,7 @@ where
     }
 
     // TODO the broker has a state? do we need to pass state and corpus?
-    fn handle_in_broker(
-        &mut self,
-        event: &Event<I>,
-    ) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::LoadInitial {
                 sender_id: _,
@@ -196,7 +190,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
-                corpus_count: _
+                corpus_count: _,
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
@@ -233,7 +227,7 @@ where
             }
             Event::None { phantom: _ } => Ok(BrokerEventResult::Handled),
             Event::Custom {
-                sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/
+                sender_id: _, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/
             } => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
@@ -250,7 +244,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
-                corpus_count: _
+                corpus_count: _,
             } => {
                 // here u should match sender_id, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
@@ -304,10 +298,7 @@ where
     W: Write,
     //CE: CustomEvent<I>,
 {
-    fn fire<'a>(
-        &mut self,
-        event: Event<'a, I>,
-    ) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
         match self.handle_in_broker(&event)? {
             BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
             // Ignore broker-only events
@@ -322,21 +313,22 @@ where
         Ok(c)
     }
 
-    fn handle_in_broker(
-        &mut self,
-        event: &Event<I>,
-    ) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
                 observers: _,
-                corpus_count
+                corpus_count,
             } => {
                 self.corpus_count = *corpus_count;
-                writeln!(self.writer, "[NEW] corpus: {} execs: {} execs/s: {}", self.corpus_count, self.executions, self.execs_over_sec);
+                writeln!(
+                    self.writer,
+                    "[NEW] corpus: {} execs: {} execs/s: {}",
+                    self.corpus_count, self.executions, self.execs_over_sec
+                )?;
                 Ok(BrokerEventResult::Handled)
-            },
+            }
             Event::UpdateStats {
                 sender_id: _,
                 executions,
@@ -345,7 +337,11 @@ where
             } => {
                 self.executions = *executions;
                 self.execs_over_sec = *execs_over_sec;
-                writeln!(self.writer, "[UPDATE] corpus: {} execs: {} execs/s: {}", self.corpus_count, self.executions, self.execs_over_sec);
+                writeln!(
+                    self.writer,
+                    "[UPDATE] corpus: {} execs: {} execs/s: {}",
+                    self.corpus_count, self.executions, self.execs_over_sec
+                )?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::Crash {
@@ -354,7 +350,7 @@ where
                 phantom: _,
             } => {
                 panic!("LoggerEventManager cannot handle Event::Crash");
-            },
+            }
             Event::Timeout {
                 sender_id: _,
                 input: _,
@@ -363,12 +359,12 @@ where
                 panic!("LoggerEventManager cannot handle Event::Timeout");
             }
             Event::Log {
-                sender_id,
+                sender_id: _,
                 severity_level,
                 message,
                 phantom: _,
             } => {
-                writeln!(self.writer, "[LOG {}]: {}", severity_level, message);
+                writeln!(self.writer, "[LOG {}]: {}", severity_level, message)?;
                 Ok(BrokerEventResult::Handled)
             }
             _ => Ok(BrokerEventResult::Handled),
@@ -417,10 +413,10 @@ where
 const LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
 #[cfg(feature = "std")]
 /// Only handle this in the broker
-const LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
+const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 #[cfg(feature = "std")]
 /// Handle in both
-const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
+const _LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 /// Eventmanager for multi-processed application
 #[cfg(feature = "std")]
@@ -432,7 +428,7 @@ where
     R: Rand,
     //CE: CustomEvent<I>,
 {
-    llmp_client: llmp::LlmpClient,
+    _llmp_client: llmp::LlmpClient,
     phantom: PhantomData<(C, E, I, R)>,
 }
 
@@ -445,10 +441,7 @@ where
     R: Rand,
 {
     /// Fire an Event
-    fn fire<'a>(
-        &mut self,
-        event: Event<'a, I>,
-    ) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp_broker
             .send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
@@ -490,10 +483,7 @@ where
         Ok(())
     }
 
-    fn handle_in_broker(
-        &mut self,
-        event: &Event<I>,
-    ) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::LoadInitial {
                 sender_id: _,
@@ -503,7 +493,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
-                corpus_count: _
+                corpus_count: _,
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
@@ -540,7 +530,7 @@ where
             }
             Event::None { phantom: _ } => Ok(BrokerEventResult::Handled),
             Event::Custom {
-                sender_id, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/
+                sender_id: _, /*custom_event} => custom_event.handle_in_broker(state, corpus)*/
             } => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
@@ -550,14 +540,14 @@ where
         &mut self,
         event: Event<I>,
         /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
-        corpus: &mut C,
+        _corpus: &mut C,
     ) -> Result<(), AflError> {
         match event {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
                 observers: _,
-                corpus_count: _
+                corpus_count: _,
             } => {
                 // here u should match sender_id, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
@@ -599,7 +589,7 @@ mod tests {
             sender_id: 0,
             input: Ptr::Ref(&i),
             observers: PtrMut::Ref(&mut map),
-            corpus_count: 1
+            corpus_count: 1,
         };
 
         let j = serde_json::to_string(&e).unwrap();
@@ -610,7 +600,7 @@ mod tests {
                 sender_id: _,
                 input: _,
                 observers: obs,
-                corpus_count: _
+                corpus_count: _,
             } => {
                 let o = obs
                     .as_ref()

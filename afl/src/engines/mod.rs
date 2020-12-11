@@ -213,14 +213,15 @@ where
             if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
                 added += 1;
             }
-            manager.fire(
-                Event::LoadInitial {
-                    sender_id: 0,
-                    phantom: PhantomData,
-                }
-            )?;
+            manager.fire(Event::LoadInitial {
+                sender_id: 0,
+                phantom: PhantomData,
+            })?;
         }
-        manager.fire(Event::log(0, format!("Loaded {} over {} initial testcases", added, num)))?;
+        manager.fire(Event::log(
+            0,
+            format!("Loaded {} over {} initial testcases", added, num),
+        ))?;
         manager.process(self, corpus)?;
         Ok(())
     }
@@ -318,7 +319,10 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.fire(Event::update_stats(state.executions(), state.executions_over_seconds()))?;
+                manager.fire(Event::update_stats(
+                    state.executions(),
+                    state.executions_over_seconds(),
+                ))?;
             }
         }
     }

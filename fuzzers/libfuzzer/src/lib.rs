@@ -22,7 +22,7 @@ use afl::observers::StdMapObserver;
 use afl::stages::mutational::StdMutationalStage;
 use afl::utils::StdRand;
 
-const MAP_SIZE: usize = 65536;
+// const MAP_SIZE: usize = 65536;
 
 #[no_mangle]
 extern "C" {

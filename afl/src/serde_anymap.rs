@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;

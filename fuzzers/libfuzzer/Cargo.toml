@@ -10,6 +10,12 @@ edition = "2018"
 default = ["std"]
 std = []
 
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
 [dependencies]
 afl = { path = "../../afl/" }
 

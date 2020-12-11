@@ -68,14 +68,12 @@ where
             let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
             if let Some(mut testcase) = testcase_maybe {
                 // TODO decouple events manager and engine
-                manager.fire(
-                    Event::NewTestcase {
-                        sender_id: 0,
-                        input: Ptr::Ref(testcase.load_input()?),
-                        observers: PtrMut::Ref(engine.executor_mut().observers_mut()),
-                        corpus_count: corpus.count() +1
-                    }
-                )?;
+                manager.fire(Event::NewTestcase {
+                    sender_id: 0,
+                    input: Ptr::Ref(testcase.load_input()?),
+                    observers: PtrMut::Ref(engine.executor_mut().observers_mut()),
+                    corpus_count: corpus.count() + 1,
+                })?;
                 let _ = corpus.add(testcase);
             }
         }

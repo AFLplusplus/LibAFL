@@ -3,8 +3,6 @@ pub use bytes::BytesInput;
 
 use alloc::vec::Vec;
 use core::clone::Clone;
-#[cfg(feature = "std")]
-use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use std::fs::File;
