@@ -156,6 +156,7 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             impl SerdeAnyMap {
+                #[inline]
                 pub fn get<T>(&self) -> Option<&T>
                 where
                     T: $trait_name,
@@ -165,6 +166,7 @@ macro_rules! create_serde_registry_for_trait {
                         .map(|x| x.as_ref().as_any().downcast_ref::<T>().unwrap())
                 }
 
+                #[inline]
                 pub fn get_mut<T>(&mut self) -> Option<&mut T>
                 where
                     T: $trait_name,
@@ -174,6 +176,7 @@ macro_rules! create_serde_registry_for_trait {
                         .map(|x| x.as_mut().as_any_mut().downcast_mut::<T>().unwrap())
                 }
 
+                #[inline]
                 pub fn insert<T>(&mut self, t: T)
                 where
                     T: $trait_name,
@@ -182,10 +185,12 @@ macro_rules! create_serde_registry_for_trait {
                         .insert(unpack_type_id(TypeId::of::<T>()), Box::new(t));
                 }
 
+                #[inline]
                 pub fn len(&self) -> usize {
                     self.map.len()
                 }
 
+                #[inline]
                 pub fn contains<T>(&self) -> bool
                 where
                     T: $trait_name,
@@ -212,6 +217,7 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             impl NamedSerdeAnyMap {
+                #[inline]
                 pub fn get<T>(&self, name: &String) -> Option<&T>
                 where
                     T: Any,
@@ -224,6 +230,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn by_typeid(
                     &self,
                     name: &String,
@@ -237,6 +244,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn get_mut<T>(&mut self, name: &String) -> Option<&mut T>
                 where
                     T: Any,
@@ -249,6 +257,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn by_typeid_mut(
                     &mut self,
                     name: &String,
@@ -262,6 +271,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn get_all<T>(
                     &self,
                 ) -> Option<
@@ -281,6 +291,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn all_by_typeid(
                     &self,
                     typeid: &TypeId,
@@ -296,6 +307,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn get_all_mut<T>(
                     &mut self,
                 ) -> Option<
@@ -316,6 +328,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn all_by_typeid_mut(
                     &mut self,
                     typeid: &TypeId,
@@ -331,6 +344,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                #[inline]
                 pub fn all_typeids(
                     &self,
                 ) -> core::iter::Map<
@@ -340,6 +354,7 @@ macro_rules! create_serde_registry_for_trait {
                     self.map.keys().map(|x| pack_type_id(*x))
                 }
 
+                #[inline]
                 pub fn for_each(
                     &self,
                     func: fn(&TypeId, &Box<dyn $trait_name>) -> Result<(), AflError>,
@@ -352,6 +367,7 @@ macro_rules! create_serde_registry_for_trait {
                     Ok(())
                 }
 
+                #[inline]
                 pub fn for_each_mut(
                     &mut self,
                     func: fn(&TypeId, &mut Box<dyn $trait_name>) -> Result<(), AflError>,
@@ -364,6 +380,7 @@ macro_rules! create_serde_registry_for_trait {
                     Ok(())
                 }
 
+                #[inline]
                 pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &String) {
                     let id = unpack_type_id((*val).type_id());
                     if !self.map.contains_key(&id) {
@@ -375,10 +392,12 @@ macro_rules! create_serde_registry_for_trait {
                         .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), val);
                 }
 
+                #[inline]
                 pub fn len(&self) -> usize {
                     self.map.len()
                 }
 
+                #[inline]
                 pub fn contains_type<T>(&self) -> bool
                 where
                     T: Any,
@@ -386,6 +405,7 @@ macro_rules! create_serde_registry_for_trait {
                     self.map.contains_key(&unpack_type_id(TypeId::of::<T>()))
                 }
 
+                #[inline]
                 pub fn contains<T>(&self, name: &String) -> bool
                 where
                     T: Any,
