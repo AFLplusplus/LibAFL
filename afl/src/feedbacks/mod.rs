@@ -1,5 +1,3 @@
-use alloc::string::String;
-use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use num::Integer;
@@ -64,15 +62,15 @@ where
 {
     fn is_interesting_all<OT: ObserversTuple>(
         &mut self,
-        input: &I,
-        observers: &OT,
+        _input: &I,
+        _observers: &OT,
     ) -> Result<u32, AflError> {
         Ok(0)
     }
-    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
+    fn append_metadata_all(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
         Ok(())
     }
-    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError> {
+    fn discard_metadata_all(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }
     //fn for_each(&self, f: fn(&dyn Feedback<I>)) {}

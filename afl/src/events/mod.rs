@@ -603,7 +603,7 @@ mod tests {
 
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
-    use crate::observers::{Observer, ObserversTuple, StdMapObserver};
+    use crate::observers::StdMapObserver;
     use crate::serde_anymap::{Ptr, PtrMut};
     use crate::tuples::{tuple_list, tuple_list_type, MatchNameAndType, Named};
 

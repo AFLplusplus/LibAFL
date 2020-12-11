@@ -7,12 +7,13 @@ use hashbrown::HashMap;
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::{Event, EventManager};
-use crate::executors::{Executor, HasObservers};
+use crate::executors::{Executor, ExecutorsTuple, HasObservers};
 use crate::feedbacks::FeedbacksTuple;
 use crate::generators::Generator;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
 use crate::stages::StagesTuple;
+use crate::tuples::{tuple_list, tuple_list_type};
 use crate::utils::{current_milliseconds, Rand};
 use crate::AflError;
 
@@ -179,12 +180,12 @@ where
         }
     }
 
-    pub fn generate_initial_inputs<G, C, E, OT, EM>(
+    pub fn generate_initial_inputs<G, C, E, OT, ET, EM>(
         &mut self,
         rand: &mut R,
         corpus: &mut C,
         generator: &mut G,
-        engine: &mut Engine<E, OT, I>,
+        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         num: usize,
     ) -> Result<(), AflError>
@@ -193,6 +194,7 @@ where
         C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
+        ET: ExecutorsTuple<I>,
         EM: EventManager<C, E, OT, FT, I, R>,
     {
         let mut added = 0;
@@ -226,49 +228,71 @@ where
     }
 }
 
-pub struct Engine<E, OT, I>
+pub struct Engine<E, OT, ET, I>
 where
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    ET: ExecutorsTuple<I>,
     I: Input,
 {
-    executor: E,
+    main_executor: E,
+    additional_executors: ET,
     phantom: PhantomData<(OT, I)>,
 }
 
-impl<E, OT, I> Engine<E, OT, I>
+impl<E, OT, ET, I> Engine<E, OT, ET, I>
 where
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    ET: ExecutorsTuple<I>,
     I: Input,
 {
     /// Return the executor
     pub fn executor(&self) -> &E {
-        &self.executor
+        &self.main_executor
     }
 
     /// Return the executor (mutable)
     pub fn executor_mut(&mut self) -> &mut E {
-        &mut self.executor
+        &mut self.main_executor
     }
 
-    // TODO additional executors, Vec<Box<dyn Executor<I>>>
+    pub fn additional_executors(&self) -> &ET {
+        &self.additional_executors
+    }
 
-    pub fn new(executor: E) -> Self {
+    pub fn additional_executors_mut(&mut self) -> &mut ET {
+        &mut self.additional_executors
+    }
+
+    pub fn with_executors(main_executor: E, additional_executors: ET) -> Self {
         Self {
-            executor: executor,
+            main_executor: main_executor,
+            additional_executors: additional_executors,
             phantom: PhantomData,
         }
     }
 }
 
-pub trait Fuzzer<ST, EM, E, OT, FT, C, I, R>
+impl<E, OT, I> Engine<E, OT, tuple_list_type!(), I>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    I: Input,
+{
+    pub fn new(main_executor: E) -> Self {
+        Self::with_executors(main_executor, tuple_list!())
+    }
+}
+
+pub trait Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
+where
+    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
+    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -282,7 +306,7 @@ where
         rand: &mut R,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, I>,
+        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
     ) -> Result<usize, AflError> {
         let (_, idx) = corpus.next(rand)?;
@@ -299,7 +323,7 @@ where
         rand: &mut R,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, I>,
+        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
     ) -> Result<(), AflError> {
         let mut last = current_milliseconds();
@@ -317,29 +341,31 @@ where
     }
 }
 
-pub struct StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+pub struct StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
+    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
     stages: ST,
-    phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
+    phantom: PhantomData<(EM, E, OT, FT, ET, C, I, R)>,
 }
 
-impl<ST, EM, E, OT, FT, C, I, R> Fuzzer<ST, EM, E, OT, FT, C, I, R>
-    for StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+impl<ST, EM, E, OT, FT, ET, C, I, R> Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
+    for StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
+    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -353,13 +379,14 @@ where
     }
 }
 
-impl<ST, EM, E, OT, FT, C, I, R> StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+impl<ST, EM, E, OT, FT, ET, C, I, R> StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
+    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -404,7 +431,7 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
-        let executor = InMemoryExecutor::<BytesInput, _>::new(harness, tuple_list!());
+        let executor = InMemoryExecutor::<BytesInput, _>::new("main", harness, tuple_list!());
         let mut state = State::new(tuple_list!());
 
         let mut events_manager = LoggerEventManager::new(stderr());

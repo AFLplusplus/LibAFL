@@ -65,10 +65,10 @@ pub trait MatchType {
 }
 
 impl MatchType for () {
-    fn match_type<T: 'static>(&self, f: fn(t: &T)) {
+    fn match_type<T: 'static>(&self, _f: fn(t: &T)) {
         ()
     }
-    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) {
+    fn match_type_mut<T: 'static>(&mut self, _f: fn(t: &mut T)) {
         ()
     }
 }
@@ -103,10 +103,10 @@ pub trait MatchNameAndType {
 }
 
 impl MatchNameAndType for () {
-    fn match_name_type<T: 'static>(&self, name: &'static str) -> Option<&T> {
+    fn match_name_type<T: 'static>(&self, _name: &'static str) -> Option<&T> {
         None
     }
-    fn match_name_type_mut<T: 'static>(&mut self, name: &'static str) -> Option<&mut T> {
+    fn match_name_type_mut<T: 'static>(&mut self, _name: &'static str) -> Option<&mut T> {
         None
     }
 }

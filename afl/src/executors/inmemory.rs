@@ -4,6 +4,7 @@ use core::ptr;
 use crate::executors::{Executor, ExitKind, HasObservers};
 use crate::inputs::{HasTargetBytes, Input};
 use crate::observers::ObserversTuple;
+use crate::tuples::Named;
 use crate::AflError;
 
 /// The (unsafe) pointer to the current inmem executor, for the current run.
@@ -21,6 +22,7 @@ where
 {
     harness: HarnessFunction<I>,
     observers: OT,
+    name: &'static str,
 }
 
 impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
@@ -39,6 +41,16 @@ where
             CURRENT_INMEMORY_EXECUTOR_PTR = ptr::null();
         }
         Ok(ret)
+    }
+}
+
+impl<I, OT> Named for InMemoryExecutor<I, OT>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    fn name(&self) -> &str {
+        self.name
     }
 }
 
@@ -63,7 +75,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(harness_fn: HarnessFunction<I>, observers: OT) -> Self {
+    pub fn new(name: &'static str, harness_fn: HarnessFunction<I>, observers: OT) -> Self {
         #[cfg(feature = "std")]
         unsafe {
             os_signals::setup_crash_handlers::<I>();
@@ -71,6 +83,7 @@ where
         Self {
             harness: harness_fn,
             observers: observers,
+            name: name,
         }
     }
 }
@@ -178,7 +191,7 @@ mod tests {
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::{HasTargetBytes, Input, TargetBytes};
-    use crate::tuples::{tuple_list, tuple_list_type};
+    use crate::tuples::tuple_list;
 
     use serde::{Deserialize, Serialize};
 
@@ -204,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut in_mem_executor = InMemoryExecutor::new(test_harness_fn_nop, tuple_list!());
+        let mut in_mem_executor = InMemoryExecutor::new("main", test_harness_fn_nop, tuple_list!());
         let mut input = NopInput {};
         assert!(in_mem_executor.run_target(&mut input).is_ok());
     }
