@@ -206,19 +206,21 @@ where
         E: Executor<I>,
         EM: EventManager<C, E, I, R>,
     {
+        let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(rand)?;
             let fitness = self.evaluate_input(&input, engine.executor_mut())?;
-            self.add_if_interesting(corpus, input, fitness)?;
+            if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
+                added += 1;
+            }
             manager.fire(
                 Event::LoadInitial {
                     sender_id: 0,
                     phantom: PhantomData,
-                },
-                self,
-                corpus,
+                }
             )?;
         }
+        manager.fire(Event::log(0, format!("Loaded {} over {} initial testcases", added, num)))?;
         manager.process(self, corpus)?;
         Ok(())
     }
@@ -316,11 +318,7 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.fire(
-                    Event::update_stats(state.executions(), state.executions_over_seconds()),
-                    state,
-                    corpus,
-                )?; // TODO self.new_execs});
+                manager.fire(Event::update_stats(state.executions(), state.executions_over_seconds()))?;
             }
         }
     }

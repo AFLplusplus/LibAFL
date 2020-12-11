@@ -221,7 +221,7 @@ where
         scheduled.add_mutation(mutation_wordinteresting);
         scheduled.add_mutation(mutation_dwordinteresting);
 
-        scheduled.add_mutation(mutation_bytesdelete);
+        /*scheduled.add_mutation(mutation_bytesdelete);
         scheduled.add_mutation(mutation_bytesdelete);
         scheduled.add_mutation(mutation_bytesdelete);
         scheduled.add_mutation(mutation_bytesdelete);
@@ -231,7 +231,7 @@ where
         scheduled.add_mutation(mutation_bytesset);
         scheduled.add_mutation(mutation_bytesrandset);
         scheduled.add_mutation(mutation_bytescopy);
-        scheduled.add_mutation(mutation_bytesswap);
+        scheduled.add_mutation(mutation_bytesswap);*/
 
         // TODO dictionary and custom dictionary (redqueen etc.)
         /*scheduled.add_mutation(mutation_bitflip);

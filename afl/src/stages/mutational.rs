@@ -72,9 +72,8 @@ where
                         sender_id: 0,
                         input: Ptr::Ref(testcase.load_input()?),
                         observers: PtrMut::Ref(engine.executor_mut().observers_mut()),
-                    },
-                    state,
-                    corpus,
+                        corpus_count: corpus.count() +1
+                    }
                 )?;
                 let _ = corpus.add(testcase);
             }
