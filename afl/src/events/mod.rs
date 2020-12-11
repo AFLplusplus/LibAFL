@@ -60,6 +60,7 @@ where
         sender_id: u64,
         input: Ptr<'a, I>,
         observers: PtrMut<'a, crate::observers::observer_serde::NamedSerdeAnyMap>,
+        corpus_count: usize
     },
     UpdateStats {
         sender_id: u64,
@@ -108,6 +109,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
+                corpus_count: _
             } => "New Testcase",
             Event::UpdateStats {
                 sender_id: _,
@@ -167,9 +169,7 @@ where
     /// Fire an Event
     fn fire<'a>(
         &mut self,
-        event: Event<'a, I>,
-        state: &mut State<I, R>,
-        corpus: &mut C,
+        event: Event<'a, I>
     ) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
@@ -184,10 +184,8 @@ where
 
     // TODO the broker has a state? do we need to pass state and corpus?
     fn handle_in_broker(
-        &self,
+        &mut self,
         event: &Event<I>,
-        /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
-        _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::LoadInitial {
@@ -198,6 +196,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
+                corpus_count: _
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
@@ -241,16 +240,17 @@ where
     }
 
     fn handle_in_client(
-        &self,
+        &mut self,
         event: Event<I>,
-        /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
-        corpus: &mut C,
+        _state: &mut State<I, R>,
+        _corpus: &mut C,
     ) -> Result<(), AflError> {
         match event {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
                 observers: _,
+                corpus_count: _
             } => {
                 // here u should match sender_id, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
@@ -285,6 +285,12 @@ where
 {
     writer: W,
     count: usize,
+
+    // stats (maybe we need a separated struct?)
+    executions: usize,
+    execs_over_sec: u64,
+    corpus_count: usize,
+
     phantom: PhantomData<(C, E, I, R)>,
 }
 
@@ -301,10 +307,8 @@ where
     fn fire<'a>(
         &mut self,
         event: Event<'a, I>,
-        state: &mut State<I, R>,
-        corpus: &mut C,
     ) -> Result<(), AflError> {
-        match self.handle_in_broker(&event, state, corpus)? {
+        match self.handle_in_broker(&event)? {
             BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
             // Ignore broker-only events
             BrokerEventResult::Handled => (),
@@ -316,6 +320,59 @@ where
         let c = self.count;
         self.count = 0;
         Ok(c)
+    }
+
+    fn handle_in_broker(
+        &mut self,
+        event: &Event<I>,
+    ) -> Result<BrokerEventResult, AflError> {
+        match event {
+            Event::NewTestcase {
+                sender_id: _,
+                input: _,
+                observers: _,
+                corpus_count
+            } => {
+                self.corpus_count = *corpus_count;
+                writeln!(self.writer, "[NEW] corpus: {} execs: {} execs/s: {}", self.corpus_count, self.executions, self.execs_over_sec);
+                Ok(BrokerEventResult::Handled)
+            },
+            Event::UpdateStats {
+                sender_id: _,
+                executions,
+                execs_over_sec,
+                phantom: _,
+            } => {
+                self.executions = *executions;
+                self.execs_over_sec = *execs_over_sec;
+                writeln!(self.writer, "[UPDATE] corpus: {} execs: {} execs/s: {}", self.corpus_count, self.executions, self.execs_over_sec);
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::Crash {
+                sender_id: _,
+                input: _,
+                phantom: _,
+            } => {
+                panic!("LoggerEventManager cannot handle Event::Crash");
+            },
+            Event::Timeout {
+                sender_id: _,
+                input: _,
+                phantom: _,
+            } => {
+                panic!("LoggerEventManager cannot handle Event::Timeout");
+            }
+            Event::Log {
+                sender_id,
+                severity_level,
+                message,
+                phantom: _,
+            } => {
+                writeln!(self.writer, "[LOG {}]: {}", severity_level, message);
+                Ok(BrokerEventResult::Handled)
+            }
+            _ => Ok(BrokerEventResult::Handled),
+        }
     }
 }
 
@@ -333,6 +390,9 @@ where
         Self {
             writer: writer,
             count: 0,
+            executions: 0,
+            execs_over_sec: 0,
+            corpus_count: 0,
             phantom: PhantomData,
         }
     }
@@ -388,8 +448,6 @@ where
     fn fire<'a>(
         &mut self,
         event: Event<'a, I>,
-        state: &mut State<I, R>,
-        corpus: &mut C,
     ) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp_broker
@@ -433,10 +491,8 @@ where
     }
 
     fn handle_in_broker(
-        &self,
+        &mut self,
         event: &Event<I>,
-        /*broker: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
-        _corpus: &mut C,
     ) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::LoadInitial {
@@ -447,6 +503,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
+                corpus_count: _
             } => Ok(BrokerEventResult::Forward),
             Event::UpdateStats {
                 sender_id: _,
@@ -490,7 +547,7 @@ where
     }
 
     fn handle_in_client(
-        &self,
+        &mut self,
         event: Event<I>,
         /*client: &dyn EventManager<C, E, I, R>,*/ _state: &mut State<I, R>,
         corpus: &mut C,
@@ -500,6 +557,7 @@ where
                 sender_id: _,
                 input: _,
                 observers: _,
+                corpus_count: _
             } => {
                 // here u should match sender_id, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
@@ -541,6 +599,7 @@ mod tests {
             sender_id: 0,
             input: Ptr::Ref(&i),
             observers: PtrMut::Ref(&mut map),
+            corpus_count: 1
         };
 
         let j = serde_json::to_string(&e).unwrap();
@@ -551,6 +610,7 @@ mod tests {
                 sender_id: _,
                 input: _,
                 observers: obs,
+                corpus_count: _
             } => {
                 let o = obs
                     .as_ref()
