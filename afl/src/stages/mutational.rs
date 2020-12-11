@@ -1,11 +1,11 @@
 use core::marker::PhantomData;
 
 use crate::events::EventManager;
-use crate::executors::{HasObservers, Executor};
-use crate::observers::ObserversTuple;
+use crate::executors::{Executor, HasObservers};
 use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
 use crate::mutators::Mutator;
+use crate::observers::ObserversTuple;
 use crate::stages::Corpus;
 use crate::stages::{Engine, Stage};
 use crate::utils::Rand;
@@ -101,7 +101,8 @@ where
     phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
 }
 
-impl<M, EM, E, OT, FT, C, I, R> MutationalStage<M, EM, E, OT, FT, C, I, R> for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
+impl<M, EM, E, OT, FT, C, I, R> MutationalStage<M, EM, E, OT, FT, C, I, R>
+    for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
 where
     M: Mutator<C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
@@ -125,7 +126,8 @@ where
     }
 }
 
-impl<M, EM, E, OT, FT, C, I, R> Stage<EM, E, OT, FT, C, I, R> for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
+impl<M, EM, E, OT, FT, C, I, R> Stage<EM, E, OT, FT, C, I, R>
+    for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
 where
     M: Mutator<C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,

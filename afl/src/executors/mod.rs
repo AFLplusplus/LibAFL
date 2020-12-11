@@ -1,7 +1,7 @@
 pub mod inmemory;
 
 use crate::inputs::Input;
-use crate::observers::{ObserversTuple};
+use crate::observers::ObserversTuple;
 use crate::AflError;
 
 /// How an execution finished.
@@ -12,7 +12,10 @@ pub enum ExitKind {
     Timeout,
 }
 
-pub trait HasObservers<OT> where OT: ObserversTuple {
+pub trait HasObservers<OT>
+where
+    OT: ObserversTuple,
+{
     /// Get the linked observers
     fn observers(&self) -> &OT;
 

@@ -14,15 +14,15 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::io::Write;
 
+use crate::corpus::Corpus;
 use crate::engines::State;
 use crate::executors::Executor;
-use crate::observers::ObserversTuple;
 use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
-use crate::serde_anymap::{SerdeAny, Ptr, PtrMut};
+use crate::observers::ObserversTuple;
+use crate::serde_anymap::{Ptr, PtrMut, SerdeAny};
 use crate::utils::Rand;
 use crate::AflError;
-use crate::corpus::Corpus;
 
 /// Indicate if an event worked or not
 pub enum BrokerEventResult {
@@ -53,7 +53,7 @@ where
 pub enum Event<'a, I, OT>
 where
     I: Input,
-    OT: ObserversTuple
+    OT: ObserversTuple,
 {
     LoadInitial {
         sender_id: u64,
@@ -100,8 +100,7 @@ where
 impl<'a, I, OT> Event<'a, I, OT>
 where
     I: Input,
-    OT: ObserversTuple
-    //CE: CustomEvent<I, OT>,
+    OT: ObserversTuple, //CE: CustomEvent<I, OT>,
 {
     pub fn name(&self) -> &str {
         match self {
@@ -304,7 +303,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R> for LoggerEventManager<C, E, OT, FT, I, R, W>
+impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R>
+    for LoggerEventManager<C, E, OT, FT, I, R, W>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -325,7 +325,11 @@ where
         Ok(())
     }
 
-    fn process(&mut self, _state: &mut State<I, R, FT>, _corpus: &mut C) -> Result<usize, AflError> {
+    fn process(
+        &mut self,
+        _state: &mut State<I, R, FT>,
+        _corpus: &mut C,
+    ) -> Result<usize, AflError> {
         let c = self.count;
         self.count = 0;
         Ok(c)
@@ -457,7 +461,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R> EventManager<C, E, OT, FT, I, R> for LlmpBrokerEventManager<C, E, OT, FT, I, R>
+impl<C, E, OT, FT, I, R> EventManager<C, E, OT, FT, I, R>
+    for LlmpBrokerEventManager<C, E, OT, FT, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -474,7 +479,11 @@ where
         Ok(())
     }
 
-    fn process(&mut self, _state: &mut State<I, R, FT>, _corpus: &mut C) -> Result<usize, AflError> {
+    fn process(
+        &mut self,
+        _state: &mut State<I, R, FT>,
+        _corpus: &mut C,
+    ) -> Result<usize, AflError> {
         // TODO: iterators
         /*
         let mut handled = vec![];
@@ -594,15 +603,14 @@ mod tests {
 
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
-    use crate::observers::{Observer, StdMapObserver, ObserversTuple};
-    use crate::tuples::{MatchNameAndType, Named, tuple_list, tuple_list_type};
+    use crate::observers::{Observer, ObserversTuple, StdMapObserver};
     use crate::serde_anymap::{Ptr, PtrMut};
+    use crate::tuples::{tuple_list, tuple_list_type, MatchNameAndType, Named};
 
     static mut MAP: [u32; 4] = [0; 4];
 
     #[test]
     fn test_event_serde() {
-        
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
         let mut map = tuple_list!(obv);
 
@@ -616,7 +624,8 @@ mod tests {
 
         let j = serde_json::to_string(&e).unwrap();
 
-        let d: Event<BytesInput, tuple_list_type!(StdMapObserver<u32>)> = serde_json::from_str(&j).unwrap();
+        let d: Event<BytesInput, tuple_list_type!(StdMapObserver<u32>)> =
+            serde_json::from_str(&j).unwrap();
         match d {
             Event::NewTestcase {
                 sender_id: _,
@@ -624,7 +633,10 @@ mod tests {
                 observers,
                 corpus_count: _,
             } => {
-                let o = observers.as_ref().match_name_type::<StdMapObserver<u32>>("test").unwrap();
+                let o = observers
+                    .as_ref()
+                    .match_name_type::<StdMapObserver<u32>>("test")
+                    .unwrap();
                 assert_eq!("test", o.name());
             }
             _ => panic!("mistmatch".to_string()),

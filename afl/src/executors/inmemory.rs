@@ -1,9 +1,9 @@
 use core::ffi::c_void;
 use core::ptr;
 
-use crate::executors::{Executor, HasObservers, ExitKind};
+use crate::executors::{Executor, ExitKind, HasObservers};
 use crate::inputs::{HasTargetBytes, Input};
-use crate::observers::{ObserversTuple};
+use crate::observers::ObserversTuple;
 use crate::AflError;
 
 /// The (unsafe) pointer to the current inmem executor, for the current run.
@@ -17,7 +17,7 @@ type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 pub struct InMemoryExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple
+    OT: ObserversTuple,
 {
     harness: HarnessFunction<I>,
     observers: OT,
@@ -26,7 +26,7 @@ where
 impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple
+    OT: ObserversTuple,
 {
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
@@ -42,9 +42,11 @@ where
     }
 }
 
-impl<I, OT> HasObservers<OT> for InMemoryExecutor<I, OT> where
-I: Input + HasTargetBytes,
-OT: ObserversTuple {
+impl<I, OT> HasObservers<OT> for InMemoryExecutor<I, OT>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers
@@ -59,7 +61,7 @@ OT: ObserversTuple {
 impl<I, OT> InMemoryExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple
+    OT: ObserversTuple,
 {
     pub fn new(harness_fn: HarnessFunction<I>, observers: OT) -> Self {
         #[cfg(feature = "std")]
@@ -190,7 +192,7 @@ mod tests {
     }
 
     #[cfg(feature = "std")]
-    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput, tuple_list_type!()>, buf: &[u8]) -> ExitKind {
+    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
         println!("Fake exec with buf of len {}", buf.len());
         ExitKind::Ok
     }

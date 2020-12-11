@@ -4,11 +4,11 @@ pub use mutational::StdMutationalStage;
 use crate::corpus::Corpus;
 use crate::engines::{Engine, State};
 use crate::events::EventManager;
-use crate::executors::{HasObservers, Executor};
-use crate::observers::ObserversTuple;
+use crate::executors::{Executor, HasObservers};
 use crate::feedbacks::FeedbacksTuple;
-use crate::tuples::{TupleList, MatchType};
 use crate::inputs::Input;
+use crate::observers::ObserversTuple;
+use crate::tuples::{MatchType, TupleList};
 use crate::utils::Rand;
 use crate::AflError;
 
@@ -77,12 +77,15 @@ where
         engine: &mut Engine<E, OT, I>,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), AflError> { Ok(()) }
-    fn for_each(&self, f: fn(&dyn Stage<EM, E, OT, FT, C, I, R>)) { }
-    fn for_each_mut(&mut self, f: fn(&mut dyn Stage<EM, E, OT, FT, C, I, R>)) { }
+    ) -> Result<(), AflError> {
+        Ok(())
+    }
+    fn for_each(&self, f: fn(&dyn Stage<EM, E, OT, FT, C, I, R>)) {}
+    fn for_each_mut(&mut self, f: fn(&mut dyn Stage<EM, E, OT, FT, C, I, R>)) {}
 }
 
-impl<Head, Tail, EM, E, OT, FT, C, I, R> StagesTuple<EM, E, OT, FT, C, I, R> for (Head, Tail) where
+impl<Head, Tail, EM, E, OT, FT, C, I, R> StagesTuple<EM, E, OT, FT, C, I, R> for (Head, Tail)
+where
     Head: Stage<EM, E, OT, FT, C, I, R>,
     Tail: StagesTuple<EM, E, OT, FT, C, I, R> + TupleList,
     EM: EventManager<C, E, OT, FT, I, R>,
@@ -102,8 +105,10 @@ impl<Head, Tail, EM, E, OT, FT, C, I, R> StagesTuple<EM, E, OT, FT, C, I, R> for
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
-        self.0.perform(rand, state, corpus, engine, manager, corpus_idx)?;
-        self.1.perform_all(rand, state, corpus, engine, manager, corpus_idx)
+        self.0
+            .perform(rand, state, corpus, engine, manager, corpus_idx)?;
+        self.1
+            .perform_all(rand, state, corpus, engine, manager, corpus_idx)
     }
 
     fn for_each(&self, f: fn(&dyn Stage<EM, E, OT, FT, C, I, R>)) {

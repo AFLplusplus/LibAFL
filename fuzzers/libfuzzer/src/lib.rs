@@ -22,8 +22,9 @@ use afl::mutators::HasMaxSize;
 use afl::observers::StdMapObserver;
 use afl::stages::mutational::StdMutationalStage;
 use afl::utils::StdRand;
+use afl::tuples::tuple_list;
 
-// const MAP_SIZE: usize = 65536;
+const MAP_SIZE: usize = 65536;
 
 #[no_mangle]
 extern "C" {
@@ -59,18 +60,12 @@ pub extern "C" fn afl_libfuzzer_main() {
         StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
             __lafl_max_edges_size as usize
         });
-    let edges_feedback = MaxMapFeedback::new_with_observer(&edges_observer);
+    let edges_feedback = MaxMapFeedback::<u8, StdMapObserver<u8>>::new(&NAME_COV_MAP, MAP_SIZE);
 
-    let mut executor = InMemoryExecutor::new(harness);
-    let mut state = State::new();
-    executor.add_observer(Box::new(edges_observer));
-    state.add_feedback(Box::new(edges_feedback));
-
+    let executor = InMemoryExecutor::new(harness, tuple_list!(edges_observer));
+    let mut state = State::new(tuple_list!(edges_feedback));
+ 
     let mut engine = Engine::new(executor);
-    let mut mutator = HavocBytesMutator::new_default();
-    mutator.set_max_size(4096);
-
-    let stage = StdMutationalStage::new(mutator);
 
     state
         .generate_initial_inputs(
@@ -83,9 +78,11 @@ pub extern "C" fn afl_libfuzzer_main() {
         )
         .expect("Failed to load initial inputs");
 
-    let mut fuzzer = StdFuzzer::new();
+    let mut mutator = HavocBytesMutator::new_default();
+    mutator.set_max_size(4096);
 
-    fuzzer.add_stage(Box::new(stage));
+    let stage = StdMutationalStage::new(mutator);
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     fuzzer
         .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut events)

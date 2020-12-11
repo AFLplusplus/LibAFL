@@ -1,19 +1,18 @@
 //! The engine is the core piece of every good fuzzer
 
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use hashbrown::HashMap;
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::{Event, EventManager};
-use crate::executors::{HasObservers, Executor};
-use crate::feedbacks::{FeedbacksTuple};
-use crate::observers::ObserversTuple;
+use crate::executors::{Executor, HasObservers};
+use crate::feedbacks::FeedbacksTuple;
 use crate::generators::Generator;
 use crate::inputs::Input;
-use crate::stages::Stage;
+use crate::observers::ObserversTuple;
+use crate::stages::StagesTuple;
 use crate::utils::{current_milliseconds, Rand};
 use crate::AflError;
 
@@ -27,7 +26,7 @@ pub struct State<I, R, FT>
 where
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>
+    FT: FeedbacksTuple<I>,
 {
     /// How many times the executor ran the harness/target
     executions: usize,
@@ -37,14 +36,14 @@ where
     metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
     // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
     feedbacks: FT,
-    phantom: PhantomData<R>,
+    phantom: PhantomData<(I, R)>,
 }
 
 impl<I, R, FT> State<I, R, FT>
 where
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>
+    FT: FeedbacksTuple<I>,
 {
     /// Get executions
     #[inline]
@@ -117,7 +116,7 @@ where
     pub fn evaluate_input<E, OT>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
     where
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple
+        OT: ObserversTuple,
     {
         executor.reset_observers()?;
         executor.run_target(&input)?;
@@ -216,12 +215,12 @@ where
         Ok(())
     }
 
-    pub fn new() -> Self {
+    pub fn new(feedbacks: FT) -> Self {
         Self {
             executions: 0,
             start_time: current_milliseconds(),
             metadatas: HashMap::default(),
-            feedbacks: vec![],
+            feedbacks: feedbacks,
             phantom: PhantomData,
         }
     }
@@ -263,8 +262,9 @@ where
     }
 }
 
-pub trait Fuzzer<EM, E, OT, FT, C, I, R>
+pub trait Fuzzer<ST, EM, E, OT, FT, C, I, R>
 where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -273,13 +273,9 @@ where
     I: Input,
     R: Rand,
 {
-    fn stages(&self) -> &[Box<dyn Stage<EM, E, OT, FT, C, I, R>>];
+    fn stages(&self) -> &ST;
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<EM, E, OT, FT, C, I, R>>>;
-
-    fn add_stage(&mut self, stage: Box<dyn Stage<EM, E, OT, FT, C, I, R>>) {
-        self.stages_mut().push(stage);
-    }
+    fn stages_mut(&mut self) -> &mut ST;
 
     fn fuzz_one(
         &mut self,
@@ -288,13 +284,11 @@ where
         corpus: &mut C,
         engine: &mut Engine<E, OT, I>,
         manager: &mut EM,
-    ) -> Result<usize, AflError>
-    {
+    ) -> Result<usize, AflError> {
         let (_, idx) = corpus.next(rand)?;
 
-        for stage in self.stages_mut() {
-            stage.perform(rand, state, corpus, engine, manager, idx)?;
-        }
+        self.stages_mut()
+            .perform_all(rand, state, corpus, engine, manager, idx)?;
 
         manager.process(state, corpus)?;
         Ok(idx)
@@ -307,8 +301,7 @@ where
         corpus: &mut C,
         engine: &mut Engine<E, OT, I>,
         manager: &mut EM,
-    ) -> Result<(), AflError>
-    {
+    ) -> Result<(), AflError> {
         let mut last = current_milliseconds();
         loop {
             self.fuzz_one(rand, state, corpus, engine, manager)?;
@@ -324,8 +317,9 @@ where
     }
 }
 
-pub struct StdFuzzer<EM, E, OT, FT, C, I, R>
+pub struct StdFuzzer<ST, EM, E, OT, FT, C, I, R>
 where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -334,11 +328,14 @@ where
     I: Input,
     R: Rand,
 {
-    stages: Vec<Box<dyn Stage<EM, E, OT, FT, C, I, R>>>,
+    stages: ST,
+    phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
 }
 
-impl<EM, E, OT, FT, C, I, R> Fuzzer<EM, E, OT, FT, C, I, R> for StdFuzzer<EM, E, OT, FT, C, I, R>
+impl<ST, EM, E, OT, FT, C, I, R> Fuzzer<ST, EM, E, OT, FT, C, I, R>
+    for StdFuzzer<ST, EM, E, OT, FT, C, I, R>
 where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -347,17 +344,18 @@ where
     I: Input,
     R: Rand,
 {
-    fn stages(&self) -> &[Box<dyn Stage<EM, E, OT, FT, C, I, R>>] {
+    fn stages(&self) -> &ST {
         &self.stages
     }
 
-    fn stages_mut(&mut self) -> &mut Vec<Box<dyn Stage<EM, E, OT, FT, C, I, R>>> {
+    fn stages_mut(&mut self) -> &mut ST {
         &mut self.stages
     }
 }
 
-impl<EM, E, OT, FT, C, I, R> StdFuzzer<EM, E, OT, FT, C, I, R>
+impl<ST, EM, E, OT, FT, C, I, R> StdFuzzer<ST, EM, E, OT, FT, C, I, R>
 where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<C, E, OT, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -366,8 +364,11 @@ where
     I: Input,
     R: Rand,
 {
-    pub fn new() -> Self {
-        Self { stages: vec![] }
+    pub fn new(stages: ST) -> Self {
+        Self {
+            stages: stages,
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -375,8 +376,6 @@ where
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-
-    use alloc::boxed::Box;
 
     #[cfg(feature = "std")]
     use std::io::stderr;
@@ -405,18 +404,15 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
-        let executor = InMemoryExecutor::new(harness, tuple_list!());
-        let mut state = State::<BytesInput, _, _>::new();
+        let executor = InMemoryExecutor::<BytesInput, _>::new(harness, tuple_list!());
+        let mut state = State::new(tuple_list!());
 
         let mut events_manager = LoggerEventManager::new(stderr());
         let mut engine = Engine::new(executor);
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);
         let stage = StdMutationalStage::new(mutator);
-        let mut fuzzer = StdFuzzer::new();
-        fuzzer.add_stage(Box::new(stage));
-
-        //
+        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
         for i in 0..1000 {
             fuzzer

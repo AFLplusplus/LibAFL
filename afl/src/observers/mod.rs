@@ -3,12 +3,12 @@ extern crate num;
 use serde::{Deserialize, Serialize};
 
 use crate::serde_anymap::ArrayMut;
-use crate::tuples::{TupleList, MatchNameAndType, MatchType, Named};
+use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
 use crate::AflError;
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer: Named + 'static {
+pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'static {
     /// The testcase finished execution, calculate any changes.
     #[inline]
     fn flush(&mut self) -> Result<(), AflError> {
@@ -23,7 +23,9 @@ pub trait Observer: Named + 'static {
     }
 }
 
-pub trait ObserversTuple: MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned {
+pub trait ObserversTuple:
+    MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned
+{
     fn reset_all(&mut self) -> Result<(), AflError>;
     fn post_exec_all(&mut self) -> Result<(), AflError>;
     //fn for_each(&self, f: fn(&dyn Observer));
@@ -31,24 +33,29 @@ pub trait ObserversTuple: MatchNameAndType + MatchType + serde::Serialize + serd
 }
 
 impl ObserversTuple for () {
-    fn reset_all(&mut self) -> Result<(), AflError> { Ok(()) }
-    fn post_exec_all(&mut self) -> Result<(), AflError> { Ok(()) }
+    fn reset_all(&mut self) -> Result<(), AflError> {
+        Ok(())
+    }
+    fn post_exec_all(&mut self) -> Result<(), AflError> {
+        Ok(())
+    }
     //fn for_each(&self, f: fn(&dyn Observer)) { }
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) { }
 }
 
-impl<Head, Tail> ObserversTuple for (Head, Tail) where
-    Head: Observer + serde::Serialize + serde::de::DeserializeOwned,
+impl<Head, Tail> ObserversTuple for (Head, Tail)
+where
+    Head: Observer,
     Tail: ObserversTuple + TupleList,
 {
     fn reset_all(&mut self) -> Result<(), AflError> {
         self.0.reset()?;
-        self.1.reset_all() 
+        self.1.reset_all()
     }
 
     fn post_exec_all(&mut self) -> Result<(), AflError> {
         self.0.post_exec()?;
-        self.1.post_exec_all() 
+        self.1.post_exec_all()
     }
 
     /*fn for_each(&self, f: fn(&dyn Observer)) {
@@ -105,7 +112,7 @@ where
 {
     map: ArrayMut<T>,
     initial: T,
-    name: &'static str,
+    name: String,
 }
 
 impl<T> Observer for StdMapObserver<T>
@@ -118,12 +125,13 @@ where
     }
 }
 
-impl<T> Named for StdMapObserver<T> where
-T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+impl<T> Named for StdMapObserver<T>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &'static str {
-        self.name
+    fn name(&self) -> &str {
+        self.name.as_str()
     }
 }
 

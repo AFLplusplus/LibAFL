@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 use num::Integer;
 
-use crate::inputs::Input;
-use crate::observers::{ObserversTuple, Observer, MapObserver};
 use crate::corpus::Testcase;
-use crate::tuples::{Named, TupleList, MatchNameAndType, MatchType};
+use crate::inputs::Input;
+use crate::observers::{MapObserver, Observer, ObserversTuple};
+use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
 use crate::AflError;
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
@@ -24,7 +24,11 @@ where
     I: Input,
 {
     /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting<OT: ObserversTuple>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>;
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
@@ -41,41 +45,63 @@ where
 
 pub trait FeedbacksTuple<I>: MatchType + MatchNameAndType
 where
-    I: Input
+    I: Input,
 {
-    fn is_interesting_all<OT: ObserversTuple>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>;
+    fn is_interesting_all<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError>;
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError>;
     fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError>;
     //fn for_each(&self, f: fn(&dyn Feedback<I>));
     //fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>));
 }
 
-impl<I> FeedbacksTuple<I> for () where
-I: Input{
-    fn is_interesting_all<OT: ObserversTuple>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError> { Ok(0) }
-    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> { Ok(())}
-    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError> { Ok(())}
+impl<I> FeedbacksTuple<I> for ()
+where
+    I: Input,
+{
+    fn is_interesting_all<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError> {
+        Ok(0)
+    }
+    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
+        Ok(())
+    }
+    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError> {
+        Ok(())
+    }
     //fn for_each(&self, f: fn(&dyn Feedback<I>)) {}
     //fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>)) {}
 }
 
-impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail) where
+impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
+where
     Head: Feedback<I>,
     Tail: FeedbacksTuple<I> + TupleList,
-    I: Input
+    I: Input,
 {
-    fn is_interesting_all<OT: ObserversTuple>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError> {
-        Ok(self.0.is_interesting(input, observers)? + self.1.is_interesting_all(input, observers)?)
+    fn is_interesting_all<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+    ) -> Result<u32, AflError> {
+        Ok(self.0.is_interesting(input, observers)?
+            + self.1.is_interesting_all(input, observers)?)
     }
 
-    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError>{
+    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
         self.0.append_metadata(testcase)?;
-        self.1.append_metadata_all(testcase) 
+        self.1.append_metadata_all(testcase)
     }
 
-    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError>{
+    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError> {
         self.0.discard_metadata(input)?;
-        self.1.discard_metadata_all(input) 
+        self.1.discard_metadata_all(input)
     }
 
     /*fn for_each(&self, f: fn(&dyn Feedback<I>)) {
@@ -191,7 +217,7 @@ where
     O: MapObserver<T> + 'static,
 {
     #[inline]
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         self.name
     }
 }
@@ -211,13 +237,13 @@ where
         }
     }
 
-    pub fn new_with_observer(map_observer: &O) -> Self {
+    /*pub fn new_with_observer(map_observer: &O) -> Self {
         Self {
             history_map: vec![T::default(); map_observer.map().len()],
             name: map_observer.name(),
             phantom: PhantomData,
         }
-    }
+    }*/
 }
 
 impl<T, R, O> MapFeedback<T, R, O>
