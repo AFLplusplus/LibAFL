@@ -221,7 +221,7 @@ where
     }
 
     /// Broker fun
-    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I, OT>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::NewTestcase {
                 sender_id: _,
@@ -293,8 +293,8 @@ where
     /// Client fun
     fn handle_in_client(
         &mut self,
-        event: Event<I>,
-        state: &mut State<I, R>,
+        event: Event<I, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
         match event {
@@ -340,7 +340,7 @@ where
     corpus_size: usize,
     start_time: time::Duration,
     client_stats: Vec<ClientStats>,
-    phantom: PhantomData<(C, E, I, R)>,
+    phantom: PhantomData<(C, E, I, R, OT, FT)>,
 }
 
 #[cfg(feature = "std")]
@@ -454,18 +454,19 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, E, I, R, W> EventManager<C, E, I, R> for LlmpEventManager<C, E, I, R, W>
+impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R> for LlmpEventManager<C, E, I, R, W>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
     FT: FeedbacksTuple<I>,
+    OT: ObserversTuple,
     I: Input,
     R: Rand,
     W: Write,
     //CE: CustomEvent<I>,
 {
     #[inline]
-    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<'a, I, OT>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
         self.send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
         Ok(())
