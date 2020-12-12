@@ -111,24 +111,12 @@ where
         &mut self.feedbacks
     }
 
-    // TODO move some of these, like evaluate_input, to Engine
-
-    /// Adds a feedback
-    #[inline]
-    pub fn add_feedback(&mut self, feedback: Box<FT>) {
-        self.feedbacks_mut().push(feedback);
-    }
-
     // TODO move some of these, like evaluate_input, to FuzzingEngine
     pub fn is_interesting<OT>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>
     where
         OT: ObserversTuple,
     {
-        let mut fitness;
-        for feedback in self.feedbacks_mut() {
-            fitness += feedback.is_interesting(&input, observers)?;
-        }
-        Ok(fitness)
+        Ok(self.feedbacks_mut().is_interesting_all(input, observers)?)
     }
 
     /// Runs the input and triggers observers and feedback
