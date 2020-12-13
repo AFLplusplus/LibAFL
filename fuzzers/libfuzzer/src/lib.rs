@@ -2,8 +2,6 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
-
 #[cfg(feature = "std")]
 use std::io::stderr;
 

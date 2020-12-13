@@ -55,7 +55,7 @@ where
 }
 
 /// Events sent around in the library
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum Event<I>
 where
@@ -232,6 +232,13 @@ where
     /// Broker fun
     fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
         match event {
+            Event::LoadInitial {
+                sender_id: _,
+                phantom: _, 
+            } => {
+                self.corpus_size_inc();
+                Ok(BrokerEventResult::Handled)
+            },
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
@@ -249,7 +256,7 @@ where
             }
             Event::UpdateStats {
                 sender_id,
-                executions: _,
+                executions,
                 execs_over_sec: _,
                 phantom: _,
             } => {
@@ -263,7 +270,8 @@ where
                         executions: 0,
                     })
                 }
-                let stat = &mut self.client_stats_mut()[*sender_id as usize];
+                let mut stat = &mut self.client_stats_mut()[*sender_id as usize];
+                stat.executions = *executions as u64;
                 println!(
                     "[UPDATE] corpus: {} execs: {} execs/s: {}",
                     self.corpus_size(),
@@ -323,7 +331,7 @@ where
                 Ok(())
             }
             _ => Err(AflError::Unknown(
-                "Received illegal message that message should not have arrived.".into(),
+                format!("Received illegal message that message should not have arrived: {:?}.", event),
             )),
         }
     }
@@ -462,11 +470,8 @@ where
     //CE: CustomEvent<I>,
 {
     writer: W,
-    count: usize,
 
     // stats (maybe we need a separated struct?)
-    executions: usize,
-    execs_over_sec: u64,
     corpus_size: usize,
     start_time: time::Duration,
     client_stats: Vec<ClientStats>,

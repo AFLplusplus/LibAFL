@@ -3,6 +3,7 @@ pub use bytes::BytesInput;
 
 use alloc::vec::Vec;
 use core::clone::Clone;
+use core::fmt::Debug;
 
 #[cfg(feature = "std")]
 use std::fs::File;
@@ -14,7 +15,7 @@ use std::path::Path;
 use crate::AflError;
 
 /// An input for the target
-pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned {
+pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug {
     #[cfg(feature = "std")]
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), AflError>
