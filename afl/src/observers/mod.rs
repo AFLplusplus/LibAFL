@@ -26,10 +26,21 @@ pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'st
 pub trait ObserversTuple:
     MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned
 {
+    /// Reset all executors in the tuple
     fn reset_all(&mut self) -> Result<(), AflError>;
     fn post_exec_all(&mut self) -> Result<(), AflError>;
     //fn for_each(&self, f: fn(&dyn Observer));
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
+
+    /// Serialize this tuple to a buf
+    fn serialize(&self) -> Result<Vec<u8>, AflError> {
+        Ok(postcard::to_allocvec(&self)?)
+    }
+
+    /// Deserilaize 
+    fn deserialize(&self, serialized: &[u8]) -> Result<Self, AflError> {
+        Ok(postcard::from_bytes(serialized)?)
+    }
 }
 
 impl ObserversTuple for () {
@@ -39,6 +50,8 @@ impl ObserversTuple for () {
     fn post_exec_all(&mut self) -> Result<(), AflError> {
         Ok(())
     }
+
+
     //fn for_each(&self, f: fn(&dyn Observer)) { }
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) { }
 }

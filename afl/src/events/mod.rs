@@ -4,6 +4,7 @@ pub mod llmp;
 pub mod shmem_translated;
 
 use alloc::string::String;
+use tuple_list::tuple_list_type;
 use core::{marker::PhantomData, time};
 
 use serde::{Deserialize, Serialize};
@@ -316,7 +317,7 @@ where
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
                 println!("Received new Testcase");
-                let observers: OT = postcard::from_bytes(&observers_buf)?;
+                let observers: OT = self.deserialize_observers(&observers_buf)?;
                 let interestingness = state.is_interesting(&input, &observers)?;
                 state.add_if_interesting(corpus, input, interestingness)?;
                 Ok(())
@@ -325,6 +326,14 @@ where
                 "Received illegal message that message should not have arrived.".into(),
             )),
         }
+    }
+
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Vec<u8>, AflError> {
+        Ok(postcard::to_allocvec(observers)?)
+    }
+
+    fn deserialize_observers(&mut self, observers_buf: &[u8]) -> Result<OT, AflError> {
+        Ok(postcard::from_bytes(observers_buf)?)
     }
 }
 
@@ -405,6 +414,8 @@ where
     fn start_time(&mut self) -> time::Duration {
         self.start_time
     }
+
+
 }
 
 #[cfg(feature = "std")]
@@ -513,49 +524,51 @@ where
     }
 }
 
+
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
 
-    use crate::events::Event;
+    use std::io::stderr;
+
+    use crate::{events::Event, observers::ObserversTuple};
     use crate::inputs::bytes::BytesInput;
     use crate::observers::StdMapObserver;
     use crate::serde_anymap::{Ptr, PtrMut};
     use crate::tuples::{tuple_list, tuple_list_type, MatchNameAndType, Named};
+    use crate::events::EventManager;
+
+    use super::LoggerEventManager;
 
     static mut MAP: [u32; 4] = [0; 4];
-
     #[test]
     fn test_event_serde() {
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
         let mut map = tuple_list!(obv);
-        let observers_buf = postcard::to_allocvec(&map).unwrap();
+        let observers_buf = map.serialize().unwrap();
+        // test_event_mgr.serialize_observers(&map).unwrap();
 
         let i = BytesInput::new(vec![0]);
         let e = Event::NewTestcase {
             sender_id: 0,
-            input: &i,
-            observers_buf: observers_buf,
+            input: i,
+            observers_buf,
             client_config: "conf".into(),
         };
 
-        let j = serde_json::to_string(&e).unwrap();
+        let serialized = postcard::to_allocvec(&e).unwrap();
 
-        let d: Event<BytesInput, tuple_list_type!(StdMapObserver<u32>)> =
-            serde_json::from_str(&j).unwrap();
-        match d {
+        match postcard::from_bytes::<Event<BytesInput>>(&serialized).unwrap() {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
                 observers_buf,
-                client_config: String,
+                client_config: _,
             } => {
-                let o = postcard::from_bytes(&observers_buf)
-                    .unwrap()
-                    .as_ref()
-                    .match_name_type::<StdMapObserver<u32>>("test")
+                let o = map.deserialize(&observers_buf).unwrap();
+                let test_observer = o.match_name_type::<StdMapObserver<u32>>("test")
                     .unwrap();
-                assert_eq!("test", o.name());
+                assert_eq!("test", test_observer.name());
             }
             _ => panic!("mistmatch".to_string()),
         };
