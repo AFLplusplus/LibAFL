@@ -436,8 +436,8 @@ impl LlmpSender {
     /// Never call alloc_next without either sending or cancelling the last allocated message for this page!
     /// There can only ever be up to one message allocated per page at each given time.
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
-        let mut buf_len_padded = buf_len;
-        let mut complete_msg_size = llmp_align(size_of::<LlmpMsg>() + buf_len_padded);
+        let buf_len_padded;
+        let mut complete_msg_size = llmp_align(size_of::<LlmpMsg>() + buf_len);
         let map = self.out_maps.last().unwrap();
         let page = map.page();
         let last_msg = self.last_msg_sent;

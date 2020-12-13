@@ -37,7 +37,7 @@ pub trait ObserversTuple:
         Ok(postcard::to_allocvec(&self)?)
     }
 
-    /// Deserilaize 
+    /// Deserilaize
     fn deserialize(&self, serialized: &[u8]) -> Result<Self, AflError> {
         Ok(postcard::from_bytes(serialized)?)
     }
@@ -50,7 +50,6 @@ impl ObserversTuple for () {
     fn post_exec_all(&mut self) -> Result<(), AflError> {
         Ok(())
     }
-
 
     //fn for_each(&self, f: fn(&dyn Observer)) { }
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) { }
@@ -187,8 +186,8 @@ where
         let initial = if map.len() > 0 { map[0] } else { T::default() };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
-            initial: initial,
             name: name.into(),
+            initial,
         }
     }
 
@@ -198,8 +197,8 @@ where
             let initial = if len > 0 { *map_ptr } else { T::default() };
             StdMapObserver {
                 map: ArrayMut::Cptr((map_ptr, len)),
-                initial: initial,
                 name: name.into(),
+                initial,
             }
         }
     }

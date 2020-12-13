@@ -235,18 +235,21 @@ where
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
-            name: name,
             phantom: PhantomData,
+            name,
         }
     }
 
-    /*pub fn new_with_observer(map_observer: &O) -> Self {
+    /// Create new MapFeedback for the observer type.
+    /// Name should match that of the observer.
+    pub fn new_with_observer(name: &'static str, map_observer: &O) -> Self {
+        debug_assert_eq!(name, map_observer.name());
         Self {
             history_map: vec![T::default(); map_observer.map().len()],
-            name: map_observer.name(),
             phantom: PhantomData,
+            name,
         }
-    }*/
+    }
 }
 
 impl<T, R, O> MapFeedback<T, R, O>

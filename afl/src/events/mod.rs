@@ -4,8 +4,8 @@ pub mod llmp;
 pub mod shmem_translated;
 
 use alloc::string::String;
-use tuple_list::tuple_list_type;
 use core::{marker::PhantomData, time};
+use tuple_list::tuple_list_type;
 
 use serde::{Deserialize, Serialize};
 
@@ -414,8 +414,6 @@ where
     fn start_time(&mut self) -> time::Duration {
         self.start_time
     }
-
-
 }
 
 #[cfg(feature = "std")]
@@ -524,19 +522,18 @@ where
     }
 }
 
-
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
 
     use std::io::stderr;
 
-    use crate::{events::Event, observers::ObserversTuple};
+    use crate::events::EventManager;
     use crate::inputs::bytes::BytesInput;
     use crate::observers::StdMapObserver;
     use crate::serde_anymap::{Ptr, PtrMut};
     use crate::tuples::{tuple_list, tuple_list_type, MatchNameAndType, Named};
-    use crate::events::EventManager;
+    use crate::{events::Event, observers::ObserversTuple};
 
     use super::LoggerEventManager;
 
@@ -566,8 +563,7 @@ mod tests {
                 client_config: _,
             } => {
                 let o = map.deserialize(&observers_buf).unwrap();
-                let test_observer = o.match_name_type::<StdMapObserver<u32>>("test")
-                    .unwrap();
+                let test_observer = o.match_name_type::<StdMapObserver<u32>>("test").unwrap();
                 assert_eq!("test", test_observer.name());
             }
             _ => panic!("mistmatch".to_string()),
