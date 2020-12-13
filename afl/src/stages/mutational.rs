@@ -76,8 +76,8 @@ where
                 // TODO decouple events manager and engine
                 manager.fire(Event::NewTestcase {
                     sender_id: 0,
-                    input: Ptr::Ref(testcase.load_input()?),
-                    observers: PtrMut::Ref(engine.executor_mut().observers_mut()),
+                    input: testcase.load_input()?,
+                    observers_buf: PtrMut::Ref(engine.executor_mut().observers_mut()),
                     corpus_count: corpus.count() + 1,
                 })?;
                 // let _ = corpus.add(testcase);

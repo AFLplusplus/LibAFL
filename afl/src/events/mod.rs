@@ -22,7 +22,7 @@ use crate::executors::Executor;
 use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
-use crate::serde_anymap::{Ptr, PtrMut, SerdeAny};
+use crate::serde_anymap::SerdeAny;
 use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, utils};
@@ -59,10 +59,9 @@ where
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum Event<'a, I, OT>
+pub enum Event<I>
 where
     I: Input,
-    OT: ObserversTuple,
 {
     LoadInitial {
         sender_id: u64,
@@ -70,9 +69,9 @@ where
     },
     NewTestcase {
         sender_id: u64,
-        input: Ptr<'a, I>,
-        observers: PtrMut<'a, OT>,
-        corpus_count: usize,
+        input: I,
+        observers_buf: Vec<u8>,
+        client_config: String,
     },
     UpdateStats {
         sender_id: u64,
@@ -106,10 +105,9 @@ where
     },
 }
 
-impl<'a, I, OT> Event<'a, I, OT>
+impl<I> Event<I>
 where
     I: Input,
-    OT: ObserversTuple, //CE: CustomEvent<I, OT>,
 {
     pub fn name(&self) -> &str {
         match self {
@@ -120,8 +118,8 @@ where
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
-                observers: _,
-                corpus_count: _,
+                client_config: _,
+                observers_buf: _,
             } => "New Testcase",
             Event::UpdateStats {
                 sender_id: _,
@@ -161,6 +159,19 @@ where
         }
     }
 
+    pub fn new_testcase<Ot>(config: String, input: I, observers: Ot) -> Result<Self, AflError>
+    where
+        Ot: ObserversTuple,
+    {
+        let observers_buf = postcard::to_allocvec(&observers)?;
+        Ok(Self::NewTestcase {
+            sender_id: 0,
+            input: input,
+            client_config: config,
+            observers_buf: observers_buf,
+        })
+    }
+
     pub fn update_stats(executions: usize, execs_over_sec: u64) -> Self {
         Event::UpdateStats {
             sender_id: 0,
@@ -181,7 +192,7 @@ where
     R: Rand,
 {
     /// Fire an Event
-    fn fire<'a>(&mut self, event: Event<'a, I, OT>) -> Result<(), AflError>;
+    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
@@ -221,13 +232,13 @@ where
     }
 
     /// Broker fun
-    fn handle_in_broker(&mut self, event: &Event<I, OT>) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
         match event {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
-                observers: _,
-                corpus_count,
+                observers_buf: _,
+                client_config: _,
             } => {
                 self.corpus_size_inc();
                 println!(
@@ -293,7 +304,7 @@ where
     /// Client fun
     fn handle_in_client(
         &mut self,
-        event: Event<I, OT>,
+        event: Event<I>,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<(), AflError> {
@@ -301,14 +312,16 @@ where
             Event::NewTestcase {
                 sender_id: _,
                 input,
-                observers,
-                corpus_count: _,
+                observers_buf,
+                client_config: _,
             } => {
-                // here u should match sender_id, if equal to the current one do not re-execute
+
+                // TODO: here u should match client_config, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
                 println!("Received new Testcase");
-                let interestingness = state.is_interesting(input, observers)?;
+                let observers = postcard::from_bytes(&observers_buf)?;
+                let interestingness = state.is_interesting(&input, observers)?;
                 state.add_if_interesting(corpus, input, interestingness);
                 Ok(())
             }
@@ -357,7 +370,7 @@ where
     //CE: CustomEvent<I, OT>,
 {
     #[inline]
-    fn fire<'a>(&mut self, event: Event<'a, I, OT>) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
         match self.handle_in_broker(&event)? {
             BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
             // Ignore broker-only events
@@ -420,7 +433,7 @@ where
             execs_over_sec: 0,
             corpus_size: 0,
             phantom: PhantomData,
-        };
+        }
     }
 }
 
@@ -466,7 +479,7 @@ where
     //CE: CustomEvent<I>,
 {
     #[inline]
-    fn fire<'a>(&mut self, event: Event<'a, I, OT>) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
         self.send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
         Ok(())
@@ -520,13 +533,14 @@ mod tests {
     fn test_event_serde() {
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
         let mut map = tuple_list!(obv);
+        let observers_buf = postcard::to_allocvec(&map).unwrap();
 
         let i = BytesInput::new(vec![0]);
         let e = Event::NewTestcase {
             sender_id: 0,
-            input: Ptr::Ref(&i),
-            observers: PtrMut::Ref(&mut map),
-            corpus_count: 1,
+            input: &i,
+            observers_buf: observers_buf,
+            client_config: "conf".into(),
         };
 
         let j = serde_json::to_string(&e).unwrap();
@@ -537,10 +551,10 @@ mod tests {
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
-                observers,
-                corpus_count: _,
+                observers_buf,
+                client_config: String,
             } => {
-                let o = observers
+                let o = postcard::from_bytes(&observers_buf).unwrap()
                     .as_ref()
                     .match_name_type::<StdMapObserver<u32>>("test")
                     .unwrap();
