@@ -12,9 +12,7 @@ use serde::{Deserialize, Serialize};
 //pub mod shmem_translated;
 
 #[cfg(feature = "std")]
-use std::{
-    io::Write,
-};
+use std::io::Write;
 
 use crate::corpus::Corpus;
 use crate::executors::Executor;
@@ -314,7 +312,6 @@ where
                 observers_buf,
                 client_config: _,
             } => {
-
                 // TODO: here u should match client_config, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
@@ -553,7 +550,8 @@ mod tests {
                 observers_buf,
                 client_config: String,
             } => {
-                let o = postcard::from_bytes(&observers_buf).unwrap()
+                let o = postcard::from_bytes(&observers_buf)
+                    .unwrap()
                     .as_ref()
                     .match_name_type::<StdMapObserver<u32>>("test")
                     .unwrap();

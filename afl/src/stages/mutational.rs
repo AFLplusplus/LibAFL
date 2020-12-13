@@ -74,7 +74,7 @@ where
             if state.is_interesting(&input_mut, observers)? > 0 {
                 // TODO decouple events manager and engine
                 manager.fire(Event::new_testcase("test".into(), input_mut, observers)?)?;
-                // let _ = corpus.add(testcase);
+            // let _ = corpus.add(testcase);
             } else {
                 state.discard_input(&input_mut)?;
             }

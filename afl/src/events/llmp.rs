@@ -245,7 +245,6 @@ impl LlmpConnection {
             LlmpConnection::IsClient { client } => client.send_buf(tag, buf),
         }
     }
-
 }
 
 /// Contents of the share mem pages, used by llmp internally
