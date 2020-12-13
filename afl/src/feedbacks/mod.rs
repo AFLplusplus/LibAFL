@@ -45,12 +45,17 @@ pub trait FeedbacksTuple<I>: MatchType + MatchNameAndType
 where
     I: Input,
 {
+    /// Get the total interestingness value from all feedbacks
     fn is_interesting_all<OT: ObserversTuple>(
         &mut self,
         input: &I,
         observers: &OT,
     ) -> Result<u32, AflError>;
+
+    /// Write metadata for this testcase
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError>;
+
+    /// Discards metadata - the end of this input's execution
     fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError>;
     //fn for_each(&self, f: fn(&dyn Feedback<I>));
     //fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>));

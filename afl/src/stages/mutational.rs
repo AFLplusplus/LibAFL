@@ -12,8 +12,6 @@ use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, events::Event};
 
-use crate::serde_anymap::{Ptr, PtrMut};
-
 // TODO multi mutators stage
 
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
@@ -66,21 +64,19 @@ where
             self.mutator_mut()
                 .post_exec(fitness, &input_mut, i as i32)?;
 
+            let observers = engine.executor_mut().observers();
+
             // put all this shit in some overridable function in engine maybe? or in corpus.
             // consider a corpus that strores new testcases in a temporary queue, for later processing
             // in a late stage, NewTestcase should be triggere donly after the processing in the later stage
             // So by default we shoudl trigger it in corpus.add, so that the user can override it and remove
             // if needed by particular cases
-            let testcase_maybe = state.testcase_if_interesting(input_mut, fitness)?;
-            if let Some(mut testcase) = testcase_maybe {
+            if state.is_interesting(&input_mut, observers)? > 0 {
                 // TODO decouple events manager and engine
-                manager.fire(Event::NewTestcase {
-                    sender_id: 0,
-                    input: testcase.load_input()?,
-                    observers_buf: PtrMut::Ref(engine.executor_mut().observers_mut()),
-                    corpus_count: corpus.count() + 1,
-                })?;
+                manager.fire(Event::new_testcase("test".into(), input_mut, observers)?)?;
                 // let _ = corpus.add(testcase);
+            } else {
+                state.discard_input(&input_mut)?;
             }
         }
         Ok(())

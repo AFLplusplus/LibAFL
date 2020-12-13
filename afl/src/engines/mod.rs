@@ -112,6 +112,7 @@ where
     }
 
     // TODO move some of these, like evaluate_input, to FuzzingEngine
+    #[inline]
     pub fn is_interesting<OT>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>
     where
         OT: ObserversTuple,

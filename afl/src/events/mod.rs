@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     io::Write,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::corpus::Corpus;
@@ -159,11 +158,11 @@ where
         }
     }
 
-    pub fn new_testcase<Ot>(config: String, input: I, observers: Ot) -> Result<Self, AflError>
+    pub fn new_testcase<OT>(config: String, input: I, observers: &OT) -> Result<Self, AflError>
     where
-        Ot: ObserversTuple,
+        OT: ObserversTuple,
     {
-        let observers_buf = postcard::to_allocvec(&observers)?;
+        let observers_buf = postcard::to_allocvec(observers)?;
         Ok(Self::NewTestcase {
             sender_id: 0,
             input: input,
@@ -251,8 +250,8 @@ where
             }
             Event::UpdateStats {
                 sender_id,
-                executions,
-                execs_over_sec,
+                executions: _,
+                execs_over_sec: _,
                 phantom: _,
             } => {
                 // TODO: The stats buffer should be added on client add.
@@ -265,7 +264,7 @@ where
                         executions: 0,
                     })
                 }
-                let mut stat = &mut self.client_stats_mut()[*sender_id as usize];
+                let stat = &mut self.client_stats_mut()[*sender_id as usize];
                 println!(
                     "[UPDATE] corpus: {} execs: {} execs/s: {}",
                     self.corpus_size(),
@@ -320,9 +319,9 @@ where
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
                 println!("Received new Testcase");
-                let observers = postcard::from_bytes(&observers_buf)?;
-                let interestingness = state.is_interesting(&input, observers)?;
-                state.add_if_interesting(corpus, input, interestingness);
+                let observers: OT = postcard::from_bytes(&observers_buf)?;
+                let interestingness = state.is_interesting(&input, &observers)?;
+                state.add_if_interesting(corpus, input, interestingness)?;
                 Ok(())
             }
             _ => Err(AflError::Unknown(
@@ -481,7 +480,7 @@ where
     #[inline]
     fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
-        self.send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
+        self.llmp.send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
         Ok(())
     }
 
