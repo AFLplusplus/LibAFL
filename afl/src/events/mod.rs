@@ -255,7 +255,7 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 let client_stat_count = self.client_stats().len();
-                for i in client_stat_count..*sender_id as usize {
+                for i in client_stat_count..(*sender_id + 1) as usize {
                     self.client_stats_mut().push(ClientStats {
                         id: client_stat_count + i,
                         corpus_size: 0,
