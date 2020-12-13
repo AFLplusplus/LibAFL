@@ -352,6 +352,7 @@ where
     writer: W,
     count: usize,
 
+    events: Vec<Event<I>>,
     // stats (maybe we need a separated struct?)
     executions: usize,
     execs_over_sec: u64,
@@ -377,7 +378,7 @@ where
     #[inline]
     fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
         match self.handle_in_broker(&event)? {
-            BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
+            BrokerEventResult::Forward => self.events.push(event),
             // Ignore broker-only events
             BrokerEventResult::Handled => (),
         }
@@ -386,12 +387,13 @@ where
 
     fn process(
         &mut self,
-        _state: &mut State<I, R, FT>,
-        _corpus: &mut C,
+        state: &mut State<I, R, FT>,
+        corpus: &mut C,
     ) -> Result<usize, AflError> {
-        let c = self.count;
-        self.count = 0;
-        Ok(c)
+        let count = self.events.len();
+        let events: Vec<Event<I>> = self.events.drain(..).collect();
+        events.into_iter().try_for_each(|x| self.handle_in_client(x, state, corpus))?;
+        Ok(count)
     }
 
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -438,6 +440,7 @@ where
             execs_over_sec: 0,
             corpus_size: 0,
             phantom: PhantomData,
+            events: vec![],
         }
     }
 }
@@ -453,7 +456,7 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 const _LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 #[cfg(feature = "std")]
-pub struct LlmpEventManager<C, E, I, R, W>
+pub struct LlmpEventManager<C, E, OT, FT, I, R, W>
 where
     W: Write,
     //CE: CustomEvent<I>,
@@ -468,11 +471,11 @@ where
     start_time: time::Duration,
     client_stats: Vec<ClientStats>,
     llmp: llmp::LlmpConnection,
-    phantom: PhantomData<(C, E, I, R)>,
+    phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
 #[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R> for LlmpEventManager<C, E, I, R, W>
+impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R> for LlmpEventManager<C, E, OT, FT, I, R, W>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -492,12 +495,33 @@ where
 
     fn process(
         &mut self,
-        _state: &mut State<I, R, FT>,
-        _corpus: &mut C,
+        state: &mut State<I, R, FT>,
+        corpus: &mut C,
     ) -> Result<usize, AflError> {
-        let c = self.count;
-        self.count = 0;
-        Ok(c)
+        let count = match &mut self.llmp {
+            llmp::LlmpConnection::IsClient {client} => {
+                let mut msg_count = 0;
+                loop {
+                    
+                    match client.recv_buf()? {
+                        Some((tag, event_buf)) => {
+                            if tag == _LLMP_TAG_EVENT_TO_BROKER {
+                                continue;
+                            }
+                            let event = postcard::from_bytes(event_buf)?;
+                            // TODO: self.handle_in_client(event, state, corpus)?;
+                            msg_count += 1;
+                        },
+                        None => break msg_count,
+                    }
+                }
+            },
+            _ => {
+                dbg!("Skipping process in broker");
+                0
+            }
+        };
+        Ok(count)
     }
 
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
