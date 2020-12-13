@@ -498,7 +498,9 @@ where
         state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<usize, AflError> {
-        let count = match &mut self.llmp {
+        // TODO: Get around local event copy by moving handle_in_client
+        let mut events = vec![];
+        match &mut self.llmp {
             llmp::LlmpConnection::IsClient {client} => {
                 let mut msg_count = 0;
                 loop {
@@ -508,9 +510,8 @@ where
                             if tag == _LLMP_TAG_EVENT_TO_BROKER {
                                 continue;
                             }
-                            let event = postcard::from_bytes(event_buf)?;
-                            // TODO: self.handle_in_client(event, state, corpus)?;
-                            msg_count += 1;
+                            let event: Event<I> = postcard::from_bytes(event_buf)?;
+                            events.push(event);
                         },
                         None => break msg_count,
                     }
@@ -521,6 +522,8 @@ where
                 0
             }
         };
+        let count = events.len();
+        events.into_iter().try_for_each(|event| self.handle_in_client(event, state, corpus))?;
         Ok(count)
     }
 
