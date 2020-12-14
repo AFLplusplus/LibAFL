@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 //pub mod shmem_translated;
 
 #[cfg(feature = "std")]
-use std::io::Write;
+use std::{io::Write, time::Duration};
 
 use crate::corpus::Corpus;
 use crate::executors::Executor;
@@ -23,6 +23,8 @@ use crate::serde_anymap::SerdeAny;
 use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, utils};
+
+use self::llmp::LlmpMsg;
 
 /// Indicate if an event worked or not
 pub enum BrokerEventResult {
@@ -474,6 +476,73 @@ where
     client_stats: Vec<ClientStats>,
     llmp: llmp::LlmpConnection,
     phantom: PhantomData<(C, E, OT, FT, I, R)>,
+}
+
+impl<C, E, OT, FT, I, R, W> LlmpEventManager<C, E, OT, FT, I, R, W>
+where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    W: Write,
+{
+    /// Create llmp on a port
+    /// If the port is not yet bound, it will act as broker
+    /// Else, it will act as client.
+    pub fn new_on_port(port: u16, writer: W) -> Result<Self, AflError> {
+        let mgr = Self {
+            llmp: llmp::LlmpConnection::on_port(port)?,
+            start_time: utils::current_time(),
+            corpus_size: 0,
+            phantom: PhantomData,
+            client_stats: vec![],
+            writer,
+        };
+        Ok(mgr)
+    }
+
+    /// Returns if we are the broker
+    pub fn is_broker(&self) -> bool {
+        match self.llmp {
+            llmp::LlmpConnection::IsBroker {
+                broker: _,
+                listener_thread: _,
+            } => true,
+            _ => false,
+        }
+    }
+
+    /// Run forever in the broker
+    pub fn broker_loop(&mut self) -> Result<(), AflError> {
+        match &mut self.llmp {
+            llmp::LlmpConnection::IsBroker {
+                broker,
+                listener_thread: _,
+            } => {
+                // TODO: Clean up that api by.. a lot!
+                /*
+                broker.add_message_hook(|client_id: u32, msg: *mut LlmpMsg| {
+                    unsafe {
+                        if (*msg).tag == _LLMP_TAG_EVENT_TO_BOTH {
+                            let event = postcard::from_bytes((*msg).as_slice_unsafe())?;
+                            match self.handle_in_broker(event)? {
+                                BrokerEventResult::Forward => llmp::LlmpMsgHookResult::ForwardToClients,
+                                BrokerEventResult::Handled => llmp::LlmpMsgHookResult::Handled,
+                            }
+                        } else {
+                            llmp::LlmpMsgHookResult::ForwardToClients
+                        }
+                    }
+                });*/
+                broker.loop_forever(Some(Duration::from_millis(5)))
+            },
+            _ => Err(AflError::IllegalState(
+                "Called broker loop in the client".into(),
+            )),
+        }
+    }
 }
 
 #[cfg(feature = "std")]

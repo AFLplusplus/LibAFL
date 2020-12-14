@@ -10,7 +10,7 @@ use afl::engines::Engine;
 use afl::engines::Fuzzer;
 use afl::engines::State;
 use afl::engines::StdFuzzer;
-use afl::events::LoggerEventManager;
+use afl::events::LlmpEventManager;
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::MaxMapFeedback;
@@ -21,8 +21,6 @@ use afl::observers::StdMapObserver;
 use afl::stages::mutational::StdMutationalStage;
 use afl::tuples::tuple_list;
 use afl::utils::StdRand;
-
-const MAP_SIZE: usize = 65536;
 
 #[no_mangle]
 extern "C" {
@@ -52,7 +50,13 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     // TODO: No_std event manager
     #[cfg(feature = "std")]
-    let mut events = LoggerEventManager::new(stderr());
+    //let mut events = LoggerEventManager::new(stderr());
+    let mut mgr = LlmpEventManager::new_on_port(1337, stderr()).unwrap();
+    if mgr.is_broker() {
+        println!("Doing broker things.");
+        mgr.broker_loop().unwrap();
+    }
+    println!("We're a client, let's fuzz :)");
 
     let edges_observer =
         StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
@@ -71,7 +75,7 @@ pub extern "C" fn afl_libfuzzer_main() {
             &mut corpus,
             &mut generator,
             &mut engine,
-            &mut events,
+            &mut mgr,
             4,
         )
         .expect("Failed to load initial inputs");
@@ -83,7 +87,7 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     fuzzer
-        .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut events)
+        .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut mgr)
         .expect("Fuzzer fatal error");
     #[cfg(feature = "std")]
     println!("OK");
