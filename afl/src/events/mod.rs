@@ -38,6 +38,7 @@ pub enum BrokerEventResult {
 #[derive(Debug, Clone, Default)]
 pub struct ClientStats {
     // stats (maybe we need a separated struct?)
+    corpus_size: u64,
     executions: u64,
 }
 
@@ -199,14 +200,10 @@ impl Stats {
     }
 
     /// Amount of elements in the corpus (combined for all children)
-    fn corpus_size(&self) -> usize {
-        self.corpus_size
-    }
-
-    /// Incremt the cropus size
-    fn corpus_size_inc(&mut self) -> usize {
-        self.corpus_size += 1;
-        self.corpus_size
+    fn corpus_size(&self) -> u64 {
+        self.client_stats()
+            .iter()
+            .fold(0u64, |acc, x| acc + x.corpus_size)
     }
 
     /// Time this fuzzing run stated
@@ -233,6 +230,17 @@ impl Stats {
         }
     }
 
+    /// The client stats for a specific id, creating new if it doesn't exist
+    fn client_stats_mut_for(&mut self, client_id: u64) -> &mut ClientStats {
+        let client_stat_count = self.client_stats().len();
+        for _ in client_stat_count..(client_id + 1) as usize {
+            self.client_stats_mut().push(ClientStats {
+                ..Default::default()
+            })
+        }
+        &mut self.client_stats_mut()[client_id as usize]
+    }
+
     /// Broker fun
     #[inline]
     fn handle_in_broker<I>(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError>
@@ -241,25 +249,22 @@ impl Stats {
     {
         match event {
             Event::LoadInitial {
-                sender_id: _,
+                sender_id,
                 phantom: _,
             } => {
-                self.corpus_size_inc();
+                let client = self.client_stats_mut_for(*sender_id);
+                client.corpus_size += 1;
                 Ok(BrokerEventResult::Handled)
             }
             Event::NewTestcase {
-                sender_id: _,
+                sender_id,
                 input: _,
                 observers_buf: _,
                 client_config: _,
             } => {
-                self.corpus_size_inc();
-                println!(
-                    "[NEW] corpus: {} execs: {} execs/s: {}",
-                    self.corpus_size(),
-                    self.total_execs(),
-                    self.execs_per_sec()
-                );
+                let client = self.client_stats_mut_for(*sender_id);
+                client.corpus_size += 1;
+                println!("[NEW] client {}: corpus: {}", sender_id, self.corpus_size(),);
                 Ok(BrokerEventResult::Forward)
             }
             Event::UpdateStats {
@@ -269,14 +274,11 @@ impl Stats {
                 phantom: _,
             } => {
                 // TODO: The stats buffer should be added on client add.
-                let client_stat_count = self.client_stats().len();
-                for _ in client_stat_count..(*sender_id + 1) as usize {
-                    self.client_stats_mut().push(ClientStats { executions: 0 })
-                }
-                let mut stat = &mut self.client_stats_mut()[*sender_id as usize];
-                stat.executions = *executions as u64;
+                let client = self.client_stats_mut_for(*sender_id);
+                client.executions += *executions as u64;
                 println!(
-                    "[UPDATE] corpus: {} execs: {} execs/s: {}",
+                    "[UPDATE] from client {}, corpus: {} execs: {} execs/s: {}",
+                    sender_id,
                     self.corpus_size(),
                     self.total_execs(),
                     self.execs_per_sec()
