@@ -24,8 +24,9 @@ use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, utils};
 
-use self::llmp::LlmpMsg;
+use self::llmp::Tag;
 
+#[derive(Debug, Copy, Clone)]
 /// Indicate if an event worked or not
 pub enum BrokerEventResult {
     /// The broker haneled this. No need to pass it on.
@@ -34,6 +35,7 @@ pub enum BrokerEventResult {
     Forward,
 }
 
+#[derive(Debug, Clone, Default)]
 pub struct ClientStats {
     // stats (maybe we need a separated struct?)
     executions: u64,
@@ -178,75 +180,39 @@ where
     }
 }
 
-/// Client fun
-fn handle_in_client<C, OT, FT, I, R>(
-    event: Event<I>,
-    state: &mut State<I, R, FT, OT>,
-    corpus: &mut C,
-) -> Result<(), AflError>
-where
-    C: Corpus<I, R>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
-    I: Input,
-    R: Rand,
-{
-    match event {
-        Event::NewTestcase {
-            sender_id: _,
-            input,
-            observers_buf,
-            client_config: _,
-        } => {
-            // TODO: here u should match client_config, if equal to the current one do not re-execute
-            // we need to pass engine to process() too, TODO
-            #[cfg(feature = "std")]
-            println!("Received new Testcase");
-            let observers = postcard::from_bytes(&observers_buf)?;
-            let interestingness = state.is_interesting(&input, &observers)?;
-            state.add_if_interesting(corpus, input, interestingness)?;
-            Ok(())
-        }
-        _ => Err(AflError::Unknown(format!(
-            "Received illegal message that message should not have arrived: {:?}.",
-            event
-        ))),
-    }
+#[derive(Debug, Clone, Default)]
+struct Stats {
+    start_time: Duration,
+    corpus_size: usize,
+    client_stats: Vec<ClientStats>,
 }
 
-pub trait EventManager<C, E, OT, FT, I, R>
-where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
-    I: Input,
-    R: Rand,
-{
-    /// Fire an Event
-    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError>;
+impl Stats {
+    /// the client stats, mutable
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        &mut self.client_stats
+    }
 
-    /// Lookup for incoming events and process them.
-    /// Return the number of processes events or an error
-    fn process(
-        &mut self,
-        state: &mut State<I, R, FT, OT>,
-        corpus: &mut C,
-    ) -> Result<usize, AflError>;
-
-    /// the client stat, mutable
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
-    /// the client stat
-    fn client_stats(&self) -> &[ClientStats];
+    /// the client stats
+    fn client_stats(&self) -> &[ClientStats] {
+        &self.client_stats
+    }
 
     /// Amount of elements in the corpus (combined for all children)
-    fn corpus_size(&self) -> usize;
+    fn corpus_size(&self) -> usize {
+        self.corpus_size
+    }
 
     /// Incremt the cropus size
-    fn corpus_size_inc(&mut self) -> usize;
+    fn corpus_size_inc(&mut self) -> usize {
+        self.corpus_size += 1;
+        self.corpus_size
+    }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration;
+    fn start_time(&mut self) -> time::Duration {
+        self.start_time
+    }
 
     /// Total executions
     #[inline]
@@ -268,7 +234,11 @@ where
     }
 
     /// Broker fun
-    fn handle_in_broker(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError> {
+    #[inline]
+    fn handle_in_broker<I>(&mut self, event: &Event<I>) -> Result<BrokerEventResult, AflError>
+    where
+        I: Input,
+    {
         match event {
             Event::LoadInitial {
                 sender_id: _,
@@ -339,6 +309,64 @@ where
             _ => Ok(BrokerEventResult::Forward),
         }
     }
+}
+
+/// Client fun
+#[inline]
+fn handle_in_client<C, OT, FT, I, R>(
+    event: Event<I>,
+    state: &mut State<I, R, FT, OT>,
+    corpus: &mut C,
+) -> Result<(), AflError>
+where
+    C: Corpus<I, R>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+{
+    match event {
+        Event::NewTestcase {
+            sender_id: _,
+            input,
+            observers_buf,
+            client_config: _,
+        } => {
+            // TODO: here u should match client_config, if equal to the current one do not re-execute
+            // we need to pass engine to process() too, TODO
+            #[cfg(feature = "std")]
+            println!("Received new Testcase");
+            let observers = postcard::from_bytes(&observers_buf)?;
+            let interestingness = state.is_interesting(&input, &observers)?;
+            state.add_if_interesting(corpus, input, interestingness)?;
+            Ok(())
+        }
+        _ => Err(AflError::Unknown(format!(
+            "Received illegal message that message should not have arrived: {:?}.",
+            event
+        ))),
+    }
+}
+
+pub trait EventManager<C, E, OT, FT, I, R>
+where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+{
+    /// Fire an Event
+    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError>;
+
+    /// Lookup for incoming events and process them.
+    /// Return the number of processes events or an error
+    fn process(
+        &mut self,
+        state: &mut State<I, R, FT, OT>,
+        corpus: &mut C,
+    ) -> Result<usize, AflError>;
 
     fn serialize_observers(&mut self, observers: &OT) -> Result<Vec<u8>, AflError> {
         Ok(postcard::to_allocvec(observers)?)
@@ -363,11 +391,9 @@ where
 {
     writer: W,
 
+    stats: Stats,
     events: Vec<Event<I>>,
     // stats (maybe we need a separated struct?)
-    corpus_size: usize,
-    start_time: time::Duration,
-    client_stats: Vec<ClientStats>,
     phantom: PhantomData<(C, E, I, R, OT, FT)>,
 }
 
@@ -386,7 +412,7 @@ where
 {
     #[inline]
     fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
-        match self.handle_in_broker(&event)? {
+        match self.stats.handle_in_broker(&event)? {
             BrokerEventResult::Forward => self.events.push(event),
             // Ignore broker-only events
             BrokerEventResult::Handled => (),
@@ -405,27 +431,6 @@ where
             .try_for_each(|event| handle_in_client(event, state, corpus))?;
         Ok(count)
     }
-
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
-
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
-
-    fn corpus_size(&self) -> usize {
-        self.corpus_size
-    }
-
-    fn corpus_size_inc(&mut self) -> usize {
-        self.corpus_size += 1;
-        self.corpus_size
-    }
-
-    fn start_time(&mut self) -> time::Duration {
-        self.start_time
-    }
 }
 
 #[cfg(feature = "std")]
@@ -442,10 +447,11 @@ where
 {
     pub fn new(writer: W) -> Self {
         Self {
-            start_time: utils::current_time(),
-            client_stats: vec![],
+            stats: Stats {
+                start_time: utils::current_time(),
+                ..Default::default()
+            },
             writer: writer,
-            corpus_size: 0,
             phantom: PhantomData,
             events: vec![],
         }
@@ -454,13 +460,13 @@ where
 
 #[cfg(feature = "std")]
 /// Forward this to the client
-const LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
+const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
 #[cfg(feature = "std")]
 /// Only handle this in the broker
 const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 #[cfg(feature = "std")]
 /// Handle in both
-const _LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
+const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 #[cfg(feature = "std")]
 pub struct LlmpEventManager<C, E, OT, FT, I, R, W>
@@ -471,10 +477,8 @@ where
     writer: W,
 
     // stats (maybe we need a separated struct?)
-    corpus_size: usize,
-    start_time: time::Duration,
-    client_stats: Vec<ClientStats>,
     llmp: llmp::LlmpConnection,
+    stats: Stats,
     phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
@@ -494,10 +498,11 @@ where
     pub fn new_on_port(port: u16, writer: W) -> Result<Self, AflError> {
         let mgr = Self {
             llmp: llmp::LlmpConnection::on_port(port)?,
-            start_time: utils::current_time(),
-            corpus_size: 0,
+            stats: Stats {
+                start_time: utils::current_time(),
+                ..Default::default()
+            },
             phantom: PhantomData,
-            client_stats: vec![],
             writer,
         };
         Ok(mgr)
@@ -521,23 +526,24 @@ where
                 broker,
                 listener_thread: _,
             } => {
-                // TODO: Clean up that api by.. a lot!
-                /*
-                broker.add_message_hook(|client_id: u32, msg: *mut LlmpMsg| {
-                    unsafe {
-                        if (*msg).tag == _LLMP_TAG_EVENT_TO_BOTH {
-                            let event = postcard::from_bytes((*msg).as_slice_unsafe())?;
-                            match self.handle_in_broker(event)? {
-                                BrokerEventResult::Forward => llmp::LlmpMsgHookResult::ForwardToClients,
-                                BrokerEventResult::Handled => llmp::LlmpMsgHookResult::Handled,
+                let stats = &mut self.stats;
+                broker.loop_forever(
+                    &mut |_client_id: u32, tag: Tag, msg: &[u8]| {
+                        if tag == LLMP_TAG_EVENT_TO_BOTH {
+                            let event = postcard::from_bytes(msg)?;
+                            match stats.handle_in_broker::<I>(&event)? {
+                                BrokerEventResult::Forward => {
+                                    Ok(llmp::LlmpMsgHookResult::ForwardToClients)
+                                }
+                                BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
                             }
                         } else {
-                            llmp::LlmpMsgHookResult::ForwardToClients
+                            Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                         }
-                    }
-                });*/
-                broker.loop_forever(Some(Duration::from_millis(5)))
-            },
+                    },
+                    Some(Duration::from_millis(5)),
+                );
+            }
             _ => Err(AflError::IllegalState(
                 "Called broker loop in the client".into(),
             )),
@@ -561,7 +567,7 @@ where
     #[inline]
     fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
-        self.llmp.send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
+        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
     }
 
@@ -593,27 +599,6 @@ where
                 0
             }
         })
-    }
-
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
-
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
-
-    fn corpus_size(&self) -> usize {
-        self.corpus_size
-    }
-
-    fn corpus_size_inc(&mut self) -> usize {
-        self.corpus_size += 1;
-        self.corpus_size
-    }
-
-    fn start_time(&mut self) -> time::Duration {
-        self.start_time
     }
 }
 

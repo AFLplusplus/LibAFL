@@ -88,9 +88,6 @@ const EOP_MSG_SIZE: usize =
 /// The header length of a llmp page in a shared map (until messages start)
 const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 
-/// Message hook type
-pub type LlmpMsgHookFn = unsafe fn(client_id: u32, msg: *mut LlmpMsg) -> LlmpMsgHookResult;
-
 /// TAGs used thorughout llmp
 pub type Tag = u32;
 
@@ -270,7 +267,6 @@ pub struct LlmpBroker {
     /// Users of Llmp can add message handlers in the broker.
     /// This allows us to intercept messages right in the broker
     /// This keeps the out map clean.
-    pub msg_hooks: Vec<LlmpMsgHookFn>,
     pub llmp_clients: Vec<LlmpReceiver>,
 }
 
@@ -797,7 +793,6 @@ impl LlmpBroker {
                 // clients may join at any time
                 keep_pages_forever: true,
             },
-            msg_hooks: vec![],
             llmp_clients: vec![],
         };
 
@@ -818,12 +813,6 @@ impl LlmpBroker {
             current_recv_map: client_page,
             last_msg_recvd: 0 as *mut LlmpMsg,
         });
-    }
-
-    /// Adds a hook that gets called in the broker for each new message the broker touches.
-    /// if the callback returns false, the message is not forwarded to the clients. */
-    pub fn add_message_hook(&mut self, hook: LlmpMsgHookFn) {
-        self.msg_hooks.push(hook);
     }
 
     /// For internal use: Forward the current message to the out map.
@@ -847,7 +836,14 @@ impl LlmpBroker {
 
     /// broker broadcast to its own page for all others to read */
     #[inline]
-    unsafe fn handle_new_msgs(&mut self, client_id: u32) -> Result<(), AflError> {
+    unsafe fn handle_new_msgs<F>(
+        &mut self,
+        client_id: u32,
+        on_new_msg: &mut F,
+    ) -> Result<(), AflError>
+    where
+        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
+    {
         let mut next_id = self.llmp_clients.len() as u32;
 
         // TODO: We could memcpy a range of pending messages, instead of one by one.
@@ -862,6 +858,7 @@ impl LlmpBroker {
                     Some(msg) => msg,
                 }
             };
+
             if (*msg).tag == LLMP_TAG_NEW_SHM_CLIENT {
                 /* This client informs us about yet another new client
                 add it to the list! Also, no need to forward this msg. */
@@ -890,11 +887,12 @@ impl LlmpBroker {
             } else {
                 // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
                 let mut should_forward_msg = true;
-                for hook in &self.msg_hooks {
-                    match (hook)(client_id, msg) {
-                        LlmpMsgHookResult::Handled => should_forward_msg = false,
-                        _ => (),
-                    }
+
+                let map = &self.llmp_clients[client_id as usize].current_recv_map;
+                let msg_buf = (*msg).as_slice(map)?;
+                match (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
+                    LlmpMsgHookResult::Handled => should_forward_msg = false,
+                    _ => (),
                 }
                 if should_forward_msg {
                     self.forward_msg(msg)?;
@@ -906,11 +904,14 @@ impl LlmpBroker {
     /// The broker walks all pages and looks for changes, then broadcasts them on
     /// its own shared page, once.
     #[inline]
-    pub fn once(&mut self) -> Result<(), AflError> {
+    pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<(), AflError>
+    where
+        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
+    {
         compiler_fence(Ordering::SeqCst);
         for i in 0..self.llmp_clients.len() {
             unsafe {
-                self.handle_new_msgs(i as u32)?;
+                self.handle_new_msgs(i as u32, on_new_msg)?;
             }
         }
         Ok(())
@@ -919,10 +920,13 @@ impl LlmpBroker {
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
     /// Never returns. Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
-    pub fn loop_forever(&mut self, sleep_time: Option<Duration>) -> ! {
+    pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>) -> !
+    where
+        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
+    {
         loop {
             compiler_fence(Ordering::SeqCst);
-            self.once()
+            self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
             match sleep_time {
                 Some(time) => thread::sleep(time),
