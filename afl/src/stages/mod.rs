@@ -29,7 +29,7 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT>,
+        state: &mut State<I, R, FT, OT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
@@ -51,7 +51,7 @@ where
     fn perform_all(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT>,
+        state: &mut State<I, R, FT, OT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
@@ -75,7 +75,7 @@ where
     fn perform_all(
         &mut self,
         _rand: &mut R,
-        _state: &mut State<I, R, FT>,
+        _state: &mut State<I, R, FT, OT>,
         _corpus: &mut C,
         _engine: &mut Engine<E, OT, ET, I>,
         _manager: &mut EM,
@@ -104,7 +104,7 @@ where
     fn perform_all(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT>,
+        state: &mut State<I, R, FT, OT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,

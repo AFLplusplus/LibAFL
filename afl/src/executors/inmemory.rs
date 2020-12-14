@@ -195,7 +195,7 @@ mod tests {
 
     use serde::{Deserialize, Serialize};
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Clone, Serialize, Deserialize, Debug)]
     struct NopInput {}
     impl Input for NopInput {}
     impl HasTargetBytes for NopInput {

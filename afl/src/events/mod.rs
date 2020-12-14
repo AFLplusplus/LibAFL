@@ -5,7 +5,6 @@ pub mod shmem_translated;
 
 use alloc::string::String;
 use core::{marker::PhantomData, time};
-use tuple_list::tuple_list_type;
 
 use serde::{Deserialize, Serialize};
 
@@ -35,10 +34,7 @@ pub enum BrokerEventResult {
 
 pub struct ClientStats {
     // stats (maybe we need a separated struct?)
-    id: usize,
     executions: u64,
-    execs_over_sec: u64,
-    corpus_size: usize,
 }
 
 /// A custom event, for own messages, with own handler.
@@ -180,6 +176,44 @@ where
     }
 }
 
+
+/// Client fun
+fn handle_in_client<C, OT, FT, I, R> (
+    event: Event<I>,
+    state: &mut State<I, R, FT, OT>,
+    corpus: &mut C,
+) -> Result<(), AflError>
+where
+    C: Corpus<I, R>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+{
+    match event {
+        Event::NewTestcase {
+            sender_id: _,
+            input,
+            observers_buf,
+            client_config: _,
+        } => {
+            // TODO: here u should match client_config, if equal to the current one do not re-execute
+            // we need to pass engine to process() too, TODO
+            #[cfg(feature = "std")]
+            println!("Received new Testcase");
+            let observers = postcard::from_bytes(&observers_buf)?;
+            let interestingness = state.is_interesting(&input, &observers)?;
+            state.add_if_interesting(corpus, input, interestingness)?;
+            Ok(())
+        }
+        _ => Err(AflError::Unknown(
+            format!("Received illegal message that message should not have arrived: {:?}.", event),
+        )),
+    }
+}
+
+
+
 pub trait EventManager<C, E, OT, FT, I, R>
 where
     C: Corpus<I, R>,
@@ -194,7 +228,7 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, state: &mut State<I, R, FT>, corpus: &mut C) -> Result<usize, AflError>;
+    fn process(&mut self, state: &mut State<I, R, FT, OT>, corpus: &mut C) -> Result<usize, AflError>;
 
     /// the client stat, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
@@ -262,11 +296,8 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 let client_stat_count = self.client_stats().len();
-                for i in client_stat_count..(*sender_id + 1) as usize {
+                for _ in client_stat_count..(*sender_id + 1) as usize {
                     self.client_stats_mut().push(ClientStats {
-                        id: client_stat_count + i,
-                        corpus_size: 0,
-                        execs_over_sec: 0,
                         executions: 0,
                     })
                 }
@@ -307,35 +338,6 @@ where
         }
     }
 
-    /// Client fun
-    fn handle_in_client(
-        &mut self,
-        event: Event<I>,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
-    ) -> Result<(), AflError> {
-        match event {
-            Event::NewTestcase {
-                sender_id: _,
-                input,
-                observers_buf,
-                client_config: _,
-            } => {
-                // TODO: here u should match client_config, if equal to the current one do not re-execute
-                // we need to pass engine to process() too, TODO
-                #[cfg(feature = "std")]
-                println!("Received new Testcase");
-                let observers: OT = self.deserialize_observers(&observers_buf)?;
-                let interestingness = state.is_interesting(&input, &observers)?;
-                state.add_if_interesting(corpus, input, interestingness)?;
-                Ok(())
-            }
-            _ => Err(AflError::Unknown(
-                format!("Received illegal message that message should not have arrived: {:?}.", event),
-            )),
-        }
-    }
-
     fn serialize_observers(&mut self, observers: &OT) -> Result<Vec<u8>, AflError> {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -358,12 +360,9 @@ where
     //CE: CustomEvent<I, OT>,
 {
     writer: W,
-    count: usize,
 
     events: Vec<Event<I>>,
     // stats (maybe we need a separated struct?)
-    executions: usize,
-    execs_over_sec: u64,
     corpus_size: usize,
     start_time: time::Duration,
     client_stats: Vec<ClientStats>,
@@ -395,12 +394,11 @@ where
 
     fn process(
         &mut self,
-        state: &mut State<I, R, FT>,
+        state: &mut State<I, R, FT, OT>,
         corpus: &mut C,
     ) -> Result<usize, AflError> {
         let count = self.events.len();
-        let events: Vec<Event<I>> = self.events.drain(..).collect();
-        events.into_iter().try_for_each(|x| self.handle_in_client(x, state, corpus))?;
+        self.events.drain(..).try_for_each(|event| handle_in_client(event, state, corpus))?;
         Ok(count)
     }
 
@@ -443,9 +441,6 @@ where
             start_time: utils::current_time(),
             client_stats: vec![],
             writer: writer,
-            count: 0,
-            executions: 0,
-            execs_over_sec: 0,
             corpus_size: 0,
             phantom: PhantomData,
             events: vec![],
@@ -500,25 +495,24 @@ where
 
     fn process(
         &mut self,
-        state: &mut State<I, R, FT>,
+        state: &mut State<I, R, FT, OT>,
         corpus: &mut C,
     ) -> Result<usize, AflError> {
         // TODO: Get around local event copy by moving handle_in_client
-        let mut events = vec![];
-        match &mut self.llmp {
+        Ok(match &mut self.llmp {
             llmp::LlmpConnection::IsClient {client} => {
-                let mut msg_count = 0;
+                let mut count = 0;
                 loop {
-                    
                     match client.recv_buf()? {
                         Some((tag, event_buf)) => {
                             if tag == _LLMP_TAG_EVENT_TO_BROKER {
                                 continue;
                             }
                             let event: Event<I> = postcard::from_bytes(event_buf)?;
-                            events.push(event);
+                            handle_in_client(event, state, corpus)?;
+                            count += 1;
                         },
-                        None => break msg_count,
+                        None => break count,
                     }
                 }
             },
@@ -526,10 +520,7 @@ where
                 dbg!("Skipping process in broker");
                 0
             }
-        };
-        let count = events.len();
-        events.into_iter().try_for_each(|event| self.handle_in_client(event, state, corpus))?;
-        Ok(count)
+        })
     }
 
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -558,22 +549,17 @@ where
 #[cfg(test)]
 mod tests {
 
-    use std::io::stderr;
 
-    use crate::events::EventManager;
     use crate::inputs::bytes::BytesInput;
     use crate::observers::StdMapObserver;
-    use crate::serde_anymap::{Ptr, PtrMut};
-    use crate::tuples::{tuple_list, tuple_list_type, MatchNameAndType, Named};
+    use crate::tuples::{tuple_list, MatchNameAndType, Named};
     use crate::{events::Event, observers::ObserversTuple};
-
-    use super::LoggerEventManager;
 
     static mut MAP: [u32; 4] = [0; 4];
     #[test]
     fn test_event_serde() {
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
-        let mut map = tuple_list!(obv);
+        let map = tuple_list!(obv);
         let observers_buf = map.serialize().unwrap();
         // test_event_mgr.serialize_observers(&map).unwrap();
 

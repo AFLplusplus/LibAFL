@@ -23,11 +23,12 @@ pub trait StateMetadata: Debug {
 }
 
 /// The state a fuzz run.
-pub struct State<I, R, FT>
+pub struct State<I, R, FT, OT>
 where
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
+    OT: ObserversTuple,
 {
     /// How many times the executor ran the harness/target
     executions: usize,
@@ -37,14 +38,15 @@ where
     metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
     // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
     feedbacks: FT,
-    phantom: PhantomData<(I, R)>,
+    phantom: PhantomData<(I, R, OT)>,
 }
 
-impl<I, R, FT> State<I, R, FT>
+impl<I, R, FT, OT> State<I, R, FT, OT>
 where
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
+    OT: ObserversTuple,
 {
     /// Get executions
     #[inline]
@@ -113,7 +115,7 @@ where
 
     // TODO move some of these, like evaluate_input, to FuzzingEngine
     #[inline]
-    pub fn is_interesting<OT>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>
+    pub fn is_interesting(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>
     where
         OT: ObserversTuple,
     {
@@ -121,10 +123,9 @@ where
     }
 
     /// Runs the input and triggers observers and feedback
-    pub fn evaluate_input<E, OT>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
+    pub fn evaluate_input<E>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
     where
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
     {
         executor.reset_observers()?;
         executor.run_target(&input)?;
@@ -187,7 +188,7 @@ where
         }
     }
 
-    pub fn generate_initial_inputs<G, C, E, OT, ET, EM>(
+    pub fn generate_initial_inputs<G, C, E, ET, EM>(
         &mut self,
         rand: &mut R,
         corpus: &mut C,
@@ -200,7 +201,6 @@ where
         G: Generator<I, R>,
         C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
         ET: ExecutorsTuple<I>,
         EM: EventManager<C, E, OT, FT, I, R>,
     {
@@ -311,7 +311,7 @@ where
     fn fuzz_one(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT>,
+        state: &mut State<I, R, FT, OT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
@@ -328,7 +328,7 @@ where
     fn fuzz_loop(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT>,
+        state: &mut State<I, R, FT, OT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
