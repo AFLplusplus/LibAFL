@@ -71,10 +71,10 @@ where
             // in a late stage, NewTestcase should be triggere donly after the processing in the later stage
             // So by default we shoudl trigger it in corpus.add, so that the user can override it and remove
             // if needed by particular cases
-            if state.is_interesting(&input_mut, observers)? > 0 {
-                // TODO decouple events manager and engine
-                manager.fire(Event::new_testcase("test".into(), input_mut, observers)?)?;
-                // let _ = corpus.add(testcase);
+            let fitness = state.is_interesting(&input_mut, observers)?;
+            if fitness > 0 {
+                manager.new_testcase("test".into(), &input_mut, observers)?;
+                state.add_if_interesting(corpus, input_mut, fitness)?;
             } else {
                 state.discard_input(&input_mut)?;
             }

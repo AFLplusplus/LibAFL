@@ -216,10 +216,10 @@ where
                 phantom: PhantomData,
             })?;
         }
-        manager.fire(Event::log(
+        manager.log(
             0,
             format!("Loaded {} over {} initial testcases", added, num),
-        ))?;
+        )?;
         manager.process(self, corpus)?;
         Ok(())
     }
@@ -339,10 +339,10 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.fire(Event::update_stats(
+                manager.update_stats(
                     state.executions(),
                     state.executions_over_seconds(),
-                ))?;
+                )?;
             }
         }
     }

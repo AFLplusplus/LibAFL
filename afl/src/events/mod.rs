@@ -21,7 +21,7 @@ use crate::executors::Executor;
 use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
-use crate::serde_anymap::SerdeAny;
+use crate::serde_anymap::{Ptr, SerdeAny};
 use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, utils};
@@ -58,7 +58,7 @@ where
 /// Events sent around in the library
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum Event<I>
+pub enum Event<'a, I>
 where
     I: Input,
 {
@@ -68,7 +68,7 @@ where
     },
     NewTestcase {
         sender_id: u64,
-        input: I,
+        input: Ptr<'a, I>,
         observers_buf: Vec<u8>,
         client_config: String,
     },
@@ -104,7 +104,7 @@ where
     },
 }
 
-impl<I> Event<I>
+impl<'a, I> Event<'a, I>
 where
     I: Input,
 {
@@ -148,37 +148,6 @@ where
             } => "todo",
         }
     }
-
-    pub fn log(severity_level: u8, message: String) -> Self {
-        Event::Log {
-            sender_id: 0,
-            severity_level: severity_level,
-            message: message,
-            phantom: PhantomData,
-        }
-    }
-
-    pub fn new_testcase<OT>(config: String, input: I, observers: &OT) -> Result<Self, AflError>
-    where
-        OT: ObserversTuple,
-    {
-        let observers_buf = postcard::to_allocvec(observers)?;
-        Ok(Self::NewTestcase {
-            sender_id: 0,
-            input: input,
-            client_config: config,
-            observers_buf: observers_buf,
-        })
-    }
-
-    pub fn update_stats(executions: usize, execs_over_sec: u64) -> Self {
-        Event::UpdateStats {
-            sender_id: 0,
-            executions: executions,
-            execs_over_sec: execs_over_sec,
-            phantom: PhantomData,
-        }
-    }
 }
 
 pub trait EventManager<C, E, OT, FT, I, R>
@@ -191,7 +160,7 @@ where
     R: Rand,
 {
     /// Fire an Event
-    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError>;
+    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
@@ -320,14 +289,48 @@ where
                 #[cfg(feature = "std")]
                 println!("Received new Testcase");
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
-                let interestingness = state.is_interesting(&input, &observers)?;
-                state.add_if_interesting(corpus, input, interestingness)?;
+                let interestingness = state.is_interesting(input.as_ref(), &observers)?;
+                match input {
+                    Ptr::Owned(b) => state.add_if_interesting(corpus, *b, interestingness)?,
+                    Ptr::Ref(r) => state.add_if_interesting(corpus, r.clone(), interestingness)?,
+                };
                 Ok(())
             }
             _ => Err(AflError::Unknown(
                 "Received illegal message that message should not have arrived.".into(),
             )),
         }
+    }
+
+    fn log<'a>(&mut self, severity_level: u8, message: String) -> Result<(), AflError> {
+        self.fire(Event::Log {
+            sender_id: 0,
+            severity_level: severity_level,
+            message: message,
+            phantom: PhantomData,
+        })
+    }
+
+    fn new_testcase<'a>(&mut self, config: String, input: &'a I, observers: &OT) -> Result<(), AflError>
+    where
+        OT: ObserversTuple,
+    {
+        let observers_buf = postcard::to_allocvec(observers)?;
+        self.fire(Event::NewTestcase {
+            sender_id: 0,
+            input: Ptr::Ref(input),
+            client_config: config,
+            observers_buf: observers_buf,
+        })
+    }
+
+    fn update_stats<'a>(&mut self, executions: usize, execs_over_sec: u64) -> Result<(), AflError> {
+        self.fire(Event::UpdateStats {
+            sender_id: 0,
+            executions: executions,
+            execs_over_sec: execs_over_sec,
+            phantom: PhantomData,
+        })
     }
 }
 
@@ -369,7 +372,7 @@ where
     //CE: CustomEvent<I, OT>,
 {
     #[inline]
-    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
         match self.handle_in_broker(&event)? {
             BrokerEventResult::Forward => (), //self.handle_in_client(event, state, corpus)?,
             // Ignore broker-only events
@@ -478,7 +481,7 @@ where
     //CE: CustomEvent<I>,
 {
     #[inline]
-    fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError> {
+    fn fire<'a>(&mut self, event: Event<'a, I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_CLIENT, &serialized)?;
         Ok(())
@@ -523,7 +526,7 @@ mod tests {
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
     use crate::observers::StdMapObserver;
-    use crate::serde_anymap::{Ptr, PtrMut};
+    use crate::serde_anymap::Ptr;
     use crate::tuples::{tuple_list, tuple_list_type, MatchNameAndType, Named};
 
     static mut MAP: [u32; 4] = [0; 4];
@@ -531,21 +534,20 @@ mod tests {
     #[test]
     fn test_event_serde() {
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
-        let mut map = tuple_list!(obv);
+        let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
 
         let i = BytesInput::new(vec![0]);
         let e = Event::NewTestcase {
             sender_id: 0,
-            input: &i,
+            input: Ptr::Ref(&i),
             observers_buf: observers_buf,
             client_config: "conf".into(),
         };
 
         let j = serde_json::to_string(&e).unwrap();
 
-        let d: Event<BytesInput, tuple_list_type!(StdMapObserver<u32>)> =
-            serde_json::from_str(&j).unwrap();
+        let d: Event<BytesInput> = serde_json::from_str(&j).unwrap();
         match d {
             Event::NewTestcase {
                 sender_id: _,
@@ -553,9 +555,8 @@ mod tests {
                 observers_buf,
                 client_config: String,
             } => {
-                let o = postcard::from_bytes(&observers_buf).unwrap()
-                    .as_ref()
-                    .match_name_type::<StdMapObserver<u32>>("test")
+                let map: tuple_list_type!(StdMapObserver<u32>) = postcard::from_bytes(&observers_buf).unwrap();
+                let o = map.match_name_type::<StdMapObserver<u32>>("test")
                     .unwrap();
                 assert_eq!("test", o.name());
             }
