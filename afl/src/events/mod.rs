@@ -176,9 +176,8 @@ where
     }
 }
 
-
 /// Client fun
-fn handle_in_client<C, OT, FT, I, R> (
+fn handle_in_client<C, OT, FT, I, R>(
     event: Event<I>,
     state: &mut State<I, R, FT, OT>,
     corpus: &mut C,
@@ -206,13 +205,12 @@ where
             state.add_if_interesting(corpus, input, interestingness)?;
             Ok(())
         }
-        _ => Err(AflError::Unknown(
-            format!("Received illegal message that message should not have arrived: {:?}.", event),
-        )),
+        _ => Err(AflError::Unknown(format!(
+            "Received illegal message that message should not have arrived: {:?}.",
+            event
+        ))),
     }
 }
-
-
 
 pub trait EventManager<C, E, OT, FT, I, R>
 where
@@ -228,7 +226,11 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, state: &mut State<I, R, FT, OT>, corpus: &mut C) -> Result<usize, AflError>;
+    fn process(
+        &mut self,
+        state: &mut State<I, R, FT, OT>,
+        corpus: &mut C,
+    ) -> Result<usize, AflError>;
 
     /// the client stat, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
@@ -268,11 +270,11 @@ where
         match event {
             Event::LoadInitial {
                 sender_id: _,
-                phantom: _, 
+                phantom: _,
             } => {
                 self.corpus_size_inc();
                 Ok(BrokerEventResult::Handled)
-            },
+            }
             Event::NewTestcase {
                 sender_id: _,
                 input: _,
@@ -297,9 +299,7 @@ where
                 // TODO: The stats buffer should be added on client add.
                 let client_stat_count = self.client_stats().len();
                 for _ in client_stat_count..(*sender_id + 1) as usize {
-                    self.client_stats_mut().push(ClientStats {
-                        executions: 0,
-                    })
+                    self.client_stats_mut().push(ClientStats { executions: 0 })
                 }
                 let mut stat = &mut self.client_stats_mut()[*sender_id as usize];
                 stat.executions = *executions as u64;
@@ -398,7 +398,9 @@ where
         corpus: &mut C,
     ) -> Result<usize, AflError> {
         let count = self.events.len();
-        self.events.drain(..).try_for_each(|event| handle_in_client(event, state, corpus))?;
+        self.events
+            .drain(..)
+            .try_for_each(|event| handle_in_client(event, state, corpus))?;
         Ok(count)
     }
 
@@ -475,7 +477,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R> for LlmpEventManager<C, E, OT, FT, I, R, W>
+impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R>
+    for LlmpEventManager<C, E, OT, FT, I, R, W>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -500,7 +503,7 @@ where
     ) -> Result<usize, AflError> {
         // TODO: Get around local event copy by moving handle_in_client
         Ok(match &mut self.llmp {
-            llmp::LlmpConnection::IsClient {client} => {
+            llmp::LlmpConnection::IsClient { client } => {
                 let mut count = 0;
                 loop {
                     match client.recv_buf()? {
@@ -511,11 +514,11 @@ where
                             let event: Event<I> = postcard::from_bytes(event_buf)?;
                             handle_in_client(event, state, corpus)?;
                             count += 1;
-                        },
+                        }
                         None => break count,
                     }
                 }
-            },
+            }
             _ => {
                 dbg!("Skipping process in broker");
                 0
@@ -548,7 +551,6 @@ where
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-
 
     use crate::inputs::bytes::BytesInput;
     use crate::observers::StdMapObserver;
