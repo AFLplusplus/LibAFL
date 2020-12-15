@@ -42,71 +42,27 @@ pub struct ClientStats {
     executions: u64,
 }
 
-/*
-/// A custom event, for own messages, with own handler.
-pub trait CustomEvent<I>: SerdeAny
-where
-    I: Input,
-{
-    /// Returns the name of this event
-    fn name(&self) -> &str;
-    /// This method will be called in the broker
-    fn handle_in_broker(&self) -> Result<BrokerEventResult, AflError>;
-    /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
-    fn handle_in_client(&self) -> Result<(), AflError>;
-}
-*/
+// TODO Stats as a trait in order to implement logging in an abstract way
+// Something like stats.show() that will render the AFL status screen
 
-/// Events sent around in the library
-pub trait Event<I>
-where
-    I: Input,
-{
-    /// Returns the name of this event
-    fn name(&self) -> &str;
-    /// This method will be called in the broker
-    fn handle_in_broker(&self, stats: &mut Stats) -> Result<BrokerEventResult, AflError>;
-    /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
-    fn handle_in_client<C, OT, FT, R>(
-        self,
-        state: &mut State<I, R, FT, OT>,
-        corpus: &mut C,
-    ) -> Result<(), AflError>
-    where
-        C: Corpus<I, R>,
-        OT: ObserversTuple,
-        FT: FeedbacksTuple<I>,
-        R: Rand;
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Stats {
-    start_time: Duration,
-    corpus_size: usize,
-    client_stats: Vec<ClientStats>,
-}
-
-impl Stats {
-    /// the client stats, mutable
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
+pub trait Stats {
+    /// the client stats (mut)
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
 
     /// the client stats
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
+    fn client_stats(&self) -> &[ClientStats];
+
+    /// creation time
+    fn start_time(&mut self) -> time::Duration;
+
+    /// show the stats to the user
+    fn show(&mut self, event_msg: String);
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
         self.client_stats()
             .iter()
             .fold(0u64, |acc, x| acc + x.corpus_size)
-    }
-
-    /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration {
-        self.start_time
     }
 
     /// Total executions
@@ -138,6 +94,102 @@ impl Stats {
         }
         &mut self.client_stats_mut()[client_id as usize]
     }
+}
+
+#[derive(Debug)]
+pub struct SimpleStats<F>
+where
+    F: FnMut(String)
+{
+    print_fn: F,
+    start_time: Duration,
+    corpus_size: usize,
+    client_stats: Vec<ClientStats>,
+}
+
+impl<F> Stats for SimpleStats<F> 
+where
+    F: FnMut(String)
+{
+    /// the client stats, mutable
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        &mut self.client_stats
+    }
+
+    /// the client stats
+    fn client_stats(&self) -> &[ClientStats] {
+        &self.client_stats
+    }
+
+    /// Time this fuzzing run stated
+    fn start_time(&mut self) -> time::Duration {
+        self.start_time
+    }
+
+    fn show(&mut self, event_msg: String) {
+        let fmt = format!("[{}] corpus: {}, executions: {}, exec/sec: {}", event_msg, self.corpus_size(), self.total_execs(), self.execs_per_sec());
+        (self.print_fn)(fmt);
+    }
+}
+
+impl<F> SimpleStats<F> 
+where
+    F: FnMut(String)
+{
+    pub fn new(print_fn: F) -> Self {
+        Self {
+            print_fn: print_fn,
+            start_time: utils::current_time(),
+            corpus_size: 0,
+            client_stats: vec![]
+        }
+    }
+
+    pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
+        Self {
+            print_fn: print_fn,
+            start_time: start_time,
+            corpus_size: 0,
+            client_stats: vec![]
+        }
+    }
+}
+
+/*
+/// A custom event, for own messages, with own handler.
+pub trait CustomEvent<I>: SerdeAny
+where
+    I: Input,
+{
+    /// Returns the name of this event
+    fn name(&self) -> &str;
+    /// This method will be called in the broker
+    fn handle_in_broker(&self) -> Result<BrokerEventResult, AflError>;
+    /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
+    fn handle_in_client(&self) -> Result<(), AflError>;
+}
+*/
+
+/// Events sent around in the library
+pub trait Event<I>
+where
+    I: Input,
+{
+    /// Returns the name of this event
+    fn name(&self) -> &str;
+    /// This method will be called in the broker
+    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError> where ST: Stats;
+    /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
+    fn handle_in_client<C, OT, FT, R>(
+        self,
+        state: &mut State<I, R, FT, OT>,
+        corpus: &mut C,
+    ) -> Result<(), AflError>
+    where
+        C: Corpus<I, R>,
+        OT: ObserversTuple,
+        FT: FeedbacksTuple<I>,
+        R: Rand;
 }
 
 pub trait EventManager<C, E, OT, FT, I, R>
@@ -258,7 +310,7 @@ where
 
     /// Broker fun
     #[inline]
-    fn handle_in_broker(&self, stats: &mut Stats) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError> where ST: Stats {
         match self {
             LoggerEvent::NewTestcase {
                 corpus_size,
@@ -321,7 +373,7 @@ where
     }
 }
 
-pub struct LoggerEventManager<C, E, OT, FT, I, R, W>
+pub struct LoggerEventManager<C, E, OT, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -329,19 +381,17 @@ where
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
-    W: Write,
+    ST: Stats,
     //CE: CustomEvent<I, OT>,
 {
-    writer: W,
-
-    stats: Stats,
+    stats: ST,
     events: Vec<LoggerEvent<I>>,
     // stats (maybe we need a separated struct?)
     phantom: PhantomData<(C, E, I, R, OT, FT)>,
 }
 
-impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R>
-    for LoggerEventManager<C, E, OT, FT, I, R, W>
+impl<C, E, OT, FT, I, R, ST> EventManager<C, E, OT, FT, I, R>
+    for LoggerEventManager<C, E, OT, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -349,7 +399,7 @@ where
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
-    W: Write,
+    ST: Stats,
     //CE: CustomEvent<I, OT>,
 {
     fn process(
@@ -431,7 +481,7 @@ where
     }
 }
 
-impl<C, E, OT, FT, I, R, W> LoggerEventManager<C, E, OT, FT, I, R, W>
+impl<C, E, OT, FT, I, R, ST> LoggerEventManager<C, E, OT, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     I: Input,
@@ -439,16 +489,12 @@ where
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     R: Rand,
-    W: Write,
+    ST: Stats,
     //TODO CE: CustomEvent,
 {
-    pub fn new(writer: W) -> Self {
+    pub fn new(stats: ST) -> Self {
         Self {
-            stats: Stats {
-                start_time: utils::current_time(),
-                ..Default::default()
-            },
-            writer: writer,
+            stats: stats,
             phantom: PhantomData,
             events: vec![],
         }
@@ -534,7 +580,7 @@ where
 
     /// Broker fun
     #[inline]
-    fn handle_in_broker(&self, stats: &mut Stats) -> Result<BrokerEventResult, AflError> {
+    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError> where ST: Stats {
         match &self.kind {
             LLMPEventKind::NewTestcase {
                 input: _,
@@ -633,20 +679,7 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 #[cfg(feature = "std")]
-pub struct LlmpEventManager<C, E, OT, FT, I, R, W>
-where
-    W: Write,
-    //CE: CustomEvent<I>,
-{
-    writer: W,
-
-    // stats (maybe we need a separated struct?)
-    llmp: llmp::LlmpConnection,
-    stats: Stats,
-    phantom: PhantomData<(C, E, OT, FT, I, R)>,
-}
-
-impl<C, E, OT, FT, I, R, W> LlmpEventManager<C, E, OT, FT, I, R, W>
+pub struct LlmpEventManager<C, E, OT, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -654,20 +687,32 @@ where
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
-    W: Write,
+    ST: Stats,
+    //CE: CustomEvent<I>,
+{
+    llmp: llmp::LlmpConnection,
+    stats: ST,
+    phantom: PhantomData<(C, E, OT, FT, I, R)>,
+}
+
+impl<C, E, OT, FT, I, R, ST> LlmpEventManager<C, E, OT, FT, I, R, ST>
+where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    ST: Stats,
 {
     /// Create llmp on a port
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
-    pub fn new_on_port(port: u16, writer: W) -> Result<Self, AflError> {
+    pub fn new_on_port(port: u16, stats: ST) -> Result<Self, AflError> {
         let mgr = Self {
             llmp: llmp::LlmpConnection::on_port(port)?,
-            stats: Stats {
-                start_time: utils::current_time(),
-                ..Default::default()
-            },
+            stats: stats,
             phantom: PhantomData,
-            writer,
         };
         Ok(mgr)
     }
@@ -723,8 +768,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R, W> EventManager<C, E, OT, FT, I, R>
-    for LlmpEventManager<C, E, OT, FT, I, R, W>
+impl<C, E, OT, FT, I, R, ST> EventManager<C, E, OT, FT, I, R>
+    for LlmpEventManager<C, E, OT, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -732,7 +777,7 @@ where
     OT: ObserversTuple,
     I: Input,
     R: Rand,
-    W: Write,
+    ST: Stats,
     //CE: CustomEvent<I>,
 {
     fn process(
