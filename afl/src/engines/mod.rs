@@ -434,7 +434,9 @@ mod tests {
         let executor = InMemoryExecutor::<BytesInput, _>::new("main", harness, tuple_list!());
         let mut state = State::new(tuple_list!());
 
-        let mut events_manager = LoggerEventManager::new(SimpleStats::new(|s| { println!("{}", s); }));
+        let mut events_manager = LoggerEventManager::new(SimpleStats::new(|s| {
+            println!("{}", s);
+        }));
         let mut engine = Engine::new(executor);
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);

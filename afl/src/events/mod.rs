@@ -85,7 +85,7 @@ pub trait Stats {
     }
 
     /// The client stats for a specific id, creating new if it doesn't exist
-    fn client_stats_mut_for(&mut self, client_id: u64) -> &mut ClientStats {
+    fn client_stats_mut_for(&mut self, client_id: u32) -> &mut ClientStats {
         let client_stat_count = self.client_stats().len();
         for _ in client_stat_count..(client_id + 1) as usize {
             self.client_stats_mut().push(ClientStats {
@@ -99,7 +99,7 @@ pub trait Stats {
 #[derive(Debug)]
 pub struct SimpleStats<F>
 where
-    F: FnMut(String)
+    F: FnMut(String),
 {
     print_fn: F,
     start_time: Duration,
@@ -107,9 +107,9 @@ where
     client_stats: Vec<ClientStats>,
 }
 
-impl<F> Stats for SimpleStats<F> 
+impl<F> Stats for SimpleStats<F>
 where
-    F: FnMut(String)
+    F: FnMut(String),
 {
     /// the client stats, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -127,21 +127,27 @@ where
     }
 
     fn show(&mut self, event_msg: String) {
-        let fmt = format!("[{}] corpus: {}, executions: {}, exec/sec: {}", event_msg, self.corpus_size(), self.total_execs(), self.execs_per_sec());
+        let fmt = format!(
+            "[{}] corpus: {}, executions: {}, exec/sec: {}",
+            event_msg,
+            self.corpus_size(),
+            self.total_execs(),
+            self.execs_per_sec()
+        );
         (self.print_fn)(fmt);
     }
 }
 
-impl<F> SimpleStats<F> 
+impl<F> SimpleStats<F>
 where
-    F: FnMut(String)
+    F: FnMut(String),
 {
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn: print_fn,
             start_time: utils::current_time(),
             corpus_size: 0,
-            client_stats: vec![]
+            client_stats: vec![],
         }
     }
 
@@ -150,7 +156,7 @@ where
             print_fn: print_fn,
             start_time: start_time,
             corpus_size: 0,
-            client_stats: vec![]
+            client_stats: vec![],
         }
     }
 }
@@ -178,7 +184,9 @@ where
     /// Returns the name of this event
     fn name(&self) -> &str;
     /// This method will be called in the broker
-    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError> where ST: Stats;
+    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError>
+    where
+        ST: Stats;
     /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
     fn handle_in_client<C, OT, FT, R>(
         self,
@@ -310,7 +318,10 @@ where
 
     /// Broker fun
     #[inline]
-    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError> where ST: Stats {
+    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError>
+    where
+        ST: Stats,
+    {
         match self {
             LoggerEvent::NewTestcase {
                 corpus_size,
@@ -538,7 +549,7 @@ pub struct LLMPEvent<'a, I>
 where
     I: Input,
 {
-    sender_id: u64,
+    sender_id: u32,
     kind: LLMPEventKind<'a, I>,
 }
 
@@ -575,7 +586,10 @@ where
 
     /// Broker fun
     #[inline]
-    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError> where ST: Stats {
+    fn handle_in_broker<ST>(&self, stats: &mut ST) -> Result<BrokerEventResult, AflError>
+    where
+        ST: Stats,
+    {
         match &self.kind {
             LLMPEventKind::NewTestcase {
                 input: _,
@@ -612,8 +626,7 @@ where
             } => {
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
-            }
-            //_ => Ok(BrokerEventResult::Forward),
+            } //_ => Ok(BrokerEventResult::Forward),
         }
     }
 
@@ -727,9 +740,13 @@ where
             } => {
                 let stats = &mut self.stats;
                 broker.loop_forever(
-                    &mut |_client_id: u32, tag: Tag, msg: &[u8]| {
+                    &mut |sender_id: u32, tag: Tag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
-                            let event: LLMPEvent<I> = postcard::from_bytes(msg)?;
+                            let kind: LLMPEventKind<I> = postcard::from_bytes(msg)?;
+                            let event = LLMPEvent {
+                                sender_id: sender_id,
+                                kind: kind,
+                            };
                             match event.handle_in_broker(stats)? {
                                 BrokerEventResult::Forward => {
                                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
@@ -750,7 +767,7 @@ where
     }
 
     #[inline]
-    fn llmp_send<'a>(&mut self, event: LLMPEvent<'a, I>) -> Result<(), AflError> {
+    fn send_event_kind<'a>(&mut self, event: LLMPEventKind<'a, I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
@@ -781,11 +798,15 @@ where
                 let mut count = 0;
                 loop {
                     match client.recv_buf()? {
-                        Some((tag, event_buf)) => {
+                        Some((sender_id, tag, msg)) => {
                             if tag == _LLMP_TAG_EVENT_TO_BROKER {
                                 continue;
                             }
-                            let event: LLMPEvent<I> = postcard::from_bytes(event_buf)?;
+                            let kind: LLMPEventKind<I> = postcard::from_bytes(msg)?;
+                            let event = LLMPEvent {
+                                sender_id: sender_id,
+                                kind: kind,
+                            };
                             event.handle_in_client(state, corpus)?;
                             count += 1;
                         }
@@ -807,60 +828,45 @@ where
         corpus_size: usize,
         config: String,
     ) -> Result<(), AflError> {
-        let event = LLMPEvent {
-            sender_id: 0,
-            kind: LLMPEventKind::NewTestcase {
-                input: Ptr::Ref(input),
-                observers_buf: postcard::to_allocvec(observers)?,
-                corpus_size: corpus_size,
-                client_config: config,
-            },
+        let kind = LLMPEventKind::NewTestcase {
+            input: Ptr::Ref(input),
+            observers_buf: postcard::to_allocvec(observers)?,
+            corpus_size: corpus_size,
+            client_config: config,
         };
-        self.llmp_send(event)
+        self.send_event_kind(kind)
     }
 
     fn update_stats(&mut self, executions: usize, execs_over_sec: u64) -> Result<(), AflError> {
-        let event = LLMPEvent {
-            sender_id: 0,
-            kind: LLMPEventKind::UpdateStats {
-                executions: executions,
-                execs_over_sec: execs_over_sec,
-                phantom: PhantomData,
-            },
+        let kind = LLMPEventKind::UpdateStats {
+            executions: executions,
+            execs_over_sec: execs_over_sec,
+            phantom: PhantomData,
         };
-        self.llmp_send(event)
+        self.send_event_kind(kind)
     }
 
     fn crash(&mut self, input: &I) -> Result<(), AflError> {
-        let event = LLMPEvent {
-            sender_id: 0,
-            kind: LLMPEventKind::Crash {
-                input: input.clone(),
-            },
+        let kind = LLMPEventKind::Crash {
+            input: input.clone(),
         };
-        self.llmp_send(event)
+        self.send_event_kind(kind)
     }
 
     fn timeout(&mut self, input: &I) -> Result<(), AflError> {
-        let event = LLMPEvent {
-            sender_id: 0,
-            kind: LLMPEventKind::Timeout {
-                input: input.clone(),
-            },
+        let kind = LLMPEventKind::Timeout {
+            input: input.clone(),
         };
-        self.llmp_send(event)
+        self.send_event_kind(kind)
     }
 
     fn log(&mut self, severity_level: u8, message: String) -> Result<(), AflError> {
-        let event = LLMPEvent {
-            sender_id: 0,
-            kind: LLMPEventKind::Log {
-                severity_level: severity_level,
-                message: message,
-                phantom: PhantomData,
-            },
+        let kind = LLMPEventKind::Log {
+            severity_level: severity_level,
+            message: message,
+            phantom: PhantomData,
         };
-        self.llmp_send(event)
+        self.send_event_kind(kind)
     }
 }
 
