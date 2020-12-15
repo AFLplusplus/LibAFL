@@ -1127,6 +1127,7 @@ impl LlmpClient {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
 
@@ -1174,3 +1175,4 @@ mod tests {
         assert_eq!(broker.llmp_clients.len(), 2);
     }
 }
+*/

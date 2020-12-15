@@ -469,9 +469,9 @@ impl<'a, T: 'a + ?Sized + serde::Serialize> serde::Serialize for Ptr<'a, T> {
     where
         S: serde::Serializer,
     {
-        match *self {
-            Ptr::Ref(ref r) => se.serialize_some(r),
-            Ptr::Owned(ref b) => se.serialize_some(b.as_ref()),
+        match self {
+            Ptr::Ref(r) => r.serialize(se),
+            Ptr::Owned(b) => b.serialize(se),
         }
     }
 }
@@ -507,9 +507,9 @@ impl<'a, T: 'a + ?Sized + serde::Serialize> serde::Serialize for PtrMut<'a, T> {
     where
         S: serde::Serializer,
     {
-        match *self {
-            PtrMut::Ref(ref r) => se.serialize_some(r),
-            PtrMut::Owned(ref b) => se.serialize_some(b.as_ref()),
+        match self {
+            PtrMut::Ref(r) => r.serialize(se),
+            PtrMut::Owned(b) => b.serialize(se),
         }
     }
 }
@@ -552,9 +552,9 @@ impl<'a, T: 'a + Sized + serde::Serialize> serde::Serialize for Slice<'a, T> {
     where
         S: serde::Serializer,
     {
-        match *self {
-            Slice::Ref(ref r) => se.serialize_some(r),
-            Slice::Owned(ref b) => se.serialize_some(b.as_slice()),
+        match self {
+            Slice::Ref(r) => r.serialize(se),
+            Slice::Owned(b) => b.serialize(se),
         }
     }
 }
@@ -590,9 +590,9 @@ impl<'a, T: 'a + Sized + serde::Serialize> serde::Serialize for SliceMut<'a, T> 
     where
         S: serde::Serializer,
     {
-        match *self {
-            SliceMut::Ref(ref r) => se.serialize_some(r),
-            SliceMut::Owned(ref b) => se.serialize_some(b.as_slice()),
+        match self {
+            SliceMut::Ref(r) => r.serialize(se),
+            SliceMut::Owned(b) => b.serialize(se),
         }
     }
 }

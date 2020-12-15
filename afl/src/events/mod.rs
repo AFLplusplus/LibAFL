@@ -317,7 +317,7 @@ where
                 phantom: _,
             } => {
                 stats.client_stats_mut()[0].corpus_size = *corpus_size as u64;
-                println!("[NEW] corpus: {}", stats.corpus_size());
+                stats.show(self.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
             LoggerEvent::UpdateStats {
@@ -327,12 +327,7 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 stats.client_stats_mut()[0].executions = *executions as u64;
-                println!(
-                    "[UPDATE] corpus: {} execs: {} execs/s: {}",
-                    stats.corpus_size(),
-                    stats.total_execs(),
-                    stats.execs_per_sec()
-                );
+                stats.show(self.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
             LoggerEvent::Crash { input: _ } => {
@@ -590,7 +585,7 @@ where
             } => {
                 let client = stats.client_stats_mut_for(self.sender_id);
                 client.corpus_size = *corpus_size as u64;
-                println!("[NEW] corpus: {}", stats.corpus_size());
+                stats.show(self.name().to_string() + " #" + &self.sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::UpdateStats {
@@ -601,12 +596,7 @@ where
                 // TODO: The stats buffer should be added on client add.
                 let client = stats.client_stats_mut_for(self.sender_id);
                 client.executions = *executions as u64;
-                println!(
-                    "[UPDATE] corpus: {} execs: {} execs/s: {}",
-                    stats.corpus_size(),
-                    stats.total_execs(),
-                    stats.execs_per_sec()
-                );
+                stats.show(self.name().to_string() + " #" + &self.sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Crash { input: _ } => {
@@ -623,7 +613,7 @@ where
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
             }
-            _ => Ok(BrokerEventResult::Forward),
+            //_ => Ok(BrokerEventResult::Forward),
         }
     }
 
@@ -891,7 +881,6 @@ mod tests {
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
         let map = tuple_list!(obv);
         let observers_buf = map.serialize().unwrap();
-        // test_event_mgr.serialize_observers(&map).unwrap();
 
         let i = BytesInput::new(vec![0]);
         let e = LLMPEvent {

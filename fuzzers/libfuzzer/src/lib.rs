@@ -2,15 +2,12 @@
 
 extern crate alloc;
 
-#[cfg(feature = "std")]
-use std::io::stderr;
-
 use afl::corpus::InMemoryCorpus;
 use afl::engines::Engine;
 use afl::engines::Fuzzer;
 use afl::engines::State;
 use afl::engines::StdFuzzer;
-use afl::events::LlmpEventManager;
+use afl::events::{SimpleStats, LlmpEventManager};
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::MaxMapFeedback;
@@ -22,7 +19,6 @@ use afl::stages::mutational::StdMutationalStage;
 use afl::tuples::tuple_list;
 use afl::utils::StdRand;
 
-#[no_mangle]
 extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
@@ -48,10 +44,8 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(32);
 
-    // TODO: No_std event manager
-    #[cfg(feature = "std")]
-    //let mut events = LoggerEventManager::new(stderr());
-    let mut mgr = LlmpEventManager::new_on_port(1337, stderr()).unwrap();
+    let stats = SimpleStats::new(|s| println!("{}", s));
+    let mut mgr = LlmpEventManager::new_on_port(1337, stats).unwrap();
     if mgr.is_broker() {
         println!("Doing broker things.");
         mgr.broker_loop().unwrap();
