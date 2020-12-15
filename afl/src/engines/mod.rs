@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 
 use crate::corpus::{Corpus, Testcase};
-use crate::events::{Event, EventManager};
+use crate::events::EventManager;
 use crate::executors::{Executor, ExecutorsTuple, HasObservers};
 use crate::feedbacks::FeedbacksTuple;
 use crate::generators::Generator;
@@ -211,15 +211,11 @@ where
             if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
                 added += 1;
             }
-            manager.fire(Event::LoadInitial {
-                sender_id: 0,
-                phantom: PhantomData,
-            })?;
         }
-        manager.fire(Event::log(
+        manager.log(
             0,
             format!("Loaded {} over {} initial testcases", added, num),
-        ))?;
+        )?;
         manager.process(self, corpus)?;
         Ok(())
     }
@@ -339,10 +335,7 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.fire(Event::update_stats(
-                    state.executions(),
-                    state.executions_over_seconds(),
-                ))?;
+                manager.update_stats(state.executions(), state.executions_over_seconds())?;
             }
         }
     }
@@ -417,7 +410,7 @@ mod tests {
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
     use crate::engines::{Engine, Fuzzer, State, StdFuzzer};
     #[cfg(feature = "std")]
-    use crate::events::LoggerEventManager;
+    use crate::events::{LoggerEventManager, SimpleStats};
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::bytes::BytesInput;
@@ -441,7 +434,9 @@ mod tests {
         let executor = InMemoryExecutor::<BytesInput, _>::new("main", harness, tuple_list!());
         let mut state = State::new(tuple_list!());
 
-        let mut events_manager = LoggerEventManager::new(stderr());
+        let mut events_manager = LoggerEventManager::new(SimpleStats::new(|s| {
+            println!("{}", s);
+        }));
         let mut engine = Engine::new(executor);
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);

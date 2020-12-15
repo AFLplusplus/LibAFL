@@ -734,10 +734,14 @@ impl LlmpReceiver {
 
     /// Returns the next message, tag, buf, if avaliable, else None
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, &[u8])>, AflError> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, AflError> {
         unsafe {
             Ok(match self.recv()? {
-                Some(msg) => Some(((*msg).tag, (*msg).as_slice(&self.current_recv_map)?)),
+                Some(msg) => Some((
+                    (*msg).sender,
+                    (*msg).tag,
+                    (*msg).as_slice(&self.current_recv_map)?,
+                )),
                 None => None,
             })
         }
@@ -745,10 +749,14 @@ impl LlmpReceiver {
 
     /// Returns the next message, tag, buf, looping until it becomes available
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, &[u8]), AflError> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), AflError> {
         unsafe {
             let msg = self.recv_blocking()?;
-            Ok(((*msg).tag, (*msg).as_slice(&self.current_recv_map)?))
+            Ok((
+                (*msg).sender,
+                (*msg).tag,
+                (*msg).as_slice(&self.current_recv_map)?,
+            ))
         }
     }
 }
@@ -1116,17 +1124,18 @@ impl LlmpClient {
 
     /// Returns the next message, tag, buf, if avaliable, else None
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, &[u8])>, AflError> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, AflError> {
         self.llmp_in.recv_buf()
     }
 
     /// Receives a buf from the broker, looping until a messages becomes avaliable
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, &[u8]), AflError> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), AflError> {
         self.llmp_in.recv_buf_blocking()
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
 
@@ -1174,3 +1183,4 @@ mod tests {
         assert_eq!(broker.llmp_clients.len(), 2);
     }
 }
+*/
