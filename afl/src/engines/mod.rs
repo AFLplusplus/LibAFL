@@ -1,9 +1,8 @@
 //! The engine is the core piece of every good fuzzer
 
-use alloc::boxed::Box;
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use hashbrown::HashMap;
+use serde::{Serialize, Deserialize};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::EventManager;
@@ -13,6 +12,7 @@ use crate::generators::Generator;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
 use crate::stages::StagesTuple;
+use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
 use crate::tuples::{tuple_list, tuple_list_type};
 use crate::utils::{current_milliseconds, Rand};
 use crate::AflError;
@@ -23,6 +23,8 @@ pub trait StateMetadata: Debug {
 }
 
 /// The state a fuzz run.
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "FT: serde::de::DeserializeOwned")]
 pub struct State<I, R, FT, OT>
 where
     I: Input,
@@ -35,8 +37,9 @@ where
     /// At what time the fuzzing started
     start_time: u64,
     /// Metadata stored for this state by one of the components
-    metadatas: HashMap<&'static str, Box<dyn StateMetadata>>,
-    // additional_corpuses: HashMap<&'static str, Box<dyn Corpus>>,
+    metadatas: SerdeAnyMap,
+    // additional_corpuses, maybe another TupleList?
+    // Feedbacks used to evaluate an input
     feedbacks: FT,
     phantom: PhantomData<(I, R, OT)>,
 }
@@ -86,20 +89,23 @@ where
 
     /// Get all the metadatas into an HashMap
     #[inline]
-    pub fn metadatas(&self) -> &HashMap<&'static str, Box<dyn StateMetadata>> {
+    pub fn metadatas(&self) -> &SerdeAnyMap {
         &self.metadatas
     }
 
     /// Get all the metadatas into an HashMap (mutable)
     #[inline]
-    pub fn metadatas_mut(&mut self) -> &mut HashMap<&'static str, Box<dyn StateMetadata>> {
+    pub fn metadatas_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadatas
     }
 
     /// Add a metadata
     #[inline]
-    pub fn add_metadata(&mut self, meta: Box<dyn StateMetadata>) {
-        self.metadatas_mut().insert(meta.name(), meta);
+    pub fn add_metadata<M>(&mut self, meta: M)
+    where
+        M: SerdeAny,
+    {
+        self.metadatas.insert(meta);
     }
 
     /// Returns vector of feebacks
@@ -225,7 +231,7 @@ where
         Self {
             executions: 0,
             start_time: current_milliseconds(),
-            metadatas: HashMap::default(),
+            metadatas: SerdeAnyMap::default(),
             feedbacks: feedbacks,
             phantom: PhantomData,
         }
@@ -404,9 +410,6 @@ where
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-
-    #[cfg(feature = "std")]
-    use std::io::stderr;
 
     use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
     use crate::engines::{Engine, Fuzzer, State, StdFuzzer};

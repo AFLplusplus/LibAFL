@@ -14,35 +14,6 @@ use crate::AflError;
 //#[cfg(feature = "std")]
 //use std::path::PathBuf;
 
-// TODO: Give example
-/// Metadata for a testcase
-pub trait TestcaseMetadata: SerdeAny {
-    /// The name of this metadata - used to find it in the list of avaliable metadatas
-    fn name(&self) -> &'static str;
-}
-
-/*
-/// Just a wrapper of Boxed TestcaseMetadata trait object for Clone
-#[derive(Serialize, Deserialize)]
-pub struct TestcaseMetadataContainer {
-    meta: Box<dyn TestcaseMetadata>,
-}
-impl Clone for TestcaseMetadataContainer {
-    fn clone(&self) -> Self {
-        TestcaseMetadataContainer {
-            meta: self.meta.clone(),
-        }
-    }
-}
-impl TestcaseMetadataContainer {
-    pub fn meta(&self) -> &Box<dyn TestcaseMetadata> {
-        &self.meta
-    }
-    pub fn meta_mut(&mut self) -> &mut Box<dyn TestcaseMetadata> {
-        &mut self.meta
-    }
-}*/
-
 /// An entry in the Testcase Corpus
 #[derive(Default, Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -145,9 +116,9 @@ where
 
     /// Add a metadata
     #[inline]
-    pub fn add_metadata<TM>(&mut self, meta: TM)
+    pub fn add_metadata<M>(&mut self, meta: M)
     where
-        TM: TestcaseMetadata + 'static,
+        M: SerdeAny,
     {
         self.metadatas.insert(meta);
     }

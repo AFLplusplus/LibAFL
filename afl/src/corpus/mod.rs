@@ -1,11 +1,12 @@
 pub mod testcase;
-pub use testcase::{Testcase, TestcaseMetadata};
+pub use testcase::{Testcase};
 
 use alloc::borrow::ToOwned;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use core::ptr;
+use serde::{Serialize, Deserialize};
 
 #[cfg(feature = "std")]
 use std::path::PathBuf;
@@ -27,7 +28,7 @@ where
 }
 
 /// Corpus with all current testcases
-pub trait Corpus<I, R>: HasTestcaseVec<I>
+pub trait Corpus<I, R>: HasTestcaseVec<I> + serde::Serialize + serde::de::DeserializeOwned
 where
     I: Input,
     R: Rand,
@@ -118,6 +119,8 @@ where
 }
 
 /// A corpus handling all important fuzzing in memory.
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryCorpus<I, R>
 where
     I: Input,
@@ -182,6 +185,8 @@ where
 
 /// A corpus able to store testcases to dis, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct OnDiskCorpus<I, R>
 where
     I: Input,
@@ -268,6 +273,8 @@ where
 }
 
 /// A Queue-like corpus, wrapping an existing Corpus instance
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct QueueCorpus<C, I, R>
 where
     C: Corpus<I, R>,

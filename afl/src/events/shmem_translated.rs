@@ -4,21 +4,13 @@ use std::{ffi::CStr, mem::size_of};
 use crate::AflError;
 
 extern "C" {
-    #[no_mangle]
     fn snprintf(_: *mut c_char, _: c_ulong, _: *const c_char, _: ...) -> c_int;
-    #[no_mangle]
     fn strncpy(_: *mut c_char, _: *const c_char, _: c_ulong) -> *mut c_char;
-    #[no_mangle]
-    fn strlen(_: *const c_char) -> c_ulong;
-    #[no_mangle]
+    //fn strlen(_: *const c_char) -> c_ulong;
     fn shmctl(__shmid: c_int, __cmd: c_int, __buf: *mut shmid_ds) -> c_int;
-    #[no_mangle]
     fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int;
-    #[no_mangle]
     fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
-    #[no_mangle]
-    fn strtol(_: *const c_char, _: *mut *mut c_char, _: c_int) -> c_long;
-    #[no_mangle]
+    //fn strtol(_: *const c_char, _: *mut *mut c_char, _: c_int) -> c_long;
     fn setenv(__name: *const c_char, __value: *const c_char, __replace: c_int) -> c_int;
 }
 #[derive(Copy, Clone)]
