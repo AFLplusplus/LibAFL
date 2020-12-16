@@ -4,6 +4,8 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 
+// yolo
+
 pub fn pack_type_id(id: u64) -> TypeId {
     unsafe { *(&id as *const u64 as *const TypeId) }
 }

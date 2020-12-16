@@ -539,6 +539,8 @@ pub enum LLMPEventKind<'a, I>
 where
     I: Input,
 {
+    // TODO use an ID to keep track of the original index in the sender Corpus
+    // The sender can then use it to send Testcase metadatas with CustomEvent
     NewTestcase {
         input: Ptr<'a, I>,
         observers_buf: Vec<u8>,
