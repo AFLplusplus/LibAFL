@@ -35,15 +35,41 @@ pub enum BrokerEventResult {
     Forward,
 }
 
+const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
+
 #[derive(Debug, Clone, Default)]
 pub struct ClientStats {
     // stats (maybe we need a separated struct?)
     corpus_size: u64,
     executions: u64,
+    last_window_executions: u64,
+    last_window_time: time::Duration,
+    last_execs_per_sec: u64,
 }
 
-// TODO Stats as a trait in order to implement logging in an abstract way
-// Something like stats.show() that will render the AFL status screen
+impl ClientStats {
+    pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
+        self.executions = executions;
+        if (cur_time - self.last_window_time).as_secs() > CLIENT_STATS_TIME_WINDOW_SECS {
+            self.last_execs_per_sec = self.execs_per_sec(cur_time);
+            self.last_window_time = cur_time;
+            self.last_window_executions = executions;
+        }
+    }
+
+    pub fn execs_per_sec(&self, cur_time: time::Duration) -> u64 {
+        if self.executions == 0 {
+            return 0;
+        } 
+        let secs = (cur_time - self.last_window_time).as_secs();
+        if secs == 0 {
+            self.last_execs_per_sec
+        } else {
+            let diff = self.executions - self.last_window_executions;
+            diff / secs
+        }
+    }
+}
 
 pub trait Stats {
     /// the client stats (mut)
@@ -76,12 +102,10 @@ pub trait Stats {
     /// Executions per second
     #[inline]
     fn execs_per_sec(&mut self) -> u64 {
-        let time_since_start = (utils::current_time() - self.start_time()).as_secs();
-        if time_since_start == 0 {
-            0
-        } else {
-            self.total_execs() / time_since_start
-        }
+        let cur_time = utils::current_time();
+        self.client_stats()
+            .iter()
+            .fold(0u64, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
     /// The client stats for a specific id, creating new if it doesn't exist
@@ -89,6 +113,7 @@ pub trait Stats {
         let client_stat_count = self.client_stats().len();
         for _ in client_stat_count..(client_id + 1) as usize {
             self.client_stats_mut().push(ClientStats {
+                last_window_time: utils::current_time(),
                 ..Default::default()
             })
         }

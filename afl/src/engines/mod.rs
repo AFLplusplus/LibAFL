@@ -69,6 +69,7 @@ where
         self.start_time = ms
     }
 
+    // TODO as this is done in the event manager, we can remove it
     #[inline]
     pub fn executions_over_seconds(&self) -> u64 {
         let elapsed = current_milliseconds() - self.start_time();
