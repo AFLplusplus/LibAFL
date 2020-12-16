@@ -7,6 +7,9 @@ Welcome to libAFL
 #[macro_use]
 extern crate alloc;
 
+#[macro_use]
+extern crate static_assertions;
+
 pub mod corpus;
 pub mod engines;
 pub mod events;

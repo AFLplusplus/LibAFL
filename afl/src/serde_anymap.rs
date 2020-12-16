@@ -7,10 +7,12 @@ use core::any::{Any, TypeId};
 // yolo
 
 pub fn pack_type_id(id: u64) -> TypeId {
+    assert_eq_size!(TypeId, u64);
     unsafe { *(&id as *const u64 as *const TypeId) }
 }
 
 pub fn unpack_type_id(id: TypeId) -> u64 {
+    assert_eq_size!(TypeId, u64);
     unsafe { *(&id as *const _ as *const u64) }
 }
 
