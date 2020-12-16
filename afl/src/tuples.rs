@@ -98,15 +98,15 @@ pub trait Named {
 }
 
 pub trait MatchNameAndType {
-    fn match_name_type<T: 'static>(&self, name: &'static str) -> Option<&T>;
-    fn match_name_type_mut<T: 'static>(&mut self, name: &'static str) -> Option<&mut T>;
+    fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T>;
+    fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T>;
 }
 
 impl MatchNameAndType for () {
-    fn match_name_type<T: 'static>(&self, _name: &'static str) -> Option<&T> {
+    fn match_name_type<T: 'static>(&self, _name: &str) -> Option<&T> {
         None
     }
-    fn match_name_type_mut<T: 'static>(&mut self, _name: &'static str) -> Option<&mut T> {
+    fn match_name_type_mut<T: 'static>(&mut self, _name: &str) -> Option<&mut T> {
         None
     }
 }
@@ -116,7 +116,7 @@ where
     Head: 'static + Named,
     Tail: TupleList + MatchNameAndType,
 {
-    fn match_name_type<T: 'static>(&self, name: &'static str) -> Option<&T> {
+    fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
             unsafe { (&self.0 as *const _ as *const T).as_ref() }
         } else {
@@ -124,7 +124,7 @@ where
         }
     }
 
-    fn match_name_type_mut<T: 'static>(&mut self, name: &'static str) -> Option<&mut T> {
+    fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
             unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
         } else {

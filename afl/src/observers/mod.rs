@@ -82,7 +82,7 @@ where
 }
 
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
-pub trait MapObserver<T>
+pub trait MapObserver<T>: Observer
 where
     T: Default + Copy,
 {

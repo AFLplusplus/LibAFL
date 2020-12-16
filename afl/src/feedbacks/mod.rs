@@ -1,11 +1,12 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use num::Integer;
+use serde::{Deserialize, Serialize};
 
 use crate::corpus::Testcase;
 use crate::inputs::Input;
 use crate::observers::{MapObserver, Observer, ObserversTuple};
-use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
+use crate::tuples::{Named, TupleList};
 use crate::AflError;
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
@@ -17,7 +18,7 @@ pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I>: Named + 'static
+pub trait Feedback<I>: Named + serde::Serialize + serde::de::DeserializeOwned + 'static
 where
     I: Input,
 {
@@ -41,7 +42,7 @@ where
     }
 }
 
-pub trait FeedbacksTuple<I>: MatchType + MatchNameAndType
+pub trait FeedbacksTuple<I>: serde::Serialize + serde::de::DeserializeOwned
 where
     I: Input,
 {
@@ -57,8 +58,6 @@ where
 
     /// Discards metadata - the end of this input's execution
     fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError>;
-    //fn for_each(&self, f: fn(&dyn Feedback<I>));
-    //fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>));
 }
 
 impl<I> FeedbacksTuple<I> for ()
@@ -78,8 +77,6 @@ where
     fn discard_metadata_all(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }
-    //fn for_each(&self, f: fn(&dyn Feedback<I>)) {}
-    //fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>)) {}
 }
 
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
@@ -106,36 +103,27 @@ where
         self.0.discard_metadata(input)?;
         self.1.discard_metadata_all(input)
     }
-
-    /*fn for_each(&self, f: fn(&dyn Feedback<I>)) {
-        f(&self.0);
-        self.1.for_each(f)
-    }
-
-    fn for_each_mut(&mut self, f: fn(&mut dyn Feedback<I>)) {
-        f(self.0);
-        self.1.for_each_mut(f)
-    }*/
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
-pub trait Reducer<T>: 'static
+pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn reduce(first: T, second: T) -> T;
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MaxReducer<T>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     phantom: PhantomData<T>,
 }
 
 impl<T> Reducer<T> for MaxReducer<T>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -147,16 +135,17 @@ where
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MinReducer<T>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     phantom: PhantomData<T>,
 }
 
 impl<T> Reducer<T> for MinReducer<T>
 where
-    T: Integer + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -169,25 +158,27 @@ where
 }
 
 /// The most common AFL-like feedback type
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedback<T, R, O>
 where
-    T: Integer + Default + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
 {
     /// Contains information about untouched entries
     history_map: Vec<T>,
     /// Name identifier of this instance
-    name: &'static str,
+    name: String,
     /// Phantom Data of Reducer
     phantom: PhantomData<(R, O)>,
 }
 
 impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
 where
-    T: Integer + Default + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
-    O: MapObserver<T> + 'static,
+    O: MapObserver<T>,
     I: Input,
 {
     fn is_interesting<OT: ObserversTuple>(
@@ -215,19 +206,19 @@ where
 
 impl<T, R, O> Named for MapFeedback<T, R, O>
 where
-    T: Integer + Default + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
-    O: MapObserver<T> + 'static,
+    O: MapObserver<T>,
 {
     #[inline]
     fn name(&self) -> &str {
-        self.name
+        self.name.as_str()
     }
 }
 
 impl<T, R, O> MapFeedback<T, R, O>
 where
-    T: Integer + Default + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T> + Observer,
 {
@@ -236,7 +227,7 @@ where
         Self {
             history_map: vec![T::default(); map_size],
             phantom: PhantomData,
-            name,
+            name: name.to_string(),
         }
     }
 
@@ -247,14 +238,14 @@ where
         Self {
             history_map: vec![T::default(); map_observer.map().len()],
             phantom: PhantomData,
-            name,
+            name: name.to_string(),
         }
     }
 }
 
 impl<T, R, O> MapFeedback<T, R, O>
 where
-    T: Integer + Default + Copy + 'static,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
 {

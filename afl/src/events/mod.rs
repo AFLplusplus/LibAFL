@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 //pub mod shmem_translated;
 
 #[cfg(feature = "std")]
-use std::{io::Write, time::Duration};
+use std::time::Duration;
 
 use crate::corpus::Corpus;
 use crate::executors::Executor;
@@ -60,7 +60,7 @@ impl ClientStats {
     pub fn execs_per_sec(&self, cur_time: time::Duration) -> u64 {
         if self.executions == 0 {
             return 0;
-        } 
+        }
         let secs = (cur_time - self.last_window_time).as_secs();
         if secs == 0 {
             self.last_execs_per_sec
