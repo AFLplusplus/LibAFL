@@ -1,12 +1,12 @@
 pub mod testcase;
-pub use testcase::{Testcase};
+pub use testcase::Testcase;
 
 use alloc::borrow::ToOwned;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 use core::ptr;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use std::path::PathBuf;
