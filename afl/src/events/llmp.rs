@@ -1135,7 +1135,6 @@ impl LlmpClient {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
 
@@ -1143,6 +1142,7 @@ mod tests {
 
     use super::{
         LlmpConnection::{self, IsBroker, IsClient},
+        LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
 
@@ -1167,15 +1167,19 @@ mod tests {
 
         // Give the (background) tcp thread a few millis to post the message
         sleep(Duration::from_millis(100));
-        broker.once().unwrap();
+        broker
+            .once(&mut |_sender_id, _tag, _msg| Ok(ForwardToClients))
+            .unwrap();
 
         let tag: Tag = 0x1337;
         let arr: [u8; 1] = [1u8];
         // Send stuff
         client.send_buf(tag, &arr).unwrap();
         // Forward stuff to clients
-        broker.once().unwrap();
-        let (tag2, arr2) = client.recv_buf_blocking().unwrap();
+        broker
+            .once(&mut |_sender_id, _tag, _msg| Ok(ForwardToClients))
+            .unwrap();
+        let (_sender_id, tag2, arr2) = client.recv_buf_blocking().unwrap();
         assert_eq!(tag, tag2);
         assert_eq!(arr[0], arr2[0]);
 
@@ -1183,4 +1187,3 @@ mod tests {
         assert_eq!(broker.llmp_clients.len(), 2);
     }
 }
-*/

@@ -2,7 +2,7 @@
 
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::EventManager;
@@ -11,8 +11,8 @@ use crate::feedbacks::FeedbacksTuple;
 use crate::generators::Generator;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
-use crate::stages::StagesTuple;
 use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
+use crate::stages::StagesTuple;
 use crate::tuples::{tuple_list, tuple_list_type};
 use crate::utils::{current_milliseconds, Rand};
 use crate::AflError;
@@ -420,7 +420,7 @@ mod tests {
     use crate::inputs::bytes::BytesInput;
     use crate::mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator};
     use crate::stages::mutational::StdMutationalStage;
-    use crate::tuples::{tuple_list_type, tuple_list};
+    use crate::tuples::{tuple_list, tuple_list_type};
     use crate::utils::StdRand;
 
     fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
@@ -460,11 +460,13 @@ mod tests {
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
-        let state_deserialized: State<BytesInput, StdRand, tuple_list_type!(), tuple_list_type!()> = postcard::from_bytes(state_serialized.as_slice()).unwrap();
+        let state_deserialized: State<BytesInput, StdRand, tuple_list_type!(), tuple_list_type!()> =
+            postcard::from_bytes(state_serialized.as_slice()).unwrap();
         assert_eq!(state.executions, state_deserialized.executions);
 
         let corpus_serialized = postcard::to_allocvec(&corpus).unwrap();
-        let corpus_deserialized: InMemoryCorpus<BytesInput, StdRand> = postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
+        let corpus_deserialized: InMemoryCorpus<BytesInput, StdRand> =
+            postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
         assert_eq!(corpus.count(), corpus_deserialized.count());
     }
 }

@@ -1,6 +1,8 @@
 pub mod inmemory;
 
-use crate::inputs::Input;
+use core::marker::PhantomData;
+
+use crate::inputs::{HasTargetBytes, Input};
 use crate::observers::ObserversTuple;
 use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
 use crate::AflError;
@@ -33,6 +35,31 @@ where
     #[inline]
     fn post_exec_observers(&mut self) -> Result<(), AflError> {
         self.observers_mut().post_exec_all()
+    }
+}
+
+/// A simple executor that does nothing.
+/// If intput len is 0, run_target will return Err
+struct NopExecutor<I> {
+    phantom: PhantomData<I>,
+}
+
+impl<I> Executor<I> for NopExecutor<I>
+where
+    I: Input + HasTargetBytes,
+{
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
+        if input.target_bytes().as_slice().len() == 0 {
+            Err(AflError::Empty("Input Empty".into()))
+        } else {
+            Ok(ExitKind::Ok)
+        }
+    }
+}
+
+impl<I> Named for NopExecutor<I> {
+    fn name(&self) -> &str {
+        &"NopExecutor"
     }
 }
 
@@ -75,5 +102,26 @@ where
     fn for_each_mut(&mut self, f: fn(&mut dyn Executor<I>)) {
         f(&mut self.0);
         self.1.for_each_mut(f)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::marker::PhantomData;
+
+    use crate::executors::Executor;
+    use crate::inputs::BytesInput;
+
+    use super::NopExecutor;
+
+    #[test]
+    fn nop_executor() {
+        let empty_input = BytesInput::new(vec![]);
+        let nonempty_input = BytesInput::new(vec![1u8]);
+        let mut executor = NopExecutor {
+            phantom: PhantomData,
+        };
+        assert!(executor.run_target(&empty_input).is_err());
+        assert!(executor.run_target(&nonempty_input).is_ok());
     }
 }
