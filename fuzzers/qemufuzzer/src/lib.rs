@@ -7,7 +7,7 @@ use afl::engines::Engine;
 use afl::engines::Fuzzer;
 use afl::engines::State;
 use afl::engines::StdFuzzer;
-use afl::events::{SimpleStats, LlmpEventManager};
+use afl::events::{LlmpEventManager, SimpleStats};
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::MaxMapFeedback;
@@ -66,7 +66,11 @@ pub extern "C" fn fuzz_main_loop() {
     }
     println!("We're a client, let's fuzz :)");
 
-    let edges_observer = StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { fuzz_hitcounts_map.as_mut_ptr() }, unsafe { fuzz_edges_id });
+    let edges_observer = StdMapObserver::new_from_ptr(
+        &NAME_COV_MAP,
+        unsafe { fuzz_hitcounts_map.as_mut_ptr() },
+        unsafe { fuzz_edges_id },
+    );
     let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
 
     let executor = InMemoryExecutor::new("QEMUFuzzer", harness, tuple_list!(edges_observer));

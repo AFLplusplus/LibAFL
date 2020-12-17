@@ -7,7 +7,7 @@ use afl::engines::Engine;
 use afl::engines::Fuzzer;
 use afl::engines::State;
 use afl::engines::StdFuzzer;
-use afl::events::{SimpleStats, LlmpEventManager};
+use afl::events::{LlmpEventManager, SimpleStats};
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
 use afl::feedbacks::MaxMapFeedback;
