@@ -189,7 +189,7 @@ where
         let mut interesting = 0;
         // TODO optimize
         let observer = observers.match_name_type::<O>(&self.name).unwrap();
-        let size = observer.map().len();
+        let size = observer.usable_count();
         for i in 0..size {
             let history = self.history_map[i];
             let item = observer.map()[i];

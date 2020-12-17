@@ -2,7 +2,7 @@ extern crate num;
 
 use serde::{Deserialize, Serialize};
 
-use crate::serde_anymap::ArrayMut;
+use crate::serde_anymap::{Cptr, ArrayMut};
 use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
 use crate::AflError;
 
@@ -92,6 +92,11 @@ where
     /// Get the map (mutable)
     fn map_mut(&mut self) -> &mut [T];
 
+    /// Get the number of usable entries in the map (all by default)
+    fn usable_count(&self) -> usize {
+        self.map().len()
+    }
+
     /// Get the initial value for reset()
     fn initial(&self) -> T;
 
@@ -106,7 +111,8 @@ where
     fn reset_map(&mut self) -> Result<(), AflError> {
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
-        for i in self.map_mut().iter_mut() {
+        let cnt = self.usable_count();
+        for i in self.map_mut()[0..cnt].iter_mut() {
             *i = initial;
         }
         Ok(())
@@ -197,6 +203,102 @@ where
             let initial = if len > 0 { *map_ptr } else { T::default() };
             StdMapObserver {
                 map: ArrayMut::Cptr((map_ptr, len)),
+                name: name.into(),
+                initial,
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "T: serde::de::DeserializeOwned")]
+pub struct VariableMapObserver<T>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    map: ArrayMut<T>,
+    size: Cptr<usize>,
+    initial: T,
+    name: String,
+}
+
+impl<T> Observer for VariableMapObserver<T>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn reset(&mut self) -> Result<(), AflError> {
+        self.reset_map()
+    }
+}
+
+impl<T> Named for VariableMapObserver<T>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<T> MapObserver<T> for VariableMapObserver<T>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn map(&self) -> &[T] {
+        self.map.as_slice()
+    }
+
+    #[inline]
+    fn map_mut(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
+    }
+    
+    #[inline]
+    fn usable_count(&self) -> usize {
+        *self.size.as_ref()
+    }
+
+    #[inline]
+    fn initial(&self) -> T {
+        self.initial
+    }
+
+    #[inline]
+    fn initial_mut(&mut self) -> &mut T {
+        &mut self.initial
+    }
+
+    #[inline]
+    fn set_initial(&mut self, initial: T) {
+        self.initial = initial
+    }
+}
+
+impl<T> VariableMapObserver<T>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new MapObserver
+    pub fn new(name: &'static str, map: &'static mut [T], size: &usize) -> Self {
+        let initial = if map.len() > 0 { map[0] } else { T::default() };
+        Self {
+            map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
+            size: Cptr::Cptr(size as *const _),
+            name: name.into(),
+            initial,
+        }
+    }
+
+    /// Creates a new MapObserver from a raw pointer
+    pub fn new_from_ptr(name: &'static str, map_ptr: *mut T, max_len: usize, size_ptr: *const usize) -> Self {
+        unsafe {
+            let initial = if max_len > 0 { *map_ptr } else { T::default() };
+            VariableMapObserver {
+                map: ArrayMut::Cptr((map_ptr, max_len)),
+                size: Cptr::Cptr(size_ptr),
                 name: name.into(),
                 initial,
             }
