@@ -55,6 +55,8 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
+
+#[cfg(feature = "std")]
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
@@ -64,6 +66,7 @@ use std::{
 use crate::utils::next_pow2;
 use crate::AflError;
 
+#[cfg(feature = "std")]
 use super::shmem_translated::AflShmem;
 
 /// We'll start off with 256 megabyte maps per fuzzer client

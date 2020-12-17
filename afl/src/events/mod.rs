@@ -1,30 +1,28 @@
+// TODO: llmp can be no_std, if we abstract away page creation
 #[cfg(feature = "std")]
 pub mod llmp;
 #[cfg(feature = "std")]
 pub mod shmem_translated;
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::time::Duration;
 use core::{marker::PhantomData, time};
-
+#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
-//#[cfg(feature = "std")]
-//pub mod shmem_translated;
-
 #[cfg(feature = "std")]
-use std::time::Duration;
-
+use self::llmp::Tag;
 use crate::corpus::Corpus;
 use crate::executors::Executor;
 use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
+#[cfg(feature = "std")]
 use crate::serde_anymap::Ptr;
 use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, utils};
-
-use self::llmp::Tag;
 
 #[derive(Debug, Copy, Clone)]
 /// Indicate if an event worked or not
@@ -377,6 +375,8 @@ where
                 message,
                 phantom: _,
             } => {
+                let (_, _) = (message, severity_level);
+                #[cfg(feature = "std")]
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
             } //_ => Ok(BrokerEventResult::Forward),
@@ -725,6 +725,7 @@ where
     phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
+#[cfg(feature = "std")]
 impl<C, E, OT, FT, I, R, ST> LlmpEventManager<C, E, OT, FT, I, R, ST>
 where
     C: Corpus<I, R>,

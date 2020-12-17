@@ -1,3 +1,4 @@
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use num::Integer;
@@ -254,7 +255,7 @@ where
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
             history_map: history_map,
-            name: name.into(),
+            name: name.to_string(),
             phantom: PhantomData,
         }
     }

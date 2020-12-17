@@ -1,5 +1,7 @@
 extern crate num;
 
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::serde_anymap::ArrayMut;
@@ -186,7 +188,7 @@ where
         let initial = if map.len() > 0 { map[0] } else { T::default() };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
-            name: name.into(),
+            name: name.to_string(),
             initial,
         }
     }
@@ -197,7 +199,7 @@ where
             let initial = if len > 0 { *map_ptr } else { T::default() };
             StdMapObserver {
                 map: ArrayMut::Cptr((map_ptr, len)),
-                name: name.into(),
+                name: name.to_string(),
                 initial,
             }
         }
