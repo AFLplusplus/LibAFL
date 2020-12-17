@@ -53,7 +53,7 @@ def ld_mode():
     args += sys.argv[1:]
     args += [
       os.path.join(script_dir, "runtime", "rt.o"),
-      os.path.join(script_dir, "target", "release", "liblibfuzzer.a"),
+      os.path.join(script_dir, "target", "debug", "liblibfuzzer.a"),
     ]
     
     args += ["-fsanitize-coverage=trace-pc-guard,trace-cmp"]

@@ -1,11 +1,12 @@
 #!/bin/sh
 
-cargo build --release
-make -C runtime
+cargo build || exit 1
+make -C runtime || exit 1
 
-./compiler -flto=thin -c test/test.c -o test_fuzz.o
-./compiler -flto=thin -fuse-ld=lld test_fuzz.o -o test_fuzz.elf
+rm -f test_fuzz.elf test_fuzz.o
+./compiler -flto=thin -c test/test.c -o test_fuzz.o || exit 1
+./compiler -flto=thin test_fuzz.o -o test_fuzz.elf || exit 1
 
-RUST_BACKTRACE=1 ./test_fuzz.elf
+RUST_BACKTRACE=1 ./test_fuzz.elf -x a -x b  foo bar
 
-#rm ./test_fuzz.elf
+

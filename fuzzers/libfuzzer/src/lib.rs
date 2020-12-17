@@ -1,6 +1,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[macro_use]
+extern crate clap;
 extern crate alloc;
+
+use clap::{App, Arg};
+use std::env;
 
 use afl::corpus::InMemoryCorpus;
 use afl::engines::Engine;
@@ -23,6 +28,9 @@ extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
 
+    /// int LLVMFuzzerInitialize(int argc, char **argv)
+    fn LLVMFuzzerInitialize(argc: u32, argv: *const *const u8) -> i32;
+
     static __lafl_edges_map: *mut u8;
     static __lafl_cmp_map: *mut u8;
     static __lafl_max_edges_size: u32;
@@ -39,8 +47,68 @@ const NAME_COV_MAP: &str = "cov_map";
 
 #[no_mangle]
 pub extern "C" fn afl_libfuzzer_main() {
-    let mut rand = StdRand::new(0);
+    let matches = App::new("libAFLrs fuzzer harness")
+        .about("libAFLrs fuzzer harness help options.")
+        .arg(
+            Arg::with_name("dictionary")
+                .short("x")
+                .value_name("DICTIONARY")
+                .takes_value(true)
+                .multiple(true)
+                .help("Dictionary file to use, can be specified multiple times."),
+        )
+        .arg(
+            Arg::with_name("statstime")
+                .short("T")
+                .value_name("STATSTIME")
+                .takes_value(true)
+                .help("How often to print statistics in seconds [default: 5, disable: 0]"),
+        )
+        .arg(Arg::with_name("workdir")
+                               .help("Where to write the corpus, also reads the data on start. If more than one is supplied the first will be the work directory, all others will just be initially read from.")
+                                .multiple(true)
+                                .value_name("WORKDIR")
+                               )
+        .get_matches();
 
+    let statstime = value_t!(matches, "statstime", u32).unwrap_or(5);
+
+    let workdir = if matches.is_present("workdir") {
+        matches.value_of("workdir").unwrap().to_string()
+    } else {
+        env::current_dir().unwrap().to_string_lossy().to_string()
+    };
+
+    let mut dictionary: Option<Vec<String>> = None;
+
+    if matches.is_present("dictionary") {
+        dictionary = Some(values_t!(matches, "dictionary", String).unwrap_or_else(|e| e.exit()));
+    }
+
+    let mut input: Option<Vec<String>> = None;
+    if matches.is_present("workdir") {
+        input = Some(values_t!(matches, "workdir", String).unwrap_or_else(|e| e.exit()));
+    }
+
+    // debug prints
+
+    println!("workdir: {}", workdir);
+
+    if dictionary != None {
+        for file in dictionary.unwrap() {
+            println!("dic: {}", file);
+        }
+    }
+
+    if input != None {
+        for indir in input.unwrap() {
+            println!("in: {}", indir);
+        }
+    }
+    
+    // original code
+
+    let mut rand = StdRand::new(0);
     let mut corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(32);
 
