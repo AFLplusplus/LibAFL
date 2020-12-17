@@ -105,7 +105,7 @@ pub extern "C" fn afl_libfuzzer_main() {
             println!("in: {}", indir);
         }
     }
-    
+
     // original code
 
     let mut rand = StdRand::new(0);
@@ -131,16 +131,28 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     let mut engine = Engine::new(executor);
 
-    state
-        .generate_initial_inputs(
-            &mut rand,
-            &mut corpus,
-            &mut generator,
-            &mut engine,
-            &mut mgr,
-            4,
-        )
-        .expect("Failed to load initial inputs");
+    if input != None {
+        state
+            .load_initial_inputs(
+                &mut corpus,
+                &mut generator,
+                &mut engine,
+                &mut mgr,
+                input.unwrap(),
+            )
+            .expect("Failed to load initial corpus");
+    } else {
+        state
+            .generate_initial_inputs(
+                &mut rand,
+                &mut corpus,
+                &mut generator,
+                &mut engine,
+                &mut mgr,
+                4,
+            )
+            .expect("Failed to load initial inputs");
+    }
 
     let mut mutator = HavocBytesMutator::new_default();
     mutator.set_max_size(4096);
