@@ -84,8 +84,10 @@ pub fn current_time() -> time::Duration {
 /// Current time (fixed fallback for no_std)
 #[cfg(not(feature = "std"))]
 #[inline]
-fn current_time() -> time::Duration {
-    self.start_time()
+pub fn current_time() -> time::Duration {
+    // We may not have a rt clock available.
+    // TODO: Make it somehow plugin-able
+    time::Duration::from_millis(1)
 }
 
 #[cfg(feature = "std")]

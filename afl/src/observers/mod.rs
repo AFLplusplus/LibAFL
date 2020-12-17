@@ -1,8 +1,10 @@
 extern crate num;
 
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::serde_anymap::{Cptr, ArrayMut};
+use crate::serde_anymap::{ArrayMut, Cptr};
 use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
 use crate::AflError;
 
@@ -192,7 +194,7 @@ where
         let initial = if map.len() > 0 { map[0] } else { T::default() };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
-            name: name.into(),
+            name: name.to_string(),
             initial,
         }
     }
@@ -203,7 +205,7 @@ where
             let initial = if len > 0 { *map_ptr } else { T::default() };
             StdMapObserver {
                 map: ArrayMut::Cptr((map_ptr, len)),
-                name: name.into(),
+                name: name.to_string(),
                 initial,
             }
         }
@@ -255,7 +257,7 @@ where
     fn map_mut(&mut self) -> &mut [T] {
         self.map.as_mut_slice()
     }
-    
+
     #[inline]
     fn usable_count(&self) -> usize {
         *self.size.as_ref()
@@ -293,7 +295,12 @@ where
     }
 
     /// Creates a new MapObserver from a raw pointer
-    pub fn new_from_ptr(name: &'static str, map_ptr: *mut T, max_len: usize, size_ptr: *const usize) -> Self {
+    pub fn new_from_ptr(
+        name: &'static str,
+        map_ptr: *mut T,
+        max_len: usize,
+        size_ptr: *const usize,
+    ) -> Self {
         unsafe {
             let initial = if max_len > 0 { *map_ptr } else { T::default() };
             VariableMapObserver {
