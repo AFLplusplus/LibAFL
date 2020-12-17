@@ -1,0 +1,23 @@
+[package]
+name = "qemufuzzer"
+version = "0.1.0"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+afl = { path = "../../afl/" }
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
