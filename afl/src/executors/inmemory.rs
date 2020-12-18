@@ -7,9 +7,9 @@ use crate::observers::ObserversTuple;
 use crate::tuples::Named;
 use crate::AflError;
 
-/// The (unsafe) pointer to the current inmem executor, for the current run.
+/// The (unsafe) pointer to the current inmem input, for the current run.
 /// This is neede for certain non-rust side effects, as well as unix signal handling.
-static mut CURRENT_INMEMORY_EXECUTOR_PTR: *const c_void = ptr::null();
+static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
 
 /// The inmem executor harness
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
@@ -34,11 +34,11 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
         let bytes = input.target_bytes();
         unsafe {
-            CURRENT_INMEMORY_EXECUTOR_PTR = self as *const InMemoryExecutor<I, OT> as *const c_void;
+            CURRENT_INPUT_PTR = input as *const _ as *const c_void;
         }
         let ret = (self.harness)(self, bytes.as_slice());
         unsafe {
-            CURRENT_INMEMORY_EXECUTOR_PTR = ptr::null();
+            CURRENT_INPUT_PTR = ptr::null();
         }
         Ok(ret)
     }
@@ -101,7 +101,7 @@ pub mod unix_signals {
     use std::io::{stdout, Write}; // Write brings flush() into scope
     use std::{mem, process, ptr};
 
-    use crate::executors::inmemory::CURRENT_INMEMORY_EXECUTOR_PTR;
+    use crate::executors::inmemory::CURRENT_INPUT_PTR;
     use crate::inputs::Input;
 
     pub extern "C" fn libaflrs_executor_inmem_handle_crash<I>(
@@ -112,7 +112,7 @@ pub mod unix_signals {
         I: Input,
     {
         unsafe {
-            if CURRENT_INMEMORY_EXECUTOR_PTR == ptr::null() {
+            if CURRENT_INPUT_PTR == ptr::null() {
                 println!(
                     "We died accessing addr {}, but are not in client...",
                     info.si_addr() as usize
@@ -125,7 +125,9 @@ pub mod unix_signals {
         #[cfg(feature = "std")]
         let _ = stdout().flush();
 
-        // TODO: LLMP
+        let _input = unsafe {
+            (CURRENT_INPUT_PTR as *const I).as_ref().unwrap()
+        };
 
         std::process::exit(139);
     }
@@ -139,11 +141,16 @@ pub mod unix_signals {
     {
         dbg!("TIMEOUT/SIGUSR2 received");
         unsafe {
-            if CURRENT_INMEMORY_EXECUTOR_PTR == ptr::null() {
+            if CURRENT_INPUT_PTR == ptr::null() {
                 dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
                 return;
             }
         }
+        
+        let _input = unsafe {
+            (CURRENT_INPUT_PTR as *const I).as_ref().unwrap()
+        };
+        
         // TODO: send LLMP.
         println!("Timeout in fuzz run.");
         let _ = stdout().flush();
