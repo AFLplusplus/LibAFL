@@ -196,8 +196,7 @@ where
         }
     }
 
-    pub fn load_from_directory<G, C, E, ET, EM>
-    (
+    pub fn load_from_directory<G, C, E, ET, EM>(
         &mut self,
         corpus: &mut C,
         generator: &mut G,
@@ -233,13 +232,7 @@ where
             //    added += 1;
             //}
             } else if attr.is_dir() {
-                let _x = self.load_from_directory(
-                    corpus,
-                    generator,
-                    engine,
-                    manager,
-                    &path,
-                );
+                let _x = self.load_from_directory(corpus, generator, engine, manager, &path);
             }
         }
 
@@ -263,13 +256,7 @@ where
     {
         let mut added = 0 as u32;
         for directory in &in_dir {
-            self.load_from_directory(
-                corpus,
-                generator,
-                engine,
-                manager,
-                Path::new(directory),
-            )?;
+            self.load_from_directory(corpus, generator, engine, manager, Path::new(directory))?;
         }
         manager.log(
             0,
