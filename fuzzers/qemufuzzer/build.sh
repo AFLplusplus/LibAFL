@@ -2,8 +2,9 @@
 
 cargo build --release
 
-cd qemu
-git pull
+cd qemu-fuzz
+
+git submodule update
 
 ./build_qemu_fuzz.sh ../target/release/libqemufuzzer.a
 
