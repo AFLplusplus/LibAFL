@@ -1,4 +1,5 @@
 use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
+use core::slice;
 use std::{ffi::CStr, mem::size_of};
 
 use crate::AflError;
@@ -50,15 +51,52 @@ const AFL_RET_SUCCESS: c_uint = 0;
 // A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
+/// A Shared map
+pub trait ShMem {
+
+    /// The string to identify this shm
+    fn shm_str(&self) -> String;
+
+    /// Let's just fix this to a large enough buf
+    fn shm_str_buf(&self) -> &[u8; 20];
+
+    /// The actual shared map, in memory
+    fn map(&self) -> &[u8];
+
+    /// The actual shared map, mutable
+    fn map_mut(&mut self) -> &mut [u8];
+
+}
+
 #[derive(Clone, Debug)]
 pub struct AflShmem {
     pub shm_str: [u8; 20],
     pub shm_id: c_int,
-    pub map: *mut c_uchar,
+    pub map: *mut u8,
     pub map_size: usize,
 }
 
-/// Deinit on drop
+impl ShMem for AflShmem {
+
+    fn shm_str(&self) -> String {
+        unsafe { CStr::from_ptr(self.shm_str.as_ptr() as *const i8) }.to_string_lossy().into()
+    }
+
+    fn shm_str_buf(&self) -> &[u8; 20] {
+        &self.shm_str
+    }
+
+    fn map(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.map, self.map_size) }
+    }
+
+    fn map_mut(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+    }
+
+}
+
+/// Deinit sharedmaps on drop
 impl Drop for AflShmem {
     fn drop(&mut self) {
         unsafe {

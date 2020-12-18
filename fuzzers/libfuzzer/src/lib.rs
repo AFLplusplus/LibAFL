@@ -45,11 +45,18 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut generator = RandPrintablesGenerator::new(32);
 
     let stats = SimpleStats::new(|s| println!("{}", s));
+
+    /// 
+    match LlmpFuzzInstance::from_env("FUZZER_ENV") {
+        
+    }
+
     let mut mgr = LlmpEventManager::new_on_port(1337, stats).unwrap();
     if mgr.is_broker() {
-        println!("Doing broker things.");
+        println!("Doing broker things. Run this tool again to start fuzzing in a client.");
         mgr.broker_loop().unwrap();
     }
+
     println!("We're a client, let's fuzz :)");
 
     let edges_observer =

@@ -6,6 +6,7 @@ pub mod shmem_translated;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use shmem_translated::AflShmem;
 use core::time::Duration;
 use core::{marker::PhantomData, time};
 #[cfg(feature = "std")]
@@ -720,7 +721,7 @@ where
     ST: Stats,
     //CE: CustomEvent<I>,
 {
-    llmp: llmp::LlmpConnection,
+    llmp: llmp::LlmpConnection<AflShmem>,
     stats: ST,
     phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }

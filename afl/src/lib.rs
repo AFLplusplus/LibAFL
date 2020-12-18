@@ -28,7 +28,7 @@ pub mod utils;
 use alloc::string::String;
 use core::fmt;
 #[cfg(feature = "std")]
-use std::io;
+use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
 
 /// Main error struct for AFL
 #[derive(Debug)]
@@ -87,6 +87,27 @@ impl From<io::Error> for AflError {
         Self::File(err)
     }
 }
+
+#[cfg(feature = "std")]
+impl From<FromUtf8Error> for AflError {
+    fn from(err: FromUtf8Error) -> Self {
+        Self::Unknown(format!("Could not convert byte to utf-8: {:?}", err))
+    }
+}
+ 
+#[cfg(feature = "std")]
+impl From<VarError> for AflError {
+    fn from(err: VarError) -> Self {
+        Self::Empty(format!("Could not get env var: {:?}", err))
+    }
+}
+ 
+impl From<ParseIntError> for AflError {
+    fn from(err: ParseIntError) -> Self {
+        Self::Unknown(format!("Failed to parse Int: {:?}", err))
+    }
+}
+ 
 
 #[cfg(test)]
 mod tests {
