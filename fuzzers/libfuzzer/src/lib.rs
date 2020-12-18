@@ -101,7 +101,7 @@ pub extern "C" fn afl_libfuzzer_main() {
     }
 
     if input != None {
-        for indir in input.unwrap() {
+        for indir in input.clone().unwrap() {
             println!("in: {}", indir);
         }
     }

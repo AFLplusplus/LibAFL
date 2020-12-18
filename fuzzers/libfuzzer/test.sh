@@ -7,6 +7,6 @@ rm -f test_fuzz.elf test_fuzz.o
 ./compiler -flto=thin -c test/test.c -o test_fuzz.o || exit 1
 ./compiler -flto=thin test_fuzz.o -o test_fuzz.elf || exit 1
 
-RUST_BACKTRACE=1 ./test_fuzz.elf -x a -x b  foo bar
+RUST_BACKTRACE=1 ./test_fuzz.elf -x a -x b -T5 foo bar
 
 

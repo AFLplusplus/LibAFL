@@ -254,7 +254,6 @@ where
         ET: ExecutorsTuple<I>,
         EM: EventManager<C, E, OT, FT, I, R>,
     {
-        let mut added = 0 as u32;
         for directory in &in_dir {
             self.load_from_directory(corpus, generator, engine, manager, Path::new(directory))?;
         }
