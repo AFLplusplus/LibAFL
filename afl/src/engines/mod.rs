@@ -232,7 +232,7 @@ where
             //    added += 1;
             //}
             } else if attr.is_dir() {
-                let _x = self.load_from_directory(corpus, generator, engine, manager, &path);
+                self.load_from_directory(corpus, generator, engine, manager, &path)?;
             }
         }
 
