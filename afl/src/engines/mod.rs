@@ -2,8 +2,8 @@
 
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use std::fs;
 use serde::{Deserialize, Serialize};
+use std::fs;
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::EventManager;
@@ -203,7 +203,7 @@ where
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         in_dir: String,
-    )-> Result<(), AflError>
+    ) -> Result<(), AflError>
     where
         G: Generator<I, R>,
         C: Corpus<I, R>,
@@ -212,48 +212,38 @@ where
         EM: EventManager<C, E, OT, FT, I, R>,
     {
         for entry in fs::read_dir(in_dir)? {
-            
             let entry = entry?;
-          
+
             let file = entry.path().display().to_string();
-          
+
             let attributes = fs::metadata(file.clone());
 
             if !attributes.is_ok() {
-            
                 continue;
-                
             }
-              
+
             let attr = attributes?;
 
             if attr.is_file() {
-
                 println!("Load file {}", file);
-                //let input = read_file(file);
-                //let fitness = self.evaluate_input(&input, engine.executor_mut())?;
-                //if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
-                //    added += 1;
-                //}
-
+            //let input = read_file(file);
+            //let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+            //if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
+            //    added += 1;
+            //}
             } else if attr.is_dir() {
-
-                let _x = load_from_directory(
+                let _x = self.load_from_directory(
                     &mut corpus,
                     &mut generator,
                     &mut engine,
                     &mut manager,
                     file,
                 );
-
             }
-              
         }
 
         Ok(())
-
     }
-
 
     pub fn load_initial_inputs<G, C, E, ET, EM>(
         &mut self,
@@ -262,7 +252,7 @@ where
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         in_dir: Vec<String>,
-    )-> Result<(), AflError>
+    ) -> Result<(), AflError>
     where
         G: Generator<I, R>,
         C: Corpus<I, R>,
@@ -272,15 +262,13 @@ where
     {
         let mut added = 0 as u32;
         for directory in in_dir {
-        
-            let _x = load_from_directory(
+            let _x = self.load_from_directory(
                 &mut corpus,
                 &mut generator,
                 &mut engine,
                 &mut manager,
                 directory,
             );
-
         }
         manager.log(
             0,

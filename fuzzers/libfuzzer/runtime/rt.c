@@ -120,14 +120,19 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 }
 
 __attribute__((weak)) int LLVMFuzzerInitialize(int *argc, char ***argv);
-
 void afl_libfuzzer_main();
+
+int afl_libfuzzer_init(int *argc, char ***argv) {
+
+  if (LLVMFuzzerInitialize)
+    return LLVMFuzzerInitialize(&argc, &argv);
+  else
+   return 0;
+
+}
 
 int main(int argc, char** argv) {
 
-  if (LLVMFuzzerInitialize)
-    LLVMFuzzerInitialize(&argc, &argv);
-  
   afl_libfuzzer_main();
   return 0;
 

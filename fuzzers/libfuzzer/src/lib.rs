@@ -29,7 +29,7 @@ extern "C" {
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
 
     /// int LLVMFuzzerInitialize(int argc, char **argv)
-    fn LLVMFuzzerInitialize(argc: u32, argv: *const *const u8) -> i32;
+    fn afl_libfuzzer_init(argc: u32, argv: *const *const u8) -> i32;
 
     static __lafl_edges_map: *mut u8;
     static __lafl_cmp_map: *mut u8;
@@ -119,6 +119,16 @@ pub extern "C" fn afl_libfuzzer_main() {
         mgr.broker_loop().unwrap();
     }
     println!("We're a client, let's fuzz :)");
+
+    //    unsafe {
+
+    //        if afl_libfuzzer_init(...) == -1 {
+
+    //            println("Warning: LLVMFuzzerInitialize failed with -1")
+
+    //        }
+
+    //    }
 
     let edges_observer =
         StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
