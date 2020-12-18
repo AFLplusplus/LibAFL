@@ -3,7 +3,7 @@
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{fs, path::Path};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::EventManager;
@@ -196,13 +196,14 @@ where
         }
     }
 
-    pub fn load_from_directory<G, C, E, ET, EM>(
+    pub fn load_from_directory<G, C, E, ET, EM>
+    (
         &mut self,
         corpus: &mut C,
         generator: &mut G,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
-        in_dir: String,
+        in_dir: &Path,
     ) -> Result<(), AflError>
     where
         G: Generator<I, R>,
@@ -214,9 +215,9 @@ where
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
 
-            let file = entry.path().display().to_string();
+            let path = entry.path();
 
-            let attributes = fs::metadata(file.clone());
+            let attributes = fs::metadata(&path);
 
             if !attributes.is_ok() {
                 continue;
@@ -225,7 +226,7 @@ where
             let attr = attributes?;
 
             if attr.is_file() {
-                println!("Load file {}", file);
+                println!("Load file {:?}", &path);
             //let input = read_file(file);
             //let fitness = self.evaluate_input(&input, engine.executor_mut())?;
             //if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
@@ -233,11 +234,11 @@ where
             //}
             } else if attr.is_dir() {
                 let _x = self.load_from_directory(
-                    &mut corpus,
-                    &mut generator,
-                    &mut engine,
-                    &mut manager,
-                    file,
+                    corpus,
+                    generator,
+                    engine,
+                    manager,
+                    &path,
                 );
             }
         }
@@ -261,14 +262,14 @@ where
         EM: EventManager<C, E, OT, FT, I, R>,
     {
         let mut added = 0 as u32;
-        for directory in in_dir {
-            let _x = self.load_from_directory(
-                &mut corpus,
-                &mut generator,
-                &mut engine,
-                &mut manager,
-                directory,
-            );
+        for directory in &in_dir {
+            self.load_from_directory(
+                corpus,
+                generator,
+                engine,
+                manager,
+                Path::new(directory),
+            )?;
         }
         manager.log(
             0,
