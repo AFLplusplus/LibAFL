@@ -48,6 +48,7 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 
 */
 
+use alloc::vec::Vec;
 use core::{
     cmp::max,
     mem::size_of,
@@ -55,9 +56,6 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
-
-use alloc::vec::Vec;
-
 #[cfg(feature = "std")]
 use std::{
     io::{Read, Write},
@@ -65,10 +63,9 @@ use std::{
     thread,
 };
 
+use super::shmem::ShMem;
 use crate::utils::next_pow2;
 use crate::AflError;
-
-use super::shmem::ShMem;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
