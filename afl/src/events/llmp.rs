@@ -594,7 +594,7 @@ where
 
         let mut end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
         (*end_of_page_msg).map_size = new_map_shmem.shmem.map().len();
-        (*end_of_page_msg).shm_str = *new_map_shmem.shmem.shm_str_buf();
+        (*end_of_page_msg).shm_str = *new_map_shmem.shmem.shm_slice();
 
         // We never sent a msg on the new buf */
         self.last_msg_sent = 0 as *mut LlmpMsg;
@@ -727,7 +727,7 @@ where
                         ptr::write_volatile(&mut (*page).save_to_unmap, 1);
                         // Map the new page. The old one should be unmapped by Drop
                         self.current_recv_map =
-                            LlmpSharedMap::existing(SH::existing_map_by_shm_bytes(
+                            LlmpSharedMap::existing(SH::existing_from_shm_slice(
                                 &pageinfo_cpy.shm_str,
                                 pageinfo_cpy.map_size,
                             )?);
@@ -962,7 +962,7 @@ where
         // to read from the initial map id.
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
-        let broadcast_str_initial = client_out_map_mem.shm_str_buf().clone();
+        let broadcast_str_initial = client_out_map_mem.shm_slice().clone();
 
         let llmp_tcp_id = self.llmp_clients.len() as u32;
 
@@ -980,7 +980,7 @@ where
                 id: 0,
                 last_msg_sent: 0 as *mut LlmpMsg,
                 out_maps: vec![LlmpSharedMap::existing(
-                    SH::existing_from_name(&tcp_out_map_str, tcp_out_map_size).unwrap(),
+                    SH::existing_from_shm_str(&tcp_out_map_str, tcp_out_map_size).unwrap(),
                 )],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
@@ -1070,8 +1070,7 @@ where
                 } else {
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
-                    match SH::existing_map_by_shm_bytes(&(*pageinfo).shm_str, (*pageinfo).map_size)
-                    {
+                    match SH::existing_from_shm_slice(&(*pageinfo).shm_str, (*pageinfo).map_size) {
                         Ok(new_map) => {
                             let new_page = LlmpSharedMap::existing(new_map);
                             let id = next_id;
@@ -1215,12 +1214,12 @@ where
         let mut new_broker_map_str: [u8; 20] = Default::default();
         stream.read_exact(&mut new_broker_map_str)?;
 
-        let ret = Self::new(LlmpSharedMap::existing(SH::existing_map_by_shm_bytes(
+        let ret = Self::new(LlmpSharedMap::existing(SH::existing_from_shm_slice(
             &new_broker_map_str,
             LLMP_PREF_INITIAL_MAP_SIZE,
         )?))?;
 
-        stream.write(ret.llmp_out.out_maps.first().unwrap().shmem.shm_str_buf())?;
+        stream.write(ret.llmp_out.out_maps.first().unwrap().shmem.shm_slice())?;
         Ok(ret)
     }
 }

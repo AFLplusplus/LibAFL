@@ -60,28 +60,32 @@ struct shmid_ds {
 /// A Shared map
 pub trait ShMem: Sized {
     /// Creates a nes variable with the given name, strigified to 20 bytes.
-    fn existing_map_by_shm_bytes(
-        map_str_bytes: &[u8; 20],
-        map_size: usize,
-    ) -> Result<Self, AflError>;
+    fn existing_from_shm_slice(map_str_bytes: &[u8; 20], map_size: usize)
+        -> Result<Self, AflError>;
 
     /// Initialize from a shm_str with fixed len of 20
-    fn existing_from_name(shm_str: &str, map_size: usize) -> Result<Self, AflError> {
+    fn existing_from_shm_str(shm_str: &str, map_size: usize) -> Result<Self, AflError> {
         let mut slice: [u8; 20] = [0; 20];
         for (i, val) in shm_str.as_bytes().iter().enumerate() {
             slice[i] = *val;
         }
-        Self::existing_map_by_shm_bytes(&slice, map_size)
+        Self::existing_from_shm_slice(&slice, map_size)
     }
 
     /// Creates a new map with the given size
     fn new_map(map_size: usize) -> Result<Self, AflError>;
 
     /// The string to identify this shm
-    fn shm_str(&self) -> String;
+    fn shm_str(&self) -> String {
+        let bytes = self.shm_slice();
+        let eof_pos = bytes.iter().position(|&c| c == 0).unwrap();
+        alloc::str::from_utf8(&bytes[..eof_pos])
+            .unwrap()
+            .to_string()
+    }
 
     /// Let's just fix this to a large enough buf
-    fn shm_str_buf(&self) -> &[u8; 20];
+    fn shm_slice(&self) -> &[u8; 20];
 
     /// The actual shared map, in memory
     fn map(&self) -> &[u8];
@@ -104,7 +108,7 @@ pub trait ShMem: Sized {
     fn existing_from_env(env_name: &str) -> Result<Self, AflError> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
-        Self::existing_from_name(&map_shm_str, map_size)
+        Self::existing_from_shm_str(&map_shm_str, map_size)
     }
 }
 
@@ -119,24 +123,21 @@ pub struct AflShmem {
 
 #[cfg(feature = "std")]
 impl ShMem for AflShmem {
-    fn existing_map_by_shm_bytes(
+    fn existing_from_shm_slice(
         map_str_bytes: &[u8; 20],
         map_size: usize,
     ) -> Result<Self, AflError> {
-        Self::from_name_slice(map_str_bytes, map_size)
+        unsafe {
+            let str_bytes = map_str_bytes as *const [u8; 20] as *const libc::c_char;
+            Self::from_str(CStr::from_ptr(str_bytes), map_size)
+        }
     }
 
     fn new_map(map_size: usize) -> Result<Self, AflError> {
         Self::new(map_size)
     }
 
-    fn shm_str(&self) -> String {
-        unsafe { CStr::from_ptr(self.shm_str.as_ptr() as *const i8) }
-            .to_string_lossy()
-            .into()
-    }
-
-    fn shm_str_buf(&self) -> &[u8; 20] {
+    fn shm_slice(&self) -> &[u8; 20] {
         &self.shm_str
     }
 
@@ -182,14 +183,6 @@ impl AflShmem {
                 "Could not allocate map with id {:?} and size {}",
                 shm_str, map_size
             )))
-        }
-    }
-
-    /// Generate a shared map with a fixed byte array of 20
-    pub fn from_name_slice(shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
-        unsafe {
-            let str_bytes = shm_str as *const [u8; 20] as *const libc::c_char;
-            Self::from_str(CStr::from_ptr(str_bytes), map_size)
         }
     }
 
@@ -280,4 +273,26 @@ unsafe fn afl_shmem_by_str(shm: *mut AflShmem, shm_str: &CStr, map_size: usize) 
         return 0 as *mut c_uchar;
     }
     return (*shm).map;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AflShmem, ShMem};
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_str_conversions() {
+        let mut shm_str: [u8; 20] = [0; 20];
+        shm_str[0] = 'A' as u8;
+        shm_str[1] = 'B' as u8;
+        shm_str[2] = 'C' as u8;
+        let faux_shmem = AflShmem {
+            shm_id: 0,
+            shm_str,
+            map: 0 as *mut u8,
+            map_size: 20,
+        };
+        let str = faux_shmem.shm_str();
+        assert_eq!(str, "ABC");
+    }
 }
