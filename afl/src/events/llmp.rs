@@ -56,6 +56,8 @@ use core::{
     time::Duration,
 };
 
+use alloc::vec::Vec;
+
 #[cfg(feature = "std")]
 use std::{
     io::{Read, Write},
@@ -66,7 +68,6 @@ use std::{
 use crate::utils::next_pow2;
 use crate::AflError;
 
-#[cfg(feature = "std")]
 use super::shmem::ShMem;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
@@ -209,6 +210,7 @@ impl LlmpMsg {
     }
 }
 
+#[cfg(feature = "std")]
 /// An Llmp instance
 pub enum LlmpConnection<SH>
 where
@@ -223,6 +225,7 @@ where
     IsClient { client: LlmpClient<SH> },
 }
 
+#[cfg(feature = "std")]
 impl<SH> LlmpConnection<SH>
 where
     SH: ShMem,
@@ -437,8 +440,8 @@ where
         let page = map.page();
         let last_msg = self.last_msg_sent;
         if (*page).size_used + EOP_MSG_SIZE > (*page).size_total {
-            panic!(format!("PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
-                (*page).size_used, (*page).size_total));
+            panic!("PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
+                (*page).size_used, (*page).size_total);
         }
         let mut ret: *mut LlmpMsg = if !last_msg.is_null() {
             llmp_next_msg_ptr_checked(&mut map, last_msg, EOP_MSG_SIZE)?
@@ -502,7 +505,7 @@ where
             }
         } else if (*page).current_msg_id != (*last_msg).message_id {
             /* Oops, wrong usage! */
-            panic!(format!("BUG: The current message never got commited using send! (page->current_msg_id {:?}, last_msg->message_id: {})", (*page).current_msg_id, (*last_msg).message_id));
+            panic!("BUG: The current message never got commited using send! (page->current_msg_id {:?}, last_msg->message_id: {})", (*page).current_msg_id, (*last_msg).message_id);
         } else {
             buf_len_padded = complete_msg_size - size_of::<LlmpMsg>();
             /* DBG("XXX ret %p id %u buf_len_padded %lu complete_msg_size %lu\n", ret, ret->message_id, buf_len_padded,
@@ -516,8 +519,12 @@ where
             ret = match llmp_next_msg_ptr_checked(map, last_msg, complete_msg_size) {
                 Ok(msg) => msg,
                 Err(e) => {
+                    #[cfg(feature = "std")]
                     dbg!("Unexpected error allocing new msg", e);
+                    #[cfg(feature = "std")]
                     return None;
+                    #[cfg(not(feature = "std"))]
+                    panic!(&format!("Unexpected error allocing new msg {:?}", e));
                 }
             };
             (*ret).message_id = (*last_msg).message_id + 1
@@ -531,8 +538,8 @@ where
         if last_msg.is_null() && (*page).size_used != 0
             || ((ret as usize) - (*page).messages.as_mut_ptr() as usize) != (*page).size_used
         {
-            panic!(format!("Allocated new message without calling send() inbetween. ret: {:?}, page: {:?}, complete_msg_size: {:?}, size_used: {:?}, last_msg: {:?}", ret, page,
-                buf_len_padded, (*page).size_used, last_msg));
+            panic!("Allocated new message without calling send() inbetween. ret: {:?}, page: {:?}, complete_msg_size: {:?}, size_used: {:?}, last_msg: {:?}", ret, page,
+                buf_len_padded, (*page).size_used, last_msg);
         }
         (*page).size_used = (*page).size_used + complete_msg_size;
         (*ret).buf_len_padded = buf_len_padded as u64;
@@ -553,10 +560,7 @@ where
             panic!("Message sent twice!");
         }
         if (*msg).tag == LLMP_TAG_UNSET {
-            panic!(format!(
-                "No tag set on message with id {}",
-                (*msg).message_id
-            ));
+            panic!("No tag set on message with id {}", (*msg).message_id);
         }
         let page = self.out_maps.last_mut().unwrap().page();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
@@ -705,14 +709,15 @@ where
                 match (*msg).tag {
                     LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
                     LLMP_TAG_END_OF_PAGE => {
+                        #[cfg(feature = "std")]
                         dbg!("Got end of page, allocing next");
                         // Handle end of page
                         if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
-                            panic!(format!(
+                            panic!(
                                 "Illegal message length for EOP (is {}, expected {})",
                                 (*msg).buf_len_padded,
                                 size_of::<LlmpPayloadSharedMapInfo>()
-                            ));
+                            );
                         }
                         let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
@@ -732,6 +737,7 @@ where
                         // Mark the new page save to unmap also (it's mapped by us, the broker now)
                         ptr::write_volatile(&mut (*page).save_to_unmap, 1);
 
+                        #[cfg(feature = "std")]
                         dbg!("Got a new recv map", self.current_recv_map.shmem.shm_str());
                         // After we mapped the new page, return the next message, if available
                         return self.recv();
@@ -878,7 +884,7 @@ where
         (*out).buf_len_padded = actual_size;
         /* We need to replace the message ID with our own */
         match self.llmp_out.send(out) {
-            Err(e) => panic!(format!("Error sending msg: {:?}", e)),
+            Err(e) => panic!("Error sending msg: {:?}", e),
             _ => (),
         };
         self.llmp_out.last_msg_sent = out;
@@ -912,8 +918,18 @@ where
             compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
+
+            #[cfg(feature = "std")]
             match sleep_time {
                 Some(time) => thread::sleep(time),
+                None => (),
+            }
+
+            #[cfg(not(feature = "std"))]
+            match sleep_time {
+                Some(_) => {
+                    panic!("Cannot sleep on no_std platform");
+                }
                 None => (),
             }
         }
@@ -924,6 +940,7 @@ where
         self.llmp_out.send_buf(tag, buf)
     }
 
+    #[cfg(feature = "std")]
     /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
     /// Does so on the given port.
     pub fn launch_tcp_listener_on(
@@ -936,6 +953,7 @@ where
         return self.launch_tcp_listener(listener);
     }
 
+    #[cfg(feature = "std")]
     /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
     pub fn launch_tcp_listener(
         &mut self,
@@ -1042,10 +1060,16 @@ where
                 /* This client informs us about yet another new client
                 add it to the list! Also, no need to forward this msg. */
                 if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
+                    #[cfg(feature = "std")]
                     println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
                         (*msg).buf_len_padded,
                         size_of::<LlmpPayloadSharedMapInfo>()
                     );
+                    #[cfg(not(feature = "std"))]
+                    return Err(AflError::Unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
+                       (*msg).buf_len_padded,
+                        size_of::<LlmpPayloadSharedMapInfo>()
+                    )));
                 } else {
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
@@ -1061,7 +1085,15 @@ where
                                 last_msg_recvd: 0 as *mut LlmpMsg,
                             });
                         }
-                        Err(e) => println!("Error adding client! {:?}", e),
+                        Err(e) => {
+                            #[cfg(feature = "std")]
+                            println!("Error adding client! Ignoring: {:?}", e);
+                            #[cfg(not(feature = "std"))]
+                            return Err(AflError::Unknown(format!(
+                                "Error adding client! PANIC! {:?}",
+                                e
+                            )));
+                        }
                     };
                 }
             } else {
@@ -1171,11 +1203,13 @@ where
         self.llmp_in.recv_buf_blocking()
     }
 
+    #[cfg(feature = "std")]
     /// Creates a new LlmpClient, reading the map id and len from env
     pub fn create_using_env(env_var: &str) -> Result<Self, AflError> {
         Self::new(LlmpSharedMap::existing(SH::existing_from_env(env_var)?))
     }
 
+    #[cfg(feature = "std")]
     /// Create a LlmpClient, getting the ID from a given port
     pub fn create_attach_to_tcp(port: u16) -> Result<Self, AflError> {
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
@@ -1197,16 +1231,19 @@ where
 #[cfg(test)]
 mod tests {
 
+    #[cfg(feature = "std")]
     use std::{thread::sleep, time::Duration};
 
-    use crate::events::shmem::AflShmem;
-
+    #[cfg(feature = "std")]
     use super::{
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
+    #[cfg(feature = "std")]
+    use crate::events::shmem::AflShmem;
 
+    #[cfg(feature = "std")]
     #[test]
     pub fn llmp_connection() {
         let mut broker = match LlmpConnection::<AflShmem>::on_port(1337).unwrap() {

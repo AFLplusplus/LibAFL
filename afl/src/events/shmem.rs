@@ -1,20 +1,30 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
-use core::slice;
+use alloc::string::String;
+#[cfg(feature = "std")]
+use core::{mem::size_of, slice};
+#[cfg(feature = "std")]
 use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
-use std::{env, ffi::CStr, mem::size_of};
+#[cfg(feature = "std")]
+use std::{env, ffi::CStr};
 
 use crate::AflError;
 
 extern "C" {
+    #[cfg(feature = "std")]
     fn snprintf(_: *mut c_char, _: c_ulong, _: *const c_char, _: ...) -> c_int;
+    #[cfg(feature = "std")]
     fn strncpy(_: *mut c_char, _: *const c_char, _: c_ulong) -> *mut c_char;
-    //fn strlen(_: *const c_char) -> c_ulong;
+    #[cfg(feature = "std")]
     fn shmctl(__shmid: c_int, __cmd: c_int, __buf: *mut shmid_ds) -> c_int;
+    #[cfg(feature = "std")]
     fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int;
+    #[cfg(feature = "std")]
     fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
 }
+
+#[cfg(feature = "std")]
 #[derive(Copy, Clone)]
 #[repr(C)]
 struct ipc_perm {
@@ -31,6 +41,7 @@ struct ipc_perm {
     pub __glibc_reserved2: c_ulong,
 }
 
+#[cfg(feature = "std")]
 #[derive(Copy, Clone)]
 #[repr(C)]
 struct shmid_ds {
@@ -79,6 +90,7 @@ pub trait ShMem: Sized {
     fn map_mut(&mut self) -> &mut [u8];
 
     /// Write this map's config to env
+    #[cfg(feature = "std")]
     fn write_to_env(&self, env_name: &str) -> Result<(), AflError> {
         let map_size = self.map().len();
         let map_size_env = format!("{}_SIZE", env_name);
@@ -88,6 +100,7 @@ pub trait ShMem: Sized {
     }
 
     /// Reads an existing map config from env vars, then maps it
+    #[cfg(feature = "std")]
     fn existing_from_env(env_name: &str) -> Result<Self, AflError> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
@@ -95,6 +108,7 @@ pub trait ShMem: Sized {
     }
 }
 
+#[cfg(feature = "std")]
 #[derive(Clone, Debug)]
 pub struct AflShmem {
     pub shm_str: [u8; 20],
@@ -103,6 +117,7 @@ pub struct AflShmem {
     pub map_size: usize,
 }
 
+#[cfg(feature = "std")]
 impl ShMem for AflShmem {
     fn existing_map_by_shm_bytes(
         map_str_bytes: &[u8; 20],
@@ -134,6 +149,7 @@ impl ShMem for AflShmem {
     }
 }
 
+#[cfg(feature = "std")]
 /// Deinit sharedmaps on drop
 impl Drop for AflShmem {
     fn drop(&mut self) {
@@ -143,6 +159,7 @@ impl Drop for AflShmem {
     }
 }
 
+#[cfg(feature = "std")]
 /// Create an uninitialized shmap
 const fn afl_shmem_unitialized() -> AflShmem {
     AflShmem {
@@ -153,6 +170,7 @@ const fn afl_shmem_unitialized() -> AflShmem {
     }
 }
 
+#[cfg(feature = "std")]
 impl AflShmem {
     pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, AflError> {
         let mut ret = afl_shmem_unitialized();
@@ -189,6 +207,7 @@ impl AflShmem {
     }
 }
 
+#[cfg(feature = "std")]
 /// Deinitialize this shmem instance
 unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
     if shm.is_null() || (*shm).map.is_null() {
@@ -201,6 +220,7 @@ unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
     (*shm).map = 0 as *mut c_uchar;
 }
 
+#[cfg(feature = "std")]
 /// Functions to create Shared memory region, for observation channels and
 /// opening inputs and stuff.
 unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_uchar {
@@ -234,6 +254,7 @@ unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_uchar {
     return (*shm).map;
 }
 
+#[cfg(feature = "std")]
 /// Uses a shmap id string to open a shared map
 unsafe fn afl_shmem_by_str(shm: *mut AflShmem, shm_str: &CStr, map_size: usize) -> *mut c_uchar {
     if shm.is_null() || shm_str.to_bytes().len() == 0 || map_size == 0 {

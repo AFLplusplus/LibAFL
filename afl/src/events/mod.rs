@@ -1,5 +1,4 @@
 pub mod llmp;
-#[cfg(feature = "std")]
 pub mod shmem;
 
 use alloc::string::{String, ToString};
@@ -9,6 +8,7 @@ use core::{marker::PhantomData, time};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
 use self::llmp::Tag;
 #[cfg(feature = "std")]
 use self::shmem::AflShmem;

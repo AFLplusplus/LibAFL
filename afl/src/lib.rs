@@ -101,6 +101,7 @@ impl From<VarError> for AflError {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<ParseIntError> for AflError {
     fn from(err: ParseIntError) -> Self {
         Self::Unknown(format!("Failed to parse Int: {:?}", err))
