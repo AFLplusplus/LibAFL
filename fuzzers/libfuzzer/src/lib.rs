@@ -46,10 +46,10 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     let stats = SimpleStats::new(|s| println!("{}", s));
 
-    /// 
-    match LlmpFuzzInstance::from_env("FUZZER_ENV") {
-        
-    }
+    // TODO
+    /* match LlmpFuzzInstance::from_env("FUZZER_ENV") {
+
+    }*/
 
     let mut mgr = LlmpEventManager::new_on_port(1337, stats).unwrap();
     if mgr.is_broker() {

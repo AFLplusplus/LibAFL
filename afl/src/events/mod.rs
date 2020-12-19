@@ -1,19 +1,17 @@
-// TODO: llmp can be no_std, if we abstract away page creation
-#[cfg(feature = "std")]
 pub mod llmp;
 #[cfg(feature = "std")]
-pub mod shmem_translated;
+pub mod shmem;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use shmem_translated::AflShmem;
 use core::time::Duration;
 use core::{marker::PhantomData, time};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "std")]
 use self::llmp::Tag;
+#[cfg(feature = "std")]
+use self::shmem::AflShmem;
 use crate::corpus::Corpus;
 use crate::executors::Executor;
 use crate::feedbacks::FeedbacksTuple;

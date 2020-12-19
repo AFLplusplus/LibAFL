@@ -58,7 +58,6 @@ use core::{
 
 #[cfg(feature = "std")]
 use std::{
-    env,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     thread,
@@ -68,7 +67,7 @@ use crate::utils::next_pow2;
 use crate::AflError;
 
 #[cfg(feature = "std")]
-use super::shmem_translated::{AflShmem, ShMem};
+use super::shmem::ShMem;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -119,7 +118,7 @@ where
 #[derive(Clone, Debug)]
 pub struct LlmpReceiver<SH>
 where
-    SH: ShMem
+    SH: ShMem,
 {
     pub id: u32,
     /// Pointer to the last meg this received
@@ -150,6 +149,7 @@ where
     /// shared between one LlmpSender and one LlmpReceiver
     shmem: SH,
 }
+
 /// Message sent over the "wire"
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -178,7 +178,7 @@ impl LlmpMsg {
 
     /// Gets the buffer from this message as slice, with the corrent length.
     #[inline]
-    pub fn as_slice<SH: ShMem>(&self, map: &LlmpSharedMap<SH>) -> Result<&[u8], AflError> {
+    pub fn as_slice<SH: ShMem>(&self, map: &mut LlmpSharedMap<SH>) -> Result<&[u8], AflError> {
         unsafe {
             if self.in_map(map) {
                 Ok(self.as_slice_unsafe())
@@ -190,7 +190,7 @@ impl LlmpMsg {
 
     /// Returns true, if the pointer is, indeed, in the page of this shared map.
     #[inline]
-    pub fn in_map<SH: ShMem>(&self, map: &LlmpSharedMap<SH>) -> bool {
+    pub fn in_map<SH: ShMem>(&self, map: &mut LlmpSharedMap<SH>) -> bool {
         unsafe {
             let map_size = map.shmem.map().len();
             let buf_ptr = self.buf.as_ptr();
@@ -209,9 +209,6 @@ impl LlmpMsg {
     }
 }
 
-
-
-
 /// An Llmp instance
 pub enum LlmpConnection<SH>
 where
@@ -226,7 +223,10 @@ where
     IsClient { client: LlmpClient<SH> },
 }
 
-impl LlmpConnection<AflShmem> {
+impl<SH> LlmpConnection<SH>
+where
+    SH: ShMem,
+{
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
     pub fn on_port(port: u16) -> Result<Self, AflError> {
         match TcpListener::bind(format!("127.0.0.1:{}", port)) {
@@ -268,7 +268,7 @@ impl LlmpConnection<AflShmem> {
 }
 
 /// Contents of the share mem pages, used by llmp internally
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 pub struct LlmpPage {
     pub sender: u32,
@@ -282,7 +282,7 @@ pub struct LlmpPage {
 }
 
 /// The broker (node 0)
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct LlmpBroker<SH>
 where
@@ -307,7 +307,7 @@ pub enum LlmpMsgHookResult {
 /// Message payload when a client got added LLMP_TAG_CLIENT_ADDED_V1 */
 /// This is an internal message!
 /// LLMP_TAG_END_OF_PAGE_V1
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 struct LlmpPayloadSharedMapInfo {
     pub map_size: usize,
@@ -316,8 +316,8 @@ struct LlmpPayloadSharedMapInfo {
 
 /// Get sharedmem from a page
 #[inline]
-unsafe fn shmem2page<SH: ShMem>(afl_shmem: &SH) -> *mut LlmpPage {
-    afl_shmem.map().as_mut_ptr() as *mut LlmpPage
+unsafe fn shmem2page<SH: ShMem>(afl_shmem: &mut SH) -> *mut LlmpPage {
+    afl_shmem.map_mut().as_mut_ptr() as *mut LlmpPage
 }
 
 /// Return, if a msg is contained in the current page
@@ -357,13 +357,14 @@ fn new_map_size(max_alloc: usize) -> usize {
 
 /// Initialize a new llmp_page. size should be relative to
 /// llmp_page->messages
-unsafe fn _llmp_page_init(shmem: &mut AflShmem, sender: u32) {
+unsafe fn _llmp_page_init<SH: ShMem>(shmem: &mut SH, sender: u32) {
+    let map_size = shmem.map().len();
     let page = shmem2page(shmem);
     (*page).sender = sender;
     ptr::write_volatile(&mut (*page).current_msg_id, 0);
     (*page).max_alloc_size = 0;
     // Don't forget to subtract our own header size
-    (*page).size_total = shmem.map_size - LLMP_PAGE_HEADER_LEN;
+    (*page).size_total = map_size - LLMP_PAGE_HEADER_LEN;
     (*page).size_used = 0;
     (*(*page).messages.as_mut_ptr()).message_id = 0;
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
@@ -373,8 +374,8 @@ unsafe fn _llmp_page_init(shmem: &mut AflShmem, sender: u32) {
 
 /// Get the next pointer and make sure it's in the current page, and has enough space.
 #[inline]
-unsafe fn llmp_next_msg_ptr_checked<SH: ShMem> (
-    map: &LlmpSharedMap<SH>,
+unsafe fn llmp_next_msg_ptr_checked<SH: ShMem>(
+    map: &mut LlmpSharedMap<SH>,
     last_msg: *const LlmpMsg,
     alloc_size: usize,
 ) -> Result<*mut LlmpMsg, AflError> {
@@ -405,14 +406,17 @@ unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
 }
 
 /// An actor on the sendin part of the shared map
-impl LlmpSender<AflShmem> {
+impl<SH> LlmpSender<SH>
+where
+    SH: ShMem,
+{
     /// For non zero-copy, we want to get rid of old pages with duplicate messages in the client
     /// eventually. This function This funtion sees if we can unallocate older pages.
     /// The broker would have informed us by setting the save_to_unmap-flag.
     unsafe fn prune_old_pages(&mut self) {
         // Exclude the current page by splitting of the last element for this iter
         let mut unmap_until_excl = 0;
-        for map in self.out_maps.split_last().unwrap().1 {
+        for map in self.out_maps.split_last_mut().unwrap().1 {
             if (*map.page()).save_to_unmap == 0 {
                 // The broker didn't read this page yet, no more pages to unmap.
                 break;
@@ -429,7 +433,7 @@ impl LlmpSender<AflShmem> {
     /// So if alloc_next fails, create new page if necessary, use this function,
     /// place EOP, commit EOP, reset, alloc again on the new space.
     unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, AflError> {
-        let map = self.out_maps.last().unwrap();
+        let mut map = self.out_maps.last_mut().unwrap();
         let page = map.page();
         let last_msg = self.last_msg_sent;
         if (*page).size_used + EOP_MSG_SIZE > (*page).size_total {
@@ -437,7 +441,7 @@ impl LlmpSender<AflShmem> {
                 (*page).size_used, (*page).size_total));
         }
         let mut ret: *mut LlmpMsg = if !last_msg.is_null() {
-            llmp_next_msg_ptr_checked(&map, last_msg, EOP_MSG_SIZE)?
+            llmp_next_msg_ptr_checked(&mut map, last_msg, EOP_MSG_SIZE)?
         } else {
             (*page).messages.as_mut_ptr()
         };
@@ -461,7 +465,7 @@ impl LlmpSender<AflShmem> {
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
         let buf_len_padded;
         let mut complete_msg_size = llmp_align(size_of::<LlmpMsg>() + buf_len);
-        let map = self.out_maps.last().unwrap();
+        let map = self.out_maps.last_mut().unwrap();
         let page = map.page();
         let last_msg = self.last_msg_sent;
         /* DBG("XXX complete_msg_size %lu (h: %lu)\n", complete_msg_size, sizeof(llmp_message)); */
@@ -554,7 +558,7 @@ impl LlmpSender<AflShmem> {
                 (*msg).message_id
             ));
         }
-        let page = self.out_maps.last().unwrap().page();
+        let page = self.out_maps.last_mut().unwrap().page();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
             return Err(AflError::Unknown(format!(
                 "Llmp Message {:?} is null or not in current page",
@@ -574,7 +578,10 @@ impl LlmpSender<AflShmem> {
         let old_map = self.out_maps.last_mut().unwrap().page();
 
         // Create a new shard page.
-        let new_map_shmem = LlmpSharedMap::<AflShmem>::new((*old_map).sender, (*old_map).max_alloc_size)?;
+        let mut new_map_shmem = LlmpSharedMap::new(
+            (*old_map).sender,
+            SH::new_map(new_map_size((*old_map).max_alloc_size))?,
+        );
         let mut new_map = new_map_shmem.page();
 
         ptr::write_volatile(&mut (*new_map).current_msg_id, (*old_map).current_msg_id);
@@ -626,7 +633,7 @@ impl LlmpSender<AflShmem> {
     pub unsafe fn cancel_send(&mut self, msg: *mut LlmpMsg) {
         /* DBG("Client %d cancels send of msg at %p with tag 0x%X and size %ld", client->id, msg, msg->tag,
          * msg->buf_len_padded); */
-        let page = self.out_maps.last().unwrap().page();
+        let page = self.out_maps.last_mut().unwrap().page();
         (*msg).tag = LLMP_TAG_UNSET;
         (*page).size_used -= (*msg).buf_len_padded as usize + size_of::<LlmpMsg>();
     }
@@ -682,7 +689,7 @@ where
         } else {
             // We don't know how big the msg wants to be, assert at least the header has space.
             Some(llmp_next_msg_ptr_checked(
-                &self.current_recv_map,
+                &mut self.current_recv_map,
                 last_msg,
                 size_of::<LlmpMsg>(),
             )?)
@@ -691,7 +698,7 @@ where
         // Let's see what we go here.
         match ret {
             Some(msg) => {
-                if !(*msg).in_map(&self.current_recv_map) {
+                if !(*msg).in_map(&mut self.current_recv_map) {
                     return Err(AflError::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
                 }
                 // Handle special, LLMP internal, messages.
@@ -717,10 +724,11 @@ where
                         // Mark the old page save to unmap, in case we didn't so earlier.
                         ptr::write_volatile(&mut (*page).save_to_unmap, 1);
                         // Map the new page. The old one should be unmapped by Drop
-                        self.current_recv_map = LlmpSharedMap::new_from_shm_str_buf(
-                            &pageinfo_cpy.shm_str,
-                            pageinfo_cpy.map_size,
-                        )?;
+                        self.current_recv_map =
+                            LlmpSharedMap::existing(SH::existing_map_by_shm_bytes(
+                                &pageinfo_cpy.shm_str,
+                                pageinfo_cpy.map_size,
+                            )?);
                         // Mark the new page save to unmap also (it's mapped by us, the broker now)
                         ptr::write_volatile(&mut (*page).save_to_unmap, 1);
 
@@ -770,7 +778,7 @@ where
                 Some(msg) => Some((
                     (*msg).sender,
                     (*msg).tag,
-                    (*msg).as_slice(&self.current_recv_map)?,
+                    (*msg).as_slice(&mut self.current_recv_map)?,
                 )),
                 None => None,
             })
@@ -785,77 +793,53 @@ where
             Ok((
                 (*msg).sender,
                 (*msg).tag,
-                (*msg).as_slice(&self.current_recv_map)?,
+                (*msg).as_slice(&mut self.current_recv_map)?,
             ))
         }
     }
 }
 
+// TODO: May be obsolete
 /// The page struct, placed on a shared mem instance.
-impl LlmpSharedMap<AflShmem> {
-    /// Creates a new page with minimum prev_max_alloc_size or LLMP_PREF_INITIAL_MAP_SIZE
-    /// returning the initialized shared mem struct
-    pub fn new(sender: u32, min_size: usize) -> Result<Self, AflError> {
-        // Create a new shard page.
-        let mut shmem = AflShmem::new(new_map_size(min_size))?;
-        unsafe {
-            _llmp_page_init(&mut shmem, sender);
-        }
-        Ok(Self { shmem })
-    }
-
-    /// Initialize from a shm_str with fixed len of 20
-    pub fn from_name(shm_str: &str, map_size: usize) -> Result<Self, AflError> {
-        let slice: [u8; 20];
-        slice.copy_from_slice(shm_str.as_bytes());
-        Self::from_name_slice(&slice, map_size)
-    }
-
-    /// Initialize from a shm_str with fixed len of 20
-    pub fn from_name_slice(shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
-        let shmem = AflShmem::from_name_slice(shm_str, map_size)?;
-        // Not initializing the page here - the other side should have done it already!
-        Ok(Self { shmem })
-    }
-}
-
+/// A thin wrapper around a ShMem implementation, with special Llmp funcs
 impl<SH> LlmpSharedMap<SH>
 where
     SH: ShMem,
 {
-
-    /// Initialize from a shm_str with fixed len of 20
-    pub fn new_from_shm_str_buf(&self, shm_str: &[u8; 20], map_size: usize) -> Result<Self, AflError> {
-        let shmem = self.shmem.new_from_shm_str_buf(shm_str, map_size)?;
-        // Not initializing the page here - the other side should have done it already!
-        Ok(Self { shmem })
+    /// Creates a new page, initializing the passed shared mem struct
+    pub fn new(sender: u32, mut new_map: SH) -> Self {
+        unsafe {
+            _llmp_page_init(&mut new_map, sender);
+        }
+        Self { shmem: new_map }
     }
 
-    pub fn write_to_env(&self, env_name: String) -> Result<(), AflError> {
-        let map_size = self.shmem.map().len();
-        let map_env = self.shmem.shm_str() ;
-        let map_size_env = format!("{}_SIZE", map_env);
-        env::set_var(map_env, self.shmem.shm_str());
-        env::set_var(map_size_env, format!("{}", map_size));
-        Ok(())
+    /// Maps and wraps an existing
+    pub fn existing(existing_map: SH) -> Self {
+        Self {
+            shmem: existing_map,
+        }
     }
 
     /// Get the unsafe ptr to this page, situated on the shared map
-    pub unsafe fn page(&self) -> *mut LlmpPage {
-        shmem2page(&self.shmem)
+    pub unsafe fn page(&mut self) -> *mut LlmpPage {
+        shmem2page(&mut self.shmem)
     }
 }
 
 /// The broker forwards all messages to its own bus-like broadcast map.
 /// It may intercept messages passing through.
-impl LlmpBroker<AflShmem> {
+impl<SH> LlmpBroker<SH>
+where
+    SH: ShMem,
+{
     /// Create and initialize a new llmp_broker
     pub fn new() -> Result<Self, AflError> {
         let broker = LlmpBroker {
             llmp_out: LlmpSender {
                 id: 0,
                 last_msg_sent: ptr::null_mut(),
-                out_maps: vec![LlmpSharedMap::new(0, 0)?],
+                out_maps: vec![LlmpSharedMap::new(0, SH::new_map(new_map_size(0))?)],
                 // Broker never cleans up the pages so that new
                 // clients may join at any time
                 keep_pages_forever: true,
@@ -901,7 +885,6 @@ impl LlmpBroker<AflShmem> {
         Ok(())
     }
 
-
     /// The broker walks all pages and looks for changes, then broadcasts them on
     /// its own shared page, once.
     #[inline]
@@ -941,11 +924,6 @@ impl LlmpBroker<AflShmem> {
         self.llmp_out.send_buf(tag, buf)
     }
 
-}
-
-impl LlmpBroker<AflShmem> {
-
-
     /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
     /// Does so on the given port.
     pub fn launch_tcp_listener_on(
@@ -974,8 +952,11 @@ impl LlmpBroker<AflShmem> {
         let llmp_tcp_id = self.llmp_clients.len() as u32;
 
         // Tcp out map sends messages from background thread tcp server to foreground client
-        let tcp_out_map = LlmpSharedMap::<AflShmem>::new(llmp_tcp_id, LLMP_PREF_INITIAL_MAP_SIZE)?;
-        let tcp_out_map_str = tcp_out_map.shmem.shm_str_buf();
+        let tcp_out_map = LlmpSharedMap::new(
+            llmp_tcp_id,
+            SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
+        );
+        let tcp_out_map_str = tcp_out_map.shmem.shm_str();
         let tcp_out_map_size = tcp_out_map.shmem.map().len();
         self.register_client(tcp_out_map);
 
@@ -983,9 +964,9 @@ impl LlmpBroker<AflShmem> {
             let mut new_client_sender = LlmpSender {
                 id: 0,
                 last_msg_sent: 0 as *mut LlmpMsg,
-                out_maps: vec![
-                    LlmpSharedMap::from_name_slice(&tcp_out_map_str, tcp_out_map_size).unwrap(),
-                ],
+                out_maps: vec![LlmpSharedMap::existing(
+                    SH::existing_from_name(&tcp_out_map_str, tcp_out_map_size).unwrap(),
+                )],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
             };
@@ -1032,26 +1013,91 @@ impl LlmpBroker<AflShmem> {
         }))
     }
 
-    fn map_new_page(shm_str_buf: &[u8; 20], map_size: usize) -> Result<LlmpSharedMap<AflShmem>, AflError> {
-        LlmpSharedMap::from_name_slice(shm_str_buf, map_size)
+    /// broker broadcast to its own page for all others to read */
+    #[inline]
+    unsafe fn handle_new_msgs<F>(
+        &mut self,
+        client_id: u32,
+        on_new_msg: &mut F,
+    ) -> Result<(), AflError>
+    where
+        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
+    {
+        let mut next_id = self.llmp_clients.len() as u32;
+
+        // TODO: We could memcpy a range of pending messages, instead of one by one.
+        loop {
+            let msg = {
+                let client = &mut self.llmp_clients[client_id as usize];
+                match client.recv()? {
+                    None => {
+                        // We're done handling this client
+                        return Ok(());
+                    }
+                    Some(msg) => msg,
+                }
+            };
+
+            if (*msg).tag == LLMP_TAG_NEW_SHM_CLIENT {
+                /* This client informs us about yet another new client
+                add it to the list! Also, no need to forward this msg. */
+                if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
+                    println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
+                        (*msg).buf_len_padded,
+                        size_of::<LlmpPayloadSharedMapInfo>()
+                    );
+                } else {
+                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+
+                    match SH::existing_map_by_shm_bytes(&(*pageinfo).shm_str, (*pageinfo).map_size)
+                    {
+                        Ok(new_map) => {
+                            let new_page = LlmpSharedMap::existing(new_map);
+                            let id = next_id;
+                            next_id += 1;
+                            self.llmp_clients.push(LlmpReceiver {
+                                id,
+                                current_recv_map: new_page,
+                                last_msg_recvd: 0 as *mut LlmpMsg,
+                            });
+                        }
+                        Err(e) => println!("Error adding client! {:?}", e),
+                    };
+                }
+            } else {
+                // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
+                let mut should_forward_msg = true;
+
+                let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
+                let msg_buf = (*msg).as_slice(map)?;
+                match (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
+                    LlmpMsgHookResult::Handled => should_forward_msg = false,
+                    _ => (),
+                }
+                if should_forward_msg {
+                    self.forward_msg(msg)?;
+                }
+            }
+        }
     }
 }
 
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
 /// and get incoming messages from the shared broker bus
-impl LlmpClient<AflShmem> {
-
-    fn map_new_page(shm_str_buf: &[u8; 20], map_size: usize) -> Result<LlmpSharedMap<SH>, AflError> {
-        panic!("End of page not handled!");
-    }
-
+impl<SH> LlmpClient<SH>
+where
+    SH: ShMem,
+{
     /// Creates a new LlmpClient
     pub fn new(initial_broker_map: LlmpSharedMap<SH>) -> Result<Self, AflError> {
         Ok(Self {
             llmp_out: LlmpSender {
                 id: 0,
                 last_msg_sent: 0 as *mut LlmpMsg,
-                out_maps: vec![LlmpSharedMap::new(0, LLMP_PREF_INITIAL_MAP_SIZE)?],
+                out_maps: vec![LlmpSharedMap::new(
+                    0,
+                    SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
+                )],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
             },
@@ -1125,86 +1171,9 @@ impl LlmpClient<AflShmem> {
         self.llmp_in.recv_buf_blocking()
     }
 
-
-
-    /// broker broadcast to its own page for all others to read */
-    #[inline]
-    unsafe fn handle_new_msgs<F>(
-        &mut self,
-        client_id: u32,
-        on_new_msg: &mut F,
-    ) -> Result<(), AflError>
-    where
-        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
-    {
-        let mut next_id = self.llmp_clients.len() as u32;
-
-        // TODO: We could memcpy a range of pending messages, instead of one by one.
-        loop {
-            let msg = {
-                let client = &mut self.llmp_clients[client_id as usize];
-                match client.recv()? {
-                    None => {
-                        // We're done handling this client
-                        return Ok(());
-                    }
-                    Some(msg) => msg,
-                }
-            };
-
-            if (*msg).tag == LLMP_TAG_NEW_SHM_CLIENT {
-                /* This client informs us about yet another new client
-                add it to the list! Also, no need to forward this msg. */
-                if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
-                    println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
-                        (*msg).buf_len_padded,
-                        size_of::<LlmpPayloadSharedMapInfo>()
-                    );
-                } else {
-                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-
-                    match LlmpSharedMap::from_name_slice(&(*pageinfo).shm_str, (*pageinfo).map_size)
-                    {
-                        Ok(new_page) => {
-                            let id = next_id;
-                            next_id += 1;
-                            self.llmp_clients.push(LlmpReceiver {
-                                id,
-                                current_recv_map: new_page,
-                                last_msg_recvd: 0 as *mut LlmpMsg,
-                            });
-                        }
-                        Err(e) => println!("Error adding client! {:?}", e),
-                    };
-                }
-            } else {
-                // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
-                let mut should_forward_msg = true;
-
-                let map = &self.llmp_clients[client_id as usize].current_recv_map;
-                let msg_buf = (*msg).as_slice(map)?;
-                match (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
-                    LlmpMsgHookResult::Handled => should_forward_msg = false,
-                    _ => (),
-                }
-                if should_forward_msg {
-                    self.forward_msg(msg)?;
-                }
-            }
-        }
-    }
-
-}
-
-impl LlmpClient<AflShmem> {
- 
     /// Creates a new LlmpClient, reading the map id and len from env
     pub fn create_using_env(env_var: &str) -> Result<Self, AflError> {
-
-        let map_str = env::var(env_var)?;
-        let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_var))?)?;
-        Ok(Self::new(LlmpSharedMap::from_name(&map_str, map_size)?)?)
-
+        Self::new(LlmpSharedMap::existing(SH::existing_from_env(env_var)?))
     }
 
     /// Create a LlmpClient, getting the ID from a given port
@@ -1215,21 +1184,22 @@ impl LlmpClient<AflShmem> {
         let mut new_broker_map_str: [u8; 20] = Default::default();
         stream.read_exact(&mut new_broker_map_str)?;
 
-        let ret = Self::new(LlmpSharedMap::from_name_slice(
+        let ret = Self::new(LlmpSharedMap::existing(SH::existing_map_by_shm_bytes(
             &new_broker_map_str,
             LLMP_PREF_INITIAL_MAP_SIZE,
-        )?)?;
+        )?))?;
 
         stream.write(ret.llmp_out.out_maps.first().unwrap().shmem.shm_str_buf())?;
         Ok(ret)
     }
-
 }
 
 #[cfg(test)]
 mod tests {
 
     use std::{thread::sleep, time::Duration};
+
+    use crate::events::shmem::AflShmem;
 
     use super::{
         LlmpConnection::{self, IsBroker, IsClient},
@@ -1239,7 +1209,7 @@ mod tests {
 
     #[test]
     pub fn llmp_connection() {
-        let mut broker = match LlmpConnection::on_port(1337).unwrap() {
+        let mut broker = match LlmpConnection::<AflShmem>::on_port(1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
             IsBroker {
                 broker,
@@ -1248,7 +1218,7 @@ mod tests {
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::on_port(1337).unwrap() {
+        let mut client = match LlmpConnection::<AflShmem>::on_port(1337).unwrap() {
             IsBroker {
                 broker: _,
                 listener_thread: _,
@@ -1277,5 +1247,4 @@ mod tests {
         // We want at least the tcp and sender clients.
         assert_eq!(broker.llmp_clients.len(), 2);
     }
-
 }

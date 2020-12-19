@@ -6,7 +6,6 @@ Welcome to libAFL
 
 #[macro_use]
 extern crate alloc;
-
 #[macro_use]
 extern crate static_assertions;
 
@@ -94,25 +93,16 @@ impl From<FromUtf8Error> for AflError {
         Self::Unknown(format!("Could not convert byte to utf-8: {:?}", err))
     }
 }
- 
+
 #[cfg(feature = "std")]
 impl From<VarError> for AflError {
     fn from(err: VarError) -> Self {
         Self::Empty(format!("Could not get env var: {:?}", err))
     }
 }
- 
+
 impl From<ParseIntError> for AflError {
     fn from(err: ParseIntError) -> Self {
         Self::Unknown(format!("Failed to parse Int: {:?}", err))
-    }
-}
- 
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }
