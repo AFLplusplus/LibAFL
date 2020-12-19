@@ -135,7 +135,7 @@ pub mod unix_signals {
 
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         let manager = (EVENT_MANAGER_PTR as *mut EM).as_mut().unwrap();
-        
+
         manager.crash(input).expect("Error in sending Crash event");
 
         std::process::exit(139);
@@ -162,8 +162,10 @@ pub mod unix_signals {
 
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         let manager = (EVENT_MANAGER_PTR as *mut EM).as_mut().unwrap();
-        
-        manager.timeout(input).expect("Error in sending Timeout event");
+
+        manager
+            .timeout(input)
+            .expect("Error in sending Timeout event");
 
         // TODO: send LLMP.
         println!("Timeout in fuzz run.");
@@ -183,7 +185,7 @@ pub mod unix_signals {
         R: Rand,
     {
         EVENT_MANAGER_PTR = manager as *mut _ as *mut c_void;
-  
+
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;
