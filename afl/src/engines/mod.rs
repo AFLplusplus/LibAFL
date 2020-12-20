@@ -47,6 +47,83 @@ where
     phantom: PhantomData<(I, R, OT)>,
 }
 
+impl<R, FT, OT> State<BytesInput, R, FT, OT>
+where
+    R: Rand,
+    FT: FeedbacksTuple<BytesInput>,
+    OT: ObserversTuple,
+{
+    pub fn load_from_directory<G, C, E, ET, EM>(
+        &mut self,
+        corpus: &mut C,
+        generator: &mut G,
+        engine: &mut Engine<E, OT, ET, BytesInput>,
+        manager: &mut EM,
+        in_dir: &Path,
+    ) -> Result<(), AflError>
+    where
+        G: Generator<BytesInput, R>,
+        C: Corpus<BytesInput, R>,
+        E: Executor<BytesInput> + HasObservers<OT>,
+        ET: ExecutorsTuple<BytesInput>,
+        EM: EventManager<C, E, OT, FT, BytesInput, R>,
+    {
+        for entry in fs::read_dir(in_dir)? {
+            let entry = entry?;
+
+            let path = entry.path();
+
+            let attributes = fs::metadata(&path);
+
+            if !attributes.is_ok() {
+                continue;
+            }
+
+            let attr = attributes?;
+
+            if attr.is_file() {
+                println!("Load file {:?}", &path);
+                let bytes = std::fs::read(path)?;
+                let input = BytesInput::new(bytes);
+                let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+                if self.add_if_interesting(corpus, input, fitness)?.is_none() {
+                    println!("File {:?} was interesting, skipped.", &path);
+                }
+            } else if attr.is_dir() {
+                self.load_from_directory(corpus, generator, engine, manager, &path)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn load_initial_inputs<G, C, E, ET, EM>(
+        &mut self,
+        corpus: &mut C,
+        generator: &mut G,
+        engine: &mut Engine<E, OT, ET, BytesInput>,
+        manager: &mut EM,
+        in_dir: Vec<String>,
+    ) -> Result<(), AflError>
+    where
+        G: Generator<BytesInput, R>,
+        C: Corpus<BytesInput, R>,
+        E: Executor<BytesInput> + HasObservers<OT>,
+        ET: ExecutorsTuple<BytesInput>,
+        EM: EventManager<C, E, OT, FT, BytesInput, R>,
+    {
+        for directory in &in_dir {
+            self.load_from_directory(corpus, generator, engine, manager, Path::new(directory))?;
+        }
+        manager.log(
+            0,
+            format!("Loaded {} initial testcases", in_dir.len()), // get corpus count
+        )?;
+        manager.process(self, corpus)?;
+        Ok(())
+    }
+}
+
 impl<I, R, FT, OT> State<I, R, FT, OT>
 where
     I: Input,
@@ -196,72 +273,6 @@ where
             self.discard_input(&input)?;
             Ok(None)
         }
-    }
-
-    pub fn load_from_directory<G, C, E, ET, EM>(
-        &mut self,
-        corpus: &mut C,
-        generator: &mut G,
-        engine: &mut Engine<E, OT, ET, I>,
-        manager: &mut EM,
-        in_dir: &Path,
-    ) -> Result<(), AflError>
-    where
-        G: Generator<I, R>,
-        C: Corpus<I, R>,
-        E: Executor<I> + HasObservers<OT>,
-        ET: ExecutorsTuple<I>,
-        EM: EventManager<C, E, OT, FT, I, R>,
-    {
-        for entry in fs::read_dir(in_dir)? {
-            let entry = entry?;
-
-            let path = entry.path();
-
-            let attributes = fs::metadata(&path);
-
-            if !attributes.is_ok() {
-                continue;
-            }
-
-            let attr = attributes?;
-
-            if attr.is_file() {
-                println!("Loading file {:?}", &path);
-                let input = std::fs::read(path)?;
-                let input = BytesInput::new(input);
-                let input = do_whatever_magic_function(input);
-                let fitness = self.evaluate_input(&input, engine.executor_mut())?;
-                self.add_if_interesting(corpus, input, fitness)?;
-            } else if attr.is_dir() {
-                self.load_from_directory(corpus, generator, engine, manager, &path)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn load_initial_inputs<G, C, E, ET, EM>(
-        &mut self,
-        corpus: &mut C,
-        generator: &mut G,
-        engine: &mut Engine<E, OT, ET, I>,
-        manager: &mut EM,
-        in_dir: Vec<String>,
-    ) -> Result<(), AflError>
-    where
-        G: Generator<I, R>,
-        C: Corpus<I, R>,
-        E: Executor<I> + HasObservers<OT>,
-        ET: ExecutorsTuple<I>,
-        EM: EventManager<C, E, OT, FT, I, R>,
-    {
-        for directory in &in_dir {
-            self.load_from_directory(corpus, generator, engine, manager, Path::new(directory))?;
-        }
-        manager.log(0, format!("Loaded {} initial testcases", corpus.count()))?;
-        manager.process(self, corpus)?;
-        Ok(())
     }
 
     pub fn generate_initial_inputs<G, C, E, ET, EM>(
