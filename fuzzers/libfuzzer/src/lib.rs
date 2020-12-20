@@ -50,6 +50,13 @@ pub extern "C" fn afl_libfuzzer_main() {
     let matches = App::new("libAFLrs fuzzer harness")
         .about("libAFLrs fuzzer harness help options.")
         .arg(
+            Arg::with_name("port")
+                .short("p")
+                .value_name("PORT")
+                .takes_value(true)
+                .help("Broker TCP port to use."),
+        )
+        .arg(
             Arg::with_name("dictionary")
                 .short("x")
                 .value_name("DICTIONARY")
@@ -72,6 +79,7 @@ pub extern "C" fn afl_libfuzzer_main() {
         .get_matches();
 
     let statstime = value_t!(matches, "statstime", u32).unwrap_or(5);
+    let broker_port = value_t!(matches, "port", u16).unwrap_or(1337);
 
     let workdir = if matches.is_present("workdir") {
         matches.value_of("workdir").unwrap().to_string()
@@ -88,6 +96,10 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut input: Option<Vec<String>> = None;
     if matches.is_present("workdir") {
         input = Some(values_t!(matches, "workdir", String).unwrap_or_else(|e| e.exit()));
+    }
+
+    if dictionary != None || input != None {
+        println!("Information: the first process started is the broker and only processes the \'-p PORT\' option if present.");
     }
 
     // debug prints
@@ -113,22 +125,12 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut generator = RandPrintablesGenerator::new(32);
 
     let stats = SimpleStats::new(|s| println!("{}", s));
-    let mut mgr = LlmpEventManager::new_on_port(1337, stats).unwrap();
+    let mut mgr = LlmpEventManager::new_on_port(broker_port, stats).unwrap();
     if mgr.is_broker() {
         println!("Doing broker things.");
         mgr.broker_loop().unwrap();
     }
     println!("We're a client, let's fuzz :)");
-
-    //    unsafe {
-
-    //        if afl_libfuzzer_init(...) == -1 {
-
-    //            println("Warning: LLVMFuzzerInitialize failed with -1")
-
-    //        }
-
-    //    }
 
     let edges_observer =
         StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
@@ -140,6 +142,12 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut state = State::new(tuple_list!(edges_feedback));
 
     let mut engine = Engine::new(executor);
+
+    //    unsafe {
+    //        if afl_libfuzzer_init(...) == -1 {
+    //            println("Warning: LLVMFuzzerInitialize failed with -1")
+    //        }
+    //    }
 
     if input != None {
         state
