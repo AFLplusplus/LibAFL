@@ -6,6 +6,7 @@ extern crate alloc;
 
 use clap::{App, Arg};
 use std::env;
+use std::path::PathBuf;
 
 use afl::corpus::InMemoryCorpus;
 use afl::engines::Engine;
@@ -87,15 +88,15 @@ pub extern "C" fn afl_libfuzzer_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     };
 
-    let mut dictionary: Option<Vec<String>> = None;
+    let mut dictionary: Option<Vec<PathBuf>> = None;
 
     if matches.is_present("dictionary") {
-        dictionary = Some(values_t!(matches, "dictionary", String).unwrap_or_else(|e| e.exit()));
+        dictionary = Some(values_t!(matches, "dictionary", PathBuf).unwrap_or_else(|e| e.exit()));
     }
 
-    let mut input: Option<Vec<String>> = None;
+    let mut input: Option<Vec<PathBuf>> = None;
     if matches.is_present("workdir") {
-        input = Some(values_t!(matches, "workdir", String).unwrap_or_else(|e| e.exit()));
+        input = Some(values_t!(matches, "workdir", PathBuf).unwrap_or_else(|e| e.exit()));
     }
 
     if dictionary != None || input != None {
@@ -104,18 +105,24 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     // debug prints
 
-    println!("workdir: {}", workdir);
+    println!("workdir: {:?}", workdir);
 
-    if dictionary != None {
-        for file in dictionary.unwrap() {
-            println!("dic: {}", file);
+    match dictionary {
+        Some(ref x) => {
+            for file in x {
+                println!("dic: {:?}", file);
+            }
         }
+        None => (),
     }
 
-    if input != None {
-        for indir in input.clone().unwrap() {
-            println!("in: {}", indir);
+    match input {
+        Some(ref x) => {
+            for indir in x {
+                println!("in: {:?}", indir);
+            }
         }
+        None => (),
     }
 
     // original code
@@ -149,18 +156,11 @@ pub extern "C" fn afl_libfuzzer_main() {
     //        }
     //    }
 
-    if input != None {
-        state
-            .load_initial_inputs(
-                &mut corpus,
-                &mut generator,
-                &mut engine,
-                &mut mgr,
-                input.unwrap(),
-            )
-            .expect("Failed to load initial corpus");
-    } else {
-        state
+    match input {
+        Some(x) => state
+            .load_initial_inputs(&mut corpus, &mut generator, &mut engine, &mut mgr, &x)
+            .expect("Failed to load initial corpus"),
+        None => state
             .generate_initial_inputs(
                 &mut rand,
                 &mut corpus,
@@ -169,7 +169,7 @@ pub extern "C" fn afl_libfuzzer_main() {
                 &mut mgr,
                 4,
             )
-            .expect("Failed to load initial inputs");
+            .expect("Failed to load initial inputs"),
     }
 
     let mut mutator = HavocBytesMutator::new_default();

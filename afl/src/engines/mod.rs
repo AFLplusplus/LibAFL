@@ -3,7 +3,10 @@
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::EventManager;
@@ -83,7 +86,7 @@ where
 
             if attr.is_file() {
                 println!("Load file {:?}", &path);
-                let bytes = std::fs::read(path)?;
+                let bytes = std::fs::read(&path)?;
                 let input = BytesInput::new(bytes);
                 let fitness = self.evaluate_input(&input, engine.executor_mut())?;
                 if self.add_if_interesting(corpus, input, fitness)?.is_none() {
@@ -103,7 +106,7 @@ where
         generator: &mut G,
         engine: &mut Engine<E, OT, ET, BytesInput>,
         manager: &mut EM,
-        in_dir: Vec<String>,
+        in_dirs: &[PathBuf],
     ) -> Result<(), AflError>
     where
         G: Generator<BytesInput, R>,
@@ -112,12 +115,12 @@ where
         ET: ExecutorsTuple<BytesInput>,
         EM: EventManager<C, E, OT, FT, BytesInput, R>,
     {
-        for directory in &in_dir {
-            self.load_from_directory(corpus, generator, engine, manager, Path::new(directory))?;
+        for in_dir in in_dirs {
+            self.load_from_directory(corpus, generator, engine, manager, in_dir)?;
         }
         manager.log(
             0,
-            format!("Loaded {} initial testcases", in_dir.len()), // get corpus count
+            format!("Loaded {} initial testcases", in_dirs.len()), // get corpus count
         )?;
         manager.process(self, corpus)?;
         Ok(())
