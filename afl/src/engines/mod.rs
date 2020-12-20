@@ -227,11 +227,12 @@ where
             let attr = attributes?;
 
             if attr.is_file() {
-                println!("Load file {:?}", &path);
+                println!("Loading file {:?}", &path);
                 let input = std::fs::read(path)?;
                 let input = BytesInput::new(input);
-            //let fitness = self.evaluate_input(&input, engine.executor_mut())?;
-            //self.add_if_interesting(corpus, input, fitness)?
+                let input = do_whatever_magic_function(input);
+                let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+                self.add_if_interesting(corpus, input, fitness)?;
             } else if attr.is_dir() {
                 self.load_from_directory(corpus, generator, engine, manager, &path)?;
             }
