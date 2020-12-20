@@ -49,6 +49,8 @@ pub enum AflError {
     NotImplemented(String),
     /// You're holding it wrong
     IllegalState(String),
+    /// The argument passed to this method or function is not valid
+    IllegalArgument(String),
     /// Something else happened
     Unknown(String),
 }
@@ -67,6 +69,7 @@ impl fmt::Display for AflError {
             }
             Self::NotImplemented(s) => write!(f, "Not implemented: {0}", &s),
             Self::IllegalState(s) => write!(f, "Illegal state: {0}", &s),
+            Self::IllegalArgument(s) => write!(f, "Illegal argument: {0}", &s),
             Self::Unknown(s) => write!(f, "Unknown error: {0}", &s),
         }
     }
