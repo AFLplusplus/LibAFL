@@ -149,6 +149,12 @@ where
     I: Input,
     R: Rand,
 {
+    /// Returns the number of elements
+    #[inline]
+    fn count(&self) -> usize {
+        self.entries().len()
+    }
+
     /// Gets the next entry
     #[inline]
     fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError> {
