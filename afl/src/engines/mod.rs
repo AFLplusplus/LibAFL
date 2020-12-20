@@ -230,7 +230,7 @@ where
                 println!("Load file {:?}", &path);
                 let input = std::fs::read(path)?;
                 let input = BytesInput::new(input);
-                let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+            //let fitness = self.evaluate_input(&input, engine.executor_mut())?;
             //self.add_if_interesting(corpus, input, fitness)?
             } else if attr.is_dir() {
                 self.load_from_directory(corpus, generator, engine, manager, &path)?;
@@ -258,10 +258,7 @@ where
         for directory in &in_dir {
             self.load_from_directory(corpus, generator, engine, manager, Path::new(directory))?;
         }
-        manager.log(
-            0,
-            format!("Loaded {} initial testcases", 123), // get corpus count
-        )?;
+        manager.log(0, format!("Loaded {} initial testcases", corpus.count()))?;
         manager.process(self, corpus)?;
         Ok(())
     }
