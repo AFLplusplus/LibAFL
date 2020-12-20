@@ -6,6 +6,7 @@ extern crate alloc;
 
 use clap::{App, Arg};
 use std::env;
+use std::path::PathBuf;
 
 use afl::corpus::Corpus;
 use afl::corpus::InMemoryCorpus;
@@ -88,15 +89,15 @@ pub extern "C" fn afl_libfuzzer_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     };
 
-    let mut dictionary: Option<Vec<String>> = None;
+    let mut dictionary: Option<Vec<PathBuf>> = None;
 
     if matches.is_present("dictionary") {
-        dictionary = Some(values_t!(matches, "dictionary", String).unwrap_or_else(|e| e.exit()));
+        dictionary = Some(values_t!(matches, "dictionary", PathBuf).unwrap_or_else(|e| e.exit()));
     }
 
-    let mut input: Option<Vec<String>> = None;
+    let mut input: Option<Vec<PathBuf>> = None;
     if matches.is_present("workdir") {
-        input = Some(values_t!(matches, "workdir", String).unwrap_or_else(|e| e.exit()));
+        input = Some(values_t!(matches, "workdir", PathBuf).unwrap_or_else(|e| e.exit()));
     }
 
     if dictionary != None || input != None {
@@ -105,18 +106,13 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     // debug prints
 
-    println!("workdir: {}", workdir);
+    println!("workdir: {:?}", workdir);
 
-    if dictionary != None {
-        for file in dictionary.unwrap() {
-            println!("dic: {}", file);
-        }
-    }
-
-    if input != None {
-        for indir in input.clone().unwrap() {
-            println!("in: {}", indir);
-        }
+    match dictionary {
+        Some(x) => for file in x {
+                println!("dic: {:?}", file);
+            },
+        None => (),
     }
 
     // original code
@@ -151,16 +147,17 @@ pub extern "C" fn afl_libfuzzer_main() {
         }
     }
 
-    if input != None {
-        state
-            .load_initial_inputs(
-                &mut corpus,
-                &mut generator,
-                &mut engine,
-                &mut mgr,
-                input.unwrap(),
-            )
-            .expect("Failed to load initial corpus");
+    match input {
+        Some(x) => {
+            for indir in &x {
+                println!("in: {:?}", indir);
+            };
+            
+            state
+            .load_initial_inputs(&mut corpus, &mut generator, &mut engine, &mut mgr, &x)
+            .expect("Failed to load initial corpus")
+        },
+        None => (),
     }
 
     if corpus.count() < 1 {

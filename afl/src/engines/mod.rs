@@ -3,7 +3,10 @@
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::EventManager;
@@ -101,7 +104,7 @@ where
         generator: &mut G,
         engine: &mut Engine<E, OT, ET, BytesInput>,
         manager: &mut EM,
-        in_dir: Vec<String>,
+        in_dirs: &[PathBuf],
     ) -> Result<(), AflError>
     where
         G: Generator<BytesInput, R>,
@@ -110,12 +113,12 @@ where
         ET: ExecutorsTuple<BytesInput>,
         EM: EventManager<C, E, OT, FT, BytesInput, R>,
     {
-        for directory in &in_dir {
-            self.load_from_directory(corpus, generator, engine, manager, Path::new(directory))?;
+        for in_dir in in_dirs {
+            self.load_from_directory(corpus, generator, engine, manager, in_dir)?;
         }
         manager.log(
             0,
-            format!("Loaded {} initial testcases", in_dir.len()), // get corpus count
+            format!("Loaded {} initial testcases", in_dirs.len()), // get corpus count
         )?;
         manager.process(self, corpus)?;
         Ok(())
