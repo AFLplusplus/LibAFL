@@ -14,7 +14,7 @@ use afl::feedbacks::MaxMapFeedback;
 use afl::generators::RandPrintablesGenerator;
 use afl::mutators::scheduled::HavocBytesMutator;
 use afl::mutators::HasMaxSize;
-use afl::observers::StdMapObserver;
+use afl::observers::VariableMapObserver;
 use afl::stages::mutational::StdMutationalStage;
 use afl::tuples::tuple_list;
 use afl::utils::StdRand;
@@ -66,11 +66,10 @@ pub extern "C" fn fuzz_main_loop() {
     }
     println!("We're a client, let's fuzz :)");
 
-    let edges_observer = StdMapObserver::new_from_ptr(
-        &NAME_COV_MAP,
-        unsafe { fuzz_hitcounts_map.as_mut_ptr() },
-        unsafe { fuzz_edges_id },
-    );
+    let edges_observer =
+        VariableMapObserver::new(&NAME_COV_MAP, unsafe { &mut fuzz_hitcounts_map }, unsafe {
+            &fuzz_edges_id
+        });
     let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
 
     let executor = InMemoryExecutor::new("QEMUFuzzer", harness, tuple_list!(edges_observer));

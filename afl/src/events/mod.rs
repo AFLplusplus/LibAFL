@@ -1,8 +1,5 @@
-// TODO: llmp can be no_std, if we abstract away page creation
-#[cfg(feature = "std")]
 pub mod llmp;
-#[cfg(feature = "std")]
-pub mod shmem_translated;
+pub mod shmem;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -10,9 +7,13 @@ use core::time::Duration;
 use core::{marker::PhantomData, time};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
+use shmem::AflShmem;
 
 #[cfg(feature = "std")]
-use self::llmp::Tag;
+use self::{
+    llmp::{LlmpClient, Tag},
+    shmem::ShMem,
+};
 use crate::corpus::Corpus;
 use crate::executors::Executor;
 use crate::feedbacks::FeedbacksTuple;
@@ -708,8 +709,7 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
-#[cfg(feature = "std")]
-pub struct LlmpEventManager<C, E, OT, FT, I, R, ST>
+pub struct LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -717,16 +717,16 @@ where
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
+    SH: ShMem,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
-    llmp: llmp::LlmpConnection,
+    llmp: llmp::LlmpConnection<SH>,
     stats: ST,
     phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
-#[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R, ST> LlmpEventManager<C, E, OT, FT, I, R, ST>
+impl<C, E, OT, FT, I, R, ST> LlmpEventManager<C, E, OT, FT, I, R, AflShmem, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -736,25 +736,55 @@ where
     R: Rand,
     ST: Stats,
 {
+    #[cfg(feature = "std")]
+    /// Create llmp on a port
+    /// If the port is not yet bound, it will act as broker
+    /// Else, it will act as client.
+    pub fn new_on_port_std(stats: ST) -> Result<Self, AflError> {
+        Ok(Self {
+            llmp: llmp::LlmpConnection::on_port(port)?,
+            stats: stats,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl<C, E, OT, FT, I, R, SH, ST> LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
+where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    SH: ShMem,
+    ST: Stats,
+{
+    #[cfg(feature = "std")]
     /// Create llmp on a port
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     pub fn new_on_port(port: u16, stats: ST) -> Result<Self, AflError> {
-        let mgr = Self {
+        Ok(Self {
             llmp: llmp::LlmpConnection::on_port(port)?,
             stats: stats,
             phantom: PhantomData,
-        };
-        Ok(mgr)
+        })
+    }
+
+    /// A client on an existing map
+    pub fn for_client(client: LlmpClient<SH>, stats: ST) -> Self {
+        Self {
+            llmp: llmp::LlmpConnection::IsClient { client },
+            stats,
+            phantom: PhantomData,
+        }
     }
 
     /// Returns if we are the broker
     pub fn is_broker(&self) -> bool {
         match self.llmp {
-            llmp::LlmpConnection::IsBroker {
-                broker: _,
-                listener_thread: _,
-            } => true,
+            llmp::LlmpConnection::IsBroker { broker: _ } => true,
             _ => false,
         }
     }
@@ -762,10 +792,7 @@ where
     /// Run forever in the broker
     pub fn broker_loop(&mut self) -> Result<(), AflError> {
         match &mut self.llmp {
-            llmp::LlmpConnection::IsBroker {
-                broker,
-                listener_thread: _,
-            } => {
+            llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = &mut self.stats;
                 broker.loop_forever(
                     &mut |sender_id: u32, tag: Tag, msg: &[u8]| {
@@ -803,8 +830,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R, ST> EventManager<C, E, OT, FT, I, R>
-    for LlmpEventManager<C, E, OT, FT, I, R, ST>
+impl<C, E, OT, FT, I, R, SH, ST> EventManager<C, E, OT, FT, I, R>
+    for LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
@@ -812,6 +839,7 @@ where
     OT: ObserversTuple,
     I: Input,
     R: Rand,
+    SH: ShMem,
     ST: Stats,
     //CE: CustomEvent<I>,
 {

@@ -14,6 +14,7 @@ use afl::engines::Engine;
 use afl::engines::Fuzzer;
 use afl::engines::State;
 use afl::engines::StdFuzzer;
+use afl::events::shmem::AflShmem;
 use afl::events::{LlmpEventManager, SimpleStats};
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
@@ -110,12 +111,13 @@ pub extern "C" fn afl_libfuzzer_main() {
     let mut corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(32);
     let stats = SimpleStats::new(|s| println!("{}", s));
-    let mut mgr = LlmpEventManager::new_on_port(broker_port, stats).unwrap();
+    let mut mgr = LlmpEventManager::new_on_port_std(broker_port, stats).unwrap();
 
     if mgr.is_broker() {
-        println!("Doing broker things.");
+        println!("Doing broker things. Run this tool again to start fuzzing in a client.");
         mgr.broker_loop().unwrap();
     }
+
     println!("We're a client, let's fuzz :)");
 
     let edges_observer =

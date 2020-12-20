@@ -629,7 +629,84 @@ impl<'a, T: Sized> SliceMut<'a, T> {
     }
 }
 
-pub enum Array<T: Sized + serde::Serialize> {
+pub enum Cptr<T: Sized> {
+    Cptr(*const T),
+    Owned(Box<T>),
+}
+
+impl<T: Sized + serde::Serialize> serde::Serialize for Cptr<T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_ref().serialize(se)
+    }
+}
+
+impl<'de, T: Sized + serde::de::DeserializeOwned> Deserialize<'de> for Cptr<T>
+where
+    Vec<T>: Deserialize<'de>,
+{
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Deserialize::deserialize(de).map(Cptr::Owned)
+    }
+}
+
+impl<T: Sized> Cptr<T> {
+    pub fn as_ref(&self) -> &T {
+        match self {
+            Cptr::Cptr(p) => unsafe { p.as_ref().unwrap() },
+            Cptr::Owned(v) => v.as_ref(),
+        }
+    }
+}
+
+pub enum CptrMut<T: Sized> {
+    Cptr(*mut T),
+    Owned(Box<T>),
+}
+
+impl<T: Sized + serde::Serialize> serde::Serialize for CptrMut<T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_ref().serialize(se)
+    }
+}
+
+impl<'de, T: Sized + serde::de::DeserializeOwned> Deserialize<'de> for CptrMut<T>
+where
+    Vec<T>: Deserialize<'de>,
+{
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Deserialize::deserialize(de).map(CptrMut::Owned)
+    }
+}
+
+impl<T: Sized> CptrMut<T> {
+    pub fn as_ref(&self) -> &T {
+        match self {
+            CptrMut::Cptr(p) => unsafe { p.as_ref().unwrap() },
+            CptrMut::Owned(b) => b.as_ref(),
+        }
+    }
+
+    pub fn as_mut(&mut self) -> &mut T {
+        match self {
+            CptrMut::Cptr(p) => unsafe { p.as_mut().unwrap() },
+            CptrMut::Owned(b) => b.as_mut(),
+        }
+    }
+}
+
+pub enum Array<T: Sized> {
     Cptr((*const T, usize)),
     Owned(Vec<T>),
 }
@@ -655,7 +732,7 @@ where
     }
 }
 
-impl<T: Sized + serde::Serialize> Array<T> {
+impl<T: Sized> Array<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
             Array::Cptr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
@@ -664,7 +741,7 @@ impl<T: Sized + serde::Serialize> Array<T> {
     }
 }
 
-pub enum ArrayMut<T: Sized + serde::Serialize> {
+pub enum ArrayMut<T: Sized> {
     Cptr((*mut T, usize)),
     Owned(Vec<T>),
 }
@@ -690,7 +767,7 @@ where
     }
 }
 
-impl<T: Sized + serde::Serialize> ArrayMut<T> {
+impl<T: Sized> ArrayMut<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
             ArrayMut::Cptr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },

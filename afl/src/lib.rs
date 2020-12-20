@@ -6,7 +6,6 @@ Welcome to libAFL
 
 #[macro_use]
 extern crate alloc;
-
 #[macro_use]
 extern crate static_assertions;
 
@@ -28,7 +27,7 @@ pub mod utils;
 use alloc::string::String;
 use core::fmt;
 #[cfg(feature = "std")]
-use std::io;
+use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
 
 /// Main error struct for AFL
 #[derive(Debug)]
@@ -50,6 +49,8 @@ pub enum AflError {
     NotImplemented(String),
     /// You're holding it wrong
     IllegalState(String),
+    /// The argument passed to this method or function is not valid
+    IllegalArgument(String),
     /// Something else happened
     Unknown(String),
 }
@@ -68,6 +69,7 @@ impl fmt::Display for AflError {
             }
             Self::NotImplemented(s) => write!(f, "Not implemented: {0}", &s),
             Self::IllegalState(s) => write!(f, "Illegal state: {0}", &s),
+            Self::IllegalArgument(s) => write!(f, "Illegal argument: {0}", &s),
             Self::Unknown(s) => write!(f, "Unknown error: {0}", &s),
         }
     }
@@ -88,10 +90,23 @@ impl From<io::Error> for AflError {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+#[cfg(feature = "std")]
+impl From<FromUtf8Error> for AflError {
+    fn from(err: FromUtf8Error) -> Self {
+        Self::Unknown(format!("Could not convert byte to utf-8: {:?}", err))
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<VarError> for AflError {
+    fn from(err: VarError) -> Self {
+        Self::Empty(format!("Could not get env var: {:?}", err))
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<ParseIntError> for AflError {
+    fn from(err: ParseIntError) -> Self {
+        Self::Unknown(format!("Failed to parse Int: {:?}", err))
     }
 }
