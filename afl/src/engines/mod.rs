@@ -3,18 +3,24 @@
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::corpus::{Corpus, Testcase};
 use crate::events::EventManager;
 use crate::executors::{Executor, ExecutorsTuple, HasObservers};
 use crate::feedbacks::FeedbacksTuple;
 use crate::generators::Generator;
+use crate::inputs::bytes::BytesInput;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
 use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
 use crate::stages::StagesTuple;
 use crate::tuples::{tuple_list, tuple_list_type};
 use crate::utils::{current_milliseconds, Rand};
+
 use crate::AflError;
 
 pub trait StateMetadata: Debug {
@@ -42,6 +48,81 @@ where
     // Feedbacks used to evaluate an input
     feedbacks: FT,
     phantom: PhantomData<(I, R, OT)>,
+}
+
+impl<R, FT, OT> State<BytesInput, R, FT, OT>
+where
+    R: Rand,
+    FT: FeedbacksTuple<BytesInput>,
+    OT: ObserversTuple,
+{
+    pub fn load_from_directory<G, C, E, ET, EM>(
+        &mut self,
+        corpus: &mut C,
+        generator: &mut G,
+        engine: &mut Engine<E, OT, ET, BytesInput>,
+        manager: &mut EM,
+        in_dir: &Path,
+    ) -> Result<(), AflError>
+    where
+        G: Generator<BytesInput, R>,
+        C: Corpus<BytesInput, R>,
+        E: Executor<BytesInput> + HasObservers<OT>,
+        ET: ExecutorsTuple<BytesInput>,
+        EM: EventManager<C, E, OT, FT, BytesInput, R>,
+    {
+        for entry in fs::read_dir(in_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            let attributes = fs::metadata(&path);
+
+            if !attributes.is_ok() {
+                continue;
+            }
+
+            let attr = attributes?;
+
+            if attr.is_file() && attr.len() > 0 {
+                println!("Loading file {:?} ...", &path);
+                let bytes = std::fs::read(&path)?;
+                let input = BytesInput::new(bytes);
+                let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+                if self.add_if_interesting(corpus, input, fitness)?.is_none() {
+                    println!("File {:?} was not interesting, skipped.", &path);
+                }
+            } else if attr.is_dir() {
+                self.load_from_directory(corpus, generator, engine, manager, &path)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn load_initial_inputs<G, C, E, ET, EM>(
+        &mut self,
+        corpus: &mut C,
+        generator: &mut G,
+        engine: &mut Engine<E, OT, ET, BytesInput>,
+        manager: &mut EM,
+        in_dirs: &[PathBuf],
+    ) -> Result<(), AflError>
+    where
+        G: Generator<BytesInput, R>,
+        C: Corpus<BytesInput, R>,
+        E: Executor<BytesInput> + HasObservers<OT>,
+        ET: ExecutorsTuple<BytesInput>,
+        EM: EventManager<C, E, OT, FT, BytesInput, R>,
+    {
+        for in_dir in in_dirs {
+            self.load_from_directory(corpus, generator, engine, manager, in_dir)?;
+        }
+        manager.log(
+            0,
+            format!("Loaded {} initial testcases.", corpus.count()), // get corpus count
+        )?;
+        manager.process(self, corpus)?;
+        Ok(())
+    }
 }
 
 impl<I, R, FT, OT> State<I, R, FT, OT>

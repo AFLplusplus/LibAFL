@@ -17,6 +17,7 @@ opt-level = 3
 debug = true
 
 [dependencies]
+clap = "2.32.0"
 afl = { path = "../../afl/" }
 
 [lib]

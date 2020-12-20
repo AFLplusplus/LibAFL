@@ -742,7 +742,7 @@ where
     /// Else, it will act as client.
     pub fn new_on_port_std(stats: ST) -> Result<Self, AflError> {
         Ok(Self {
-            llmp: llmp::LlmpConnection::on_port(port)?,
+            llmp: llmp::LlmpConnection::on_port(1337)?,
             stats: stats,
             phantom: PhantomData,
         })

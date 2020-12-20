@@ -1,6 +1,11 @@
+#include <stdio.h>
 #include <stdint.h>
 
 #define MAP_SIZE 65536
+
+int orig_argc;
+char **orig_argv;
+char **orig_envp;
 
 uint8_t  __lafl_dummy_map[MAP_SIZE];
 
@@ -119,15 +124,29 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
 }
 
-__attribute__((weak)) int LLVMFuzzerInitialize(int *argc, char ***argv);
 
+ static void afl_libfuzzer_copy_args(int argc, char** argv, char** envp) {
+   orig_argc = argc;
+   orig_argv = argv;
+   orig_envp = envp;
+}
+
+__attribute__((section(".init_array"))) void (* p_afl_libfuzzer_copy_args)(int,char*[],char*[]) = &afl_libfuzzer_copy_args;
+
+__attribute__((weak)) int LLVMFuzzerInitialize(int *argc, char ***argv);
 void afl_libfuzzer_main();
+
+int afl_libfuzzer_init() {
+
+  if (LLVMFuzzerInitialize)
+    return LLVMFuzzerInitialize(&orig_argc, &orig_argv);
+  else
+   return 0;
+
+}
 
 int main(int argc, char** argv) {
 
-  if (LLVMFuzzerInitialize)
-    LLVMFuzzerInitialize(&argc, &argv);
-  
   afl_libfuzzer_main();
   return 0;
 
