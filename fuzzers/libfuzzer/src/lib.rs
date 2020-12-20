@@ -164,6 +164,7 @@ pub extern "C" fn afl_libfuzzer_main() {
     }
 
     if corpus.count() < 1 {
+        println!("Generating random inputs");
         state
             .generate_initial_inputs(
                 &mut rand,

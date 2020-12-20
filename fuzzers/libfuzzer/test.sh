@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cargo build || exit 1
+cargo build --release || exit 1
 make -C runtime || exit 1
 
 rm -f test_fuzz.elf test_fuzz.o

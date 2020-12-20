@@ -70,9 +70,7 @@ where
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
-
             let path = entry.path();
-
             let attributes = fs::metadata(&path);
 
             if !attributes.is_ok() {
@@ -81,13 +79,13 @@ where
 
             let attr = attributes?;
 
-            if attr.is_file() {
+            if attr.is_file() && attr.len() > 0 {
                 println!("Load file {:?}", &path);
-                let bytes = std::fs::read(path)?;
+                let bytes = std::fs::read(&path)?;
                 let input = BytesInput::new(bytes);
                 let fitness = self.evaluate_input(&input, engine.executor_mut())?;
                 if self.add_if_interesting(corpus, input, fitness)?.is_none() {
-                    println!("File {:?} was interesting, skipped.", &path);
+                    println!("File {:?} was not interesting, skipped.", &path);
                 }
             } else if attr.is_dir() {
                 self.load_from_directory(corpus, generator, engine, manager, &path)?;
