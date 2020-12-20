@@ -104,25 +104,14 @@ pub extern "C" fn afl_libfuzzer_main() {
         println!("Information: the first process started is the broker and only processes the \'-p PORT\' option if present.");
     }
 
-    // debug prints
-
-    println!("workdir: {:?}", workdir);
-
-    match dictionary {
-        Some(x) => for file in x {
-                println!("dic: {:?}", file);
-            },
-        None => (),
-    }
-
-    // original code
+    println!("Workdir: {:?}", workdir);
 
     let mut rand = StdRand::new(0);
     let mut corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(32);
-
     let stats = SimpleStats::new(|s| println!("{}", s));
     let mut mgr = LlmpEventManager::new_on_port(broker_port, stats).unwrap();
+
     if mgr.is_broker() {
         println!("Doing broker things.");
         mgr.broker_loop().unwrap();
@@ -148,15 +137,9 @@ pub extern "C" fn afl_libfuzzer_main() {
     }
 
     match input {
-        Some(x) => {
-            for indir in &x {
-                println!("in: {:?}", indir);
-            };
-            
-            state
+        Some(x) => state
             .load_initial_inputs(&mut corpus, &mut generator, &mut engine, &mut mgr, &x)
-            .expect("Failed to load initial corpus")
-        },
+            .expect("Failed to load initial corpus"),
         None => (),
     }
 

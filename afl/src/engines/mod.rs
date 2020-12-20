@@ -83,7 +83,7 @@ where
             let attr = attributes?;
 
             if attr.is_file() && attr.len() > 0 {
-                println!("Load file {:?}", &path);
+                println!("Loading file {:?} ...", &path);
                 let bytes = std::fs::read(&path)?;
                 let input = BytesInput::new(bytes);
                 let fitness = self.evaluate_input(&input, engine.executor_mut())?;
@@ -118,7 +118,7 @@ where
         }
         manager.log(
             0,
-            format!("Loaded {} initial testcases", in_dirs.len()), // get corpus count
+            format!("Loaded {} initial testcases.", corpus.count()), // get corpus count
         )?;
         manager.process(self, corpus)?;
         Ok(())
