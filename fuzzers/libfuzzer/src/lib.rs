@@ -8,6 +8,7 @@ use clap::{App, Arg};
 use std::env;
 use std::path::PathBuf;
 
+use afl::corpus::Corpus;
 use afl::corpus::InMemoryCorpus;
 use afl::engines::Engine;
 use afl::engines::Fuzzer;
@@ -29,8 +30,8 @@ extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
 
-    /// int LLVMFuzzerInitialize(int argc, char **argv)
-    fn afl_libfuzzer_init(argc: u32, argv: *const *const u8) -> i32;
+    // afl_libfuzzer_init calls LLVMFUzzerInitialize()
+    fn afl_libfuzzer_init() -> i32;
 
     static __lafl_edges_map: *mut u8;
     static __lafl_cmp_map: *mut u8;
@@ -108,20 +109,9 @@ pub extern "C" fn afl_libfuzzer_main() {
     println!("workdir: {:?}", workdir);
 
     match dictionary {
-        Some(ref x) => {
-            for file in x {
+        Some(x) => for file in x {
                 println!("dic: {:?}", file);
-            }
-        }
-        None => (),
-    }
-
-    match input {
-        Some(ref x) => {
-            for indir in x {
-                println!("in: {:?}", indir);
-            }
-        }
+            },
         None => (),
     }
 
@@ -150,17 +140,28 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     let mut engine = Engine::new(executor);
 
-    //    unsafe {
-    //        if afl_libfuzzer_init(...) == -1 {
-    //            println("Warning: LLVMFuzzerInitialize failed with -1")
-    //        }
-    //    }
+    // Call LLVMFUzzerInitialize() if present.
+    unsafe {
+        if afl_libfuzzer_init() == -1 {
+            println!("Warning: LLVMFuzzerInitialize failed with -1")
+        }
+    }
 
     match input {
-        Some(x) => state
+        Some(x) => {
+            for indir in &x {
+                println!("in: {:?}", indir);
+            };
+            
+            state
             .load_initial_inputs(&mut corpus, &mut generator, &mut engine, &mut mgr, &x)
-            .expect("Failed to load initial corpus"),
-        None => state
+            .expect("Failed to load initial corpus")
+        },
+        None => (),
+    }
+
+    if corpus.count() < 1 {
+        state
             .generate_initial_inputs(
                 &mut rand,
                 &mut corpus,
@@ -169,8 +170,10 @@ pub extern "C" fn afl_libfuzzer_main() {
                 &mut mgr,
                 4,
             )
-            .expect("Failed to load initial inputs"),
+            .expect("Failed to generate initial inputs");
     }
+
+    println!("We have {} inputs.", corpus.count());
 
     let mut mutator = HavocBytesMutator::new_default();
     mutator.set_max_size(4096);
