@@ -3,6 +3,7 @@
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -13,6 +14,7 @@ use crate::events::EventManager;
 use crate::executors::{Executor, ExecutorsTuple, HasObservers};
 use crate::feedbacks::FeedbacksTuple;
 use crate::generators::Generator;
+#[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
@@ -50,6 +52,7 @@ where
     phantom: PhantomData<(I, R, OT)>,
 }
 
+#[cfg(feature = "std")]
 impl<R, FT, OT> State<BytesInput, R, FT, OT>
 where
     R: Rand,

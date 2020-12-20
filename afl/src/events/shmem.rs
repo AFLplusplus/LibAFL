@@ -1,7 +1,7 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 #[cfg(feature = "std")]
 use core::{mem::size_of, slice};
 #[cfg(feature = "std")]
@@ -277,6 +277,8 @@ unsafe fn afl_shmem_by_str(shm: *mut AflShmem, shm_str: &CStr, map_size: usize) 
 
 #[cfg(test)]
 mod tests {
+
+    #[cfg(feature = "std")]
     use super::{AflShmem, ShMem};
 
     #[cfg(feature = "std")]

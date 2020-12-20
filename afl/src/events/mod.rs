@@ -5,11 +5,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::time::Duration;
 use core::{marker::PhantomData, time};
-#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
-use shmem::AflShmem;
 
-#[cfg(feature = "std")]
 use self::{
     llmp::{LlmpClient, Tag},
     shmem::ShMem,
@@ -19,11 +16,12 @@ use crate::executors::Executor;
 use crate::feedbacks::FeedbacksTuple;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
-#[cfg(feature = "std")]
 use crate::serde_anymap::Ptr;
 use crate::utils::Rand;
 use crate::AflError;
 use crate::{engines::State, utils};
+#[cfg(feature = "std")]
+use shmem::AflShmem;
 
 #[derive(Debug, Copy, Clone)]
 /// Indicate if an event worked or not
@@ -533,7 +531,6 @@ where
     }
 }
 
-#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum LLMPEventKind<'a, I>
@@ -570,7 +567,6 @@ where
     },*/
 }
 
-#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct LLMPEvent<'a, I>
@@ -581,7 +577,6 @@ where
     kind: LLMPEventKind<'a, I>,
 }
 
-#[cfg(feature = "std")]
 impl<'a, I> Event<I> for LLMPEvent<'a, I>
 where
     I: Input,
@@ -652,6 +647,8 @@ where
                 message,
                 phantom: _,
             } => {
+                let (_, _) = (severity_level, message);
+                #[cfg(feature = "std")]
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
             } //_ => Ok(BrokerEventResult::Forward),
@@ -699,13 +696,10 @@ where
     }
 }
 
-#[cfg(feature = "std")]
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
-#[cfg(feature = "std")]
 /// Only handle this in the broker
 const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
-#[cfg(feature = "std")]
 /// Handle in both
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
@@ -726,6 +720,7 @@ where
     phantom: PhantomData<(C, E, OT, FT, I, R)>,
 }
 
+#[cfg(feature = "std")]
 impl<C, E, OT, FT, I, R, ST> LlmpEventManager<C, E, OT, FT, I, R, AflShmem, ST>
 where
     C: Corpus<I, R>,
@@ -740,9 +735,9 @@ where
     /// Create llmp on a port
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
-    pub fn new_on_port_std(stats: ST) -> Result<Self, AflError> {
+    pub fn new_on_port_std(port: u16, stats: ST) -> Result<Self, AflError> {
         Ok(Self {
-            llmp: llmp::LlmpConnection::on_port(1337)?,
+            llmp: llmp::LlmpConnection::on_port(port)?,
             stats: stats,
             phantom: PhantomData,
         })
@@ -829,7 +824,6 @@ where
     }
 }
 
-#[cfg(feature = "std")]
 impl<C, E, OT, FT, I, R, SH, ST> EventManager<C, E, OT, FT, I, R>
     for LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
 where
@@ -871,6 +865,7 @@ where
                 }
             }
             _ => {
+                #[cfg(feature = "std")]
                 dbg!("Skipping process in broker");
                 0
             }
@@ -926,7 +921,6 @@ where
     }
 }
 
-#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
 
@@ -938,6 +932,7 @@ mod tests {
     use crate::tuples::{tuple_list, MatchNameAndType, Named};
 
     static mut MAP: [u32; 4] = [0; 4];
+
     #[test]
     fn test_event_serde() {
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
@@ -969,7 +964,7 @@ mod tests {
                 let test_observer = o.match_name_type::<StdMapObserver<u32>>("test").unwrap();
                 assert_eq!("test", test_observer.name());
             }
-            _ => panic!("mistmatch".to_string()),
+            _ => panic!("mistmatch"),
         };
     }
 }
