@@ -10,12 +10,14 @@ use crate::events::EventManager;
 use crate::executors::{Executor, ExecutorsTuple, HasObservers};
 use crate::feedbacks::FeedbacksTuple;
 use crate::generators::Generator;
+use crate::inputs::bytes::BytesInput;
 use crate::inputs::Input;
 use crate::observers::ObserversTuple;
 use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
 use crate::stages::StagesTuple;
 use crate::tuples::{tuple_list, tuple_list_type};
 use crate::utils::{current_milliseconds, Rand};
+
 use crate::AflError;
 
 pub trait StateMetadata: Debug {
@@ -226,11 +228,10 @@ where
 
             if attr.is_file() {
                 println!("Load file {:?}", &path);
-            //let input = read_file(file);
-            //let fitness = self.evaluate_input(&input, engine.executor_mut())?;
-            //if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
-            //    added += 1;
-            //}
+                let input = std::fs::read(path)?;
+                let input = BytesInput::new(input);
+                let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+            //self.add_if_interesting(corpus, input, fitness)?
             } else if attr.is_dir() {
                 self.load_from_directory(corpus, generator, engine, manager, &path)?;
             }
