@@ -7,6 +7,7 @@ use core::time::Duration;
 use core::{marker::PhantomData, time};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
+use shmem::AflShmem;
 
 #[cfg(feature = "std")]
 use self::{
@@ -723,6 +724,29 @@ where
     llmp: llmp::LlmpConnection<SH>,
     stats: ST,
     phantom: PhantomData<(C, E, OT, FT, I, R)>,
+}
+
+impl<C, E, OT, FT, I, R, ST> LlmpEventManager<C, E, OT, FT, I, R, AflShmem, ST>
+where
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    ST: Stats,
+{
+    #[cfg(feature = "std")]
+    /// Create llmp on a port
+    /// If the port is not yet bound, it will act as broker
+    /// Else, it will act as client.
+    pub fn new_on_port_std(stats: ST) -> Result<Self, AflError> {
+        Ok(Self {
+            llmp: llmp::LlmpConnection::on_port(port)?,
+            stats: stats,
+            phantom: PhantomData,
+        })
+    }
 }
 
 impl<C, E, OT, FT, I, R, SH, ST> LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
