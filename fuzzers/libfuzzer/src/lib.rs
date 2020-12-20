@@ -7,6 +7,7 @@ use afl::engines::Engine;
 use afl::engines::Fuzzer;
 use afl::engines::State;
 use afl::engines::StdFuzzer;
+use afl::events::shmem::AflShmem;
 use afl::events::{LlmpEventManager, SimpleStats};
 use afl::executors::inmemory::InMemoryExecutor;
 use afl::executors::{Executor, ExitKind};
@@ -46,12 +47,8 @@ pub extern "C" fn afl_libfuzzer_main() {
 
     let stats = SimpleStats::new(|s| println!("{}", s));
 
-    // TODO
-    /* match LlmpFuzzInstance::from_env("FUZZER_ENV") {
-
-    }*/
-
-    let mut mgr = LlmpEventManager::new_on_port(1337, stats).unwrap();
+    let mut mgr =
+        LlmpEventManager::<_, _, _, _, _, _, AflShmem, _>::new_on_port(1337, stats).unwrap();
     if mgr.is_broker() {
         println!("Doing broker things. Run this tool again to start fuzzing in a client.");
         mgr.broker_loop().unwrap();
