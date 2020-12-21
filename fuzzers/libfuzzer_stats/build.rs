@@ -4,40 +4,67 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
+const LIBPNG_URL: &str = "http://prdownloads.sourceforge.net/libpng/libpng-1.6.37.tar.gz?download";
+
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    let out_dir = out_dir.to_string_lossy();
+    let out_dir = out_dir.to_string_lossy().to_string();
+    let out_dir_path = Path::new(&out_dir);
 
-    println!("cargo:rerun-if-changed=./runtime/rt.c",);
-    Command::new("clang")
-        .args(&["-c", "./runtime/rt.c", "-o"])
-        .arg(&format!("{:?}/rt.o", out_dir))
-        .status()
-        .unwrap();
-    Command::new("ar")
-        .args(&["crus", "librt.a", "librt.o"])
-        .current_dir(&Path::new(out_dir.as_ref()))
-        .status()
-        .unwrap();
-
+    println!("cargo:rerun-if-changed=./r&untime/rt.c",);
     println!("cargo:rerun-if-changed=harness.c");
-    Command::new("clang")
-        .args(&["-c", "./harness.c", "-I./libpng-1.6.37", "-o"])
-        .arg(&format!("{}/harness.o", out_dir))
-        .status()
-        .unwrap();
-    Command::new("ar")
-        .args(&["crus", "harness.a", "harness.o"])
-        .current_dir(&Path::new(out_dir.as_ref()))
-        .status()
-        .unwrap();
 
-    println!("cargo:rustc-link-search=native={}", out_dir);
-    println!("cargo:rustc-link-lib=static=libpng16");
-    println!("cargo:rustc-link-lib=static=harness");
-    println!("cargo:rustc-link-lib=static=rt");
+    cc::Build::new()
+        .file("./runtime/rt.c")
+        .file("./harness.c")
+        .compile("libfuzzer-sys");
 
-    println!("cargo:rerun-if-changed=libpng16.a");
+
+    let libpng = format!("{}/libpng-1.6.37", &out_dir);
+    let libpng_path = Path::new(&libpng);
+    let libpng_tar = format!("{}/libpng-1.6.37.tar.gz", &out_dir);
+
+    if !libpng_path.is_dir() {
+        if !Path::new(&libpng_tar).is_file() {
+            println!("cargo:warning=Libpng not found, downloading...");
+            // Download libpng
+            Command::new("wget")
+                .arg("-c")
+                .arg(LIBPNG_URL)
+                .arg("-O")
+                .arg(&libpng_tar)
+                .status()
+                .unwrap();
+        }
+        Command::new("tar")
+            .current_dir(&out_dir_path)
+            .arg("-xvzf")
+            .arg(&libpng_tar)
+            .status()
+            .unwrap();
+        Command::new(format!("{}/configure", &libpng))
+            .current_dir(&libpng_path)
+            .arg("--disable-shared")
+            .status()
+            .unwrap();
+        Command::new("make")
+            .current_dir(&libpng_path)
+            .env("CC", "clang")
+            .env("CXX", "clang++")
+            .env("CFLAGS", "-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard")
+            .env("LDFLAGS", "-fPIE -fsanitize-coverage=trace-pc-guard")
+            .env("CXXFLAGS", "-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard")
+            .status()
+            .unwrap();
+    }
+
+    println!("cargo:rustc-link-search=native={}", &out_dir);
+    println!("cargo:rustc-link-search=native={}/.libs", &libpng);
+    println!("cargo:rustc-link-lib=static=png16");
+
+    //Deps for libpng: -pthread -lz -lm 
+    println!("cargo:rustc-link-lib=dylib=m");
+    println!("cargo:rustc-link-lib=dylib=z");
 
     println!("cargo:rerun-if-changed=build.rs");
 }

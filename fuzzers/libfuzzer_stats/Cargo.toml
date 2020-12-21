@@ -17,9 +17,15 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
+[build-dependencies]
+cc = "1.0"
+
 [dependencies]
 clap = "2.32.0"
 afl = { path = "../../afl/" }
 
-[lib]
-crate-type = ["staticlib", "cdylib"]
+[[bin]]
+name = "libfuzzer"
+path = "./src/mod.rs"
+test = false
+bench = false
