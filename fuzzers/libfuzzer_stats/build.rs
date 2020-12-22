@@ -8,6 +8,7 @@ const LIBPNG_URL: &str = "http://prdownloads.sourceforge.net/libpng/libpng-1.6.3
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
+    let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
 
@@ -21,7 +22,7 @@ fn main() {
 
     let libpng = format!("{}/libpng-1.6.37", &out_dir);
     let libpng_path = Path::new(&libpng);
-    let libpng_tar = format!("{}/libpng-1.6.37.tar.gz", &out_dir);
+    let libpng_tar = format!("{}/libpng-1.6.37.tar.gz", &cwd);
 
     if !libpng_path.is_dir() {
         if !Path::new(&libpng_tar).is_file() {
@@ -43,19 +44,46 @@ fn main() {
             .unwrap();
         Command::new(format!("{}/configure", &libpng))
             .current_dir(&libpng_path)
-            .arg("--disable-shared")
+            .args(&[
+                "--disable-shared",
+                "CC=clang",
+                "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+                "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
+            ])
+            .env("CC", "clang")
+            .env("CXX", "clang++")
+            .env(
+                "CFLAGS",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+            )
+            .env(
+                "CXXFLAGS",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+            )
+            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
             .status()
             .unwrap();
         Command::new("make")
             .current_dir(&libpng_path)
-            .arg(&format!("-j{}", num_cpus::get()))
+            //.arg(&format!("-j{}", num_cpus::get()))
             .args(&[
                 "CC=clang",
                 "CXX=clang++",
-                "CFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-                "LDFLAGS=-fPIE -fsanitize-coverage=trace-pc-guard",
+                "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+                "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
                 "CXXFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
             ])
+            .env("CC", "clang")
+            .env("CXX", "clang++")
+            .env(
+                "CFLAGS",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+            )
+            .env(
+                "CXXFLAGS",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+            )
+            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
             .status()
             .unwrap();
     }
