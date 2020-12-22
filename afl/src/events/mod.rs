@@ -150,8 +150,9 @@ where
 
     fn show(&mut self, event_msg: String) {
         let fmt = format!(
-            "[{}] corpus: {}, executions: {}, exec/sec: {}",
+            "[{}] clients: {}, corpus: {}, executions: {}, exec/sec: {}",
             event_msg,
+            self.client_stats().len(),
             self.corpus_size(),
             self.total_execs(),
             self.execs_per_sec()
