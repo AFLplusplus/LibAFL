@@ -19,7 +19,6 @@ fn main() {
         .file("./harness.c")
         .compile("libfuzzer-sys");
 
-
     let libpng = format!("{}/libpng-1.6.37", &out_dir);
     let libpng_path = Path::new(&libpng);
     let libpng_tar = format!("{}/libpng-1.6.37.tar.gz", &out_dir);
@@ -49,11 +48,14 @@ fn main() {
             .unwrap();
         Command::new("make")
             .current_dir(&libpng_path)
-            .env("CC", "clang")
-            .env("CXX", "clang++")
-            .env("CFLAGS", "-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard")
-            .env("LDFLAGS", "-fPIE -fsanitize-coverage=trace-pc-guard")
-            .env("CXXFLAGS", "-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard")
+            .arg(&format!("-j{}", num_cpus::get()))
+            .args(&[
+                "CC=clang",
+                "CXX=clang++",
+                "CFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+                "LDFLAGS=-fPIE -fsanitize-coverage=trace-pc-guard",
+                "CXXFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+            ])
             .status()
             .unwrap();
     }
@@ -62,7 +64,7 @@ fn main() {
     println!("cargo:rustc-link-search=native={}/.libs", &libpng);
     println!("cargo:rustc-link-lib=static=png16");
 
-    //Deps for libpng: -pthread -lz -lm 
+    //Deps for libpng: -pthread -lz -lm
     println!("cargo:rustc-link-lib=dylib=m");
     println!("cargo:rustc-link-lib=dylib=z");
 

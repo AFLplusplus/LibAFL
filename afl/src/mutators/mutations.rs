@@ -166,7 +166,8 @@ where
         let idx = rand.below(input.bytes().len() as u64) as usize;
         unsafe {
             // moar speed, no bound check
-            *input.bytes_mut().get_unchecked_mut(idx) += 1;
+            let ptr = input.bytes_mut().get_unchecked_mut(idx);
+            *ptr = (*ptr).wrapping_add(1);
         }
         Ok(MutationResult::Mutated)
     }
@@ -190,7 +191,8 @@ where
         let idx = rand.below(input.bytes().len() as u64) as usize;
         unsafe {
             // moar speed, no bound check
-            *input.bytes_mut().get_unchecked_mut(idx) -= 1;
+            let ptr = input.bytes_mut().get_unchecked_mut(idx);
+            *ptr = (*ptr).wrapping_sub(1);
         }
         Ok(MutationResult::Mutated)
     }
@@ -265,8 +267,8 @@ where
             let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut u8;
             let num = 1 + rand.below(ARITH_MAX) as u8;
             match rand.below(2) {
-                0 => *ptr += num,
-                _ => *ptr -= num,
+                0 => *ptr = (*ptr).wrapping_add(num),
+                _ => *ptr = (*ptr).wrapping_sub(num),
             };
         }
         Ok(MutationResult::Mutated)
@@ -294,10 +296,10 @@ where
             let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
             let num = 1 + rand.below(ARITH_MAX) as u16;
             match rand.below(4) {
-                0 => *ptr += num,
-                1 => *ptr -= num,
-                2 => *ptr = ((*ptr).swap_bytes() + num).swap_bytes(),
-                _ => *ptr = ((*ptr).swap_bytes() - num).swap_bytes(),
+                0 => *ptr = (*ptr).wrapping_add(num),
+                1 => *ptr = (*ptr).wrapping_sub(num),
+                2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
+                _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
             };
         }
         Ok(MutationResult::Mutated)
@@ -325,10 +327,10 @@ where
             let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
             let num = 1 + rand.below(ARITH_MAX) as u32;
             match rand.below(4) {
-                0 => *ptr += num,
-                1 => *ptr -= num,
-                2 => *ptr = ((*ptr).swap_bytes() + num).swap_bytes(),
-                _ => *ptr = ((*ptr).swap_bytes() - num).swap_bytes(),
+                0 => *ptr = (*ptr).wrapping_add(num),
+                1 => *ptr = (*ptr).wrapping_sub(num),
+                2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
+                _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
             };
         }
         Ok(MutationResult::Mutated)
