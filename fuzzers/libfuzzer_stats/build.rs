@@ -13,11 +13,11 @@ fn main() {
     let out_dir_path = Path::new(&out_dir);
 
     println!("cargo:rerun-if-changed=./r&untime/rt.c",);
-    println!("cargo:rerun-if-changed=harness.c");
+    println!("cargo:rerun-if-changed=harness.cc");
 
     cc::Build::new()
         .file("./runtime/rt.c")
-        .file("./harness.c")
+        .file("./harness.cc")
         .compile("libfuzzer-sys");
 
     let libpng = format!("{}/libpng-1.6.37", &out_dir);
@@ -95,6 +95,9 @@ fn main() {
     //Deps for libpng: -pthread -lz -lm
     println!("cargo:rustc-link-lib=dylib=m");
     println!("cargo:rustc-link-lib=dylib=z");
+
+    //For the C++ harness
+    println!("cargo:rustc-link-lib=static=stdc++");
 
     println!("cargo:rerun-if-changed=build.rs");
 }
