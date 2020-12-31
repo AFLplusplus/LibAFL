@@ -1,13 +1,15 @@
+/*!
+This shows how llmp can be used directly, without libafl abstractions
+*/
 extern crate alloc;
 
-use core::convert::TryInto;
-use core::time::Duration;
-use std::thread;
-use std::time;
+use core::{convert::TryInto, time::Duration};
+use std::{thread, time};
 
-use afl::events::llmp;
-use afl::events::shmem::AflShmem;
-use afl::AflError;
+use afl::{
+    events::{llmp, shmem::AflShmem},
+    AflError,
+};
 
 const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
 const TAG_MATH_RESULT_V1: u32 = 0x77474331;

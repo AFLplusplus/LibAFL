@@ -22,7 +22,7 @@ void __sanitizer_cov_trace_pc_guard(uint32_t *guard) {
 
 void __sanitizer_cov_trace_pc_guard_init(uint32_t *start, uint32_t *stop) {
 
-  if (start == stop || *start) return;
+  if (start == stop || *start) { return; }
 
   *(start++) = (++__lafl_max_edges_size) & (MAP_SIZE -1);
 
@@ -124,8 +124,7 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
 }
 
-
- static void afl_libfuzzer_copy_args(int argc, char** argv, char** envp) {
+static void afl_libfuzzer_copy_args(int argc, char** argv, char** envp) {
    orig_argc = argc;
    orig_argv = argv;
    orig_envp = envp;
@@ -138,9 +137,10 @@ void afl_libfuzzer_main();
 
 int afl_libfuzzer_init() {
 
-  if (LLVMFuzzerInitialize)
+  if (LLVMFuzzerInitialize) {
     return LLVMFuzzerInitialize(&orig_argc, &orig_argv);
-  else
+  } else {
    return 0;
+  }
 
 }
