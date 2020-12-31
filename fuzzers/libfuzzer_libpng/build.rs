@@ -16,7 +16,7 @@ fn main() {
     println!("cargo:rerun-if-changed=harness.cc");
 
     cc::Build::new()
-        .file("./runtime/rt.c")
+        .file("../libfuzzer_runtime/rt.c")
         .file("./harness.cc")
         .compile("libfuzzer-sys");
 

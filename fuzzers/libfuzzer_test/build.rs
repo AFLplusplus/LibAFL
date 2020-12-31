@@ -9,14 +9,14 @@ fn main() {
     let out_dir = out_dir.to_string_lossy().to_string();
     let _out_dir_path = Path::new(&out_dir);
 
-    println!("cargo:rerun-if-changed=./runtime/rt.c",);
+    println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
     println!("cargo:rerun-if-changed=./test/test.c");
 
     // We need clang for pc-guard support
     std::env::set_var("CC", "clang");
 
     cc::Build::new()
-        .file("./runtime/rt.c")
+        .file("../libfuzzer_runtime/rt.c")
         .compile("libfuzzer-sys-rt");
 
     cc::Build::new()
