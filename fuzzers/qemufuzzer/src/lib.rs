@@ -59,7 +59,7 @@ pub extern "C" fn fuzz_main_loop() {
     let mut generator = RandPrintablesGenerator::new(32);
 
     let stats = SimpleStats::new(|s| println!("{}", s));
-    let mut mgr = LlmpEventManager::new_on_port(1337, stats).unwrap();
+    let mut mgr = LlmpEventManager::new_on_port_std(1337, stats).unwrap();
     if mgr.is_broker() {
         println!("Doing broker things.");
         mgr.broker_loop().unwrap();
@@ -99,4 +99,9 @@ pub extern "C" fn fuzz_main_loop() {
         .expect("Fuzzer fatal error");
     #[cfg(feature = "std")]
     println!("OK");
+}
+
+#[no_mangle]
+extern "C" {
+    fn main();
 }
