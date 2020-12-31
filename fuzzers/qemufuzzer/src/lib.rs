@@ -100,8 +100,3 @@ pub extern "C" fn fuzz_main_loop() {
     #[cfg(feature = "std")]
     println!("OK");
 }
-
-#[no_mangle]
-extern "C" {
-    fn main();
-}
