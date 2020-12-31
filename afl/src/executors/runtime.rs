@@ -1,7 +1,9 @@
 //#![feature(asm)]
 
+const MAP_SIZE: usize = 65536;
+
 #[no_mangle]
-pub static mut __lafl_dummy_map: [u8; 65536] = [0; 65536];
+pub static mut __lafl_dummy_map: [u8; MAP_SIZE] = [0; MAP_SIZE];
 #[no_mangle]
 pub static mut __lafl_edges_map: *mut u8 = unsafe { __lafl_dummy_map.as_ptr() as *mut _ };
 #[no_mangle]
@@ -36,10 +38,10 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     __lafl_max_edges_size = __lafl_max_edges_size.wrapping_add(1);
     let fresh1 = start;
     start = start.offset(1);
-    *fresh1 = __lafl_max_edges_size & (65536 as libc::c_int - 1 as libc::c_int) as libc::c_uint;
+    *fresh1 = __lafl_max_edges_size & (MAP_SIZE - 1) as u32;
     while start < stop {
         __lafl_max_edges_size = __lafl_max_edges_size.wrapping_add(1);
-        *start = __lafl_max_edges_size & (65536 as libc::c_int - 1 as libc::c_int) as libc::c_uint;
+        *start = __lafl_max_edges_size & (MAP_SIZE - 1) as u32;
         start = start.offset(1)
     }
 }
