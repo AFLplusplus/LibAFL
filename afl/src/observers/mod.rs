@@ -313,22 +313,21 @@ where
     }
 }
 
-/*
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
 
-    use crate::observers::{Observer, StdMapObserver};
+    use crate::observers::StdMapObserver;
+    use crate::tuples::Named;
+
     static mut MAP: [u32; 4] = [0; 4];
 
     #[test]
     fn test_observer_serde() {
-        let o: Box<dyn Observer> =
-            Box::new(StdMapObserver::<u32>::new("test", unsafe { &mut MAP }));
-        let s = serde_json::to_string(&o).unwrap();
-        println!("{}", s);
-        let d: Box<dyn Observer> = serde_json::from_str(&s).unwrap();
-        assert_eq!(d.name(), o.name());
+        let obv = StdMapObserver::new("test", unsafe { &mut MAP });
+        let vec = postcard::to_allocvec(&obv).unwrap();
+        println!("{:?}", vec);
+        let obv2: StdMapObserver<u32> = postcard::from_bytes(&vec).unwrap();
+        assert_eq!(obv.name(), obv2.name());
     }
 }
-*/

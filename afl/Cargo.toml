@@ -13,6 +13,8 @@ fxhash = "0.2.1" # yet another hash
 xxhash-rust = { version = "0.8.0", features = ["const_xxh3", "xxh3"] } # xxh3 hashing for rust
 serde_json = "1.0.60"
 
+num_cpus = "1.0" # cpu count, for llmp example
+
 [[bench]]
 name = "rand_speeds"
 harness = false
@@ -29,6 +31,10 @@ debug = true
 [features]
 default = ["std"]
 std = []
+
+[[example]]
+name = "llmp_test"
+path = "./examples/llmp_test/main.rs"
 
 [dependencies]
 tuple_list = "0.1.2"

@@ -6,18 +6,20 @@ use std::thread;
 use std::time;
 
 use afl::events::llmp;
+use afl::events::shmem::AflShmem;
+use afl::AflError;
 
 const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
 const TAG_MATH_RESULT_V1: u32 = 0x77474331;
 
 fn adder_loop(port: u16) -> ! {
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(port).unwrap();
+    let mut client = llmp::LlmpClient::<AflShmem>::create_attach_to_tcp(port).unwrap();
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
         let mut msg_counter = 0;
         loop {
-            let (tag, buf) = match client.recv_buf().unwrap() {
+            let (_sender, tag, buf) = match client.recv_buf().unwrap() {
                 None => break,
                 Some(msg) => msg,
             };
@@ -47,29 +49,30 @@ fn adder_loop(port: u16) -> ! {
     }
 }
 
-unsafe fn broker_message_hook(
+fn broker_message_hook(
     client_id: u32,
-    message: *mut llmp::LlmpMsg,
-) -> llmp::LlmpMsgHookResult {
-    match (*message).tag {
+    tag: llmp::Tag,
+    message: &[u8],
+) -> Result<llmp::LlmpMsgHookResult, AflError> {
+    match tag {
         TAG_SIMPLE_U32_V1 => {
             println!(
                 "Client {:?} sent message: {:?}",
                 client_id,
-                u32::from_le_bytes((*message).as_slice_unsafe().try_into().unwrap())
+                u32::from_le_bytes(message.try_into().unwrap())
             );
-            llmp::LlmpMsgHookResult::ForwardToClients
+            Ok(llmp::LlmpMsgHookResult::ForwardToClients)
         }
         TAG_MATH_RESULT_V1 => {
             println!(
                 "Adder Client has this current result: {:?}",
-                u32::from_le_bytes((*message).as_slice_unsafe().try_into().unwrap())
+                u32::from_le_bytes(message.try_into().unwrap())
             );
-            llmp::LlmpMsgHookResult::Handled
+            Ok(llmp::LlmpMsgHookResult::Handled)
         }
         _ => {
             println!("Unknwon message id received!");
-            llmp::LlmpMsgHookResult::ForwardToClients
+            Ok(llmp::LlmpMsgHookResult::ForwardToClients)
         }
     }
 }
@@ -89,13 +92,16 @@ fn main() {
 
     match mode.as_str() {
         "broker" => {
-            let mut broker: llmp::LlmpBroker = llmp::LlmpBroker::new().unwrap();
-            broker.launch_tcp_listener(port).unwrap();
-            broker.add_message_hook(broker_message_hook);
-            broker.loop_forever(Some(Duration::from_millis(5)))
+            let mut broker = llmp::LlmpBroker::<AflShmem>::new().unwrap();
+            broker
+                .launch_tcp_listener(
+                    std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap(),
+                )
+                .unwrap();
+            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
         }
         "ctr" => {
-            let mut client = llmp::LlmpClient::create_attach_to_tcp(port).unwrap();
+            let mut client = llmp::LlmpClient::<AflShmem>::create_attach_to_tcp(port).unwrap();
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
