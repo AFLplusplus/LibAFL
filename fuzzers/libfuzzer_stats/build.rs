@@ -12,7 +12,7 @@ fn main() {
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
 
-    println!("cargo:rerun-if-changed=./r&untime/rt.c",);
+    println!("cargo:rerun-if-changed=./runtime/rt.c",);
     println!("cargo:rerun-if-changed=harness.cc");
 
     cc::Build::new()

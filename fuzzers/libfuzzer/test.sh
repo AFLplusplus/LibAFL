@@ -1,21 +1,17 @@
 #!/bin/sh
 
 cargo build --release || exit 1
-make -C runtime || exit 1
+cp ./target/release/libfuzzer ./.libfuzzer_test.elf
 
-rm -f test_fuzz.elf test_fuzz.o
-./compiler -flto=thin -c test/test.c -o test_fuzz.o || exit 1
-./compiler -flto=thin test_fuzz.o -o test_fuzz.elf || exit 1
-
-RUST_BACKTRACE=1 ./test_fuzz.elf &
+RUST_BACKTRACE=1 ./.libfuzzer_test.elf &
 
 test "$!" -gt 0 && {
 
   usleep 250
-  RUST_BACKTRACE=1 ./test_fuzz.elf -x a -x b -T5 in1 in2 &
+  RUST_BACKTRACE=1 ./.libfuzzer_test.elf -x a -x b -T5 in1 in2 &
 
 }
 
 sleep 10
-killall test_fuzz.elf
-
+killall .libfuzzer_test.elf
+rm -rf ./.libfuzzer_test.elf

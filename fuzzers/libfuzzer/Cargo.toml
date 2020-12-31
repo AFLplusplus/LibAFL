@@ -3,6 +3,7 @@ name = "libfuzzer"
 version = "0.1.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,9 +17,16 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
+[build-dependencies]
+cc = "1.0"
+num_cpus = "1.0"
+
 [dependencies]
 clap = "2.32.0"
 afl = { path = "../../afl/" }
 
-[lib]
-crate-type = ["staticlib", "cdylib"]
+[[bin]]
+name = "libfuzzer"
+path = "./src/mod.rs"
+test = false
+bench = false

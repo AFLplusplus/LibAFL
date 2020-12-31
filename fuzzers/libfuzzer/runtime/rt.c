@@ -144,10 +144,3 @@ int afl_libfuzzer_init() {
    return 0;
 
 }
-
-int main(int argc, char** argv) {
-
-  afl_libfuzzer_main();
-  return 0;
-
-}

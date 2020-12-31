@@ -47,8 +47,7 @@ fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
 
 const NAME_COV_MAP: &str = "cov_map";
 
-#[no_mangle]
-pub extern "C" fn afl_libfuzzer_main() {
+pub fn main() {
     let matches = App::new("libAFLrs fuzzer harness")
         .about("libAFLrs fuzzer harness help options.")
         .arg(
