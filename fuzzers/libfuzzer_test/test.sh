@@ -12,7 +12,7 @@ test "$!" -gt 0 && {
 
 }
 
-sleep 10
+sleep 15
 echo "[+] Done"
 killall .libfuzzer_test.elf
 rm -rf ./.libfuzzer_test.elf

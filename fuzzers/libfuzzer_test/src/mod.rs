@@ -30,9 +30,6 @@ extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
 
-    // afl_libfuzzer_init calls LLVMFUzzerInitialize()
-    fn afl_libfuzzer_init() -> i32;
-
     static __lafl_edges_map: *mut u8;
     static __lafl_cmp_map: *mut u8;
     static __lafl_max_edges_size: u32;
@@ -128,13 +125,6 @@ pub fn main() {
     let mut state = State::new(tuple_list!(edges_feedback));
 
     let mut engine = Engine::new(executor);
-
-    // Call LLVMFUzzerInitialize() if present.
-    unsafe {
-        if afl_libfuzzer_init() == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
-        }
-    }
 
     match input {
         Some(x) => state

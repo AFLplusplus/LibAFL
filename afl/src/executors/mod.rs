@@ -1,4 +1,6 @@
 pub mod inmemory;
+#[cfg(feature = "runtime")]
+pub mod runtime;
 
 use core::marker::PhantomData;
 

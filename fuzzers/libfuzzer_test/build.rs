@@ -15,13 +15,15 @@ fn main() {
     // We need clang for pc-guard support
     std::env::set_var("CC", "clang");
 
+    /*
     cc::Build::new()
         .file("../libfuzzer_runtime/rt.c")
         .compile("libfuzzer-sys-rt");
+        */
 
     cc::Build::new()
         .file("./test/test.c")
-        .flag("-fsanitize-coverage=trace-pc-guard,trace-cmp")
+        .flag("-fsanitize-coverage=trace-pc-guard")
         .compile("libfuzzer-sys-target");
 
     println!("cargo:rustc-link-search=native={}", &out_dir);

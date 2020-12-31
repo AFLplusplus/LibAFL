@@ -30,7 +30,8 @@ debug = true
 
 [features]
 default = ["std"]
-std = []
+std = [] # print, sharedmap, ... support
+runtime = [] # a runtime for clang inmem-executor
 
 [[example]]
 name = "llmp_test"
