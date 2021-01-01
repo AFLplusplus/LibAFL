@@ -36,6 +36,7 @@ runtime = [] # a runtime for clang inmem-executor
 [[example]]
 name = "llmp_test"
 path = "./examples/llmp_test/main.rs"
+required-features = ["std"]
 
 [dependencies]
 tuple_list = "0.1.2"
