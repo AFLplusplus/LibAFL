@@ -380,55 +380,6 @@ where
     }
 }
 
-/* TODO: Iterator corpus, like:
-
-enum MutationAction {
-    ReplaceInput(old_ref, new_val),
-    AppendNewInput(new_val),
-}
-
-struct NewCorpus {
-    testcases: Vec<NewTestCase>,
-    offset: usize;
-}
-
-impl NewCorpus {
-
-    pub fn handle_mutation(&mut self, action: MutationAction) {
-        match action {
-            MutationAction::ReplaceInput() => {},
-            MutationAction::AppendNewInput() => {},
-        }
-    }
-}
-
-impl Iterator for NewCorpus {
-    type Item = NewTestCase;
-
-    fn next(&mut self) -> Option<&Self::Item> {
-        // FIXME: implement next here
-        self.offset = 3;
-
-        // When no more stuff, return None
-        None
-    }
-}
-
-And then:
-
-    corpus.iter()
-        .mutate_foo()
-        .mutate_bar()
-        .set_observer(obs)
-        .execute_binary(|input| {
-            ...
-        })
-        .map(|observers, input, mutators| match result {
-            /// do things  depending on coverage, etc...
-            e.g. corpus.handle_mutation(MutationAction::AppendNewInput)
-        })
-*/
-
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {

@@ -92,62 +92,6 @@ const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 /// TAGs used thorughout llmp
 pub type Tag = u32;
 
-/// Sending end on a (unidirectional) sharedmap channel
-#[derive(Clone, Debug)]
-pub struct LlmpSender<SH>
-where
-    SH: ShMem,
-{
-    /// ID of this sender. Only used in the broker.
-    pub id: u32,
-    /// Ref to the last message this sender sent on the last page.
-    /// If null, a new page (just) started.
-    pub last_msg_sent: *mut LlmpMsg,
-    /// A vec of page wrappers, each containing an intialized AfShmem
-    pub out_maps: Vec<LlmpSharedMap<SH>>,
-    /// If true, pages will never be pruned.
-    /// The broker uses this feature.
-    /// By keeping the message history around,
-    /// new clients may join at any time in the future.
-    pub keep_pages_forever: bool,
-}
-
-/// Receiving end on a (unidirectional) sharedmap channel
-#[derive(Clone, Debug)]
-pub struct LlmpReceiver<SH>
-where
-    SH: ShMem,
-{
-    pub id: u32,
-    /// Pointer to the last meg this received
-    pub last_msg_recvd: *mut LlmpMsg,
-    /// current page. After EOP, this gets replaced with the new one
-    pub current_recv_map: LlmpSharedMap<SH>,
-}
-
-/// Client side of LLMP
-#[derive(Clone, Debug)]
-pub struct LlmpClient<SH>
-where
-    SH: ShMem,
-{
-    /// Outgoing channel to the broker
-    pub llmp_out: LlmpSender<SH>,
-    /// Incoming (broker) broadcast map
-    pub llmp_in: LlmpReceiver<SH>,
-}
-
-/// A page wrapper
-#[derive(Clone, Debug)]
-pub struct LlmpSharedMap<SH>
-where
-    SH: ShMem,
-{
-    /// Shmem containg the actual (unsafe) page,
-    /// shared between one LlmpSender and one LlmpReceiver
-    shmem: SH,
-}
-
 /// Message sent over the "wire"
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -387,11 +331,53 @@ unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
         .offset((*last_msg).buf_len_padded as isize) as *mut LlmpMsg;
 }
 
+/// Sending end on a (unidirectional) sharedmap channel
+#[derive(Clone, Debug)]
+pub struct LlmpSender<SH>
+where
+    SH: ShMem,
+{
+    /// ID of this sender. Only used in the broker.
+    pub id: u32,
+    /// Ref to the last message this sender sent on the last page.
+    /// If null, a new page (just) started.
+    pub last_msg_sent: *mut LlmpMsg,
+    /// A vec of page wrappers, each containing an intialized AfShmem
+    pub out_maps: Vec<LlmpSharedMap<SH>>,
+    /// If true, pages will never be pruned.
+    /// The broker uses this feature.
+    /// By keeping the message history around,
+    /// new clients may join at any time in the future.
+    pub keep_pages_forever: bool,
+}
+
 /// An actor on the sendin part of the shared map
 impl<SH> LlmpSender<SH>
 where
     SH: ShMem,
 {
+    /// Reattach to a vacant out_map.
+    /// It is essential, that the receiver (or someone else) keeps a pointer to this map
+    /// else reattach will get a new, empty page, from the OS, or fail.
+    pub fn on_existing_map(
+        current_out_map: SH,
+        last_msg_sent_offset: Option<u64>,
+    ) -> Result<Self, AflError> {
+        let mut out_map = LlmpSharedMap::new(0, current_out_map);
+        let last_msg_sent = match last_msg_sent_offset {
+            Some(offset) => out_map.msg_from_offset(offset)?,
+            None => 0 as *mut LlmpMsg,
+        };
+
+        Ok(Self {
+            id: 0,
+            last_msg_sent,
+            out_maps: vec![out_map],
+            // drop pages to the broker if it already read them
+            keep_pages_forever: false,
+        })
+    }
+
     /// For non zero-copy, we want to get rid of old pages with duplicate messages in the client
     /// eventually. This function This funtion sees if we can unallocate older pages.
     /// The broker would have informed us by setting the save_to_unmap-flag.
@@ -644,11 +630,44 @@ where
     }
 }
 
+/// Receiving end on a (unidirectional) sharedmap channel
+#[derive(Clone, Debug)]
+pub struct LlmpReceiver<SH>
+where
+    SH: ShMem,
+{
+    pub id: u32,
+    /// Pointer to the last meg this received
+    pub last_msg_recvd: *mut LlmpMsg,
+    /// current page. After EOP, this gets replaced with the new one
+    pub current_recv_map: LlmpSharedMap<SH>,
+}
+
 /// Receiving end of an llmp channel
 impl<SH> LlmpReceiver<SH>
 where
     SH: ShMem,
 {
+    /// Create a Receiver, reattaching to an existing sender map.
+    /// It is essential, that the sender (or someone else) keeps a pointer to the sender_map
+    /// else reattach will get a new, empty page, from the OS, or fail.
+    pub fn on_existing_map(
+        current_sender_map: SH,
+        last_msg_recvd_offset: Option<u64>,
+    ) -> Result<Self, AflError> {
+        let mut current_recv_map = LlmpSharedMap::new(0, current_sender_map);
+        let last_msg_recvd = match last_msg_recvd_offset {
+            Some(offset) => current_recv_map.msg_from_offset(offset)?,
+            None => 0 as *mut LlmpMsg,
+        };
+
+        Ok(Self {
+            id: 0,
+            current_recv_map,
+            last_msg_recvd,
+        })
+    }
+
     // Never inline, to not get some strange effects
     /// Read next message.
     #[inline(never)]
@@ -782,6 +801,17 @@ where
             ))
         }
     }
+}
+
+/// A page wrapper
+#[derive(Clone, Debug)]
+pub struct LlmpSharedMap<SH>
+where
+    SH: ShMem,
+{
+    /// Shmem containg the actual (unsafe) page,
+    /// shared between one LlmpSender and one LlmpReceiver
+    shmem: SH,
 }
 
 // TODO: May be obsolete
@@ -1149,6 +1179,18 @@ where
     }
 }
 
+/// Client side of LLMP
+#[derive(Clone, Debug)]
+pub struct LlmpClient<SH>
+where
+    SH: ShMem,
+{
+    /// Outgoing channel to the broker
+    pub llmp_out: LlmpSender<SH>,
+    /// Incoming (broker) broadcast map
+    pub llmp_in: LlmpReceiver<SH>,
+}
+
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
 /// and get incoming messages from the shared broker bus
 impl<SH> LlmpClient<SH>
@@ -1157,38 +1199,16 @@ where
 {
     /// Reattach to a vacant client map.
     /// It is essential, that the broker (or someone else) kept a pointer to the out_map
-    /// else reattach will get a new, empty page, from the OS
+    /// else reattach will get a new, empty page, from the OS, or fail
     pub fn on_existing_map(
         current_out_map: SH,
         last_msg_sent_offset: Option<u64>,
         current_broker_map: SH,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, AflError> {
-        let mut out_map = LlmpSharedMap::new(0, current_out_map);
-        let last_msg_sent = match last_msg_sent_offset {
-            Some(offset) => out_map.msg_from_offset(offset)?,
-            None => 0 as *mut LlmpMsg,
-        };
-
-        let mut current_recv_map = LlmpSharedMap::new(0, current_broker_map);
-        let last_msg_recvd = match last_msg_recvd_offset {
-            Some(offset) => current_recv_map.msg_from_offset(offset)?,
-            None => 0 as *mut LlmpMsg,
-        };
-
         Ok(Self {
-            llmp_out: LlmpSender {
-                id: 0,
-                last_msg_sent,
-                out_maps: vec![out_map],
-                // drop pages to the broker if it already read them
-                keep_pages_forever: false,
-            },
-            llmp_in: LlmpReceiver {
-                id: 0,
-                current_recv_map,
-                last_msg_recvd,
-            },
+            llmp_in: LlmpReceiver::on_existing_map(current_broker_map, last_msg_recvd_offset)?,
+            llmp_out: LlmpSender::on_existing_map(current_out_map, last_msg_sent_offset)?,
         })
     }
 

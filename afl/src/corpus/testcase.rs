@@ -1,6 +1,4 @@
-use alloc::rc::Rc;
 use alloc::string::String;
-use core::cell::RefCell;
 use core::convert::Into;
 use core::default::Default;
 use core::option::Option;
@@ -9,10 +7,6 @@ use serde::{Deserialize, Serialize};
 use crate::inputs::Input;
 use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
 use crate::AflError;
-
-// TODO PathBuf for no_std and change filename to PathBuf
-//#[cfg(feature = "std")]
-//use std::path::PathBuf;
 
 /// An entry in the Testcase Corpus
 #[derive(Default, Serialize, Deserialize)]
@@ -30,15 +24,6 @@ where
     // TODO find a way to use TypeId
     /// Map of metadatas associated with this testcase
     metadatas: SerdeAnyMap,
-}
-
-impl<I> Into<Rc<RefCell<Self>>> for Testcase<I>
-where
-    I: Input,
-{
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
-    }
 }
 
 /// Impl of a testcase
