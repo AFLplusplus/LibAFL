@@ -86,7 +86,7 @@ const LLMP_TAG_END_OF_PAGE: u32 = 0xAF1E0F1;
 const LLMP_TAG_NEW_SHM_CLIENT: u32 = 0xC11E471;
 
 /// An env var of this value indicates that the set value was a NULL PTR
-const NULL_ENV_STR: &str = "_NULL";
+const _NULL_ENV_STR: &str = "_NULL";
 
 /// Magic indicating that a got initialized correctly
 const PAGE_INITIALIZED_MAGIC: u64 = 0x1A1A1A1A1A1A1AF1;
@@ -142,7 +142,7 @@ const fn llmp_align(to_align: usize) -> usize {
 #[inline]
 fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, AflError> {
     let msg_offset_str = env::var(&format!("{}_OFFSET", env_name))?;
-    Ok(if msg_offset_str == NULL_ENV_STR {
+    Ok(if msg_offset_str == _NULL_ENV_STR {
         None
     } else {
         Some(msg_offset_str.parse()?)
@@ -985,7 +985,7 @@ where
     #[cfg(feature = "std")]
     pub fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), AflError> {
         if msg.is_null() {
-            env::set_var(&format!("{}_OFFSET", map_env_name), NULL_ENV_STR)
+            env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR)
         } else {
             env::set_var(
                 &format!("{}_OFFSET", map_env_name),
@@ -1344,6 +1344,7 @@ where
     }
 
     /// Recreate this client from a previous client.to_env
+    #[cfg(feature = "std")]
     pub fn on_existing_from_env(env_name: &str) -> Result<Self, AflError> {
         Ok(Self {
             sender: LlmpSender::on_existing_from_env(&format!("{}_SENDER", env_name))?,
@@ -1353,6 +1354,7 @@ where
 
     /// Write the current state to env.
     /// A new client can attach to exactly the same state by calling on_existing_map.
+    #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), AflError> {
         self.sender.to_env(&format!("{}_SENDER", env_name))?;
         self.receiver.to_env(&format!("{}_RECEIVER", env_name))
@@ -1483,9 +1485,9 @@ mod tests {
     #[cfg(feature = "std")]
     use std::{thread::sleep, time::Duration};
 
-    use super::LlmpClient;
     #[cfg(feature = "std")]
     use super::{
+        LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
         Tag,
