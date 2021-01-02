@@ -2,6 +2,7 @@
 // too.)
 
 use alloc::string::{String, ToString};
+use core::fmt::Debug;
 #[cfg(feature = "std")]
 use core::{mem::size_of, slice};
 #[cfg(feature = "std")]
@@ -58,7 +59,7 @@ struct shmid_ds {
 }
 
 /// A Shared map
-pub trait ShMem: Sized {
+pub trait ShMem: Sized + Debug {
     /// Creates a nes variable with the given name, strigified to 20 bytes.
     fn existing_from_shm_slice(map_str_bytes: &[u8; 20], map_size: usize)
         -> Result<Self, AflError>;
