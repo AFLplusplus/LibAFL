@@ -21,6 +21,7 @@ use afl::{
     stages::mutational::StdMutationalStage,
     tuples::tuple_list,
     utils::StdRand,
+    AflError,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -52,6 +53,111 @@ fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
     ExitKind::Ok
 }
 
+/// The actual fuzzer
+fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
+    let mut rand = StdRand::new(0);
+    let mut corpus = InMemoryCorpus::new();
+    let mut generator = RandPrintablesGenerator::new(32);
+    let stats = SimpleStats::new(|s| println!("{}", s));
+    let mut mgr;
+
+    // We start ourself as child process to actually fuzz
+    if std::env::var(ENV_FUZZER_PARENT_SENDER).is_err() {
+        // We are either the broker, or the parent of the fuzzing instance
+        mgr = LlmpEventManager::new_on_port_std(broker_port, stats.clone())?;
+        if mgr.is_broker() {
+            // Yep, broker. Just loop here.
+            println!("Doing broker things. Run this tool again to start fuzzing in a client.");
+            mgr.broker_loop()?;
+        } else {
+            // we are one of the fuzzing instances. Let's launch the fuzzer.
+
+            // First, store the mgr to an env so the client can use it
+            mgr.to_env(ENV_FUZZER_BROKER_CLIENT);
+
+            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
+            let sender = LlmpSender::new(0, false)?;
+            let mut receiver = LlmpReceiver::on_existing_map(
+                AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
+                None,
+            )?;
+            // Store the information to a map.
+            sender.to_env(ENV_FUZZER_PARENT_SENDER)?;
+
+            loop {
+                dbg!("Spawning next client");
+                Command::new(env::current_exe()?)
+                    .current_dir(env::current_dir()?)
+                    .args(env::args())
+                    .status()?;
+
+                match receiver.recv_buf()? {
+                    None => panic!("Fuzzer process exited without giving us its result."),
+                    Some((sender, tag, msg)) => {
+                        todo!("Restore this: {}, {}, {:?}", sender, tag, msg);
+                    }
+                }
+            }
+        }
+    }
+
+    println!("We're a client, let's fuzz :)");
+
+    // We are the fuzzing instance
+    mgr = LlmpEventManager::existing_client_from_env_std(ENV_FUZZER_BROKER_CLIENT, stats)?;
+    let channel_sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_PARENT_SENDER)?;
+
+    let edges_observer =
+        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
+            __lafl_max_edges_size as usize
+        });
+    let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
+
+    let executor = InMemoryExecutor::new("Libfuzzer", harness, tuple_list!(edges_observer));
+    let mut state = State::new(tuple_list!(edges_feedback));
+
+    let mut engine = Engine::new(executor);
+
+    // Call LLVMFUzzerInitialize() if present.
+    unsafe {
+        if afl_libfuzzer_init() == -1 {
+            println!("Warning: LLVMFuzzerInitialize failed with -1")
+        }
+    }
+
+    match input {
+        Some(x) => state
+            .load_initial_inputs(&mut corpus, &mut generator, &mut engine, &mut mgr, &x)
+            .expect(&format!("Failed to load initial corpus at {:?}", &x)),
+        None => (),
+    }
+
+    if corpus.count() < 1 {
+        println!("Generating random inputs");
+        state
+            .generate_initial_inputs(
+                &mut rand,
+                &mut corpus,
+                &mut generator,
+                &mut engine,
+                &mut mgr,
+                4,
+            )
+            .expect("Failed to generate initial inputs");
+    }
+
+    println!("We have {} inputs.", corpus.count());
+
+    let mut mutator = HavocBytesMutator::new_default();
+    mutator.set_max_size(4096);
+
+    let stage = StdMutationalStage::new(mutator);
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+
+    fuzzer.fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut mgr)
+}
+
+/// The main fn, parsing parameters, and starting the fuzzer
 pub fn main() {
     let matches = App::new("libAFLrs fuzzer harness")
         .about("libAFLrs fuzzer harness help options.")
@@ -110,109 +216,5 @@ pub fn main() {
 
     println!("Workdir: {:?}", workdir);
 
-    let mut rand = StdRand::new(0);
-    let mut corpus = InMemoryCorpus::new();
-    let mut generator = RandPrintablesGenerator::new(32);
-    let stats = SimpleStats::new(|s| println!("{}", s));
-    let mut mgr;
-
-    // We start ourself as child process to actually fuzz
-    if std::env::var(ENV_FUZZER_PARENT_SENDER).is_err() {
-        // We are either the broker, or the parent of the fuzzing instance
-        mgr = LlmpEventManager::new_on_port_std(broker_port, stats.clone()).unwrap();
-        if mgr.is_broker() {
-            // Yep, broker. Just loop here.
-            println!("Doing broker things. Run this tool again to start fuzzing in a client.");
-            mgr.broker_loop().unwrap();
-        } else {
-            // we are one of the fuzzing instances. Let's launch the fuzzer.
-
-            // First, store the mgr to an env so the client can use it
-            mgr.to_env(ENV_FUZZER_BROKER_CLIENT);
-
-            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-            let sender = LlmpSender::new(0, false).unwrap();
-            let mut receiver = LlmpReceiver::on_existing_map(
-                AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem).unwrap(),
-                None,
-            )
-            .unwrap();
-            // Store the information to a map.
-            sender.to_env(ENV_FUZZER_PARENT_SENDER).unwrap();
-
-            loop {
-                dbg!("Spawning next client");
-                Command::new(env::current_exe().unwrap())
-                    .current_dir(env::current_dir().unwrap())
-                    .args(env::args())
-                    .status()
-                    .unwrap();
-
-                match receiver.recv_buf().unwrap() {
-                    None => panic!("Fuzzer process exited without giving us its result."),
-                    Some((sender, tag, msg)) => {
-                        todo!("Restore this: {}, {}, {:?}", sender, tag, msg);
-                    }
-                }
-            }
-        }
-    }
-
-    println!("We're a client, let's fuzz :)");
-
-    // We are the fuzzing instance
-    mgr = LlmpEventManager::existing_client_from_env_std(ENV_FUZZER_BROKER_CLIENT, stats).unwrap();
-    let channel_sender =
-        LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_PARENT_SENDER).unwrap();
-
-    let edges_observer =
-        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
-            __lafl_max_edges_size as usize
-        });
-    let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
-
-    let executor = InMemoryExecutor::new("Libfuzzer", harness, tuple_list!(edges_observer));
-    let mut state = State::new(tuple_list!(edges_feedback));
-
-    let mut engine = Engine::new(executor);
-
-    // Call LLVMFUzzerInitialize() if present.
-    unsafe {
-        if afl_libfuzzer_init() == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
-        }
-    }
-
-    match input {
-        Some(x) => state
-            .load_initial_inputs(&mut corpus, &mut generator, &mut engine, &mut mgr, &x)
-            .expect(&format!("Failed to load initial corpus at {:?}", &x)),
-        None => (),
-    }
-
-    if corpus.count() < 1 {
-        println!("Generating random inputs");
-        state
-            .generate_initial_inputs(
-                &mut rand,
-                &mut corpus,
-                &mut generator,
-                &mut engine,
-                &mut mgr,
-                4,
-            )
-            .expect("Failed to generate initial inputs");
-    }
-
-    println!("We have {} inputs.", corpus.count());
-
-    let mut mutator = HavocBytesMutator::new_default();
-    mutator.set_max_size(4096);
-
-    let stage = StdMutationalStage::new(mutator);
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
-
-    fuzzer
-        .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut mgr)
-        .expect("Fuzzer fatal error");
+    fuzz(input, broker_port).expect("An error occurred while fuzzing");
 }
