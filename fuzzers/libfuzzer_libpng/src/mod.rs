@@ -1,31 +1,37 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
 #[macro_use]
 extern crate clap;
-extern crate alloc;
 
 use clap::{App, Arg};
-use std::env;
-use std::path::PathBuf;
+use std::{env, path::PathBuf, process::Command};
 
-use afl::corpus::Corpus;
-use afl::corpus::InMemoryCorpus;
-use afl::engines::Engine;
-use afl::engines::Fuzzer;
-use afl::engines::State;
-use afl::engines::StdFuzzer;
-use afl::events::{LlmpEventManager, SimpleStats};
-use afl::executors::inmemory::InMemoryExecutor;
-use afl::executors::{Executor, ExitKind};
-use afl::feedbacks::MaxMapFeedback;
-use afl::generators::RandPrintablesGenerator;
-use afl::mutators::scheduled::HavocBytesMutator;
-use afl::mutators::HasMaxSize;
-use afl::observers::StdMapObserver;
-use afl::stages::mutational::StdMutationalStage;
-use afl::tuples::tuple_list;
-use afl::utils::StdRand;
+use afl::{
+    corpus::{Corpus, InMemoryCorpus},
+    engines::{Engine, Fuzzer, State, StdFuzzer},
+    events::{
+        llmp::LlmpReceiver,
+        llmp::LlmpSender,
+        shmem::{AflShmem, ShMem},
+        LlmpEventManager, SimpleStats,
+    },
+    executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
+    feedbacks::MaxMapFeedback,
+    generators::RandPrintablesGenerator,
+    mutators::{scheduled::HavocBytesMutator, HasMaxSize},
+    observers::StdMapObserver,
+    stages::mutational::StdMutationalStage,
+    tuples::tuple_list,
+    utils::StdRand,
+};
 
+/// The llmp connection from the actual fuzzer to the process supervising it
+const ENV_FUZZER_PARENT_SENDER: &str = &"_AFL_ENV_FUZZER_PARENT_SENDER";
+/// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
+const ENV_FUZZER_BROKER_CLIENT: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
+
+/// The name of the coverage map observer, to find it again in the observer list
+const NAME_COV_MAP: &str = "cov_map";
+
+/// We will interact with a c++ target, so use external c functionality
 extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
@@ -38,14 +44,13 @@ extern "C" {
     static __lafl_max_edges_size: u32;
 }
 
+/// The wrapped harness function, calling out to the llvm-style libfuzzer harness
 fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
     unsafe {
         LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len());
     }
     ExitKind::Ok
 }
-
-const NAME_COV_MAP: &str = "cov_map";
 
 pub fn main() {
     let matches = App::new("libAFLrs fuzzer harness")
@@ -109,14 +114,56 @@ pub fn main() {
     let mut corpus = InMemoryCorpus::new();
     let mut generator = RandPrintablesGenerator::new(32);
     let stats = SimpleStats::new(|s| println!("{}", s));
-    let mut mgr = LlmpEventManager::new_on_port_std(broker_port, stats).unwrap();
+    let mut mgr;
 
-    if mgr.is_broker() {
-        println!("Doing broker things. Run this tool again to start fuzzing in a client.");
-        mgr.broker_loop().unwrap();
+    // We start ourself as child process to actually fuzz
+    if std::env::var(ENV_FUZZER_PARENT_SENDER).is_err() {
+        // We are either the broker, or the parent of the fuzzing instance
+        mgr = LlmpEventManager::new_on_port_std(broker_port, stats.clone()).unwrap();
+        if mgr.is_broker() {
+            // Yep, broker. Just loop here.
+            println!("Doing broker things. Run this tool again to start fuzzing in a client.");
+            mgr.broker_loop().unwrap();
+        } else {
+            // we are one of the fuzzing instances. Let's launch the fuzzer.
+
+            // First, store the mgr to an env so the client can use it
+            mgr.to_env(ENV_FUZZER_BROKER_CLIENT);
+
+            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
+            let sender = LlmpSender::new(0, false).unwrap();
+            let mut receiver = LlmpReceiver::on_existing_map(
+                AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem).unwrap(),
+                None,
+            )
+            .unwrap();
+            // Store the information to a map.
+            sender.to_env(ENV_FUZZER_PARENT_SENDER).unwrap();
+
+            loop {
+                dbg!("Spawning next client");
+                Command::new(env::current_exe().unwrap())
+                    .current_dir(env::current_dir().unwrap())
+                    .args(env::args())
+                    .status()
+                    .unwrap();
+
+                match receiver.recv_buf().unwrap() {
+                    None => panic!("Fuzzer process exited without giving us its result."),
+                    Some((sender, tag, msg)) => {
+                        todo!("Restore this: {}, {}, {:?}", sender, tag, msg);
+                    }
+                }
+            }
+        }
     }
 
     println!("We're a client, let's fuzz :)");
+
+    // We are the fuzzing instance
+    mgr = LlmpEventManager::existing_client_from_env_std(ENV_FUZZER_BROKER_CLIENT, stats).unwrap();
+    let channel_sender =
+        LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_PARENT_SENDER).unwrap();
 
     let edges_observer =
         StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
@@ -168,6 +215,4 @@ pub fn main() {
     fuzzer
         .fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut mgr)
         .expect("Fuzzer fatal error");
-    #[cfg(feature = "std")]
-    println!("OK");
 }

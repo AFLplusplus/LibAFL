@@ -400,6 +400,19 @@ impl<SH> LlmpSender<SH>
 where
     SH: ShMem,
 {
+    pub fn new(id: u32, keep_pages_forever: bool) -> Result<Self, AflError> {
+        Ok(Self {
+            id,
+            last_msg_sent: 0 as *mut LlmpMsg,
+            out_maps: vec![LlmpSharedMap::new(
+                0,
+                SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
+            )],
+            // drop pages to the broker if it already read them
+            keep_pages_forever,
+        })
+    }
+
     /// Reattach to a vacant out_map, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(env_name: &str) -> Result<Self, AflError> {
@@ -890,7 +903,7 @@ where
         }
     }
 
-    /// Returns the next message, tag, buf, looping until it becomes available
+    /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), AflError> {
         unsafe {
@@ -912,7 +925,7 @@ where
 {
     /// Shmem containg the actual (unsafe) page,
     /// shared between one LlmpSender and one LlmpReceiver
-    shmem: SH,
+    pub shmem: SH,
 }
 
 // TODO: May be obsolete

@@ -20,9 +20,16 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    harness: HarnessFunction<I>,
-    observers: OT,
+    /// The name of this executor instance, to address it from other components
     name: &'static str,
+    /// The harness function, being executed for each fuzzing loop execution
+    harness: HarnessFunction<I>,
+    /// The observers, observing each run
+    observers: OT,
+    /*
+    /// A special function being called right before the process crashes. It may save state to restore fuzzing after respawn.
+    on_crash_fn: Option<Box<dyn FnOnce(ExitKind)>>,
+    */
 }
 
 impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
@@ -75,11 +82,22 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(name: &'static str, harness_fn: HarnessFunction<I>, observers: OT) -> Self {
+    /// Create a new in mem executor.
+    /// * `name` - the name of this executor (to address it along the way)
+    /// * `harness_fn` - the harness, executiong the function
+    /// * `on_crash_fn` - When an in-mem harness crashes, it may safe some state to continue fuzzing later.
+    ///                   Do that that in this function. The program will crash afterwards.
+    /// * `observers` - the observers observing the target during execution
+    pub fn new(
+        name: &'static str,
+        harness_fn: HarnessFunction<I>,
+        observers: OT, /*on_crash_fn: Option<Box<dyn FnOnce(ExitKind)>*/
+    ) -> Self {
         Self {
             harness: harness_fn,
-            observers: observers,
-            name: name,
+            //on_crash_fn,
+            observers,
+            name,
         }
     }
 }

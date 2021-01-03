@@ -118,7 +118,7 @@ pub trait Stats {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SimpleStats<F>
 where
     F: FnMut(String),
@@ -743,6 +743,12 @@ where
             phantom: PhantomData,
         })
     }
+
+    /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
+    /// Std uses AflShmem.
+    pub fn existing_client_from_env_std(env_name: &str, stats: ST) -> Result<Self, AflError> {
+        Self::existing_client_from_env(env_name, stats)
+    }
 }
 
 impl<C, E, OT, FT, I, R, SH, ST> LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
@@ -768,12 +774,36 @@ where
         })
     }
 
+    /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
+    pub fn existing_client_from_env(env_name: &str, stats: ST) -> Result<Self, AflError> {
+        Ok(Self {
+            llmp: llmp::LlmpConnection::IsClient {
+                client: LlmpClient::on_existing_from_env(env_name)?,
+            },
+            // Inserting a nop-stats element here so rust won't complain.
+            // In any case, the client won't currently use it.
+            stats: stats,
+            phantom: PhantomData,
+        })
+    }
+
     /// A client on an existing map
     pub fn for_client(client: LlmpClient<SH>, stats: ST) -> Self {
         Self {
             llmp: llmp::LlmpConnection::IsClient { client },
             stats,
             phantom: PhantomData,
+        }
+    }
+
+    #[cfg(feature = "std")]
+    /// Write the config for a client eventmgr to env vars, a new client can reattach using existing_client_from_env
+    pub fn to_env(&self, env_name: &str) {
+        match &self.llmp {
+            llmp::LlmpConnection::IsBroker { broker: _ } => {
+                todo!("There is probably no use storing the broker to env. Client only for now")
+            }
+            llmp::LlmpConnection::IsClient { client } => client.to_env(env_name).unwrap(),
         }
     }
 

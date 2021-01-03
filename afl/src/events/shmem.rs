@@ -60,6 +60,14 @@ struct shmid_ds {
 
 /// A Shared map
 pub trait ShMem: Sized + Debug {
+    /// Creates a new map with the given size
+    fn new_map(map_size: usize) -> Result<Self, AflError>;
+
+    /// Creates a new reference to the same map
+    fn clone_ref(old_ref: &Self) -> Result<Self, AflError> {
+        Self::existing_from_shm_slice(old_ref.shm_slice(), old_ref.map().len())
+    }
+
     /// Creates a nes variable with the given name, strigified to 20 bytes.
     fn existing_from_shm_slice(map_str_bytes: &[u8; 20], map_size: usize)
         -> Result<Self, AflError>;
@@ -72,9 +80,6 @@ pub trait ShMem: Sized + Debug {
         }
         Self::existing_from_shm_slice(&slice, map_size)
     }
-
-    /// Creates a new map with the given size
-    fn new_map(map_size: usize) -> Result<Self, AflError>;
 
     /// The string to identify this shm
     fn shm_str(&self) -> String {
