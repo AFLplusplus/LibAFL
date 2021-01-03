@@ -413,6 +413,13 @@ where
         })
     }
 
+    /// Completely reset the current sender map.
+    /// Afterwards, no receiver should read from it at a different location.
+    /// This is only useful if all connected llmp parties start over, for example after a crash.
+    pub unsafe fn reset_last_page(&mut self) {
+        _llmp_page_init(&mut self.out_maps.last_mut().unwrap().shmem, self.id);
+    }
+
     /// Reattach to a vacant out_map, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(env_name: &str) -> Result<Self, AflError> {
