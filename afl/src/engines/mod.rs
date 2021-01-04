@@ -521,12 +521,22 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
-        let executor = InMemoryExecutor::<BytesInput, _>::new("main", harness, tuple_list!(), None);
         let mut state = State::new(tuple_list!());
 
-        let mut events_manager = LoggerEventManager::new(SimpleStats::new(|s| {
+        let mut event_manager = LoggerEventManager::new(SimpleStats::new(|s| {
             println!("{}", s);
         }));
+
+        let executor = InMemoryExecutor::new(
+            "main",
+            harness,
+            tuple_list!(),
+            Box::new(|_, _| ()),
+            &state,
+            &corpus,
+            &mut event_manager,
+        );
+
         let mut engine = Engine::new(executor);
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);
@@ -540,7 +550,7 @@ mod tests {
                     &mut state,
                     &mut corpus,
                     &mut engine,
-                    &mut events_manager,
+                    &mut event_manager,
                 )
                 .expect(&format!("Error in iter {}", i));
         }

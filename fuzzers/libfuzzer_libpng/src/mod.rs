@@ -14,7 +14,10 @@ use afl::{
         shmem::{AflShmem, ShMem},
         LlmpEventManager, SimpleStats,
     },
-    executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
+    executors::{
+        inmemory::{deserialize_state_corpus, InMemoryExecutor},
+        Executor, ExitKind,
+    },
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
     mutators::{scheduled::HavocBytesMutator, HasMaxSize},
@@ -127,7 +130,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
             (state, corpus)
         }
         // Restoring from a previous run, deserialize state and corpus.
-        Some((_sender, _tag, msg)) => postcard::from_bytes(msg)?,
+        Some((_sender, _tag, msg)) => deserialize_state_corpus(&msg)?,
     };
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
     unsafe { sender.reset_last_page() };
@@ -137,13 +140,12 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         "Libfuzzer",
         harness,
         tuple_list!(edges_observer),
-        Some(Box::new(|exit_kind| {
-            // TODO: How to access state, corpus? Unsafe is fine?
-            /*
-            let serialized = postcard::to_allocvec(&(state, corpus)).unwrap();
-            sender.send_buf(0x1, &serialized).unwrap();
-            */
-        })),
+        Box::new(move |exit_kind, state_corpus_serialized| {
+            sender.send_buf(0x1, &state_corpus_serialized).unwrap();
+        }),
+        &state,
+        &corpus,
+        &mut mgr,
     );
 
     let mut engine = Engine::new(executor);
