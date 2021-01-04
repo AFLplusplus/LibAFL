@@ -105,6 +105,11 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut receiver = LlmpReceiver::<AflShmem>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
     let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
 
+    let edges_observer =
+        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
+            __lafl_max_edges_size as usize
+        });
+
     // Call LLVMFUzzerInitialize() if present.
     unsafe {
         if afl_libfuzzer_init() == -1 {
@@ -113,28 +118,32 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     }
 
     // If we're restarting, deserialize the old corpus.
-    let mut corpus = match receiver.recv_buf()? {
+    let (mut state, mut corpus) = match receiver.recv_buf()? {
         None => {
-            // Initial execution, read or generate initial inputs
-            InMemoryCorpus::new()
+            // Initial execution, read or generate initial state, corpus, and feedbacks
+            let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
+            let state = State::new(tuple_list!(edges_feedback));
+            let corpus = InMemoryCorpus::new();
+            (state, corpus)
         }
+        // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => postcard::from_bytes(msg)?,
     };
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
     unsafe { sender.reset_last_page() };
 
-    // TODO: How to restore the observer state?
-    let edges_observer =
-        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
-            __lafl_max_edges_size as usize
-        });
-    let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
-
-    let executor = InMemoryExecutor::new("Libfuzzer", harness, tuple_list!(edges_observer));
-    let mut state = State::new(tuple_list!(edges_feedback));
+    // Create the engine
+    let executor = InMemoryExecutor::new("Libfuzzer", harness, tuple_list!(edges_observer), Some(Box::new(|exit_kind| {
+        // TODO: How to access state, corpus? Unsafe is fine?
+        /*
+        let serialized = postcard::to_allocvec(&(state, corpus)).unwrap();
+        sender.send_buf(0x1, &serialized).unwrap();
+        */
+    })));
 
     let mut engine = Engine::new(executor);
 
+    // in case the corpus is empty (on first run), reset
     if corpus.count() < 1 {
         match input {
             Some(x) => state
@@ -142,6 +151,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
                 .expect(&format!("Failed to load initial corpus at {:?}", &x)),
             None => (),
         }
+        println!("We imported {} inputs from disk.", corpus.count());
     }
     if corpus.count() < 1 {
         println!("Generating random inputs");
@@ -155,9 +165,8 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
                 4,
             )
             .expect("Failed to generate initial inputs");
+        println!("We generated {} inputs.", corpus.count());
     }
-
-    println!("We have {} inputs.", corpus.count());
 
     let mut mutator = HavocBytesMutator::new_default();
     mutator.set_max_size(4096);

@@ -1,8 +1,9 @@
 use serde::Deserialize;
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::any::{Any, TypeId};
+#[cfg(fature = "anymap_debug")]
+use serde_json;
 
 // yolo
 
@@ -16,8 +17,11 @@ pub fn unpack_type_id(id: TypeId) -> u64 {
     unsafe { *(&id as *const _ as *const u64) }
 }
 
+/// An any object
 pub trait SerdeAny: Any + erased_serde::Serialize {
+    /// returns this as Any trait
     fn as_any(&self) -> &dyn Any;
+    /// returns this as mutable Any trait
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
@@ -68,6 +72,7 @@ macro_rules! create_serde_registry_for_trait {
             use alloc::string::String;
             use core::any::{Any, TypeId};
             use core::fmt;
+            use postcard;
             use serde::{Deserialize, Serialize};
 
             use hashbrown::hash_map::{Keys, Values, ValuesMut};
@@ -157,6 +162,30 @@ macro_rules! create_serde_registry_for_trait {
             #[derive(Serialize, Deserialize)]
             pub struct SerdeAnyMap {
                 map: HashMap<u64, Box<dyn $trait_name>>,
+            }
+
+            // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
+            // We unwrap postcard, it should not have a reason to fail.
+            impl Clone for SerdeAnyMap {
+                fn clone(&self) -> Self {
+                    let serialized = postcard::to_allocvec(&self).unwrap();
+                    postcard::from_bytes(&serialized).unwrap()
+                }
+            }
+
+            #[cfg(fature = "anymapdbg")]
+            impl fmt::Debug for SerdeAnyMap {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    let json = serde_json::to_string(&self);
+                    write!(f, "SerdeAnyMap: [{}]", json)
+                }
+            }
+
+            #[cfg(not(fature = "anymapdbg"))]
+            impl fmt::Debug for SerdeAnyMap {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    write!(f, "SerdeAnymap with {} elements", self.len())
+                }
             }
 
             impl SerdeAnyMap {
@@ -463,6 +492,7 @@ macro_rules! create_serde_registry_for_trait {
 create_serde_registry_for_trait!(serdeany_serde, crate::serde_anymap::SerdeAny);
 pub use serdeany_serde::*;
 
+#[derive(Clone, Debug)]
 pub enum Ptr<'a, T: 'a + ?Sized> {
     Ref(&'a T),
     Owned(Box<T>),
@@ -629,6 +659,7 @@ impl<'a, T: Sized> SliceMut<'a, T> {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum Cptr<T: Sized> {
     Cptr(*const T),
     Owned(Box<T>),
@@ -741,6 +772,7 @@ impl<T: Sized> Array<T> {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum ArrayMut<T: Sized> {
     Cptr((*mut T, usize)),
     Owned(Vec<T>),

@@ -44,6 +44,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct StdScheduledMutator<C, I, R>
 where
     C: Corpus<I, R>,
@@ -142,6 +143,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 /// Schedule some selected byte level mutations given a ScheduledMutator type
 pub struct HavocBytesMutator<SM, C, I, R>
 where

@@ -41,6 +41,30 @@ where
     fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }
+
+    /*
+    /// Serialize this feedback's state only, to be restored later using deserialize_state
+    /// As opposed to completely serializing the observer, this is only needed when the fuzzer is to be restarted
+    /// If no state is needed to be kept, just return an empty vec.
+    /// Example:
+    /// >> The virgin_bits map in AFL needs to be in sync with the corpus
+    #[inline]
+    fn serialize_state(&mut self) -> Result<Vec<u8>, AflError> {
+        Ok(vec![])
+    }
+
+    /// Restore the state from a given vec, priviously stored using `serialize_state`
+    #[inline]
+    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), AflError> {
+        let _ = serialized_state;
+        Ok(())
+    }
+
+    // TODO: Restore_from
+    fn restore_from(&mut self, restore_from: Self) -> Result<(), AflError> {
+        Ok(())
+    }
+    */
 }
 
 pub trait FeedbacksTuple<I>: serde::Serialize + serde::de::DeserializeOwned
@@ -59,25 +83,38 @@ where
 
     /// Discards metadata - the end of this input's execution
     fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError>;
+
+    /*
+    /// Restores the state from each of the containing feedbacks in a list of the same shape.
+    /// Used (prette exclusively) to restore the feedback states after a crash.
+    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), AflError>;
+    */
 }
 
 impl<I> FeedbacksTuple<I> for ()
 where
     I: Input,
 {
-    fn is_interesting_all<OT: ObserversTuple>(
-        &mut self,
-        _input: &I,
-        _observers: &OT,
-    ) -> Result<u32, AflError> {
+    #[inline]
+    fn is_interesting_all<OT: ObserversTuple>(&mut self, _: &I, _: &OT) -> Result<u32, AflError> {
         Ok(0)
     }
+
+    #[inline]
     fn append_metadata_all(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
         Ok(())
     }
+
+    #[inline]
     fn discard_metadata_all(&mut self, _input: &I) -> Result<(), AflError> {
         Ok(())
     }
+
+    /*
+    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), AflError> {
+        Ok(())
+    }
+    */
 }
 
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
@@ -104,6 +141,13 @@ where
         self.0.discard_metadata(input)?;
         self.1.discard_metadata_all(input)
     }
+
+    /*
+    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), AflError> {
+        self.0.restore_from(restore_from.0)?;
+        self.1.restore_state_from_all(restore_from.1)?;
+    }
+    */
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
@@ -114,7 +158,7 @@ where
     fn reduce(first: T, second: T) -> T;
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MaxReducer<T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
@@ -136,7 +180,7 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MinReducer<T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
@@ -159,7 +203,7 @@ where
 }
 
 /// The most common AFL-like feedback type
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedback<T, R, O>
 where

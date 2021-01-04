@@ -1,15 +1,18 @@
-use core::ffi::c_void;
-use core::ptr;
+use alloc::boxed::Box;
+use core::{ffi::c_void, ptr};
 
-use crate::executors::{Executor, ExitKind, HasObservers};
-use crate::inputs::{HasTargetBytes, Input};
-use crate::observers::ObserversTuple;
-use crate::tuples::Named;
-use crate::AflError;
+use crate::{
+    executors::{Executor, ExitKind, HasObservers},
+    inputs::{HasTargetBytes, Input},
+    observers::ObserversTuple,
+    tuples::Named,
+    AflError,
+};
 
 /// The (unsafe) pointer to the current inmem input, for the current run.
 /// This is neede for certain non-rust side effects, as well as unix signal handling.
 static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
+static mut CURRENT_ON_CRASH_FN: *const Box<dyn FnOnce(ExitKind)> = ptr::null();
 
 /// The inmem executor harness
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
@@ -26,10 +29,8 @@ where
     harness: HarnessFunction<I>,
     /// The observers, observing each run
     observers: OT,
-    /*
     /// A special function being called right before the process crashes. It may save state to restore fuzzing after respawn.
-    on_crash_fn: Option<Box<dyn FnOnce(ExitKind)>>,
-    */
+    on_crash_fn: Box<dyn FnOnce(ExitKind)>,
 }
 
 impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
@@ -41,10 +42,12 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
         let bytes = input.target_bytes();
         unsafe {
+            CURRENT_ON_CRASH_FN = &self.on_crash_fn as *const _;
             CURRENT_INPUT_PTR = input as *const _ as *const c_void;
         }
         let ret = (self.harness)(self, bytes.as_slice());
         unsafe {
+            CURRENT_ON_CRASH_FN = ptr::null();
             CURRENT_INPUT_PTR = ptr::null();
         }
         Ok(ret)
@@ -91,11 +94,12 @@ where
     pub fn new(
         name: &'static str,
         harness_fn: HarnessFunction<I>,
-        observers: OT, /*on_crash_fn: Option<Box<dyn FnOnce(ExitKind)>*/
+        observers: OT,
+        on_crash_fn: Box<dyn FnOnce(ExitKind)>,
     ) -> Self {
         Self {
             harness: harness_fn,
-            //on_crash_fn,
+            on_crash_fn,
             observers,
             name,
         }
@@ -107,22 +111,32 @@ where
 pub mod unix_signals {
 
     extern crate libc;
-    use self::libc::{c_int, c_void, sigaction, siginfo_t};
-    // Unhandled signals: SIGALRM, SIGHUP, SIGINT, SIGKILL, SIGQUIT, SIGTERM
-    use self::libc::{
-        SA_NODEFER, SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGPIPE, SIGSEGV, SIGUSR2,
-    };
-    use std::io::{stdout, Write}; // Write brings flush() into scope
-    use std::{mem, process, ptr};
 
-    use crate::corpus::Corpus;
-    use crate::events::EventManager;
-    use crate::executors::inmemory::CURRENT_INPUT_PTR;
-    use crate::executors::Executor;
-    use crate::feedbacks::FeedbacksTuple;
-    use crate::inputs::Input;
-    use crate::observers::ObserversTuple;
-    use crate::utils::Rand;
+    // Unhandled signals: SIGALRM, SIGHUP, SIGINT, SIGKILL, SIGQUIT, SIGTERM
+    use libc::{
+        c_int, c_void, sigaction, siginfo_t, SA_NODEFER, SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE,
+        SIGILL, SIGPIPE, SIGSEGV, SIGUSR2,
+    };
+
+    use std::{
+        io::{stdout, Write}, // Write brings flush() into scope
+        mem,
+        process,
+        ptr,
+    };
+
+    use crate::{
+        corpus::Corpus,
+        events::EventManager,
+        executors::{
+            inmemory::{ExitKind, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN},
+            Executor,
+        },
+        feedbacks::FeedbacksTuple,
+        inputs::Input,
+        observers::ObserversTuple,
+        utils::Rand,
+    };
 
     static mut EVENT_MANAGER_PTR: *mut c_void = ptr::null_mut();
 
@@ -156,6 +170,10 @@ pub mod unix_signals {
 
         manager.crash(input).expect("Error in sending Crash event");
 
+        if !CURRENT_ON_CRASH_FN.is_null() {
+            (*CURRENT_ON_CRASH_FN)(ExitKind::Crash);
+        }
+
         std::process::exit(139);
     }
 
@@ -173,7 +191,7 @@ pub mod unix_signals {
         R: Rand,
     {
         dbg!("TIMEOUT/SIGUSR2 received");
-        if CURRENT_INPUT_PTR == ptr::null() {
+        if CURRENT_INPUT_PTR.is_null() {
             dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
         }
@@ -184,6 +202,10 @@ pub mod unix_signals {
         manager
             .timeout(input)
             .expect("Error in sending Timeout event");
+
+        if !CURRENT_ON_CRASH_FN.is_null() {
+            (*CURRENT_ON_CRASH_FN)(ExitKind::Timeout);
+        }
 
         // TODO: send LLMP.
         println!("Timeout in fuzz run.");
@@ -238,6 +260,8 @@ pub mod unix_signals {
 #[cfg(test)]
 mod tests {
 
+    use alloc::boxed::Box;
+
     use crate::executors::inmemory::InMemoryExecutor;
     use crate::executors::{Executor, ExitKind};
     use crate::inputs::{HasTargetBytes, Input, TargetBytes};
@@ -267,7 +291,8 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut in_mem_executor = InMemoryExecutor::new("main", test_harness_fn_nop, tuple_list!());
+        let mut in_mem_executor =
+            InMemoryExecutor::new("main", test_harness_fn_nop, tuple_list!(), Box::new(|_| ()));
         let mut input = NopInput {};
         assert!(in_mem_executor.run_target(&mut input).is_ok());
     }

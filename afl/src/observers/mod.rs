@@ -17,10 +17,29 @@ pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'st
         Ok(())
     }
 
+    /// Resets the observer
     fn reset(&mut self) -> Result<(), AflError>;
 
+    /// This function is executed after each fuzz run
     #[inline]
     fn post_exec(&mut self) -> Result<(), AflError> {
+        Ok(())
+    }
+
+    /// Serialize this observer's state only, to be restored later using deserialize_state
+    /// As opposed to completely serializing the observer, this is only needed when the fuzzer is to be restarted
+    /// If no state is needed to be kept, just return an empty vec.
+    /// Example:
+    /// >> The virgin_bits map in AFL needs to be in sync with the corpus
+    #[inline]
+    fn serialize_state(&mut self) -> Result<Vec<u8>, AflError> {
+        Ok(vec![])
+    }
+
+    /// Restore the state from a given vec, priviously stored using `serialize_state`
+    #[inline]
+    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), AflError> {
+        let _ = serialized_state;
         Ok(())
     }
 }
@@ -124,7 +143,7 @@ where
 /// The Map Observer retrieves the state of a map,
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct StdMapObserver<T>
 where
@@ -212,7 +231,7 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct VariableMapObserver<T>
 where

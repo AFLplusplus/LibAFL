@@ -23,6 +23,7 @@ where
     fn generate_dummy(&self) -> I;
 }
 
+#[derive(Clone, Debug)]
 /// Generates random bytes
 pub struct RandBytesGenerator<R>
 where
@@ -64,6 +65,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 /// Generates random printable characters
 pub struct RandPrintablesGenerator<R> {
     max_size: usize,

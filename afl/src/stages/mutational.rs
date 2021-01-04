@@ -84,6 +84,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 /// The default mutational stage
 pub struct StdMutationalStage<M, EM, E, OT, FT, ET, C, I, R>
 where

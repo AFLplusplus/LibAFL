@@ -31,7 +31,7 @@ pub trait StateMetadata: Debug {
 }
 
 /// The state a fuzz run.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "FT: serde::de::DeserializeOwned")]
 pub struct State<I, R, FT, OT>
 where
@@ -322,6 +322,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Engine<E, OT, ET, I>
 where
     E: Executor<I> + HasObservers<OT>,
@@ -432,6 +433,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
@@ -519,7 +521,7 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
-        let executor = InMemoryExecutor::<BytesInput, _>::new("main", harness, tuple_list!());
+        let executor = InMemoryExecutor::<BytesInput, _>::new("main", harness, tuple_list!(), None);
         let mut state = State::new(tuple_list!());
 
         let mut events_manager = LoggerEventManager::new(SimpleStats::new(|s| {

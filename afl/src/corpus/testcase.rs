@@ -9,7 +9,7 @@ use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
 use crate::AflError;
 
 /// An entry in the Testcase Corpus
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct Testcase<I>
 where

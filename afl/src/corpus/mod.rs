@@ -119,7 +119,7 @@ where
 }
 
 /// A corpus handling all important fuzzing in memory.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryCorpus<I, R>
 where
@@ -185,7 +185,7 @@ where
 
 /// A corpus able to store testcases to dis, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct OnDiskCorpus<I, R>
 where
@@ -273,7 +273,7 @@ where
 }
 
 /// A Queue-like corpus, wrapping an existing Corpus instance
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct QueueCorpus<C, I, R>
 where

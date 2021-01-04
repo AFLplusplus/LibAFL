@@ -280,7 +280,7 @@ where
     // TODO Custom event fire (dyn CustomEvent or similar)
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum LoggerEvent<I>
 where
     I: Input,
@@ -404,6 +404,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct LoggerEventManager<C, E, OT, FT, I, R, ST>
 where
     C: Corpus<I, R>,
@@ -532,7 +533,7 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum LLMPEventKind<'a, I>
 where
@@ -568,7 +569,7 @@ where
     },*/
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct LLMPEvent<'a, I>
 where
@@ -704,6 +705,7 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
+#[derive(Clone, Debug)]
 pub struct LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
 where
     C: Corpus<I, R>,
@@ -732,10 +734,10 @@ where
     R: Rand,
     ST: Stats,
 {
-    #[cfg(feature = "std")]
     /// Create llmp on a port
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
+    #[cfg(feature = "std")]
     pub fn new_on_port_std(port: u16, stats: ST) -> Result<Self, AflError> {
         Ok(Self {
             llmp: llmp::LlmpConnection::on_port(port)?,
@@ -746,6 +748,7 @@ where
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     /// Std uses AflShmem.
+    #[cfg(feature = "std")]
     pub fn existing_client_from_env_std(env_name: &str, stats: ST) -> Result<Self, AflError> {
         Self::existing_client_from_env(env_name, stats)
     }
@@ -762,10 +765,10 @@ where
     SH: ShMem,
     ST: Stats,
 {
-    #[cfg(feature = "std")]
     /// Create llmp on a port
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
+    #[cfg(feature = "std")]
     pub fn new_on_port(port: u16, stats: ST) -> Result<Self, AflError> {
         Ok(Self {
             llmp: llmp::LlmpConnection::on_port(port)?,
@@ -775,6 +778,7 @@ where
     }
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
+    #[cfg(features = "std")]
     pub fn existing_client_from_env(env_name: &str, stats: ST) -> Result<Self, AflError> {
         Ok(Self {
             llmp: llmp::LlmpConnection::IsClient {
@@ -796,8 +800,8 @@ where
         }
     }
 
-    #[cfg(feature = "std")]
     /// Write the config for a client eventmgr to env vars, a new client can reattach using existing_client_from_env
+    #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         match &self.llmp {
             llmp::LlmpConnection::IsBroker { broker: _ } => {
