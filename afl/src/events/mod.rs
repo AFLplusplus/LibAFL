@@ -778,7 +778,7 @@ where
     }
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
-    #[cfg(features = "std")]
+    #[cfg(feature = "std")]
     pub fn existing_client_from_env(env_name: &str, stats: ST) -> Result<Self, AflError> {
         Ok(Self {
             llmp: llmp::LlmpConnection::IsClient {

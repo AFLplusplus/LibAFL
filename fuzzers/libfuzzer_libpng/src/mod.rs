@@ -133,13 +133,18 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     unsafe { sender.reset_last_page() };
 
     // Create the engine
-    let executor = InMemoryExecutor::new("Libfuzzer", harness, tuple_list!(edges_observer), Some(Box::new(|exit_kind| {
-        // TODO: How to access state, corpus? Unsafe is fine?
-        /*
-        let serialized = postcard::to_allocvec(&(state, corpus)).unwrap();
-        sender.send_buf(0x1, &serialized).unwrap();
-        */
-    })));
+    let executor = InMemoryExecutor::new(
+        "Libfuzzer",
+        harness,
+        tuple_list!(edges_observer),
+        Some(Box::new(|exit_kind| {
+            // TODO: How to access state, corpus? Unsafe is fine?
+            /*
+            let serialized = postcard::to_allocvec(&(state, corpus)).unwrap();
+            sender.send_buf(0x1, &serialized).unwrap();
+            */
+        })),
+    );
 
     let mut engine = Engine::new(executor);
 

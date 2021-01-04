@@ -2,17 +2,24 @@ use alloc::boxed::Box;
 use core::{ffi::c_void, ptr};
 
 use crate::{
+    corpus::Corpus,
+    engines::State,
+    events::EventManager,
     executors::{Executor, ExitKind, HasObservers},
+    feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     tuples::Named,
+    utils::Rand,
     AflError,
 };
+
+use self::unix_signals::setup_crash_handlers;
 
 /// The (unsafe) pointer to the current inmem input, for the current run.
 /// This is neede for certain non-rust side effects, as well as unix signal handling.
 static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
-static mut CURRENT_ON_CRASH_FN: *const Box<dyn FnOnce(ExitKind)> = ptr::null();
+static mut CURRENT_ON_CRASH_FN: *const Box<dyn FnOnce(ExitKind, &[u8])> = ptr::null();
 
 /// The inmem executor harness
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
@@ -30,7 +37,7 @@ where
     /// The observers, observing each run
     observers: OT,
     /// A special function being called right before the process crashes. It may save state to restore fuzzing after respawn.
-    on_crash_fn: Box<dyn FnOnce(ExitKind)>,
+    on_crash_fn: Box<dyn FnOnce(ExitKind, &[u8])>,
 }
 
 impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
@@ -91,12 +98,29 @@ where
     /// * `on_crash_fn` - When an in-mem harness crashes, it may safe some state to continue fuzzing later.
     ///                   Do that that in this function. The program will crash afterwards.
     /// * `observers` - the observers observing the target during execution
-    pub fn new(
+    pub fn new<C, E, EM, FT, R>(
         name: &'static str,
         harness_fn: HarnessFunction<I>,
         observers: OT,
-        on_crash_fn: Box<dyn FnOnce(ExitKind)>,
-    ) -> Self {
+        on_crash_fn: Box<dyn FnOnce(ExitKind, &[u8])>,
+        state: &State<I, R, FT, OT>,
+        corpus: &C,
+        event_manager: &mut EM,
+    ) -> Self
+    where
+        C: Corpus<I, R>,
+        E: Executor<I>,
+        EM: EventManager<C, E, OT, FT, I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand,
+    {
+        unsafe {
+            CORPUS_PTR = corpus as *const _ as *const c_void;
+            STATE_PTR = state as *const _ as *const c_void;
+
+            setup_crash_handlers(event_manager);
+        }
+
         Self {
             harness: harness_fn,
             on_crash_fn,
@@ -104,6 +128,50 @@ where
             name,
         }
     }
+}
+
+static mut CORPUS_PTR: *const c_void = ptr::null_mut();
+static mut STATE_PTR: *const c_void = ptr::null_mut();
+
+/// Serialize the current state and corpus during an executiont to bytes.
+/// This method is needed when the fuzzer run crashes and has to restart.
+pub unsafe fn serialize_state_corpus<C, FT, I, OT, R>() -> Result<Vec<u8>, AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    OT: ObserversTuple,
+    R: Rand,
+{
+    if STATE_PTR.is_null() || CORPUS_PTR.is_null() {
+        return Err(AflError::IllegalState(
+            "State or corpus is not currently set and cannot be serialized in in-mem-executor"
+                .to_string(),
+        ));
+    }
+    let state: &State<I, R, FT, OT> = (STATE_PTR as *const State<I, R, FT, OT>).as_ref().unwrap();
+    let corpus = (CORPUS_PTR as *mut C).as_ref().unwrap();
+    let state_bytes = postcard::to_allocvec(&state)?;
+    let corpus_bytes = postcard::to_allocvec(&corpus)?;
+    Ok(postcard::to_allocvec(&(state_bytes, corpus_bytes))?)
+}
+
+/// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
+pub fn deserialize_state_corpus<C, FT, I, OT, R>(
+    state_corpus_serialized: &[u8],
+) -> Result<(State<I, R, FT, OT>, C), AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    OT: ObserversTuple,
+    R: Rand,
+{
+    let tuple: (Vec<u8>, Vec<u8>) = postcard::from_bytes(&state_corpus_serialized)?;
+    Ok((
+        postcard::from_bytes(&tuple.0)?,
+        postcard::from_bytes(&tuple.1)?,
+    ))
 }
 
 #[cfg(feature = "std")]
@@ -129,7 +197,7 @@ pub mod unix_signals {
         corpus::Corpus,
         events::EventManager,
         executors::{
-            inmemory::{ExitKind, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN},
+            inmemory::{serialize_state_corpus, ExitKind, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN},
             Executor,
         },
         feedbacks::FeedbacksTuple,
@@ -171,7 +239,10 @@ pub mod unix_signals {
         manager.crash(input).expect("Error in sending Crash event");
 
         if !CURRENT_ON_CRASH_FN.is_null() {
-            (*CURRENT_ON_CRASH_FN)(ExitKind::Crash);
+            (*CURRENT_ON_CRASH_FN)(
+                ExitKind::Crash,
+                &serialize_state_corpus::<C, FT, I, OT, R>().unwrap(),
+            );
         }
 
         std::process::exit(139);
@@ -204,7 +275,10 @@ pub mod unix_signals {
             .expect("Error in sending Timeout event");
 
         if !CURRENT_ON_CRASH_FN.is_null() {
-            (*CURRENT_ON_CRASH_FN)(ExitKind::Timeout);
+            (*CURRENT_ON_CRASH_FN)(
+                ExitKind::Timeout,
+                &serialize_state_corpus::<C, FT, I, OT, R>().unwrap(),
+            );
         }
 
         // TODO: send LLMP.
