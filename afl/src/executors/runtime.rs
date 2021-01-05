@@ -15,7 +15,7 @@ pub static mut __lafl_max_edges_size: u32 = 0;
 #[inline]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: &u32) {
     let ref mut trace_byte = *__lafl_edges_map.offset(*guard as isize);
-    /* TODO: translate to RUST inline ASM
+    /* TODO: translate to RUST inline ASM once it's stable (neverzero)
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     asm! volatile(                     \
       "addb $1, (%0, %1, 1)\n"      \
@@ -26,7 +26,12 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: &u32) {
 
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     */
-    *trace_byte = (*trace_byte).wrapping_add(1);
+
+    // Make sure we wrap to 0, not zero, it's empirically proven to be better for fuzzing.
+    let added = (*trace_byte as u16) + 1;
+    *trace_byte = (added as u8) + (added >> 8) as u8;
+
+    //*trace_byte = (*trace_byte).wrapping_add(1);
 }
 
 #[no_mangle]
