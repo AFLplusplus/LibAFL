@@ -222,24 +222,23 @@ where
         R: Rand;
 }
 
-pub trait EventManager<C, E, FT, I, R>
+pub trait EventManager<I>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    R: Rand,
 {
     /// Fire an Event
     //fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(
+    fn process<C, FT, R>(
         &mut self,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-    ) -> Result<usize, AflError>;
+    ) -> Result<usize, AflError> where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand;
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, AflError> where OT: ObserversTuple {
         Ok(postcard::to_allocvec(observers)?)
@@ -402,38 +401,30 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct LoggerEventManager<C, E, FT, I, R, ST>
+pub struct LoggerEventManager<I, ST>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    R: Rand,
-    ST: Stats,
     //CE: CustomEvent<I, OT>,
 {
     stats: ST,
     events: Vec<LoggerEvent<I>>,
-    // stats (maybe we need a separated struct?)
-    phantom: PhantomData<(C, E, I, R, FT)>,
 }
 
-impl<C, E, FT, I, R, ST> EventManager<C, E, FT, I, R>
-    for LoggerEventManager<C, E, FT, I, R, ST>
+impl<I, ST> EventManager<I>
+    for LoggerEventManager<I, ST>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    R: Rand,
     ST: Stats,
     //CE: CustomEvent<I, OT>,
 {
-    fn process(
+    fn process<C, FT, R>(
         &mut self,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-    ) -> Result<usize, AflError> {
+    ) -> Result<usize, AflError> where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand {
         let count = self.events.len();
         self.events
             .drain(..)
@@ -508,20 +499,15 @@ where
     }
 }
 
-impl<C, E, FT, I, R, ST> LoggerEventManager<C, E, FT, I, R, ST>
+impl<I, ST> LoggerEventManager<I, ST>
 where
-    C: Corpus<I, R>,
     I: Input,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
-    R: Rand,
     ST: Stats,
     //TODO CE: CustomEvent,
 {
     pub fn new(stats: ST) -> Self {
         Self {
             stats: stats,
-            phantom: PhantomData,
             events: vec![],
         }
     }
@@ -699,30 +685,22 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 #[derive(Clone, Debug)]
-pub struct LlmpEventManager<C, E, FT, I, R, SH, ST>
+pub struct LlmpEventManager<I, SH, ST>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    R: Rand,
     SH: ShMem,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
     llmp: llmp::LlmpConnection<SH>,
     stats: ST,
-    phantom: PhantomData<(C, E, FT, I, R)>,
+    phantom: PhantomData<I>,
 }
 
 #[cfg(feature = "std")]
-impl<C, E, FT, I, R, ST> LlmpEventManager<C, E, FT, I, R, AflShmem, ST>
+impl<I, ST> LlmpEventManager<I, AflShmem, ST>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    R: Rand,
     ST: Stats,
 {
     /// Create llmp on a port
@@ -745,13 +723,9 @@ where
     }
 }
 
-impl<C, E, FT, I, R, SH, ST> LlmpEventManager<C, E, FT, I, R, SH, ST>
+impl<I, ST, SH> LlmpEventManager<I, SH, ST>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    R: Rand,
     SH: ShMem,
     ST: Stats,
 {
@@ -849,23 +823,22 @@ where
     }
 }
 
-impl<C, E, FT, I, R, SH, ST> EventManager<C, E, FT, I, R>
-    for LlmpEventManager<C, E, FT, I, R, SH, ST>
+impl<I, ST, SH> EventManager<I>
+    for LlmpEventManager<I, SH, ST>
 where
-    C: Corpus<I, R>,
-    E: Executor<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    R: Rand,
     SH: ShMem,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
-    fn process(
+    fn process<C, FT, R>(
         &mut self,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-    ) -> Result<usize, AflError> {
+    ) -> Result<usize, AflError> where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand {
         // TODO: Get around local event copy by moving handle_in_client
         Ok(match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {

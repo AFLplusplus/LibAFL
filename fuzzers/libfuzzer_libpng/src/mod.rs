@@ -12,7 +12,7 @@ use afl::{
         llmp::LlmpReceiver,
         llmp::LlmpSender,
         shmem::{AflShmem, ShMem},
-        LlmpEventManager, SimpleStats,
+        EventManager, LlmpEventManager, SimpleStats,
     },
     executors::{
         inmemory::{serialize_state_corpus, deserialize_state_corpus, InMemoryExecutor},
@@ -142,12 +142,14 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         tuple_list!(edges_observer),
         Box::new(move |exit_kind, input, state, corpus, mgr| {
             match exit_kind {
-                ExitKind::Timeout => mgr.timeout(input).expect("Error sending Timeout event for input {:?}", input),
-                ExitKind::Crash  => mgr.crash(input).expect("Error sending crash event for input {:?}", input),
+                ExitKind::Timeout => mgr.timeout(input).expect(&format!("Error sending Timeout event for input {:?}", input)),
+                ExitKind::Crash  => mgr.crash(input).expect(&format!("Error sending crash event for input {:?}", input)),
             }
             let state_corpus_serialized = serialize_state_corpus(state, corpus).unwrap();
             sender.send_buf(0x1, &state_corpus_serialized).unwrap();
         }),
+        &state,
+        &corpus,
         &mgr,
     );
 

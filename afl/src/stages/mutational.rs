@@ -21,7 +21,7 @@ pub trait MutationalStage<M, EM, E, OT, FT, ET, C, I, R>:
     Stage<EM, E, OT, FT, ET, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -89,7 +89,7 @@ where
 pub struct StdMutationalStage<M, EM, E, OT, FT, ET, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -106,7 +106,7 @@ impl<M, EM, E, OT, FT, ET, C, I, R> MutationalStage<M, EM, E, OT, FT, ET, C, I, 
     for StdMutationalStage<M, EM, E, OT, FT, ET, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -132,7 +132,7 @@ impl<M, EM, E, OT, FT, ET, C, I, R> Stage<EM, E, OT, FT, ET, C, I, R>
     for StdMutationalStage<M, EM, E, OT, FT, ET, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -158,7 +158,7 @@ where
 impl<M, EM, E, OT, FT, ET, C, I, R> StdMutationalStage<M, EM, E, OT, FT, ET, C, I, R>
 where
     M: Mutator<C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,

@@ -71,7 +71,7 @@ where
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         ET: ExecutorsTuple<BytesInput>,
-        EM: EventManager<C, E, FT, BytesInput, R>,
+        EM: EventManager<BytesInput>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -114,7 +114,7 @@ where
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         ET: ExecutorsTuple<BytesInput>,
-        EM: EventManager<C, E, FT, BytesInput, R>,
+        EM: EventManager<BytesInput>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(corpus, generator, engine, manager, in_dir)?;
@@ -294,7 +294,7 @@ where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
         ET: ExecutorsTuple<I>,
-        EM: EventManager<C, E, FT, I, R>,
+        EM: EventManager<I>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -384,7 +384,7 @@ where
 pub trait Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -438,7 +438,7 @@ where
 pub struct StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -455,7 +455,7 @@ impl<ST, EM, E, OT, FT, ET, C, I, R> Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
     for StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -476,7 +476,7 @@ where
 impl<ST, EM, E, OT, FT, ET, C, I, R> StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,

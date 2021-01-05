@@ -16,7 +16,7 @@ use crate::AflError;
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<EM, E, OT, FT, ET, C, I, R>
 where
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -39,7 +39,7 @@ where
 
 pub trait StagesTuple<EM, E, OT, FT, ET, C, I, R>
 where
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -63,7 +63,7 @@ where
 
 impl<EM, E, OT, FT, ET, C, I, R> StagesTuple<EM, E, OT, FT, ET, C, I, R> for ()
 where
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -92,7 +92,7 @@ impl<Head, Tail, EM, E, OT, FT, ET, C, I, R> StagesTuple<EM, E, OT, FT, ET, C, I
 where
     Head: Stage<EM, E, OT, FT, ET, C, I, R>,
     Tail: StagesTuple<EM, E, OT, FT, ET, C, I, R> + TupleList,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,

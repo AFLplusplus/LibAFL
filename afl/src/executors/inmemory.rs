@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, string::ToString, vec::Vec};
-use core::{marker::PhantomData, ffi::c_void, ptr};
+use core::{ffi::c_void, ptr};
 
 use crate::{
     corpus::Corpus,
@@ -31,13 +31,12 @@ type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
 type OnCrashFunction<I, C, EM, FT, R> = dyn FnMut(ExitKind, &I, &State<I, R, FT>, &C, &mut EM);
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InMemoryExecutor<I, OT, C, E, EM, FT, R>
+pub struct InMemoryExecutor<I, OT, C, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
     C: Corpus<I, R>,
-    E: Executor<I>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     R: Rand,
 {
@@ -49,17 +48,14 @@ where
     observers: OT,
     /// A special function being called right before the process crashes. It may save state to restore fuzzing after respawn.
     on_crash_fn: Box<OnCrashFunction<I, C, EM, FT, R>>,
-    
-    phantom: PhantomData<E>
 }
 
-impl<I, OT, C, E, EM, FT, R> Executor<I> for InMemoryExecutor<I, OT, C, E, EM, FT, R>
+impl<I, OT, C, EM, FT, R> Executor<I> for InMemoryExecutor<I, OT, C, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
     C: Corpus<I, R>,
-    E: Executor<I>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     R: Rand,
 {
@@ -79,13 +75,12 @@ where
     }
 }
 
-impl<I, OT, C, E, EM, FT, R> Named for InMemoryExecutor<I, OT, C, E, EM, FT, R>
+impl<I, OT, C, EM, FT, R> Named for InMemoryExecutor<I, OT, C, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
     C: Corpus<I, R>,
-    E: Executor<I>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     R: Rand,
 {
@@ -94,13 +89,12 @@ where
     }
 }
 
-impl<I, OT, C, E, EM, FT, R> HasObservers<OT> for InMemoryExecutor<I, OT, C, E, EM, FT, R>
+impl<I, OT, C, EM, FT, R> HasObservers<OT> for InMemoryExecutor<I, OT, C, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
     C: Corpus<I, R>,
-    E: Executor<I>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     R: Rand,
 {
@@ -115,13 +109,12 @@ where
     }
 }
 
-impl<I, OT, C, E, EM, FT, R> InMemoryExecutor<I, OT, C, E, EM, FT, R>
+impl<I, OT, C, EM, FT, R> InMemoryExecutor<I, OT, C, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
     C: Corpus<I, R>,
-    E: Executor<I>,
-    EM: EventManager<C, E, FT, I, R>,
+    EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     R: Rand,
 {
@@ -138,6 +131,8 @@ where
         harness_fn: HarnessFunction<I>,
         observers: OT,
         on_crash_fn: Box<OnCrashFunction<I, C, EM, FT, R>>,
+        _state: &State<I, R, FT>,
+        _corpus: &C,
         _event_mgr: &EM,
     ) -> Self
     {
@@ -154,7 +149,6 @@ where
             on_crash_fn,
             observers,
             name,
-            phantom: PhantomData
         }
     }
 }
@@ -228,9 +222,8 @@ pub mod unix_signals {
         info: siginfo_t,
         _void: c_void,
     ) where
-        EM: EventManager<C, E, FT, I, R>,
+        EM: EventManager<I>,
         C: Corpus<I, R>,
-        E: Executor<I>,
         OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         I: Input,
@@ -271,9 +264,8 @@ pub mod unix_signals {
         _info: siginfo_t,
         _void: c_void,
     ) where
-        EM: EventManager<C, E, FT, I, R>,
+        EM: EventManager<I>,
         C: Corpus<I, R>,
-        E: Executor<I>,
         OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         I: Input,
@@ -309,9 +301,8 @@ pub mod unix_signals {
     // TODO clearly state that manager should be static (maybe put the 'static lifetime?)
     pub unsafe fn setup_crash_handlers<EM, C, E, OT, FT, I, R>(state: &State<I, R, FT>, corpus: &C, manager: &mut EM)
     where
-        EM: EventManager<C, E, FT, I, R>,
+        EM: EventManager<I>,
         C: Corpus<I, R>,
-        E: Executor<I>,
         OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         I: Input,
