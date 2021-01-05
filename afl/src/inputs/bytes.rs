@@ -1,8 +1,5 @@
-use alloc::borrow::ToOwned;
-use alloc::rc::Rc;
-use alloc::vec::Vec;
-use core::cell::RefCell;
-use core::convert::From;
+use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
+use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input, TargetBytes};

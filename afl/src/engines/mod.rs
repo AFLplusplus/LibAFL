@@ -9,21 +9,23 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::corpus::{Corpus, Testcase};
-use crate::events::EventManager;
-use crate::executors::{Executor, ExecutorsTuple, HasObservers};
-use crate::feedbacks::FeedbacksTuple;
-use crate::generators::Generator;
+use crate::{
+    corpus::{Corpus, Testcase},
+    events::EventManager,
+    executors::{Executor, ExecutorsTuple, HasObservers},
+    feedbacks::FeedbacksTuple,
+    generators::Generator,
+    inputs::Input,
+    observers::ObserversTuple,
+    serde_anymap::{SerdeAny, SerdeAnyMap},
+    stages::StagesTuple,
+    tuples::{tuple_list, tuple_list_type},
+    utils::{current_milliseconds, Rand},
+    AflError,
+};
+
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
-use crate::inputs::Input;
-use crate::observers::ObserversTuple;
-use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
-use crate::stages::StagesTuple;
-use crate::tuples::{tuple_list, tuple_list_type};
-use crate::utils::{current_milliseconds, Rand};
-
-use crate::AflError;
 
 pub trait StateMetadata: Debug {
     /// The name of this metadata - used to find it in the list of avaliable metadatas

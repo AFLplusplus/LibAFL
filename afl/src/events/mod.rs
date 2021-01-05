@@ -1,25 +1,30 @@
 pub mod llmp;
 pub mod shmem;
 
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use core::time::Duration;
-use core::{marker::PhantomData, time};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{
+    time::Duration,
+    {marker::PhantomData, time},
+};
 use serde::{Deserialize, Serialize};
 
 use self::{
     llmp::{LlmpClient, Tag},
     shmem::ShMem,
 };
-use crate::corpus::Corpus;
-use crate::executors::Executor;
-use crate::feedbacks::FeedbacksTuple;
-use crate::inputs::Input;
-use crate::observers::ObserversTuple;
-use crate::serde_anymap::Ptr;
-use crate::utils::Rand;
-use crate::AflError;
-use crate::{engines::State, utils};
+use crate::{
+    corpus::Corpus,
+    feedbacks::FeedbacksTuple,
+    inputs::Input,
+    observers::ObserversTuple,
+    serde_anymap::Ptr,
+    utils::Rand,
+    AflError,
+    {engines::State, utils},
+};
 #[cfg(feature = "std")]
 use shmem::AflShmem;
 
@@ -235,16 +240,23 @@ where
         &mut self,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-    ) -> Result<usize, AflError> where
+    ) -> Result<usize, AflError>
+    where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
         R: Rand;
 
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, AflError> where OT: ObserversTuple {
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, AflError>
+    where
+        OT: ObserversTuple,
+    {
         Ok(postcard::to_allocvec(observers)?)
     }
 
-    fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, AflError> where OT: ObserversTuple {
+    fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, AflError>
+    where
+        OT: ObserversTuple,
+    {
         Ok(postcard::from_bytes(observers_buf)?)
     }
 
@@ -254,7 +266,10 @@ where
         _observers: &OT,
         _corpus_size: usize,
         _config: String,
-    ) -> Result<(), AflError> where OT: ObserversTuple {
+    ) -> Result<(), AflError>
+    where
+        OT: ObserversTuple,
+    {
         Ok(())
     }
 
@@ -410,8 +425,7 @@ where
     events: Vec<LoggerEvent<I>>,
 }
 
-impl<I, ST> EventManager<I>
-    for LoggerEventManager<I, ST>
+impl<I, ST> EventManager<I> for LoggerEventManager<I, ST>
 where
     I: Input,
     ST: Stats,
@@ -421,10 +435,12 @@ where
         &mut self,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-    ) -> Result<usize, AflError> where
+    ) -> Result<usize, AflError>
+    where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
-        R: Rand {
+        R: Rand,
+    {
         let count = self.events.len();
         self.events
             .drain(..)
@@ -438,7 +454,10 @@ where
         _observers: &OT,
         corpus_size: usize,
         _config: String,
-    ) -> Result<(), AflError> where OT: ObserversTuple {
+    ) -> Result<(), AflError>
+    where
+        OT: ObserversTuple,
+    {
         let event = LoggerEvent::NewTestcase {
             corpus_size: corpus_size,
             phantom: PhantomData,
@@ -823,8 +842,7 @@ where
     }
 }
 
-impl<I, ST, SH> EventManager<I>
-    for LlmpEventManager<I, SH, ST>
+impl<I, ST, SH> EventManager<I> for LlmpEventManager<I, SH, ST>
 where
     I: Input,
     SH: ShMem,
@@ -835,10 +853,12 @@ where
         &mut self,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-    ) -> Result<usize, AflError> where
+    ) -> Result<usize, AflError>
+    where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
-        R: Rand {
+        R: Rand,
+    {
         // TODO: Get around local event copy by moving handle_in_client
         Ok(match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {
@@ -875,7 +895,10 @@ where
         observers: &OT,
         corpus_size: usize,
         config: String,
-    ) -> Result<(), AflError> where OT: ObserversTuple {
+    ) -> Result<(), AflError>
+    where
+        OT: ObserversTuple,
+    {
         let kind = LLMPEventKind::NewTestcase {
             input: Ptr::Ref(input),
             observers_buf: postcard::to_allocvec(observers)?,

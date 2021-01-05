@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, string::ToString, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use core::{ffi::c_void, ptr};
 
 use crate::{
@@ -134,8 +134,7 @@ where
         _state: &State<I, R, FT>,
         _corpus: &C,
         _event_mgr: &EM,
-    ) -> Self
-    {
+    ) -> Self {
         /*#[cfg(feature = "std")]
         unsafe {
             CORPUS_PTR = _corpus as *const _ as *const c_void;
@@ -155,7 +154,10 @@ where
 
 /// Serialize the current state and corpus during an executiont to bytes.
 /// This method is needed when the fuzzer run crashes and has to restart.
-pub fn serialize_state_corpus<C, FT, I, R>(state: &State<I, R, FT>, corpus: &C) -> Result<Vec<u8>, AflError>
+pub fn serialize_state_corpus<C, FT, I, R>(
+    state: &State<I, R, FT>,
+    corpus: &C,
+) -> Result<Vec<u8>, AflError>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,
@@ -205,12 +207,12 @@ pub mod unix_signals {
 
     use crate::{
         corpus::Corpus,
-        events::EventManager,
-        executors::{
-            inmemory::{OnCrashFunction, ExitKind, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN, CORPUS_PTR, STATE_PTR, EVENT_MANAGER_PTR},
-            Executor,
-        },
         engines::State,
+        events::EventManager,
+        executors::inmemory::{
+            ExitKind, OnCrashFunction, CORPUS_PTR, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN,
+            EVENT_MANAGER_PTR, STATE_PTR,
+        },
         feedbacks::FeedbacksTuple,
         inputs::Input,
         observers::ObserversTuple,
@@ -243,7 +245,9 @@ pub mod unix_signals {
 
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         let corpus = (CORPUS_PTR as *const C).as_ref().unwrap();
-        let state = (EVENT_MANAGER_PTR as *const State<I, R, FT>).as_ref().unwrap();
+        let state = (EVENT_MANAGER_PTR as *const State<I, R, FT>)
+            .as_ref()
+            .unwrap();
         let manager = (EVENT_MANAGER_PTR as *mut EM).as_mut().unwrap();
 
         if !CURRENT_ON_CRASH_FN.is_null() {
@@ -279,7 +283,9 @@ pub mod unix_signals {
 
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         let corpus = (CORPUS_PTR as *const C).as_ref().unwrap();
-        let state = (EVENT_MANAGER_PTR as *const State<I, R, FT>).as_ref().unwrap();
+        let state = (EVENT_MANAGER_PTR as *const State<I, R, FT>)
+            .as_ref()
+            .unwrap();
         let manager = (EVENT_MANAGER_PTR as *mut EM).as_mut().unwrap();
 
         if !CURRENT_ON_CRASH_FN.is_null() {
@@ -288,7 +294,7 @@ pub mod unix_signals {
                 input,
                 state,
                 corpus,
-                manager
+                manager,
             );
         }
 
@@ -299,8 +305,11 @@ pub mod unix_signals {
     }
 
     // TODO clearly state that manager should be static (maybe put the 'static lifetime?)
-    pub unsafe fn setup_crash_handlers<EM, C, E, OT, FT, I, R>(state: &State<I, R, FT>, corpus: &C, manager: &mut EM)
-    where
+    pub unsafe fn setup_crash_handlers<EM, C, E, OT, FT, I, R>(
+        state: &State<I, R, FT>,
+        corpus: &C,
+        manager: &mut EM,
+    ) where
         EM: EventManager<I>,
         C: Corpus<I, R>,
         OT: ObserversTuple,
@@ -311,7 +320,7 @@ pub mod unix_signals {
         CORPUS_PTR = corpus as *const _ as *const c_void;
         STATE_PTR = state as *const _ as *const c_void;
         EVENT_MANAGER_PTR = manager as *mut _ as *mut c_void;
-    
+
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;

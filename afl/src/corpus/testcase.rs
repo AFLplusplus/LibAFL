@@ -1,12 +1,12 @@
 use alloc::string::String;
-use core::convert::Into;
-use core::default::Default;
-use core::option::Option;
+use core::{convert::Into, default::Default, option::Option};
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::Input;
-use crate::serde_anymap::{SerdeAny, SerdeAnyMap};
-use crate::AflError;
+use crate::{
+    inputs::Input,
+    serde_anymap::{SerdeAny, SerdeAnyMap},
+    AflError,
+};
 
 /// An entry in the Testcase Corpus
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]

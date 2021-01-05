@@ -1,11 +1,12 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::inputs::{HasBytesVec, Input};
-use crate::mutators::Corpus;
-use crate::mutators::*;
-use crate::utils::Rand;
-use crate::AflError;
+use crate::{
+    inputs::{HasBytesVec, Input},
+    mutators::{Corpus, *},
+    utils::Rand,
+    AflError,
+};
 
 pub trait ScheduledMutator<C, I, R>: Mutator<C, I, R> + ComposedByMutations<C, I, R>
 where

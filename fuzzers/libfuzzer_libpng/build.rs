@@ -4,7 +4,8 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-const LIBPNG_URL: &str = "https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz";
+const LIBPNG_URL: &str =
+    "https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz";
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -18,7 +19,7 @@ fn main() {
     let libpng = format!("{}/libpng-1.6.37", &out_dir);
     let libpng_path = Path::new(&libpng);
     let libpng_tar = format!("{}/libpng-1.6.37.tar.xz", &cwd);
-    
+
     if !libpng_path.is_dir() {
         if !Path::new(&libpng_tar).is_file() {
             println!("cargo:warning=Libpng not found, downloading...");
@@ -82,7 +83,7 @@ fn main() {
             .status()
             .unwrap();
     }
-    
+
     cc::Build::new()
         .include(&libpng_path)
         .file("../libfuzzer_runtime/rt.c")

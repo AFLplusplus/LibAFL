@@ -2,7 +2,6 @@
 extern crate clap;
 
 use clap::{App, Arg};
-use postcard;
 use std::{env, path::PathBuf, process::Command};
 
 use afl::{
@@ -15,17 +14,17 @@ use afl::{
         EventManager, LlmpEventManager, SimpleStats,
     },
     executors::{
-        inmemory::{serialize_state_corpus, deserialize_state_corpus, InMemoryExecutor},
+        inmemory::{deserialize_state_corpus, serialize_state_corpus, InMemoryExecutor},
         Executor, ExitKind,
     },
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
+    inputs::BytesInput,
     mutators::{scheduled::HavocBytesMutator, HasMaxSize},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     tuples::tuple_list,
     utils::StdRand,
-    inputs::BytesInput,
     AflError,
 };
 
@@ -104,7 +103,10 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
 
     // We are the fuzzing instance, first, connect to all channels.
     // Mgr to send and receive msgs from/to all other fuzzer instances
-    mgr = LlmpEventManager::<BytesInput, _, _>::existing_client_from_env_std(ENV_FUZZER_BROKER_CLIENT, stats)?;
+    mgr = LlmpEventManager::<BytesInput, _, _>::existing_client_from_env_std(
+        ENV_FUZZER_BROKER_CLIENT,
+        stats,
+    )?;
     // A sender and a receiver for single communication
     let mut receiver = LlmpReceiver::<AflShmem>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
     let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
@@ -143,9 +145,14 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         tuple_list!(edges_observer),
         Box::new(move |exit_kind, input, state, corpus, mgr| {
             match exit_kind {
-                ExitKind::Timeout => mgr.timeout(input).expect(&format!("Error sending Timeout event for input {:?}", input)),
-                ExitKind::Crash  => mgr.crash(input).expect(&format!("Error sending crash event for input {:?}", input)),
-                _ => ()
+                ExitKind::Timeout => mgr.timeout(input).expect(&format!(
+                    "Error sending Timeout event for input {:?}",
+                    input
+                )),
+                ExitKind::Crash => mgr
+                    .crash(input)
+                    .expect(&format!("Error sending crash event for input {:?}", input)),
+                _ => (),
             }
             let state_corpus_serialized = serialize_state_corpus(state, corpus).unwrap();
             sender.send_buf(0x1, &state_corpus_serialized).unwrap();
@@ -250,6 +257,6 @@ pub fn main() {
 
     println!("Workdir: {:?}", workdir);
 
-    fuzz(Some(vec![PathBuf::from("./corpus/")]), broker_port).expect("An error occurred while fuzzing");
+    fuzz(Some(vec![PathBuf::from("./in1")]), broker_port).expect("An error occurred while fuzzing");
     //fuzz(input, broker_port).expect("An error occurred while fuzzing");
 }

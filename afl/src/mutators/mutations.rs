@@ -1,8 +1,10 @@
-use crate::inputs::{HasBytesVec, Input};
-use crate::mutators::Corpus;
-use crate::mutators::*;
-use crate::utils::Rand;
-use crate::AflError;
+use crate::{
+    inputs::{HasBytesVec, Input},
+    mutators::Corpus,
+    mutators::*,
+    utils::Rand,
+    AflError,
+};
 
 /// The result of a mutation.
 /// If the mutation got skipped, the target

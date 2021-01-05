@@ -1,6 +1,4 @@
-pub use tuple_list::tuple_list;
-pub use tuple_list::tuple_list_type;
-pub use tuple_list::TupleList;
+pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 use core::any::TypeId;
 

@@ -1,16 +1,18 @@
 use core::marker::PhantomData;
 
-use crate::engines::State;
-use crate::events::EventManager;
-use crate::executors::{Executor, ExecutorsTuple, HasObservers};
-use crate::feedbacks::FeedbacksTuple;
-use crate::inputs::Input;
-use crate::mutators::Mutator;
-use crate::observers::ObserversTuple;
-use crate::stages::Corpus;
-use crate::stages::{Engine, Stage};
-use crate::utils::Rand;
-use crate::AflError;
+use crate::{
+    engines::State,
+    events::EventManager,
+    executors::{Executor, ExecutorsTuple, HasObservers},
+    feedbacks::FeedbacksTuple,
+    inputs::Input,
+    mutators::Mutator,
+    observers::ObserversTuple,
+    stages::Corpus,
+    stages::{Engine, Stage},
+    utils::Rand,
+    AflError,
+};
 
 // TODO multi mutators stage
 

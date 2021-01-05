@@ -1,19 +1,14 @@
 pub mod testcase;
 pub use testcase::Testcase;
 
-use alloc::borrow::ToOwned;
-use alloc::vec::Vec;
-use core::cell::RefCell;
-use core::marker::PhantomData;
-use core::ptr;
+use alloc::{borrow::ToOwned, vec::Vec};
+use core::{cell::RefCell, marker::PhantomData, ptr};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-use crate::inputs::Input;
-use crate::utils::Rand;
-use crate::AflError;
+use crate::{inputs::Input, utils::Rand, AflError};
 
 /// A way to obtain the containing testcase entries
 pub trait HasTestcaseVec<I>

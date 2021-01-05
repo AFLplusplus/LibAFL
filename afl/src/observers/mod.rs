@@ -1,12 +1,16 @@
 extern crate num;
 
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::{Deserialize, Serialize};
 
-use crate::serde_anymap::{ArrayMut, Cptr};
-use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
-use crate::AflError;
+use crate::{
+    serde_anymap::{ArrayMut, Cptr},
+    tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    AflError,
+};
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.

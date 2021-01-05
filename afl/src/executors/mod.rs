@@ -4,10 +4,12 @@ pub mod runtime;
 
 use core::marker::PhantomData;
 
-use crate::inputs::{HasTargetBytes, Input};
-use crate::observers::ObserversTuple;
-use crate::tuples::{MatchNameAndType, MatchType, Named, TupleList};
-use crate::AflError;
+use crate::{
+    inputs::{HasTargetBytes, Input},
+    observers::ObserversTuple,
+    tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    AflError,
+};
 
 /// How an execution finished.
 pub enum ExitKind {

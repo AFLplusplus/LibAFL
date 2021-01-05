@@ -1,16 +1,18 @@
 pub mod mutational;
 pub use mutational::StdMutationalStage;
 
-use crate::corpus::Corpus;
-use crate::engines::{Engine, State};
-use crate::events::EventManager;
-use crate::executors::{Executor, ExecutorsTuple, HasObservers};
-use crate::feedbacks::FeedbacksTuple;
-use crate::inputs::Input;
-use crate::observers::ObserversTuple;
-use crate::tuples::TupleList;
-use crate::utils::Rand;
-use crate::AflError;
+use crate::{
+    corpus::Corpus,
+    engines::{Engine, State},
+    events::EventManager,
+    executors::{Executor, ExecutorsTuple, HasObservers},
+    feedbacks::FeedbacksTuple,
+    inputs::Input,
+    observers::ObserversTuple,
+    tuples::TupleList,
+    utils::Rand,
+    AflError,
+};
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.

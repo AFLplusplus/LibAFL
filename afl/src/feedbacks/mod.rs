@@ -1,14 +1,18 @@
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::marker::PhantomData;
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
-use crate::corpus::Testcase;
-use crate::inputs::Input;
-use crate::observers::{MapObserver, Observer, ObserversTuple};
-use crate::tuples::{Named, TupleList};
-use crate::AflError;
+use crate::{
+    corpus::Testcase,
+    inputs::Input,
+    observers::{MapObserver, Observer, ObserversTuple},
+    tuples::{Named, TupleList},
+    AflError,
+};
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
 pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;

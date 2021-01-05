@@ -1,9 +1,12 @@
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-use core::any::{Any, TypeId};
-use core::slice::{Iter, IterMut};
-use hashbrown::hash_map::{Keys, Values, ValuesMut};
-use hashbrown::HashMap;
+use alloc::{boxed::Box, vec::Vec};
+use core::{
+    any::{Any, TypeId},
+    slice::{Iter, IterMut},
+};
+use hashbrown::{
+    hash_map::{Keys, Values, ValuesMut},
+    HashMap,
+};
 
 /// A map, storing any trait object by TypeId
 #[derive(Default)]

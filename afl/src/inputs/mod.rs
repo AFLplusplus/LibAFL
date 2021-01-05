@@ -2,15 +2,14 @@ pub mod bytes;
 pub use bytes::BytesInput;
 
 use alloc::vec::Vec;
-use core::clone::Clone;
-use core::fmt::Debug;
+use core::{clone::Clone, fmt::Debug};
 
 #[cfg(feature = "std")]
-use std::fs::File;
-#[cfg(feature = "std")]
-use std::io::{Read, Write};
-#[cfg(feature = "std")]
-use std::path::Path;
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
 use crate::AflError;
 
