@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, string::ToString, vec::Vec};
-use core::{ffi::c_void, ptr};
+use core::{marker::PhantomData, ffi::c_void, ptr};
 
 use crate::{
     corpus::Corpus,
@@ -20,16 +20,26 @@ use self::unix_signals::setup_crash_handlers;
 /// The (unsafe) pointer to the current inmem input, for the current run.
 /// This is neede for certain non-rust side effects, as well as unix signal handling.
 static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
-static mut CURRENT_ON_CRASH_FN: *mut Box<dyn FnMut(ExitKind, &[u8])> = ptr::null_mut();
+static mut CURRENT_ON_CRASH_FN: *mut c_void = ptr::null_mut();
+
+static mut CORPUS_PTR: *const c_void = ptr::null_mut();
+static mut STATE_PTR: *const c_void = ptr::null_mut();
+static mut EVENT_MANAGER_PTR: *mut c_void = ptr::null_mut();
 
 /// The inmem executor harness
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
+type OnCrashFunction<I, C, EM, FT, R> = fn(ExitKind, &State<I, R, FT>, &C, &mut EM);
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InMemoryExecutor<I, OT>
+pub struct InMemoryExecutor<I, OT, C, E, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    EM: EventManager<C, E, FT, I, R>,
+    FT: FeedbacksTuple<I>,
+    R: Rand,
 {
     /// The name of this executor instance, to address it from other components
     name: &'static str,
@@ -38,19 +48,26 @@ where
     /// The observers, observing each run
     observers: OT,
     /// A special function being called right before the process crashes. It may save state to restore fuzzing after respawn.
-    on_crash_fn: Box<dyn FnMut(ExitKind, &[u8])>,
+    on_crash_fn: OnCrashFunction<I, C, EM, FT, R>,
+    
+    phantom: PhantomData<E>
 }
 
-impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
+impl<I, OT, C, E, EM, FT, R> Executor<I> for InMemoryExecutor<I, OT, C, E, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    EM: EventManager<C, E, FT, I, R>,
+    FT: FeedbacksTuple<I>,
+    R: Rand,
 {
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
         let bytes = input.target_bytes();
         unsafe {
-            CURRENT_ON_CRASH_FN = &mut self.on_crash_fn as *mut _;
+            CURRENT_ON_CRASH_FN = &mut self.on_crash_fn as *mut _ as *mut c_void;
             CURRENT_INPUT_PTR = input as *const _ as *const c_void;
         }
         let ret = (self.harness)(self, bytes.as_slice());
@@ -62,20 +79,30 @@ where
     }
 }
 
-impl<I, OT> Named for InMemoryExecutor<I, OT>
+impl<I, OT, C, E, EM, FT, R> Named for InMemoryExecutor<I, OT, C, E, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    EM: EventManager<C, E, FT, I, R>,
+    FT: FeedbacksTuple<I>,
+    R: Rand,
 {
     fn name(&self) -> &str {
         self.name
     }
 }
 
-impl<I, OT> HasObservers<OT> for InMemoryExecutor<I, OT>
+impl<I, OT, C, E, EM, FT, R> HasObservers<OT> for InMemoryExecutor<I, OT, C, E, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    EM: EventManager<C, E, FT, I, R>,
+    FT: FeedbacksTuple<I>,
+    R: Rand,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -88,10 +115,15 @@ where
     }
 }
 
-impl<I, OT> InMemoryExecutor<I, OT>
+impl<I, OT, C, E, EM, FT, R> InMemoryExecutor<I, OT, C, E, EM, FT, R>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    C: Corpus<I, R>,
+    E: Executor<I>,
+    EM: EventManager<C, E, FT, I, R>,
+    FT: FeedbacksTuple<I>,
+    R: Rand,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -101,41 +133,30 @@ where
     /// * `on_crash_fn` - When an in-mem harness crashes, it may safe some state to continue fuzzing later.
     ///                   Do that that in this function. The program will crash afterwards.
     /// * `observers` - the observers observing the target during execution
-    pub fn new<C, E, EM, FT, R>(
+    pub fn new(
         name: &'static str,
         harness_fn: HarnessFunction<I>,
         observers: OT,
-        on_crash_fn: Box<dyn FnMut(ExitKind, &[u8])>,
-        _state: &State<I, R, FT, OT>,
-        _corpus: &C,
-        _event_manager: &mut EM,
+        on_crash_fn: OnCrashFunction<I, C, EM, FT, R>,
     ) -> Self
-    where
-        C: Corpus<I, R>,
-        E: Executor<I>,
-        EM: EventManager<C, E, OT, FT, I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
     {
-        #[cfg(feature = "std")]
+        /*#[cfg(feature = "std")]
         unsafe {
             CORPUS_PTR = _corpus as *const _ as *const c_void;
             STATE_PTR = _state as *const _ as *const c_void;
 
             setup_crash_handlers(_event_manager);
-        }
+        }*/
 
         Self {
             harness: harness_fn,
             on_crash_fn,
             observers,
             name,
+            phantom: PhantomData
         }
     }
 }
-
-static mut CORPUS_PTR: *const c_void = ptr::null_mut();
-static mut STATE_PTR: *const c_void = ptr::null_mut();
 
 /// Serialize the current state and corpus during an executiont to bytes.
 /// This method is needed when the fuzzer run crashes and has to restart.
@@ -153,7 +174,7 @@ where
                 .to_string(),
         ));
     }
-    let state: &State<I, R, FT, OT> = (STATE_PTR as *const State<I, R, FT, OT>).as_ref().unwrap();
+    let state: &State<I, R, FT> = (STATE_PTR as *const State<I, R, FT>).as_ref().unwrap();
     let corpus = (CORPUS_PTR as *mut C).as_ref().unwrap();
     let state_bytes = postcard::to_allocvec(&state)?;
     let corpus_bytes = postcard::to_allocvec(&corpus)?;
@@ -163,7 +184,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 pub fn deserialize_state_corpus<C, FT, I, OT, R>(
     state_corpus_serialized: &[u8],
-) -> Result<(State<I, R, FT, OT>, C), AflError>
+) -> Result<(State<I, R, FT>, C), AflError>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,
@@ -201,23 +222,22 @@ pub mod unix_signals {
         corpus::Corpus,
         events::EventManager,
         executors::{
-            inmemory::{serialize_state_corpus, ExitKind, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN},
+            inmemory::{OnCrashFunction, ExitKind, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN, CORPUS_PTR, STATE_PTR, EVENT_MANAGER_PTR},
             Executor,
         },
+        engines::State,
         feedbacks::FeedbacksTuple,
         inputs::Input,
         observers::ObserversTuple,
         utils::Rand,
     };
 
-    static mut EVENT_MANAGER_PTR: *mut c_void = ptr::null_mut();
-
     pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<EM, C, E, OT, FT, I, R>(
         _sig: c_int,
         info: siginfo_t,
         _void: c_void,
     ) where
-        EM: EventManager<C, E, OT, FT, I, R>,
+        EM: EventManager<C, E, FT, I, R>,
         C: Corpus<I, R>,
         E: Executor<I>,
         OT: ObserversTuple,
@@ -238,14 +258,18 @@ pub mod unix_signals {
         let _ = stdout().flush();
 
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
+        let corpus = (CORPUS_PTR as *const C).as_ref().unwrap();
+        let state = (EVENT_MANAGER_PTR as *const State<I, R, FT>).as_ref().unwrap();
         let manager = (EVENT_MANAGER_PTR as *mut EM).as_mut().unwrap();
 
         manager.crash(input).expect("Error in sending Crash event");
 
         if !CURRENT_ON_CRASH_FN.is_null() {
-            (*CURRENT_ON_CRASH_FN)(
+            (*(CURRENT_ON_CRASH_FN as *mut OnCrashFunction<I, C, EM, FT, R>))(
                 ExitKind::Crash,
-                &serialize_state_corpus::<C, FT, I, OT, R>().unwrap(),
+                state,
+                corpus,
+                manager
             );
         }
 
@@ -257,7 +281,7 @@ pub mod unix_signals {
         _info: siginfo_t,
         _void: c_void,
     ) where
-        EM: EventManager<C, E, OT, FT, I, R>,
+        EM: EventManager<C, E, FT, I, R>,
         C: Corpus<I, R>,
         E: Executor<I>,
         OT: ObserversTuple,
@@ -272,6 +296,8 @@ pub mod unix_signals {
         }
 
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
+        let corpus = (CORPUS_PTR as *const C).as_ref().unwrap();
+        let state = (EVENT_MANAGER_PTR as *const State<I, R, FT>).as_ref().unwrap();
         let manager = (EVENT_MANAGER_PTR as *mut EM).as_mut().unwrap();
 
         manager
@@ -279,9 +305,11 @@ pub mod unix_signals {
             .expect("Error in sending Timeout event");
 
         if !CURRENT_ON_CRASH_FN.is_null() {
-            (*CURRENT_ON_CRASH_FN)(
+            (*(CURRENT_ON_CRASH_FN as *mut OnCrashFunction<I, C, EM, FT, R>))(
                 ExitKind::Timeout,
-                &serialize_state_corpus::<C, FT, I, OT, R>().unwrap(),
+                state,
+                corpus,
+                manager
             );
         }
 
@@ -292,9 +320,9 @@ pub mod unix_signals {
     }
 
     // TODO clearly state that manager should be static (maybe put the 'static lifetime?)
-    pub unsafe fn setup_crash_handlers<EM, C, E, OT, FT, I, R>(manager: &mut EM)
+    pub unsafe fn setup_crash_handlers<EM, C, E, OT, FT, I, R>(state: &State<I, R, FT>, corpus: &C, manager: &mut EM)
     where
-        EM: EventManager<C, E, OT, FT, I, R>,
+        EM: EventManager<C, E, FT, I, R>,
         C: Corpus<I, R>,
         E: Executor<I>,
         OT: ObserversTuple,
@@ -302,8 +330,10 @@ pub mod unix_signals {
         I: Input,
         R: Rand,
     {
+        CORPUS_PTR = corpus as *const _ as *const c_void;
+        STATE_PTR = state as *const _ as *const c_void;
         EVENT_MANAGER_PTR = manager as *mut _ as *mut c_void;
-
+    
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;

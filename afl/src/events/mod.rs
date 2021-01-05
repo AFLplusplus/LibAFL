@@ -211,23 +211,21 @@ where
     where
         ST: Stats;
     /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
-    fn handle_in_client<C, OT, FT, R>(
+    fn handle_in_client<C, FT, R>(
         self,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
-        OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         R: Rand;
 }
 
-pub trait EventManager<C, E, OT, FT, I, R>
+pub trait EventManager<C, E, FT, I, R>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
@@ -239,25 +237,25 @@ where
     /// Return the number of processes events or an error
     fn process(
         &mut self,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<usize, AflError>;
 
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Vec<u8>, AflError> {
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, AflError> where OT: ObserversTuple {
         Ok(postcard::to_allocvec(observers)?)
     }
 
-    fn deserialize_observers(&mut self, observers_buf: &[u8]) -> Result<OT, AflError> {
+    fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, AflError> where OT: ObserversTuple {
         Ok(postcard::from_bytes(observers_buf)?)
     }
 
-    fn new_testcase(
+    fn new_testcase<OT>(
         &mut self,
         _input: &I,
         _observers: &OT,
         _corpus_size: usize,
         _config: String,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), AflError> where OT: ObserversTuple {
         Ok(())
     }
 
@@ -384,14 +382,13 @@ where
     }
 
     #[inline]
-    fn handle_in_client<C, OT, FT, R>(
+    fn handle_in_client<C, FT, R>(
         self,
-        _state: &mut State<I, R, FT, OT>,
+        _state: &mut State<I, R, FT>,
         _corpus: &mut C,
     ) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
-        OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         R: Rand,
     {
@@ -405,11 +402,10 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct LoggerEventManager<C, E, OT, FT, I, R, ST>
+pub struct LoggerEventManager<C, E, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
@@ -419,15 +415,14 @@ where
     stats: ST,
     events: Vec<LoggerEvent<I>>,
     // stats (maybe we need a separated struct?)
-    phantom: PhantomData<(C, E, I, R, OT, FT)>,
+    phantom: PhantomData<(C, E, I, R, FT)>,
 }
 
-impl<C, E, OT, FT, I, R, ST> EventManager<C, E, OT, FT, I, R>
-    for LoggerEventManager<C, E, OT, FT, I, R, ST>
+impl<C, E, FT, I, R, ST> EventManager<C, E, FT, I, R>
+    for LoggerEventManager<C, E, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
@@ -436,7 +431,7 @@ where
 {
     fn process(
         &mut self,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<usize, AflError> {
         let count = self.events.len();
@@ -446,13 +441,13 @@ where
         Ok(count)
     }
 
-    fn new_testcase(
+    fn new_testcase<OT>(
         &mut self,
         _input: &I,
         _observers: &OT,
         corpus_size: usize,
         _config: String,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), AflError> where OT: ObserversTuple {
         let event = LoggerEvent::NewTestcase {
             corpus_size: corpus_size,
             phantom: PhantomData,
@@ -513,12 +508,11 @@ where
     }
 }
 
-impl<C, E, OT, FT, I, R, ST> LoggerEventManager<C, E, OT, FT, I, R, ST>
+impl<C, E, FT, I, R, ST> LoggerEventManager<C, E, FT, I, R, ST>
 where
     C: Corpus<I, R>,
     I: Input,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     R: Rand,
     ST: Stats,
@@ -658,14 +652,13 @@ where
     }
 
     #[inline]
-    fn handle_in_client<C, OT, FT, R>(
+    fn handle_in_client<C, FT, R>(
         self,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
-        OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         R: Rand,
     {
@@ -706,11 +699,10 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 
 #[derive(Clone, Debug)]
-pub struct LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
+pub struct LlmpEventManager<C, E, FT, I, R, SH, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
@@ -720,15 +712,14 @@ where
 {
     llmp: llmp::LlmpConnection<SH>,
     stats: ST,
-    phantom: PhantomData<(C, E, OT, FT, I, R)>,
+    phantom: PhantomData<(C, E, FT, I, R)>,
 }
 
 #[cfg(feature = "std")]
-impl<C, E, OT, FT, I, R, ST> LlmpEventManager<C, E, OT, FT, I, R, AflShmem, ST>
+impl<C, E, FT, I, R, ST> LlmpEventManager<C, E, FT, I, R, AflShmem, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
@@ -754,11 +745,10 @@ where
     }
 }
 
-impl<C, E, OT, FT, I, R, SH, ST> LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
+impl<C, E, FT, I, R, SH, ST> LlmpEventManager<C, E, FT, I, R, SH, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
-    OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     I: Input,
     R: Rand,
@@ -859,13 +849,12 @@ where
     }
 }
 
-impl<C, E, OT, FT, I, R, SH, ST> EventManager<C, E, OT, FT, I, R>
-    for LlmpEventManager<C, E, OT, FT, I, R, SH, ST>
+impl<C, E, FT, I, R, SH, ST> EventManager<C, E, FT, I, R>
+    for LlmpEventManager<C, E, FT, I, R, SH, ST>
 where
     C: Corpus<I, R>,
     E: Executor<I>,
     FT: FeedbacksTuple<I>,
-    OT: ObserversTuple,
     I: Input,
     R: Rand,
     SH: ShMem,
@@ -874,7 +863,7 @@ where
 {
     fn process(
         &mut self,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
     ) -> Result<usize, AflError> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -907,13 +896,13 @@ where
         })
     }
 
-    fn new_testcase(
+    fn new_testcase<OT>(
         &mut self,
         input: &I,
         observers: &OT,
         corpus_size: usize,
         config: String,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), AflError> where OT: ObserversTuple {
         let kind = LLMPEventKind::NewTestcase {
             input: Ptr::Ref(input),
             observers_buf: postcard::to_allocvec(observers)?,

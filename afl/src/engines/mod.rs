@@ -33,12 +33,11 @@ pub trait StateMetadata: Debug {
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct State<I, R, FT, OT>
+pub struct State<I, R, FT>
 where
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
-    OT: ObserversTuple,
 {
     /// How many times the executor ran the harness/target
     executions: usize,
@@ -49,17 +48,16 @@ where
     // additional_corpuses, maybe another TupleList?
     // Feedbacks used to evaluate an input
     feedbacks: FT,
-    phantom: PhantomData<(I, R, OT)>,
+    phantom: PhantomData<(I, R)>,
 }
 
 #[cfg(feature = "std")]
-impl<R, FT, OT> State<BytesInput, R, FT, OT>
+impl<R, FT> State<BytesInput, R, FT>
 where
     R: Rand,
     FT: FeedbacksTuple<BytesInput>,
-    OT: ObserversTuple,
 {
-    pub fn load_from_directory<G, C, E, ET, EM>(
+    pub fn load_from_directory<G, C, E, OT, ET, EM>(
         &mut self,
         corpus: &mut C,
         generator: &mut G,
@@ -71,8 +69,9 @@ where
         G: Generator<BytesInput, R>,
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
+        OT: ObserversTuple,
         ET: ExecutorsTuple<BytesInput>,
-        EM: EventManager<C, E, OT, FT, BytesInput, R>,
+        EM: EventManager<C, E, FT, BytesInput, R>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -101,7 +100,7 @@ where
         Ok(())
     }
 
-    pub fn load_initial_inputs<G, C, E, ET, EM>(
+    pub fn load_initial_inputs<G, C, E, OT, ET, EM>(
         &mut self,
         corpus: &mut C,
         generator: &mut G,
@@ -113,8 +112,9 @@ where
         G: Generator<BytesInput, R>,
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
+        OT: ObserversTuple,
         ET: ExecutorsTuple<BytesInput>,
-        EM: EventManager<C, E, OT, FT, BytesInput, R>,
+        EM: EventManager<C, E, FT, BytesInput, R>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(corpus, generator, engine, manager, in_dir)?;
@@ -128,12 +128,11 @@ where
     }
 }
 
-impl<I, R, FT, OT> State<I, R, FT, OT>
+impl<I, R, FT> State<I, R, FT>
 where
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
-    OT: ObserversTuple,
 {
     /// Get executions
     #[inline]
@@ -206,7 +205,7 @@ where
 
     // TODO move some of these, like evaluate_input, to FuzzingEngine
     #[inline]
-    pub fn is_interesting(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>
+    pub fn is_interesting<OT>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>
     where
         OT: ObserversTuple,
     {
@@ -214,9 +213,10 @@ where
     }
 
     /// Runs the input and triggers observers and feedback
-    pub fn evaluate_input<E>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
+    pub fn evaluate_input<E, OT>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
     where
         E: Executor<I> + HasObservers<OT>,
+        OT: ObserversTuple,
     {
         executor.reset_observers()?;
         executor.run_target(&input)?;
@@ -279,7 +279,7 @@ where
         }
     }
 
-    pub fn generate_initial_inputs<G, C, E, ET, EM>(
+    pub fn generate_initial_inputs<G, C, E, OT, ET, EM>(
         &mut self,
         rand: &mut R,
         corpus: &mut C,
@@ -292,8 +292,9 @@ where
         G: Generator<I, R>,
         C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
+        OT: ObserversTuple,
         ET: ExecutorsTuple<I>,
-        EM: EventManager<C, E, OT, FT, I, R>,
+        EM: EventManager<C, E, FT, I, R>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -383,7 +384,7 @@ where
 pub trait Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -399,7 +400,7 @@ where
     fn fuzz_one(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
@@ -416,7 +417,7 @@ where
     fn fuzz_loop(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
@@ -437,7 +438,7 @@ where
 pub struct StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -454,7 +455,7 @@ impl<ST, EM, E, OT, FT, ET, C, I, R> Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
     for StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -475,7 +476,7 @@ where
 impl<ST, EM, E, OT, FT, ET, C, I, R> StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,

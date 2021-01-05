@@ -16,7 +16,7 @@ use crate::AflError;
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<EM, E, OT, FT, ET, C, I, R>
 where
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -29,7 +29,7 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
@@ -39,7 +39,7 @@ where
 
 pub trait StagesTuple<EM, E, OT, FT, ET, C, I, R>
 where
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -51,7 +51,7 @@ where
     fn perform_all(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
@@ -63,7 +63,7 @@ where
 
 impl<EM, E, OT, FT, ET, C, I, R> StagesTuple<EM, E, OT, FT, ET, C, I, R> for ()
 where
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -75,7 +75,7 @@ where
     fn perform_all(
         &mut self,
         _rand: &mut R,
-        _state: &mut State<I, R, FT, OT>,
+        _state: &mut State<I, R, FT>,
         _corpus: &mut C,
         _engine: &mut Engine<E, OT, ET, I>,
         _manager: &mut EM,
@@ -92,7 +92,7 @@ impl<Head, Tail, EM, E, OT, FT, ET, C, I, R> StagesTuple<EM, E, OT, FT, ET, C, I
 where
     Head: Stage<EM, E, OT, FT, ET, C, I, R>,
     Tail: StagesTuple<EM, E, OT, FT, ET, C, I, R> + TupleList,
-    EM: EventManager<C, E, OT, FT, I, R>,
+    EM: EventManager<C, E, FT, I, R>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
@@ -104,7 +104,7 @@ where
     fn perform_all(
         &mut self,
         rand: &mut R,
-        state: &mut State<I, R, FT, OT>,
+        state: &mut State<I, R, FT>,
         corpus: &mut C,
         engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
