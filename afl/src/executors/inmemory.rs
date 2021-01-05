@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 use core::{ffi::c_void, ptr};
 
 use crate::{
@@ -14,6 +14,7 @@ use crate::{
     AflError,
 };
 
+#[cfg(feature = "std")]
 use self::unix_signals::setup_crash_handlers;
 
 /// The (unsafe) pointer to the current inmem input, for the current run.
@@ -93,6 +94,8 @@ where
     OT: ObserversTuple,
 {
     /// Create a new in mem executor.
+    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
+    /// depnding on different corpus or state.
     /// * `name` - the name of this executor (to address it along the way)
     /// * `harness_fn` - the harness, executiong the function
     /// * `on_crash_fn` - When an in-mem harness crashes, it may safe some state to continue fuzzing later.
@@ -103,9 +106,9 @@ where
         harness_fn: HarnessFunction<I>,
         observers: OT,
         on_crash_fn: Box<dyn FnMut(ExitKind, &[u8])>,
-        state: &State<I, R, FT, OT>,
-        corpus: &C,
-        event_manager: &mut EM,
+        _state: &State<I, R, FT, OT>,
+        _corpus: &C,
+        _event_manager: &mut EM,
     ) -> Self
     where
         C: Corpus<I, R>,
@@ -114,11 +117,12 @@ where
         FT: FeedbacksTuple<I>,
         R: Rand,
     {
+        #[cfg(feature = "std")]
         unsafe {
-            CORPUS_PTR = corpus as *const _ as *const c_void;
-            STATE_PTR = state as *const _ as *const c_void;
+            CORPUS_PTR = _corpus as *const _ as *const c_void;
+            STATE_PTR = _state as *const _ as *const c_void;
 
-            setup_crash_handlers(event_manager);
+            setup_crash_handlers(_event_manager);
         }
 
         Self {
@@ -365,11 +369,13 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        /*
-        let mut in_mem_executor =
-            InMemoryExecutor::new("main", test_harness_fn_nop, tuple_list!(), Box::new(|_| ()));
+        let mut in_mem_executor = InMemoryExecutor {
+            harness: test_harness_fn_nop,
+            on_crash_fn: Box::new(|_, _| ()),
+            observers: tuple_list!(),
+            name: "main",
+        };
         let mut input = NopInput {};
         assert!(in_mem_executor.run_target(&mut input).is_ok());
-        */
     }
 }
