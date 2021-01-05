@@ -64,7 +64,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
     let mut generator = RandPrintablesGenerator::new(32);
     let stats = SimpleStats::new(|s| println!("{}", s));
-    let mut mgr: LlmpEventManager<_, _, _>;
+    let mut mgr;
 
     // We start ourself as child process to actually fuzz
     if std::env::var(ENV_FUZZER_SENDER).is_err() {
