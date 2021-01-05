@@ -162,10 +162,10 @@ fn new_map_size(max_alloc: usize) -> usize {
 
 /// Initialize a new llmp_page. size should be relative to
 /// llmp_page->messages
-unsafe fn _llmp_page_init<SH: ShMem>(shmem: &mut SH, sender: u32) {
+unsafe fn _llmp_page_init<SH: ShMem>(shmem: &mut SH, sender: u32, allow_reinit: bool) {
     let map_size = shmem.map().len();
     let page = shmem2page_mut(shmem);
-    if (*page).magic == PAGE_INITIALIZED_MAGIC {
+    if (*page).magic == PAGE_INITIALIZED_MAGIC && !allow_reinit {
         panic!(
             "Tried to initialize page {:?} twice (for shmem {:?})",
             page, shmem
@@ -417,7 +417,7 @@ where
     /// Afterwards, no receiver should read from it at a different location.
     /// This is only useful if all connected llmp parties start over, for example after a crash.
     pub unsafe fn reset_last_page(&mut self) {
-        _llmp_page_init(&mut self.out_maps.last_mut().unwrap().shmem, self.id);
+        _llmp_page_init(&mut self.out_maps.last_mut().unwrap().shmem, self.id, true);
     }
 
     /// Reattach to a vacant out_map, to with a previous sender stored the information in an env before.
@@ -945,7 +945,7 @@ where
     /// Creates a new page, initializing the passed shared mem struct
     pub fn new(sender: u32, mut new_map: SH) -> Self {
         unsafe {
-            _llmp_page_init(&mut new_map, sender);
+            _llmp_page_init(&mut new_map, sender, false);
         }
         Self { shmem: new_map }
     }
