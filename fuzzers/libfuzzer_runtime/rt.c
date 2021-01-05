@@ -16,7 +16,9 @@ uint32_t __lafl_max_edges_size = 0;
 
 void __sanitizer_cov_trace_pc_guard(uint32_t *guard) {
 
-  __lafl_edges_map[*guard]++;
+  uint32_t pos = *guard;
+  uint16_t val = __lafl_edges_map[pos] + 1;
+  __lafl_edges_map[pos] = ((uint8_t) val) + (uint8_t) (val >> 8);
 
 }
 
