@@ -250,5 +250,6 @@ pub fn main() {
 
     println!("Workdir: {:?}", workdir);
 
-    fuzz(input, broker_port).expect("An error occurred while fuzzing");
+    fuzz(Some(vec![PathBuf::from("./corpus/")]), broker_port).expect("An error occurred while fuzzing");
+    //fuzz(input, broker_port).expect("An error occurred while fuzzing");
 }
