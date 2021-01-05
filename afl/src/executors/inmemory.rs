@@ -155,7 +155,7 @@ where
 
 /// Serialize the current state and corpus during an executiont to bytes.
 /// This method is needed when the fuzzer run crashes and has to restart.
-pub fn serialize_state_corpus<C, FT, I, OT, R>(state: &State<I, R, FT>, corpus: &C) -> Result<Vec<u8>, AflError>
+pub fn serialize_state_corpus<C, FT, I, R>(state: &State<I, R, FT>, corpus: &C) -> Result<Vec<u8>, AflError>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,

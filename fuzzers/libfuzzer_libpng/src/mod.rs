@@ -25,6 +25,7 @@ use afl::{
     stages::mutational::StdMutationalStage,
     tuples::tuple_list,
     utils::StdRand,
+    inputs::BytesInput,
     AflError,
 };
 
@@ -103,7 +104,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
 
     // We are the fuzzing instance, first, connect to all channels.
     // Mgr to send and receive msgs from/to all other fuzzer instances
-    mgr = LlmpEventManager::existing_client_from_env_std(ENV_FUZZER_BROKER_CLIENT, stats)?;
+    mgr = LlmpEventManager::<BytesInput, _, _>::existing_client_from_env_std(ENV_FUZZER_BROKER_CLIENT, stats)?;
     // A sender and a receiver for single communication
     let mut receiver = LlmpReceiver::<AflShmem>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
     let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
@@ -136,7 +137,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     unsafe { sender.reset_last_page() };
 
     // Create the engine
-    let executor = InMemoryExecutor::new(
+    let executor = InMemoryExecutor::<_, _, _, LlmpEventManager<_, _, _>, _, _>::new(
         "Libfuzzer",
         harness,
         tuple_list!(edges_observer),
@@ -144,6 +145,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
             match exit_kind {
                 ExitKind::Timeout => mgr.timeout(input).expect(&format!("Error sending Timeout event for input {:?}", input)),
                 ExitKind::Crash  => mgr.crash(input).expect(&format!("Error sending crash event for input {:?}", input)),
+                _ => ()
             }
             let state_corpus_serialized = serialize_state_corpus(state, corpus).unwrap();
             sender.send_buf(0x1, &state_corpus_serialized).unwrap();
