@@ -4,7 +4,7 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-const LIBPNG_URL: &str = "http://prdownloads.sourceforge.net/libpng/libpng-1.6.37.tar.gz?download";
+const LIBPNG_URL: &str = "https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz";
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -15,15 +15,10 @@ fn main() {
     println!("cargo:rerun-if-changed=./runtime/rt.c",);
     println!("cargo:rerun-if-changed=harness.cc");
 
-    cc::Build::new()
-        .file("../libfuzzer_runtime/rt.c")
-        .file("./harness.cc")
-        .compile("libfuzzer-sys");
-
     let libpng = format!("{}/libpng-1.6.37", &out_dir);
     let libpng_path = Path::new(&libpng);
-    let libpng_tar = format!("{}/libpng-1.6.37.tar.gz", &cwd);
-
+    let libpng_tar = format!("{}/libpng-1.6.37.tar.xz", &cwd);
+    
     if !libpng_path.is_dir() {
         if !Path::new(&libpng_tar).is_file() {
             println!("cargo:warning=Libpng not found, downloading...");
@@ -38,7 +33,7 @@ fn main() {
         }
         Command::new("tar")
             .current_dir(&out_dir_path)
-            .arg("-xvzf")
+            .arg("-xvf")
             .arg(&libpng_tar)
             .status()
             .unwrap();
@@ -87,6 +82,12 @@ fn main() {
             .status()
             .unwrap();
     }
+    
+    cc::Build::new()
+        .include(&libpng_path)
+        .file("../libfuzzer_runtime/rt.c")
+        .file("./harness.cc")
+        .compile("libfuzzer-sys");
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
     println!("cargo:rustc-link-search=native={}/.libs", &libpng);
