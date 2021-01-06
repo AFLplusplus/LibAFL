@@ -1,7 +1,6 @@
 //! The engine is the core piece of every good fuzzer
 
-use core::fmt::Debug;
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
@@ -500,17 +499,19 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::corpus::{Corpus, InMemoryCorpus, Testcase};
-    use crate::engines::{Engine, Fuzzer, State, StdFuzzer};
+    use crate::{
+        corpus::{Corpus, InMemoryCorpus, Testcase},
+        engines::{Engine, Fuzzer, State, StdFuzzer},
+        executors::{Executor, ExitKind, InMemoryExecutor},
+        inputs::bytes::BytesInput,
+        mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
+        stages::mutational::StdMutationalStage,
+        tuples::tuple_list,
+        utils::StdRand,
+    };
+
     #[cfg(feature = "std")]
     use crate::events::{LoggerEventManager, SimpleStats};
-    use crate::executors::inmemory::InMemoryExecutor;
-    use crate::executors::{Executor, ExitKind};
-    use crate::inputs::bytes::BytesInput;
-    use crate::mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator};
-    use crate::stages::mutational::StdMutationalStage;
-    use crate::tuples::tuple_list;
-    use crate::utils::StdRand;
 
     fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
