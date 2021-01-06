@@ -91,7 +91,9 @@ where
     }
 }
 
+/// We need fixed names for many parts of this lib.
 pub trait Named {
+    /// Provide the name of this element.
     fn name(&self) -> &str;
 }
 

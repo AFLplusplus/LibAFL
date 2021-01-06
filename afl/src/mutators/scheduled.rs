@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
-use core::marker::PhantomData;
+use core::{fmt, marker::PhantomData};
+use fmt::Debug;
 
 use crate::{
     inputs::{HasBytesVec, Input},
@@ -54,6 +55,23 @@ where
 {
     mutations: Vec<MutationFunction<Self, C, I, R>>,
     max_size: usize,
+}
+
+impl<C, I, R> Debug for StdScheduledMutator<C, I, R>
+where
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StdScheduledMutator with {} Mutations, max_size: {}, for Input type {}",
+            self.mutations.len(),
+            self.max_size,
+            core::any::type_name::<I>()
+        )
+    }
 }
 
 impl<C, I, R> Mutator<C, I, R> for StdScheduledMutator<C, I, R>

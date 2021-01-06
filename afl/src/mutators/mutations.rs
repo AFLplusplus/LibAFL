@@ -6,35 +6,6 @@ use crate::{
     AflError,
 };
 
-/// The result of a mutation.
-/// If the mutation got skipped, the target
-/// will not be executed with the returned input.
-pub enum MutationResult {
-    Mutated,
-    Skipped,
-}
-
-// TODO maybe the mutator arg is not needed
-/// The generic function type that identifies mutations
-pub type MutationFunction<M, C, I, R> =
-    fn(&mut M, &mut R, &C, &mut I) -> Result<MutationResult, AflError>;
-
-pub trait ComposedByMutations<C, I, R>
-where
-    C: Corpus<I, R>,
-    I: Input,
-    R: Rand,
-{
-    /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<Self, C, I, R>;
-
-    /// Get the number of mutations
-    fn mutations_count(&self) -> usize;
-
-    /// Add a mutation
-    fn add_mutation(&mut self, mutation: MutationFunction<Self, C, I, R>);
-}
-
 const ARITH_MAX: u64 = 35;
 
 const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
@@ -70,6 +41,36 @@ const INTERESTING_32: [i32; 27] = [
     100663045,
     2147483647,
 ];
+
+/// The result of a mutation.
+/// If the mutation got skipped, the target
+/// will not be executed with the returned input.
+#[derive(Clone, Copy, Debug)]
+pub enum MutationResult {
+    Mutated,
+    Skipped,
+}
+
+// TODO maybe the mutator arg is not needed
+/// The generic function type that identifies mutations
+pub type MutationFunction<M, C, I, R> =
+    fn(&mut M, &mut R, &C, &mut I) -> Result<MutationResult, AflError>;
+
+pub trait ComposedByMutations<C, I, R>
+where
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    /// Get a mutation by index
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<Self, C, I, R>;
+
+    /// Get the number of mutations
+    fn mutations_count(&self) -> usize;
+
+    /// Add a mutation
+    fn add_mutation(&mut self, mutation: MutationFunction<Self, C, I, R>);
+}
 
 #[inline]
 fn self_mem_move(data: &mut [u8], from: usize, to: usize, len: usize) {

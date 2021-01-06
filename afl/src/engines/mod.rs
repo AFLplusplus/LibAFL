@@ -220,7 +220,7 @@ where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
     {
-        executor.reset_observers()?;
+        executor.pre_exec_observers()?;
         executor.run_target(&input)?;
         self.set_executions(self.executions() + 1);
         executor.post_exec_observers()?;

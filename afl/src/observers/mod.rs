@@ -4,11 +4,13 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     serde_anymap::{ArrayMut, Cptr},
     tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    utils::current_time,
     AflError,
 };
 
@@ -22,7 +24,7 @@ pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'st
     }
 
     /// Resets the observer
-    fn reset(&mut self) -> Result<(), AflError>;
+    fn pre_exec(&mut self) -> Result<(), AflError>;
 
     /// This function is executed after each fuzz run
     #[inline]
@@ -48,11 +50,15 @@ pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'st
     }
 }
 
+/// A hastkel-style tuple of observers
 pub trait ObserversTuple:
     MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned
 {
     /// Reset all executors in the tuple
-    fn reset_all(&mut self) -> Result<(), AflError>;
+    /// This is called right before the next execution.
+    fn pre_exec_all(&mut self) -> Result<(), AflError>;
+    /// Do whatever you need to do after a run.
+    /// This is called right after the last execution
     fn post_exec_all(&mut self) -> Result<(), AflError>;
     //fn for_each(&self, f: fn(&dyn Observer));
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
@@ -69,7 +75,7 @@ pub trait ObserversTuple:
 }
 
 impl ObserversTuple for () {
-    fn reset_all(&mut self) -> Result<(), AflError> {
+    fn pre_exec_all(&mut self) -> Result<(), AflError> {
         Ok(())
     }
     fn post_exec_all(&mut self) -> Result<(), AflError> {
@@ -85,9 +91,9 @@ where
     Head: Observer,
     Tail: ObserversTuple + TupleList,
 {
-    fn reset_all(&mut self) -> Result<(), AflError> {
-        self.0.reset()?;
-        self.1.reset_all()
+    fn pre_exec_all(&mut self) -> Result<(), AflError> {
+        self.0.pre_exec()?;
+        self.1.pre_exec_all()
     }
 
     fn post_exec_all(&mut self) -> Result<(), AflError> {
@@ -104,6 +110,44 @@ where
         f(&mut self.0);
         self.1.for_each_mut(f)
     }*/
+}
+
+/// A simple observer, just overlooking the runtime of the target.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TimeObserver {
+    name: String,
+    start_time: Duration,
+    last_runtime: Option<Duration>,
+}
+
+impl TimeObserver {
+    /// Creates a new TimeObserver with the given name.
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: name.to_string(),
+            start_time: Duration::from_secs(0),
+            last_runtime: None,
+        }
+    }
+}
+
+impl Observer for TimeObserver {
+    fn pre_exec(&mut self) -> Result<(), AflError> {
+        self.last_runtime = None;
+        self.start_time = current_time();
+        Ok(())
+    }
+
+    fn post_exec(&mut self) -> Result<(), AflError> {
+        self.last_runtime = Some(current_time() - self.start_time);
+        Ok(())
+    }
+}
+
+impl Named for TimeObserver {
+    fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
@@ -163,7 +207,7 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn reset(&mut self) -> Result<(), AflError> {
+    fn pre_exec(&mut self) -> Result<(), AflError> {
         self.reset_map()
     }
 }
@@ -235,6 +279,7 @@ where
     }
 }
 
+/// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct VariableMapObserver<T>
@@ -252,7 +297,7 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn reset(&mut self) -> Result<(), AflError> {
+    fn pre_exec(&mut self) -> Result<(), AflError> {
         self.reset_map()
     }
 }
@@ -340,17 +385,23 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::observers::StdMapObserver;
-    use crate::tuples::Named;
+    use crate::{
+        observers::{StdMapObserver, TimeObserver},
+        tuples::{tuple_list, tuple_list_type, Named},
+    };
 
     static mut MAP: [u32; 4] = [0; 4];
 
     #[test]
     fn test_observer_serde() {
-        let obv = StdMapObserver::new("test", unsafe { &mut MAP });
+        let obv = tuple_list!(
+            TimeObserver::new("time"),
+            StdMapObserver::new("map", unsafe { &mut MAP })
+        );
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{:?}", vec);
-        let obv2: StdMapObserver<u32> = postcard::from_bytes(&vec).unwrap();
-        assert_eq!(obv.name(), obv2.name());
+        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32>) =
+            postcard::from_bytes(&vec).unwrap();
+        assert_eq!(obv.0.name(), obv2.0.name());
     }
 }

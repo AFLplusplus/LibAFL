@@ -31,8 +31,8 @@ where
 
     /// Reset the state of all the observes linked to this executor
     #[inline]
-    fn reset_observers(&mut self) -> Result<(), AflError> {
-        self.observers_mut().reset_all()
+    fn pre_exec_observers(&mut self) -> Result<(), AflError> {
+        self.observers_mut().pre_exec_all()
     }
 
     /// Run the post exec hook for all the observes linked to this executor
