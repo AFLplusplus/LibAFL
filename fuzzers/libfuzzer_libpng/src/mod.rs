@@ -159,7 +159,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         }),
         &state,
         &corpus,
-        &mgr,
+        &mut mgr,
     );
 
     let mut engine = Engine::new(executor);

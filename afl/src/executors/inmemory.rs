@@ -133,15 +133,12 @@ where
         on_crash_fn: Box<OnCrashFunction<I, C, EM, FT, R>>,
         _state: &State<I, R, FT>,
         _corpus: &C,
-        _event_mgr: &EM,
+        _event_mgr: &mut EM,
     ) -> Self {
-        /*#[cfg(feature = "std")]
+        #[cfg(feature = "std")]
         unsafe {
-            CORPUS_PTR = _corpus as *const _ as *const c_void;
-            STATE_PTR = _state as *const _ as *const c_void;
-
-            setup_crash_handlers(_event_manager);
-        }*/
+            setup_crash_handlers::<EM, C, OT, FT, I, R>(_state, _corpus, _event_mgr);
+        }
 
         Self {
             harness_fn,
@@ -219,7 +216,7 @@ pub mod unix_signals {
         utils::Rand,
     };
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<EM, C, E, OT, FT, I, R>(
+    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<EM, C, OT, FT, I, R>(
         _sig: c_int,
         info: siginfo_t,
         _void: c_void,
@@ -263,7 +260,7 @@ pub mod unix_signals {
         std::process::exit(139);
     }
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<EM, C, E, OT, FT, I, R>(
+    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<EM, C, OT, FT, I, R>(
         _sig: c_int,
         _info: siginfo_t,
         _void: c_void,
@@ -305,7 +302,7 @@ pub mod unix_signals {
     }
 
     // TODO clearly state that manager should be static (maybe put the 'static lifetime?)
-    pub unsafe fn setup_crash_handlers<EM, C, E, OT, FT, I, R>(
+    pub unsafe fn setup_crash_handlers<EM, C, OT, FT, I, R>(
         state: &State<I, R, FT>,
         corpus: &C,
         manager: &mut EM,
@@ -324,7 +321,7 @@ pub mod unix_signals {
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_crash::<EM, C, E, OT, FT, I, R> as usize;
+        sa.sa_sigaction = libaflrs_executor_inmem_handle_crash::<EM, C, OT, FT, I, R> as usize;
         for (sig, msg) in &[
             (SIGSEGV, "segfault"),
             (SIGBUS, "sigbus"),
@@ -338,7 +335,7 @@ pub mod unix_signals {
             }
         }
 
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_timeout::<EM, C, E, OT, FT, I, R> as usize;
+        sa.sa_sigaction = libaflrs_executor_inmem_handle_timeout::<EM, C, OT, FT, I, R> as usize;
         if sigaction(SIGUSR2, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up sigusr2 handler for timeouts");
         }
