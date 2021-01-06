@@ -1,4 +1,5 @@
 pub mod inmemory;
+pub use inmemory::InMemoryExecutor;
 #[cfg(feature = "runtime")]
 pub mod runtime;
 
@@ -113,10 +114,8 @@ where
 mod test {
     use core::marker::PhantomData;
 
-    use crate::executors::Executor;
+    use super::{Executor, NopExecutor};
     use crate::inputs::BytesInput;
-
-    use super::NopExecutor;
 
     #[test]
     fn nop_executor() {

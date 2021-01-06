@@ -304,15 +304,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::inputs::BytesInput;
-    use crate::mutators::scheduled::StdScheduledMutator;
-    use crate::utils::{Rand, XKCDRand};
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
+        inputs::BytesInput,
         inputs::HasBytesVec,
+        mutators::scheduled::{mutation_splice, StdScheduledMutator},
+        utils::{Rand, XKCDRand},
     };
-
-    use super::mutation_splice;
 
     #[test]
     fn test_mut_splice() {
