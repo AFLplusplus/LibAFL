@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use core::{ffi::c_void, ptr};
 
 use crate::{
@@ -15,16 +15,16 @@ use crate::{
 };
 
 #[cfg(feature = "std")]
-use self::unix_signals::setup_crash_handlers;
+#[cfg(unix)]
+use unix_signals as os_signals;
+
+#[cfg(feature = "std")]
+use self::os_signals::setup_crash_handlers;
 
 /// The (unsafe) pointer to the current inmem input, for the current run.
 /// This is neede for certain non-rust side effects, as well as unix signal handling.
 static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
 static mut CURRENT_ON_CRASH_FN: *mut c_void = ptr::null_mut();
-
-static mut CORPUS_PTR: *const c_void = ptr::null_mut();
-static mut STATE_PTR: *const c_void = ptr::null_mut();
-static mut EVENT_MANAGER_PTR: *mut c_void = ptr::null_mut();
 
 /// The inmem executor harness
 type HarnessFunction<I> = fn(&dyn Executor<I>, &[u8]) -> ExitKind;
@@ -149,40 +149,6 @@ where
     }
 }
 
-/// Serialize the current state and corpus during an executiont to bytes.
-/// This method is needed when the fuzzer run crashes and has to restart.
-pub fn serialize_state_corpus<C, FT, I, R>(
-    state: &State<I, R, FT>,
-    corpus: &C,
-) -> Result<Vec<u8>, AflError>
-where
-    C: Corpus<I, R>,
-    FT: FeedbacksTuple<I>,
-    I: Input,
-    R: Rand,
-{
-    let state_bytes = postcard::to_allocvec(&state)?;
-    let corpus_bytes = postcard::to_allocvec(&corpus)?;
-    Ok(postcard::to_allocvec(&(state_bytes, corpus_bytes))?)
-}
-
-/// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
-pub fn deserialize_state_corpus<C, FT, I, R>(
-    state_corpus_serialized: &[u8],
-) -> Result<(State<I, R, FT>, C), AflError>
-where
-    C: Corpus<I, R>,
-    FT: FeedbacksTuple<I>,
-    I: Input,
-    R: Rand,
-{
-    let tuple: (Vec<u8>, Vec<u8>) = postcard::from_bytes(&state_corpus_serialized)?;
-    Ok((
-        postcard::from_bytes(&tuple.0)?,
-        postcard::from_bytes(&tuple.1)?,
-    ))
-}
-
 #[cfg(feature = "std")]
 #[cfg(unix)]
 pub mod unix_signals {
@@ -206,15 +172,18 @@ pub mod unix_signals {
         corpus::Corpus,
         engines::State,
         events::EventManager,
-        executors::inmemory::{
-            ExitKind, OnCrashFunction, CORPUS_PTR, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN,
-            EVENT_MANAGER_PTR, STATE_PTR,
-        },
+        executors::inmemory::{ExitKind, OnCrashFunction, CURRENT_INPUT_PTR, CURRENT_ON_CRASH_FN},
         feedbacks::FeedbacksTuple,
         inputs::Input,
         observers::ObserversTuple,
         utils::Rand,
     };
+
+    /// Pointers to values only needed on crash. As the program will not continue after a crash,
+    /// we should (tm) be okay with raw pointers here,
+    static mut CORPUS_PTR: *const c_void = ptr::null_mut();
+    static mut STATE_PTR: *const c_void = ptr::null_mut();
+    static mut EVENT_MANAGER_PTR: *mut c_void = ptr::null_mut();
 
     pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<EM, C, OT, FT, I, R>(
         _sig: c_int,
@@ -230,9 +199,10 @@ pub mod unix_signals {
     {
         if CURRENT_INPUT_PTR == ptr::null() {
             println!(
-                "We died accessing addr {}, but are not in client...",
+                "We died accessing addr {}, but are not in client... Exiting.",
                 info.si_addr() as usize
             );
+            return;
         }
 
         #[cfg(feature = "std")]
@@ -274,7 +244,7 @@ pub mod unix_signals {
     {
         dbg!("TIMEOUT/SIGUSR2 received");
         if CURRENT_INPUT_PTR.is_null() {
-            dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
+            dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
             return;
         }
 
@@ -342,33 +312,16 @@ pub mod unix_signals {
     }
 }
 
-//#[cfg(feature = "std")]
-//#[cfg(unix)]
-//use unix_signals as os_signals;
-//#[cfg(feature = "std")]
-//#[cfg(not(unix))]
-//compile_error!("InMemoryExecutor not yet supported on this OS");
-
 #[cfg(test)]
 mod tests {
 
     use alloc::boxed::Box;
 
-    use crate::executors::inmemory::InMemoryExecutor;
-    use crate::executors::{Executor, ExitKind};
-    use crate::inputs::{HasTargetBytes, Input, TargetBytes};
-    use crate::tuples::tuple_list;
-
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Clone, Serialize, Deserialize, Debug)]
-    struct NopInput {}
-    impl Input for NopInput {}
-    impl HasTargetBytes for NopInput {
-        fn target_bytes(&self) -> TargetBytes {
-            TargetBytes::Owned(vec![0])
-        }
-    }
+    use crate::{
+        executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
+        inputs::NopInput,
+        tuples::tuple_list,
+    };
 
     #[cfg(feature = "std")]
     fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
@@ -383,12 +336,22 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut in_mem_executor = InMemoryExecutor {
+        use crate::{
+            corpus::InMemoryCorpus, events::NopEventManager, inputs::NopInput, utils::StdRand,
+        };
+
+        let mut in_mem_executor = InMemoryExecutor::<
+            NopInput,
+            (),
+            InMemoryCorpus<_, _>,
+            NopEventManager<_>,
+            (),
+            StdRand,
+        > {
             harness_fn: test_harness_fn_nop,
-            on_crash_fn: Box::new(|_, _| ()),
+            on_crash_fn: Box::new(|_, _, _, _, _| ()),
             observers: tuple_list!(),
             name: "main",
-            phantom: PhantomData,
         };
         let mut input = NopInput {};
         assert!(in_mem_executor.run_target(&mut input).is_ok());

@@ -1,13 +1,50 @@
 //! Utility functions for AFL
 
-use alloc::rc::Rc;
+use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
+use postcard;
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::{corpus::Corpus, engines::State, feedbacks::FeedbacksTuple, inputs::Input, AflError};
+
 pub type StdRand = RomuTrioRand;
+
+/// Serialize the current state and corpus during an executiont to bytes.
+/// This method is needed when the fuzzer run crashes and has to restart.
+pub fn serialize_state_corpus<C, FT, I, R>(
+    state: &State<I, R, FT>,
+    corpus: &C,
+) -> Result<Vec<u8>, AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+{
+    let state_bytes = postcard::to_allocvec(&state)?;
+    let corpus_bytes = postcard::to_allocvec(&corpus)?;
+    Ok(postcard::to_allocvec(&(state_bytes, corpus_bytes))?)
+}
+
+/// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
+pub fn deserialize_state_corpus<C, FT, I, R>(
+    state_corpus_serialized: &[u8],
+) -> Result<(State<I, R, FT>, C), AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+{
+    let tuple: (Vec<u8>, Vec<u8>) = postcard::from_bytes(&state_corpus_serialized)?;
+    Ok((
+        postcard::from_bytes(&tuple.0)?,
+        postcard::from_bytes(&tuple.1)?,
+    ))
+}
 
 /// Ways to get random around here
 pub trait Rand: Debug {
@@ -137,12 +174,6 @@ impl Rand for Xoshiro256StarRand {
     }
 }
 
-impl Into<Rc<RefCell<Self>>> for Xoshiro256StarRand {
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
-    }
-}
-
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
@@ -184,12 +215,6 @@ impl Rand for XorShift64Rand {
     }
 }
 
-impl Into<Rc<RefCell<Self>>> for XorShift64Rand {
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
-    }
-}
-
 impl XorShift64Rand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
@@ -224,12 +249,6 @@ impl Rand for Lehmer64Rand {
     fn next(&mut self) -> u64 {
         self.rand_seed *= 0xda942042e4dd58b5;
         return (self.rand_seed >> 64) as u64;
-    }
-}
-
-impl Into<Rc<RefCell<Self>>> for Lehmer64Rand {
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
     }
 }
 
@@ -357,13 +376,6 @@ impl Rand for XKCDRand {
 
     fn next(&mut self) -> u64 {
         self.val
-    }
-}
-
-#[cfg(test)]
-impl Into<Rc<RefCell<Self>>> for XKCDRand {
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
     }
 }
 

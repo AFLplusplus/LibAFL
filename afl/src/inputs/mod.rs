@@ -3,13 +3,14 @@ pub use bytes::BytesInput;
 
 use alloc::vec::Vec;
 use core::{clone::Clone, fmt::Debug};
-
 #[cfg(feature = "std")]
 use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
 };
+
+use serde::{Deserialize, Serialize};
 
 use crate::AflError;
 
@@ -51,6 +52,16 @@ where {
     fn from_file<P>(_path: P) -> Result<Self, AflError>
 where {
         Err(AflError::NotImplemented("Not suppored in no_std".into()))
+    }
+}
+
+/// An input for tests, mainly. There is no real use much else.
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+pub struct NopInput {}
+impl Input for NopInput {}
+impl HasTargetBytes for NopInput {
+    fn target_bytes(&self) -> TargetBytes {
+        TargetBytes::Owned(vec![0])
     }
 }
 

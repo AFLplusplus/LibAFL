@@ -509,7 +509,7 @@ mod tests {
     use crate::inputs::bytes::BytesInput;
     use crate::mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator};
     use crate::stages::mutational::StdMutationalStage;
-    use crate::tuples::{tuple_list, tuple_list_type};
+    use crate::tuples::tuple_list;
     use crate::utils::StdRand;
 
     fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
@@ -534,7 +534,7 @@ mod tests {
             "main",
             harness,
             tuple_list!(),
-            Box::new(|_, _| ()),
+            Box::new(|_, _, _, _, _| ()),
             &state,
             &corpus,
             &mut event_manager,
@@ -559,7 +559,7 @@ mod tests {
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
-        let state_deserialized: State<BytesInput, StdRand, tuple_list_type!(), tuple_list_type!()> =
+        let state_deserialized: State<BytesInput, StdRand, ()> =
             postcard::from_bytes(state_serialized.as_slice()).unwrap();
         assert_eq!(state.executions, state_deserialized.executions);
 

@@ -13,10 +13,7 @@ use afl::{
         shmem::{AflShmem, ShMem},
         EventManager, LlmpEventManager, SimpleStats,
     },
-    executors::{
-        inmemory::{deserialize_state_corpus, serialize_state_corpus, InMemoryExecutor},
-        Executor, ExitKind,
-    },
+    executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
@@ -24,7 +21,7 @@ use afl::{
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     tuples::tuple_list,
-    utils::StdRand,
+    utils::{deserialize_state_corpus, serialize_state_corpus, StdRand},
     AflError,
 };
 

@@ -292,6 +292,30 @@ where
     // TODO Custom event fire (dyn CustomEvent or similar)
 }
 
+/// An eventmgr for tests, and as placeholder if you really don't need an event manager.
+#[derive(Copy, Clone, Debug)]
+pub struct NopEventManager<I> {
+    phantom: PhantomData<I>,
+}
+impl<I> EventManager<I> for NopEventManager<I>
+where
+    I: Input,
+{
+    fn process<C, FT, R>(
+        &mut self,
+        _state: &mut State<I, R, FT>,
+        _corpus: &mut C,
+    ) -> Result<usize, AflError>
+    where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand,
+    {
+        Ok(0)
+    }
+}
+
+/// Events that may happen
 #[derive(Clone, Debug)]
 pub enum LoggerEvent<I>
 where
