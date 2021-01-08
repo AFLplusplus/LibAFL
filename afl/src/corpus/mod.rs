@@ -378,13 +378,14 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
-    use crate::corpus::Corpus;
-    use crate::corpus::Testcase;
-    use crate::corpus::{OnDiskCorpus, QueueCorpus};
-    use crate::inputs::bytes::BytesInput;
-    use crate::utils::StdRand;
 
     use std::path::PathBuf;
+
+    use crate::{
+        corpus::{Corpus, OnDiskCorpus, QueueCorpus, Testcase},
+        inputs::bytes::BytesInput,
+        utils::StdRand,
+    };
 
     #[test]
     fn test_queuecorpus() {

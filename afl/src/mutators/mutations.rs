@@ -460,8 +460,7 @@ pub fn mutation_bytesexpand<M, C, I, R>(
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R> + HasMaxSize,
-    C: Corpus<I, R>,
+    M: HasMaxSize,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -485,8 +484,7 @@ pub fn mutation_bytesinsert<M, C, I, R>(
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R> + HasMaxSize,
-    C: Corpus<I, R>,
+    M: HasMaxSize,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -512,8 +510,7 @@ pub fn mutation_bytesrandinsert<M, C, I, R>(
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R> + HasMaxSize,
-    C: Corpus<I, R>,
+    M: HasMaxSize,
     I: Input + HasBytesVec,
     R: Rand,
 {
