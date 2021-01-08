@@ -318,7 +318,7 @@ mod tests {
     use alloc::boxed::Box;
 
     use crate::{
-        executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
+        executors::{Executor, ExitKind, InMemoryExecutor},
         inputs::NopInput,
         tuples::tuple_list,
     };

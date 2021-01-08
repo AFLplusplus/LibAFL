@@ -104,14 +104,12 @@ fn mem_set(data: &mut [u8], from: usize, len: usize, val: u8) {
 
 /// Bitflip mutation for inputs with a bytes vector
 pub fn mutation_bitflip<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -128,14 +126,12 @@ where
 }
 
 pub fn mutation_byteflip<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -152,14 +148,12 @@ where
 }
 
 pub fn mutation_byteinc<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -177,14 +171,12 @@ where
 }
 
 pub fn mutation_bytedec<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -202,14 +194,12 @@ where
 }
 
 pub fn mutation_byteneg<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -226,14 +216,12 @@ where
 }
 
 pub fn mutation_byterand<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -250,14 +238,12 @@ where
 }
 
 pub fn mutation_byteadd<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -279,14 +265,12 @@ where
 }
 
 pub fn mutation_wordadd<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -310,14 +294,12 @@ where
 }
 
 pub fn mutation_dwordadd<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -341,14 +323,12 @@ where
 }
 
 pub fn mutation_qwordadd<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -372,14 +352,12 @@ where
 }
 
 pub fn mutation_byteinteresting<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -397,14 +375,12 @@ where
 }
 
 pub fn mutation_wordinteresting<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -427,14 +403,12 @@ where
 }
 
 pub fn mutation_dwordinteresting<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -457,14 +431,12 @@ where
 }
 
 pub fn mutation_bytesdelete<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -481,9 +453,10 @@ where
 }
 
 pub fn mutation_bytesexpand<M, C, I, R>(
+    // TODO: max_size instead of mutator?
     mutator: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -508,7 +481,7 @@ where
 pub fn mutation_bytesinsert<M, C, I, R>(
     mutator: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -535,7 +508,7 @@ where
 pub fn mutation_bytesrandinsert<M, C, I, R>(
     mutator: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -560,14 +533,12 @@ where
 }
 
 pub fn mutation_bytesset<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -588,14 +559,12 @@ where
 }
 
 pub fn mutation_bytesrandset<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -616,14 +585,12 @@ where
 }
 
 pub fn mutation_bytescopy<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -641,14 +608,12 @@ where
 }
 
 pub fn mutation_bytesswap<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
-    _corpus: &C,
+    _: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
-    C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
 {
@@ -685,13 +650,12 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 
 /// Splicing mutator
 pub fn mutation_splice<M, C, I, R>(
-    _mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
     corpus: &C,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: Mutator<C, I, R>,
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
