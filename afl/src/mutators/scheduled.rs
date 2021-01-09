@@ -194,23 +194,24 @@ where
         let num = self.scheduled.iterations(rand, input);
         for _ in 0..num {
             let idx = self.scheduled.schedule(13, rand, input);
-            match idx {
-                0 => mutation_bitflip(self, rand, corpus, input)?,
-                1 => mutation_byteflip(self, rand, corpus, input)?,
-                2 => mutation_byteinc(self, rand, corpus, input)?,
-                3 => mutation_bytedec(self, rand, corpus, input)?,
-                4 => mutation_byteneg(self, rand, corpus, input)?,
-                5 => mutation_byterand(self, rand, corpus, input)?,
+            let mutation = match idx {
+                0 => mutation_bitflip,
+                1 => mutation_byteflip,
+                2 => mutation_byteinc,
+                3 => mutation_bytedec,
+                4 => mutation_byteneg,
+                5 => mutation_byterand,
 
-                6 => mutation_byteadd(self, rand, corpus, input)?,
-                7 => mutation_wordadd(self, rand, corpus, input)?,
-                8 => mutation_dwordadd(self, rand, corpus, input)?,
-                9 => mutation_byteinteresting(self, rand, corpus, input)?,
-                10 => mutation_wordinteresting(self, rand, corpus, input)?,
-                11 => mutation_dwordinteresting(self, rand, corpus, input)?,
+                6 => mutation_byteadd,
+                7 => mutation_wordadd,
+                8 => mutation_dwordadd,
+                9 => mutation_byteinteresting,
+                10 => mutation_wordinteresting,
+                11 => mutation_dwordinteresting,
 
-                _ => mutation_splice(self, rand, corpus, input)?,
+                _ => mutation_splice,
             };
+            mutation(self, rand, corpus, input)?;
         }
         Ok(())
     }

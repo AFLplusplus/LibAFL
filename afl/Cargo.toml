@@ -41,7 +41,7 @@ required-features = ["std"]
 
 [dependencies]
 tuple_list = "0.1.2"
-hashbrown =  { version = "0.9", features = ["serde"] } # A faster hashmap, nostd compatible
+hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
 libc = "0.2" # For (*nix) libc
 num = "*"
 xxhash-rust = { version = "0.8.0", features = ["xxh3"] } # xxh3 hashing for rust
