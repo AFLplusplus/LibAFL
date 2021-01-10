@@ -662,10 +662,12 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Crash { input: _ } => {
-                panic!("LoggerEventManager cannot handle Event::Crash");
+                println!("LLMPEvent::Crash");
+                Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Timeout { input: _ } => {
-                panic!("LoggerEventManager cannot handle Event::Timeout");
+                println!("LLMPEvent::Timeout");
+                Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Log {
                 severity_level,
