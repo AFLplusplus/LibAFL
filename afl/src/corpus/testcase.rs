@@ -21,7 +21,6 @@ where
     filename: Option<String>,
     /// Accumulated fitness from all the feedbacks
     fitness: u32,
-    // TODO find a way to use TypeId
     /// Map of metadatas associated with this testcase
     metadatas: SerdeAnyMap,
 }
