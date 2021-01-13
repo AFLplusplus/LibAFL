@@ -225,7 +225,13 @@ where
 
 impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + core::fmt::Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
     I: Input,
@@ -239,6 +245,7 @@ where
         // TODO optimize
         let observer = observers.match_name_type::<O>(&self.name).unwrap();
         let size = observer.usable_count();
+        //println!("count: {:?}, map: {:?}, history: {:?}", size, observer.map(), &self.history_map);
         for i in 0..size {
             let history = self.history_map[i];
             let item = observer.map()[i];
@@ -248,6 +255,9 @@ where
                 interesting += 1;
             }
         }
+
+        //println!("..interesting: {:?}, new_history: {:?}\n", interesting, &self.history_map);
+        //std::thread::sleep(std::time::Duration::from_millis(100));
 
         Ok(interesting)
     }

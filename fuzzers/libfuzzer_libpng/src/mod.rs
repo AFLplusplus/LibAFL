@@ -181,6 +181,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     // If we're restarting, deserialize the old state.
     let (mut state, mut corpus, mut mgr) = match receiver.recv_buf()? {
         None => {
+            println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
             mgr = LlmpEventManager::<BytesInput, _, _>::existing_client_from_env_std(
                 ENV_FUZZER_BROKER_CLIENT_INITIAL,
@@ -194,7 +195,10 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
             (state, corpus, mgr)
         }
         // Restoring from a previous run, deserialize state and corpus.
-        Some((_sender, _tag, msg)) => deserialize_state_corpus_mgr(&msg, stats)?,
+        Some((_sender, _tag, msg)) => {
+            println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
+            deserialize_state_corpus_mgr(&msg, stats)?
+        }
     };
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
     unsafe { sender.reset_last_page() };
