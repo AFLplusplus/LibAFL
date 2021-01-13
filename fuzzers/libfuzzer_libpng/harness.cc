@@ -157,6 +157,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   // This is going to be too slow.
   if (width && height > 100000000 / width) {
     PNG_CLEANUP
+    asm("ud2");
     return 0;
   }
 
