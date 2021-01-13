@@ -57,6 +57,7 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -65,7 +66,7 @@ use std::{
     thread,
 };
 
-use super::shmem::ShMem;
+use super::shmem::{ShMem, ShMemDescription};
 use crate::utils::next_pow2;
 use crate::AflError;
 
@@ -217,6 +218,16 @@ unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
         .offset((*last_msg).buf_len_padded as isize) as *mut LlmpMsg;
 }
 
+/// Description of a shared map.
+/// May be used to restore the map by id.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct LlmpDescription {
+    /// Info about the SharedMap in use
+    shmem: ShMemDescription,
+    /// The last message sent or received, depnding on page type
+    last_message_offset: Option<u64>,
+}
+
 #[derive(Copy, Clone, Debug)]
 /// Result of an LLMP Mesasge hook
 pub enum LlmpMsgHookResult {
@@ -327,6 +338,23 @@ where
         }
     }
 
+    /// Describe this in a reproducable fashion, if it's a client
+    pub fn describe(&self) -> Result<LlmpClientDescription, AflError> {
+        Ok(match self {
+            LlmpConnection::IsClient { client } => client.describe()?,
+            _ => todo!("Only client can be described atm."),
+        })
+    }
+
+    /// Recreate an existing client from the stored description
+    pub fn existing_client_from_description(
+        description: &LlmpClientDescription,
+    ) -> Result<LlmpConnection<SH>, AflError> {
+        Ok(LlmpConnection::IsClient {
+            client: LlmpClient::existing_client_from_description(description)?,
+        })
+    }
+
     /// Sends the given buffer over this connection, no matter if client or broker.
     pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
         match self {
@@ -432,9 +460,6 @@ where
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), AflError> {
         let current_out_map = self.out_maps.last().unwrap();
-        // TODO: Make sure somebody else has mapped this
-        // current_out_map.await_read_blocking();
-
         current_out_map.shmem.write_to_env(env_name)?;
         current_out_map.msg_to_env(self.last_msg_sent, env_name)
     }
@@ -731,6 +756,28 @@ where
             self.send(msg)
         }
     }
+
+    // Describe this cient in a way, that it can be restored later with `Self::on_existing_from_description`
+    pub fn describe(&self) -> Result<LlmpDescription, AflError> {
+        let map = self.out_maps.last().unwrap();
+        let last_message_offset = if self.last_msg_sent.is_null() {
+            None
+        } else {
+            Some(map.msg_to_offset(self.last_msg_sent)?)
+        };
+        Ok(LlmpDescription {
+            shmem: map.shmem.description(),
+            last_message_offset,
+        })
+    }
+
+    // Create this client on an existing map from the given description. acquired with `self.describe`
+    pub fn on_existing_from_description(description: &LlmpDescription) -> Result<Self, AflError> {
+        Self::on_existing_map(
+            SH::existing_from_description(&description.shmem)?,
+            description.last_message_offset,
+        )
+    }
 }
 
 /// Receiving end on a (unidirectional) sharedmap channel
@@ -921,6 +968,28 @@ where
                 (*msg).as_slice(&mut self.current_recv_map)?,
             ))
         }
+    }
+
+    // Describe this cient in a way, that it can be restored later with `Self::on_existing_from_description`
+    pub fn describe(&self) -> Result<LlmpDescription, AflError> {
+        let map = &self.current_recv_map;
+        let last_message_offset = if self.last_msg_recvd.is_null() {
+            None
+        } else {
+            Some(map.msg_to_offset(self.last_msg_recvd)?)
+        };
+        Ok(LlmpDescription {
+            shmem: map.shmem.description(),
+            last_message_offset,
+        })
+    }
+
+    // Create this client on an existing map from the given description. acquired with `self.describe`
+    pub fn on_existing_from_description(description: &LlmpDescription) -> Result<Self, AflError> {
+        Self::on_existing_map(
+            SH::existing_from_description(&description.shmem)?,
+            description.last_message_offset,
+        )
     }
 }
 
@@ -1330,6 +1399,15 @@ where
     }
 }
 
+/// A restorable client description
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct LlmpClientDescription {
+    /// Description of the sender
+    sender: LlmpDescription,
+    /// Description of the receiver
+    receiver: LlmpDescription,
+}
+
 /// Client side of LLMP
 #[derive(Clone, Debug)]
 pub struct LlmpClient<SH>
@@ -1378,6 +1456,24 @@ where
     pub fn to_env(&self, env_name: &str) -> Result<(), AflError> {
         self.sender.to_env(&format!("{}_SENDER", env_name))?;
         self.receiver.to_env(&format!("{}_RECEIVER", env_name))
+    }
+
+    /// Describe this client in a way that it can be recreated, for example after crash
+    fn describe(&self) -> Result<LlmpClientDescription, AflError> {
+        Ok(LlmpClientDescription {
+            sender: self.sender.describe()?,
+            receiver: self.receiver.describe()?,
+        })
+    }
+
+    /// Create an existing client from description
+    fn existing_client_from_description(
+        description: &LlmpClientDescription,
+    ) -> Result<Self, AflError> {
+        Ok(Self {
+            sender: LlmpSender::on_existing_from_description(&description.sender)?,
+            receiver: LlmpReceiver::on_existing_from_description(&description.receiver)?,
+        })
     }
 
     /// Waits for the sender to be save to unmap.

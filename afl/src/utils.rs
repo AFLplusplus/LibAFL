@@ -8,9 +8,64 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{corpus::Corpus, engines::State, feedbacks::FeedbacksTuple, inputs::Input, AflError};
+use crate::{
+    corpus::Corpus,
+    engines::State,
+    events::{shmem::ShMem, LlmpEventManager, Stats},
+    feedbacks::FeedbacksTuple,
+    inputs::Input,
+    AflError,
+};
 
 pub type StdRand = RomuTrioRand;
+
+/// Serialize the current state and corpus during an executiont to bytes.
+/// On top, add the current llmp event manager instance to be restored
+/// This method is needed when the fuzzer run crashes and has to restart.
+pub fn serialize_state_corpus_mgr<C, FT, I, R, SH, ST>(
+    state: &State<I, R, FT>,
+    corpus: &C,
+    mgr: &LlmpEventManager<I, SH, ST>,
+) -> Result<Vec<u8>, AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    SH: ShMem,
+    ST: Stats,
+{
+    let mgr_bytes = postcard::to_allocvec(&mgr.describe()?)?;
+    let state_bytes = postcard::to_allocvec(&state)?;
+    let corpus_bytes = postcard::to_allocvec(&corpus)?;
+    Ok(postcard::to_allocvec(&(
+        state_bytes,
+        corpus_bytes,
+        mgr_bytes,
+    ))?)
+}
+
+/// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
+pub fn deserialize_state_corpus_mgr<C, FT, I, R, SH, ST>(
+    state_corpus_serialized: &[u8],
+    stats: ST,
+) -> Result<(State<I, R, FT>, C, LlmpEventManager<I, SH, ST>), AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    SH: ShMem,
+    ST: Stats,
+{
+    let tuple: (Vec<u8>, Vec<u8>, Vec<u8>) = postcard::from_bytes(&state_corpus_serialized)?;
+    let client_description = postcard::from_bytes(&tuple.2)?;
+    Ok((
+        postcard::from_bytes(&tuple.0)?,
+        postcard::from_bytes(&tuple.1)?,
+        LlmpEventManager::existing_client_from_description(&client_description, stats)?,
+    ))
+}
 
 /// Serialize the current state and corpus during an executiont to bytes.
 /// This method is needed when the fuzzer run crashes and has to restart.

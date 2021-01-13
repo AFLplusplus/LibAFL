@@ -12,7 +12,7 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 use self::{
-    llmp::{LlmpClient, Tag},
+    llmp::{LlmpClient, LlmpClientDescription, Tag},
     shmem::ShMem,
 };
 use crate::{
@@ -800,6 +800,25 @@ where
         })
     }
 
+    /// Describe the client event mgr's llmp parts in a restorable fashion
+    pub fn describe(&self) -> Result<LlmpClientDescription, AflError> {
+        self.llmp.describe()
+    }
+
+    /// Create an existing client from description
+    pub fn existing_client_from_description(
+        description: &LlmpClientDescription,
+        stats: ST,
+    ) -> Result<Self, AflError> {
+        Ok(Self {
+            llmp: llmp::LlmpConnection::existing_client_from_description(description)?,
+            // Inserting a nop-stats element here so rust won't complain.
+            // In any case, the client won't currently use it.
+            stats: stats,
+            phantom: PhantomData,
+        })
+    }
+
     /// A client on an existing map
     pub fn for_client(client: LlmpClient<SH>, stats: ST) -> Self {
         Self {
@@ -860,6 +879,7 @@ where
         }
     }
 
+    /// Send an event kind via llmp
     #[inline]
     fn send_event_kind<'a>(&mut self, event: LLMPEventKind<'a, I>) -> Result<(), AflError> {
         let serialized = postcard::to_allocvec(&event)?;

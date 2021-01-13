@@ -6,10 +6,21 @@ pub use shmem::AflShmem;
 
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 
 use crate::AflError;
+
+/// Description of a shared map.
+/// May be used to restore the map by id.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct ShMemDescription {
+    /// Size of this map
+    size: usize,
+    /// of name of this map, as fixed 20 bytes c-string
+    str_bytes: [u8; 20],
+}
 
 /// A Shared map
 pub trait ShMem: Sized + Debug {
@@ -51,6 +62,19 @@ pub trait ShMem: Sized + Debug {
 
     /// The actual shared map, mutable
     fn map_mut(&mut self) -> &mut [u8];
+
+    /// Describe this shared map in a recreatable fashion
+    fn description(&self) -> ShMemDescription {
+        ShMemDescription {
+            size: self.map().len(),
+            str_bytes: self.shm_slice().clone(),
+        }
+    }
+
+    /// Create a map from a map description
+    fn existing_from_description(description: &ShMemDescription) -> Result<Self, AflError> {
+        Self::existing_from_shm_slice(&description.str_bytes, description.size)
+    }
 
     /// Write this map's config to env
     #[cfg(feature = "std")]
