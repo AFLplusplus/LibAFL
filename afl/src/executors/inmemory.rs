@@ -265,7 +265,19 @@ pub mod unix_signals {
             );
         }
 
-        // TODO: send LLMP.
+        /* TODO: If we want to be on the safe side, we really need to do this:
+        match manager.llmp {
+            IsClient { client } => {
+                let map = client.out_maps.last().unwrap();
+                /// wait until we can drop the message safely.
+                map.await_save_to_unmap_blocking();
+                /// Make sure all pages are unmapped.
+                drop(manager);
+            }
+            _ => (),
+        }
+        */
+
         println!("Timeout in fuzz run.");
         let _ = stdout().flush();
         process::abort();

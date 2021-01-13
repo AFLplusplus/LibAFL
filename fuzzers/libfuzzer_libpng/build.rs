@@ -20,6 +20,10 @@ fn main() {
     let libpng_path = Path::new(&libpng);
     let libpng_tar = format!("{}/libpng-1.6.37.tar.xz", &cwd);
 
+    // Enforce clang for its -fsanitize-coverage support.
+    std::env::set_var("CC", "clang");
+    std::env::set_var("CXX", "clang++");
+
     if !libpng_path.is_dir() {
         if !Path::new(&libpng_tar).is_file() {
             println!("cargo:warning=Libpng not found, downloading...");
@@ -84,13 +88,10 @@ fn main() {
             .unwrap();
     }
 
-    std::env::set_var("CC", "clang");
-    std::env::set_var("CXX", "clang++");
-
     cc::Build::new()
         .file("../libfuzzer_runtime/rt.c")
         .compile("libfuzzer-sys");
-    
+
     cc::Build::new()
         .include(&libpng_path)
         .flag("-fsanitize-coverage=trace-pc-guard")

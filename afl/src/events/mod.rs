@@ -17,13 +17,13 @@ use self::{
 };
 use crate::{
     corpus::Corpus,
+    engines::State,
     feedbacks::FeedbacksTuple,
     inputs::Input,
     observers::ObserversTuple,
     serde_anymap::Ptr,
-    utils::Rand,
+    utils::{current_time, Rand},
     AflError,
-    {engines::State, utils},
 };
 #[cfg(feature = "std")]
 use shmem::AflShmem;
@@ -104,7 +104,7 @@ pub trait Stats {
     /// Executions per second
     #[inline]
     fn execs_per_sec(&mut self) -> u64 {
-        let cur_time = utils::current_time();
+        let cur_time = current_time();
         self.client_stats()
             .iter()
             .fold(0u64, |acc, x| acc + x.execs_per_sec(cur_time))
@@ -115,7 +115,7 @@ pub trait Stats {
         let client_stat_count = self.client_stats().len();
         for _ in client_stat_count..(client_id + 1) as usize {
             self.client_stats_mut().push(ClientStats {
-                last_window_time: utils::current_time(),
+                last_window_time: current_time(),
                 ..Default::default()
             })
         }
@@ -173,7 +173,7 @@ where
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn: print_fn,
-            start_time: utils::current_time(),
+            start_time: current_time(),
             corpus_size: 0,
             client_stats: vec![],
         }
