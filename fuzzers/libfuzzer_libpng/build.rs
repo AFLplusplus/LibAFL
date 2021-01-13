@@ -84,11 +84,18 @@ fn main() {
             .unwrap();
     }
 
+    std::env::set_var("CC", "clang");
+    std::env::set_var("CXX", "clang++");
+
+    cc::Build::new()
+        .file("../libfuzzer_runtime/rt.c")
+        .compile("libfuzzer-sys");
+    
     cc::Build::new()
         .include(&libpng_path)
-        .file("../libfuzzer_runtime/rt.c")
+        .flag("-fsanitize-coverage=trace-pc-guard")
         .file("./harness.cc")
-        .compile("libfuzzer-sys");
+        .compile("libfuzzer-harness");
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
     println!("cargo:rustc-link-search=native={}/.libs", &libpng);
