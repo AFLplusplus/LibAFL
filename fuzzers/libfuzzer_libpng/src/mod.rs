@@ -149,12 +149,17 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
             sender.to_env(ENV_FUZZER_SENDER)?;
             receiver.to_env(ENV_FUZZER_RECEIVER)?;
 
+            let mut ctr = 0;
             loop {
                 dbg!("Spawning next client");
                 Command::new(env::current_exe()?)
                     .current_dir(env::current_dir()?)
                     .args(env::args())
                     .status()?;
+                ctr += 1;
+                if ctr == 10 {
+                    return Ok(());
+                }
             }
         }
     }
@@ -219,7 +224,9 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
                     .expect(&format!("Error sending crash event for input {:?}", input)),
                 _ => (),
             }
+            println!("foo");
             let state_corpus_serialized = serialize_state_corpus_mgr(state, corpus, mgr).unwrap();
+            println!("bar: {:?}", &state_corpus_serialized);
             sender.send_buf(0x1, &state_corpus_serialized).unwrap();
         }),
         &state,

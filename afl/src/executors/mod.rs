@@ -6,6 +6,7 @@ pub mod runtime;
 use core::marker::PhantomData;
 
 use crate::{
+    engines::State,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     tuples::{MatchNameAndType, MatchType, Named, TupleList},
@@ -74,7 +75,13 @@ where
     I: Input,
 {
     /// Instruct the target about the input and run
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError>;
+    fn run_target<R, FT, C, EM>(
+        &mut self,
+        input: &I,
+        state: &State<I, R, FT>,
+        corpus: &C,
+        event_mgr: &EM,
+    ) -> Result<ExitKind, AflError>;
 }
 
 pub trait ExecutorsTuple<I>: MatchType + MatchNameAndType

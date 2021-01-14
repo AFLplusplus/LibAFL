@@ -35,14 +35,25 @@ where
     SH: ShMem,
     ST: Stats,
 {
-    let mgr_bytes = postcard::to_allocvec(&mgr.describe()?)?;
-    let state_bytes = postcard::to_allocvec(&state)?;
-    let corpus_bytes = postcard::to_allocvec(&corpus)?;
-    Ok(postcard::to_allocvec(&(
+    println!("state ptr: {:x}", state as *const _ as u64);
+    println!("state execs: {}", state.executions());
+    println!("More fun");
+    let ret_slice = postcard::to_allocvec(&(&state, &corpus, &mgr.describe()?))?;
+    println!("done: {:?}", ret_slice);
+    //let corpus_bytes = serde_json::to_string(&corpus).unwrap();
+
+    //println!("fun");
+    //let state_bytes = serde_json::to_string(&state).unwrap();
+    //println!("fun & games");
+    /*match serde_json::to_string(&(
         state_bytes,
         corpus_bytes,
         mgr_bytes,
-    ))?)
+    )) {
+        Ok(val) => Ok(val.as_bytes().to_vec()),
+        Err(e) => panic!("couldn't do things"),
+    }*/
+    Ok(ret_slice)
 }
 
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`

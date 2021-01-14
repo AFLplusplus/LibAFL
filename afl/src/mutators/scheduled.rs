@@ -208,7 +208,6 @@ where
                 9 => mutation_byteinteresting,
                 10 => mutation_wordinteresting,
                 11 => mutation_dwordinteresting,*/
-
                 _ => mutation_splice,
             };
             mutation(self, rand, corpus, input)?;

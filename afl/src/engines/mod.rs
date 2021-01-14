@@ -214,13 +214,20 @@ where
     }
 
     /// Runs the input and triggers observers and feedback
-    pub fn evaluate_input<E, OT>(&mut self, input: &I, executor: &mut E) -> Result<u32, AflError>
+    pub fn evaluate_input<C, E, EM, OT>(
+        &mut self,
+        input: &I,
+        executor: &mut E,
+        corpus: &C,
+        event_mgr: &mut EM,
+    ) -> Result<u32, AflError>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
     {
         executor.pre_exec_observers()?;
-        executor.run_target(&input)?;
+
+        executor.run_target(&input, &self, &corpus, &mut event_mgr)?;
         self.set_executions(self.executions() + 1);
         executor.post_exec_observers()?;
 
