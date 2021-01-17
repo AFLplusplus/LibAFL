@@ -89,7 +89,8 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = std::fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let fitness = self.evaluate_input(&input, engine.executor_mut(), corpus, manager)?;
+                let fitness =
+                    self.evaluate_input(&input, engine.executor_mut(), corpus, manager)?;
                 if self.add_if_interesting(corpus, input, fitness)?.is_none() {
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
@@ -232,7 +233,7 @@ where
         executor.pre_exec(&self, corpus, event_mgr, input)?;
         executor.run_target(input)?;
         executor.post_exec(&self, corpus, event_mgr, input)?;
-        
+
         self.set_executions(self.executions() + 1);
         executor.post_exec_observers()?;
 

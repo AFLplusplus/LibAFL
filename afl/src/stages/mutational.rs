@@ -61,7 +61,8 @@ where
             self.mutator_mut()
                 .mutate(rand, corpus, &mut input_mut, i as i32)?;
 
-            let fitness = state.evaluate_input(&input_mut, engine.executor_mut(), corpus, manager)?;
+            let fitness =
+                state.evaluate_input(&input_mut, engine.executor_mut(), corpus, manager)?;
 
             self.mutator_mut()
                 .post_exec(fitness, &input_mut, i as i32)?;

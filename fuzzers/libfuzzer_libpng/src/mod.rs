@@ -16,7 +16,7 @@ use afl::{
     executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
-    inputs::BytesInput,
+    inputs::{BytesInput, Input},
     mutators::{scheduled::HavocBytesMutator, HasMaxSize},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
@@ -48,7 +48,11 @@ extern "C" {
 }
 
 /// The wrapped harness function, calling out to the llvm-style libfuzzer harness
-fn harness<I>(_executor: &dyn Executor<I>, buf: &[u8]) -> ExitKind {
+fn harness<E, I>(_executor: &E, buf: &[u8]) -> ExitKind
+where
+    E: Executor<I>,
+    I: Input,
+{
     unsafe {
         LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len());
     }
@@ -208,12 +212,8 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
     unsafe { sender.reset_last_page() };
 
-    // Create the engine
-    let executor = InMemoryExecutor::<_, _, _, LlmpEventManager<_, _, _>, _, _>::new(
-        "Libfuzzer",
-        harness,
-        tuple_list!(edges_observer),
-        Box::new(move |exit_kind, input, state, corpus, mgr| {
+    /*
+    move |exit_kind, input, state, corpus, mgr| {
             match exit_kind {
                 ExitKind::Timeout => mgr.timeout(input).expect(&format!(
                     "Error sending Timeout event for input {:?}",
@@ -228,7 +228,14 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
             let state_corpus_serialized = serialize_state_corpus_mgr(state, corpus, mgr).unwrap();
             println!("bar: {:?}", &state_corpus_serialized);
             sender.send_buf(0x1, &state_corpus_serialized).unwrap();
-        }),
+        }
+    */
+
+    // Create the engine
+    let executor = InMemoryExecutor::new(
+        "Libfuzzer",
+        harness,
+        tuple_list!(edges_observer),
         &state,
         &corpus,
         &mut mgr,

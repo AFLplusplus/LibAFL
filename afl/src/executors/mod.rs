@@ -6,14 +6,14 @@ pub mod runtime;
 use core::marker::PhantomData;
 
 use crate::{
-    engines::State,
     corpus::Corpus,
-    feedbacks::FeedbacksTuple,
+    engines::State,
     events::EventManager,
-    utils::Rand,
+    feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    utils::Rand,
     AflError,
 };
 
@@ -84,30 +84,34 @@ where
         _corpus: &C,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), AflError> where
-        R: Rand ,
+    ) -> Result<(), AflError>
+    where
+        R: Rand,
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
-        EM: EventManager<I>, { Ok(()) }
-    
+        EM: EventManager<I>,
+    {
+        Ok(())
+    }
+
     fn post_exec<R, FT, C, EM>(
         &mut self,
         _state: &State<I, R, FT>,
         _corpus: &C,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), AflError> where
-        R: Rand ,
+    ) -> Result<(), AflError>
+    where
+        R: Rand,
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
-        EM: EventManager<I>, { Ok(()) }
+        EM: EventManager<I>,
+    {
+        Ok(())
+    }
 
     /// Instruct the target about the input and run
-    fn run_target(
-        &mut self,
-        input: &I
-    ) -> Result<ExitKind, AflError>;
-    
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError>;
 }
 
 pub trait ExecutorsTuple<I>: MatchType + MatchNameAndType

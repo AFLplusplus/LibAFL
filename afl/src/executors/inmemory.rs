@@ -1,5 +1,5 @@
-use os_signals::set_oncrash_ptrs;
 use core::marker::PhantomData;
+use os_signals::set_oncrash_ptrs;
 
 use crate::{
     corpus::Corpus,
@@ -45,42 +45,39 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    
     fn pre_exec<R, FT, C, EM>(
         &mut self,
         state: &State<I, R, FT>,
         corpus: &C,
         event_mgr: &mut EM,
         input: &I,
-    ) -> Result<(), AflError> where
-        R: Rand ,
+    ) -> Result<(), AflError>
+    where
+        R: Rand,
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
         EM: EventManager<I>,
-        {
-      #[cfg(unix)]
+    {
+        #[cfg(unix)]
         unsafe {
-            set_oncrash_ptrs::<EM, C, OT, FT, I, R>(
-                state,
-                corpus,
-                event_mgr,
-                input,
-            );
+            set_oncrash_ptrs::<EM, C, OT, FT, I, R>(state, corpus, event_mgr, input);
         }
         Ok(())
     }
-    
+
     fn post_exec<R, FT, C, EM>(
         &mut self,
         _state: &State<I, R, FT>,
         _corpus: &C,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), AflError> where
-        R: Rand ,
+    ) -> Result<(), AflError>
+    where
+        R: Rand,
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
-        EM: EventManager<I>, {
+        EM: EventManager<I>,
+    {
         #[cfg(unix)]
         unsafe {
             reset_oncrash_ptrs::<EM, C, OT, FT, I, R>();
@@ -89,10 +86,7 @@ where
     }
 
     #[inline]
-    fn run_target(
-        &mut self,
-        input: &I,
-    ) -> Result<ExitKind, AflError> {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(self, bytes.as_slice());
         Ok(ret)
@@ -145,11 +139,13 @@ where
         _state: &State<I, R, FT>,
         _corpus: &C,
         _event_mgr: &mut EM,
-    ) -> Self where
-        R: Rand ,
+    ) -> Self
+    where
+        R: Rand,
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
-        EM: EventManager<I>, {
+        EM: EventManager<I>,
+    {
         #[cfg(feature = "std")]
         unsafe {
             setup_crash_handlers::<EM, C, OT, FT, I, R>();
@@ -159,7 +155,7 @@ where
             harness_fn,
             observers,
             name,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -203,13 +199,8 @@ pub mod unix_signals {
     };
 
     use crate::{
-        corpus::Corpus,
-        engines::State,
-        events::EventManager,
-        feedbacks::FeedbacksTuple,
-        inputs::Input,
-        observers::ObserversTuple,
-        utils::Rand,
+        corpus::Corpus, engines::State, events::EventManager, feedbacks::FeedbacksTuple,
+        inputs::Input, observers::ObserversTuple, utils::Rand,
     };
 
     /// Pointers to values only needed on crash. As the program will not continue after a crash,
