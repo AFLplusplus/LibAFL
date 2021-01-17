@@ -89,7 +89,7 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = std::fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+                let fitness = self.evaluate_input(&input, engine.executor_mut(), corpus, manager)?;
                 if self.add_if_interesting(corpus, input, fitness)?.is_none() {
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
@@ -224,10 +224,15 @@ where
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
+        C: Corpus<I, R>,
+        EM: EventManager<I>,
     {
         executor.pre_exec_observers()?;
 
-        executor.run_target(&input, &self, &corpus, &mut event_mgr)?;
+        executor.pre_exec(&self, corpus, event_mgr, input)?;
+        executor.run_target(input)?;
+        executor.post_exec(&self, corpus, event_mgr, input)?;
+        
         self.set_executions(self.executions() + 1);
         executor.post_exec_observers()?;
 
@@ -307,7 +312,7 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(rand)?;
-            let fitness = self.evaluate_input(&input, engine.executor_mut())?;
+            let fitness = self.evaluate_input(&input, engine.executor_mut(), corpus, manager)?;
             if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
                 added += 1;
             }

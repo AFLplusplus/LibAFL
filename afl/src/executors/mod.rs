@@ -7,6 +7,10 @@ use core::marker::PhantomData;
 
 use crate::{
     engines::State,
+    corpus::Corpus,
+    feedbacks::FeedbacksTuple,
+    events::EventManager,
+    utils::Rand,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     tuples::{MatchNameAndType, MatchType, Named, TupleList},
@@ -74,30 +78,52 @@ pub trait Executor<I>: Named
 where
     I: Input,
 {
-    /// Instruct the target about the input and run
-    fn run_target<R, FT, C, EM>(
+    fn pre_exec<R, FT, C, EM>(
         &mut self,
-        input: &I,
-        state: &State<I, R, FT>,
-        corpus: &C,
-        event_mgr: &EM,
+        _state: &State<I, R, FT>,
+        _corpus: &C,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), AflError> where
+        R: Rand ,
+        FT: FeedbacksTuple<I>,
+        C: Corpus<I, R>,
+        EM: EventManager<I>, { Ok(()) }
+    
+    fn post_exec<R, FT, C, EM>(
+        &mut self,
+        _state: &State<I, R, FT>,
+        _corpus: &C,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), AflError> where
+        R: Rand ,
+        FT: FeedbacksTuple<I>,
+        C: Corpus<I, R>,
+        EM: EventManager<I>, { Ok(()) }
+
+    /// Instruct the target about the input and run
+    fn run_target(
+        &mut self,
+        input: &I
     ) -> Result<ExitKind, AflError>;
+    
 }
 
 pub trait ExecutorsTuple<I>: MatchType + MatchNameAndType
 where
     I: Input,
 {
-    fn for_each(&self, f: fn(&dyn Executor<I>));
-    fn for_each_mut(&mut self, f: fn(&mut dyn Executor<I>));
+    //fn for_each(&self, f: fn(&dyn Executor<I>));
+    //fn for_each_mut(&mut self, f: fn(&mut dyn Executor<I>));
 }
 
 impl<I> ExecutorsTuple<I> for ()
 where
     I: Input,
 {
-    fn for_each(&self, _f: fn(&dyn Executor<I>)) {}
-    fn for_each_mut(&mut self, _f: fn(&mut dyn Executor<I>)) {}
+    //fn for_each(&self, _f: fn(&dyn Executor<I>)) {}
+    //fn for_each_mut(&mut self, _f: fn(&mut dyn Executor<I>)) {}
 }
 
 impl<Head, Tail, I> ExecutorsTuple<I> for (Head, Tail)
@@ -106,7 +132,7 @@ where
     Tail: ExecutorsTuple<I> + TupleList,
     I: Input,
 {
-    fn for_each(&self, f: fn(&dyn Executor<I>)) {
+    /*fn for_each(&self, f: fn(&dyn Executor<I>)) {
         f(&self.0);
         self.1.for_each(f)
     }
@@ -114,7 +140,7 @@ where
     fn for_each_mut(&mut self, f: fn(&mut dyn Executor<I>)) {
         f(&mut self.0);
         self.1.for_each_mut(f)
-    }
+    }*/
 }
 
 #[cfg(test)]
