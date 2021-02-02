@@ -11,9 +11,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::{
     corpus::Corpus,
     engines::State,
-    events::{shmem::ShMem, LlmpEventManager, Stats},
+    events::{LlmpEventManager, Stats},
     feedbacks::FeedbacksTuple,
     inputs::Input,
+    shmem::ShMem,
     AflError,
 };
 

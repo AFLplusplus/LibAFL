@@ -1609,7 +1609,7 @@ mod tests {
         Tag,
     };
     #[cfg(feature = "std")]
-    use crate::events::shmem::AflShmem;
+    use crate::shmem::AflShmem;
 
     #[cfg(feature = "std")]
     #[test]
