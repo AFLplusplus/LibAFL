@@ -662,10 +662,12 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Crash { input: _ } => {
+                #[cfg(feature = "std")]
                 println!("LLMPEvent::Crash");
                 Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Timeout { input: _ } => {
+                #[cfg(feature = "std")]
                 println!("LLMPEvent::Timeout");
                 Ok(BrokerEventResult::Handled)
             }

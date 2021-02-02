@@ -12,7 +12,7 @@ pub use ondisk::OnDiskCorpus;
 pub mod queue;
 pub use queue::QueueCorpus;
 
-use alloc::vec::Vec;
+use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cell::RefCell, ptr};
 
 use crate::{inputs::Input, utils::Rand, AflError};
