@@ -67,7 +67,6 @@ use std::{
 };
 
 use super::shmem::{ShMem, ShMemDescription};
-use crate::utils::next_pow2;
 use crate::AflError;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
@@ -155,10 +154,11 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, AflError> {
 /// largest messages we encountered (plus message one new_page message).
 #[inline]
 fn new_map_size(max_alloc: usize) -> usize {
-    next_pow2(max(
+    max(
         max_alloc * 2 + EOP_MSG_SIZE + LLMP_PAGE_HEADER_LEN,
         LLMP_PREF_INITIAL_MAP_SIZE,
-    ) as u64) as usize
+    )
+    .next_power_of_two()
 }
 
 /// Initialize a new llmp_page. size should be relative to
