@@ -154,12 +154,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
 
+#ifdef HAS_BUG
   // This is going to be too slow.
   if (width && height > 100000000 / width) {
     PNG_CLEANUP
     asm("ud2");
     return 0;
   }
+#endif
 
   // Set several transforms that browsers typically use:
   png_set_gray_to_rgb(png_handler.png_ptr);
