@@ -87,7 +87,7 @@ where
 
             if attr.is_file() && attr.len() > 0 {
                 println!("Loading file {:?} ...", &path);
-                let bytes = std::fs::read(&path)?;
+                let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
                 let fitness =
                     self.evaluate_input(&input, engine.executor_mut(), corpus, manager)?;

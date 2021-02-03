@@ -6,6 +6,12 @@ use crate::{
     AflError,
 };
 
+#[cfg(feature = "std")]
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
+
 const ARITH_MAX: u64 = 35;
 
 const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
@@ -690,4 +696,70 @@ where
     // println!("Splice result: {:?}, input is now: {:?}", split_result, input.bytes());
 
     Ok(MutationResult::Mutated)
+}
+
+/// Read a dictionary file and return the number of entries read
+pub fn read_dict_file(
+    f: &str,
+    dict : &mut Vec<Vec<u8>>,
+) -> Result<u32, AflError> {
+
+    let mut entries = 0;
+
+    println!("Loading dictionary {:?} ...", &f);
+
+    let file = File::open(&f)?;  // panic if not found
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        let line = line.unwrap();
+        let line = line.trim_start().trim_end();
+
+        // we are only interested in '"..."', not prefixed 'foo = '
+        let start = line.chars().nth(0);
+        if line.len() == 0 || start == Some('#') { continue; }
+        let pos_quote = match line.find("\"") {
+            Some(x) => x,
+            _ => return Err(AflError::IllegalArgument("Illegal line: ".to_owned() + line)),
+        };
+        if line.chars().nth(line.len() - 1) != Some('"') {
+            return Err(AflError::IllegalArgument("Illegal line: ".to_owned() + line));
+        }
+
+        // extract item        
+        let item = match line.get(pos_quote + 1 .. line.len() - 1) {
+            Some(x) => x,
+            _ => return Err(AflError::IllegalArgument("Illegal line: ".to_owned() + line)),
+        };
+        
+        if item.len() == 0 { continue; }
+        
+        // decode
+        // FIXME: TODO
+        //let item = unescape(item);        
+
+        let entry: Vec<u8> = item.as_bytes().to_vec();
+        dict.push(entry);
+
+        println!("Debug: {:?}", item);
+        entries += 1;
+    }
+
+    Ok(entries)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        mutators::{read_dict_file},
+    };
+
+    #[test]
+    fn test_read_dict() {
+        let mut v : Vec<Vec<u8>> = Vec::new();
+        let res = read_dict_file(&"test.dic".to_string(), &mut v).unwrap();
+        #[cfg(feature = "std")]
+        println!("Dictionary entries: {:?}", res);
+    }
 }
