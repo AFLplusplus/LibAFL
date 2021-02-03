@@ -374,43 +374,33 @@ pub mod unix_signals {
 #[cfg(test)]
 mod tests {
 
-    use alloc::boxed::Box;
+    use core::marker::PhantomData;
 
     use crate::{
-        executors::{Executor, ExitKind, InMemoryExecutor},
-        inputs::NopInput,
+        executors::{Executor, InMemoryExecutor, ExitKind},
+        inputs::Input,
         tuples::tuple_list,
     };
 
-    #[cfg(feature = "std")]
-    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, buf: &[u8]) -> ExitKind {
-        println!("Fake exec with buf of len {}", buf.len());
-        ExitKind::Ok
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn test_harness_fn_nop(_executor: &dyn Executor<NopInput>, _buf: &[u8]) -> ExitKind {
+    fn test_harness_fn_nop<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
     }
 
     #[test]
     fn test_inmem_exec() {
         use crate::{
-            corpus::InMemoryCorpus, events::NopEventManager, inputs::NopInput, utils::StdRand,
+            inputs::NopInput,
         };
 
         let mut in_mem_executor = InMemoryExecutor::<
             NopInput,
             (),
-            InMemoryCorpus<_, _>,
-            NopEventManager<_>,
-            (),
-            StdRand,
         > {
             harness_fn: test_harness_fn_nop,
-            on_crash_fn: Box::new(|_, _, _, _, _| ()),
+            // TODO: on_crash_fn: Box::new(|_, _, _, _, _| ()),
             observers: tuple_list!(),
             name: "main",
+            phantom: PhantomData,
         };
         let mut input = NopInput {};
         assert!(in_mem_executor.run_target(&mut input).is_ok());

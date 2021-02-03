@@ -1,3 +1,5 @@
+//! Executors take input, and run it in the target.
+
 pub mod inmemory;
 pub use inmemory::InMemoryExecutor;
 #[cfg(feature = "runtime")]

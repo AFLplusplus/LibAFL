@@ -516,9 +516,9 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, Testcase},
         engines::{Engine, Fuzzer, State, StdFuzzer},
         executors::{Executor, ExitKind, InMemoryExecutor},
-        inputs::bytes::BytesInput,
+        inputs::{Input, BytesInput},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
-        stages::mutational::StdMutationalStage,
+        stages::StdMutationalStage,
         tuples::tuple_list,
         utils::StdRand,
     };
@@ -526,7 +526,7 @@ mod tests {
     #[cfg(feature = "std")]
     use crate::events::{LoggerEventManager, SimpleStats};
 
-    fn harness<I>(_executor: &dyn Executor<I>, _buf: &[u8]) -> ExitKind {
+    fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
     }
 
@@ -548,7 +548,7 @@ mod tests {
             "main",
             harness,
             tuple_list!(),
-            Box::new(|_, _, _, _, _| ()),
+            //Box::new(|_, _, _, _, _| ()),
             &state,
             &corpus,
             &mut event_manager,
