@@ -12,7 +12,7 @@ use afl::{
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, Input},
-    llmp::{LlmpSender, LlmpReceiver},
+    llmp::{LlmpReceiver, LlmpSender},
     mutators::{scheduled::HavocBytesMutator, HasMaxSize},
     observers::StdMapObserver,
     shmem::{AflShmem, ShMem},
