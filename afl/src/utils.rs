@@ -36,11 +36,7 @@ where
     SH: ShMem,
     ST: Stats,
 {
-    println!("state ptr: {:x}", state as *const _ as u64);
-    println!("state execs: {}", state.executions());
-    println!("More fun");
     let ret_slice = postcard::to_allocvec(&(&state, &corpus, &mgr.describe()?))?;
-    println!("done: {:?}", ret_slice);
     //let corpus_bytes = serde_json::to_string(&corpus).unwrap();
 
     //println!("fun");

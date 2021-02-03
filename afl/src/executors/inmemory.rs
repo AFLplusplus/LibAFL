@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+#[cfg(feature = "std")]
 use os_signals::set_oncrash_ptrs;
 
 use crate::{
@@ -18,6 +19,7 @@ use crate::{
 #[cfg(unix)]
 use unix_signals as os_signals;
 
+#[cfg(feature = "std")]
 use self::os_signals::reset_oncrash_ptrs;
 #[cfg(feature = "std")]
 use self::os_signals::setup_crash_handlers;
@@ -48,10 +50,10 @@ where
     #[inline]
     fn pre_exec<R, FT, C, EM>(
         &mut self,
-        state: &State<I, R, FT>,
-        corpus: &C,
-        event_mgr: &mut EM,
-        input: &I,
+        _state: &State<I, R, FT>,
+        _corpus: &C,
+        _event_mgr: &mut EM,
+        _input: &I,
     ) -> Result<(), AflError>
     where
         R: Rand,
@@ -60,8 +62,9 @@ where
         EM: EventManager<I>,
     {
         #[cfg(unix)]
+        #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs::<EM, C, OT, FT, I, R>(state, corpus, event_mgr, input);
+            set_oncrash_ptrs::<EM, C, OT, FT, I, R>(_state, _corpus, _event_mgr, _input);
         }
         Ok(())
     }
@@ -81,6 +84,7 @@ where
         EM: EventManager<I>,
     {
         #[cfg(unix)]
+        #[cfg(feature = "std")]
         unsafe {
             reset_oncrash_ptrs::<EM, C, OT, FT, I, R>();
         }
