@@ -1,3 +1,5 @@
+//! The ondisk corpus stores unused testcases to disk.
+
 use alloc::vec::Vec;
 use core::{cell::RefCell, marker::PhantomData};
 use serde::{Deserialize, Serialize};

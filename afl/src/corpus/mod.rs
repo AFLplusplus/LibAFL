@@ -1,3 +1,6 @@
+//! Corpuses contain the testcases, either in mem, on disk, or somewhere else.
+//! They will hand out the next fuzz target, potentially doing basic scheduling.
+
 pub mod testcase;
 pub use testcase::Testcase;
 

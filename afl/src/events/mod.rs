@@ -1,3 +1,5 @@
+//! Eventmanager manages all events that go to other instances of the fuzzer.
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,

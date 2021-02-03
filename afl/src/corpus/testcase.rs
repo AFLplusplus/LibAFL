@@ -1,3 +1,6 @@
+//! The testcase is a struct embedded in each corpus.
+//! It will contain a respective input, and metadata.
+
 use alloc::string::String;
 use core::{convert::Into, default::Default, option::Option};
 use serde::{Deserialize, Serialize};

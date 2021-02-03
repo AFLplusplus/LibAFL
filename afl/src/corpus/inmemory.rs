@@ -1,3 +1,5 @@
+//! In-memory corpus, keeps all test cases in memory at all times
+
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cell::RefCell, marker::PhantomData};
 use serde::{Deserialize, Serialize};
