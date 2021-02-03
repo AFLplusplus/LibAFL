@@ -6,10 +6,7 @@ extern crate alloc;
 use core::{convert::TryInto, time::Duration};
 use std::{thread, time};
 
-use afl::{
-    events::{llmp, shmem::AflShmem},
-    AflError,
-};
+use afl::{llmp, shmem::AflShmem, AflError};
 
 const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
 const TAG_MATH_RESULT_V1: u32 = 0x77474331;

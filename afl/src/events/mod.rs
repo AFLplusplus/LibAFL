@@ -1,6 +1,3 @@
-pub mod llmp;
-pub mod shmem;
-
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -11,22 +8,20 @@ use core::{
 };
 use serde::{Deserialize, Serialize};
 
-use self::{
-    llmp::{LlmpClient, LlmpClientDescription, Tag},
-    shmem::ShMem,
-};
+#[cfg(feature = "std")]
+use crate::shmem::AflShmem;
 use crate::{
     corpus::Corpus,
     engines::State,
     feedbacks::FeedbacksTuple,
     inputs::Input,
+    llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     observers::ObserversTuple,
     serde_anymap::Ptr,
+    shmem::ShMem,
     utils::{current_time, Rand},
     AflError,
 };
-#[cfg(feature = "std")]
-use shmem::AflShmem;
 
 #[derive(Debug, Copy, Clone)]
 /// Indicate if an event worked or not
@@ -662,10 +657,12 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Crash { input: _ } => {
+                #[cfg(feature = "std")]
                 println!("LLMPEvent::Crash");
                 Ok(BrokerEventResult::Handled)
             }
             LLMPEventKind::Timeout { input: _ } => {
+                #[cfg(feature = "std")]
                 println!("LLMPEvent::Timeout");
                 Ok(BrokerEventResult::Handled)
             }

@@ -11,9 +11,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::{
     corpus::Corpus,
     engines::State,
-    events::{shmem::ShMem, LlmpEventManager, Stats},
+    events::{LlmpEventManager, Stats},
     feedbacks::FeedbacksTuple,
     inputs::Input,
+    shmem::ShMem,
     AflError,
 };
 
@@ -452,23 +453,11 @@ impl XKCDRand {
     }
 }
 
-/// Get the next higher power of two
-#[inline]
-pub const fn next_pow2(val: u64) -> u64 {
-    let mut out = val.wrapping_sub(1);
-    out |= out >> 1;
-    out |= out >> 2;
-    out |= out >> 4;
-    out |= out >> 8;
-    out |= out >> 16;
-    out.wrapping_add(1)
-}
-
 #[cfg(test)]
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::utils::{next_pow2, Rand, StdRand};
+    use crate::utils::{Rand, StdRand};
 
     #[test]
     fn test_rand() {
@@ -491,15 +480,5 @@ mod tests {
         assert_eq!(rand.below(1), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
-    }
-
-    #[test]
-    fn test_next_pow2() {
-        assert_eq!(next_pow2(0), 0);
-        assert_eq!(next_pow2(1), 1);
-        assert_eq!(next_pow2(2), 2);
-        assert_eq!(next_pow2(3), 4);
-        assert_eq!(next_pow2(1000), 1024);
-        assert_eq!(next_pow2(0xFFFFFFFF as u64), (0xFFFFFFFF as u64) + 1);
     }
 }

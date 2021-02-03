@@ -326,7 +326,7 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
         rand.set_seed(5);
-        let mut mutator = StdScheduledMutator::new();
+        let mut mutator = StdScheduledMutator::<InMemoryCorpus<BytesInput, XKCDRand>, _, _>::new();
 
         mutation_splice(&mut mutator, &mut rand, &mut corpus, &mut input).unwrap();
 
