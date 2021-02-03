@@ -78,6 +78,8 @@ pub trait Executor<I>: Named
 where
     I: Input,
 {
+    #[inline]
+    /// Called right before exexution starts
     fn pre_exec<R, FT, C, EM>(
         &mut self,
         _state: &State<I, R, FT>,
@@ -94,6 +96,8 @@ where
         Ok(())
     }
 
+    #[inline]
+    /// Called right after execution finished.
     fn post_exec<R, FT, C, EM>(
         &mut self,
         _state: &State<I, R, FT>,

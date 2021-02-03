@@ -45,6 +45,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
+    #[inline]
     fn pre_exec<R, FT, C, EM>(
         &mut self,
         state: &State<I, R, FT>,
@@ -65,6 +66,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn post_exec<R, FT, C, EM>(
         &mut self,
         _state: &State<I, R, FT>,
