@@ -516,7 +516,7 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, Testcase},
         engines::{Engine, Fuzzer, State, StdFuzzer},
         executors::{Executor, ExitKind, InMemoryExecutor},
-        inputs::{Input, BytesInput},
+        inputs::{BytesInput, Input},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
         stages::StdMutationalStage,
         tuples::tuple_list,

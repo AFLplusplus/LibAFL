@@ -377,7 +377,7 @@ mod tests {
     use core::marker::PhantomData;
 
     use crate::{
-        executors::{Executor, InMemoryExecutor, ExitKind},
+        executors::{Executor, ExitKind, InMemoryExecutor},
         inputs::Input,
         tuples::tuple_list,
     };
@@ -388,14 +388,9 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        use crate::{
-            inputs::NopInput,
-        };
+        use crate::inputs::NopInput;
 
-        let mut in_mem_executor = InMemoryExecutor::<
-            NopInput,
-            (),
-        > {
+        let mut in_mem_executor = InMemoryExecutor::<NopInput, ()> {
             harness_fn: test_harness_fn_nop,
             // TODO: on_crash_fn: Box::new(|_, _, _, _, _| ()),
             observers: tuple_list!(),
