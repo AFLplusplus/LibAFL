@@ -483,6 +483,35 @@ where
     Ok(MutationResult::Mutated)
 }
 
+/*
+// Insert a dictionary token
+pub fn mutation_tokeninsert<M, C, I, R>(
+    mutator: &mut M,
+    rand: &mut R,
+    _: &C,
+    input: &mut I,
+) -> Result<MutationResult, AflError>
+where
+    M: HasMaxSize,
+    I: Input + HasBytesVec,
+    R: Rand,
+{
+    if mutator.tokens.size() == 0 { return Ok(MutationResult::Skipped); }
+    let token = &mutator.tokens[rand.below(token.size())];
+    let token_len = token.size();
+    let size = input.bytes().len();
+    let off = if size == 0 {
+        0
+    } else {
+        rand.below(core::cmp::min(size, (mutator.max_size() - token_len) as u64)) as usize
+    } as usize;
+
+    input.bytes_mut().resize(size + token_len, 0);
+    mem_move(input.bytes_mut(), token, 0, off, len);
+    Ok(MutationResult::Mutated)
+}
+*/
+
 pub fn mutation_bytesinsert<M, C, I, R>(
     mutator: &mut M,
     rand: &mut R,
