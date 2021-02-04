@@ -3,6 +3,7 @@
 use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use postcard;
+use serde::{Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
@@ -110,7 +111,7 @@ where
 }
 
 /// Ways to get random around here
-pub trait Rand: Debug {
+pub trait Rand: Debug + Serialize {
     // Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
 
@@ -200,7 +201,7 @@ pub fn current_nanos() -> u64 {
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 ///
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Xoshiro256StarRand {
     rand_seed: [u64; 4],
     seeded: bool,
@@ -255,7 +256,7 @@ impl Xoshiro256StarRand {
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 ///
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct XorShift64Rand {
     rand_seed: u64,
     seeded: bool,
@@ -296,7 +297,7 @@ impl XorShift64Rand {
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 ///
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Lehmer64Rand {
     rand_seed: u128,
     seeded: bool,
@@ -333,7 +334,7 @@ impl Lehmer64Rand {
 
 /// Extremely quick rand implementation
 /// see https://arxiv.org/pdf/2002.11331.pdf
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RomuTrioRand {
     x_state: u64,
     y_state: u64,
@@ -375,7 +376,7 @@ impl Rand for RomuTrioRand {
 }
 
 /// see https://arxiv.org/pdf/2002.11331.pdf
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RomuDuoJrRand {
     x_state: u64,
     y_state: u64,
@@ -426,7 +427,7 @@ pub fn current_milliseconds() -> u64 {
 
 /// fake rand, for testing purposes
 #[cfg(test)]
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct XKCDRand {
     val: u64,
 }

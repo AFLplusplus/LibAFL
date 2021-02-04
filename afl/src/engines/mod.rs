@@ -18,7 +18,6 @@ use crate::{
     observers::ObserversTuple,
     serde_anymap::{SerdeAny, SerdeAnyMap},
     stages::StagesTuple,
-    tuples::{tuple_list, tuple_list_type},
     utils::{current_milliseconds, Rand},
     AflError,
 };
@@ -37,7 +36,6 @@ pub trait StateMetadata: Debug {
 pub struct State<I, R, FT>
 where
     I: Input,
-    R: Rand,
     FT: FeedbacksTuple<I>,
 {
     /// How many times the executor ran the harness/target
@@ -49,7 +47,7 @@ where
     // additional_corpuses, maybe another TupleList?
     // Feedbacks used to evaluate an input
     feedbacks: FT,
-    phantom: PhantomData<(I, R)>,
+    phantom: PhantomData<(R, I)>,
 }
 
 #[cfg(feature = "std")]
@@ -58,11 +56,11 @@ where
     R: Rand,
     FT: FeedbacksTuple<BytesInput>,
 {
-    pub fn load_from_directory<G, C, E, OT, ET, EM>(
+    pub fn load_from_directory<G, C, E, OT, EM>(
         &mut self,
+        executor: &mut E,
         corpus: &mut C,
         generator: &mut G,
-        engine: &mut Engine<E, OT, ET, BytesInput>,
         manager: &mut EM,
         in_dir: &Path,
     ) -> Result<(), AflError>
@@ -71,7 +69,6 @@ where
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
-        ET: ExecutorsTuple<BytesInput>,
         EM: EventManager<BytesInput>,
     {
         for entry in fs::read_dir(in_dir)? {
@@ -89,24 +86,23 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let fitness =
-                    self.evaluate_input(&input, engine.executor_mut(), corpus, manager)?;
+                let fitness = self.evaluate_input(&input, executor, corpus, manager)?;
                 if self.add_if_interesting(corpus, input, fitness)?.is_none() {
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
             } else if attr.is_dir() {
-                self.load_from_directory(corpus, generator, engine, manager, &path)?;
+                self.load_from_directory(executor, corpus, generator, manager, &path)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn load_initial_inputs<G, C, E, OT, ET, EM>(
+    pub fn load_initial_inputs<G, C, E, OT, EM>(
         &mut self,
+        executor: &mut E,
         corpus: &mut C,
         generator: &mut G,
-        engine: &mut Engine<E, OT, ET, BytesInput>,
         manager: &mut EM,
         in_dirs: &[PathBuf],
     ) -> Result<(), AflError>
@@ -115,11 +111,10 @@ where
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
-        ET: ExecutorsTuple<BytesInput>,
         EM: EventManager<BytesInput>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(corpus, generator, engine, manager, in_dir)?;
+            self.load_from_directory(executor, corpus, generator, manager, in_dir)?;
         }
         manager.log(
             0,
@@ -296,9 +291,9 @@ where
     pub fn generate_initial_inputs<G, C, E, OT, ET, EM>(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         corpus: &mut C,
         generator: &mut G,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         num: usize,
     ) -> Result<(), AflError>
@@ -313,7 +308,7 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(rand)?;
-            let fitness = self.evaluate_input(&input, engine.executor_mut(), corpus, manager)?;
+            let fitness = self.evaluate_input(&input, executor, corpus, manager)?;
             if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
                 added += 1;
             }
@@ -337,64 +332,6 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Engine<E, OT, ET, I>
-where
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    ET: ExecutorsTuple<I>,
-    I: Input,
-{
-    main_executor: E,
-    additional_executors: ET,
-    phantom: PhantomData<(OT, I)>,
-}
-
-impl<E, OT, ET, I> Engine<E, OT, ET, I>
-where
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    ET: ExecutorsTuple<I>,
-    I: Input,
-{
-    /// Return the executor
-    pub fn executor(&self) -> &E {
-        &self.main_executor
-    }
-
-    /// Return the executor (mutable)
-    pub fn executor_mut(&mut self) -> &mut E {
-        &mut self.main_executor
-    }
-
-    pub fn additional_executors(&self) -> &ET {
-        &self.additional_executors
-    }
-
-    pub fn additional_executors_mut(&mut self) -> &mut ET {
-        &mut self.additional_executors
-    }
-
-    pub fn with_executors(main_executor: E, additional_executors: ET) -> Self {
-        Self {
-            main_executor: main_executor,
-            additional_executors: additional_executors,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<E, OT, I> Engine<E, OT, tuple_list_type!(), I>
-where
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    I: Input,
-{
-    pub fn new(main_executor: E) -> Self {
-        Self::with_executors(main_executor, tuple_list!())
-    }
-}
-
 pub trait Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
 where
     ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
@@ -414,15 +351,15 @@ where
     fn fuzz_one(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
     ) -> Result<usize, AflError> {
         let (_, idx) = corpus.next(rand)?;
 
         self.stages_mut()
-            .perform_all(rand, state, corpus, engine, manager, idx)?;
+            .perform_all(rand, executor, state, corpus, manager, idx)?;
 
         manager.process(state, corpus)?;
         Ok(idx)
@@ -431,14 +368,14 @@ where
     fn fuzz_loop(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
     ) -> Result<(), AflError> {
         let mut last = current_milliseconds();
         loop {
-            self.fuzz_one(rand, state, corpus, engine, manager)?;
+            self.fuzz_one(rand, executor, state, corpus, manager)?;
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
@@ -514,7 +451,7 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        engines::{Engine, Fuzzer, State, StdFuzzer},
+        engines::{Fuzzer, State, StdFuzzer},
         executors::{Executor, ExitKind, InMemoryExecutor},
         inputs::{BytesInput, Input},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
@@ -554,7 +491,6 @@ mod tests {
             &mut event_manager,
         );
 
-        let mut engine = Engine::new(executor);
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);
         let stage = StdMutationalStage::new(mutator);
@@ -564,9 +500,9 @@ mod tests {
             fuzzer
                 .fuzz_one(
                     &mut rand,
+                    &mut executor,
                     &mut state,
                     &mut corpus,
-                    &mut engine,
                     &mut event_manager,
                 )
                 .expect(&format!("Error in iter {}", i));

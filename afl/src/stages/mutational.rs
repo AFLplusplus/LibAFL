@@ -9,7 +9,7 @@ use crate::{
     mutators::Mutator,
     observers::ObserversTuple,
     stages::Corpus,
-    stages::{Engine, Stage},
+    stages::Stage,
     utils::Rand,
     AflError,
 };
@@ -49,9 +49,9 @@ where
     fn perform_mutational(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -61,13 +61,12 @@ where
             self.mutator_mut()
                 .mutate(rand, corpus, &mut input_mut, i as i32)?;
 
-            let fitness =
-                state.evaluate_input(&input_mut, engine.executor_mut(), corpus, manager)?;
+            let fitness = state.evaluate_input(&input_mut, executor, corpus, manager)?;
 
             self.mutator_mut()
                 .post_exec(fitness, &input_mut, i as i32)?;
 
-            let observers = engine.executor_mut().observers();
+            let observers = executor.observers();
 
             // put all this shit in some overridable function in engine maybe? or in corpus.
             // consider a corpus that strores new testcases in a temporary queue, for later processing
@@ -148,13 +147,13 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
-        self.perform_mutational(rand, state, corpus, engine, manager, corpus_idx)
+        self.perform_mutational(rand, executor, state, corpus, manager, corpus_idx)
     }
 }
 

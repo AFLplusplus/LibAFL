@@ -729,23 +729,26 @@ where
 
 // Converts a hex u8 to its u8 value: 'A' -> 10 etc.
 fn from_hex(hex: u8) -> Result<u8, AflError> {
-
-    if hex >= 48 && hex <= 57 { return Ok(hex - 48); }
-    if hex >= 65 && hex <= 70 { return Ok(hex - 55); }
-    if hex >= 97 && hex <= 102 { return Ok(hex - 87); }
+    if hex >= 48 && hex <= 57 {
+        return Ok(hex - 48);
+    }
+    if hex >= 65 && hex <= 70 {
+        return Ok(hex - 55);
+    }
+    if hex >= 97 && hex <= 102 {
+        return Ok(hex - 87);
+    }
     return Err(AflError::IllegalArgument("".to_owned()));
-
 }
 
 /// Decodes a dictionary token: 'foo\x41\\and\"bar' -> 'fooA\and"bar'
 pub fn str_decode(item: &str) -> Result<Vec<u8>, AflError> {
-
-    let mut token : Vec<u8> = Vec::new();
-    let item : Vec<u8> = item.as_bytes().to_vec();
-    let backslash : u8 = 92; // '\\'
-    let mut take_next : bool = false;
-    let mut take_next_two : u32 = 0;
-    let mut decoded : u8 = 0;
+    let mut token: Vec<u8> = Vec::new();
+    let item: Vec<u8> = item.as_bytes().to_vec();
+    let backslash: u8 = 92; // '\\'
+    let mut take_next: bool = false;
+    let mut take_next_two: u32 = 0;
+    let mut decoded: u8 = 0;
 
     for c in item {
         if take_next_two == 1 {
@@ -770,30 +773,24 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, AflError> {
     }
 
     return Ok(token);
-
 }
 
-
 /// Adds a token to a dictionary, checking it is not a duplicate
-pub fn add_token_to_dictionary(dict : &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
-
-    if dict.contains(token) { return 0; }
+pub fn add_token_to_dictionary(dict: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
+    if dict.contains(token) {
+        return 0;
+    }
     dict.push(token.to_vec());
     return 1;
-
 }
 
 /// Read a dictionary file and return the number of entries read
-pub fn read_dict_file(
-    f: &str,
-    dict : &mut Vec<Vec<u8>>,
-) -> Result<u32, AflError> {
-
+pub fn read_dict_file(f: &str, dict: &mut Vec<Vec<u8>>) -> Result<u32, AflError> {
     let mut entries = 0;
 
     println!("Loading dictionary {:?} ...", &f);
 
-    let file = File::open(&f)?;  // panic if not found
+    let file = File::open(&f)?; // panic if not found
     let reader = BufReader::new(file);
 
     for line in reader.lines() {
@@ -802,46 +799,60 @@ pub fn read_dict_file(
 
         // we are only interested in '"..."', not prefixed 'foo = '
         let start = line.chars().nth(0);
-        if line.len() == 0 || start == Some('#') { continue; }
+        if line.len() == 0 || start == Some('#') {
+            continue;
+        }
         let pos_quote = match line.find("\"") {
             Some(x) => x,
-            _ => return Err(AflError::IllegalArgument("Illegal line: ".to_owned() + line)),
+            _ => {
+                return Err(AflError::IllegalArgument(
+                    "Illegal line: ".to_owned() + line,
+                ))
+            }
         };
         if line.chars().nth(line.len() - 1) != Some('"') {
-            return Err(AflError::IllegalArgument("Illegal line: ".to_owned() + line));
+            return Err(AflError::IllegalArgument(
+                "Illegal line: ".to_owned() + line,
+            ));
         }
 
-        // extract item        
-        let item = match line.get(pos_quote + 1 .. line.len() - 1) {
+        // extract item
+        let item = match line.get(pos_quote + 1..line.len() - 1) {
             Some(x) => x,
-            _ => return Err(AflError::IllegalArgument("Illegal line: ".to_owned() + line)),
+            _ => {
+                return Err(AflError::IllegalArgument(
+                    "Illegal line: ".to_owned() + line,
+                ))
+            }
         };
-        if item.len() == 0 { continue; }
-        
+        if item.len() == 0 {
+            continue;
+        }
+
         // decode
         let token: Vec<u8> = match str_decode(item) {
             Ok(val) => val,
-            Err(_) => return Err(AflError::IllegalArgument("Illegal line (hex decoding): ".to_owned() + line)),
+            Err(_) => {
+                return Err(AflError::IllegalArgument(
+                    "Illegal line (hex decoding): ".to_owned() + line,
+                ))
+            }
         };
         println!("Debug: {:?} -> {:?}", item, token);
         entries += add_token_to_dictionary(dict, &token);
-
     }
 
     Ok(entries)
-
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        mutators::{read_dict_file},
-    };
+    use crate::mutators::read_dict_file;
 
     #[test]
     fn test_read_dict() {
         println!("For this testcase to success create \"test.dic\".");
-        let mut v : Vec<Vec<u8>> = Vec::new();
+        let mut v: Vec<Vec<u8>> = Vec::new();
         let res = read_dict_file(&"test.dic".to_string(), &mut v).unwrap();
         #[cfg(feature = "std")]
         println!("Dictionary entries: {:?}", res);

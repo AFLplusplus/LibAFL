@@ -3,7 +3,7 @@ pub use mutational::StdMutationalStage;
 
 use crate::{
     corpus::Corpus,
-    engines::{Engine, State},
+    engines::State,
     events::EventManager,
     executors::{Executor, ExecutorsTuple, HasObservers},
     feedbacks::FeedbacksTuple,
@@ -31,9 +31,9 @@ where
     fn perform(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError>;
@@ -53,9 +53,9 @@ where
     fn perform_all(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError>;
@@ -77,9 +77,9 @@ where
     fn perform_all(
         &mut self,
         _rand: &mut R,
+        _executor: &mut E,
         _state: &mut State<I, R, FT>,
         _corpus: &mut C,
-        _engine: &mut Engine<E, OT, ET, I>,
         _manager: &mut EM,
         _corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -106,16 +106,16 @@ where
     fn perform_all(
         &mut self,
         rand: &mut R,
+        executor: &mut E,
         state: &mut State<I, R, FT>,
         corpus: &mut C,
-        engine: &mut Engine<E, OT, ET, I>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
         self.0
-            .perform(rand, state, corpus, engine, manager, corpus_idx)?;
+            .perform(rand, executor, state, corpus, manager, corpus_idx)?;
         self.1
-            .perform_all(rand, state, corpus, engine, manager, corpus_idx)
+            .perform_all(rand, executor, state, corpus, manager, corpus_idx)
     }
 
     fn for_each(&self, f: fn(&dyn Stage<EM, E, OT, FT, ET, C, I, R>)) {

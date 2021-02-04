@@ -1,13 +1,13 @@
 #[macro_use]
 extern crate clap;
 
-use clap::{App, Arg};
+
 use std::{env, path::PathBuf, process::Command};
 
 use afl::{
     corpus::{Corpus, InMemoryCorpus},
     engines::{Engine, Fuzzer, State, StdFuzzer},
-    events::{EventManager, LlmpEventManager, SimpleStats},
+    events::{LlmpEventManager, SimpleStats},
     executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
@@ -18,7 +18,7 @@ use afl::{
     shmem::{AflShmem, ShMem},
     stages::mutational::StdMutationalStage,
     tuples::tuple_list,
-    utils::{deserialize_state_corpus_mgr, serialize_state_corpus_mgr, StdRand},
+    utils::{deserialize_state_corpus_mgr, StdRand},
     AflError,
 };
 
