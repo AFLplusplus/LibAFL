@@ -9,11 +9,11 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::Corpus,
-    engines::State,
     events::EventManager,
     feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
+    state::State,
     tuples::{MatchNameAndType, MatchType, Named, TupleList},
     utils::Rand,
     AflError,

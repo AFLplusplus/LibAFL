@@ -14,13 +14,13 @@ use serde::{Deserialize, Serialize};
 use crate::shmem::AflShmem;
 use crate::{
     corpus::Corpus,
-    engines::State,
     feedbacks::FeedbacksTuple,
     inputs::Input,
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     observers::ObserversTuple,
     serde_anymap::Ptr,
     shmem::ShMem,
+    state::State,
     utils::{current_time, Rand},
     AflError,
 };

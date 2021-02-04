@@ -4,12 +4,12 @@ use os_signals::set_oncrash_ptrs;
 
 use crate::{
     corpus::Corpus,
-    engines::State,
     events::EventManager,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
+    state::State,
     tuples::Named,
     utils::Rand,
     AflError,
@@ -205,8 +205,8 @@ pub mod unix_signals {
     };
 
     use crate::{
-        corpus::Corpus, engines::State, events::EventManager, feedbacks::FeedbacksTuple,
-        inputs::Input, observers::ObserversTuple, utils::Rand,
+        corpus::Corpus, events::EventManager, feedbacks::FeedbacksTuple, inputs::Input,
+        observers::ObserversTuple, state::State, utils::Rand,
     };
 
     /// Pointers to values only needed on crash. As the program will not continue after a crash,

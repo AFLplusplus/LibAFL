@@ -1,4 +1,4 @@
-//! The engine is the core piece of every good fuzzer
+//! The fuzzer, and state are the core pieces of every good fuzzer
 
 use core::{fmt::Debug, marker::PhantomData};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use std::{
 use crate::{
     corpus::{Corpus, Testcase},
     events::EventManager,
-    executors::{Executor, ExecutorsTuple, HasObservers},
+    executors::{Executor, HasObservers},
     feedbacks::FeedbacksTuple,
     generators::Generator,
     inputs::Input,
@@ -288,7 +288,7 @@ where
         }
     }
 
-    pub fn generate_initial_inputs<G, C, E, OT, ET, EM>(
+    pub fn generate_initial_inputs<G, C, E, OT, EM>(
         &mut self,
         rand: &mut R,
         executor: &mut E,
@@ -302,7 +302,6 @@ where
         C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        ET: ExecutorsTuple<I>,
         EM: EventManager<I>,
     {
         let mut added = 0;
@@ -332,14 +331,13 @@ where
     }
 }
 
-pub trait Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
+pub trait Fuzzer<ST, EM, E, OT, FT, C, I, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
-    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -386,31 +384,29 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
+pub struct StdFuzzer<ST, EM, E, OT, FT, C, I, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
-    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
 {
     stages: ST,
-    phantom: PhantomData<(EM, E, OT, FT, ET, C, I, R)>,
+    phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
 }
 
-impl<ST, EM, E, OT, FT, ET, C, I, R> Fuzzer<ST, EM, E, OT, FT, ET, C, I, R>
-    for StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
+impl<ST, EM, E, OT, FT, C, I, R> Fuzzer<ST, EM, E, OT, FT, C, I, R>
+    for StdFuzzer<ST, EM, E, OT, FT, C, I, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
-    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -424,14 +420,13 @@ where
     }
 }
 
-impl<ST, EM, E, OT, FT, ET, C, I, R> StdFuzzer<ST, EM, E, OT, FT, ET, C, I, R>
+impl<ST, EM, E, OT, FT, C, I, R> StdFuzzer<ST, EM, E, OT, FT, C, I, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, ET, C, I, R>,
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
-    ET: ExecutorsTuple<I>,
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
@@ -451,11 +446,11 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        engines::{Fuzzer, State, StdFuzzer},
         executors::{Executor, ExitKind, InMemoryExecutor},
         inputs::{BytesInput, Input},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
         stages::StdMutationalStage,
+        state::{Fuzzer, State, StdFuzzer},
         tuples::tuple_list,
         utils::StdRand,
     };
@@ -468,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn test_engine() {
+    fn test_fuzzer() {
         let mut rand = StdRand::new(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput, StdRand>::new();
@@ -481,7 +476,7 @@ mod tests {
             println!("{}", s);
         }));
 
-        let executor = InMemoryExecutor::new(
+        let mut executor = InMemoryExecutor::new(
             "main",
             harness,
             tuple_list!(),

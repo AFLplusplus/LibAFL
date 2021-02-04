@@ -10,7 +10,6 @@ extern crate alloc;
 extern crate static_assertions;
 
 pub mod corpus;
-pub mod engines;
 pub mod events;
 pub mod executors;
 pub mod feedbacks;
@@ -23,6 +22,7 @@ pub mod observers;
 pub mod serde_anymap;
 pub mod shmem;
 pub mod stages;
+pub mod state;
 pub mod tuples;
 pub mod utils;
 

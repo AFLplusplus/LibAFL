@@ -1,12 +1,11 @@
 #[macro_use]
 extern crate clap;
 
-
+use clap::{App, Arg};
 use std::{env, path::PathBuf, process::Command};
 
 use afl::{
     corpus::{Corpus, InMemoryCorpus},
-    engines::{Engine, Fuzzer, State, StdFuzzer},
     events::{LlmpEventManager, SimpleStats},
     executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
@@ -17,6 +16,7 @@ use afl::{
     observers::StdMapObserver,
     shmem::{AflShmem, ShMem},
     stages::mutational::StdMutationalStage,
+    state::{Fuzzer, State, StdFuzzer},
     tuples::tuple_list,
     utils::{deserialize_state_corpus_mgr, StdRand},
     AflError,
@@ -229,7 +229,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     */
 
     // Create the engine
-    let executor = InMemoryExecutor::new(
+    let mut executor = InMemoryExecutor::new(
         "Libfuzzer",
         harness,
         tuple_list!(edges_observer),
@@ -238,13 +238,11 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         &mut mgr,
     );
 
-    let mut engine = Engine::new(executor);
-
     // in case the corpus is empty (on first run), reset
     if corpus.count() < 1 {
         match input {
             Some(x) => state
-                .load_initial_inputs(&mut corpus, &mut generator, &mut engine, &mut mgr, &x)
+                .load_initial_inputs(&mut executor, &mut corpus, &mut generator, &mut mgr, &x)
                 .expect(&format!("Failed to load initial corpus at {:?}", &x)),
             None => (),
         }
@@ -255,9 +253,9 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         state
             .generate_initial_inputs(
                 &mut rand,
+                &mut executor,
                 &mut corpus,
                 &mut generator,
-                &mut engine,
                 &mut mgr,
                 4,
             )
@@ -271,5 +269,5 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
-    fuzzer.fuzz_loop(&mut rand, &mut state, &mut corpus, &mut engine, &mut mgr)
+    fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut corpus, &mut mgr)
 }
