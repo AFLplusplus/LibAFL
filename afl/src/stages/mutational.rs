@@ -9,7 +9,7 @@ use crate::{
     observers::ObserversTuple,
     stages::Corpus,
     stages::Stage,
-    state::State,
+    state::{HasCorpus, State},
     utils::Rand,
     AflError,
 };
@@ -19,9 +19,9 @@ use crate::{
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<M, EM, E, OT, FT, C, I, R>: Stage<EM, E, OT, FT, C, I, R>
+pub trait MutationalStage<C, E, EM, FT, I, M, OT, R>: Stage<C, E, EM, FT, I, OT, R>
 where
-    M: Mutator<C, I, R>,
+    M: Mutator<C, I, R, State<C, I, R, FT>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -48,21 +48,25 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
+        state: &mut State<C, I, R, FT>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
         let num = self.iterations(rand);
         for i in 0..num {
-            let mut input_mut = corpus.get(corpus_idx).borrow_mut().load_input()?.clone();
+            let mut input_mut = state
+                .corpus()
+                .get(corpus_idx)
+                .borrow_mut()
+                .load_input()?
+                .clone();
             self.mutator_mut()
-                .mutate(rand, corpus, &mut input_mut, i as i32)?;
+                .mutate(rand, state, &mut input_mut, i as i32)?;
 
-            let fitness = state.evaluate_input(&input_mut, executor, corpus, manager)?;
+            let fitness = state.evaluate_input(&input_mut, executor, manager)?;
 
             self.mutator_mut()
-                .post_exec(fitness, &input_mut, i as i32)?;
+                .post_exec(state, fitness, &input_mut, i as i32)?;
 
             let observers = executor.observers();
 
@@ -73,8 +77,13 @@ where
             // if needed by particular cases
             if fitness > 0 {
                 // TODO decouple events manager and engine
-                manager.new_testcase(&input_mut, observers, corpus.count() + 1, "test".into())?;
-                state.add_if_interesting(corpus, input_mut, fitness)?;
+                manager.new_testcase(
+                    &input_mut,
+                    observers,
+                    state.corpus().count() + 1,
+                    "test".into(),
+                )?;
+                state.add_if_interesting(input_mut, fitness)?;
             // let _ = corpus.add(testcase);
             } else {
                 state.discard_input(&input_mut)?;
@@ -86,31 +95,31 @@ where
 
 #[derive(Clone, Debug)]
 /// The default mutational stage
-pub struct StdMutationalStage<M, EM, E, OT, FT, C, I, R>
+pub struct StdMutationalStage<C, E, EM, FT, I, M, OT, R>
 where
-    M: Mutator<C, I, R>,
-    EM: EventManager<I>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    EM: EventManager<I>,
+    FT: FeedbacksTuple<I>,
     I: Input,
+    M: Mutator<C, I, R, State<C, I, R, FT>>,
+    OT: ObserversTuple,
     R: Rand,
 {
     mutator: M,
     phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
 }
 
-impl<M, EM, E, OT, FT, C, I, R> MutationalStage<M, EM, E, OT, FT, C, I, R>
-    for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
+impl<C, E, EM, FT, I, M, OT, R> MutationalStage<C, E, EM, FT, I, M, OT, R>
+    for StdMutationalStage<C, E, EM, FT, I, M, OT, R>
 where
-    M: Mutator<C, I, R>,
-    EM: EventManager<I>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
+    E: Executor<I> + HasObservers<OT>,
+    EM: EventManager<I>,
+    FT: FeedbacksTuple<I>,
     I: Input,
+    M: Mutator<C, I, R, State<C, I, R, FT>>,
+    OT: ObserversTuple,
     R: Rand,
 {
     /// The mutator, added to this stage
@@ -126,10 +135,10 @@ where
     }
 }
 
-impl<M, EM, E, OT, FT, C, I, R> Stage<EM, E, OT, FT, C, I, R>
-    for StdMutationalStage<M, EM, E, OT, FT, C, I, R>
+impl<C, E, EM, FT, I, M, OT, R> Stage<C, E, EM, FT, I, OT, R>
+    for StdMutationalStage<C, E, EM, FT, I, M, OT, R>
 where
-    M: Mutator<C, I, R>,
+    M: Mutator<C, I, R, State<C, I, R, FT>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -143,18 +152,17 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
+        state: &mut State<C, I, R, FT>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
-        self.perform_mutational(rand, executor, state, corpus, manager, corpus_idx)
+        self.perform_mutational(rand, executor, state, manager, corpus_idx)
     }
 }
 
-impl<M, EM, E, OT, FT, C, I, R> StdMutationalStage<M, EM, E, OT, FT, C, I, R>
+impl<C, E, EM, FT, I, M, OT, R> StdMutationalStage<C, E, EM, FT, I, M, OT, R>
 where
-    M: Mutator<C, I, R>,
+    M: Mutator<C, I, R, State<C, I, R, FT>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,

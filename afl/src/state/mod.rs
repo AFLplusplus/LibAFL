@@ -26,24 +26,53 @@ use crate::{
 use crate::inputs::bytes::BytesInput;
 
 pub trait StateMetadata: Debug {
-    /// The name of this metadata - used to find it in the list of avaliable metadatas
+    /// The name of this metadata - used to find it in the list of avaliable metadata
     fn name(&self) -> &'static str;
+}
+
+/// Trait for elements offering a corpus
+pub trait HasCorpus<C> {
+    /// The testcase corpus
+    fn corpus(&self) -> &C;
+    /// The testcase corpus (mut)
+    fn corpus_mut(&mut self) -> &mut C;
+}
+
+/// Trait for elements offering metadata
+pub trait HasMetadata {
+    /// A map, storing all metadata
+    fn metadata(&self) -> &SerdeAnyMap;
+    /// A map, storing all metadata (mut)
+    fn metadata_mut(&mut self) -> &mut SerdeAnyMap;
+
+    /// Add a metadata to the metadata map
+    #[inline]
+    fn add_metadata<M>(&mut self, meta: M)
+    where
+        M: SerdeAny,
+    {
+        self.metadata_mut().insert(meta);
+    }
 }
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct State<I, R, FT>
+pub struct State<C, I, R, FT>
 where
+    C: Corpus<I, R>,
     I: Input,
+    R: Rand,
     FT: FeedbacksTuple<I>,
 {
     /// How many times the executor ran the harness/target
     executions: usize,
+    /// The corpus
+    corpus: C,
     /// At what time the fuzzing started
     start_time: u64,
     /// Metadata stored for this state by one of the components
-    metadatas: SerdeAnyMap,
+    metadata: SerdeAnyMap,
     // additional_corpuses, maybe another TupleList?
     // Feedbacks used to evaluate an input
     feedbacks: FT,
@@ -51,15 +80,15 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<R, FT> State<BytesInput, R, FT>
+impl<C, R, FT> State<C, BytesInput, R, FT>
 where
+    C: Corpus<BytesInput, R>,
     R: Rand,
     FT: FeedbacksTuple<BytesInput>,
 {
-    pub fn load_from_directory<G, C, E, OT, EM>(
+    pub fn load_from_directory<G, E, OT, EM>(
         &mut self,
         executor: &mut E,
-        corpus: &mut C,
         generator: &mut G,
         manager: &mut EM,
         in_dir: &Path,
@@ -86,22 +115,21 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let fitness = self.evaluate_input(&input, executor, corpus, manager)?;
-                if self.add_if_interesting(corpus, input, fitness)?.is_none() {
+                let fitness = self.evaluate_input(&input, executor, manager)?;
+                if self.add_if_interesting(input, fitness)?.is_none() {
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
             } else if attr.is_dir() {
-                self.load_from_directory(executor, corpus, generator, manager, &path)?;
+                self.load_from_directory(executor, generator, manager, &path)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn load_initial_inputs<G, C, E, OT, EM>(
+    pub fn load_initial_inputs<G, E, OT, EM>(
         &mut self,
         executor: &mut E,
-        corpus: &mut C,
         generator: &mut G,
         manager: &mut EM,
         in_dirs: &[PathBuf],
@@ -114,19 +142,59 @@ where
         EM: EventManager<BytesInput>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(executor, corpus, generator, manager, in_dir)?;
+            self.load_from_directory(executor, generator, manager, in_dir)?;
         }
         manager.log(
             0,
-            format!("Loaded {} initial testcases.", corpus.count()), // get corpus count
+            format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
         )?;
-        manager.process(self, corpus)?;
+        manager.process(self)?;
         Ok(())
     }
 }
 
-impl<I, R, FT> State<I, R, FT>
+impl<C, I, R, FT> HasCorpus<C> for State<C, I, R, FT>
 where
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+    FT: FeedbacksTuple<I>,
+{
+    /// Returns the corpus
+    fn corpus(&self) -> &C {
+        &self.corpus
+    }
+
+    /// Returns the mutable corpus
+    fn corpus_mut(&mut self) -> &mut C {
+        &mut self.corpus
+    }
+}
+
+/// Trait for elements offering metadata
+impl<C, I, R, FT> HasMetadata for State<C, I, R, FT>
+where
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+    FT: FeedbacksTuple<I>,
+{
+    /// Get all the metadata into an HashMap
+    #[inline]
+    fn metadata(&self) -> &SerdeAnyMap {
+        &self.metadata
+    }
+
+    /// Get all the metadata into an HashMap (mutable)
+    #[inline]
+    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+        &mut self.metadata
+    }
+}
+
+impl<C, I, R, FT> State<C, I, R, FT>
+where
+    C: Corpus<I, R>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
@@ -151,7 +219,6 @@ where
     pub fn set_start_time(&mut self, ms: u64) {
         self.start_time = ms
     }
-
     // TODO as this is done in the event manager, we can remove it
     #[inline]
     pub fn executions_over_seconds(&self) -> u64 {
@@ -165,27 +232,6 @@ where
         } else {
             (self.executions() as u64) / elapsed
         }
-    }
-
-    /// Get all the metadatas into an HashMap
-    #[inline]
-    pub fn metadatas(&self) -> &SerdeAnyMap {
-        &self.metadatas
-    }
-
-    /// Get all the metadatas into an HashMap (mutable)
-    #[inline]
-    pub fn metadatas_mut(&mut self) -> &mut SerdeAnyMap {
-        &mut self.metadatas
-    }
-
-    /// Add a metadata
-    #[inline]
-    pub fn add_metadata<M>(&mut self, meta: M)
-    where
-        M: SerdeAny,
-    {
-        self.metadatas.insert(meta);
     }
 
     /// Returns vector of feebacks
@@ -210,11 +256,10 @@ where
     }
 
     /// Runs the input and triggers observers and feedback
-    pub fn evaluate_input<C, E, EM, OT>(
+    pub fn evaluate_input<E, EM, OT>(
         &mut self,
         input: &I,
         executor: &mut E,
-        corpus: &C,
         event_mgr: &mut EM,
     ) -> Result<u32, AflError>
     where
@@ -225,9 +270,9 @@ where
     {
         executor.pre_exec_observers()?;
 
-        executor.pre_exec(&self, corpus, event_mgr, input)?;
+        executor.pre_exec(&self, event_mgr, input)?;
         executor.run_target(input)?;
-        executor.post_exec(&self, corpus, event_mgr, input)?;
+        executor.post_exec(&self, event_mgr, input)?;
 
         self.set_executions(self.executions() + 1);
         executor.post_exec_observers()?;
@@ -270,29 +315,23 @@ where
 
     /// Adds this input to the corpus, if it's intersting
     #[inline]
-    pub fn add_if_interesting<C>(
-        &mut self,
-        corpus: &mut C,
-        input: I,
-        fitness: u32,
-    ) -> Result<Option<usize>, AflError>
+    pub fn add_if_interesting(&mut self, input: I, fitness: u32) -> Result<Option<usize>, AflError>
     where
         C: Corpus<I, R>,
     {
         if fitness > 0 {
             let testcase = self.input_to_testcase(input, fitness)?;
-            Ok(Some(corpus.add(testcase)))
+            Ok(Some(self.corpus_mut().add(testcase)))
         } else {
             self.discard_input(&input)?;
             Ok(None)
         }
     }
 
-    pub fn generate_initial_inputs<G, C, E, OT, EM>(
+    pub fn generate_initial_inputs<G, E, OT, EM>(
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        corpus: &mut C,
         generator: &mut G,
         manager: &mut EM,
         num: usize,
@@ -307,8 +346,8 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(rand)?;
-            let fitness = self.evaluate_input(&input, executor, corpus, manager)?;
-            if !self.add_if_interesting(corpus, input, fitness)?.is_none() {
+            let fitness = self.evaluate_input(&input, executor, manager)?;
+            if !self.add_if_interesting(input, fitness)?.is_none() {
                 added += 1;
             }
         }
@@ -316,15 +355,16 @@ where
             0,
             format!("Loaded {} over {} initial testcases", added, num),
         )?;
-        manager.process(self, corpus)?;
+        manager.process(self)?;
         Ok(())
     }
 
-    pub fn new(feedbacks: FT) -> Self {
+    pub fn new(corpus: C, feedbacks: FT) -> Self {
         Self {
+            corpus,
             executions: 0,
             start_time: current_milliseconds(),
-            metadatas: SerdeAnyMap::default(),
+            metadata: SerdeAnyMap::default(),
             feedbacks: feedbacks,
             phantom: PhantomData,
         }
@@ -350,16 +390,15 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
+        state: &mut State<C, I, R, FT>,
         manager: &mut EM,
     ) -> Result<usize, AflError> {
-        let (_, idx) = corpus.next(rand)?;
+        let (_, idx) = state.corpus_mut().next(rand)?;
 
         self.stages_mut()
-            .perform_all(rand, executor, state, corpus, manager, idx)?;
+            .perform_all(rand, executor, state, manager, idx)?;
 
-        manager.process(state, corpus)?;
+        manager.process(state)?;
         Ok(idx)
     }
 
@@ -367,13 +406,12 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
+        state: &mut State<C, I, R, FT>,
         manager: &mut EM,
     ) -> Result<(), AflError> {
         let mut last = current_milliseconds();
         loop {
-            self.fuzz_one(rand, executor, state, corpus, manager)?;
+            self.fuzz_one(rand, executor, state, manager)?;
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
@@ -458,6 +496,8 @@ mod tests {
     #[cfg(feature = "std")]
     use crate::events::{LoggerEventManager, SimpleStats};
 
+    use super::HasCorpus;
+
     fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
     }
@@ -470,7 +510,7 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
-        let mut state = State::new(tuple_list!());
+        let mut state = State::new(corpus, tuple_list!());
 
         let mut event_manager = LoggerEventManager::new(SimpleStats::new(|s| {
             println!("{}", s);
@@ -481,8 +521,7 @@ mod tests {
             harness,
             tuple_list!(),
             //Box::new(|_, _, _, _, _| ()),
-            &state,
-            &corpus,
+            &mut state,
             &mut event_manager,
         );
 
@@ -493,24 +532,18 @@ mod tests {
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(
-                    &mut rand,
-                    &mut executor,
-                    &mut state,
-                    &mut corpus,
-                    &mut event_manager,
-                )
+                .fuzz_one(&mut rand, &mut executor, &mut state, &mut event_manager)
                 .expect(&format!("Error in iter {}", i));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
-        let state_deserialized: State<BytesInput, StdRand, ()> =
+        let state_deserialized: State<InMemoryCorpus<BytesInput, _>, BytesInput, StdRand, ()> =
             postcard::from_bytes(state_serialized.as_slice()).unwrap();
         assert_eq!(state.executions, state_deserialized.executions);
 
-        let corpus_serialized = postcard::to_allocvec(&corpus).unwrap();
+        let corpus_serialized = postcard::to_allocvec(state.corpus()).unwrap();
         let corpus_deserialized: InMemoryCorpus<BytesInput, StdRand> =
             postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
-        assert_eq!(corpus.count(), corpus_deserialized.count());
+        assert_eq!(state.corpus().count(), corpus_deserialized.count());
     }
 }

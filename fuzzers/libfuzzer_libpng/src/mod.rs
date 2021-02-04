@@ -16,7 +16,7 @@ use afl::{
     observers::StdMapObserver,
     shmem::{AflShmem, ShMem},
     stages::mutational::StdMutationalStage,
-    state::{Fuzzer, State, StdFuzzer},
+    state::{Fuzzer, HasCorpus, State, StdFuzzer},
     tuples::tuple_list,
     utils::{deserialize_state_corpus_mgr, StdRand},
     AflError,
@@ -185,7 +185,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     }
 
     // If we're restarting, deserialize the old state.
-    let (mut state, mut corpus, mut mgr) = match receiver.recv_buf()? {
+    let (mut state, mut mgr) = match receiver.recv_buf()? {
         None => {
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
@@ -196,9 +196,9 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
 
             // Initial execution, read or generate initial state, corpus, and feedbacks
             let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
-            let state = State::new(tuple_list!(edges_feedback));
             let corpus = InMemoryCorpus::new();
-            (state, corpus, mgr)
+            let state = State::new(corpus, tuple_list!(edges_feedback));
+            (state, mgr)
         }
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
@@ -233,34 +233,26 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         "Libfuzzer",
         harness,
         tuple_list!(edges_observer),
-        &state,
-        &corpus,
+        &mut state,
         &mut mgr,
     );
 
     // in case the corpus is empty (on first run), reset
-    if corpus.count() < 1 {
+    if state.corpus().count() < 1 {
         match input {
             Some(x) => state
-                .load_initial_inputs(&mut executor, &mut corpus, &mut generator, &mut mgr, &x)
+                .load_initial_inputs(&mut executor, &mut generator, &mut mgr, &x)
                 .expect(&format!("Failed to load initial corpus at {:?}", &x)),
             None => (),
         }
-        println!("We imported {} inputs from disk.", corpus.count());
+        println!("We imported {} inputs from disk.", state.corpus().count());
     }
-    if corpus.count() < 1 {
+    if state.corpus().count() < 1 {
         println!("Generating random inputs");
         state
-            .generate_initial_inputs(
-                &mut rand,
-                &mut executor,
-                &mut corpus,
-                &mut generator,
-                &mut mgr,
-                4,
-            )
+            .generate_initial_inputs(&mut rand, &mut executor, &mut generator, &mut mgr, 4)
             .expect("Failed to generate initial inputs");
-        println!("We generated {} inputs.", corpus.count());
+        println!("We generated {} inputs.", state.corpus().count());
     }
 
     let mut mutator = HavocBytesMutator::new_default();
@@ -269,5 +261,5 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
-    fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut corpus, &mut mgr)
+    fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut mgr)
 }

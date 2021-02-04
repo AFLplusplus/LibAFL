@@ -213,11 +213,7 @@ where
     where
         ST: Stats;
     /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
-    fn handle_in_client<C, FT, R>(
-        self,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
-    ) -> Result<(), AflError>
+    fn handle_in_client<C, FT, R>(self, state: &mut State<C, I, R, FT>) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -233,11 +229,7 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<C, FT, R>(
-        &mut self,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
-    ) -> Result<usize, AflError>
+    fn process<C, FT, R>(&mut self, state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -298,11 +290,7 @@ impl<I> EventManager<I> for NopEventManager<I>
 where
     I: Input,
 {
-    fn process<C, FT, R>(
-        &mut self,
-        _state: &mut State<I, R, FT>,
-        _corpus: &mut C,
-    ) -> Result<usize, AflError>
+    fn process<C, FT, R>(&mut self, _state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -417,11 +405,7 @@ where
     }
 
     #[inline]
-    fn handle_in_client<C, FT, R>(
-        self,
-        _state: &mut State<I, R, FT>,
-        _corpus: &mut C,
-    ) -> Result<(), AflError>
+    fn handle_in_client<C, FT, R>(self, _state: &mut State<C, I, R, FT>) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -452,11 +436,7 @@ where
     ST: Stats,
     //CE: CustomEvent<I, OT>,
 {
-    fn process<C, FT, R>(
-        &mut self,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
-    ) -> Result<usize, AflError>
+    fn process<C, FT, R>(&mut self, state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -465,7 +445,7 @@ where
         let count = self.events.len();
         self.events
             .drain(..)
-            .try_for_each(|event| event.handle_in_client(state, corpus))?;
+            .try_for_each(|event| event.handle_in_client(state))?;
         Ok(count)
     }
 
@@ -682,11 +662,7 @@ where
     }
 
     #[inline]
-    fn handle_in_client<C, FT, R>(
-        self,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
-    ) -> Result<(), AflError>
+    fn handle_in_client<C, FT, R>(self, state: &mut State<C, I, R, FT>) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -707,7 +683,7 @@ where
                 let interestingness = state.is_interesting(input.as_ref(), &observers)?;
                 match input {
                     Ptr::Owned(b) => {
-                        state.add_if_interesting(corpus, *b, interestingness)?;
+                        state.add_if_interesting(*b, interestingness)?;
                     }
                     _ => {}
                 };
@@ -894,11 +870,7 @@ where
     ST: Stats,
     //CE: CustomEvent<I>,
 {
-    fn process<C, FT, R>(
-        &mut self,
-        state: &mut State<I, R, FT>,
-        corpus: &mut C,
-    ) -> Result<usize, AflError>
+    fn process<C, FT, R>(&mut self, state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -919,7 +891,7 @@ where
                                 sender_id: sender_id,
                                 kind: kind,
                             };
-                            event.handle_in_client(state, corpus)?;
+                            event.handle_in_client(state)?;
                             count += 1;
                         }
                         None => break count,

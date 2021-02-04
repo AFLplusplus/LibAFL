@@ -25,8 +25,7 @@ pub type StdRand = RomuTrioRand;
 /// On top, add the current llmp event manager instance to be restored
 /// This method is needed when the fuzzer run crashes and has to restart.
 pub fn serialize_state_corpus_mgr<C, FT, I, R, SH, ST>(
-    state: &State<I, R, FT>,
-    corpus: &C,
+    state: &State<C, I, R, FT>,
     mgr: &LlmpEventManager<I, SH, ST>,
 ) -> Result<Vec<u8>, AflError>
 where
@@ -37,7 +36,7 @@ where
     SH: ShMem,
     ST: Stats,
 {
-    let ret_slice = postcard::to_allocvec(&(&state, &corpus, &mgr.describe()?))?;
+    let ret_slice = postcard::to_allocvec(&(&state, &mgr.describe()?))?;
     //let corpus_bytes = serde_json::to_string(&corpus).unwrap();
 
     //println!("fun");
@@ -58,7 +57,7 @@ where
 pub fn deserialize_state_corpus_mgr<C, FT, I, R, SH, ST>(
     state_corpus_serialized: &[u8],
     stats: ST,
-) -> Result<(State<I, R, FT>, C, LlmpEventManager<I, SH, ST>), AflError>
+) -> Result<(State<C, I, R, FT>, LlmpEventManager<I, SH, ST>), AflError>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,
@@ -67,11 +66,10 @@ where
     SH: ShMem,
     ST: Stats,
 {
-    let tuple: (Vec<u8>, Vec<u8>, Vec<u8>) = postcard::from_bytes(&state_corpus_serialized)?;
-    let client_description = postcard::from_bytes(&tuple.2)?;
+    let tuple: (Vec<u8>, Vec<u8>) = postcard::from_bytes(&state_corpus_serialized)?;
+    let client_description = postcard::from_bytes(&tuple.1)?;
     Ok((
         postcard::from_bytes(&tuple.0)?,
-        postcard::from_bytes(&tuple.1)?,
         LlmpEventManager::existing_client_from_description(&client_description, stats)?,
     ))
 }
@@ -79,7 +77,7 @@ where
 /// Serialize the current state and corpus during an executiont to bytes.
 /// This method is needed when the fuzzer run crashes and has to restart.
 pub fn serialize_state_corpus<C, FT, I, R>(
-    state: &State<I, R, FT>,
+    state: &State<C, I, R, FT>,
     corpus: &C,
 ) -> Result<Vec<u8>, AflError>
 where
@@ -96,7 +94,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 pub fn deserialize_state_corpus<C, FT, I, R>(
     state_corpus_serialized: &[u8],
-) -> Result<(State<I, R, FT>, C), AflError>
+) -> Result<(State<C, I, R, FT>, C), AflError>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,

@@ -6,11 +6,9 @@ use crate::{
     AflError,
 };
 
+use std::fs::File;
 #[cfg(feature = "std")]
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
+use std::io::{BufRead, BufReader};
 
 const ARITH_MAX: u64 = 35;
 
@@ -59,23 +57,24 @@ pub enum MutationResult {
 
 // TODO maybe the mutator arg is not needed
 /// The generic function type that identifies mutations
-pub type MutationFunction<M, C, I, R> =
-    fn(&mut M, &mut R, &C, &mut I) -> Result<MutationResult, AflError>;
+pub type MutationFunction<I, M, R, S> =
+    fn(&mut M, &mut R, &mut S, &mut I) -> Result<MutationResult, AflError>;
 
-pub trait ComposedByMutations<C, I, R>
+pub trait ComposedByMutations<C, I, R, S>
 where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
+    S: HasCorpus<C> + HasMetadata,
 {
     /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<Self, C, I, R>;
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, R, S>;
 
     /// Get the number of mutations
     fn mutations_count(&self) -> usize;
 
     /// Add a mutation
-    fn add_mutation(&mut self, mutation: MutationFunction<Self, C, I, R>);
+    fn add_mutation(&mut self, mutation: MutationFunction<I, Self, R, S>);
 }
 
 #[inline]
@@ -109,10 +108,10 @@ fn mem_set(data: &mut [u8], from: usize, len: usize, val: u8) {
 }
 
 /// Bitflip mutation for inputs with a bytes vector
-pub fn mutation_bitflip<M, C, I, R>(
+pub fn mutation_bitflip<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -131,10 +130,10 @@ where
     }
 }
 
-pub fn mutation_byteflip<M, C, I, R>(
+pub fn mutation_byteflip<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -153,10 +152,10 @@ where
     }
 }
 
-pub fn mutation_byteinc<M, C, I, R>(
+pub fn mutation_byteinc<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -176,10 +175,10 @@ where
     }
 }
 
-pub fn mutation_bytedec<M, C, I, R>(
+pub fn mutation_bytedec<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -199,10 +198,10 @@ where
     }
 }
 
-pub fn mutation_byteneg<M, C, I, R>(
+pub fn mutation_byteneg<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -221,10 +220,10 @@ where
     }
 }
 
-pub fn mutation_byterand<M, C, I, R>(
+pub fn mutation_byterand<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -243,10 +242,10 @@ where
     }
 }
 
-pub fn mutation_byteadd<M, C, I, R>(
+pub fn mutation_byteadd<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -270,10 +269,10 @@ where
     }
 }
 
-pub fn mutation_wordadd<M, C, I, R>(
+pub fn mutation_wordadd<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -299,10 +298,10 @@ where
     }
 }
 
-pub fn mutation_dwordadd<M, C, I, R>(
+pub fn mutation_dwordadd<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -328,10 +327,10 @@ where
     }
 }
 
-pub fn mutation_qwordadd<M, C, I, R>(
+pub fn mutation_qwordadd<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -357,10 +356,10 @@ where
     }
 }
 
-pub fn mutation_byteinteresting<M, C, I, R>(
+pub fn mutation_byteinteresting<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -380,10 +379,10 @@ where
     }
 }
 
-pub fn mutation_wordinteresting<M, C, I, R>(
+pub fn mutation_wordinteresting<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -408,10 +407,10 @@ where
     }
 }
 
-pub fn mutation_dwordinteresting<M, C, I, R>(
+pub fn mutation_dwordinteresting<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -436,10 +435,10 @@ where
     }
 }
 
-pub fn mutation_bytesdelete<M, C, I, R>(
+pub fn mutation_bytesdelete<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -458,11 +457,11 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesexpand<M, C, I, R>(
+pub fn mutation_bytesexpand<I, M, R, S>(
     // TODO: max_size instead of mutator?
     mutator: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -485,10 +484,10 @@ where
 
 /*
 // Insert a dictionary token
-pub fn mutation_tokeninsert<M, C, I, R>(
+pub fn mutation_tokeninsert<I, M, R, S>(
     mutator: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -512,10 +511,10 @@ where
 }
 */
 
-pub fn mutation_bytesinsert<M, C, I, R>(
+pub fn mutation_bytesinsert<I, M, R, S>(
     mutator: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -538,10 +537,10 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesrandinsert<M, C, I, R>(
+pub fn mutation_bytesrandinsert<I, M, R, S>(
     mutator: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -564,10 +563,10 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesset<M, C, I, R>(
+pub fn mutation_bytesset<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -590,10 +589,10 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesrandset<M, C, I, R>(
+pub fn mutation_bytesrandset<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -616,10 +615,10 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytescopy<M, C, I, R>(
+pub fn mutation_bytescopy<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -639,10 +638,10 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesswap<M, C, I, R>(
+pub fn mutation_bytesswap<I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    _: &C,
+    _: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
@@ -681,20 +680,21 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 }
 
 /// Splicing mutator
-pub fn mutation_splice<M, C, I, R>(
+pub fn mutation_splice<C, I, M, R, S>(
     _: &mut M,
     rand: &mut R,
-    corpus: &C,
+    state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
+    S: HasCorpus<C>,
 {
     // We don't want to use the testcase we're already using for splicing
-    let (other_testcase, idx) = corpus.random_entry(rand)?;
-    if idx == corpus.current_testcase().1 {
+    let (other_testcase, idx) = state.corpus().random_entry(rand)?;
+    if idx == state.corpus().current_testcase().1 {
         return Ok(MutationResult::Skipped);
     }
     // println!("Input: {:?}, other input: {:?}", input.bytes(), other.bytes());
@@ -847,14 +847,25 @@ pub fn read_dict_file(f: &str, dict: &mut Vec<Vec<u8>>) -> Result<u32, AflError>
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use crate::mutators::read_dict_file;
 
     #[test]
     fn test_read_dict() {
-        println!("For this testcase to success create \"test.dic\".");
+        let _ = fs::remove_file("test.dict");
+        let data = r###"
+# comment
+token1="AAA"
+token1="A\x41A"
+token2="B"
+        "###;
+        fs::write("test.dict", data).expect("Unable to write test.dict");
         let mut v: Vec<Vec<u8>> = Vec::new();
         let res = read_dict_file(&"test.dic".to_string(), &mut v).unwrap();
         #[cfg(feature = "std")]
         println!("Dictionary entries: {:?}", res);
+        assert_eq!(res, 2);
+        let _ = fs::remove_file("test.dict");
     }
 }

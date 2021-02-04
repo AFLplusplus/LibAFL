@@ -3,24 +3,31 @@ pub use scheduled::*;
 pub mod mutations;
 pub use mutations::*;
 
-use crate::{corpus::Corpus, inputs::Input, utils::Rand, AflError};
+use crate::{
+    corpus::Corpus,
+    inputs::Input,
+    state::{HasCorpus, HasMetadata},
+    utils::Rand,
+    AflError,
+};
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<C, I, R>
+pub trait Mutator<C, I, R, S>
 where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
+    S: HasCorpus<C> + HasMetadata,
 {
     /// Mutate a given input
     fn mutate(
         &mut self,
         rand: &mut R,
-        corpus: &C,
+        state: &mut S,
         input: &mut I,
         stage_idx: i32,
     ) -> Result<(), AflError>;
@@ -28,6 +35,7 @@ where
     /// Post-process given the outcome of the execution
     fn post_exec(
         &mut self,
+        _state: &mut S,
         _is_interesting: u32,
         _input: &I,
         _stage_idx: i32,

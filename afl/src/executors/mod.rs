@@ -84,8 +84,7 @@ where
     /// Called right before exexution starts
     fn pre_exec<R, FT, C, EM>(
         &mut self,
-        _state: &State<I, R, FT>,
-        _corpus: &C,
+        _state: &State<C, I, R, FT>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -102,8 +101,7 @@ where
     /// Called right after execution finished.
     fn post_exec<R, FT, C, EM>(
         &mut self,
-        _state: &State<I, R, FT>,
-        _corpus: &C,
+        _state: &State<C, I, R, FT>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>

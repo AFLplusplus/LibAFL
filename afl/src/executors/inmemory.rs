@@ -50,8 +50,7 @@ where
     #[inline]
     fn pre_exec<R, FT, C, EM>(
         &mut self,
-        _state: &State<I, R, FT>,
-        _corpus: &C,
+        _state: &State<C, I, R, FT>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -64,7 +63,7 @@ where
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs::<EM, C, OT, FT, I, R>(_state, _corpus, _event_mgr, _input);
+            set_oncrash_ptrs::<EM, C, OT, FT, I, R>(_state, _event_mgr, _input);
         }
         Ok(())
     }
@@ -72,8 +71,7 @@ where
     #[inline]
     fn post_exec<R, FT, C, EM>(
         &mut self,
-        _state: &State<I, R, FT>,
-        _corpus: &C,
+        _state: &State<C, I, R, FT>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -142,8 +140,7 @@ where
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
-        _state: &State<I, R, FT>,
-        _corpus: &C,
+        _state: &mut State<C, I, R, FT>,
         _event_mgr: &mut EM,
     ) -> Self
     where
@@ -211,7 +208,6 @@ pub mod unix_signals {
 
     /// Pointers to values only needed on crash. As the program will not continue after a crash,
     /// we should (tm) be okay with raw pointers here,
-    static mut CORPUS_PTR: *const c_void = ptr::null_mut();
     static mut STATE_PTR: *const c_void = ptr::null_mut();
     static mut EVENT_MGR_PTR: *mut c_void = ptr::null_mut();
     /// The (unsafe) pointer to the current inmem input, for the current run.
@@ -245,7 +241,6 @@ pub mod unix_signals {
         let _ = stdout().flush();
 
         /*let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
-        let corpus = (CORPUS_PTR as *const C).as_ref().unwrap();
         let state = (EVENT_MGR_PTR as *const State<I, R, FT>).as_ref().unwrap();
         let manager = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
 
@@ -281,7 +276,6 @@ pub mod unix_signals {
         }
 
         /*let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
-        let corpus = (CORPUS_PTR as *const C).as_ref().unwrap();
         let state = (EVENT_MGR_PTR as *const State<I, R, FT>).as_ref().unwrap();
         let manager = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
 
@@ -315,8 +309,7 @@ pub mod unix_signals {
 
     #[inline]
     pub unsafe fn set_oncrash_ptrs<EM, C, OT, FT, I, R>(
-        state: &State<I, R, FT>,
-        corpus: &C,
+        state: &State<C, I, R, FT>,
         event_mgr: &mut EM,
         input: &I,
     ) where
@@ -328,7 +321,6 @@ pub mod unix_signals {
         R: Rand,
     {
         CURRENT_INPUT_PTR = input as *const _ as *const c_void;
-        CORPUS_PTR = corpus as *const _ as *const c_void;
         STATE_PTR = state as *const _ as *const c_void;
         EVENT_MGR_PTR = event_mgr as *mut _ as *mut c_void;
     }
@@ -336,7 +328,6 @@ pub mod unix_signals {
     #[inline]
     pub unsafe fn reset_oncrash_ptrs<EM, C, OT, FT, I, R>() {
         CURRENT_INPUT_PTR = ptr::null();
-        CORPUS_PTR = ptr::null();
         STATE_PTR = ptr::null();
         EVENT_MGR_PTR = ptr::null_mut();
     }
