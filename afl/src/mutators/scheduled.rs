@@ -303,10 +303,10 @@ where
         scheduled.add_mutation(mutation_bytescopy);
         scheduled.add_mutation(mutation_bytesswap);
 
-        // TODO dictionary and custom dictionary (redqueen etc.)
-        /*scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_bitflip);*/
+        /*scheduled.add_mutation(mutation_tokeninsert);
+        scheduled.add_mutation(mutation_tokenreplace);*/
+
+        // TODO: custom dictionary (redqueen etc.)
 
         scheduled.add_mutation(mutation_splice);
 
