@@ -6,9 +6,13 @@ use crate::{
     AflError,
 };
 
-use std::fs::File;
+use alloc::{borrow::ToOwned, vec::Vec};
+
 #[cfg(feature = "std")]
-use std::io::{BufRead, BufReader};
+use std::{
+    fs::File,
+    std::io::{BufRead, BufReader},
+};
 
 const ARITH_MAX: u64 = 35;
 
@@ -816,6 +820,7 @@ pub fn add_token_to_dictionary(dict: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 
 }
 
 /// Read a dictionary file and return the number of entries read
+#[cfg(feature = "std")]
 pub fn read_dict_file(f: &str, dict: &mut Vec<Vec<u8>>) -> Result<u32, AflError> {
     let mut entries = 0;
 
@@ -878,10 +883,13 @@ pub fn read_dict_file(f: &str, dict: &mut Vec<Vec<u8>>) -> Result<u32, AflError>
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "std")]
     use std::fs;
 
+    #[cfg(feature = "std")]
     use crate::mutators::read_dict_file;
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_read_dict() {
         let _ = fs::remove_file("test.dict");

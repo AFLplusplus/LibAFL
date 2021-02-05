@@ -27,7 +27,7 @@ pub mod tuples;
 pub mod utils;
 
 use alloc::string::String;
-use core::fmt;
+use core::{fmt, marker::PhantomData};
 use corpus::Corpus;
 use events::EventManager;
 use executors::{Executor, HasObservers};
@@ -36,10 +36,10 @@ use inputs::Input;
 use observers::ObserversTuple;
 use stages::StagesTuple;
 use state::{HasCorpus, State};
-use std::marker::PhantomData;
+use utils::{current_milliseconds, Rand};
+
 #[cfg(feature = "std")]
 use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
-use utils::{current_milliseconds, Rand};
 
 /// The main fuzzer trait.
 pub trait Fuzzer<C, E, EM, FT, ST, I, OT, R>
