@@ -16,10 +16,10 @@ use afl::{
     observers::StdMapObserver,
     shmem::{AflShmem, ShMem},
     stages::mutational::StdMutationalStage,
-    state::{Fuzzer, HasCorpus, State, StdFuzzer},
+    state::{HasCorpus, State},
     tuples::tuple_list,
     utils::{deserialize_state_corpus_mgr, StdRand},
-    AflError,
+    AflError, Fuzzer, StdFuzzer,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it

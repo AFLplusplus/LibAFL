@@ -28,8 +28,125 @@ pub mod utils;
 
 use alloc::string::String;
 use core::fmt;
+use corpus::Corpus;
+use events::EventManager;
+use executors::{Executor, HasObservers};
+use feedbacks::FeedbacksTuple;
+use inputs::Input;
+use observers::ObserversTuple;
+use stages::StagesTuple;
+use state::{HasCorpus, State};
+use std::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
+use utils::{current_milliseconds, Rand};
+
+/// The main fuzzer trait.
+pub trait Fuzzer<ST, EM, E, OT, FT, C, I, R>
+where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    EM: EventManager<I>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    fn stages(&self) -> &ST;
+
+    fn stages_mut(&mut self) -> &mut ST;
+
+    fn fuzz_one(
+        &mut self,
+        rand: &mut R,
+        executor: &mut E,
+        state: &mut State<C, I, R, FT>,
+        manager: &mut EM,
+    ) -> Result<usize, AflError> {
+        let (_, idx) = state.corpus_mut().next(rand)?;
+
+        self.stages_mut()
+            .perform_all(rand, executor, state, manager, idx)?;
+
+        manager.process(state)?;
+        Ok(idx)
+    }
+
+    fn fuzz_loop(
+        &mut self,
+        rand: &mut R,
+        executor: &mut E,
+        state: &mut State<C, I, R, FT>,
+        manager: &mut EM,
+    ) -> Result<(), AflError> {
+        let mut last = current_milliseconds();
+        loop {
+            self.fuzz_one(rand, executor, state, manager)?;
+            let cur = current_milliseconds();
+            if cur - last > 60 * 100 {
+                last = cur;
+                manager.update_stats(state.executions(), state.executions_over_seconds())?;
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    EM: EventManager<I>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    stages: ST,
+    phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
+}
+
+impl<ST, EM, E, OT, FT, C, I, R> Fuzzer<ST, EM, E, OT, FT, C, I, R>
+    for StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    EM: EventManager<I>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    fn stages(&self) -> &ST {
+        &self.stages
+    }
+
+    fn stages_mut(&mut self) -> &mut ST {
+        &mut self.stages
+    }
+}
+
+impl<ST, EM, E, OT, FT, C, I, R> StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+where
+    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    EM: EventManager<I>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    FT: FeedbacksTuple<I>,
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
+    pub fn new(stages: ST) -> Self {
+        Self {
+            stages: stages,
+            phantom: PhantomData,
+        }
+    }
+}
 
 /// Main error struct for AFL
 #[derive(Debug)]
@@ -110,5 +227,75 @@ impl From<VarError> for AflError {
 impl From<ParseIntError> for AflError {
     fn from(err: ParseIntError) -> Self {
         Self::Unknown(format!("Failed to parse Int: {:?}", err))
+    }
+}
+
+// TODO: no_std test
+#[cfg(feature = "std")]
+#[cfg(test)]
+mod tests {
+
+    use crate::{
+        corpus::{Corpus, InMemoryCorpus, Testcase},
+        executors::{Executor, ExitKind, InMemoryExecutor},
+        inputs::{BytesInput, Input},
+        mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
+        stages::StdMutationalStage,
+        state::{HasCorpus, State},
+        tuples::tuple_list,
+        utils::StdRand,
+        Fuzzer, StdFuzzer,
+    };
+
+    #[cfg(feature = "std")]
+    use crate::events::{LoggerEventManager, SimpleStats};
+
+    fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
+        ExitKind::Ok
+    }
+
+    #[test]
+    fn test_fuzzer() {
+        let mut rand = StdRand::new(0);
+
+        let mut corpus = InMemoryCorpus::<BytesInput, StdRand>::new();
+        let testcase = Testcase::new(vec![0; 4]).into();
+        corpus.add(testcase);
+
+        let mut state = State::new(corpus, tuple_list!());
+
+        let mut event_manager = LoggerEventManager::new(SimpleStats::new(|s| {
+            println!("{}", s);
+        }));
+
+        let mut executor = InMemoryExecutor::new(
+            "main",
+            harness,
+            tuple_list!(),
+            //Box::new(|_, _, _, _, _| ()),
+            &mut state,
+            &mut event_manager,
+        );
+
+        let mut mutator = StdScheduledMutator::new();
+        mutator.add_mutation(mutation_bitflip);
+        let stage = StdMutationalStage::new(mutator);
+        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+
+        for i in 0..1000 {
+            fuzzer
+                .fuzz_one(&mut rand, &mut executor, &mut state, &mut event_manager)
+                .expect(&format!("Error in iter {}", i));
+        }
+
+        let state_serialized = postcard::to_allocvec(&state).unwrap();
+        let state_deserialized: State<InMemoryCorpus<BytesInput, _>, BytesInput, StdRand, ()> =
+            postcard::from_bytes(state_serialized.as_slice()).unwrap();
+        assert_eq!(state.executions(), state_deserialized.executions());
+
+        let corpus_serialized = postcard::to_allocvec(state.corpus()).unwrap();
+        let corpus_deserialized: InMemoryCorpus<BytesInput, StdRand> =
+            postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
+        assert_eq!(state.corpus().count(), corpus_deserialized.count());
     }
 }
