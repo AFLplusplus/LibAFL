@@ -11,7 +11,7 @@ use alloc::{borrow::ToOwned, vec::Vec};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
-    std::io::{BufRead, BufReader},
+    io::{BufRead, BufReader},
 };
 
 const ARITH_MAX: u64 = 35;
