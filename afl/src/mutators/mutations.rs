@@ -811,20 +811,20 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, AflError> {
 }
 
 /// Adds a token to a dictionary, checking it is not a duplicate
-pub fn add_token_to_dictionary(dict: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
-    if dict.contains(token) {
+pub fn add_token(tokens: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
+    if tokens.contains(token) {
         return 0;
     }
-    dict.push(token.to_vec());
+    tokens.push(token.to_vec());
     return 1;
 }
 
 /// Read a dictionary file and return the number of entries read
 #[cfg(feature = "std")]
-pub fn read_dict_file(f: &str, dict: &mut Vec<Vec<u8>>) -> Result<u32, AflError> {
+pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, AflError> {
     let mut entries = 0;
 
-    println!("Loading dictionary {:?} ...", &f);
+    println!("Loading tokens file {:?} ...", &f);
 
     let file = File::open(&f)?; // panic if not found
     let reader = BufReader::new(file);
@@ -875,7 +875,7 @@ pub fn read_dict_file(f: &str, dict: &mut Vec<Vec<u8>>) -> Result<u32, AflError>
             }
         };
         println!("Debug: {:?} -> {:?}", item, token);
-        entries += add_token_to_dictionary(dict, &token);
+        entries += add_token(tokens, &token);
     }
 
     Ok(entries)
@@ -887,24 +887,24 @@ mod tests {
     use std::fs;
 
     #[cfg(feature = "std")]
-    use crate::mutators::read_dict_file;
+    use crate::mutators::read_tokens_file;
 
     #[cfg(feature = "std")]
     #[test]
-    fn test_read_dict() {
-        let _ = fs::remove_file("test.dict");
+    fn test_read_tokens() {
+        let _ = fs::remove_file("test.tkns");
         let data = r###"
 # comment
 token1="AAA"
 token1="A\x41A"
 token2="B"
         "###;
-        fs::write("test.dict", data).expect("Unable to write test.dict");
+        fs::write("test.tkns", data).expect("Unable to write test.tkns");
         let mut v: Vec<Vec<u8>> = Vec::new();
-        let res = read_dict_file(&"test.dic".to_string(), &mut v).unwrap();
+        let res = read_tokens_file(&"test.tkns".to_string(), &mut v).unwrap();
         #[cfg(feature = "std")]
-        println!("Dictionary entries: {:?}", res);
+        println!("Token file entries: {:?}", res);
         assert_eq!(res, 2);
-        let _ = fs::remove_file("test.dict");
+        let _ = fs::remove_file("test.tkns");
     }
 }
