@@ -874,7 +874,8 @@ pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, AflEr
                 ))
             }
         };
-        println!("Debug: {:?} -> {:?}", item, token);
+
+        // add
         entries += add_token(tokens, &token);
     }
 
@@ -895,8 +896,9 @@ mod tests {
         let _ = fs::remove_file("test.tkns");
         let data = r###"
 # comment
-token1="AAA"
+token1@123="AAA"
 token1="A\x41A"
+"A\AA"
 token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
