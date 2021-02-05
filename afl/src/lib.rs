@@ -42,7 +42,7 @@ use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
 use utils::{current_milliseconds, Rand};
 
 /// The main fuzzer trait.
-pub trait Fuzzer<ST, EM, E, OT, FT, C, I, R>
+pub trait Fuzzer<C, E, EM, FT, ST, I, OT, R>
 where
     ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
@@ -92,8 +92,9 @@ where
     }
 }
 
+/// Your default fuzzer instance, for everyday use.
 #[derive(Clone, Debug)]
-pub struct StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+pub struct StdFuzzer<C, E, EM, FT, ST, I, OT, R>
 where
     ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
@@ -108,8 +109,8 @@ where
     phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
 }
 
-impl<ST, EM, E, OT, FT, C, I, R> Fuzzer<ST, EM, E, OT, FT, C, I, R>
-    for StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+impl<C, E, EM, FT, ST, I, OT, R> Fuzzer<C, E, EM, FT, ST, I, OT, R>
+    for StdFuzzer<C, E, EM, FT, ST, I, OT, R>
 where
     ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
@@ -129,7 +130,7 @@ where
     }
 }
 
-impl<ST, EM, E, OT, FT, C, I, R> StdFuzzer<ST, EM, E, OT, FT, C, I, R>
+impl<C, E, EM, FT, ST, I, OT, R> StdFuzzer<C, E, EM, FT, ST, I, OT, R>
 where
     ST: StagesTuple<EM, E, OT, FT, C, I, R>,
     EM: EventManager<I>,
