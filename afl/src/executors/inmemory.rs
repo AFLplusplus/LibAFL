@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 #[cfg(feature = "std")]
+#[cfg(unix)]
 use os_signals::set_oncrash_ptrs;
 
 use crate::{
@@ -20,8 +21,10 @@ use crate::{
 use unix_signals as os_signals;
 
 #[cfg(feature = "std")]
+#[cfg(unix)]
 use self::os_signals::reset_oncrash_ptrs;
 #[cfg(feature = "std")]
+#[cfg(unix)]
 use self::os_signals::setup_crash_handlers;
 
 /// The inmem executor harness
@@ -150,6 +153,7 @@ where
         EM: EventManager<I>,
     {
         #[cfg(feature = "std")]
+        #[cfg(unix)]
         unsafe {
             setup_crash_handlers::<C, EM, FT, I, OT, R>();
         }

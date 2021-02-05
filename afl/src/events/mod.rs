@@ -11,6 +11,7 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
+#[cfg(unix)]
 use crate::shmem::AflShmem;
 use crate::{
     corpus::Corpus,
@@ -718,6 +719,7 @@ where
 }
 
 #[cfg(feature = "std")]
+#[cfg(unix)]
 impl<I, ST> LlmpEventManager<I, AflShmem, ST>
 where
     I: Input,

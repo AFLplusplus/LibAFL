@@ -2,6 +2,7 @@
 // too.)
 
 #[cfg(feature = "std")]
+#[cfg(unix)]
 pub use shmem::AflShmem;
 
 use alloc::string::{String, ToString};
@@ -95,6 +96,7 @@ pub trait ShMem: Sized + Debug {
     }
 }
 
+#[cfg(unix)]
 #[cfg(feature = "std")]
 pub mod shmem {
 
@@ -106,6 +108,7 @@ pub mod shmem {
 
     use super::ShMem;
 
+    #[cfg(unix)]
     extern "C" {
         #[cfg(feature = "std")]
         fn snprintf(_: *mut c_char, _: c_ulong, _: *const c_char, _: ...) -> c_int;
@@ -119,6 +122,7 @@ pub mod shmem {
         fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
     }
 
+    #[cfg(unix)]
     #[derive(Copy, Clone)]
     #[repr(C)]
     struct ipc_perm {
@@ -135,6 +139,7 @@ pub mod shmem {
         pub __glibc_reserved2: c_ulong,
     }
 
+    #[cfg(unix)]
     #[derive(Copy, Clone)]
     #[repr(C)]
     struct shmid_ds {
@@ -151,6 +156,7 @@ pub mod shmem {
     }
 
     /// The default Sharedmap impl for unix using shmctl & shmget
+    #[cfg(unix)]
     #[derive(Clone, Debug)]
     pub struct AflShmem {
         pub shm_str: [u8; 20],
@@ -159,6 +165,7 @@ pub mod shmem {
         pub map_size: usize,
     }
 
+    #[cfg(unix)]
     impl ShMem for AflShmem {
         fn existing_from_shm_slice(
             map_str_bytes: &[u8; 20],
@@ -197,6 +204,7 @@ pub mod shmem {
     }
 
     /// Create an uninitialized shmap
+    #[cfg(unix)]
     const fn afl_shmem_unitialized() -> AflShmem {
         AflShmem {
             shm_str: [0; 20],
@@ -206,6 +214,7 @@ pub mod shmem {
         }
     }
 
+    #[cfg(unix)]
     impl AflShmem {
         pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, AflError> {
             let mut ret = afl_shmem_unitialized();
