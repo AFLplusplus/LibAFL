@@ -37,7 +37,7 @@ where
     ) -> Result<(), AflError>;
 }
 
-pub trait StagesTuple<EM, E, OT, FT, C, I, R>
+pub trait StagesTuple<C, E, EM, FT, I, OT, R>
 where
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
@@ -59,7 +59,7 @@ where
     fn for_each_mut(&mut self, f: fn(&mut dyn Stage<C, E, EM, FT, I, OT, R>));
 }
 
-impl<EM, E, OT, FT, C, I, R> StagesTuple<EM, E, OT, FT, C, I, R> for ()
+impl<C, E, EM, FT, I, OT, R> StagesTuple<C, E, EM, FT, I, OT, R> for ()
 where
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
@@ -83,10 +83,10 @@ where
     fn for_each_mut(&mut self, _f: fn(&mut dyn Stage<C, E, EM, FT, I, OT, R>)) {}
 }
 
-impl<Head, Tail, EM, E, OT, FT, C, I, R> StagesTuple<EM, E, OT, FT, C, I, R> for (Head, Tail)
+impl<Head, Tail, EM, E, OT, FT, C, I, R> StagesTuple<C, E, EM, FT, I, OT, R> for (Head, Tail)
 where
     Head: Stage<C, E, EM, FT, I, OT, R>,
-    Tail: StagesTuple<EM, E, OT, FT, C, I, R> + TupleList,
+    Tail: StagesTuple<C, E, EM, FT, I, OT, R> + TupleList,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,

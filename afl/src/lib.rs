@@ -44,7 +44,7 @@ use utils::{current_milliseconds, Rand};
 /// The main fuzzer trait.
 pub trait Fuzzer<C, E, EM, FT, ST, I, OT, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -96,7 +96,7 @@ where
 #[derive(Clone, Debug)]
 pub struct StdFuzzer<C, E, EM, FT, ST, I, OT, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -112,7 +112,7 @@ where
 impl<C, E, EM, FT, ST, I, OT, R> Fuzzer<C, E, EM, FT, ST, I, OT, R>
     for StdFuzzer<C, E, EM, FT, ST, I, OT, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -132,7 +132,7 @@ where
 
 impl<C, E, EM, FT, ST, I, OT, R> StdFuzzer<C, E, EM, FT, ST, I, OT, R>
 where
-    ST: StagesTuple<EM, E, OT, FT, C, I, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,

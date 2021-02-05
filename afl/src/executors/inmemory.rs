@@ -63,7 +63,7 @@ where
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs::<EM, C, OT, FT, I, R>(_state, _event_mgr, _input);
+            set_oncrash_ptrs::<C, EM, FT, I, OT, R>(_state, _event_mgr, _input);
         }
         Ok(())
     }
@@ -84,7 +84,7 @@ where
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            reset_oncrash_ptrs::<EM, C, OT, FT, I, R>();
+            reset_oncrash_ptrs::<C, EM, FT, I, OT, R>();
         }
         Ok(())
     }
@@ -151,7 +151,7 @@ where
     {
         #[cfg(feature = "std")]
         unsafe {
-            setup_crash_handlers::<EM, C, OT, FT, I, R>();
+            setup_crash_handlers::<C, EM, FT, I, OT, R>();
         }
 
         Self {
@@ -214,7 +214,7 @@ pub mod unix_signals {
     /// This is neede for certain non-rust side effects, as well as unix signal handling.
     static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<EM, C, OT, FT, I, R>(
+    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<C, EM, FT, I, OT, R>(
         _sig: c_int,
         info: siginfo_t,
         _void: c_void,
@@ -257,7 +257,7 @@ pub mod unix_signals {
         std::process::exit(139);
     }
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<EM, C, OT, FT, I, R>(
+    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OT, R>(
         _sig: c_int,
         _info: siginfo_t,
         _void: c_void,
@@ -308,7 +308,7 @@ pub mod unix_signals {
     }
 
     #[inline]
-    pub unsafe fn set_oncrash_ptrs<EM, C, OT, FT, I, R>(
+    pub unsafe fn set_oncrash_ptrs<C, EM, FT, I, OT, R>(
         state: &State<C, I, R, FT>,
         event_mgr: &mut EM,
         input: &I,
@@ -326,14 +326,14 @@ pub mod unix_signals {
     }
 
     #[inline]
-    pub unsafe fn reset_oncrash_ptrs<EM, C, OT, FT, I, R>() {
+    pub unsafe fn reset_oncrash_ptrs<C, EM, FT, I, OT, R>() {
         CURRENT_INPUT_PTR = ptr::null();
         STATE_PTR = ptr::null();
         EVENT_MGR_PTR = ptr::null_mut();
     }
 
     // TODO clearly state that manager should be static (maybe put the 'static lifetime?)
-    pub unsafe fn setup_crash_handlers<EM, C, OT, FT, I, R>()
+    pub unsafe fn setup_crash_handlers<C, EM, FT, I, OT, R>()
     where
         EM: EventManager<I>,
         C: Corpus<I, R>,
@@ -345,7 +345,7 @@ pub mod unix_signals {
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO;
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_crash::<EM, C, OT, FT, I, R> as usize;
+        sa.sa_sigaction = libaflrs_executor_inmem_handle_crash::<C, EM, FT, I, OT, R> as usize;
         for (sig, msg) in &[
             (SIGSEGV, "segfault"),
             (SIGBUS, "sigbus"),
@@ -359,7 +359,7 @@ pub mod unix_signals {
             }
         }
 
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_timeout::<EM, C, OT, FT, I, R> as usize;
+        sa.sa_sigaction = libaflrs_executor_inmem_handle_timeout::<C, EM, FT, I, OT, R> as usize;
         if sigaction(SIGUSR2, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up sigusr2 handler for timeouts");
         }
