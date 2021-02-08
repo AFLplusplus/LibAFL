@@ -9,8 +9,8 @@ use crate::{
 };
 
 use alloc::{borrow::ToOwned, vec::Vec};
+use core::cmp::{max, min};
 
-use std::cmp::{max, min};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -84,23 +84,25 @@ where
     fn add_mutation(&mut self, mutation: MutationFunction<I, Self, R, S>);
 }
 
+/// Mem move in the own vec
 #[inline]
 fn self_mem_move(data: &mut [u8], from: usize, to: usize, len: usize) {
     debug_assert!(data.len() > 0);
-    debug_assert!(from + len <= data.len());
-    debug_assert!(to + len <= data.len());
+    debug_assert!(from + len < data.len());
+    debug_assert!(to + len < data.len());
     if len != 0 && from != to {
         let ptr = data.as_mut_ptr();
         unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
     }
 }
 
+/// Mem move between vecs
 #[inline]
 fn mem_move(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
     debug_assert!(dst.len() > 0);
     debug_assert!(src.len() > 0);
-    debug_assert!(from + len <= src.len());
-    debug_assert!(to + len <= dst.len());
+    debug_assert!(from + len < src.len());
+    debug_assert!(to + len < dst.len());
     let dst_ptr = dst.as_mut_ptr();
     let src_ptr = src.as_ptr();
     if len != 0 {
@@ -580,10 +582,10 @@ where
         size = input.bytes().len();
     }
     let off = rand.below(size as u64 - 1) as usize;
-    let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
+    let len = rand.below(max(16, mutator.max_size() as u64)) as usize;
 
     let val = input.bytes()[rand.below(size as u64) as usize];
-    input.bytes_mut().resize(max(size, off + (2 * len)), 0);
+    input.bytes_mut().resize(max(size, off + (2 * len) + 1), 0);
     self_mem_move(input.bytes_mut(), off, off + len, len);
     memset(input.bytes_mut(), off, len, val);
     Ok(MutationResult::Mutated)
@@ -611,7 +613,7 @@ where
     let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
 
     let val = rand.below(256) as u8;
-    input.bytes_mut().resize(max(size, off + (2 * len)), 0);
+    input.bytes_mut().resize(max(size, off + (2 * len) + 1), 0);
     self_mem_move(input.bytes_mut(), off, off + len, len);
     memset(input.bytes_mut(), off, len, val);
     Ok(MutationResult::Mutated)
@@ -954,9 +956,11 @@ token2="B"
         let mut inputs = vec![
             BytesInput::new(vec![0x13, 0x37]),
             BytesInput::new(vec![0xFF; 2048]),
+            BytesInput::new(vec![]),
             BytesInput::new(vec![0xFF; 50000]),
             BytesInput::new(vec![0x0]),
             BytesInput::new(vec![]),
+            BytesInput::new(vec![1; 4]),
         ];
 
         let mut mutator = WithMaxSize {};
@@ -989,14 +993,14 @@ token2="B"
         mutations.push(mutation_bytesdelete);
         mutations.push(mutation_bytesdelete);
         mutations.push(mutation_bytesexpand);
-        //mutations.push(mutation_bytesinsert);
-        //mutations.push(mutation_bytesrandinsert);
+        mutations.push(mutation_bytesinsert);
+        mutations.push(mutation_bytesrandinsert);
         mutations.push(mutation_bytesset);
         mutations.push(mutation_bytesrandset);
         mutations.push(mutation_bytescopy);
         mutations.push(mutation_bytesswap);
 
-        for _ in 0..3 {
+        for _ in 0..2 {
             let mut new_testcases = vec![];
             for mutation in &mutations {
                 for input in inputs.iter() {
