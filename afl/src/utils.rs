@@ -24,7 +24,7 @@ pub type StdRand = RomuTrioRand;
 /// Serialize the current state and corpus during an executiont to bytes.
 /// On top, add the current llmp event manager instance to be restored
 /// This method is needed when the fuzzer run crashes and has to restart.
-pub fn serialize_state_corpus_mgr<C, FT, I, R, SH, ST>(
+pub fn serialize_state_mgr<C, FT, I, R, SH, ST>(
     state: &State<C, I, R, FT>,
     mgr: &LlmpEventManager<I, SH, ST>,
 ) -> Result<Vec<u8>, AflError>
@@ -54,7 +54,7 @@ where
 }
 
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
-pub fn deserialize_state_corpus_mgr<C, FT, I, R, SH, ST>(
+pub fn deserialize_state_mgr<C, FT, I, R, SH, ST>(
     state_corpus_serialized: &[u8],
 ) -> Result<(State<C, I, R, FT>, LlmpEventManager<I, SH, ST>), AflError>
 where

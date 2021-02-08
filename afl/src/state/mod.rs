@@ -143,7 +143,7 @@ where
         for in_dir in in_dirs {
             self.load_from_directory(executor, generator, manager, in_dir)?;
         }
-        manager.fire(Event::Log {
+        manager.fire(self, Event::Log {
             severity_level: LogSeverity::Debug,
             message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
             phantom: PhantomData,
@@ -351,7 +351,7 @@ where
                 added += 1;
             }
         }
-        manager.fire(Event::Log {
+        manager.fire(self, Event::Log {
             severity_level: LogSeverity::Debug,
             message: format!("Loaded {} over {} initial testcases", added, num),
             phantom: PhantomData,
