@@ -86,32 +86,43 @@ where
 
 #[inline]
 fn self_mem_move(data: &mut [u8], from: usize, to: usize, len: usize) {
+    debug_assert!(data.len() > 0);
     debug_assert!(from + len <= data.len());
     debug_assert!(to + len <= data.len());
-    let ptr = data.as_mut_ptr();
-    unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
-}
-
-#[inline]
-fn mem_move(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
-    debug_assert!(from + len <= src.len());
-    debug_assert!(to + len <= dst.len());
-    let dst_ptr = dst.as_mut_ptr();
-    let src_ptr = src.as_ptr();
-    unsafe {
-        core::ptr::copy(
-            src_ptr.offset(from as isize),
-            dst_ptr.offset(to as isize),
-            len,
-        )
+    if len != 0 && from != to {
+        let ptr = data.as_mut_ptr();
+        unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
     }
 }
 
 #[inline]
-fn mem_set(data: &mut [u8], from: usize, len: usize, val: u8) {
+fn mem_move(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
+    debug_assert!(dst.len() > 0);
+    debug_assert!(src.len() > 0);
+    debug_assert!(from + len <= src.len());
+    debug_assert!(to + len <= dst.len());
+    let dst_ptr = dst.as_mut_ptr();
+    let src_ptr = src.as_ptr();
+    if len != 0 {
+        unsafe {
+            core::ptr::copy(
+                src_ptr.offset(from as isize),
+                dst_ptr.offset(to as isize),
+                len,
+            )
+        }
+    }
+}
+
+/// A simple memset.
+/// The compiler does the heavy lifting.
+/// see https://stackoverflow.com/a/51732799/1345238
+#[inline]
+fn memset(data: &mut [u8], from: usize, len: usize, val: u8) {
     debug_assert!(from + len <= data.len());
-    let ptr = data.as_mut_ptr();
-    unsafe { core::ptr::write_bytes(ptr.offset(from as isize), val, len) }
+    for p in &mut data[from..from + len] {
+        *p = val
+    }
 }
 
 /// Bitflip mutation for inputs with a bytes vector
@@ -572,9 +583,9 @@ where
     let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
 
     let val = input.bytes()[rand.below(size as u64) as usize];
-    input.bytes_mut().resize(off + (2 * len), 0);
+    input.bytes_mut().resize(max(size, off + (2 * len)), 0);
     self_mem_move(input.bytes_mut(), off, off + len, len);
-    mem_set(input.bytes_mut(), off, len, val);
+    memset(input.bytes_mut(), off, len, val);
     Ok(MutationResult::Mutated)
 }
 
@@ -589,18 +600,18 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    let size = input.bytes().len();
-    let off = if size == 0 {
-        0
-    } else {
-        rand.below(size as u64 - 1)
-    } as usize;
+    let mut size = input.bytes().len();
+    if size == 0 {
+        input.bytes_mut().append(&mut rand.next().to_le_bytes().to_vec());
+        size = input.bytes().len();
+    }
+    let off = rand.below(size as u64 - 1) as usize;
     let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
 
     let val = rand.below(256) as u8;
-    input.bytes_mut().resize(off + (2 * len), 0);
+    input.bytes_mut().resize(max(size, off + (2 * len)), 0);
     self_mem_move(input.bytes_mut(), off, off + len, len);
-    mem_set(input.bytes_mut(), off, len, val);
+    memset(input.bytes_mut(), off, len, val);
     Ok(MutationResult::Mutated)
 }
 
@@ -626,7 +637,7 @@ where
         rand.below(size as u64 - 1) as usize
     };
     let end = rand.between(start as u64, size as u64) as usize;
-    mem_set(input.bytes_mut(), start, end - start, val);
+    memset(input.bytes_mut(), start, end - start, val);
     Ok(MutationResult::Mutated)
 }
 
@@ -652,7 +663,7 @@ where
         rand.below(size as u64 - 1) as usize
     };
     let len = rand.below((size - start) as u64) as usize;
-    mem_set(input.bytes_mut(), start, len, val);
+    memset(input.bytes_mut(), start, len, val);
     Ok(MutationResult::Mutated)
 }
 
@@ -695,10 +706,10 @@ where
     }
 
     let first = rand.below(input.bytes().len() as u64 - 1) as usize;
-    let second = rand.between(first as u64, input.bytes().len() as u64 - 1) as usize;
-    let len = rand.below((size - max(first, second)) as u64) as usize;
+    let second = rand.below(input.bytes().len() as u64 - 1) as usize;
+    let len = max(rand.below((size - max(first, second)) as u64) as usize, 1);
 
-    let tmp = input.bytes()[first..first + len].to_vec();
+    let tmp = input.bytes()[first..=first + len].to_vec();
     self_mem_move(input.bytes_mut(), second, first, len);
     mem_move(input.bytes_mut(), &tmp, 0, second, len);
     Ok(MutationResult::Mutated)
@@ -963,7 +974,6 @@ token2="B"
         mutations.push(mutation_bytedec);
         mutations.push(mutation_byteneg);
         mutations.push(mutation_byterand);
-
         mutations.push(mutation_byteadd);
         mutations.push(mutation_wordadd);
         mutations.push(mutation_dwordadd);
@@ -977,8 +987,8 @@ token2="B"
         mutations.push(mutation_bytesdelete);
         mutations.push(mutation_bytesdelete);
         mutations.push(mutation_bytesexpand);
-        mutations.push(mutation_bytesinsert);
-        mutations.push(mutation_bytesrandinsert);
+        //mutations.push(mutation_bytesinsert);
+        //mutations.push(mutation_bytesrandinsert);
         mutations.push(mutation_bytesset);
         mutations.push(mutation_bytesrandset);
         mutations.push(mutation_bytescopy);
