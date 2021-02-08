@@ -145,3 +145,13 @@ where
         }
     }
 }
+
+/// Create a testcase from an input
+impl<I> From<I> for Testcase<I>
+where
+    I: Input,
+{
+    fn from(input: I) -> Self {
+        Testcase::new(input)
+    }
+}

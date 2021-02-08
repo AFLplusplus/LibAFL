@@ -10,6 +10,7 @@ use crate::{
 
 use alloc::{borrow::ToOwned, vec::Vec};
 
+use std::cmp::{max, min};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -476,15 +477,15 @@ where
     R: Rand,
 {
     let size = input.bytes().len();
-    let off = if size == 0 {
-        0
-    } else {
-        rand.below(size as u64 - 1)
-    } as usize;
-    let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
+    if size == 0 {
+        return Ok(MutationResult::Skipped);
+    }
+    let off = rand.below(size as u64 - 1) as usize;
+    let len = rand.below(min(16, mutator.max_size() as u64 - 1) + 1) as usize;
 
     input.bytes_mut().resize(size + len, 0);
-    self_mem_move(input.bytes_mut(), off, off + len, len);
+    //println!("Size {}, off {}, len {}", size, off, len);
+    self_mem_move(input.bytes_mut(), 0, 0 + off, len);
     Ok(MutationResult::Mutated)
 }
 
@@ -559,16 +560,19 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    let size = input.bytes().len();
-    let off = if size == 0 {
-        0
-    } else {
-        rand.below(size as u64 - 1)
-    } as usize;
+    let mut size = input.bytes().len();
+    if size == 0 {
+        // Generate random bytes if we're empty.
+        input
+            .bytes_mut()
+            .append(&mut rand.next().to_be_bytes().to_vec());
+        size = input.bytes().len();
+    }
+    let off = rand.below(size as u64 - 1) as usize;
     let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
 
     let val = input.bytes()[rand.below(size as u64) as usize];
-    input.bytes_mut().resize(size + len, 0);
+    input.bytes_mut().resize(off + (2 * len), 0);
     self_mem_move(input.bytes_mut(), off, off + len, len);
     mem_set(input.bytes_mut(), off, len, val);
     Ok(MutationResult::Mutated)
@@ -594,7 +598,7 @@ where
     let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
 
     let val = rand.below(256) as u8;
-    input.bytes_mut().resize(size + len, 0);
+    input.bytes_mut().resize(off + (2 * len), 0);
     self_mem_move(input.bytes_mut(), off, off + len, len);
     mem_set(input.bytes_mut(), off, len, val);
     Ok(MutationResult::Mutated)
@@ -621,7 +625,7 @@ where
     } else {
         rand.below(size as u64 - 1) as usize
     };
-    let end = rand.below((size - start) as u64) as usize;
+    let end = rand.between(start as u64, size as u64) as usize;
     mem_set(input.bytes_mut(), start, end - start, val);
     Ok(MutationResult::Mutated)
 }
@@ -647,8 +651,8 @@ where
     } else {
         rand.below(size as u64 - 1) as usize
     };
-    let end = rand.below((size - start) as u64) as usize;
-    mem_set(input.bytes_mut(), start, end - start, val);
+    let len = rand.below((size - start) as u64) as usize;
+    mem_set(input.bytes_mut(), start, len, val);
     Ok(MutationResult::Mutated)
 }
 
@@ -692,7 +696,7 @@ where
 
     let first = rand.below(input.bytes().len() as u64 - 1) as usize;
     let second = rand.below(input.bytes().len() as u64 - 1) as usize;
-    let len = rand.below((size - core::cmp::max(first, second)) as u64) as usize;
+    let len = rand.below((size - max(first, second)) as u64) as usize;
 
     let tmp = input.bytes()[first..len].to_vec();
     self_mem_move(input.bytes_mut(), second, first, len);
@@ -892,13 +896,14 @@ mod tests {
     #[cfg(feature = "std")]
     use crate::mutators::read_tokens_file;
 
-    use super::{
-        mutation_bitflip, mutation_bytedec, mutation_byteflip, mutation_byteinc,
-        mutation_byteinteresting, mutation_byteneg, mutation_byterand, mutation_bytesdelete,
-        mutation_dwordadd, mutation_dwordinteresting, mutation_qwordadd, mutation_wordadd,
-        mutation_wordinteresting,
+    use super::*;
+    use crate::{
+        corpus::{Corpus, InMemoryCorpus},
+        executors::InMemoryExecutor,
+        inputs::BytesInput,
+        state::State,
+        utils::StdRand,
     };
-    use crate::{inputs::BytesInput, state::State, utils::StdRand};
 
     #[cfg(feature = "std")]
     #[test]
@@ -920,54 +925,77 @@ token2="B"
         let _ = fs::remove_file("test.tkns");
     }
 
+    struct WithMaxSize {}
+    impl HasMaxSize for WithMaxSize {
+        fn max_size(&self) -> usize {
+            16000 as usize
+        }
+
+        fn set_max_size(&mut self, max_size: usize) {
+            todo!("Not needed");
+        }
+    }
+
     #[test]
     fn test_mutators() {
-        let inputs = &[
+        let mut inputs = vec![
             BytesInput::new(vec![0x13, 0x37]),
             BytesInput::new(vec![0xFF; 2048]),
+            BytesInput::new(vec![0xFF; 50000]),
             BytesInput::new(vec![0x0]),
             BytesInput::new(vec![]),
         ];
 
-        let rand = StdRand::new(1337);
-        let corpus: crate::corpus::InMemoryCorpus::new();
-        corpus.add(BytesInput::new(vec![0x42; 0x1337]));
+        let mut mutator = WithMaxSize {};
 
-        let state = State::new(corpus);
+        let mut rand = StdRand::new(1337);
+        let mut corpus: InMemoryCorpus<_, StdRand> = InMemoryCorpus::new();
 
-        let mut mutations = vec![];
+        corpus.add(BytesInput::new(vec![0x42; 0x1337]).into());
 
-        mutations.append(mutation_bitflip);
-        mutations.append(mutation_byteflip);
-        mutations.append(mutation_byteinc);
-        mutations.append(mutation_bytedec);
-        mutations.append(mutation_byteneg);
-        mutations.append(mutation_byterand);
+        let mut state = State::new(corpus, ());
 
-        mutations.append(mutation_byteadd);
-        mutations.append(mutation_wordadd);
-        mutations.append(mutation_dwordadd);
-        mutations.append(mutation_qwordadd);
-        mutations.append(mutation_byteinteresting);
-        mutations.append(mutation_wordinteresting);
-        mutations.append(mutation_dwordinteresting);
+        let mut mutations: Vec<MutationFunction<BytesInput, WithMaxSize, StdRand, _>> = vec![];
 
-        mutations.append(mutation_bytesdelete);
-        mutations.append(mutation_bytesdelete);
-        mutations.append(mutation_bytesdelete);
-        mutations.append(mutation_bytesdelete);
-        mutations.append(mutation_bytesexpand);
-        mutations.append(mutation_bytesinsert);
-        mutations.append(mutation_bytesrandinsert);
-        mutations.append(mutation_bytesset);
-        mutations.append(mutation_bytesrandset);
-        mutations.append(mutation_bytescopy);
-        mutations.append(mutation_bytesswap);
+        mutations.push(mutation_bitflip);
+        mutations.push(mutation_byteflip);
+        mutations.push(mutation_byteinc);
+        mutations.push(mutation_bytedec);
+        mutations.push(mutation_byteneg);
+        mutations.push(mutation_byterand);
 
-        for mutation in mutations {
-            for input in inputs.iter_mut() {
-                mutation(None, rand, state, input).unwrap();
+        mutations.push(mutation_byteadd);
+        mutations.push(mutation_wordadd);
+        mutations.push(mutation_dwordadd);
+        mutations.push(mutation_qwordadd);
+        mutations.push(mutation_byteinteresting);
+        mutations.push(mutation_wordinteresting);
+        mutations.push(mutation_dwordinteresting);
+
+        mutations.push(mutation_bytesdelete);
+        mutations.push(mutation_bytesdelete);
+        mutations.push(mutation_bytesdelete);
+        mutations.push(mutation_bytesdelete);
+        mutations.push(mutation_bytesexpand);
+        mutations.push(mutation_bytesinsert);
+        mutations.push(mutation_bytesrandinsert);
+        mutations.push(mutation_bytesset);
+        mutations.push(mutation_bytesrandset);
+        mutations.push(mutation_bytescopy);
+        mutations.push(mutation_bytesswap);
+
+        for _ in 0..3 {
+            let mut new_testcases = vec![];
+            for mutation in &mutations {
+                for input in inputs.iter() {
+                    let mut mutant = input.clone();
+                    match mutation(&mut mutator, &mut rand, &mut state, &mut mutant).unwrap() {
+                        MutationResult::Mutated => new_testcases.push(mutant),
+                        MutationResult::Skipped => (),
+                    };
+                }
             }
+            inputs.append(&mut new_testcases);
         }
 
         /* TODO
