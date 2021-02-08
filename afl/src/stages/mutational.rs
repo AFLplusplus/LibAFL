@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    events::EventManager,
+    events::{Event, EventManager},
     executors::{Executor, HasObservers},
     feedbacks::FeedbacksTuple,
     inputs::Input,
@@ -76,13 +76,15 @@ where
             // So by default we shoudl trigger it in corpus.add, so that the user can override it and remove
             // if needed by particular cases
             if fitness > 0 {
+                let observers_buf = manager.serialize_observers(observers)?;
+
                 // TODO decouple events manager and engine
-                manager.new_testcase(
-                    &input_mut,
-                    observers,
-                    state.corpus().count() + 1,
-                    "test".into(),
-                )?;
+                manager.fire(Event::NewTestcase {
+                    input: input_mut.clone(),
+                    observers_buf,
+                    corpus_size: state.corpus().count() + 1,
+                    client_config: "TODO".into(),
+                })?;
                 state.add_if_interesting(input_mut, fitness)?;
             // let _ = corpus.add(testcase);
             } else {

@@ -208,7 +208,7 @@ where
             let idx = self.scheduled.schedule(14, rand, input);
             let mutation = match idx {
                 0 => mutation_bitflip,
-                1 => mutation_byteflip,
+                /*1 => mutation_byteflip,
                 2 => mutation_byteinc,
                 3 => mutation_bytedec,
                 4 => mutation_byteneg,
@@ -219,7 +219,7 @@ where
                 8 => mutation_dwordadd,
                 9 => mutation_byteinteresting,
                 10 => mutation_wordinteresting,
-                11 => mutation_dwordinteresting,
+                11 => mutation_dwordinteresting,*/
                 _ => mutation_splice,
             };
             mutation(self, rand, state, input)?;
@@ -277,7 +277,7 @@ where
     pub fn new_default() -> Self {
         let mut scheduled = StdScheduledMutator::<C, I, R, S>::new();
         scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_byteflip);
+        /*scheduled.add_mutation(mutation_byteflip);
         scheduled.add_mutation(mutation_byteinc);
         scheduled.add_mutation(mutation_bytedec);
         scheduled.add_mutation(mutation_byteneg);
@@ -301,7 +301,7 @@ where
         scheduled.add_mutation(mutation_bytesset);
         scheduled.add_mutation(mutation_bytesrandset);
         scheduled.add_mutation(mutation_bytescopy);
-        scheduled.add_mutation(mutation_bytesswap);
+        scheduled.add_mutation(mutation_bytesswap);*/
 
         /* TODO
         scheduled.add_mutation(mutation_tokeninsert);

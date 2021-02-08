@@ -29,7 +29,7 @@ pub mod utils;
 use alloc::string::String;
 use core::{fmt, marker::PhantomData};
 use corpus::Corpus;
-use events::EventManager;
+use events::{Event, EventManager};
 use executors::{Executor, HasObservers};
 use feedbacks::FeedbacksTuple;
 use inputs::Input;
@@ -86,7 +86,11 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.update_stats(state.executions(), state.executions_over_seconds())?;
+                manager.fire(Event::UpdateStats {
+                    executions: state.executions(),
+                    execs_over_sec: state.executions_over_seconds(),
+                    phantom: PhantomData,
+                })?
             }
         }
     }
@@ -265,9 +269,10 @@ mod tests {
 
         let mut state = State::new(corpus, tuple_list!());
 
-        let mut event_manager = LoggerEventManager::new(SimpleStats::new(|s| {
+        let stats = SimpleStats::new(|s| {
             println!("{}", s);
-        }));
+        });
+        let mut event_manager = LoggerEventManager::new(stats);
 
         let mut executor = InMemoryExecutor::new(
             "main",

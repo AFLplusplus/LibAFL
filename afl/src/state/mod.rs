@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     corpus::{Corpus, Testcase},
-    events::EventManager,
+    events::{Event, EventManager, LogSeverity},
     executors::{Executor, HasObservers},
     feedbacks::FeedbacksTuple,
     generators::Generator,
@@ -143,10 +143,11 @@ where
         for in_dir in in_dirs {
             self.load_from_directory(executor, generator, manager, in_dir)?;
         }
-        manager.log(
-            0,
-            format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
-        )?;
+        manager.fire(Event::Log {
+            severity_level: LogSeverity::Debug,
+            message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
+            phantom: PhantomData,
+        })?;
         manager.process(self)?;
         Ok(())
     }
@@ -350,10 +351,11 @@ where
                 added += 1;
             }
         }
-        manager.log(
-            0,
-            format!("Loaded {} over {} initial testcases", added, num),
-        )?;
+        manager.fire(Event::Log {
+            severity_level: LogSeverity::Debug,
+            message: format!("Loaded {} over {} initial testcases", added, num),
+            phantom: PhantomData,
+        })?;
         manager.process(self)?;
         Ok(())
     }

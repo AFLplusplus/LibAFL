@@ -56,7 +56,6 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 pub fn deserialize_state_corpus_mgr<C, FT, I, R, SH, ST>(
     state_corpus_serialized: &[u8],
-    stats: ST,
 ) -> Result<(State<C, I, R, FT>, LlmpEventManager<I, SH, ST>), AflError>
 where
     C: Corpus<I, R>,
@@ -70,7 +69,7 @@ where
     let client_description = postcard::from_bytes(&tuple.1)?;
     Ok((
         postcard::from_bytes(&tuple.0)?,
-        LlmpEventManager::existing_client_from_description(&client_description, stats)?,
+        LlmpEventManager::existing_client_from_description(&client_description)?,
     ))
 }
 
