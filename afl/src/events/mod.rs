@@ -11,6 +11,7 @@ use alloc::{
 };
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
+use std::env;
 
 #[cfg(feature = "std")]
 use std::process::Command;
@@ -732,7 +733,7 @@ where
         match &event {
             Event::Crash { input: _ } | Event::Timeout { input: _ } => {
                 // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-                unsafe { sender.reset_last_page() };
+                unsafe { self.sender.reset_last_page() };
                 let buf = postcard::to_allocvec(&(&state, &self.llmp_mgr.describe()?))?;
                 self.sender.send_buf(_LLMP_TAG_RESTART, &buf).unwrap();
             }
@@ -804,7 +805,7 @@ where
                         .status()?;
                     ctr += 1;
                     if ctr == 10 {
-                        return Ok(());
+                        todo!("This function should be removed");
                     }
                 }
             }
@@ -829,13 +830,15 @@ where
             // Restoring from a previous run, deserialize state and corpus.
             Some((_sender, _tag, msg)) => {
                 println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-                deserialize_state_mgr(&msg, stats)?
+                deserialize_state_mgr(&msg)?;
+                todo!("Remove this func");
             }
         };
         // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
         unsafe { sender.reset_last_page() };
 
-        Ok(mgr)
+        //Ok(mgr)
+        todo!("Remove this fn");
     }
 }
 
@@ -876,7 +879,7 @@ where
                 .status()?;
             ctr += 1;
             if ctr == 10 {
-                return Ok(());
+                todo!("Fix this");
             }
         }
     }
@@ -889,7 +892,7 @@ where
     let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
 
     // If we're restarting, deserialize the old state.
-    let (mut state, mut mgr) = match receiver.recv_buf()? {
+    let (mut mgr, mut state) = match receiver.recv_buf()? {
         None => {
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
@@ -901,7 +904,8 @@ where
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            deserialize_state_mgr(&msg)?
+            let (mgr, state) = deserialize_state_mgr(&msg)?;
+            (LlmpRestartingEventManager::new(mgr), Some(state))
         }
     };
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
@@ -911,6 +915,8 @@ where
     // in case something crashes in the fuzzer.
     sender.send_buf(_LLMP_TAG_NO_RESTART, []);
     */
+
+    (mgr, state)
 }
 
 #[cfg(test)]
