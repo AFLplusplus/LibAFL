@@ -86,11 +86,14 @@ where
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
-                manager.fire(state, Event::UpdateStats {
-                    executions: state.executions(),
-                    execs_over_sec: state.executions_over_seconds(),
-                    phantom: PhantomData,
-                })?
+                manager.fire(
+                    state,
+                    Event::UpdateStats {
+                        executions: state.executions(),
+                        execs_over_sec: state.executions_over_seconds(),
+                        phantom: PhantomData,
+                    },
+                )?
             }
         }
     }
