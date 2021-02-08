@@ -353,10 +353,10 @@ where
             let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u64;
             let num = 1 + rand.below(ARITH_MAX) as u64;
             match rand.below(4) {
-                0 => *ptr += num,
-                1 => *ptr -= num,
-                2 => *ptr = ((*ptr).swap_bytes() + num).swap_bytes(),
-                _ => *ptr = ((*ptr).swap_bytes() - num).swap_bytes(),
+                0 => *ptr = (*ptr).wrapping_add(num),
+                1 => *ptr = (*ptr).wrapping_sub(num),
+                2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
+                _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
             };
         }
         Ok(MutationResult::Mutated)
@@ -695,10 +695,10 @@ where
     }
 
     let first = rand.below(input.bytes().len() as u64 - 1) as usize;
-    let second = rand.below(input.bytes().len() as u64 - 1) as usize;
+    let second = rand.between(first as u64, input.bytes().len() as u64 - 1) as usize;
     let len = rand.below((size - max(first, second)) as u64) as usize;
 
-    let tmp = input.bytes()[first..len].to_vec();
+    let tmp = input.bytes()[first..first + len].to_vec();
     self_mem_move(input.bytes_mut(), second, first, len);
     mem_move(input.bytes_mut(), &tmp, 0, second, len);
     Ok(MutationResult::Mutated)
