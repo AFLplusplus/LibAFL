@@ -602,7 +602,9 @@ where
 {
     let mut size = input.bytes().len();
     if size == 0 {
-        input.bytes_mut().append(&mut rand.next().to_le_bytes().to_vec());
+        input
+            .bytes_mut()
+            .append(&mut rand.next().to_le_bytes().to_vec());
         size = input.bytes().len();
     }
     let off = rand.below(size as u64 - 1) as usize;
