@@ -760,6 +760,7 @@ where
         Self { llmp_mgr, sender }
     }
 
+    /*
     pub fn temp<C, FT, R>(
         stats: ST,
         broker_port: u16,
@@ -840,6 +841,7 @@ where
         //Ok(mgr)
         todo!("Remove this fn");
     }
+    */
 }
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
@@ -891,21 +893,26 @@ where
     let mut receiver = LlmpReceiver::<AflShmem>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
     let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
 
+    todo!("all the things");
+    /*
+
     // If we're restarting, deserialize the old state.
     let (mut mgr, mut state) = match receiver.recv_buf()? {
         None => {
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
-            let client_mgr =
+            /*let client_mgr =
                 LlmpEventManager::existing_client_from_env(ENV_FUZZER_BROKER_CLIENT_INITIAL)?;
 
-            (LlmpRestartingEventManager::new(client_mgr, sender), None)
+            (LlmpRestartingEventManager::new(client_mgr, sender), None)*/
+            todo!("Do");
         }
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
             let (mgr, state) = deserialize_state_mgr(&msg)?;
-            (LlmpRestartingEventManager::new(mgr), Some(state))
+            todo!("Finish");
+            //(LlmpRestartingEventManager::new(mgr, sender), Some(state))
         }
     };
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
@@ -916,7 +923,9 @@ where
     sender.send_buf(_LLMP_TAG_NO_RESTART, []);
     */
 
-    (mgr, state)
+    //Ok(state)
+    todo!("More")
+    */
 }
 
 #[cfg(test)]

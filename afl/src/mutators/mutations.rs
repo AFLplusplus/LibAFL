@@ -1,7 +1,9 @@
 use crate::{
-    inputs::{HasBytesVec, Input},
+    corpus::InMemoryCorpus,
+    inputs::{BytesInput, HasBytesVec, Input},
     mutators::Corpus,
     mutators::*,
+    state::State,
     utils::Rand,
     AflError,
 };
@@ -890,6 +892,14 @@ mod tests {
     #[cfg(feature = "std")]
     use crate::mutators::read_tokens_file;
 
+    use super::{
+        mutation_bitflip, mutation_bytedec, mutation_byteflip, mutation_byteinc,
+        mutation_byteinteresting, mutation_byteneg, mutation_byterand, mutation_bytesdelete,
+        mutation_dwordadd, mutation_dwordinteresting, mutation_qwordadd, mutation_wordadd,
+        mutation_wordinteresting,
+    };
+    use crate::{inputs::BytesInput, state::State, utils::StdRand};
+
     #[cfg(feature = "std")]
     #[test]
     fn test_read_tokens() {
@@ -908,5 +918,61 @@ token2="B"
         println!("Token file entries: {:?}", res);
         assert_eq!(res, 2);
         let _ = fs::remove_file("test.tkns");
+    }
+
+    #[test]
+    fn test_mutators() {
+        let inputs = &[
+            BytesInput::new(vec![0x13, 0x37]),
+            BytesInput::new(vec![0xFF; 2048]),
+            BytesInput::new(vec![0x0]),
+            BytesInput::new(vec![]),
+        ];
+
+        let rand = StdRand::new(1337);
+        let corpus: crate::corpus::InMemoryCorpus::new();
+        corpus.add(BytesInput::new(vec![0x42; 0x1337]));
+
+        let state = State::new(corpus);
+
+        let mut mutations = vec![];
+
+        mutations.append(mutation_bitflip);
+        mutations.append(mutation_byteflip);
+        mutations.append(mutation_byteinc);
+        mutations.append(mutation_bytedec);
+        mutations.append(mutation_byteneg);
+        mutations.append(mutation_byterand);
+
+        mutations.append(mutation_byteadd);
+        mutations.append(mutation_wordadd);
+        mutations.append(mutation_dwordadd);
+        mutations.append(mutation_qwordadd);
+        mutations.append(mutation_byteinteresting);
+        mutations.append(mutation_wordinteresting);
+        mutations.append(mutation_dwordinteresting);
+
+        mutations.append(mutation_bytesdelete);
+        mutations.append(mutation_bytesdelete);
+        mutations.append(mutation_bytesdelete);
+        mutations.append(mutation_bytesdelete);
+        mutations.append(mutation_bytesexpand);
+        mutations.append(mutation_bytesinsert);
+        mutations.append(mutation_bytesrandinsert);
+        mutations.append(mutation_bytesset);
+        mutations.append(mutation_bytesrandset);
+        mutations.append(mutation_bytescopy);
+        mutations.append(mutation_bytesswap);
+
+        for mutation in mutations {
+            for input in inputs.iter_mut() {
+                mutation(None, rand, state, input).unwrap();
+            }
+        }
+
+        /* TODO
+        scheduled.add_mutation(mutation_tokeninsert);
+        scheduled.add_mutation(mutation_tokenreplace);
+        */
     }
 }

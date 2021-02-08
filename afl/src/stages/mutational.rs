@@ -79,12 +79,15 @@ where
                 let observers_buf = manager.serialize_observers(observers)?;
 
                 // TODO decouple events manager and engine
-                manager.fire(Event::NewTestcase {
-                    input: input_mut.clone(),
-                    observers_buf,
-                    corpus_size: state.corpus().count() + 1,
-                    client_config: "TODO".into(),
-                })?;
+                manager.fire(
+                    state,
+                    Event::NewTestcase {
+                        input: input_mut.clone(),
+                        observers_buf,
+                        corpus_size: state.corpus().count() + 1,
+                        client_config: "TODO".into(),
+                    },
+                )?;
                 state.add_if_interesting(input_mut, fitness)?;
             // let _ = corpus.add(testcase);
             } else {
