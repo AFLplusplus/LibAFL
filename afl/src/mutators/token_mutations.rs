@@ -1,11 +1,61 @@
 
+use crate::{
+    inputs::{HasBytesVec, Input},
+    mutators::*,
+    utils::Rand,
+    serde_anymap::SerdeAny,
+    AflError,
+};
 
-struct Tokens {
-    vec: Vec<Vec<u8>>,
+use alloc::{vec::Vec};
+use serde::{Serialize, Deserialize};
+use core::any::Any;
+
+/// Mem move in the own vec
+#[inline]
+fn self_mem_move(data: &mut [u8], from: usize, to: usize, len: usize) {
+    debug_assert!(data.len() > 0);
+    debug_assert!(from + len < data.len());
+    debug_assert!(to + len < data.len());
+    if len != 0 && from != to {
+        let ptr = data.as_mut_ptr();
+        unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
+    }
 }
 
-impl AsAny for Tokens {
+/// Mem move between vecs
+#[inline]
+fn mem_move(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
+    debug_assert!(dst.len() > 0);
+    debug_assert!(src.len() > 0);
+    debug_assert!(from + len < src.len());
+    debug_assert!(to + len < dst.len());
+    let dst_ptr = dst.as_mut_ptr();
+    let src_ptr = src.as_ptr();
+    if len != 0 {
+        unsafe {
+            core::ptr::copy(
+                src_ptr.offset(from as isize),
+                dst_ptr.offset(to as isize),
+                len,
+            )
+        }
+    }
+}
 
+#[derive(Serialize, Deserialize)]
+pub struct TokensMetadata {
+    tokens: Vec<Vec<u8>>
+}
+
+impl SerdeAny for TokensMetadata {
+    fn as_any(&self) -> &Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut Any {
+        self
+    }
 }
 
 /// Insert a dictionary token
@@ -21,25 +71,28 @@ where
     R: Rand,
     S: HasMetadata,
 {
-    let tokens: &Tokens = &state.metadata().get::<Tokens>().unwrap();
-    let tokens = tokens.token_vec;
-    if mutator.tokens.size() == 0 {
+    let meta;
+    match state.metadata().get::<TokensMetadata>() {
+        Some(t) => { meta = t; },
+        None => { return Ok(MutationResult::Skipped); }
+    };
+    if meta.tokens.len() == 0 {
         return Ok(MutationResult::Skipped);
     }
-    let token = &mutator.tokens[rand.below(token.size())];
-    let token_len = token.size();
+    let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
+    let token_len = token.len();
     let size = input.bytes().len();
     let off = if size == 0 {
         0
     } else {
         rand.below(core::cmp::min(
-            size,
+            size as u64,
             (mutator.max_size() - token_len) as u64,
         )) as usize
     } as usize;
 
     input.bytes_mut().resize(size + token_len, 0);
-    mem_move(input.bytes_mut(), token, 0, off, len);
+    mem_move(input.bytes_mut(), token, 0, off, size);
     Ok(MutationResult::Mutated)
 }
 
@@ -56,13 +109,18 @@ where
     R: Rand,
     S: HasMetadata,
 {
-    if mutator.tokens.size() > len || !len {
+    let meta;
+    match state.metadata().get::<TokensMetadata>() {
+        Some(t) => { meta = t; },
+        None => { return Ok(MutationResult::Skipped); }
+    };
+    if meta.tokens.len() == 0 {
         return Ok(MutationResult::Skipped);
     }
-    let token = &mutator.tokens[rand.below(token.size())];
-    let token_len = token.size();
+    let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
+    let token_len = token.len();
     let size = input.bytes().len();
     let off = rand.below((mutator.max_size() - token_len) as u64) as usize;
-    mem_move(input.bytes_mut(), token, 0, off, len);
+    mem_move(input.bytes_mut(), token, 0, off, size);
     Ok(MutationResult::Mutated)
 }

@@ -1,9 +1,7 @@
 use crate::{
-    corpus::InMemoryCorpus,
-    inputs::{BytesInput, HasBytesVec, Input},
+    inputs::{HasBytesVec, Input},
     mutators::Corpus,
     mutators::*,
-    state::State,
     utils::Rand,
     AflError,
 };
@@ -914,7 +912,6 @@ mod tests {
     use super::*;
     use crate::{
         corpus::{Corpus, InMemoryCorpus},
-        executors::InProcessExecutor,
         inputs::BytesInput,
         state::State,
         utils::StdRand,

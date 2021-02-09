@@ -24,11 +24,6 @@ use crate::{
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
 
-pub trait StateMetadata: Debug {
-    /// The name of this metadata - used to find it in the list of avaliable metadata
-    fn name(&self) -> &'static str;
-}
-
 /// Trait for elements offering a corpus
 pub trait HasCorpus<C> {
     /// The testcase corpus
