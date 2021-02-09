@@ -11,22 +11,16 @@ use afl::{
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, Input},
-    llmp::{LlmpReceiver, LlmpSender},
     mutators::{scheduled::HavocBytesMutator, HasMaxSize},
     observers::StdMapObserver,
     shmem::{AflShmem, ShMem},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, State},
     tuples::tuple_list,
-    utils::{deserialize_state_corpus_mgr, StdRand},
+    utils::{ StdRand},
+    events::setup_restarting_state,
     AflError, Fuzzer, StdFuzzer,
 };
-
-/// The llmp connection from the actual fuzzer to the process supervising it
-const ENV_FUZZER_SENDER: &str = &"_AFL_ENV_FUZZER_SENDER";
-const ENV_FUZZER_RECEIVER: &str = &"_AFL_ENV_FUZZER_RECEIVER";
-/// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
-const ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 /// The name of the coverage map observer, to find it again in the observer list
 const NAME_COV_MAP: &str = "cov_map";
@@ -124,58 +118,15 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
     let mut generator = RandPrintablesGenerator::new(32);
     let stats = SimpleStats::new(|s| println!("{}", s));
-    let mut mgr;
 
-    // We start ourself as child process to actually fuzz
-    if std::env::var(ENV_FUZZER_SENDER).is_err() {
-        // We are either the broker, or the parent of the fuzzing instance
-        mgr = LlmpEventManager::new_on_port_std(broker_port, stats.clone())?;
-        if mgr.is_broker() {
-            // Yep, broker. Just loop here.
-            println!("Doing broker things. Run this tool again to start fuzzing in a client.");
-            mgr.broker_loop()?;
-        } else {
-            // we are one of the fuzzing instances. Let's launch the fuzzer.
-
-            // First, store the mgr to an env so the client can use it
-            mgr.to_env(ENV_FUZZER_BROKER_CLIENT_INITIAL);
-
-            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-            let sender = LlmpSender::new(0, false)?;
-            let receiver = LlmpReceiver::on_existing_map(
-                AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
-                None,
-            )?;
-            // Store the information to a map.
-            sender.to_env(ENV_FUZZER_SENDER)?;
-            receiver.to_env(ENV_FUZZER_RECEIVER)?;
-
-            let mut ctr = 0;
-            loop {
-                dbg!("Spawning next client");
-                Command::new(env::current_exe()?)
-                    .current_dir(env::current_dir()?)
-                    .args(env::args())
-                    .status()?;
-                ctr += 1;
-                if ctr == 10 {
-                    return Ok(());
-                }
-            }
-        }
+    let mut mgr = LlmpEventManager::new_on_port_std(stats, broker_port)?;
+    if mgr.is_broker() {
+        // Yep, broker. Just loop here.
+        println!("Doing broker things. Run this tool again to start fuzzing in a client.");
+        mgr.broker_loop()?;
     }
 
     println!("We're a client, let's fuzz :)");
-
-    // We are the fuzzing instance, first, connect to our own restore map.
-    // A sender and a receiver for single communication
-    let mut receiver = LlmpReceiver::<AflShmem>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
-    let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
-
-    let edges_observer =
-        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
-            __lafl_max_edges_size as usize
-        });
 
     // Call LLVMFUzzerInitialize() if present.
     unsafe {
@@ -184,49 +135,16 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         }
     }
 
-    // If we're restarting, deserialize the old state.
-    let (mut state, mut mgr) = match receiver.recv_buf()? {
-        None => {
-            println!("First run. Let's set it all up");
-            // Mgr to send and receive msgs from/to all other fuzzer instances
-            mgr = LlmpEventManager::<BytesInput, _, _>::existing_client_from_env_std(
-                ENV_FUZZER_BROKER_CLIENT_INITIAL,
-                stats,
-            )?;
+    let edges_observer =
+        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
+            __lafl_max_edges_size as usize
+        });
 
-            // Initial execution, read or generate initial state, corpus, and feedbacks
-            let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
-            let corpus = InMemoryCorpus::new();
-            let state = State::new(corpus, tuple_list!(edges_feedback));
-            (state, mgr)
-        }
-        // Restoring from a previous run, deserialize state and corpus.
-        Some((_sender, _tag, msg)) => {
-            println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            deserialize_state_corpus_mgr(&msg, stats)?
-        }
+    let (state_opt, mut restarting_mgr) = setup_restarting_state(&mut mgr).expect("Failed to setup the restarter".into());
+    let mut state = match state_opt {
+        Some(s) => s,
+        None => State::new(InMemoryCorpus::new(), tuple_list!(MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer)))
     };
-    // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
-    unsafe { sender.reset_last_page() };
-
-    /*
-    move |exit_kind, input, state, corpus, mgr| {
-            match exit_kind {
-                ExitKind::Timeout => mgr.timeout(input).expect(&format!(
-                    "Error sending Timeout event for input {:?}",
-                    input
-                )),
-                ExitKind::Crash => mgr
-                    .crash(input)
-                    .expect(&format!("Error sending crash event for input {:?}", input)),
-                _ => (),
-            }
-            println!("foo");
-            let state_corpus_serialized = serialize_state_corpus_mgr(state, corpus, mgr).unwrap();
-            println!("bar: {:?}", &state_corpus_serialized);
-            sender.send_buf(0x1, &state_corpus_serialized).unwrap();
-        }
-    */
 
     // Create the engine
     let mut executor = InProcessExecutor::new(
@@ -234,14 +152,14 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         harness,
         tuple_list!(edges_observer),
         &mut state,
-        &mut mgr,
+        &mut restarting_mgr,
     );
 
     // in case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         match input {
             Some(x) => state
-                .load_initial_inputs(&mut executor, &mut generator, &mut mgr, &x)
+                .load_initial_inputs(&mut executor, &mut generator, &mut restarting_mgr, &x)
                 .expect(&format!("Failed to load initial corpus at {:?}", &x)),
             None => (),
         }
@@ -250,7 +168,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     if state.corpus().count() < 1 {
         println!("Generating random inputs");
         state
-            .generate_initial_inputs(&mut rand, &mut executor, &mut generator, &mut mgr, 4)
+            .generate_initial_inputs(&mut rand, &mut executor, &mut generator, &mut restarting_mgr, 4)
             .expect("Failed to generate initial inputs");
         println!("We generated {} inputs.", state.corpus().count());
     }
@@ -261,5 +179,5 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
-    fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut mgr)
+    fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut restarting_mgr)
 }
