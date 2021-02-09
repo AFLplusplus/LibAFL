@@ -11,18 +11,6 @@ use alloc::{vec::Vec};
 use serde::{Serialize, Deserialize};
 use core::any::Any;
 
-/// Mem move in the own vec
-#[inline]
-fn self_mem_move(data: &mut [u8], from: usize, to: usize, len: usize) {
-    debug_assert!(data.len() > 0);
-    debug_assert!(from + len < data.len());
-    debug_assert!(to + len < data.len());
-    if len != 0 && from != to {
-        let ptr = data.as_mut_ptr();
-        unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
-    }
-}
-
 /// Mem move between vecs
 #[inline]
 fn mem_move(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
@@ -49,11 +37,11 @@ pub struct TokensMetadata {
 }
 
 impl SerdeAny for TokensMetadata {
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut Any {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
