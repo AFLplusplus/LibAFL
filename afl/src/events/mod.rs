@@ -759,6 +759,16 @@ where
         Self { llmp_mgr, sender }
     }
 
+    /// Get the sender
+    pub fn sender(&self) -> &LlmpSender<SH> {
+        &self.sender
+    }
+
+    /// Get the sender (mut)
+    pub fn sender_mut(&mut self) -> &mut LlmpSender<SH> {
+        &mut self.sender
+    }
+
     /*
     pub fn temp<C, FT, R>(
         stats: ST,
@@ -848,7 +858,7 @@ where
 #[cfg(feature = "std")]
 pub fn setup_restarting_state<I, C, FT, R, SH, ST>(
     mgr: &mut LlmpEventManager<I, SH, ST>,
-) -> Result<Option<State<C, I, R, FT>>, AflError>
+) -> Result<(Option<State<C, I, R, FT>>, LlmpRestartingEventManager<I, SH, ST>), AflError>
 where
     I: Input,
     C: Corpus<I, R>,
@@ -890,42 +900,36 @@ where
 
     // We are the fuzzing instance, first, connect to our own restore map.
     // A sender and a receiver for single communication
-    let mut receiver = LlmpReceiver::<AflShmem>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
-    let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
-
-    todo!("all the things");
-    /*
+    let mut receiver = LlmpReceiver::<SH>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
+    let sender = LlmpSender::<SH>::on_existing_from_env(ENV_FUZZER_SENDER)?;
 
     // If we're restarting, deserialize the old state.
-    let (mut mgr, mut state) = match receiver.recv_buf()? {
+    let (state, mut mgr) = match receiver.recv_buf()? {
         None => {
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
-            /*let client_mgr =
-                LlmpEventManager::existing_client_from_env(ENV_FUZZER_BROKER_CLIENT_INITIAL)?;
+            let client_mgr =
+                LlmpEventManager::<I, SH, ST>::existing_client_from_env(ENV_FUZZER_BROKER_CLIENT_INITIAL)?;
 
-            (LlmpRestartingEventManager::new(client_mgr, sender), None)*/
-            todo!("Do");
+            (None, LlmpRestartingEventManager::new(client_mgr, sender))
         }
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (mgr, state) = deserialize_state_mgr(&msg)?;
-            todo!("Finish");
-            //(LlmpRestartingEventManager::new(mgr, sender), Some(state))
+            let (state, mgr): (State<C, I, R, FT>, LlmpEventManager<I, SH, ST>) = deserialize_state_mgr(&msg)?;
+            
+            (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }
     };
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
-    unsafe { sender.reset_last_page() };
+    unsafe { mgr.sender_mut().reset_last_page() };
     /* TODO: Not sure if this is needed
     // We commit an empty NO_RESTART message to this buf, against infinite loops,
     // in case something crashes in the fuzzer.
     sender.send_buf(_LLMP_TAG_NO_RESTART, []);
     */
 
-    //Ok(state)
-    todo!("More")
-    */
+    Ok((state, mgr))
 }
 
 #[cfg(test)]
