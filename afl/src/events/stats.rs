@@ -1,3 +1,5 @@
+//! Keep stats, and dispaly them to the user. Usually used in a broker, or main node, of some sort.
+
 use alloc::{string::String, vec::Vec};
 use core::{time, time::Duration};
 
@@ -22,6 +24,7 @@ pub struct ClientStats {
 }
 
 impl ClientStats {
+    /// We got a new information about executions for this client, insert them.
     pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
         self.executions = executions;
         if (cur_time - self.last_window_time).as_secs() > CLIENT_STATS_TIME_WINDOW_SECS {
@@ -31,6 +34,7 @@ impl ClientStats {
         }
     }
 
+    /// Get the calculated executions per second for this client
     pub fn execs_per_sec(&self, cur_time: time::Duration) -> u64 {
         if self.executions == 0 {
             return 0;
@@ -45,6 +49,7 @@ impl ClientStats {
     }
 }
 
+/// The stats trait keeps track of all the client's stats, and offers methods to dispaly them.
 pub trait Stats {
     /// the client stats (mut)
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
@@ -56,7 +61,7 @@ pub trait Stats {
     fn start_time(&mut self) -> time::Duration;
 
     /// show the stats to the user
-    fn show(&mut self, event_msg: String);
+    fn display(&mut self, event_msg: String);
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
@@ -125,7 +130,7 @@ where
         self.start_time
     }
 
-    fn show(&mut self, event_msg: String) {
+    fn display(&mut self, event_msg: String) {
         let fmt = format!(
             "[{}] clients: {}, corpus: {}, executions: {}, exec/sec: {}",
             event_msg,

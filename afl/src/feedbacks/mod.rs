@@ -1,3 +1,6 @@
+//! The feedbacks reduce observer state after each run to a single `is_interesting`-value.
+//! If a testcase is interesting, it may be added to a Corpus.
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,

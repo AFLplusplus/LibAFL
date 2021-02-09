@@ -1,11 +1,13 @@
+//! Tokens are what afl calls extras or dictionaries.
+//! They may be inserted as part of mutations during fuzzing.
 
-
+/// The tokens type, to be stored as metadata
 struct Tokens {
     vec: Vec<Vec<u8>>,
 }
 
 impl AsAny for Tokens {
-
+    
 }
 
 /// Insert a dictionary token

@@ -1,3 +1,5 @@
+//! Mutators mutate input during fuzzing.
+
 pub mod scheduled;
 pub use scheduled::*;
 pub mod mutations;

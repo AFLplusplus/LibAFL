@@ -1,3 +1,5 @@
+//! Generators may generate bytes or, in general, data, for inputs.
+
 use alloc::vec::Vec;
 use core::{cmp::min, marker::PhantomData};
 

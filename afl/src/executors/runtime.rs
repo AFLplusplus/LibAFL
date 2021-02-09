@@ -1,5 +1,8 @@
+//! A sancov runtime to update a simple u8 map with coverage-information during fuzzing
+
 //#![feature(asm)]
 
+/// The map size used by this instance.
 const MAP_SIZE: usize = 65536;
 
 #[no_mangle]
@@ -11,6 +14,7 @@ pub static mut __lafl_cmp_map: *mut u8 = unsafe { __lafl_dummy_map.as_ptr() as *
 #[no_mangle]
 pub static mut __lafl_max_edges_size: u32 = 0;
 
+/// Called for each branch the target program takes.
 #[no_mangle]
 #[inline]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: &u32) {
@@ -34,6 +38,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: &u32) {
     //*trace_byte = (*trace_byte).wrapping_add(1);
 }
 
+/// Called when the targetprogram starts
 #[no_mangle]
 #[inline]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {

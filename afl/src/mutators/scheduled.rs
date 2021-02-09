@@ -208,7 +208,7 @@ where
             let idx = self.scheduled.schedule(14, rand, input);
             let mutation = match idx {
                 0 => mutation_bitflip,
-                /*1 => mutation_byteflip,
+                1 => mutation_byteflip,
                 2 => mutation_byteinc,
                 3 => mutation_bytedec,
                 4 => mutation_byteneg,
@@ -219,7 +219,7 @@ where
                 8 => mutation_dwordadd,
                 9 => mutation_byteinteresting,
                 10 => mutation_wordinteresting,
-                11 => mutation_dwordinteresting,*/
+                11 => mutation_dwordinteresting,
                 _ => mutation_splice,
             };
             mutation(self, rand, state, input)?;
@@ -323,18 +323,20 @@ where
 mod tests {
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        inputs::BytesInput,
-        inputs::HasBytesVec,
-        mutators::scheduled::{mutation_splice, StdScheduledMutator},
+        inputs::{BytesInput, HasBytesVec},
+        mutators::{
+            scheduled::{mutation_splice, HavocBytesMutator, StdScheduledMutator},
+            Mutator,
+        },
         state::State,
-        utils::{Rand, XKCDRand},
+        utils::{Rand, StdRand, XKCDRand},
     };
 
     #[test]
-    fn test_mut_splice() {
+    fn test_mut_scheduled() {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let mut rand = XKCDRand::new();
-        let mut corpus: InMemoryCorpus<BytesInput, XKCDRand> = InMemoryCorpus::new();
+        let mut corpus: InMemoryCorpus<BytesInput, _> = InMemoryCorpus::new();
         corpus.add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into());
         corpus.add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into());
 
@@ -346,6 +348,7 @@ mod tests {
         let mut state = State::new(corpus, ());
 
         rand.set_seed(5);
+
         let mut mutator = StdScheduledMutator::<
             InMemoryCorpus<BytesInput, XKCDRand>,
             _,
@@ -361,5 +364,31 @@ mod tests {
         // The pre-seeded rand should have spliced at position 2.
         // TODO: Maybe have a fixed rand for this purpose?
         assert_eq!(input.bytes(), &['a' as u8, 'b' as u8, 'f' as u8])
+    }
+
+    #[test]
+    fn test_havoc() {
+        // With the current impl, seed of 1 will result in a split at pos 2.
+        let mut rand = StdRand::new(0x1337);
+        let mut corpus: InMemoryCorpus<BytesInput, StdRand> = InMemoryCorpus::new();
+        corpus.add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into());
+        corpus.add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into());
+
+        let (testcase, _) = corpus
+            .next(&mut rand)
+            .expect("Corpus did not contain entries");
+        let mut input = testcase.borrow_mut().load_input().unwrap().clone();
+        let input_prior = input.clone();
+
+        let mut state = State::new(corpus, ());
+
+        let mut havoc = HavocBytesMutator::new(StdScheduledMutator::new());
+
+        assert_eq!(input, input_prior);
+
+        for i in 0..42 {
+            havoc.mutate(&mut rand, &mut state, &mut input, i).unwrap();
+            assert_ne!(input, input_prior);
+        }
     }
 }

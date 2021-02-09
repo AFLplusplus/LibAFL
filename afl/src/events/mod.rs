@@ -315,7 +315,7 @@ where
                 observers_buf: _,
             } => {
                 stats.client_stats_mut()[0].corpus_size = *corpus_size as u64;
-                stats.show(event.name().to_string());
+                stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateStats {
@@ -325,7 +325,7 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 stats.client_stats_mut()[0].executions = *executions as u64;
-                stats.show(event.name().to_string());
+                stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
             Event::Crash { input: _ } => {
@@ -540,7 +540,7 @@ where
             } => {
                 let client = stats.client_stats_mut_for(sender_id);
                 client.corpus_size = *corpus_size as u64;
-                stats.show(event.name().to_string() + " #" + &sender_id.to_string());
+                stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateStats {
@@ -551,7 +551,7 @@ where
                 // TODO: The stats buffer should be added on client add.
                 let client = stats.client_stats_mut_for(sender_id);
                 client.executions = *executions as u64;
-                stats.show(event.name().to_string() + " #" + &sender_id.to_string());
+                stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
             Event::Crash { input: _ } => {

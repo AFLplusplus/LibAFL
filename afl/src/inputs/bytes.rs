@@ -1,3 +1,6 @@
+//! The BytesInput is the "normal" input, a map of bytes, that can be sent directly to the client
+//! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
+
 use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
@@ -5,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::inputs::{HasBytesVec, HasTargetBytes, Input, TargetBytes};
 
 /// A bytes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct BytesInput {
     /// The raw input bytes
     bytes: Vec<u8>,
