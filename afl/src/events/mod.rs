@@ -11,10 +11,12 @@ use alloc::{
 };
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
-use std::env;
 
 #[cfg(feature = "std")]
-use std::process::Command;
+use std::{
+    process::Command,
+    env,
+};
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
@@ -846,6 +848,7 @@ where
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
+#[cfg(feature = "std")]
 pub fn setup_restarting_state<I, C, FT, R, SH, ST>(
     mgr: &mut LlmpEventManager<I, SH, ST>,
 ) -> Result<Option<State<C, I, R, FT>>, AflError>
