@@ -13,10 +13,7 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use std::{
-    process::Command,
-    env,
-};
+use std::{env, process::Command};
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
