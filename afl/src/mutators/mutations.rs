@@ -914,7 +914,7 @@ mod tests {
     use super::*;
     use crate::{
         corpus::{Corpus, InMemoryCorpus},
-        executors::InMemoryExecutor,
+        executors::InProcessExecutor,
         inputs::BytesInput,
         state::State,
         utils::StdRand,

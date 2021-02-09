@@ -7,7 +7,7 @@ use std::{env, path::PathBuf, process::Command};
 use afl::{
     corpus::{Corpus, InMemoryCorpus},
     events::{LlmpEventManager, SimpleStats},
-    executors::{inmemory::InMemoryExecutor, Executor, ExitKind},
+    executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, Input},
@@ -229,7 +229,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     */
 
     // Create the engine
-    let mut executor = InMemoryExecutor::new(
+    let mut executor = InProcessExecutor::new(
         "Libfuzzer",
         harness,
         tuple_list!(edges_observer),

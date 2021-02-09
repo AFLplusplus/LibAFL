@@ -245,7 +245,7 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        executors::{Executor, ExitKind, InMemoryExecutor},
+        executors::{Executor, ExitKind, InProcessExecutor},
         inputs::{BytesInput, Input},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
         stages::StdMutationalStage,
@@ -277,7 +277,7 @@ mod tests {
         });
         let mut event_manager = LoggerEventManager::new(stats);
 
-        let mut executor = InMemoryExecutor::new(
+        let mut executor = InProcessExecutor::new(
             "main",
             harness,
             tuple_list!(),

@@ -1,7 +1,7 @@
 //! Executors take input, and run it in the target.
 
-pub mod inmemory;
-pub use inmemory::InMemoryExecutor;
+pub mod inprocess;
+pub use inprocess::InProcessExecutor;
 #[cfg(feature = "runtime")]
 pub mod runtime;
 

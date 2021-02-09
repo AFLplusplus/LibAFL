@@ -31,7 +31,7 @@ use self::os_signals::setup_crash_handlers;
 type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InMemoryExecutor<I, OT>
+pub struct InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -45,7 +45,7 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<I, OT> Executor<I> for InMemoryExecutor<I, OT>
+impl<I, OT> Executor<I> for InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -100,7 +100,7 @@ where
     }
 }
 
-impl<I, OT> Named for InMemoryExecutor<I, OT>
+impl<I, OT> Named for InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -110,7 +110,7 @@ where
     }
 }
 
-impl<I, OT> HasObservers<OT> for InMemoryExecutor<I, OT>
+impl<I, OT> HasObservers<OT> for InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -126,7 +126,7 @@ where
     }
 }
 
-impl<I, OT> InMemoryExecutor<I, OT>
+impl<I, OT> InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -376,7 +376,7 @@ mod tests {
     use core::marker::PhantomData;
 
     use crate::{
-        executors::{Executor, ExitKind, InMemoryExecutor},
+        executors::{Executor, ExitKind, InProcessExecutor},
         inputs::Input,
         tuples::tuple_list,
     };
@@ -389,7 +389,7 @@ mod tests {
     fn test_inmem_exec() {
         use crate::inputs::NopInput;
 
-        let mut in_mem_executor = InMemoryExecutor::<NopInput, ()> {
+        let mut in_process_executor = InProcessExecutor::<NopInput, ()> {
             harness_fn: test_harness_fn_nop,
             // TODO: on_crash_fn: Box::new(|_, _, _, _, _| ()),
             observers: tuple_list!(),
@@ -397,6 +397,6 @@ mod tests {
             phantom: PhantomData,
         };
         let mut input = NopInput {};
-        assert!(in_mem_executor.run_target(&mut input).is_ok());
+        assert!(in_process_executor.run_target(&mut input).is_ok());
     }
 }
