@@ -4,6 +4,8 @@ pub mod scheduled;
 pub use scheduled::*;
 pub mod mutations;
 pub use mutations::*;
+pub mod token_mutations;
+pub use token_mutations::*;
 
 use crate::{
     corpus::Corpus,
