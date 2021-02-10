@@ -858,7 +858,13 @@ where
 #[cfg(feature = "std")]
 pub fn setup_restarting_state<I, C, FT, R, SH, ST>(
     mgr: &mut LlmpEventManager<I, SH, ST>,
-) -> Result<(Option<State<C, I, R, FT>>, LlmpRestartingEventManager<I, SH, ST>), AflError>
+) -> Result<
+    (
+        Option<State<C, I, R, FT>>,
+        LlmpRestartingEventManager<I, SH, ST>,
+    ),
+    AflError,
+>
 where
     I: Input,
     C: Corpus<I, R>,
@@ -908,16 +914,18 @@ where
         None => {
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
-            let client_mgr =
-                LlmpEventManager::<I, SH, ST>::existing_client_from_env(ENV_FUZZER_BROKER_CLIENT_INITIAL)?;
+            let client_mgr = LlmpEventManager::<I, SH, ST>::existing_client_from_env(
+                ENV_FUZZER_BROKER_CLIENT_INITIAL,
+            )?;
 
             (None, LlmpRestartingEventManager::new(client_mgr, sender))
         }
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (state, mgr): (State<C, I, R, FT>, LlmpEventManager<I, SH, ST>) = deserialize_state_mgr(&msg)?;
-            
+            let (state, mgr): (State<C, I, R, FT>, LlmpEventManager<I, SH, ST>) =
+                deserialize_state_mgr(&msg)?;
+
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }
     };

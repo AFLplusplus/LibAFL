@@ -1,3 +1,6 @@
+//! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
+//! The example harness is built for libpng.
+
 #[macro_use]
 extern crate clap;
 
@@ -6,6 +9,7 @@ use std::{env, path::PathBuf, process::Command};
 
 use afl::{
     corpus::{Corpus, InMemoryCorpus},
+    events::setup_restarting_state,
     events::{LlmpEventManager, SimpleStats},
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
@@ -17,8 +21,7 @@ use afl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, State},
     tuples::tuple_list,
-    utils::{ StdRand},
-    events::setup_restarting_state,
+    utils::StdRand,
     AflError, Fuzzer, StdFuzzer,
 };
 
@@ -116,7 +119,7 @@ pub fn main() {
 /// The actual fuzzer
 fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
-    let mut generator = RandPrintablesGenerator::new(32);
+    /// TODO: Don't the stats need to be serialized, too?
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     let mut mgr = LlmpEventManager::new_on_port_std(stats, broker_port)?;
@@ -126,27 +129,33 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         mgr.broker_loop()?;
     }
 
-    println!("We're a client, let's fuzz :)");
-
-    // Call LLVMFUzzerInitialize() if present.
-    unsafe {
-        if afl_libfuzzer_init() == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
-        }
-    }
-
     let edges_observer =
         StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
             __lafl_max_edges_size as usize
         });
 
-    let (state_opt, mut restarting_mgr) = setup_restarting_state(&mut mgr).expect("Failed to setup the restarter".into());
+    let mut mutator = HavocBytesMutator::new_default();
+    mutator.set_max_size(4096);
+    let stage = StdMutationalStage::new(mutator);
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+
+    // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
+    let (state_opt, mut restarting_mgr) =
+        setup_restarting_state(&mut mgr).expect("Failed to setup the restarter".into());
     let mut state = match state_opt {
         Some(s) => s,
-        None => State::new(InMemoryCorpus::new(), tuple_list!(MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer)))
+        None => State::new(
+            InMemoryCorpus::new(),
+            tuple_list!(MaxMapFeedback::new_with_observer(
+                &NAME_COV_MAP,
+                &edges_observer
+            )),
+        ),
     };
 
-    // Create the engine
+    println!("We're a client, let's fuzz :)");
+
+    // Create the executor
     let mut executor = InProcessExecutor::new(
         "Libfuzzer",
         harness,
@@ -155,29 +164,35 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         &mut restarting_mgr,
     );
 
+    // The actual target run starts here.
+
+    // Call LLVMFUzzerInitialize() if present.
+    unsafe {
+        if afl_libfuzzer_init() == -1 {
+            println!("Warning: LLVMFuzzerInitialize failed with -1")
+        }
+    }
+
     // in case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         match input {
             Some(x) => state
-                .load_initial_inputs(&mut executor, &mut generator, &mut restarting_mgr, &x)
+                .load_initial_inputs(&mut executor, &mut restarting_mgr, &x)
                 .expect(&format!("Failed to load initial corpus at {:?}", &x)),
             None => (),
         }
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
+    /*
     if state.corpus().count() < 1 {
         println!("Generating random inputs");
+        let mut generator = RandPrintablesGenerator::new(32);
         state
             .generate_initial_inputs(&mut rand, &mut executor, &mut generator, &mut restarting_mgr, 4)
             .expect("Failed to generate initial inputs");
         println!("We generated {} inputs.", state.corpus().count());
     }
-
-    let mut mutator = HavocBytesMutator::new_default();
-    mutator.set_max_size(4096);
-
-    let stage = StdMutationalStage::new(mutator);
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+    */
 
     fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut restarting_mgr)
 }

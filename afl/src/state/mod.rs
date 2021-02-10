@@ -80,15 +80,13 @@ where
     R: Rand,
     FT: FeedbacksTuple<BytesInput>,
 {
-    pub fn load_from_directory<G, E, OT, EM>(
+    pub fn load_from_directory<E, OT, EM>(
         &mut self,
         executor: &mut E,
-        generator: &mut G,
         manager: &mut EM,
         in_dir: &Path,
     ) -> Result<(), AflError>
     where
-        G: Generator<BytesInput, R>,
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -114,29 +112,27 @@ where
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
             } else if attr.is_dir() {
-                self.load_from_directory(executor, generator, manager, &path)?;
+                self.load_from_directory(executor, manager, &path)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn load_initial_inputs<G, E, OT, EM>(
+    pub fn load_initial_inputs<E, OT, EM>(
         &mut self,
         executor: &mut E,
-        generator: &mut G,
         manager: &mut EM,
         in_dirs: &[PathBuf],
     ) -> Result<(), AflError>
     where
-        G: Generator<BytesInput, R>,
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<BytesInput>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(executor, generator, manager, in_dir)?;
+            self.load_from_directory(executor, manager, in_dir)?;
         }
         manager.fire(
             self,
