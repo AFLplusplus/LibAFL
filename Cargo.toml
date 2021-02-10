@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "afl",
+    "fuzzers/libfuzzer_libpng",
+]
