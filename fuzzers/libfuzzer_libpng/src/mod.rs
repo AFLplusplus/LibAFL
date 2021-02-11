@@ -4,6 +4,8 @@
 #[macro_use]
 extern crate clap;
 
+// extern crate libc;
+
 use clap::{App, Arg};
 use std::{env, path::PathBuf};
 
@@ -162,6 +164,16 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
             println!("Warning: LLVMFuzzerInitialize failed with -1")
         }
     }
+    
+    /*
+    // TODO close fds in a rusty way
+    unsafe {
+      let null_fname = std::ffi::CString::new("/dev/null").unwrap();
+      let null_file = libc::open(null_fname.as_ptr(), libc::O_RDWR);
+      libc::dup2(null_file, 1);
+      libc::dup2(null_file, 2);
+    }
+    */
 
     // in case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {

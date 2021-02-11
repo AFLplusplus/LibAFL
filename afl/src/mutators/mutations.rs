@@ -70,7 +70,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Get a mutation by index
     fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, R, S>;
@@ -684,7 +684,7 @@ where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
-    S: HasCorpus<C>,
+    S: HasCorpus<C, I, R>,
 {
     // We don't want to use the testcase we're already using for splicing
     let (other_testcase, idx) = state.corpus().random_entry(rand)?;

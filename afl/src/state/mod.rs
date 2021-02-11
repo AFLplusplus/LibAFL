@@ -25,7 +25,12 @@ use crate::{
 use crate::inputs::bytes::BytesInput;
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus<C> {
+pub trait HasCorpus<C, I, R>
+where
+    C: Corpus<I, R>,
+    I: Input,
+    R: Rand,
+{
     /// The testcase corpus
     fn corpus(&self) -> &C;
     /// The testcase corpus (mut)
@@ -147,7 +152,7 @@ where
     }
 }
 
-impl<C, FT, I, R> HasCorpus<C> for State<C, FT, I, R>
+impl<C, FT, I, R> HasCorpus<C, I, R> for State<C, FT, I, R>
 where
     C: Corpus<I, R>,
     I: Input,

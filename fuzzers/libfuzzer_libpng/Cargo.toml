@@ -26,6 +26,7 @@ clap = "2.32.0"
 serde = { version = "1.0", default-features = false, features = ["alloc"] }
 postcard = { version = "0.5.1", features = ["alloc"] }
 afl = { path = "../../afl/" }
+# libc = "0.2"
 
 [[bin]]
 name = "libfuzzer"

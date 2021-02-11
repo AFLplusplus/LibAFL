@@ -25,7 +25,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Mutate a given input
     fn mutate(

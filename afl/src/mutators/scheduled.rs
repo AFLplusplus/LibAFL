@@ -16,7 +16,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Compute the number of iterations used to apply stacked mutations
     #[inline]
@@ -55,7 +55,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     mutations: Vec<MutationFunction<I, Self, R, S>>,
     max_size: usize,
@@ -66,7 +66,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -84,7 +84,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -102,7 +102,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     #[inline]
     fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, R, S> {
@@ -125,7 +125,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     // Just use the default methods
 }
@@ -135,7 +135,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     #[inline]
     fn max_size(&self) -> usize {
@@ -153,7 +153,7 @@ where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Create a new StdScheduledMutator instance without mutations and corpus
     pub fn new() -> Self {
@@ -180,7 +180,7 @@ where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     scheduled: SM,
     phantom: PhantomData<(C, I, R, S)>,
@@ -192,7 +192,7 @@ where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Mutate bytes
     fn mutate(
@@ -234,7 +234,7 @@ where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     #[inline]
     fn max_size(&self) -> usize {
@@ -253,7 +253,7 @@ where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Create a new HavocBytesMutator instance given a ScheduledMutator to wrap
     pub fn new(mut scheduled: SM) -> Self {
@@ -271,7 +271,7 @@ where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
-    S: HasCorpus<C> + HasMetadata,
+    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Create a new HavocBytesMutator instance wrapping StdScheduledMutator
     pub fn new_default() -> Self {
