@@ -12,7 +12,7 @@ use afl::{
     bolts::tuples::tuple_list,
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
-    events::{SimpleStats},
+    events::SimpleStats,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     inputs::Input,
@@ -120,28 +120,24 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
-    
+
     // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
-    let (state_opt, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, _, _, AflShmem, _>(stats, broker_port).expect("Failed to setup the restarter".into());
+    let (state, mut restarting_mgr) =
+        setup_restarting_mgr::<_, _, _, _, AflShmem, _>(stats, broker_port)
+            .expect("Failed to setup the restarter".into());
 
     let edges_observer =
-    StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
-        __lafl_max_edges_size as usize
-    });
+        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
+            __lafl_max_edges_size as usize
+        });
 
-    let mut state = match state_opt {
-        Some(s) => s,
-        None => {
-            State::new(
-                InMemoryCorpus::new(),
-                tuple_list!(MaxMapFeedback::new_with_observer(
-                    &NAME_COV_MAP,
-                    &edges_observer
-                )),
-            )
-        },
-    };
+    let mut state = state.unwrap_or(State::new(
+        InMemoryCorpus::new(),
+        tuple_list!(MaxMapFeedback::new_with_observer(
+            &NAME_COV_MAP,
+            &edges_observer
+        )),
+    ));
 
     println!("We're a client, let's fuzz :)");
 
@@ -149,7 +145,6 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     mutator.set_max_size(4096);
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
-
 
     // Create the executor
     let mut executor = InProcessExecutor::new(
