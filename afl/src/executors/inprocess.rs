@@ -273,7 +273,13 @@ pub mod unix_signals {
         )
         .expect(&format!("Could not send crashing input {:?}", input));
 
+        mgr.on_restart(state).unwrap();
+
+        println!("Waiting for broker...");
         mgr.await_restart_safe();
+        println!("Bye!");
+
+        std::process::exit(1);
     }
 
     pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OT, R>(
@@ -302,6 +308,7 @@ pub mod unix_signals {
         CURRENT_INPUT_PTR = ptr::null();
         let state = (STATE_PTR as *mut State<C, FT, I, R>).as_mut().unwrap();
         let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
+
         mgr.fire(
             state,
             Event::Timeout {
@@ -309,6 +316,8 @@ pub mod unix_signals {
             },
         )
         .expect(&format!("Could not send timeouting input {:?}", input));
+
+        mgr.on_restart(state).unwrap();
 
         mgr.await_restart_safe();
 

@@ -431,7 +431,7 @@ where
     pub fn new(id: u32, keep_pages_forever: bool) -> Result<Self, AflError> {
         Ok(Self {
             id,
-            last_msg_sent: 0 as *mut LlmpMsg,
+            last_msg_sent: ptr::null_mut(),
             out_maps: vec![LlmpSharedMap::new(
                 0,
                 SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
@@ -444,8 +444,9 @@ where
     /// Completely reset the current sender map.
     /// Afterwards, no receiver should read from it at a different location.
     /// This is only useful if all connected llmp parties start over, for example after a crash.
-    pub unsafe fn reset_last_page(&mut self) {
+    pub unsafe fn reset(&mut self) {
         _llmp_page_init(&mut self.out_maps.last_mut().unwrap().shmem, self.id, true);
+        self.last_msg_sent = ptr::null_mut();
     }
 
     /// Reattach to a vacant out_map, to with a previous sender stored the information in an env before.
@@ -494,7 +495,7 @@ where
         let mut out_map = LlmpSharedMap::existing(current_out_map);
         let last_msg_sent = match last_msg_sent_offset {
             Some(offset) => out_map.msg_from_offset(offset)?,
-            None => 0 as *mut LlmpMsg,
+            None => ptr::null_mut(),
         };
 
         Ok(Self {
@@ -694,7 +695,7 @@ where
         (*end_of_page_msg).shm_str = *new_map_shmem.shmem.shm_slice();
 
         // We never sent a msg on the new buf */
-        self.last_msg_sent = 0 as *mut LlmpMsg;
+        self.last_msg_sent = ptr::null_mut();
 
         /* Send the last msg on the old buf */
         self.send(out)?;
@@ -827,7 +828,7 @@ where
         let mut current_recv_map = LlmpSharedMap::existing(current_sender_map);
         let last_msg_recvd = match last_msg_recvd_offset {
             Some(offset) => current_recv_map.msg_from_offset(offset)?,
-            None => 0 as *mut LlmpMsg,
+            None => ptr::null_mut(),
         };
 
         Ok(Self {
@@ -1074,7 +1075,7 @@ where
     pub fn msg_from_env(&mut self, map_env_name: &str) -> Result<*mut LlmpMsg, AflError> {
         match msg_offset_from_env(map_env_name)? {
             Some(offset) => self.msg_from_offset(offset),
-            None => Ok(0 as *mut LlmpMsg),
+            None => Ok(ptr::null_mut()),
         }
     }
 
@@ -1166,7 +1167,7 @@ where
         self.llmp_clients.push(LlmpReceiver {
             id,
             current_recv_map: client_page,
-            last_msg_recvd: 0 as *mut LlmpMsg,
+            last_msg_recvd: ptr::null_mut(),
         });
     }
 
@@ -1279,7 +1280,7 @@ where
         Ok(thread::spawn(move || {
             let mut new_client_sender = LlmpSender {
                 id: 0,
-                last_msg_sent: 0 as *mut LlmpMsg,
+                last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::existing(
                     SH::existing_from_shm_str(&tcp_out_map_str, tcp_out_map_size).unwrap(),
                 )],
@@ -1380,7 +1381,7 @@ where
                             self.llmp_clients.push(LlmpReceiver {
                                 id,
                                 current_recv_map: new_page,
-                                last_msg_recvd: 0 as *mut LlmpMsg,
+                                last_msg_recvd: ptr::null_mut(),
                             });
                         }
                         Err(e) => {
@@ -1505,7 +1506,7 @@ where
         Ok(Self {
             sender: LlmpSender {
                 id: 0,
-                last_msg_sent: 0 as *mut LlmpMsg,
+                last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::new(
                     0,
                     SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
@@ -1517,7 +1518,7 @@ where
             receiver: LlmpReceiver {
                 id: 0,
                 current_recv_map: initial_broker_map,
-                last_msg_recvd: 0 as *mut LlmpMsg,
+                last_msg_recvd: ptr::null_mut(),
             },
         })
     }

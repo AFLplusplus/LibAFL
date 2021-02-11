@@ -199,6 +199,17 @@ where
         Ok(postcard::from_bytes(observers_buf)?)
     }
 
+    /// For restarting event managers, implement a way to forward state to their next peers.
+    #[inline]
+    fn on_restart<C, FT, R>(&mut self, _state: &mut State<C, FT, I, R>) -> Result<(), AflError>
+    where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand,
+    {
+        Ok(())
+    }
+
     /// Block until we are safe to exit.
     #[inline]
     fn await_restart_safe(&mut self) {}
@@ -766,6 +777,20 @@ where
         self.llmp_mgr.await_restart_safe();
     }
 
+    /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
+    fn on_restart<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<(), AflError>
+    where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand,
+    {
+        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
+        unsafe { self.sender.reset() };
+        let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
+        self.sender
+            .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
+    }
+
     fn process<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
@@ -786,15 +811,6 @@ where
         R: Rand,
     {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
-        match &event {
-            Event::Crash { input: _ } | Event::Timeout { input: _ } => {
-                // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-                unsafe { self.sender.reset_last_page() };
-                let buf = serialize_state_mgr(&state, &self.llmp_mgr)?;
-                self.sender.send_buf(_LLMP_TAG_RESTART, &buf).unwrap();
-            }
-            _ => (),
-        };
         self.llmp_mgr.fire(state, event)
     }
 }
@@ -874,15 +890,12 @@ where
             let mut ctr = 0;
             // Client->parent loop
             loop {
-                dbg!("Spawning next client");
+                dbg!("Spawning next client (id {})", ctr);
                 Command::new(env::current_exe()?)
                     .current_dir(env::current_dir()?)
                     .args(env::args())
                     .status()?;
                 ctr += 1;
-                if ctr == 10 {
-                    todo!("Fix this");
-                }
             }
         }
     }
@@ -915,7 +928,7 @@ where
         }
     };
     // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
-    unsafe { mgr.sender_mut().reset_last_page() };
+    unsafe { mgr.sender_mut().reset() };
     /* TODO: Not sure if this is needed
     // We commit an empty NO_RESTART message to this buf, against infinite loops,
     // in case something crashes in the fuzzer.
