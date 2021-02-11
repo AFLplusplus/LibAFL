@@ -25,7 +25,7 @@ pub type StdRand = RomuTrioRand;
 /// On top, add the current llmp event manager instance to be restored
 /// This method is needed when the fuzzer run crashes and has to restart.
 pub fn serialize_state_mgr<C, FT, I, R, SH, ST>(
-    state: &State<C, I, R, FT>,
+    state: &State<C, FT, I, R>,
     mgr: &LlmpEventManager<I, SH, ST>,
 ) -> Result<Vec<u8>, AflError>
 where
@@ -56,7 +56,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 pub fn deserialize_state_mgr<C, FT, I, R, SH, ST>(
     state_corpus_serialized: &[u8],
-) -> Result<(State<C, I, R, FT>, LlmpEventManager<I, SH, ST>), AflError>
+) -> Result<(State<C, FT, I, R>, LlmpEventManager<I, SH, ST>), AflError>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,
@@ -76,7 +76,7 @@ where
 /// Serialize the current state and corpus during an executiont to bytes.
 /// This method is needed when the fuzzer run crashes and has to restart.
 pub fn serialize_state_corpus<C, FT, I, R>(
-    state: &State<C, I, R, FT>,
+    state: &State<C, FT, I, R>,
     corpus: &C,
 ) -> Result<Vec<u8>, AflError>
 where
@@ -93,7 +93,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 pub fn deserialize_state_corpus<C, FT, I, R>(
     state_corpus_serialized: &[u8],
-) -> Result<(State<C, I, R, FT>, C), AflError>
+) -> Result<(State<C, FT, I, R>, C), AflError>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,

@@ -31,7 +31,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError>;
@@ -51,7 +51,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError>;
@@ -73,7 +73,7 @@ where
         &mut self,
         _rand: &mut R,
         _executor: &mut E,
-        _state: &mut State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         _manager: &mut EM,
         _corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -99,7 +99,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {

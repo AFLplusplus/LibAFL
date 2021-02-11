@@ -61,7 +61,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         manager: &mut EM,
     ) -> Result<usize, AflError> {
         let (_, idx) = state.corpus_mut().next(rand)?;
@@ -77,7 +77,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         manager: &mut EM,
     ) -> Result<(), AflError> {
         let mut last = current_milliseconds();

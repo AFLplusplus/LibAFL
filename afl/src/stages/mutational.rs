@@ -21,7 +21,7 @@ use crate::{
 /// being applied to the input one by one, between executions.
 pub trait MutationalStage<C, E, EM, FT, I, M, OT, R>: Stage<C, E, EM, FT, I, OT, R>
 where
-    M: Mutator<C, I, R, State<C, I, R, FT>>,
+    M: Mutator<C, I, R, State<C, FT, I, R>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -48,7 +48,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -107,7 +107,7 @@ where
     EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     I: Input,
-    M: Mutator<C, I, R, State<C, I, R, FT>>,
+    M: Mutator<C, I, R, State<C, FT, I, R>>,
     OT: ObserversTuple,
     R: Rand,
 {
@@ -123,7 +123,7 @@ where
     EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     I: Input,
-    M: Mutator<C, I, R, State<C, I, R, FT>>,
+    M: Mutator<C, I, R, State<C, FT, I, R>>,
     OT: ObserversTuple,
     R: Rand,
 {
@@ -143,7 +143,7 @@ where
 impl<C, E, EM, FT, I, M, OT, R> Stage<C, E, EM, FT, I, OT, R>
     for StdMutationalStage<C, E, EM, FT, I, M, OT, R>
 where
-    M: Mutator<C, I, R, State<C, I, R, FT>>,
+    M: Mutator<C, I, R, State<C, FT, I, R>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -157,7 +157,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -167,7 +167,7 @@ where
 
 impl<C, E, EM, FT, I, M, OT, R> StdMutationalStage<C, E, EM, FT, I, M, OT, R>
 where
-    M: Mutator<C, I, R, State<C, I, R, FT>>,
+    M: Mutator<C, I, R, State<C, FT, I, R>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,

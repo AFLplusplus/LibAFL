@@ -54,9 +54,9 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec<R, FT, C, EM>(
+    fn pre_exec<C, EM, FT, R>(
         &mut self,
-        _state: &State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -75,9 +75,9 @@ where
     }
 
     #[inline]
-    fn post_exec<R, FT, C, EM>(
+    fn post_exec<C, EM, FT, R>(
         &mut self,
-        _state: &State<C, I, R, FT>,
+        _state: &State<C, FT, I, R>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -142,11 +142,11 @@ where
     /// * `on_crash_fn` - When an in-mem harness crashes, it may safe some state to continue fuzzing later.
     ///                   Do that that in this function. The program will crash afterwards.
     /// * `observers` - the observers observing the target during execution
-    pub fn new<R, FT, C, EM>(
+    pub fn new<C, EM, FT, R>(
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
-        _state: &mut State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         _event_mgr: &mut EM,
     ) -> Self
     where
@@ -195,6 +195,9 @@ pub mod unix_signals {
 
     extern crate libc;
 
+    #[cfg(target_os = "linux")]
+    use fs::read_to_string;
+
     // Unhandled signals: SIGALRM, SIGHUP, SIGINT, SIGKILL, SIGQUIT, SIGTERM
     use libc::{
         c_int, c_void, sigaction, siginfo_t, SA_NODEFER, SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE,
@@ -202,20 +205,24 @@ pub mod unix_signals {
     };
 
     use std::{
-        io::{stdout, Write}, // Write brings flush() into scope
-        mem,
-        process,
-        ptr,
+        fs,
+        io::{stdout, Write},
+        mem, ptr,
     };
 
     use crate::{
-        corpus::Corpus, events::EventManager, feedbacks::FeedbacksTuple, inputs::Input,
-        observers::ObserversTuple, state::State, utils::Rand,
+        corpus::Corpus,
+        events::{Event, EventManager},
+        feedbacks::FeedbacksTuple,
+        inputs::Input,
+        observers::ObserversTuple,
+        state::State,
+        utils::Rand,
     };
 
     /// Pointers to values only needed on crash. As the program will not continue after a crash,
     /// we should (tm) be okay with raw pointers here,
-    static mut STATE_PTR: *const c_void = ptr::null_mut();
+    static mut STATE_PTR: *mut c_void = ptr::null_mut();
     static mut EVENT_MGR_PTR: *mut c_void = ptr::null_mut();
     /// The (unsafe) pointer to the current inmem input, for the current run.
     /// This is neede for certain non-rust side effects, as well as unix signal handling.
@@ -235,9 +242,15 @@ pub mod unix_signals {
     {
         if CURRENT_INPUT_PTR == ptr::null() {
             println!(
-                "We died accessing addr {}, but are not in client... Exiting.",
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
                 info.si_addr() as usize
             );
+            // let's yolo-cat the maps for debugging, if possible.
+            #[cfg(target_os = "linux")]
+            match fs::read_to_string("/proc/self/maps") {
+                Ok(maps) => println!("maps:\n{}", maps),
+                Err(e) => println!("Couldn't load mappings: {:?}", e),
+            };
             return;
             //exit(1);
         }
@@ -247,21 +260,23 @@ pub mod unix_signals {
         #[cfg(feature = "std")]
         let _ = stdout().flush();
 
-        /*let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
-        let state = (EVENT_MGR_PTR as *const State<I, R, FT>).as_ref().unwrap();
-        let manager = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
+        let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
+        // Make sure we don't crash in the crash handler forever.
+        CURRENT_INPUT_PTR = ptr::null();
+        let state = (STATE_PTR as *mut State<C, FT, I, R>).as_mut().unwrap();
+        let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
+        mgr.fire(
+            state,
+            Event::Crash {
+                input: input.to_owned(),
+            },
+        )
+        .expect(&format!("Could not send crashing input {:?}", input));
 
-        if !on_crash_fn_ptr.is_null() {
-            (*(on_crash_fn_ptr as *mut Box<OnCrashFunction<I, C, EM, FT, R>>))(
-                ExitKind::Crash,
-                input,
-                state,
-                corpus,
-                manager,
-            );
-        }*/
-
-        std::process::exit(139);
+        // Send our current state to the next execution
+        mgr.on_restart(state).unwrap();
+        mgr.await_restart_safe();
+        //std::process::exit(139);
     }
 
     pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OT, R>(
@@ -282,41 +297,31 @@ pub mod unix_signals {
             return;
         }
 
-        /*let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
-        let state = (EVENT_MGR_PTR as *const State<I, R, FT>).as_ref().unwrap();
-        let manager = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
-
-        if !on_crash_fn_ptr.is_null() {
-            (*(on_crash_fn_ptr as *mut Box<OnCrashFunction<I, C, EM, FT, R>>))(
-                ExitKind::Timeout,
-                input,
-                state,
-                corpus,
-                manager,
-            );
-        }*/
-
-        /* TODO: If we want to be on the safe side, we really need to do this:
-        match manager.llmp {
-            IsClient { client } => {
-                let map = client.out_maps.last().unwrap();
-                /// wait until we can drop the message safely.
-                map.await_save_to_unmap_blocking();
-                /// Make sure all pages are unmapped.
-                drop(manager);
-            }
-            _ => (),
-        }
-        */
-
         println!("Timeout in fuzz run.");
         let _ = stdout().flush();
-        process::abort();
+
+        let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
+        // Make sure we don't crash in the crash handler forever.
+        CURRENT_INPUT_PTR = ptr::null();
+        let state = (STATE_PTR as *mut State<C, FT, I, R>).as_mut().unwrap();
+        let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
+        mgr.fire(
+            state,
+            Event::Timeout {
+                input: input.to_owned(),
+            },
+        )
+        .expect(&format!("Could not send timeouting input {:?}", input));
+        // Send our current state to the next execution
+        mgr.on_restart(state).unwrap();
+        mgr.await_restart_safe();
+
+        //process::abort();
     }
 
     #[inline]
     pub unsafe fn set_oncrash_ptrs<C, EM, FT, I, OT, R>(
-        state: &State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         event_mgr: &mut EM,
         input: &I,
     ) where
@@ -327,15 +332,17 @@ pub mod unix_signals {
         I: Input,
         R: Rand,
     {
+        println!("Setting oncrash");
         CURRENT_INPUT_PTR = input as *const _ as *const c_void;
-        STATE_PTR = state as *const _ as *const c_void;
+        STATE_PTR = state as *mut _ as *mut c_void;
         EVENT_MGR_PTR = event_mgr as *mut _ as *mut c_void;
     }
 
     #[inline]
     pub unsafe fn reset_oncrash_ptrs<C, EM, FT, I, OT, R>() {
+        println!("Resetting oncrash");
         CURRENT_INPUT_PTR = ptr::null();
-        STATE_PTR = ptr::null();
+        STATE_PTR = ptr::null_mut();
         EVENT_MGR_PTR = ptr::null_mut();
     }
 

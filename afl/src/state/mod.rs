@@ -52,7 +52,7 @@ pub trait HasMetadata {
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct State<C, I, R, FT>
+pub struct State<C, FT, I, R>
 where
     C: Corpus<I, R>,
     I: Input,
@@ -74,7 +74,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, R, FT> State<C, BytesInput, R, FT>
+impl<C, FT, R> State<C, FT, BytesInput, R>
 where
     C: Corpus<BytesInput, R>,
     R: Rand,
@@ -147,7 +147,7 @@ where
     }
 }
 
-impl<C, I, R, FT> HasCorpus<C> for State<C, I, R, FT>
+impl<C, FT, I, R> HasCorpus<C> for State<C, FT, I, R>
 where
     C: Corpus<I, R>,
     I: Input,
@@ -166,7 +166,7 @@ where
 }
 
 /// Trait for elements offering metadata
-impl<C, I, R, FT> HasMetadata for State<C, I, R, FT>
+impl<C, FT, I, R> HasMetadata for State<C, FT, I, R>
 where
     C: Corpus<I, R>,
     I: Input,
@@ -186,7 +186,7 @@ where
     }
 }
 
-impl<C, I, R, FT> State<C, I, R, FT>
+impl<C, FT, I, R> State<C, FT, I, R>
 where
     C: Corpus<I, R>,
     I: Input,
@@ -264,7 +264,7 @@ where
     {
         executor.pre_exec_observers()?;
 
-        executor.pre_exec(&self, event_mgr, input)?;
+        executor.pre_exec(self, event_mgr, input)?;
         executor.run_target(input)?;
         executor.post_exec(&self, event_mgr, input)?;
 

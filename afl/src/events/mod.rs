@@ -26,7 +26,7 @@ use crate::{
     observers::ObserversTuple,
     shmem::ShMem,
     state::State,
-    utils::Rand,
+    utils::{serialize_state_mgr, Rand},
     AflError,
 };
 
@@ -173,7 +173,7 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<C, FT, R>(&mut self, state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
+    fn process<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -195,10 +195,25 @@ where
         Ok(postcard::from_bytes(observers_buf)?)
     }
 
+    /// For restarting event managers, implement a way to forward state to their next peers.
+    #[inline]
+    fn on_restart<C, FT, R>(&mut self, _state: &mut State<C, FT, I, R>) -> Result<(), AflError>
+    where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand,
+    {
+        Ok(())
+    }
+
+    /// Block until we are safe to exit.
+    #[inline]
+    fn await_restart_safe(&mut self) {}
+
     /// Send off an event to the broker
     fn fire<C, FT, R>(
         &mut self,
-        _state: &mut State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         event: Event<I>,
     ) -> Result<(), AflError>
     where
@@ -216,7 +231,7 @@ impl<I> EventManager<I> for NopEventManager<I>
 where
     I: Input,
 {
-    fn process<C, FT, R>(&mut self, _state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
+    fn process<C, FT, R>(&mut self, _state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -227,7 +242,7 @@ where
 
     fn fire<C, FT, R>(
         &mut self,
-        _state: &mut State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         _event: Event<I>,
     ) -> Result<(), AflError>
     where
@@ -257,7 +272,7 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<C, FT, R>(&mut self, state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
+    fn process<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -273,7 +288,7 @@ where
 
     fn fire<C, FT, R>(
         &mut self,
-        _state: &mut State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         event: Event<I>,
     ) -> Result<(), AflError>
     where
@@ -350,7 +365,7 @@ where
     // Handle arriving events in the client
     fn handle_in_client<C, FT, R>(
         &mut self,
-        _state: &mut State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         _sender_id: u32,
         event: Event<I>,
     ) -> Result<(), AflError>
@@ -416,6 +431,18 @@ where
     #[cfg(feature = "std")]
     pub fn existing_client_from_env_std(env_name: &str) -> Result<Self, AflError> {
         Self::existing_client_from_env(env_name)
+    }
+}
+
+impl<I, SH, ST> Drop for LlmpEventManager<I, SH, ST>
+where
+    I: Input,
+    SH: ShMem,
+    ST: Stats,
+{
+    /// LLMP clients will have to wait until their pages are mapped by somebody.
+    fn drop(&mut self) {
+        self.await_restart_safe()
     }
 }
 
@@ -580,7 +607,7 @@ where
     // Handle arriving events in the client
     fn handle_in_client<C, FT, R>(
         &mut self,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         _sender_id: u32,
         event: Event<I>,
     ) -> Result<(), AflError>
@@ -619,7 +646,19 @@ where
     SH: ShMem,
     ST: Stats, //CE: CustomEvent<I>,
 {
-    fn process<C, FT, R>(&mut self, state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
+    /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
+    /// Otherwise, the OS may already have removed the shared maps,
+    fn await_restart_safe(&mut self) {
+        match &self.llmp {
+            llmp::LlmpConnection::IsClient { client } => {
+                // wait until we can drop the message safely.
+                client.await_save_to_unmap_blocking();
+            }
+            _ => (),
+        }
+    }
+
+    fn process<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -654,7 +693,7 @@ where
 
     fn fire<C, FT, R>(
         &mut self,
-        _state: &mut State<C, I, R, FT>,
+        _state: &mut State<C, FT, I, R>,
         event: Event<I>,
     ) -> Result<(), AflError>
     where
@@ -688,7 +727,7 @@ where
 
 */
 
-/// A manager that can restart on the fly
+/// A manager that can restart on the fly, storing states in-between (in `on_resatrt`)
 #[derive(Clone, Debug)]
 pub struct LlmpRestartingEventManager<I, SH, ST>
 where
@@ -709,7 +748,27 @@ where
     SH: ShMem,
     ST: Stats, //CE: CustomEvent<I>,
 {
-    fn process<C, FT, R>(&mut self, state: &mut State<C, I, R, FT>) -> Result<usize, AflError>
+    /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
+    fn on_restart<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<(), AflError>
+    where
+        C: Corpus<I, R>,
+        FT: FeedbacksTuple<I>,
+        R: Rand,
+    {
+        unsafe { self.sender.reset_last_page() };
+        let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
+        self.sender
+            .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
+    }
+
+    /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
+    /// Otherwise, the OS may already have removed the shared maps,
+    #[inline]
+    fn await_restart_safe(&mut self) {
+        self.llmp_mgr.await_restart_safe();
+    }
+
+    fn process<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -720,7 +779,7 @@ where
 
     fn fire<C, FT, R>(
         &mut self,
-        state: &mut State<C, I, R, FT>,
+        state: &mut State<C, FT, I, R>,
         event: Event<I>,
     ) -> Result<(), AflError>
     where
@@ -773,7 +832,7 @@ where
     pub fn temp<C, FT, R>(
         stats: ST,
         broker_port: u16,
-    ) -> Result<(Self, Option<State<C, I, R, FT>>), AflError>
+    ) -> Result<(Self, Option<State<C, FT, I, R>>), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -860,7 +919,7 @@ pub fn setup_restarting_state<I, C, FT, R, SH, ST>(
     mgr: &mut LlmpEventManager<I, SH, ST>,
 ) -> Result<
     (
-        Option<State<C, I, R, FT>>,
+        Option<State<C, FT, I, R>>,
         LlmpRestartingEventManager<I, SH, ST>,
     ),
     AflError,
@@ -923,7 +982,7 @@ where
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (state, mgr): (State<C, I, R, FT>, LlmpEventManager<I, SH, ST>) =
+            let (state, mgr): (State<C, FT, I, R>, LlmpEventManager<I, SH, ST>) =
                 deserialize_state_mgr(&msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))

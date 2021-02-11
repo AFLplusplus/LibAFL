@@ -5,7 +5,7 @@
 extern crate clap;
 
 use clap::{App, Arg};
-use std::{env, path::PathBuf, process::Command};
+use std::{env, path::PathBuf};
 
 use afl::{
     corpus::{Corpus, InMemoryCorpus},
@@ -13,11 +13,9 @@ use afl::{
     events::{LlmpEventManager, SimpleStats},
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
-    generators::RandPrintablesGenerator,
-    inputs::{BytesInput, Input},
+    inputs::Input,
     mutators::{scheduled::HavocBytesMutator, HasMaxSize},
     observers::StdMapObserver,
-    shmem::{AflShmem, ShMem},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, State},
     tuples::tuple_list,
@@ -119,7 +117,7 @@ pub fn main() {
 /// The actual fuzzer
 fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
-    /// TODO: Don't the stats need to be serialized, too?
+    // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     let mut mgr = LlmpEventManager::new_on_port_std(stats, broker_port)?;
