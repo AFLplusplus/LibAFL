@@ -942,14 +942,12 @@ where
 
     // We start ourself as child process to actually fuzz
     if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-
         mgr = LlmpEventManager::<I, SH, ST>::new_on_port(stats, broker_port)?;
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
             mgr.broker_loop()?;
         } else {
-        
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
             // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
@@ -975,7 +973,6 @@ where
                     todo!("Fix this");
                 }
             }
-
         }
     }
 
