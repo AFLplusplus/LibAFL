@@ -353,7 +353,7 @@ mod tests {
             InMemoryCorpus<BytesInput, XKCDRand>,
             _,
             _,
-            State<_, _, _, ()>,
+            State<_, (), _, _>,
         >::new();
 
         mutation_splice(&mut mutator, &mut rand, &mut state, &mut input).unwrap();

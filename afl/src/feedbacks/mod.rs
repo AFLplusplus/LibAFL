@@ -10,10 +10,10 @@ use num::Integer;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    bolts::tuples::{Named, TupleList},
     corpus::Testcase,
     inputs::Input,
     observers::{MapObserver, Observer, ObserversTuple},
-    tuples::{Named, TupleList},
     AflError,
 };
 

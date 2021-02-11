@@ -2,9 +2,9 @@
 //! They may be inserted as part of mutations during fuzzing.
 
 use crate::{
+    bolts::serde_anymap::SerdeAny,
     inputs::{HasBytesVec, Input},
     mutators::*,
-    serde_anymap::SerdeAny,
     utils::Rand,
     AflError,
 };

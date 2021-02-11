@@ -8,6 +8,7 @@ use clap::{App, Arg};
 use std::{env, path::PathBuf};
 
 use afl::{
+    bolts::tuples::tuple_list,
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_state,
     events::{LlmpEventManager, SimpleStats},
@@ -18,7 +19,6 @@ use afl::{
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, State},
-    tuples::tuple_list,
     utils::StdRand,
     AflError, Fuzzer, StdFuzzer,
 };

@@ -8,13 +8,13 @@ pub mod runtime;
 use core::marker::PhantomData;
 
 use crate::{
+    bolts::tuples::{MatchNameAndType, MatchType, Named, TupleList},
     corpus::Corpus,
     events::EventManager,
     feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     state::State,
-    tuples::{MatchNameAndType, MatchType, Named, TupleList},
     utils::Rand,
     AflError,
 };

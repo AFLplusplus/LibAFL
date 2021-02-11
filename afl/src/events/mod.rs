@@ -3,8 +3,7 @@
 pub mod stats;
 pub use stats::*;
 
-use crate::llmp::LlmpSender;
-use crate::{llmp::LlmpReceiver, utils::deserialize_state_mgr};
+use crate::bolts::llmp::LlmpSender;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -13,18 +12,23 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
+use crate::{bolts::llmp::LlmpReceiver, utils::deserialize_state_mgr};
+
+#[cfg(feature = "std")]
 use std::{env, process::Command};
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-use crate::shmem::AflShmem;
+use crate::bolts::shmem::AflShmem;
 use crate::{
+    bolts::{
+        llmp::{self, LlmpClient, LlmpClientDescription, Tag},
+        shmem::ShMem,
+    },
     corpus::Corpus,
     feedbacks::FeedbacksTuple,
     inputs::Input,
-    llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     observers::ObserversTuple,
-    shmem::ShMem,
     state::State,
     utils::{serialize_state_mgr, Rand},
     AflError,
@@ -802,10 +806,10 @@ where
 }
 
 /// The llmp connection from the actual fuzzer to the process supervising it
-const ENV_FUZZER_SENDER: &str = &"_AFL_ENV_FUZZER_SENDER";
-const ENV_FUZZER_RECEIVER: &str = &"_AFL_ENV_FUZZER_RECEIVER";
+const _ENV_FUZZER_SENDER: &str = &"_AFL_ENV_FUZZER_SENDER";
+const _ENV_FUZZER_RECEIVER: &str = &"_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
-const ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
+const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 impl<I, SH, ST> LlmpRestartingEventManager<I, SH, ST>
 where
@@ -933,8 +937,8 @@ where
     ST: Stats,
 {
     // We start ourself as child process to actually fuzz
-    if std::env::var(ENV_FUZZER_SENDER).is_err() {
-        mgr.to_env(ENV_FUZZER_BROKER_CLIENT_INITIAL);
+    if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+        mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
         // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
         let sender = LlmpSender::new(0, false)?;
@@ -943,8 +947,8 @@ where
             None,
         )?;
         // Store the information to a map.
-        sender.to_env(ENV_FUZZER_SENDER)?;
-        receiver.to_env(ENV_FUZZER_RECEIVER)?;
+        sender.to_env(_ENV_FUZZER_SENDER)?;
+        receiver.to_env(_ENV_FUZZER_RECEIVER)?;
 
         let mut ctr = 0;
         // Client->parent loop
@@ -965,8 +969,8 @@ where
 
     // We are the fuzzing instance, first, connect to our own restore map.
     // A sender and a receiver for single communication
-    let mut receiver = LlmpReceiver::<SH>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
-    let sender = LlmpSender::<SH>::on_existing_from_env(ENV_FUZZER_SENDER)?;
+    let mut receiver = LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?;
+    let sender = LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?;
 
     // If we're restarting, deserialize the old state.
     let (state, mut mgr) = match receiver.recv_buf()? {
@@ -974,7 +978,7 @@ where
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
             let client_mgr = LlmpEventManager::<I, SH, ST>::existing_client_from_env(
-                ENV_FUZZER_BROKER_CLIENT_INITIAL,
+                _ENV_FUZZER_BROKER_CLIENT_INITIAL,
             )?;
 
             (None, LlmpRestartingEventManager::new(client_mgr, sender))
@@ -1002,11 +1006,11 @@ where
 #[cfg(test)]
 mod tests {
 
+    use crate::bolts::tuples::{tuple_list, MatchNameAndType, Named};
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
     use crate::observers::ObserversTuple;
     use crate::observers::StdMapObserver;
-    use crate::tuples::{tuple_list, MatchNameAndType, Named};
 
     static mut MAP: [u32; 4] = [0; 4];
 

@@ -1,5 +1,5 @@
 /*!
-A PoC for low level message passing
+A library for low level message passing
 
 To send new messages, the clients place a new message at the end of their
 client_out_map. If the ringbuf is filled up, they start place a
@@ -1609,7 +1609,7 @@ mod tests {
         Tag,
     };
     #[cfg(feature = "std")]
-    use crate::shmem::AflShmem;
+    use crate::bolts::shmem::AflShmem;
 
     #[cfg(feature = "std")]
     #[test]

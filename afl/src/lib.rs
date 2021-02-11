@@ -9,21 +9,17 @@ extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
 
+pub mod bolts;
 pub mod corpus;
 pub mod events;
 pub mod executors;
 pub mod feedbacks;
 pub mod generators;
 pub mod inputs;
-pub mod llmp;
-pub mod metamap;
 pub mod mutators;
 pub mod observers;
-pub mod serde_anymap;
-pub mod shmem;
 pub mod stages;
 pub mod state;
-pub mod tuples;
 pub mod utils;
 
 use alloc::string::String;
@@ -244,13 +240,13 @@ impl From<ParseIntError> for AflError {
 mod tests {
 
     use crate::{
+        bolts::tuples::tuple_list,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         executors::{Executor, ExitKind, InProcessExecutor},
         inputs::{BytesInput, Input},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, State},
-        tuples::tuple_list,
         utils::StdRand,
         Fuzzer, StdFuzzer,
     };
@@ -298,7 +294,7 @@ mod tests {
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
-        let state_deserialized: State<InMemoryCorpus<BytesInput, _>, BytesInput, StdRand, ()> =
+        let state_deserialized: State<InMemoryCorpus<BytesInput, _>, (), BytesInput, StdRand> =
             postcard::from_bytes(state_serialized.as_slice()).unwrap();
         assert_eq!(state.executions(), state_deserialized.executions());
 

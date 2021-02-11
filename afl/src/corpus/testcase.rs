@@ -6,8 +6,8 @@ use core::{convert::Into, default::Default, option::Option};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    bolts::serde_anymap::{SerdeAny, SerdeAnyMap},
     inputs::Input,
-    serde_anymap::{SerdeAny, SerdeAnyMap},
     AflError,
 };
 

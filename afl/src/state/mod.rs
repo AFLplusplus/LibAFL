@@ -9,6 +9,7 @@ use std::{
 };
 
 use crate::{
+    bolts::serde_anymap::{SerdeAny, SerdeAnyMap},
     corpus::{Corpus, Testcase},
     events::{Event, EventManager, LogSeverity},
     executors::{Executor, HasObservers},
@@ -16,7 +17,6 @@ use crate::{
     generators::Generator,
     inputs::Input,
     observers::ObserversTuple,
-    serde_anymap::{SerdeAny, SerdeAnyMap},
     utils::{current_milliseconds, Rand},
     AflError,
 };
