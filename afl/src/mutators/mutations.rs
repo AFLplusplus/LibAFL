@@ -883,7 +883,7 @@ token2="B"
             16000 as usize
         }
 
-        fn set_max_size(&mut self, max_size: usize) {
+        fn set_max_size(&mut self, _max_size: usize) {
             todo!("Not needed");
         }
     }

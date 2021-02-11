@@ -7,6 +7,7 @@ use core::marker::PhantomData;
 use os_signals::set_oncrash_ptrs;
 
 use crate::{
+    bolts::tuples::Named,
     corpus::Corpus,
     events::EventManager,
     executors::{Executor, ExitKind, HasObservers},
@@ -14,7 +15,6 @@ use crate::{
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     state::State,
-    tuples::Named,
     utils::Rand,
     AflError,
 };
@@ -397,9 +397,9 @@ mod tests {
     use core::marker::PhantomData;
 
     use crate::{
+        bolts::tuples::tuple_list,
         executors::{Executor, ExitKind, InProcessExecutor},
         inputs::Input,
-        tuples::tuple_list,
     };
 
     fn test_harness_fn_nop<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {

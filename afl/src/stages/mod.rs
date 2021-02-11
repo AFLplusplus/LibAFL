@@ -2,6 +2,7 @@ pub mod mutational;
 pub use mutational::StdMutationalStage;
 
 use crate::{
+    bolts::tuples::TupleList,
     corpus::Corpus,
     events::EventManager,
     executors::{Executor, HasObservers},
@@ -9,7 +10,6 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     state::State,
-    tuples::TupleList,
     utils::Rand,
     AflError,
 };

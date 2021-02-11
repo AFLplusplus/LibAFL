@@ -8,8 +8,10 @@ use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    serde_anymap::{ArrayMut, Cptr},
-    tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    bolts::{
+        serde_anymap::{ArrayMut, Cptr},
+        tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    },
     utils::current_time,
     AflError,
 };
@@ -386,8 +388,8 @@ where
 mod tests {
 
     use crate::{
+        bolts::tuples::{tuple_list, tuple_list_type, Named},
         observers::{StdMapObserver, TimeObserver},
-        tuples::{tuple_list, tuple_list_type, Named},
     };
 
     static mut MAP: [u32; 4] = [0; 4];

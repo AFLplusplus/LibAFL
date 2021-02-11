@@ -78,7 +78,7 @@ macro_rules! create_serde_registry_for_trait {
             use hashbrown::hash_map::{Keys, Values, ValuesMut};
             use hashbrown::HashMap;
 
-            use $crate::serde_anymap::{
+            use $crate::bolts::serde_anymap::{
                 pack_type_id, unpack_type_id, DeserializeCallback, DeserializeCallbackSeed,
             };
             use $crate::AflError;
@@ -470,10 +470,10 @@ macro_rules! create_serde_registry_for_trait {
             {
                 use serde::ser::SerializeSeq;
 
-                let id = $crate::serde_anymap::unpack_type_id(self.type_id());
+                let id = $crate::bolts::serde_anymap::unpack_type_id(self.type_id());
                 let mut seq = se.serialize_seq(Some(2))?;
                 seq.serialize_element(&id)?;
-                seq.serialize_element(&$crate::serde_anymap::Wrap(self))?;
+                seq.serialize_element(&$crate::bolts::serde_anymap::Wrap(self))?;
                 seq.end()
             }
         }
@@ -489,7 +489,7 @@ macro_rules! create_serde_registry_for_trait {
     };
 }
 
-create_serde_registry_for_trait!(serdeany_serde, crate::serde_anymap::SerdeAny);
+create_serde_registry_for_trait!(serdeany_serde, crate::bolts::serde_anymap::SerdeAny);
 pub use serdeany_serde::*;
 
 #[derive(Clone, Debug)]

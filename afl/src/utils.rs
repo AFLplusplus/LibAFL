@@ -10,11 +10,11 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
+    bolts::shmem::ShMem,
     corpus::Corpus,
     events::{LlmpEventManager, Stats},
     feedbacks::FeedbacksTuple,
     inputs::Input,
-    shmem::ShMem,
     state::State,
     AflError,
 };
