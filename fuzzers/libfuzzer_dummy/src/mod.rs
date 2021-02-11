@@ -2,6 +2,7 @@
 //! The example harness is built for libpng.
 
 use std::{path::PathBuf};
+use std::io::{self, BufRead};
 
 use afl::{
     bolts::{tuples::tuple_list, shmem::AflShmem},
@@ -31,7 +32,7 @@ where
     E: Executor<I>,
     I: Input,
 {
-    println!("{:?}", buf);
+    //println!("{:?}", buf);
 
     unsafe {
       __lafl_edges_map[0] = 1;
@@ -56,6 +57,10 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
+    
+    println!("NEW START");
+    let stdin = io::stdin();
+    let _ = stdin.lock().lines().next().unwrap().unwrap();
     
     // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
     let (state_opt, mut restarting_mgr) =

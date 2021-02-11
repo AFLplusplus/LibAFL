@@ -12,7 +12,7 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use crate::{bolts::llmp::LlmpReceiver, utils::deserialize_state_mgr};
+use crate::{bolts::llmp::LlmpReceiver};
 
 #[cfg(feature = "std")]
 use std::{env, process::Command};
@@ -30,7 +30,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     state::State,
-    utils::{serialize_state_mgr, Rand},
+    utils::{Rand},
     AflError,
 };
 
@@ -197,17 +197,6 @@ where
         OT: ObserversTuple,
     {
         Ok(postcard::from_bytes(observers_buf)?)
-    }
-
-    /// For restarting event managers, implement a way to forward state to their next peers.
-    #[inline]
-    fn on_restart<C, FT, R>(&mut self, _state: &mut State<C, FT, I, R>) -> Result<(), AflError>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-    {
-        Ok(())
     }
 
     /// Block until we are safe to exit.
@@ -712,24 +701,42 @@ where
     }
 }
 
-/* TODO
+/// Serialize the current state and corpus during an executiont to bytes.
+/// On top, add the current llmp event manager instance to be restored
+/// This method is needed when the fuzzer run crashes and has to restart.
+pub fn serialize_state_mgr<C, FT, I, R, SH, ST>(
+    state: &State<C, FT, I, R>,
+    mgr: &LlmpEventManager<I, SH, ST>,
+) -> Result<Vec<u8>, AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    SH: ShMem,
+    ST: Stats,
+{
+    Ok(postcard::to_allocvec(&(&state, &mgr.describe()?))?)
+}
 
-    match exit_kind {
-        Exit::Timeout => mgr.fire(Event::Timeout(&input)).expect(&format!(
-            "Error sending Timeout event for input {:?}",
-            input
-        )),
-        Exit::Crash => mgr
-            .crash(input)
-            .expect(&format!("Error sending crash event for input {:?}", input)),
-        _ => (),
-    }
-    println!("foo");
-    let state_corpus_serialized = serialize_state_corpus_mgr(state, corpus, mgr).unwrap();
-    println!("bar: {:?}", &state_corpus_serialized);
-    sender.send_buf(0x1, &state_corpus_serialized).unwrap();
-
-*/
+/// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
+pub fn deserialize_state_mgr<C, FT, I, R, SH, ST>(
+    state_corpus_serialized: &[u8],
+) -> Result<(State<C, FT, I, R>, LlmpEventManager<I, SH, ST>), AflError>
+where
+    C: Corpus<I, R>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    R: Rand,
+    SH: ShMem,
+    ST: Stats,
+{
+    let tuple: (State<C, FT, I, R>, _) = postcard::from_bytes(&state_corpus_serialized)?;
+    Ok((
+        tuple.0,
+        LlmpEventManager::existing_client_from_description(&tuple.1)?,
+    ))
+}
 
 /// A manager that can restart on the fly, storing states in-between (in `on_resatrt`)
 #[derive(Clone, Debug)]
@@ -752,19 +759,6 @@ where
     SH: ShMem,
     ST: Stats, //CE: CustomEvent<I>,
 {
-    /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
-    fn on_restart<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<(), AflError>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-    {
-        unsafe { self.sender.reset_last_page() };
-        let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
-        self.sender
-            .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
-    }
-
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     #[inline]
@@ -796,7 +790,7 @@ where
             Event::Crash { input: _ } | Event::Timeout { input: _ } => {
                 // First, reset the page to 0 so the next iteration can read read from the beginning of this page
                 unsafe { self.sender.reset_last_page() };
-                let buf = postcard::to_allocvec(&(&state, &self.llmp_mgr.describe()?))?;
+                let buf = serialize_state_mgr(&state, &self.llmp_mgr)?;
                 self.sender.send_buf(_LLMP_TAG_RESTART, &buf).unwrap();
             }
             _ => (),
@@ -831,89 +825,6 @@ where
     pub fn sender_mut(&mut self) -> &mut LlmpSender<SH> {
         &mut self.sender
     }
-
-    /*
-    pub fn temp<C, FT, R>(
-        stats: ST,
-        broker_port: u16,
-    ) -> Result<(Self, Option<State<C, FT, I, R>>), AflError>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-    {
-        let mut mgr;
-
-        // We start ourself as child process to actually fuzz
-        if std::env::var(ENV_FUZZER_SENDER).is_err() {
-            // We are either the broker, or the parent of the fuzzing instance
-            mgr = LlmpEventManager::new_on_port(stats, broker_port)?;
-            if mgr.is_broker() {
-                // Yep, broker. Just loop here.
-                println!("Doing broker things. Run this tool again to start fuzzing in a client.");
-                mgr.broker_loop()?;
-            } else {
-                // we are one of the fuzzing instances. Let's launch the fuzzer.
-
-                // First, store the mgr to an env so the client can use it
-                mgr.to_env(ENV_FUZZER_BROKER_CLIENT_INITIAL);
-
-                // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-                let sender = LlmpSender::new(0, false)?;
-                let receiver = LlmpReceiver::on_existing_map(
-                    AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
-                    None,
-                )?;
-                // Store the information to a map.
-                sender.to_env(ENV_FUZZER_SENDER)?;
-                receiver.to_env(ENV_FUZZER_RECEIVER)?;
-
-                let mut ctr = 0;
-                // Client->parent loop
-                loop {
-                    dbg!("Spawning next client");
-                    Command::new(env::current_exe()?)
-                        .current_dir(env::current_dir()?)
-                        .args(env::args())
-                        .status()?;
-                    ctr += 1;
-                    if ctr == 10 {
-                        todo!("This function should be removed");
-                    }
-                }
-            }
-        }
-
-        println!("We're a client, let's fuzz :)");
-
-        // We are the fuzzing instance, first, connect to our own restore map.
-        // A sender and a receiver for single communication
-        let mut receiver = LlmpReceiver::<AflShmem>::on_existing_from_env(ENV_FUZZER_RECEIVER)?;
-        let mut sender = LlmpSender::<AflShmem>::on_existing_from_env(ENV_FUZZER_SENDER)?;
-
-        // If we're restarting, deserialize the old state.
-        let (mut state, mut mgr) = match receiver.recv_buf()? {
-            None => {
-                println!("First run. Let's set it all up");
-                // Mgr to send and receive msgs from/to all other fuzzer instances
-                mgr = LlmpEventManager::existing_client_from_env(ENV_FUZZER_BROKER_CLIENT_INITIAL)?;
-
-                (mgr, None)
-            }
-            // Restoring from a previous run, deserialize state and corpus.
-            Some((_sender, _tag, msg)) => {
-                println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-                deserialize_state_mgr(&msg)?;
-                todo!("Remove this func");
-            }
-        };
-        // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
-        unsafe { sender.reset_last_page() };
-
-        //Ok(mgr)
-        todo!("Remove this fn");
-    }
-    */
 }
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.

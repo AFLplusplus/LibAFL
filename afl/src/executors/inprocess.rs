@@ -252,8 +252,7 @@ pub mod unix_signals {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
             };
-            return;
-            //exit(1);
+            std::process::exit(1);
         }
 
         #[cfg(feature = "std")]
@@ -274,10 +273,9 @@ pub mod unix_signals {
         )
         .expect(&format!("Could not send crashing input {:?}", input));
 
-        // Send our current state to the next execution
-        mgr.on_restart(state).unwrap();
         mgr.await_restart_safe();
-        //std::process::exit(139);
+        
+        std::process::exit(139);
     }
 
     pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OT, R>(
@@ -313,8 +311,7 @@ pub mod unix_signals {
             },
         )
         .expect(&format!("Could not send timeouting input {:?}", input));
-        // Send our current state to the next execution
-        mgr.on_restart(state).unwrap();
+
         mgr.await_restart_safe();
 
         //process::abort();
