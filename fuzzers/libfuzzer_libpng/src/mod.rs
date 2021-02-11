@@ -4,12 +4,11 @@
 #[macro_use]
 extern crate clap;
 
-use afl::shmem::AflShmem;
 use clap::{App, Arg};
 use std::{env, path::PathBuf};
 
 use afl::{
-    bolts::tuples::tuple_list,
+    bolts::{tuples::tuple_list, shmem::AflShmem},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
     events::{SimpleStats},
