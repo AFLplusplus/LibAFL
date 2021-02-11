@@ -941,7 +941,7 @@ where
     let mut mgr;
 
     // We start ourself as child process to actually fuzz
-    if std::env::var(ENV_FUZZER_SENDER).is_err() {
+    if std::env::var(_ENV_FUZZER_SENDER).is_err() {
 
         mgr = LlmpEventManager::<I, SH, ST>::new_on_port(stats, broker_port)?;
         if mgr.is_broker() {
@@ -950,17 +950,17 @@ where
             mgr.broker_loop()?;
         } else {
         
-            mgr.to_env(ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
             // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
             let sender = LlmpSender::new(0, false)?;
             let receiver = LlmpReceiver::on_existing_map(
-                AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
+                SH::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
                 None,
             )?;
             // Store the information to a map.
-            sender.to_env(ENV_FUZZER_SENDER)?;
-            receiver.to_env(ENV_FUZZER_RECEIVER)?;
+            sender.to_env(_ENV_FUZZER_SENDER)?;
+            receiver.to_env(_ENV_FUZZER_RECEIVER)?;
 
             let mut ctr = 0;
             // Client->parent loop
