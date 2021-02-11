@@ -4,13 +4,14 @@
 #[macro_use]
 extern crate clap;
 
+use afl::shmem::AflShmem;
 use clap::{App, Arg};
 use std::{env, path::PathBuf};
 
 use afl::{
     corpus::{Corpus, InMemoryCorpus},
-    events::setup_restarting_state,
-    events::{LlmpEventManager, SimpleStats},
+    events::setup_restarting_mgr,
+    events::{SimpleStats},
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     inputs::Input,
@@ -119,39 +120,36 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
-
-    let mut mgr = LlmpEventManager::new_on_port_std(stats, broker_port)?;
-    if mgr.is_broker() {
-        // Yep, broker. Just loop here.
-        println!("Doing broker things. Run this tool again to start fuzzing in a client.");
-        mgr.broker_loop()?;
-    }
+    
+    // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
+    let (state_opt, mut restarting_mgr) =
+        setup_restarting_mgr::<_, _, _, _, AflShmem, _>(stats, broker_port).expect("Failed to setup the restarter".into());
 
     let edges_observer =
-        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
-            __lafl_max_edges_size as usize
-        });
+    StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
+        __lafl_max_edges_size as usize
+    });
+
+    let mut state = match state_opt {
+        Some(s) => s,
+        None => {
+            State::new(
+                InMemoryCorpus::new(),
+                tuple_list!(MaxMapFeedback::new_with_observer(
+                    &NAME_COV_MAP,
+                    &edges_observer
+                )),
+            )
+        },
+    };
+
+    println!("We're a client, let's fuzz :)");
 
     let mut mutator = HavocBytesMutator::new_default();
     mutator.set_max_size(4096);
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
-    // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
-    let (state_opt, mut restarting_mgr) =
-        setup_restarting_state(&mut mgr).expect("Failed to setup the restarter".into());
-    let mut state = match state_opt {
-        Some(s) => s,
-        None => State::new(
-            InMemoryCorpus::new(),
-            tuple_list!(MaxMapFeedback::new_with_observer(
-                &NAME_COV_MAP,
-                &edges_observer
-            )),
-        ),
-    };
-
-    println!("We're a client, let's fuzz :)");
 
     // Create the executor
     let mut executor = InProcessExecutor::new(

@@ -915,8 +915,10 @@ where
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
-pub fn setup_restarting_state<I, C, FT, R, SH, ST>(
-    mgr: &mut LlmpEventManager<I, SH, ST>,
+pub fn setup_restarting_mgr<I, C, FT, R, SH, ST>(
+    //mgr: &mut LlmpEventManager<I, SH, ST>,
+    stats: ST,
+    broker_port: u16,
 ) -> Result<
     (
         Option<State<C, FT, I, R>>,
@@ -932,32 +934,44 @@ where
     SH: ShMem,
     ST: Stats,
 {
+    let mut mgr;
+
     // We start ourself as child process to actually fuzz
     if std::env::var(ENV_FUZZER_SENDER).is_err() {
-        mgr.to_env(ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
-        // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-        let sender = LlmpSender::new(0, false)?;
-        let receiver = LlmpReceiver::on_existing_map(
-            AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
-            None,
-        )?;
-        // Store the information to a map.
-        sender.to_env(ENV_FUZZER_SENDER)?;
-        receiver.to_env(ENV_FUZZER_RECEIVER)?;
+        mgr = LlmpEventManager::<I, SH, ST>::new_on_port(stats, broker_port)?;
+        if mgr.is_broker() {
+            // Yep, broker. Just loop here.
+            println!("Doing broker things. Run this tool again to start fuzzing in a client.");
+            mgr.broker_loop()?;
+        } else {
+        
+            mgr.to_env(ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
-        let mut ctr = 0;
-        // Client->parent loop
-        loop {
-            dbg!("Spawning next client");
-            Command::new(env::current_exe()?)
-                .current_dir(env::current_dir()?)
-                .args(env::args())
-                .status()?;
-            ctr += 1;
-            if ctr == 10 {
-                todo!("Fix this");
+            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
+            let sender = LlmpSender::new(0, false)?;
+            let receiver = LlmpReceiver::on_existing_map(
+                AflShmem::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
+                None,
+            )?;
+            // Store the information to a map.
+            sender.to_env(ENV_FUZZER_SENDER)?;
+            receiver.to_env(ENV_FUZZER_RECEIVER)?;
+
+            let mut ctr = 0;
+            // Client->parent loop
+            loop {
+                dbg!("Spawning next client");
+                Command::new(env::current_exe()?)
+                    .current_dir(env::current_dir()?)
+                    .args(env::args())
+                    .status()?;
+                ctr += 1;
+                if ctr == 10 {
+                    todo!("Fix this");
+                }
             }
+
         }
     }
 
