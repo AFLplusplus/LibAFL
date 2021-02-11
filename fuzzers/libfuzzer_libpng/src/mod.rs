@@ -8,7 +8,7 @@ use clap::{App, Arg};
 use std::{env, path::PathBuf};
 
 use afl::{
-    bolts::{tuples::tuple_list, shmem::AflShmem},
+    bolts::{shmem::AflShmem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
     events::SimpleStats,
