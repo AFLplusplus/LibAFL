@@ -195,13 +195,10 @@ pub mod unix_signals {
 
     extern crate libc;
 
-    #[cfg(target_os = "linux")]
-    use fs::read_to_string;
-
     // Unhandled signals: SIGALRM, SIGHUP, SIGINT, SIGKILL, SIGQUIT, SIGTERM
     use libc::{
-        c_int, c_void, sigaction, siginfo_t, SA_NODEFER, SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE,
-        SIGILL, SIGPIPE, SIGSEGV, SIGUSR2,
+        c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK,
+        SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGPIPE, SIGSEGV, SIGUSR2,
     };
 
     use std::{
@@ -219,6 +216,10 @@ pub mod unix_signals {
         state::State,
         utils::Rand,
     };
+    /// Let's get 8 mb for now.
+    const SIGNAL_STACK_SIZE: usize = 2 << 22;
+    /// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
+    static mut SIGNAL_STACK_PTR: *const c_void = ptr::null_mut();
 
     /// Pointers to values only needed on crash. As the program will not continue after a crash,
     /// we should (tm) be okay with raw pointers here,
@@ -332,7 +333,6 @@ pub mod unix_signals {
         I: Input,
         R: Rand,
     {
-        println!("Setting oncrash");
         CURRENT_INPUT_PTR = input as *const _ as *const c_void;
         STATE_PTR = state as *mut _ as *mut c_void;
         EVENT_MGR_PTR = event_mgr as *mut _ as *mut c_void;
@@ -340,7 +340,6 @@ pub mod unix_signals {
 
     #[inline]
     pub unsafe fn reset_oncrash_ptrs<C, EM, FT, I, OT, R>() {
-        println!("Resetting oncrash");
         CURRENT_INPUT_PTR = ptr::null();
         STATE_PTR = ptr::null_mut();
         EVENT_MGR_PTR = ptr::null_mut();
@@ -356,9 +355,21 @@ pub mod unix_signals {
         I: Input,
         R: Rand,
     {
+        // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
+        if SIGNAL_STACK_PTR.is_null() {
+            SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
+            if SIGNAL_STACK_PTR.is_null() {
+                panic!(
+                    "Failed to allocate signal stack with {} bytes!",
+                    SIGNAL_STACK_SIZE
+                );
+            }
+        }
+        sigaltstack(SIGNAL_STACK_PTR as _, ptr::null_mut() as _);
+
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
-        sa.sa_flags = SA_NODEFER | SA_SIGINFO;
+        sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
         sa.sa_sigaction = libaflrs_executor_inmem_handle_crash::<C, EM, FT, I, OT, R> as usize;
         for (sig, msg) in &[
             (SIGSEGV, "segfault"),
