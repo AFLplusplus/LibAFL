@@ -479,6 +479,7 @@ where
         let current_out_map = self.out_maps.last().unwrap();
         unsafe {
             compiler_fence(Ordering::SeqCst);
+            // println!("Reading save_to_unmap from {:?}", current_out_map.page() as *const _);
             ptr::read_volatile(&(*current_out_map.page()).save_to_unmap) != 0
         }
     }
@@ -1032,6 +1033,14 @@ where
         ret
     }
 
+    /// Marks the containing page as `save_to_unmap`.
+    /// This indicates, that the page may safely be unmapped by the sender.
+    pub fn mark_save_to_unmap(&mut self) {
+        unsafe {
+            ptr::write_volatile(&mut (*self.page_mut()).save_to_unmap, 1);
+        }
+    }
+
     /// Get the unsafe ptr to this page, situated on the shared map
     pub unsafe fn page_mut(&mut self) -> *mut LlmpPage {
         shmem2page_mut(&mut self.shmem)
@@ -1149,7 +1158,10 @@ where
 
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in broker.client_map
-    pub fn register_client(&mut self, client_page: LlmpSharedMap<SH>) {
+    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SH>) {
+        // Tell the client it may unmap this page now.
+        client_page.mark_save_to_unmap();
+
         let id = self.llmp_clients.len() as u32;
         self.llmp_clients.push(LlmpReceiver {
             id,
@@ -1361,9 +1373,10 @@ where
 
                     match SH::existing_from_shm_slice(&(*pageinfo).shm_str, (*pageinfo).map_size) {
                         Ok(new_map) => {
-                            let new_page = LlmpSharedMap::existing(new_map);
+                            let mut new_page = LlmpSharedMap::existing(new_map);
                             let id = next_id;
                             next_id += 1;
+                            new_page.mark_save_to_unmap();
                             self.llmp_clients.push(LlmpReceiver {
                                 id,
                                 current_recv_map: new_page,
@@ -1500,6 +1513,7 @@ where
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
             },
+
             receiver: LlmpReceiver {
                 id: 0,
                 current_recv_map: initial_broker_map,

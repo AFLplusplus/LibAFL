@@ -12,7 +12,7 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use crate::{bolts::llmp::LlmpReceiver};
+use crate::bolts::llmp::LlmpReceiver;
 
 #[cfg(feature = "std")]
 use std::{env, process::Command};
@@ -30,7 +30,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     state::State,
-    utils::{Rand},
+    utils::Rand,
     AflError,
 };
 

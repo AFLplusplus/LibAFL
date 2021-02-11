@@ -273,8 +273,7 @@ pub mod unix_signals {
         )
         .expect(&format!("Could not send crashing input {:?}", input));
 
-        //mgr.await_restart_safe();
-        
+        mgr.await_restart_safe();
     }
 
     pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OT, R>(
