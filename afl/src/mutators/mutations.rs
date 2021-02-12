@@ -270,10 +270,10 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    if input.bytes().len() <= 1 {
+    if input.bytes().len() == 0 {
         Ok(MutationResult::Skipped)
     } else {
-        let idx = rand.below(input.bytes().len() as u64 - 1) as usize;
+        let idx = rand.below(input.bytes().len() as u64) as usize;
         unsafe {
             // moar speed, no bound check
             let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut u8;
@@ -297,7 +297,7 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    if input.bytes().len() <= 1 {
+    if input.bytes().len() < 2 {
         Ok(MutationResult::Skipped)
     } else {
         let idx = rand.below(input.bytes().len() as u64 - 1) as usize;
@@ -326,10 +326,10 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    if input.bytes().len() <= 1 {
+    if input.bytes().len() < 4 {
         Ok(MutationResult::Skipped)
     } else {
-        let idx = rand.below(input.bytes().len() as u64 - 1) as usize;
+        let idx = rand.below(input.bytes().len() as u64 - 3) as usize;
         unsafe {
             // moar speed, no bound check
             let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
@@ -355,10 +355,10 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    if input.bytes().len() <= 1 {
+    if input.bytes().len() < 8 {
         Ok(MutationResult::Skipped)
     } else {
-        let idx = rand.below(input.bytes().len() as u64 - 1) as usize;
+        let idx = rand.below(input.bytes().len() as u64 - 7) as usize;
         unsafe {
             // moar speed, no bound check
             let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u64;
@@ -384,10 +384,10 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    if input.bytes().len() <= 1 {
+    if input.bytes().len() == 0 {
         Ok(MutationResult::Skipped)
     } else {
-        let idx = rand.below(input.bytes().len() as u64 - 1) as usize;
+        let idx = rand.below(input.bytes().len() as u64) as usize;
         let val = INTERESTING_8[rand.below(INTERESTING_8.len() as u64) as usize] as u8;
         unsafe {
             // moar speed, no bound check
@@ -407,7 +407,7 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    if input.bytes().len() <= 1 {
+    if input.bytes().len() < 2 {
         Ok(MutationResult::Skipped)
     } else {
         let idx = rand.below(input.bytes().len() as u64 - 1) as usize;
@@ -435,10 +435,10 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    if input.bytes().len() <= 1 {
+    if input.bytes().len() < 4 {
         Ok(MutationResult::Skipped)
     } else {
-        let idx = rand.below(input.bytes().len() as u64 - 1) as usize;
+        let idx = rand.below(input.bytes().len() as u64 - 3) as usize;
         let val = INTERESTING_32[rand.below(INTERESTING_8.len() as u64) as usize] as u32;
         unsafe {
             // moar speed, no bound check
