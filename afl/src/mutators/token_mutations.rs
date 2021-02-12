@@ -2,7 +2,7 @@
 //! They may be inserted as part of mutations during fuzzing.
 
 use crate::{
-    bolts::serde_anymap::SerdeAny,
+    bolts::serdeany::SerdeAny,
     inputs::{HasBytesVec, Input},
     mutators::*,
     utils::Rand,

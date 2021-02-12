@@ -6,7 +6,7 @@ use core::{convert::Into, default::Default, option::Option};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serde_anymap::{SerdeAny, SerdeAnyMap},
+    bolts::serdeany::{SerdeAny, SerdeAnyMap},
     inputs::Input,
     AflError,
 };

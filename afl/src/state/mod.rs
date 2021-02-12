@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    bolts::serde_anymap::{SerdeAny, SerdeAnyMap},
+    bolts::serdeany::{SerdeAny, SerdeAnyMap},
     corpus::{Corpus, Testcase},
     events::{Event, EventManager, LogSeverity},
     executors::{Executor, HasObservers},

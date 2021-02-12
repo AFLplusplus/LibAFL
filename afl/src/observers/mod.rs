@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        serde_anymap::{ArrayMut, Cptr},
+        ownedref::{ArrayMut, Cptr},
         tuples::{MatchNameAndType, MatchType, Named, TupleList},
     },
     utils::current_time,

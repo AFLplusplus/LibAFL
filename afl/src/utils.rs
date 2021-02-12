@@ -1,51 +1,13 @@
 //! Utility functions for AFL
 
-use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
-use postcard;
 use serde::{Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{corpus::Corpus, feedbacks::FeedbacksTuple, inputs::Input, state::State, AflError};
-
 pub type StdRand = RomuTrioRand;
-
-/// Serialize the current state and corpus during an executiont to bytes.
-/// This method is needed when the fuzzer run crashes and has to restart.
-pub fn serialize_state_corpus<C, FT, I, R>(
-    state: &State<C, FT, I, R>,
-    corpus: &C,
-) -> Result<Vec<u8>, AflError>
-where
-    C: Corpus<I, R>,
-    FT: FeedbacksTuple<I>,
-    I: Input,
-    R: Rand,
-{
-    let state_bytes = postcard::to_allocvec(&state)?;
-    let corpus_bytes = postcard::to_allocvec(&corpus)?;
-    Ok(postcard::to_allocvec(&(state_bytes, corpus_bytes))?)
-}
-
-/// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
-pub fn deserialize_state_corpus<C, FT, I, R>(
-    state_corpus_serialized: &[u8],
-) -> Result<(State<C, FT, I, R>, C), AflError>
-where
-    C: Corpus<I, R>,
-    FT: FeedbacksTuple<I>,
-    I: Input,
-    R: Rand,
-{
-    let tuple: (Vec<u8>, Vec<u8>) = postcard::from_bytes(&state_corpus_serialized)?;
-    Ok((
-        postcard::from_bytes(&tuple.0)?,
-        postcard::from_bytes(&tuple.1)?,
-    ))
-}
 
 /// Ways to get random around here
 pub trait Rand: Debug + Serialize {
