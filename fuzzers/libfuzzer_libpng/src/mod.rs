@@ -1,12 +1,10 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
-// extern crate libc;
-
 use std::{env, path::PathBuf};
 
 use afl::{
-    bolts::{shmem::AflShmem, tuples::tuple_list},
+    bolts::{shmem::AflShmem, tuples::tuple_list, serdeany::RegistryBuilder},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
     events::SimpleStats,
@@ -14,9 +12,10 @@ use afl::{
     feedbacks::MaxMapFeedback,
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
+    mutators::token_mutations::TokensMetadata,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, State},
+    state::{HasCorpus, HasMetadata, State},
     utils::StdRand,
     AflError, Fuzzer, StdFuzzer,
 };
@@ -43,6 +42,7 @@ where
     E: Executor<I>,
     I: Input,
 {
+    // println!("{:?}", buf);
     unsafe {
         LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len());
     }
@@ -51,6 +51,10 @@ where
 
 /// The main fn, parsing parameters, and starting the fuzzer
 pub fn main() {
+    // Registry the metadata types used in this fuzzer
+    RegistryBuilder::register::<TokensMetadata>();
+    RegistryBuilder::finalize();
+
     println!(
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
@@ -64,16 +68,18 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
-    // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
+    // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
         setup_restarting_mgr::<_, _, _, _, AflShmem, _>(stats, broker_port)
             .expect("Failed to setup the restarter".into());
 
+    // Create an observation channel using the coverage map
     let edges_observer =
         StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
             __lafl_max_edges_size as usize
         });
 
+    // If not retsrating, create a State from scratch
     let mut state = state.unwrap_or(State::new(
         InMemoryCorpus::new(),
         tuple_list!(MaxMapFeedback::new_with_observer(
@@ -84,6 +90,20 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
 
     println!("We're a client, let's fuzz :)");
 
+    // Create a PNG dictionary of not existing
+    if state.metadata().get::<TokensMetadata>().is_none() {
+        state.add_metadata(TokensMetadata::new(
+            vec![
+                vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
+                "IHDR".as_bytes().to_vec(),
+                "IDAT".as_bytes().to_vec(),
+                "PLTE".as_bytes().to_vec(),
+                "IEND".as_bytes().to_vec(),
+            ]
+        ));
+    }
+
+    // Setup a basic mutator with a mutational stage
     let mutator = HavocBytesMutator::new_default();
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
@@ -98,7 +118,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
     );
 
     // The actual target run starts here.
-
     // Call LLVMFUzzerInitialize() if present.
     unsafe {
         if afl_libfuzzer_init() == -1 {

@@ -488,10 +488,7 @@ where
     R: Rand,
 {
     let size = input.bytes().len();
-    if size == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-    let off = rand.below(size as u64) as usize;
+    let off = rand.below((size +1) as u64) as usize;
     let mut len = 1 + rand.below(16) as usize;
 
     if size + len > mutator.max_size() {
@@ -520,10 +517,7 @@ where
     R: Rand,
 {
     let size = input.bytes().len();
-    if size == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-    let off = rand.below(size as u64) as usize;
+    let off = rand.below((size +1) as u64) as usize;
     let mut len = 1 + rand.below(16) as usize;
 
     if size + len > mutator.max_size() {
@@ -555,10 +549,7 @@ where
     R: Rand,
 {
     let size = input.bytes().len();
-    if size == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-    let off = rand.below(size as u64) as usize;
+    let off = rand.below((size +1) as u64) as usize;
     let mut len = 1 + rand.below(16) as usize;
 
     if size + len > mutator.max_size() {
@@ -678,12 +669,13 @@ where
 
 /// Crossover insert mutation
 pub fn mutation_crossover_insert<C, I, M, R, S>(
-    _: &mut M,
+    mutator: &mut M,
     rand: &mut R,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
+    M: HasMaxSize,
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
     R: Rand,
@@ -705,12 +697,20 @@ where
         return Ok(MutationResult::Skipped);
     }
 
-    let from = rand.below(other_size as u64 - 1) as usize;
-    let to = rand.below(size as u64 - 1) as usize;
-    let len = rand.below((other_size - from) as u64) as usize;
+    let from = rand.below(other_size as u64) as usize;
+    let to = rand.below(size as u64) as usize;
+    let mut len = rand.below((other_size - from) as u64) as usize;
+    
+    if size + len > mutator.max_size() {
+        if mutator.max_size() > size {
+            len = mutator.max_size() - size;
+        } else {
+            return Ok(MutationResult::Skipped);
+        }
+    }
 
-    input.bytes_mut().resize(max(size, to + (2 * len) + 1), 0);
-    buffer_self_copy(input.bytes_mut(), to, to + len, len);
+    input.bytes_mut().resize(size + len, 0);
+    buffer_self_copy(input.bytes_mut(), to, to + len, size - to);
     buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
 
     Ok(MutationResult::Mutated)
@@ -745,9 +745,9 @@ where
         return Ok(MutationResult::Skipped);
     }
 
-    let from = rand.below(other_size as u64 - 1) as usize;
+    let from = rand.below(other_size as u64) as usize;
     let len = rand.below(min(other_size - from, size) as u64) as usize;
-    let to = rand.below((size - len) as u64 - 1) as usize;
+    let to = rand.below((size - len) as u64) as usize;
 
     buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
 

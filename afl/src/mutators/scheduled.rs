@@ -303,9 +303,8 @@ where
         scheduled.add_mutation(mutation_bytescopy);
         scheduled.add_mutation(mutation_bytesswap);
 
-        /* TODO
         scheduled.add_mutation(mutation_tokeninsert);
-        scheduled.add_mutation(mutation_tokenreplace);
+        /*scheduled.add_mutation(mutation_tokenreplace);
         */
 
         scheduled.add_mutation(mutation_crossover_insert);

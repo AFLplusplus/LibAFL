@@ -30,6 +30,14 @@ impl SerdeAny for TokensMetadata {
     }
 }
 
+impl TokensMetadata {
+    pub fn new(tokens: Vec<Vec<u8>>) -> Self {
+        Self {
+            tokens: tokens
+        }
+    }
+}
+
 /// Insert a dictionary token
 pub fn mutation_tokeninsert<I, M, R, S>(
     mutator: &mut M,
@@ -56,36 +64,43 @@ where
         return Ok(MutationResult::Skipped);
     }
     let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
-    let token_len = token.len();
+    
     let size = input.bytes().len();
-    let off = if size == 0 {
-        0
-    } else {
-        rand.below(core::cmp::min(
-            size as u64,
-            (mutator.max_size() - token_len) as u64,
-        )) as usize
-    } as usize;
+    let off = rand.below((size +1) as u64) as usize;
+    let mut len = token.len();
 
-    input.bytes_mut().resize(size + token_len, 0);
-    buffer_copy(input.bytes_mut(), token, 0, off, size);
+    if size + len > mutator.max_size() {
+        if mutator.max_size() > size {
+            len = mutator.max_size() - size;
+        } else {
+            return Ok(MutationResult::Skipped);
+        }
+    }
 
+    input.bytes_mut().resize(size + len, 0);
+    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+    buffer_copy(input.bytes_mut(), token, 0, off, len);
+    
     Ok(MutationResult::Mutated)
 }
 
 /// Overwrite with a dictionary token
 pub fn mutation_tokenreplace<I, M, R, S>(
-    mutator: &mut M,
+    _: &mut M,
     rand: &mut R,
     state: &S,
     input: &mut I,
 ) -> Result<MutationResult, AflError>
 where
-    M: HasMaxSize,
     I: Input + HasBytesVec,
     R: Rand,
     S: HasMetadata,
 {
+    let size = input.bytes().len();
+    if size == 0 {
+        return Ok(MutationResult::Skipped);
+    }
+
     let meta;
     match state.metadata().get::<TokensMetadata>() {
         Some(t) => {
@@ -99,11 +114,15 @@ where
         return Ok(MutationResult::Skipped);
     }
     let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
-    let token_len = token.len();
-    let size = input.bytes().len();
-    let off = rand.below((mutator.max_size() - token_len) as u64) as usize;
+    
+    let off = rand.below(size as u64) as usize;
+    
+    let mut len = token.len();
+    if off + len > size {
+        len = size - off;
+    }
 
-    buffer_copy(input.bytes_mut(), token, 0, off, size);
+    buffer_copy(input.bytes_mut(), token, 0, off, len);
 
     Ok(MutationResult::Mutated)
 }
