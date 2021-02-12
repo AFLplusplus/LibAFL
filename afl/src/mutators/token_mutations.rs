@@ -69,7 +69,7 @@ where
 
     input.bytes_mut().resize(size + token_len, 0);
     buffer_copy(input.bytes_mut(), token, 0, off, size);
-    
+
     Ok(MutationResult::Mutated)
 }
 

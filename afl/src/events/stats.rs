@@ -26,7 +26,9 @@ pub struct ClientStats {
 impl ClientStats {
     /// We got a new information about executions for this client, insert them.
     pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
-        let diff = cur_time.checked_sub(self.last_window_time).map_or(0, |d| d.as_secs());
+        let diff = cur_time
+            .checked_sub(self.last_window_time)
+            .map_or(0, |d| d.as_secs());
         if diff > CLIENT_STATS_TIME_WINDOW_SECS {
             let _ = self.execs_per_sec(cur_time);
             self.last_window_time = cur_time;
@@ -46,7 +48,9 @@ impl ClientStats {
             return 0;
         }
 
-        let elapsed = cur_time.checked_sub(self.last_window_time).map_or(0, |d| d.as_secs());
+        let elapsed = cur_time
+            .checked_sub(self.last_window_time)
+            .map_or(0, |d| d.as_secs());
         if elapsed == 0 {
             return self.last_execs_per_sec as u64;
         }
@@ -62,7 +66,8 @@ impl ClientStats {
             self.last_execs_per_sec = cur_avg;
         }
 
-        self.last_execs_per_sec = self.last_execs_per_sec * (1.0 - 1.0 / 16.0) + cur_avg * (1.0 / 16.0);
+        self.last_execs_per_sec =
+            self.last_execs_per_sec * (1.0 - 1.0 / 16.0) + cur_avg * (1.0 / 16.0);
         self.last_execs_per_sec as u64
     }
 }

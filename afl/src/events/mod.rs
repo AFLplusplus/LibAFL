@@ -578,7 +578,7 @@ where
                 corpus_size,
                 observers_buf: _,
                 time,
-                executions
+                executions,
             } => {
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_corpus_size(*corpus_size as u64);
@@ -639,7 +639,7 @@ where
                 corpus_size: _,
                 observers_buf,
                 time: _,
-                executions: _
+                executions: _,
             } => {
                 // TODO: here u should match client_config, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
@@ -977,7 +977,7 @@ mod tests {
             corpus_size: 123,
             client_config: "conf".into(),
             time: current_time(),
-            executions: 0
+            executions: 0,
         };
 
         let serialized = postcard::to_allocvec(&e).unwrap();
@@ -990,7 +990,7 @@ mod tests {
                 corpus_size: _,
                 client_config: _,
                 time: _,
-                executions: _
+                executions: _,
             } => {
                 let o = map.deserialize(&observers_buf).unwrap();
                 let test_observer = o.match_name_type::<StdMapObserver<u32>>("test").unwrap();

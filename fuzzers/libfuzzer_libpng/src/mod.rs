@@ -13,7 +13,7 @@ use afl::{
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     inputs::Input,
-    mutators::{scheduled::HavocBytesMutator, HasMaxSize},
+    mutators::scheduled::HavocBytesMutator,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, State},
@@ -51,7 +51,10 @@ where
 
 /// The main fn, parsing parameters, and starting the fuzzer
 pub fn main() {
-    println!("Workdir: {:?}", env::current_dir().unwrap().to_string_lossy().to_string());
+    println!(
+        "Workdir: {:?}",
+        env::current_dir().unwrap().to_string_lossy().to_string()
+    );
     fuzz(vec![PathBuf::from("./corpus")], 1337).expect("An error occurred while fuzzing");
 }
 
@@ -81,8 +84,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
 
     println!("We're a client, let's fuzz :)");
 
-    let mut mutator = HavocBytesMutator::new_default();
-    mutator.set_max_size(4096);
+    let mutator = HavocBytesMutator::new_default();
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
@@ -103,12 +105,15 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
             println!("Warning: LLVMFuzzerInitialize failed with -1")
         }
     }
-    
+
     // in case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut executor, &mut restarting_mgr, &corpus_dirs)
-            .expect(&format!("Failed to load initial corpus at {:?}", &corpus_dirs));
+            .expect(&format!(
+                "Failed to load initial corpus at {:?}",
+                &corpus_dirs
+            ));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

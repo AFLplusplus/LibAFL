@@ -504,7 +504,7 @@ where
 
     input.bytes_mut().resize(size + len, 0);
     buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-    
+
     Ok(MutationResult::Mutated)
 }
 
@@ -533,7 +533,7 @@ where
             return Ok(MutationResult::Skipped);
         }
     }
-    
+
     let val = input.bytes()[rand.below(size as u64) as usize];
 
     input.bytes_mut().resize(size + len, 0);
@@ -568,7 +568,7 @@ where
             return Ok(MutationResult::Skipped);
         }
     }
-    
+
     let val = rand.below(256) as u8;
 
     input.bytes_mut().resize(size + len, 0);
@@ -618,7 +618,7 @@ where
     }
     let off = rand.below(size as u64) as usize;
     let len = 1 + rand.below(min(16, size - off) as u64) as usize;
-    
+
     let val = rand.below(256) as u8;
 
     buffer_set(input.bytes_mut(), off, len, val);
@@ -705,8 +705,8 @@ where
         return Ok(MutationResult::Skipped);
     }
 
-    let from = rand.below(other_size as u64 -1) as usize;
-    let to = rand.below(size as u64 -1) as usize;
+    let from = rand.below(other_size as u64 - 1) as usize;
+    let to = rand.below(size as u64 - 1) as usize;
     let len = rand.below((other_size - from) as u64) as usize;
 
     input.bytes_mut().resize(max(size, to + (2 * len) + 1), 0);
@@ -745,9 +745,9 @@ where
         return Ok(MutationResult::Skipped);
     }
 
-    let from = rand.below(other_size as u64 -1) as usize;
+    let from = rand.below(other_size as u64 - 1) as usize;
     let len = rand.below(min(other_size - from, size) as u64) as usize;
-    let to = rand.below((size - len) as u64 -1) as usize;
+    let to = rand.below((size - len) as u64 - 1) as usize;
 
     buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
 
