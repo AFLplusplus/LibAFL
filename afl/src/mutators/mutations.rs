@@ -654,6 +654,7 @@ where
     let tmp = input.bytes()[first..=first + len].to_vec();
     self_mem_move(input.bytes_mut(), second, first, len);
     mem_move(input.bytes_mut(), &tmp, 0, second, len);
+
     Ok(MutationResult::Mutated)
 }
 
@@ -673,7 +674,87 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     (first_diff, last_diff)
 }
 
-/// Splicing mutator
+/// Crossover insert mutation
+pub fn mutation_crossover_insert<C, I, M, R, S>(
+    _: &mut M,
+    rand: &mut R,
+    state: &mut S,
+    input: &mut I,
+) -> Result<MutationResult, AflError>
+where
+    C: Corpus<I, R>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasCorpus<C, I, R>,
+{
+    let size = input.bytes().len();
+
+    // We don't want to use the testcase we're already using for splicing
+    let (other_testcase, idx) = state.corpus().random_entry(rand)?;
+    if idx == state.corpus().current_testcase().1 {
+        return Ok(MutationResult::Skipped);
+    }
+
+    let mut other_ref = other_testcase.borrow_mut();
+    let other = other_ref.load_input()?;
+
+    let other_size = other.bytes().len();
+    if other_size < 2 {
+        return Ok(MutationResult::Skipped);
+    }
+
+    let from = rand.below(other_size as u64 -1) as usize;
+    let to = rand.below(size as u64 -1) as usize;
+    let len = rand.below((other_size - from) as u64) as usize;
+
+    input.bytes_mut().resize(max(size, to + (2 * len) + 1), 0);
+    self_mem_move(input.bytes_mut(), to, to + len, len);
+    mem_move(input.bytes_mut(), other.bytes(), from, to, len);
+
+    Ok(MutationResult::Mutated)
+}
+
+/// Crossover insert mutation
+pub fn mutation_crossover_replace<C, I, M, R, S>(
+    _: &mut M,
+    rand: &mut R,
+    state: &mut S,
+    input: &mut I,
+) -> Result<MutationResult, AflError>
+where
+    C: Corpus<I, R>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasCorpus<C, I, R>,
+{
+    let size = input.bytes().len();
+
+    // We don't want to use the testcase we're already using for splicing
+    let (other_testcase, idx) = state.corpus().random_entry(rand)?;
+    if idx == state.corpus().current_testcase().1 {
+        return Ok(MutationResult::Skipped);
+    }
+
+    let mut other_ref = other_testcase.borrow_mut();
+    let other = other_ref.load_input()?;
+
+    let other_size = other.bytes().len();
+    if other_size < 2 {
+        return Ok(MutationResult::Skipped);
+    }
+
+    let from = rand.below(other_size as u64 -1) as usize;
+    let len = rand.below(core::cmp::min(other_size - from, size) as u64) as usize;
+    let to = rand.below(input.bytes().len() as u64) as usize;
+
+    input.bytes_mut().resize(size + len, 0);
+    self_mem_move(input.bytes_mut(), to, to + len, len);
+    mem_move(input.bytes_mut(), other.bytes(), from, to, len);
+
+    Ok(MutationResult::Mutated)
+}
+
+/// Splicing mutation from AFL
 pub fn mutation_splice<C, I, M, R, S>(
     _: &mut M,
     rand: &mut R,
@@ -691,14 +772,14 @@ where
     if idx == state.corpus().current_testcase().1 {
         return Ok(MutationResult::Skipped);
     }
-    // println!("Input: {:?}, other input: {:?}", input.bytes(), other.bytes());
+
     let mut other_ref = other_testcase.borrow_mut();
     let other = other_ref.load_input()?;
 
     let mut counter = 0;
     let (first_diff, last_diff) = loop {
         let (f, l) = locate_diffs(input.bytes(), other.bytes());
-        // println!("Diffs were between {} and {}", f, l);
+
         if f != l && f >= 0 && l >= 2 {
             break (f, l);
         }
@@ -709,14 +790,9 @@ where
     };
 
     let split_at = rand.between(first_diff as u64, last_diff as u64) as usize;
-
-    // println!("Splicing at {}", split_at);
-
     input
         .bytes_mut()
         .splice(split_at.., other.bytes()[split_at..].iter().cloned());
-
-    // println!("Splice result: {:?}, input is now: {:?}", split_result, input.bytes());
 
     Ok(MutationResult::Mutated)
 }

@@ -308,7 +308,7 @@ where
         scheduled.add_mutation(mutation_tokenreplace);
         */
         
-        scheduled.add_mutation(mutation_splice);
+        scheduled.add_mutation(mutation_crossover_insert);
 
         HavocBytesMutator {
             scheduled: scheduled,
