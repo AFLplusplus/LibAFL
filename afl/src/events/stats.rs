@@ -20,19 +20,19 @@ pub struct ClientStats {
     /// The last time we got this information
     pub last_window_time: time::Duration,
     /// The last executions per sec
-    pub last_execs_per_sec: u64,
+    pub last_execs_per_sec: f32,
 }
 
 impl ClientStats {
     /// We got a new information about executions for this client, insert them.
     pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
-        self.executions = executions;
         let diff = cur_time.checked_sub(self.last_window_time).map_or(0, |d| d.as_secs());
         if diff > CLIENT_STATS_TIME_WINDOW_SECS {
-            self.last_execs_per_sec = self.execs_per_sec(cur_time);
+            let _ = self.execs_per_sec(cur_time);
             self.last_window_time = cur_time;
-            self.last_window_executions = executions;
+            self.last_window_executions = self.executions;
         }
+        self.executions = executions;
     }
 
     /// We got a new information about corpus size for this client, insert them.
@@ -41,17 +41,29 @@ impl ClientStats {
     }
 
     /// Get the calculated executions per second for this client
-    pub fn execs_per_sec(&self, cur_time: time::Duration) -> u64 {
+    pub fn execs_per_sec(&mut self, cur_time: time::Duration) -> u64 {
         if self.executions == 0 {
             return 0;
         }
-        let secs = (cur_time - self.last_window_time).as_secs();
-        if secs == 0 {
-            self.last_execs_per_sec
-        } else {
-            let diff = self.executions - self.last_window_executions;
-            diff / secs
+
+        let elapsed = cur_time.checked_sub(self.last_window_time).map_or(0, |d| d.as_secs());
+        if elapsed == 0 {
+            return self.last_execs_per_sec as u64;
         }
+
+        let cur_avg = ((self.executions - self.last_window_executions) as f32) / (elapsed as f32);
+        if self.last_window_executions == 0 {
+            self.last_execs_per_sec = cur_avg;
+            return self.last_execs_per_sec as u64;
+        }
+
+        // If there is a dramatic (5x+) jump in speed, reset the indicator more quickly
+        if cur_avg * 5.0 < self.last_execs_per_sec || cur_avg / 5.0 > self.last_execs_per_sec {
+            self.last_execs_per_sec = cur_avg;
+        }
+
+        self.last_execs_per_sec = self.last_execs_per_sec * (1.0 - 1.0 / 16.0) + cur_avg * (1.0 / 16.0);
+        self.last_execs_per_sec as u64
     }
 }
 
@@ -88,8 +100,8 @@ pub trait Stats {
     #[inline]
     fn execs_per_sec(&mut self) -> u64 {
         let cur_time = current_time();
-        self.client_stats()
-            .iter()
+        self.client_stats_mut()
+            .iter_mut()
             .fold(0u64, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 

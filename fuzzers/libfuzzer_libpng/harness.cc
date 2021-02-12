@@ -20,7 +20,7 @@
 
 #include <vector>
 
-#define HAS_BUG 1
+//#define HAS_BUG 1
 
 #define PNG_INTERNAL
 #include "png.h"
