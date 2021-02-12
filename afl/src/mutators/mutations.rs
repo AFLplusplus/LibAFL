@@ -120,7 +120,7 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
 #[inline]
 fn buffer_set(data: &mut [u8], from: usize, len: usize, val: u8) {
     debug_assert!(from + len <= data.len());
-    for p in &mut data[from..from + len] {
+    for p in &mut data[from..(from + len)] {
         *p = val
     }
 }
@@ -491,12 +491,20 @@ where
     if size == 0 {
         return Ok(MutationResult::Skipped);
     }
-    let off = rand.below(size as u64 - 1) as usize;
-    let len = rand.below(min(16, mutator.max_size() as u64 - 1) + 1) as usize;
+    let off = rand.below(size as u64) as usize;
+    let mut len = 1 + rand.below(16) as usize;
+
+    if size + len > mutator.max_size() {
+        if mutator.max_size() > size {
+            len = mutator.max_size() - size;
+        } else {
+            return Ok(MutationResult::Skipped);
+        }
+    }
 
     input.bytes_mut().resize(size + len, 0);
-    buffer_self_copy(input.bytes_mut(), 0, 0 + off, len);
-
+    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+    
     Ok(MutationResult::Mutated)
 }
 
@@ -511,21 +519,25 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    let mut size = input.bytes().len();
+    let size = input.bytes().len();
     if size == 0 {
-        // Generate random bytes if we're empty.
-        input
-            .bytes_mut()
-            .append(&mut rand.next().to_be_bytes().to_vec());
-        size = input.bytes().len();
+        return Ok(MutationResult::Skipped);
     }
-    let off = rand.below(size as u64 - 1) as usize;
-    let len = rand.below(max(16, mutator.max_size() as u64)) as usize;
+    let off = rand.below(size as u64) as usize;
+    let mut len = 1 + rand.below(16) as usize;
 
+    if size + len > mutator.max_size() {
+        if mutator.max_size() > size {
+            len = mutator.max_size() - size;
+        } else {
+            return Ok(MutationResult::Skipped);
+        }
+    }
+    
     let val = input.bytes()[rand.below(size as u64) as usize];
 
-    input.bytes_mut().resize(max(size, off + (2 * len) + 1), 0);
-    buffer_self_copy(input.bytes_mut(), off, off + len, len);
+    input.bytes_mut().resize(size + len, 0);
+    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
     buffer_set(input.bytes_mut(), off, len, val);
 
     Ok(MutationResult::Mutated)
@@ -542,20 +554,25 @@ where
     I: Input + HasBytesVec,
     R: Rand,
 {
-    let mut size = input.bytes().len();
+    let size = input.bytes().len();
     if size == 0 {
-        input
-            .bytes_mut()
-            .append(&mut rand.next().to_le_bytes().to_vec());
-        size = input.bytes().len();
+        return Ok(MutationResult::Skipped);
     }
-    let off = rand.below(size as u64 - 1) as usize;
-    let len = rand.below(core::cmp::min(16, mutator.max_size() as u64)) as usize;
+    let off = rand.below(size as u64) as usize;
+    let mut len = 1 + rand.below(16) as usize;
 
+    if size + len > mutator.max_size() {
+        if mutator.max_size() > size {
+            len = mutator.max_size() - size;
+        } else {
+            return Ok(MutationResult::Skipped);
+        }
+    }
+    
     let val = rand.below(256) as u8;
 
-    input.bytes_mut().resize(max(size, off + (2 * len) + 1), 0);
-    buffer_self_copy(input.bytes_mut(), off, off + len, len);
+    input.bytes_mut().resize(size + len, 0);
+    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
     buffer_set(input.bytes_mut(), off, len, val);
 
     Ok(MutationResult::Mutated)
@@ -575,16 +592,12 @@ where
     if size == 0 {
         return Ok(MutationResult::Skipped);
     }
+    let off = rand.below(size as u64) as usize;
+    let len = 1 + rand.below(min(16, size - off) as u64) as usize;
 
     let val = input.bytes()[rand.below(size as u64) as usize];
-    let start = if size == 1 {
-        0
-    } else {
-        rand.below(size as u64 - 1) as usize
-    };
 
-    let end = rand.between(start as u64, size as u64) as usize;
-    buffer_set(input.bytes_mut(), start, end - start, val);
+    buffer_set(input.bytes_mut(), off, len, val);
 
     Ok(MutationResult::Mutated)
 }
@@ -603,16 +616,12 @@ where
     if size == 0 {
         return Ok(MutationResult::Skipped);
     }
-
+    let off = rand.below(size as u64) as usize;
+    let len = 1 + rand.below(min(16, size - off) as u64) as usize;
+    
     let val = rand.below(256) as u8;
-    let start = if size == 1 {
-        0
-    } else {
-        rand.below(size as u64 - 1) as usize
-    };
 
-    let len = rand.below((size - start) as u64) as usize;
-    buffer_set(input.bytes_mut(), start, len, val);
+    buffer_set(input.bytes_mut(), off, len, val);
 
     Ok(MutationResult::Mutated)
 }
@@ -632,9 +641,9 @@ where
         return Ok(MutationResult::Skipped);
     }
 
-    let from = rand.below(input.bytes().len() as u64 - 1) as usize;
-    let to = rand.below(input.bytes().len() as u64 - 1) as usize;
-    let len = rand.below((size - core::cmp::max(from, to)) as u64) as usize;
+    let from = rand.below(input.bytes().len() as u64) as usize;
+    let to = rand.below(input.bytes().len() as u64) as usize;
+    let len = 1 + rand.below((size - max(from, to)) as u64) as usize;
 
     buffer_self_copy(input.bytes_mut(), from, to, len);
 
@@ -656,11 +665,11 @@ where
         return Ok(MutationResult::Skipped);
     }
 
-    let first = rand.below(input.bytes().len() as u64 - 1) as usize;
-    let second = rand.below(input.bytes().len() as u64 - 1) as usize;
-    let len = max(rand.below((size - max(first, second)) as u64) as usize, 1);
+    let first = rand.below(input.bytes().len() as u64) as usize;
+    let second = rand.below(input.bytes().len() as u64) as usize;
+    let len = 1 + rand.below((size - max(first, second)) as u64) as usize;
 
-    let tmp = input.bytes()[first..=first + len].to_vec();
+    let tmp = input.bytes()[first..(first + len)].to_vec();
     buffer_self_copy(input.bytes_mut(), second, first, len);
     buffer_copy(input.bytes_mut(), &tmp, 0, second, len);
 

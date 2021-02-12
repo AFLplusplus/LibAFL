@@ -1,12 +1,8 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
-#[macro_use]
-extern crate clap;
-
 // extern crate libc;
 
-use clap::{App, Arg};
 use std::{env, path::PathBuf};
 
 use afl::{
@@ -55,69 +51,12 @@ where
 
 /// The main fn, parsing parameters, and starting the fuzzer
 pub fn main() {
-    let matches = App::new("libAFLrs fuzzer harness")
-        .about("libAFLrs fuzzer harness help options.")
-        .arg(
-            Arg::with_name("port")
-                .short("p")
-                .value_name("PORT")
-                .takes_value(true)
-                .help("Broker TCP port to use."),
-        )
-        .arg(
-            Arg::with_name("dictionary")
-                .short("x")
-                .value_name("DICTIONARY")
-                .takes_value(true)
-                .multiple(true)
-                .help("Dictionary file to use, can be specified multiple times."),
-        )
-        .arg(
-            Arg::with_name("statstime")
-                .short("T")
-                .value_name("STATSTIME")
-                .takes_value(true)
-                .help("How often to print statistics in seconds [default: 5, disable: 0]"),
-        )
-        .arg(Arg::with_name("workdir")
-                               .help("Where to write the corpus, also reads the data on start. If more than one is supplied the first will be the work directory, all others will just be initially read from.")
-                                .multiple(true)
-                                .value_name("WORKDIR")
-                               )
-        .get_matches();
-
-    let _ = value_t!(matches, "statstime", u32).unwrap_or(5);
-    let broker_port = value_t!(matches, "port", u16).unwrap_or(1337);
-
-    let workdir = if matches.is_present("workdir") {
-        matches.value_of("workdir").unwrap().to_string()
-    } else {
-        env::current_dir().unwrap().to_string_lossy().to_string()
-    };
-
-    let mut dictionary: Option<Vec<PathBuf>> = None;
-
-    if matches.is_present("dictionary") {
-        dictionary = Some(values_t!(matches, "dictionary", PathBuf).unwrap_or_else(|e| e.exit()));
-    }
-
-    let mut input: Option<Vec<PathBuf>> = None;
-    if matches.is_present("workdir") {
-        input = Some(values_t!(matches, "workdir", PathBuf).unwrap_or_else(|e| e.exit()));
-    }
-
-    if dictionary != None || input != None {
-        println!("Information: the first process started is the broker and only processes the \'-p PORT\' option if present.");
-    }
-
-    println!("Workdir: {:?}", workdir);
-
-    fuzz(Some(vec![PathBuf::from("./in1")]), broker_port).expect("An error occurred while fuzzing");
-    //fuzz(input, broker_port).expect("An error occurred while fuzzing");
+    println!("Workdir: {:?}", env::current_dir().unwrap().to_string_lossy().to_string());
+    fuzz(vec![PathBuf::from("./corpus")], 1337).expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
-fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
+fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
@@ -165,36 +104,13 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
         }
     }
     
-    /*
-    // TODO close fds in a rusty way
-    unsafe {
-      let null_fname = std::ffi::CString::new("/dev/null").unwrap();
-      let null_file = libc::open(null_fname.as_ptr(), libc::O_RDWR);
-      libc::dup2(null_file, 1);
-      libc::dup2(null_file, 2);
-    }
-    */
-
     // in case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
-        match input {
-            Some(x) => state
-                .load_initial_inputs(&mut executor, &mut restarting_mgr, &x)
-                .expect(&format!("Failed to load initial corpus at {:?}", &x)),
-            None => (),
-        }
+        state
+            .load_initial_inputs(&mut executor, &mut restarting_mgr, &corpus_dirs)
+            .expect(&format!("Failed to load initial corpus at {:?}", &corpus_dirs));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
-    /*
-    if state.corpus().count() < 1 {
-        println!("Generating random inputs");
-        let mut generator = RandPrintablesGenerator::new(32);
-        state
-            .generate_initial_inputs(&mut rand, &mut executor, &mut generator, &mut restarting_mgr, 4)
-            .expect("Failed to generate initial inputs");
-        println!("We generated {} inputs.", state.corpus().count());
-    }
-    */
 
     fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut restarting_mgr)
 }
