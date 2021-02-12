@@ -383,6 +383,95 @@ where
     }
 }
 
+
+/// Map observer with hitcounts postprocessing
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "M: serde::de::DeserializeOwned")]
+pub struct HitcountsMapObserver<M>
+where
+    M: MapObserver<u8>,
+{
+    base: M,
+}
+
+static COUNT_CLASS_LOOKUP: [u8; 256] = [0, 1, 2, 0, 8, 8, 8, 8, 16, 16, 16, 16, 16, 16, 16, 16, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128];
+
+impl<M> Observer for HitcountsMapObserver<M>
+where
+    M: MapObserver<u8>,
+{
+    #[inline]
+    fn pre_exec(&mut self) -> Result<(), AflError> {
+        self.reset_map()
+    }
+
+    #[inline]
+    fn post_exec(&mut self) -> Result<(), AflError> {
+        for x in self.map_mut().iter_mut() {
+            *x = COUNT_CLASS_LOOKUP[*x as usize];
+        }
+        Ok(())
+    }
+}
+
+impl<M> Named for HitcountsMapObserver<M>
+where
+    M: MapObserver<u8>,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.base.name()
+    }
+}
+
+impl<M> MapObserver<u8> for HitcountsMapObserver<M>
+where
+    M: MapObserver<u8>,
+{
+    #[inline]
+    fn map(&self) -> &[u8] {
+        self.base.map()
+    }
+
+    #[inline]
+    fn map_mut(&mut self) -> &mut [u8] {
+        self.base.map_mut()
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.base.usable_count()
+    }
+
+    #[inline]
+    fn initial(&self) -> u8 {
+        self.base.initial()
+    }
+
+    #[inline]
+    fn initial_mut(&mut self) -> &mut u8 {
+        self.base.initial_mut()
+    }
+
+    #[inline]
+    fn set_initial(&mut self, initial: u8) {
+        self.base.set_initial(initial);
+    }
+}
+
+impl<M> HitcountsMapObserver<M>
+where
+    M: MapObserver<u8>,
+{
+    /// Creates a new MapObserver
+    pub fn new(base: M) -> Self {
+        Self {
+            base: base,
+        }
+    }
+}
+
+
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
