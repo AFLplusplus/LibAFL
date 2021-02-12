@@ -4,7 +4,7 @@
 use std::{env, path::PathBuf};
 
 use afl::{
-    bolts::{shmem::AflShmem, tuples::tuple_list, serdeany::RegistryBuilder},
+    bolts::{serdeany::RegistryBuilder, shmem::AflShmem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
     events::SimpleStats,
@@ -92,15 +92,13 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
 
     // Create a PNG dictionary of not existing
     if state.metadata().get::<TokensMetadata>().is_none() {
-        state.add_metadata(TokensMetadata::new(
-            vec![
-                vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
-                "IHDR".as_bytes().to_vec(),
-                "IDAT".as_bytes().to_vec(),
-                "PLTE".as_bytes().to_vec(),
-                "IEND".as_bytes().to_vec(),
-            ]
-        ));
+        state.add_metadata(TokensMetadata::new(vec![
+            vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
+            "IHDR".as_bytes().to_vec(),
+            "IDAT".as_bytes().to_vec(),
+            "PLTE".as_bytes().to_vec(),
+            "IEND".as_bytes().to_vec(),
+        ]));
     }
 
     // Setup a basic mutator with a mutational stage

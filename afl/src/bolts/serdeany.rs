@@ -18,7 +18,7 @@ pub fn unpack_type_id(id: TypeId) -> u64 {
     unsafe { *(&id as *const _ as *const u64) }
 }
 
-/// An any object
+/// A (de)serializable Any trait
 pub trait SerdeAny: Any + erased_serde::Serialize {
     /// returns this as Any trait
     fn as_any(&self) -> &dyn Any;
@@ -142,8 +142,12 @@ macro_rules! create_serde_registry_for_trait {
                 finalized: false,
             };
 
+            /// This shugar must be used to register all the structs which
+            /// have trait objects that can be serialized and deserialized in the program
             pub struct RegistryBuilder {}
+
             impl RegistryBuilder {
+                /// Register a given struct type for trait object (de)serialization
                 pub fn register<T>()
                 where
                     T: $trait_name + Serialize + serde::de::DeserializeOwned,
@@ -153,6 +157,7 @@ macro_rules! create_serde_registry_for_trait {
                     }
                 }
 
+                /// Finalize the registry, no more registrations are allowed after this call
                 pub fn finalize() {
                     unsafe {
                         REGISTRY.finalize();
@@ -161,6 +166,8 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             #[derive(Serialize, Deserialize)]
+            /// A (de)serializable anymap containing (de)serializable trait objects registered
+            /// in the registry
             pub struct SerdeAnyMap {
                 map: HashMap<u64, Box<dyn $trait_name>>,
             }

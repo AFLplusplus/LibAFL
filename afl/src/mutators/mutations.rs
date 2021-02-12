@@ -488,7 +488,7 @@ where
     R: Rand,
 {
     let size = input.bytes().len();
-    let off = rand.below((size +1) as u64) as usize;
+    let off = rand.below((size + 1) as u64) as usize;
     let mut len = 1 + rand.below(16) as usize;
 
     if size + len > mutator.max_size() {
@@ -517,7 +517,7 @@ where
     R: Rand,
 {
     let size = input.bytes().len();
-    let off = rand.below((size +1) as u64) as usize;
+    let off = rand.below((size + 1) as u64) as usize;
     let mut len = 1 + rand.below(16) as usize;
 
     if size + len > mutator.max_size() {
@@ -549,7 +549,7 @@ where
     R: Rand,
 {
     let size = input.bytes().len();
-    let off = rand.below((size +1) as u64) as usize;
+    let off = rand.below((size + 1) as u64) as usize;
     let mut len = 1 + rand.below(16) as usize;
 
     if size + len > mutator.max_size() {
@@ -700,7 +700,7 @@ where
     let from = rand.below(other_size as u64) as usize;
     let to = rand.below(size as u64) as usize;
     let mut len = rand.below((other_size - from) as u64) as usize;
-    
+
     if size + len > mutator.max_size() {
         if mutator.max_size() > size {
             len = mutator.max_size() - size;
