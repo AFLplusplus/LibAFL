@@ -68,6 +68,7 @@ where
     executions: usize,
     /// The corpus
     corpus: C,
+    // TODO use Duration
     /// At what time the fuzzing started
     start_time: u64,
     /// Metadata stored for this state by one of the components
@@ -217,20 +218,6 @@ where
     #[inline]
     pub fn set_start_time(&mut self, ms: u64) {
         self.start_time = ms
-    }
-    // TODO as this is done in the event manager, we can remove it
-    #[inline]
-    pub fn executions_over_seconds(&self) -> u64 {
-        let elapsed = current_milliseconds() - self.start_time();
-        if elapsed == 0 {
-            return 0;
-        }
-        let elapsed = elapsed / 1000;
-        if elapsed == 0 {
-            0
-        } else {
-            (self.executions() as u64) / elapsed
-        }
     }
 
     /// Returns vector of feebacks

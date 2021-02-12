@@ -101,13 +101,17 @@ where
         corpus_size: usize,
         /// The client config for this observers/testcase combination
         client_config: String,
+        /// The time of generation of the event
+        time: Duration,
+        /// The executions of this client
+        executions: usize,
     },
     /// New stats.
     UpdateStats {
+        /// The time of generation of the event
+        time: Duration,
         /// The executions of this client
         executions: usize,
-        /// The execs per sec for this client
-        execs_over_sec: u64,
         phantom: PhantomData<I>,
     },
     /// A crash was found
@@ -146,10 +150,12 @@ where
                 client_config: _,
                 corpus_size: _,
                 observers_buf: _,
+                time: _,
+                executions: _,
             } => "New Testcase",
             Event::UpdateStats {
+                time: _,
                 executions: _,
-                execs_over_sec: _,
                 phantom: _,
             } => "Stats",
             Event::Crash { input: _ } => "Crash",
@@ -332,18 +338,21 @@ where
                 client_config: _,
                 corpus_size,
                 observers_buf: _,
+                time,
+                executions,
             } => {
-                stats.client_stats_mut()[0].corpus_size = *corpus_size as u64;
+                stats.client_stats_mut()[0].update_corpus_size(*corpus_size as u64);
+                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
                 stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateStats {
+                time,
                 executions,
-                execs_over_sec: _,
                 phantom: _,
             } => {
                 // TODO: The stats buffer should be added on client add.
-                stats.client_stats_mut()[0].executions = *executions as u64;
+                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
                 stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
@@ -568,20 +577,23 @@ where
                 client_config: _,
                 corpus_size,
                 observers_buf: _,
+                time,
+                executions
             } => {
                 let client = stats.client_stats_mut_for(sender_id);
-                client.corpus_size = *corpus_size as u64;
+                client.update_corpus_size(*corpus_size as u64);
+                client.update_executions(*executions as u64, *time);
                 stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateStats {
+                time,
                 executions,
-                execs_over_sec: _,
                 phantom: _,
             } => {
                 // TODO: The stats buffer should be added on client add.
                 let client = stats.client_stats_mut_for(sender_id);
-                client.executions = *executions as u64;
+                client.update_executions(*executions as u64, *time);
                 stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
@@ -626,6 +638,8 @@ where
                 client_config: _,
                 corpus_size: _,
                 observers_buf,
+                time: _,
+                executions: _
             } => {
                 // TODO: here u should match client_config, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
@@ -946,6 +960,7 @@ mod tests {
     use crate::inputs::bytes::BytesInput;
     use crate::observers::ObserversTuple;
     use crate::observers::StdMapObserver;
+    use crate::utils::current_time;
 
     static mut MAP: [u32; 4] = [0; 4];
 
@@ -961,6 +976,8 @@ mod tests {
             observers_buf,
             corpus_size: 123,
             client_config: "conf".into(),
+            time: current_time(),
+            executions: 0
         };
 
         let serialized = postcard::to_allocvec(&e).unwrap();
@@ -972,6 +989,8 @@ mod tests {
                 observers_buf,
                 corpus_size: _,
                 client_config: _,
+                time: _,
+                executions: _
             } => {
                 let o = map.deserialize(&observers_buf).unwrap();
                 let test_observer = o.match_name_type::<StdMapObserver<u32>>("test").unwrap();

@@ -307,9 +307,7 @@ where
         scheduled.add_mutation(mutation_tokeninsert);
         scheduled.add_mutation(mutation_tokenreplace);
         */
-
-        // TODO: custom dictionary (redqueen etc.)
-
+        
         scheduled.add_mutation(mutation_splice);
 
         HavocBytesMutator {

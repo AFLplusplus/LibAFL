@@ -86,6 +86,8 @@ where
                         observers_buf,
                         corpus_size: state.corpus().count() + 1,
                         client_config: "TODO".into(),
+                        time: crate::utils::current_time(),
+                        executions: state.executions(),
                     },
                 )?;
                 state.add_if_interesting(input_mut, fitness)?;

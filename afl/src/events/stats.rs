@@ -27,11 +27,17 @@ impl ClientStats {
     /// We got a new information about executions for this client, insert them.
     pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
         self.executions = executions;
-        if (cur_time - self.last_window_time).as_secs() > CLIENT_STATS_TIME_WINDOW_SECS {
+        let diff = cur_time.checked_sub(self.last_window_time).map_or(0, |d| d.as_secs());
+        if diff > CLIENT_STATS_TIME_WINDOW_SECS {
             self.last_execs_per_sec = self.execs_per_sec(cur_time);
             self.last_window_time = cur_time;
             self.last_window_executions = executions;
         }
+    }
+
+    /// We got a new information about corpus size for this client, insert them.
+    pub fn update_corpus_size(&mut self, corpus_size: u64) {
+        self.corpus_size = corpus_size;
     }
 
     /// Get the calculated executions per second for this client

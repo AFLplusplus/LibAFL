@@ -32,7 +32,7 @@ use inputs::Input;
 use observers::ObserversTuple;
 use stages::StagesTuple;
 use state::{HasCorpus, State};
-use utils::{current_milliseconds, Rand};
+use utils::{current_milliseconds, current_time, Rand};
 
 #[cfg(feature = "std")]
 use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
@@ -86,7 +86,7 @@ where
                     state,
                     Event::UpdateStats {
                         executions: state.executions(),
-                        execs_over_sec: state.executions_over_seconds(),
+                        time: current_time(),
                         phantom: PhantomData,
                     },
                 )?
