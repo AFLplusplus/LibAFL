@@ -7,7 +7,6 @@ use afl::{
     bolts::{serdeany::RegistryBuilder, shmem::AflShmem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
-    events::SimpleStats,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
     inputs::Input,
@@ -16,6 +15,7 @@ use afl::{
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
+    stats::SimpleStats,
     utils::StdRand,
     AflError, Fuzzer, StdFuzzer,
 };

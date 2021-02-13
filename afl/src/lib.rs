@@ -20,6 +20,7 @@ pub mod mutators;
 pub mod observers;
 pub mod stages;
 pub mod state;
+pub mod stats;
 pub mod utils;
 
 use alloc::string::String;
