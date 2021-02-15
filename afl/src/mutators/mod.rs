@@ -41,7 +41,6 @@ where
         &mut self,
         _state: &mut S,
         _is_interesting: u32,
-        _input: &I,
         _stage_idx: i32,
     ) -> Result<(), AflError> {
         Ok(())

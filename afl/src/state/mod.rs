@@ -12,7 +12,7 @@ use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
     corpus::{Corpus, Testcase},
     events::{Event, EventManager, LogSeverity},
-    executors::{Executor, HasObservers, ExitKind},
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::FeedbacksTuple,
     generators::Generator,
     inputs::Input,
@@ -121,9 +121,12 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let fitness = self.evaluate_input(&input, executor, manager)?;
+                let (fitness, obj_fitness) = self.evaluate_input(&input, executor, manager)?;
                 if self.add_if_interesting(input, fitness)?.is_none() {
                     println!("File {:?} was not interesting, skipped.", &path);
+                }
+                if obj_fitness > 0 {
+                    println!("File {:?} is an objective, however will be not added as an initial testcase.", &path);
                 }
             } else if attr.is_dir() {
                 self.load_from_directory(executor, manager, &path)?;
@@ -246,13 +249,32 @@ where
         &mut self.feedbacks
     }
 
+    /// Returns vector of objective feebacks
+    #[inline]
+    pub fn objective_feedbacks(&self) -> &OFT {
+        &self.objective_feedbacks
+    }
+
+    /// Returns vector of objective feebacks (mutable)
+    #[inline]
+    pub fn objective_feedbacks_mut(&mut self) -> &mut OFT {
+        &mut self.objective_feedbacks
+    }
+
     // TODO move some of these, like evaluate_input, to FuzzingEngine
     #[inline]
-    pub fn is_interesting<OT>(&mut self, input: &I, observers: &OT, exit_kind: ExitKind) -> Result<u32, AflError>
+    pub fn is_interesting<OT>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+        exit_kind: ExitKind,
+    ) -> Result<u32, AflError>
     where
         OT: ObserversTuple,
     {
-        Ok(self.feedbacks_mut().is_interesting_all(input, observers, exit_kind)?)
+        Ok(self
+            .feedbacks_mut()
+            .is_interesting_all(input, observers, exit_kind)?)
     }
 
     /// Runs the input and triggers observers and feedback
@@ -261,7 +283,7 @@ where
         input: &I,
         executor: &mut E,
         event_mgr: &mut EM,
-    ) -> Result<u32, AflError>
+    ) -> Result<(u32, u32), AflError>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -278,8 +300,13 @@ where
         executor.post_exec_observers()?;
 
         let observers = executor.observers();
-        let fitness = self.feedbacks_mut().is_interesting_all(&input, observers, exit_kind)?;
-        Ok(fitness)
+        let objective_fitness =
+            self.objective_feedbacks
+                .is_interesting_all(&input, observers, exit_kind.clone())?;
+        let fitness = self
+            .feedbacks_mut()
+            .is_interesting_all(&input, observers, exit_kind)?;
+        Ok((fitness, objective_fitness))
     }
 
     /// Resets all current feedbacks
@@ -328,6 +355,64 @@ where
         }
     }
 
+    /// Adds this input to the objective corpus, if it's an objective
+    #[inline]
+    pub fn add_if_objective(&mut self, input: I, fitness: u32) -> Result<Option<usize>, AflError>
+    where
+        C: Corpus<I, R>,
+    {
+        if fitness > 0 {
+            let testcase = self.input_to_testcase(input, fitness)?;
+            Ok(Some(self.objective_corpus.add(testcase)))
+        } else {
+            self.discard_input(&input)?;
+            Ok(None)
+        }
+    }
+
+    /// Process one input, adding to the respective corpuses if needed and firing the right events
+    #[inline]
+    pub fn process_input<E, EM, OT>(
+        &mut self,
+        // TODO probably we can take a ref to input and pass a cloned one to add_if_interesting
+        input: I,
+        executor: &mut E,
+        manager: &mut EM,
+    ) -> Result<u32, AflError>
+    where
+        E: Executor<I> + HasObservers<OT>,
+        OT: ObserversTuple,
+        C: Corpus<I, R>,
+        EM: EventManager<I>,
+    {
+        let (fitness, obj_fitness) = self.evaluate_input(&input, executor, manager)?;
+        let observers = executor.observers();
+
+        if obj_fitness > 0 {
+            self.add_if_objective(input.clone(), obj_fitness)?;
+        }
+
+        if fitness > 0 {
+            let observers_buf = manager.serialize_observers(observers)?;
+            manager.fire(
+                self,
+                Event::NewTestcase {
+                    input: input.clone(),
+                    observers_buf,
+                    corpus_size: self.corpus().count() + 1,
+                    client_config: "TODO".into(),
+                    time: crate::utils::current_time(),
+                    executions: self.executions(),
+                },
+            )?;
+            self.add_if_interesting(input, fitness)?;
+        } else {
+            self.discard_input(&input)?;
+        }
+
+        Ok(fitness)
+    }
+
     pub fn generate_initial_inputs<G, E, OT, EM>(
         &mut self,
         rand: &mut R,
@@ -346,8 +431,8 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(rand)?;
-            let fitness = self.evaluate_input(&input, executor, manager)?;
-            if !self.add_if_interesting(input, fitness)?.is_none() {
+            let fitness = self.process_input(input, executor, manager)?;
+            if fitness > 0 {
                 added += 1;
             }
         }

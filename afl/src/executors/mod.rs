@@ -5,6 +5,7 @@ pub use inprocess::InProcessExecutor;
 #[cfg(feature = "runtime")]
 pub mod runtime;
 
+use core::cmp::PartialEq;
 use core::marker::PhantomData;
 
 use crate::{
@@ -20,7 +21,7 @@ use crate::{
 };
 
 /// How an execution finished.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExitKind {
     Ok,
     Crash,

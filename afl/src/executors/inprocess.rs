@@ -71,7 +71,12 @@ where
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs::<C, EM, FT, I, OC, OFT, OT, R>(_state, _event_mgr, _input);
+            set_oncrash_ptrs::<C, EM, FT, I, OC, OFT, OT, R>(
+                _state,
+                _event_mgr,
+                self.observers(),
+                _input,
+            );
         }
         Ok(())
     }
@@ -216,6 +221,7 @@ pub mod unix_signals {
     use crate::{
         corpus::Corpus,
         events::{Event, EventManager},
+        executors::ExitKind,
         feedbacks::FeedbacksTuple,
         inputs::Input,
         observers::ObserversTuple,
@@ -231,6 +237,7 @@ pub mod unix_signals {
     /// we should (tm) be okay with raw pointers here,
     static mut STATE_PTR: *mut c_void = ptr::null_mut();
     static mut EVENT_MGR_PTR: *mut c_void = ptr::null_mut();
+    static mut OBSERVERS_PTR: *const c_void = ptr::null();
     /// The (unsafe) pointer to the current inmem input, for the current run.
     /// This is neede for certain non-rust side effects, as well as unix signal handling.
     static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
@@ -260,6 +267,8 @@ pub mod unix_signals {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
             };
+
+            // TODO tell the parent to not restart
             std::process::exit(1);
         }
 
@@ -275,6 +284,18 @@ pub mod unix_signals {
             .as_mut()
             .unwrap();
         let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
+
+        let observers = (OBSERVERS_PTR as *const OT).as_ref().unwrap();
+        let obj_fitness = state
+            .objective_feedbacks_mut()
+            .is_interesting_all(&input, observers, ExitKind::Crash)
+            .expect("In crash handler objective feedbacks failure.".into());
+        if obj_fitness > 0 {
+            state
+                .add_if_objective(input.clone(), obj_fitness)
+                .expect("In crash handler objective corpus add failure.".into());
+        }
+
         mgr.fire(
             state,
             Event::Crash {
@@ -323,6 +344,17 @@ pub mod unix_signals {
             .unwrap();
         let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
 
+        let observers = (OBSERVERS_PTR as *const OT).as_ref().unwrap();
+        let obj_fitness = state
+            .objective_feedbacks_mut()
+            .is_interesting_all(&input, observers, ExitKind::Timeout)
+            .expect("In timeout handler objective feedbacks failure.".into());
+        if obj_fitness > 0 {
+            state
+                .add_if_objective(input.clone(), obj_fitness)
+                .expect("In timeout handler objective corpus add failure.".into());
+        }
+
         mgr.fire(
             state,
             Event::Timeout {
@@ -342,6 +374,7 @@ pub mod unix_signals {
     pub unsafe fn set_oncrash_ptrs<C, EM, FT, I, OC, OFT, OT, R>(
         state: &mut State<C, FT, I, OC, OFT, R>,
         event_mgr: &mut EM,
+        observers: &OT,
         input: &I,
     ) where
         EM: EventManager<I>,
@@ -356,6 +389,7 @@ pub mod unix_signals {
         CURRENT_INPUT_PTR = input as *const _ as *const c_void;
         STATE_PTR = state as *mut _ as *mut c_void;
         EVENT_MGR_PTR = event_mgr as *mut _ as *mut c_void;
+        OBSERVERS_PTR = observers as *const _ as *const c_void;
     }
 
     #[inline]
@@ -363,6 +397,7 @@ pub mod unix_signals {
         CURRENT_INPUT_PTR = ptr::null();
         STATE_PTR = ptr::null_mut();
         EVENT_MGR_PTR = ptr::null_mut();
+        OBSERVERS_PTR = ptr::null_mut();
     }
 
     // TODO clearly state that manager should be static (maybe put the 'static lifetime?)

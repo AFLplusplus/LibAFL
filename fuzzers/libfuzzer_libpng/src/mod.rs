@@ -8,7 +8,7 @@ use afl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
-    feedbacks::MaxMapFeedback,
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
     mutators::token_mutations::TokensMetadata,
@@ -96,7 +96,7 @@ fn fuzz(
             &edges_observer
         )),
         OnDiskCorpus::new(objective_dir),
-        tuple_list!(),
+        tuple_list!(CrashFeedback::new()),
     ));
 
     println!("We're a client, let's fuzz :)");

@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    events::{Event, EventManager},
+    events::EventManager,
     executors::{Executor, HasObservers},
     feedbacks::FeedbacksTuple,
     inputs::Input,
@@ -66,37 +66,9 @@ where
             self.mutator_mut()
                 .mutate(rand, state, &mut input_mut, i as i32)?;
 
-            let fitness = state.evaluate_input(&input_mut, executor, manager)?;
+            let fitness = state.process_input(input_mut, executor, manager)?;
 
-            self.mutator_mut()
-                .post_exec(state, fitness, &input_mut, i as i32)?;
-
-            let observers = executor.observers();
-
-            // put all this shit in some overridable function in engine maybe? or in corpus.
-            // consider a corpus that strores new testcases in a temporary queue, for later processing
-            // in a late stage, NewTestcase should be triggere donly after the processing in the later stage
-            // So by default we shoudl trigger it in corpus.add, so that the user can override it and remove
-            // if needed by particular cases
-            if fitness > 0 {
-                let observers_buf = manager.serialize_observers(observers)?;
-
-                manager.fire(
-                    state,
-                    Event::NewTestcase {
-                        input: input_mut.clone(),
-                        observers_buf,
-                        corpus_size: state.corpus().count() + 1,
-                        client_config: "TODO".into(),
-                        time: crate::utils::current_time(),
-                        executions: state.executions(),
-                    },
-                )?;
-                state.add_if_interesting(input_mut, fitness)?;
-            // let _ = corpus.add(testcase);
-            } else {
-                state.discard_input(&input_mut)?;
-            }
+            self.mutator_mut().post_exec(state, fitness, i as i32)?;
         }
         Ok(())
     }

@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::tuples::{Named, TupleList},
-    executors::ExitKind,
     corpus::Testcase,
+    executors::ExitKind,
     inputs::Input,
     observers::{MapObserver, Observer, ObserversTuple},
     AflError,
@@ -106,7 +106,12 @@ where
     I: Input,
 {
     #[inline]
-    fn is_interesting_all<OT: ObserversTuple>(&mut self, _: &I, _: &OT, _: ExitKind,) -> Result<u32, AflError> {
+    fn is_interesting_all<OT: ObserversTuple>(
+        &mut self,
+        _: &I,
+        _: &OT,
+        _: ExitKind,
+    ) -> Result<u32, AflError> {
         Ok(0)
     }
 
@@ -159,6 +164,41 @@ where
         self.1.restore_state_from_all(restore_from.1)?;
     }
     */
+}
+
+/// Is a crash feedback
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CrashFeedback {}
+
+impl<I> Feedback<I> for CrashFeedback
+where
+    I: Input,
+{
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        _input: &I,
+        _observers: &OT,
+        exit_kind: ExitKind,
+    ) -> Result<u32, AflError> {
+        if exit_kind == ExitKind::Crash {
+            Ok(1)
+        } else {
+            Ok(0)
+        }
+    }
+}
+
+impl Named for CrashFeedback {
+    #[inline]
+    fn name(&self) -> &str {
+        "CrashFeedback"
+    }
+}
+
+impl CrashFeedback {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 /// A Reducer function is used to aggregate values for the novelty search
