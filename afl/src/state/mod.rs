@@ -260,6 +260,18 @@ where
     pub fn objective_feedbacks_mut(&mut self) -> &mut OFT {
         &mut self.objective_feedbacks
     }
+    
+    /// Returns the objective corpus
+    #[inline]
+    pub fn objective_corpus(&self) -> &OC {
+        &self.objective_corpus
+    }
+
+    /// Returns the mutable objective corpus
+    #[inline]
+    pub fn objective_corpus_mut(&mut self) -> &mut OC {
+        &mut self.objective_corpus
+    }
 
     // TODO move some of these, like evaluate_input, to FuzzingEngine
     #[inline]

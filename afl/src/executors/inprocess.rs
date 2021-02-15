@@ -291,18 +291,17 @@ pub mod unix_signals {
             .is_interesting_all(&input, observers, ExitKind::Crash)
             .expect("In crash handler objective feedbacks failure.".into());
         if obj_fitness > 0 {
-            state
+            if !state
                 .add_if_objective(input.clone(), obj_fitness)
-                .expect("In crash handler objective corpus add failure.".into());
+                .expect("In crash handler objective corpus add failure.".into()).is_none() {
+                mgr.fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.objective_corpus().count(),
+                    },
+                ) .expect(&format!("Could not send timeouting input {:?}", input));
+            }
         }
-
-        mgr.fire(
-            state,
-            Event::Crash {
-                input: input.to_owned(),
-            },
-        )
-        .expect(&format!("Could not send crashing input {:?}", input));
 
         mgr.on_restart(state).unwrap();
 
@@ -350,18 +349,17 @@ pub mod unix_signals {
             .is_interesting_all(&input, observers, ExitKind::Timeout)
             .expect("In timeout handler objective feedbacks failure.".into());
         if obj_fitness > 0 {
-            state
+            if !state
                 .add_if_objective(input.clone(), obj_fitness)
-                .expect("In timeout handler objective corpus add failure.".into());
+                .expect("In timeout handler objective corpus add failure.".into()).is_none() {
+                mgr.fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.objective_corpus().count(),
+                    },
+                ) .expect(&format!("Could not send timeouting input {:?}", input));
+            }
         }
-
-        mgr.fire(
-            state,
-            Event::Timeout {
-                input: input.to_owned(),
-            },
-        )
-        .expect(&format!("Could not send timeouting input {:?}", input));
 
         mgr.on_restart(state).unwrap();
 

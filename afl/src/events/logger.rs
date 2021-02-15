@@ -112,11 +112,10 @@ where
                 stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Crash { input: _ } => {
-                panic!("LoggerEventManager cannot handle Event::Crash");
-            }
-            Event::Timeout { input: _ } => {
-                panic!("LoggerEventManager cannot handle Event::Timeout");
+            Event::Objective { objective_size } => {
+                stats.client_stats_mut()[0].update_objective_size(*objective_size as u64);
+                stats.display(event.name().to_string());
+                Ok(BrokerEventResult::Handled)
             }
             Event::Log {
                 severity_level,

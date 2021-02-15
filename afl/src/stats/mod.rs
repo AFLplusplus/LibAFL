@@ -15,6 +15,8 @@ pub struct ClientStats {
     pub corpus_size: u64,
     /// The total executions for this client
     pub executions: u64,
+    /// The size of the objectives corpus for this client
+    pub objective_size: u64,
     /// The last reported executions for this client
     pub last_window_executions: u64,
     /// The last time we got this information
@@ -40,6 +42,11 @@ impl ClientStats {
     /// We got a new information about corpus size for this client, insert them.
     pub fn update_corpus_size(&mut self, corpus_size: u64) {
         self.corpus_size = corpus_size;
+    }
+    
+    /// We got a new information about objective corpus size for this client, insert them.
+    pub fn update_objective_size(&mut self, objective_size: u64) {
+        self.objective_size = objective_size;
     }
 
     /// Get the calculated executions per second for this client
@@ -91,6 +98,13 @@ pub trait Stats {
         self.client_stats()
             .iter()
             .fold(0u64, |acc, x| acc + x.corpus_size)
+    }
+
+    /// Amount of elements in the objectives (combined for all children)
+    fn objective_size(&self) -> u64 {
+        self.client_stats()
+            .iter()
+            .fold(0u64, |acc, x| acc + x.objective_size)
     }
 
     /// Total executions
@@ -155,10 +169,11 @@ where
 
     fn display(&mut self, event_msg: String) {
         let fmt = format!(
-            "[{}] clients: {}, corpus: {}, executions: {}, exec/sec: {}",
+            "[{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             self.client_stats().len(),
             self.corpus_size(),
+            self.objective_size(),
             self.total_execs(),
             self.execs_per_sec()
         );

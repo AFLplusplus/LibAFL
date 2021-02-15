@@ -228,14 +228,10 @@ where
                 stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Crash { input: _ } => {
-                #[cfg(feature = "std")]
-                println!("Event::Crash");
-                Ok(BrokerEventResult::Handled)
-            }
-            Event::Timeout { input: _ } => {
-                #[cfg(feature = "std")]
-                println!("Event::Timeout");
+            Event::Objective { objective_size } => {
+                let client = stats.client_stats_mut_for(sender_id);
+                client.update_objective_size(*objective_size as u64);
+                stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {

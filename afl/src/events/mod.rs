@@ -93,15 +93,10 @@ where
         executions: usize,
         phantom: PhantomData<I>,
     },
-    /// A crash was found
-    Crash {
-        /// Crashing input
-        input: I,
-    },
-    /// A timeout was found
-    Timeout {
-        /// Timeouting input
-        input: I,
+    /// A new objective was found
+    Objective {
+        /// Objective corpus size
+        objective_size: usize,
     },
     /// Write a new log
     Log {
@@ -137,8 +132,7 @@ where
                 executions: _,
                 phantom: _,
             } => "Stats",
-            Event::Crash { input: _ } => "Crash",
-            Event::Timeout { input: _ } => "Timeout",
+            Event::Objective { objective_size: _ } => "Objective",
             Event::Log {
                 severity_level: _,
                 message: _,
