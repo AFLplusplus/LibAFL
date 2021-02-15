@@ -57,18 +57,10 @@ pub trait ObserversTuple:
     /// Do whatever you need to do after a run.
     /// This is called right after the last execution
     fn post_exec_all(&mut self) -> Result<(), Error>;
+
     //fn for_each(&self, f: fn(&dyn Observer));
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
 
-    /// Serialize this tuple to a buf
-    fn serialize(&self) -> Result<Vec<u8>, Error> {
-        Ok(postcard::to_allocvec(&self)?)
-    }
-
-    /// Deserilaize
-    fn deserialize(&self, serialized: &[u8]) -> Result<Self, Error> {
-        Ok(postcard::from_bytes(serialized)?)
-    }
 }
 
 impl ObserversTuple for () {

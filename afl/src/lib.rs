@@ -68,7 +68,7 @@ where
         self.stages_mut()
             .perform_all(rand, executor, state, manager, idx)?;
 
-        manager.process(state)?;
+        manager.process(state, executor)?;
         Ok(idx)
     }
 

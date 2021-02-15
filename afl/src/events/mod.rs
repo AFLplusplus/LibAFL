@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Corpus, feedbacks::FeedbacksTuple, inputs::Input, observers::ObserversTuple,
+    executors::{HasObservers, Executor}, 
     state::State, utils::Rand, Error,
 };
 
@@ -156,16 +157,19 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<C, FT, OC, OFT, R>(
+    fn process<C, E, FT, OC, OFT, OT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
+        executor: &mut E,
     ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
+        E: Executor<I> + HasObservers<OT>,
         FT: FeedbacksTuple<I>,
         R: Rand,
         OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>;
+        OFT: FeedbacksTuple<I>,
+        OT: ObserversTuple;
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
@@ -226,16 +230,19 @@ impl<I> EventManager<I> for NopEventManager<I>
 where
     I: Input,
 {
-    fn process<C, FT, OC, OFT, R>(
+    fn process<C, E, FT, OC, OFT, OT, R>(
         &mut self,
         _state: &mut State<C, FT, I, OC, OFT, R>,
+        _executor: &mut E,
     ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
+        E: Executor<I> + HasObservers<OT>,
         FT: FeedbacksTuple<I>,
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
+        OT: ObserversTuple,
     {
         Ok(0)
     }
@@ -259,10 +266,9 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::bolts::tuples::{tuple_list, MatchNameAndType, Named};
+    use crate::bolts::tuples::{tuple_list};
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
-    use crate::observers::ObserversTuple;
     use crate::observers::StdMapObserver;
     use crate::utils::current_time;
 
@@ -272,7 +278,7 @@ mod tests {
     fn test_event_serde() {
         let obv = StdMapObserver::new("test", unsafe { &mut MAP });
         let map = tuple_list!(obv);
-        let observers_buf = map.serialize().unwrap();
+        let observers_buf = postcard::to_allocvec(&map).unwrap();
 
         let i = BytesInput::new(vec![0]);
         let e = Event::NewTestcase {
@@ -296,7 +302,7 @@ mod tests {
                 time: _,
                 executions: _,
             } => {
-                let o = map.deserialize(&observers_buf).unwrap();
+                let o: tuple_list!(StdMapObserver::<u32>) = postcard::from_bytes(&observers_buf).unwrap();
                 let test_observer = o.match_name_type::<StdMapObserver<u32>>("test").unwrap();
                 assert_eq!("test", test_observer.name());
             }

@@ -8,9 +8,9 @@ use afl::{
     bolts::{tuples::tuple_list, shmem::UnixShMem},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
-    events::{SimpleStats},
+    stats::{SimpleStats},
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
-    feedbacks::MaxMapFeedback,
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::Input,
     mutators::{scheduled::HavocBytesMutator, HasMaxSize},
     observers::StdMapObserver,
@@ -40,7 +40,7 @@ where
         __lafl_edges_map[2] = 1;
         if buf.len() > 1 && buf[1] == 'b'  as u8 {
           __lafl_edges_map[3] = 1;
-            std::process::abort();
+            //std::process::abort();
         }
       }
     }
@@ -64,7 +64,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), Error> {
     
     // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
     let (state_opt, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, _, _, UnixShMem, _>(stats, broker_port).expect("Failed to setup the restarter".into());
+        setup_restarting_mgr::<_, _, _, _, _, _, UnixShMem, _>(stats, broker_port).expect("Failed to setup the restarter".into());
 
     let edges_observer =
     StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { &mut __lafl_edges_map[0] as *mut u8 }, __lafl_max_edges_size as usize);
@@ -78,6 +78,8 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), Error> {
                     &NAME_COV_MAP,
                     &edges_observer
                 )),
+                InMemoryCorpus::new(),
+                tuple_list!(CrashFeedback::new()),
             )
         },
     };

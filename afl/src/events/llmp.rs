@@ -16,6 +16,8 @@ use crate::{
         llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMem,
     },
+    executors::{HasObservers, Executor}, 
+    observers::ObserversTuple,
     corpus::Corpus,
     events::{BrokerEventResult, Event, EventManager},
     executors::ExitKind,
@@ -248,18 +250,21 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client<C, FT, OC, OFT, R>(
+    fn handle_in_client<C, E, FT, OC, OFT, OT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
-        _sender_id: u32,
+        sender_id: u32,
         event: Event<I>,
+        _executor: &mut E,
     ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
+        E: Executor<I> + HasObservers<OT>,
         FT: FeedbacksTuple<I>,
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
+        OT: ObserversTuple
     {
         match event {
             Event::NewTestcase {
@@ -273,11 +278,17 @@ where
                 // TODO: here u should match client_config, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
-                println!("Received new Testcase");
-                let observers = postcard::from_bytes(&observers_buf)?;
+                println!("Received new Testcase from {}", sender_id);
+
+                let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
-                let interestingness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
-                state.add_if_interesting(input, interestingness)?;
+                let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
+                if fitness > 0 {
+                    if !state.add_if_interesting(input, fitness)?.is_none() {
+                        #[cfg(feature = "std")]
+                        println!("Added received Testcase");
+                    }
+                }
                 Ok(())
             }
             _ => Err(Error::Unknown(format!(
@@ -306,16 +317,19 @@ where
         }
     }
 
-    fn process<C, FT, OC, OFT, R>(
+    fn process<C, E, FT, OC, OFT, OT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
+        executor: &mut E,
     ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
+        E: Executor<I> + HasObservers<OT>,
         FT: FeedbacksTuple<I>,
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
+        OT: ObserversTuple
     {
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
@@ -340,7 +354,7 @@ where
         let count = events.len();
         events
             .drain(..)
-            .try_for_each(|(sender_id, event)| self.handle_in_client(state, sender_id, event))?;
+            .try_for_each(|(sender_id, event)| self.handle_in_client(state, sender_id, event, executor))?;
         Ok(count)
     }
 
@@ -451,18 +465,21 @@ where
             .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
     }
 
-    fn process<C, FT, OC, OFT, R>(
+    fn process<C, E, FT, OC, OFT, OT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
+        executor: &mut E,
     ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
+        E: Executor<I> + HasObservers<OT>,
         FT: FeedbacksTuple<I>,
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
+        OT: ObserversTuple
     {
-        self.llmp_mgr.process(state)
+        self.llmp_mgr.process(state, executor)
     }
 
     fn fire<C, FT, OC, OFT, R>(
