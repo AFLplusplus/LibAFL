@@ -45,8 +45,12 @@ where
     pub fn store_input(&mut self) -> Result<bool, AflError> {
         let fname;
         match self.filename() {
-            Some(f) => { fname = f.clone(); },
-            None => { return Ok(false); }
+            Some(f) => {
+                fname = f.clone();
+            }
+            None => {
+                return Ok(false);
+            }
         };
         match self.input_mut() {
             None => Ok(false),

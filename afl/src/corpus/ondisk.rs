@@ -59,7 +59,9 @@ where
             }
             _ => {}
         }
-        entry.store_input().expect("Could not save testcase to disk".into());
+        entry
+            .store_input()
+            .expect("Could not save testcase to disk".into());
         self.entries.push(RefCell::new(entry));
         self.entries.len() - 1
     }
