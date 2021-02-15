@@ -1,10 +1,8 @@
-
 # LibAFL, the fuzzer library.
-
 
 ## Example usages
 
-We collect example fuzzers in `./examples`.
+We collect example fuzzers in `./fuzzers`.
 The best-tested fuzzer is `./fuzzers/libfuzzer_libpng`, a clone of libfuzzer using libafl for a libpng harness.
 
 ## How to perf:
