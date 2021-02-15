@@ -82,9 +82,9 @@ where
 {
     #[inline]
     /// Called right before exexution starts
-    fn pre_exec<C, EM, FT, R>(
+    fn pre_exec<C, EM, FT, OC, OFT, R>(
         &mut self,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -92,6 +92,8 @@ where
         R: Rand,
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         EM: EventManager<I>,
     {
         Ok(())
@@ -99,9 +101,9 @@ where
 
     #[inline]
     /// Called right after execution finished.
-    fn post_exec<C, EM, FT, R>(
+    fn post_exec<C, EM, FT, OC, OFT, R>(
         &mut self,
-        _state: &State<C, FT, I, R>,
+        _state: &State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -109,6 +111,8 @@ where
         R: Rand,
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         EM: EventManager<I>,
     {
         Ok(())

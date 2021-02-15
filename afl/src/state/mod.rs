@@ -57,12 +57,14 @@ pub trait HasMetadata {
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct State<C, FT, I, R>
+pub struct State<C, FT, I, OC, OFT, R>
 where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
 {
     /// How many times the executor ran the harness/target
     executions: usize,
@@ -73,18 +75,24 @@ where
     start_time: u64,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
-    // additional_corpuses, maybe another TupleList?
-    // Feedbacks used to evaluate an input
+    /// Feedbacks used to evaluate an input
     feedbacks: FT,
+    // Objective corpus
+    objective_corpus: OC,
+    /// Objective Feedbacks
+    objective_feedbacks: OFT,
+
     phantom: PhantomData<(R, I)>,
 }
 
 #[cfg(feature = "std")]
-impl<C, FT, R> State<C, FT, BytesInput, R>
+impl<C, FT, OC, OFT, R> State<C, FT, BytesInput, OC, OFT, R>
 where
     C: Corpus<BytesInput, R>,
     R: Rand,
     FT: FeedbacksTuple<BytesInput>,
+    OC: Corpus<BytesInput, R>,
+    OFT: FeedbacksTuple<BytesInput>,
 {
     pub fn load_from_directory<E, OT, EM>(
         &mut self,
@@ -153,12 +161,14 @@ where
     }
 }
 
-impl<C, FT, I, R> HasCorpus<C, I, R> for State<C, FT, I, R>
+impl<C, FT, I, OC, OFT, R> HasCorpus<C, I, R> for State<C, FT, I, OC, OFT, R>
 where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
 {
     /// Returns the corpus
     fn corpus(&self) -> &C {
@@ -172,12 +182,14 @@ where
 }
 
 /// Trait for elements offering metadata
-impl<C, FT, I, R> HasMetadata for State<C, FT, I, R>
+impl<C, FT, I, OC, OFT, R> HasMetadata for State<C, FT, I, OC, OFT, R>
 where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
 {
     /// Get all the metadata into an HashMap
     #[inline]
@@ -192,12 +204,14 @@ where
     }
 }
 
-impl<C, FT, I, R> State<C, FT, I, R>
+impl<C, FT, I, OC, OFT, R> State<C, FT, I, OC, OFT, R>
 where
     C: Corpus<I, R>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
 {
     /// Get executions
     #[inline]
@@ -349,13 +363,15 @@ where
         Ok(())
     }
 
-    pub fn new(corpus: C, feedbacks: FT) -> Self {
+    pub fn new(corpus: C, feedbacks: FT, objective_corpus: OC, objective_feedbacks: OFT) -> Self {
         Self {
             corpus,
             executions: 0,
             start_time: current_milliseconds(),
             metadata: SerdeAnyMap::default(),
             feedbacks: feedbacks,
+            objective_corpus: objective_corpus,
+            objective_feedbacks: objective_feedbacks,
             phantom: PhantomData,
         }
     }

@@ -39,11 +39,13 @@ use utils::{current_milliseconds, current_time, Rand};
 use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
 
 /// The main fuzzer trait.
-pub trait Fuzzer<C, E, EM, FT, ST, I, OT, R>
+pub trait Fuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
 where
-    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -58,7 +60,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, FT, I, R>,
+        state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
     ) -> Result<usize, AflError> {
         let (_, idx) = state.corpus_mut().next(rand)?;
@@ -74,7 +76,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, FT, I, R>,
+        state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
     ) -> Result<(), AflError> {
         let mut last = current_milliseconds();
@@ -98,11 +100,13 @@ where
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Clone, Debug)]
-pub struct StdFuzzer<C, E, EM, FT, ST, I, OT, R>
+pub struct StdFuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
 where
-    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -110,15 +114,17 @@ where
     R: Rand,
 {
     stages: ST,
-    phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
+    phantom: PhantomData<(EM, E, OC, OFT, OT, FT, C, I, R)>,
 }
 
-impl<C, E, EM, FT, ST, I, OT, R> Fuzzer<C, E, EM, FT, ST, I, OT, R>
-    for StdFuzzer<C, E, EM, FT, ST, I, OT, R>
+impl<C, E, EM, FT, ST, I, OC, OFT, OT, R> Fuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
+    for StdFuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
 where
-    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -134,11 +140,13 @@ where
     }
 }
 
-impl<C, E, EM, FT, ST, I, OT, R> StdFuzzer<C, E, EM, FT, ST, I, OT, R>
+impl<C, E, EM, FT, ST, I, OC, OFT, OT, R> StdFuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
 where
-    ST: StagesTuple<C, E, EM, FT, I, OT, R>,
+    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -248,12 +256,13 @@ mod tests {
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, State},
+        stats::SimpleStats,
         utils::StdRand,
         Fuzzer, StdFuzzer,
     };
 
     #[cfg(feature = "std")]
-    use crate::events::{LoggerEventManager, SimpleStats};
+    use crate::events::LoggerEventManager;
 
     fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
@@ -267,7 +276,12 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
-        let mut state = State::new(corpus, tuple_list!());
+        let mut state = State::new(
+            corpus,
+            tuple_list!(),
+            InMemoryCorpus::<BytesInput, StdRand>::new(),
+            tuple_list!(),
+        );
 
         let stats = SimpleStats::new(|s| {
             println!("{}", s);
@@ -295,8 +309,14 @@ mod tests {
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
-        let state_deserialized: State<InMemoryCorpus<BytesInput, _>, (), BytesInput, StdRand> =
-            postcard::from_bytes(state_serialized.as_slice()).unwrap();
+        let state_deserialized: State<
+            InMemoryCorpus<BytesInput, _>,
+            (),
+            BytesInput,
+            InMemoryCorpus<BytesInput, _>,
+            (),
+            StdRand,
+        > = postcard::from_bytes(state_serialized.as_slice()).unwrap();
         assert_eq!(state.executions(), state_deserialized.executions());
 
         let corpus_serialized = postcard::to_allocvec(state.corpus()).unwrap();

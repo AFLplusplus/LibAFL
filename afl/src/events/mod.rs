@@ -162,11 +162,16 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
+    fn process<C, FT, OC, OFT, R>(
+        &mut self,
+        state: &mut State<C, FT, I, OC, OFT, R>,
+    ) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
-        R: Rand;
+        R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>;
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, AflError>
@@ -186,11 +191,16 @@ where
 
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
-    fn on_restart<C, FT, R>(&mut self, _state: &mut State<C, FT, I, R>) -> Result<(), AflError>
+    fn on_restart<C, FT, OC, OFT, R>(
+        &mut self,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
+    ) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
         R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
     {
         Ok(())
     }
@@ -200,15 +210,17 @@ where
     fn await_restart_safe(&mut self) {}
 
     /// Send off an event to the broker
-    fn fire<C, FT, R>(
+    fn fire<C, FT, OC, OFT, R>(
         &mut self,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         event: Event<I>,
     ) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
-        R: Rand;
+        R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>;
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
@@ -220,24 +232,31 @@ impl<I> EventManager<I> for NopEventManager<I>
 where
     I: Input,
 {
-    fn process<C, FT, R>(&mut self, _state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
+    fn process<C, FT, OC, OFT, R>(
+        &mut self,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
+    ) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
         R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
     {
         Ok(0)
     }
 
-    fn fire<C, FT, R>(
+    fn fire<C, FT, OC, OFT, R>(
         &mut self,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         _event: Event<I>,
     ) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
         R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
     {
         Ok(())
     }

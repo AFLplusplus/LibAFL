@@ -999,7 +999,7 @@ token2="B"
 
         corpus.add(BytesInput::new(vec![0x42; 0x1337]).into());
 
-        let mut state = State::new(corpus, ());
+        let mut state = State::new(corpus, (), InMemoryCorpus::new(), ());
 
         let mut mutations: Vec<MutationFunction<BytesInput, WithMaxSize, StdRand, _>> = vec![];
 

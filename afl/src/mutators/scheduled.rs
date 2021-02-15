@@ -343,7 +343,7 @@ mod tests {
             .expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
-        let mut state = State::new(corpus, ());
+        let mut state = State::new(corpus, (), InMemoryCorpus::new(), ());
 
         rand.set_seed(5);
 
@@ -351,7 +351,7 @@ mod tests {
             InMemoryCorpus<BytesInput, XKCDRand>,
             _,
             _,
-            State<_, (), _, _>,
+            State<_, (), _, InMemoryCorpus<BytesInput, XKCDRand>, (), _>,
         >::new();
 
         mutation_splice(&mut mutator, &mut rand, &mut state, &mut input).unwrap();
@@ -378,7 +378,7 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let mut state = State::new(corpus, ());
+        let mut state = State::new(corpus, (), InMemoryCorpus::new(), ());
 
         let mut havoc = HavocBytesMutator::new(StdScheduledMutator::new());
 

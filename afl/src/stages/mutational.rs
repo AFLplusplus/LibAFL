@@ -19,11 +19,14 @@ use crate::{
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<C, E, EM, FT, I, M, OT, R>: Stage<C, E, EM, FT, I, OT, R>
+pub trait MutationalStage<C, E, EM, FT, I, M, OC, OFT, OT, R>:
+    Stage<C, E, EM, FT, I, OC, OFT, OT, R>
 where
-    M: Mutator<C, I, R, State<C, FT, I, R>>,
+    M: Mutator<C, I, R, State<C, FT, I, OC, OFT, R>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -48,7 +51,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, FT, I, R>,
+        state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -102,30 +105,34 @@ where
 
 #[derive(Clone, Debug)]
 /// The default mutational stage
-pub struct StdMutationalStage<C, E, EM, FT, I, M, OT, R>
+pub struct StdMutationalStage<C, E, EM, FT, I, M, OC, OFT, OT, R>
 where
     C: Corpus<I, R>,
     E: Executor<I> + HasObservers<OT>,
     EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     I: Input,
-    M: Mutator<C, I, R, State<C, FT, I, R>>,
+    M: Mutator<C, I, R, State<C, FT, I, OC, OFT, R>>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     R: Rand,
 {
     mutator: M,
-    phantom: PhantomData<(EM, E, OT, FT, C, I, R)>,
+    phantom: PhantomData<(EM, E, OC, OFT, OT, FT, C, I, R)>,
 }
 
-impl<C, E, EM, FT, I, M, OT, R> MutationalStage<C, E, EM, FT, I, M, OT, R>
-    for StdMutationalStage<C, E, EM, FT, I, M, OT, R>
+impl<C, E, EM, FT, I, M, OC, OFT, OT, R> MutationalStage<C, E, EM, FT, I, M, OC, OFT, OT, R>
+    for StdMutationalStage<C, E, EM, FT, I, M, OC, OFT, OT, R>
 where
     C: Corpus<I, R>,
     E: Executor<I> + HasObservers<OT>,
     EM: EventManager<I>,
     FT: FeedbacksTuple<I>,
     I: Input,
-    M: Mutator<C, I, R, State<C, FT, I, R>>,
+    M: Mutator<C, I, R, State<C, FT, I, OC, OFT, R>>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     R: Rand,
 {
@@ -142,12 +149,14 @@ where
     }
 }
 
-impl<C, E, EM, FT, I, M, OT, R> Stage<C, E, EM, FT, I, OT, R>
-    for StdMutationalStage<C, E, EM, FT, I, M, OT, R>
+impl<C, E, EM, FT, I, M, OC, OFT, OT, R> Stage<C, E, EM, FT, I, OC, OFT, OT, R>
+    for StdMutationalStage<C, E, EM, FT, I, M, OC, OFT, OT, R>
 where
-    M: Mutator<C, I, R, State<C, FT, I, R>>,
+    M: Mutator<C, I, R, State<C, FT, I, OC, OFT, R>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -159,7 +168,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, FT, I, R>,
+        state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -167,11 +176,13 @@ where
     }
 }
 
-impl<C, E, EM, FT, I, M, OT, R> StdMutationalStage<C, E, EM, FT, I, M, OT, R>
+impl<C, E, EM, FT, I, M, OC, OFT, OT, R> StdMutationalStage<C, E, EM, FT, I, M, OC, OFT, OT, R>
 where
-    M: Mutator<C, I, R, State<C, FT, I, R>>,
+    M: Mutator<C, I, R, State<C, FT, I, OC, OFT, R>>,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,

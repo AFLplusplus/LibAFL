@@ -16,10 +16,12 @@ use crate::{
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<C, E, EM, FT, I, OT, R>
+pub trait Stage<C, E, EM, FT, I, OC, OFT, OT, R>
 where
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -31,16 +33,18 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, FT, I, R>,
+        state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError>;
 }
 
-pub trait StagesTuple<C, E, EM, FT, I, OT, R>
+pub trait StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>
 where
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -51,18 +55,20 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, FT, I, R>,
+        state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError>;
-    fn for_each(&self, f: fn(&dyn Stage<C, E, EM, FT, I, OT, R>));
-    fn for_each_mut(&mut self, f: fn(&mut dyn Stage<C, E, EM, FT, I, OT, R>));
+    fn for_each(&self, f: fn(&dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>));
+    fn for_each_mut(&mut self, f: fn(&mut dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>));
 }
 
-impl<C, E, EM, FT, I, OT, R> StagesTuple<C, E, EM, FT, I, OT, R> for ()
+impl<C, E, EM, FT, I, OC, OFT, OT, R> StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R> for ()
 where
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -73,22 +79,25 @@ where
         &mut self,
         _rand: &mut R,
         _executor: &mut E,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         _manager: &mut EM,
         _corpus_idx: usize,
     ) -> Result<(), AflError> {
         Ok(())
     }
-    fn for_each(&self, _f: fn(&dyn Stage<C, E, EM, FT, I, OT, R>)) {}
-    fn for_each_mut(&mut self, _f: fn(&mut dyn Stage<C, E, EM, FT, I, OT, R>)) {}
+    fn for_each(&self, _f: fn(&dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>)) {}
+    fn for_each_mut(&mut self, _f: fn(&mut dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>)) {}
 }
 
-impl<Head, Tail, EM, E, OT, FT, C, I, R> StagesTuple<C, E, EM, FT, I, OT, R> for (Head, Tail)
+impl<Head, Tail, EM, E, OC, OFT, OT, FT, C, I, R> StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>
+    for (Head, Tail)
 where
-    Head: Stage<C, E, EM, FT, I, OT, R>,
-    Tail: StagesTuple<C, E, EM, FT, I, OT, R> + TupleList,
+    Head: Stage<C, E, EM, FT, I, OC, OFT, OT, R>,
+    Tail: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R> + TupleList,
     EM: EventManager<I>,
     E: Executor<I> + HasObservers<OT>,
+    OC: Corpus<I, R>,
+    OFT: FeedbacksTuple<I>,
     OT: ObserversTuple,
     FT: FeedbacksTuple<I>,
     C: Corpus<I, R>,
@@ -99,7 +108,7 @@ where
         &mut self,
         rand: &mut R,
         executor: &mut E,
-        state: &mut State<C, FT, I, R>,
+        state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), AflError> {
@@ -108,12 +117,12 @@ where
             .perform_all(rand, executor, state, manager, corpus_idx)
     }
 
-    fn for_each(&self, f: fn(&dyn Stage<C, E, EM, FT, I, OT, R>)) {
+    fn for_each(&self, f: fn(&dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>)) {
         f(&self.0);
         self.1.for_each(f)
     }
 
-    fn for_each_mut(&mut self, f: fn(&mut dyn Stage<C, E, EM, FT, I, OT, R>)) {
+    fn for_each_mut(&mut self, f: fn(&mut dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>)) {
         f(&mut self.0);
         self.1.for_each_mut(f)
     }

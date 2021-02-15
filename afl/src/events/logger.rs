@@ -31,11 +31,16 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<C, FT, R>(&mut self, state: &mut State<C, FT, I, R>) -> Result<usize, AflError>
+    fn process<C, FT, OC, OFT, R>(
+        &mut self,
+        state: &mut State<C, FT, I, OC, OFT, R>,
+    ) -> Result<usize, AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
         R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
     {
         let count = self.events.len();
         while self.events.len() > 0 {
@@ -45,15 +50,17 @@ where
         Ok(count)
     }
 
-    fn fire<C, FT, R>(
+    fn fire<C, FT, OC, OFT, R>(
         &mut self,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         event: Event<I>,
     ) -> Result<(), AflError>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
         R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
     {
         match Self::handle_in_broker(&mut self.stats, 0, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
@@ -125,9 +132,9 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client<C, FT, R>(
+    fn handle_in_client<C, FT, OC, OFT, R>(
         &mut self,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         _sender_id: u32,
         event: Event<I>,
     ) -> Result<(), AflError>
@@ -135,6 +142,8 @@ where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
         R: Rand,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
     {
         match event {
             _ => Err(AflError::Unknown(format!(

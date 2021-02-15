@@ -54,30 +54,32 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec<C, EM, FT, R>(
+    fn pre_exec<C, EM, FT, OC, OFT, R>(
         &mut self,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
     where
         R: Rand,
         FT: FeedbacksTuple<I>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
         EM: EventManager<I>,
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs::<C, EM, FT, I, OT, R>(_state, _event_mgr, _input);
+            set_oncrash_ptrs::<C, EM, FT, I, OC, OFT, OT, R>(_state, _event_mgr, _input);
         }
         Ok(())
     }
 
     #[inline]
-    fn post_exec<C, EM, FT, R>(
+    fn post_exec<C, EM, FT, OC, OFT, R>(
         &mut self,
-        _state: &State<C, FT, I, R>,
+        _state: &State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), AflError>
@@ -86,6 +88,8 @@ where
         FT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
         EM: EventManager<I>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
@@ -142,23 +146,25 @@ where
     /// * `on_crash_fn` - When an in-mem harness crashes, it may safe some state to continue fuzzing later.
     ///                   Do that that in this function. The program will crash afterwards.
     /// * `observers` - the observers observing the target during execution
-    pub fn new<C, EM, FT, R>(
+    pub fn new<C, EM, FT, OC, OFT, R>(
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
-        _state: &mut State<C, FT, I, R>,
+        _state: &mut State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
     ) -> Self
     where
         R: Rand,
         FT: FeedbacksTuple<I>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         C: Corpus<I, R>,
         EM: EventManager<I>,
     {
         #[cfg(feature = "std")]
         #[cfg(unix)]
         unsafe {
-            setup_crash_handlers::<C, EM, FT, I, OT, R>();
+            setup_crash_handlers::<C, EM, FT, I, OC, OFT, OT, R>();
         }
 
         Self {
@@ -229,7 +235,7 @@ pub mod unix_signals {
     /// This is neede for certain non-rust side effects, as well as unix signal handling.
     static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<C, EM, FT, I, OT, R>(
+    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<C, EM, FT, I, OC, OFT, OT, R>(
         _sig: c_int,
         info: siginfo_t,
         _void: c_void,
@@ -237,6 +243,8 @@ pub mod unix_signals {
         EM: EventManager<I>,
         C: Corpus<I, R>,
         OT: ObserversTuple,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         FT: FeedbacksTuple<I>,
         I: Input,
         R: Rand,
@@ -263,7 +271,9 @@ pub mod unix_signals {
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         // Make sure we don't crash in the crash handler forever.
         CURRENT_INPUT_PTR = ptr::null();
-        let state = (STATE_PTR as *mut State<C, FT, I, R>).as_mut().unwrap();
+        let state = (STATE_PTR as *mut State<C, FT, I, OC, OFT, R>)
+            .as_mut()
+            .unwrap();
         let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
         mgr.fire(
             state,
@@ -282,13 +292,15 @@ pub mod unix_signals {
         std::process::exit(1);
     }
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OT, R>(
+    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OC, OFT, OT, R>(
         _sig: c_int,
         _info: siginfo_t,
         _void: c_void,
     ) where
         EM: EventManager<I>,
         C: Corpus<I, R>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         I: Input,
@@ -306,7 +318,9 @@ pub mod unix_signals {
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         // Make sure we don't crash in the crash handler forever.
         CURRENT_INPUT_PTR = ptr::null();
-        let state = (STATE_PTR as *mut State<C, FT, I, R>).as_mut().unwrap();
+        let state = (STATE_PTR as *mut State<C, FT, I, OC, OFT, R>)
+            .as_mut()
+            .unwrap();
         let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
 
         mgr.fire(
@@ -325,13 +339,15 @@ pub mod unix_signals {
     }
 
     #[inline]
-    pub unsafe fn set_oncrash_ptrs<C, EM, FT, I, OT, R>(
-        state: &mut State<C, FT, I, R>,
+    pub unsafe fn set_oncrash_ptrs<C, EM, FT, I, OC, OFT, OT, R>(
+        state: &mut State<C, FT, I, OC, OFT, R>,
         event_mgr: &mut EM,
         input: &I,
     ) where
         EM: EventManager<I>,
         C: Corpus<I, R>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         I: Input,
@@ -350,10 +366,12 @@ pub mod unix_signals {
     }
 
     // TODO clearly state that manager should be static (maybe put the 'static lifetime?)
-    pub unsafe fn setup_crash_handlers<C, EM, FT, I, OT, R>()
+    pub unsafe fn setup_crash_handlers<C, EM, FT, I, OC, OFT, OT, R>()
     where
         EM: EventManager<I>,
         C: Corpus<I, R>,
+        OC: Corpus<I, R>,
+        OFT: FeedbacksTuple<I>,
         OT: ObserversTuple,
         FT: FeedbacksTuple<I>,
         I: Input,
@@ -374,7 +392,8 @@ pub mod unix_signals {
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_crash::<C, EM, FT, I, OT, R> as usize;
+        sa.sa_sigaction =
+            libaflrs_executor_inmem_handle_crash::<C, EM, FT, I, OC, OFT, OT, R> as usize;
         for (sig, msg) in &[
             (SIGSEGV, "segfault"),
             (SIGBUS, "sigbus"),
@@ -388,7 +407,8 @@ pub mod unix_signals {
             }
         }
 
-        sa.sa_sigaction = libaflrs_executor_inmem_handle_timeout::<C, EM, FT, I, OT, R> as usize;
+        sa.sa_sigaction =
+            libaflrs_executor_inmem_handle_timeout::<C, EM, FT, I, OC, OFT, OT, R> as usize;
         if sigaction(SIGUSR2, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up sigusr2 handler for timeouts");
         }

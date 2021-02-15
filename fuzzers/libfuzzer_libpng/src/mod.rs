@@ -5,7 +5,7 @@ use std::{env, path::PathBuf};
 
 use afl::{
     bolts::{serdeany::RegistryBuilder, shmem::AflShmem, tuples::tuple_list},
-    corpus::{Corpus, InMemoryCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::MaxMapFeedback,
@@ -59,18 +59,27 @@ pub fn main() {
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
-    fuzz(vec![PathBuf::from("./corpus")], 1337).expect("An error occurred while fuzzing");
+    fuzz(
+        vec![PathBuf::from("./corpus")],
+        PathBuf::from("./crashes"),
+        1337,
+    )
+    .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
-fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
+fn fuzz(
+    corpus_dirs: Vec<PathBuf>,
+    objective_dir: PathBuf,
+    broker_port: u16,
+) -> Result<(), AflError> {
     let mut rand = StdRand::new(0);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, _, _, AflShmem, _>(stats, broker_port)
+        setup_restarting_mgr::<_, _, _, _, _, _, AflShmem, _>(stats, broker_port)
             .expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
@@ -86,6 +95,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, broker_port: u16) -> Result<(), AflError> {
             &NAME_COV_MAP,
             &edges_observer
         )),
+        OnDiskCorpus::new(objective_dir),
+        tuple_list!(),
     ));
 
     println!("We're a client, let's fuzz :)");
