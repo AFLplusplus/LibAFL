@@ -1,7 +1,7 @@
 [package]
-name = "afl"
+name = "libafl"
 version = "0.1.0"
-authors = ["Dominik Maier <domenukk@gmail.com>"]
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

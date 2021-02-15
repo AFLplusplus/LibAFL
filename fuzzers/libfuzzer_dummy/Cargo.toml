@@ -1,10 +1,8 @@
 [package]
 name = "libfuzzer_dummy"
 version = "0.1.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
-
-[workspace]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -23,13 +21,10 @@ cc = { version = "1.0", features = ["parallel"] }
 num_cpus = "1.0"
 
 [dependencies]
-clap = "2.32.0"
-serde = { version = "1.0", default-features = false, features = ["alloc"] }
-postcard = { version = "0.5.1", features = ["alloc"] }
-afl = { path = "../../afl/" }
+libafl = { path = "../../libafl/" }
 
 [[bin]]
-name = "libfuzzer"
+name = "libfuzzer_dummy"
 path = "./src/mod.rs"
 test = false
 bench = false

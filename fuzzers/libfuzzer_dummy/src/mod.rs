@@ -4,7 +4,7 @@
 use std::{path::PathBuf};
 use std::io::{self, BufRead};
 
-use afl::{
+use libafl::{
     bolts::{tuples::tuple_list, shmem::UnixShMem},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
@@ -23,8 +23,8 @@ use afl::{
 /// The name of the coverage map observer, to find it again in the observer list
 const NAME_COV_MAP: &str = "cov_map";
 
-static mut __lafl_edges_map: [u8; 32] = [0; 32];
-static __lafl_max_edges_size: u32 = 32;
+static mut EDGES_MAP: [u8; 32] = [0; 32];
+static EDGES_SIZE: u32 = 32;
 
 /// The wrapped harness function, calling out to the llvm-style libfuzzer harness
 fn harness<E, I>(_executor: &E, buf: &[u8]) -> ExitKind
@@ -35,11 +35,11 @@ where
     //println!("{:?}", buf);
 
     unsafe {
-      __lafl_edges_map[0] = 1;
+      EDGES_MAP[0] = 1;
       if buf.len() > 0 && buf[0] == 'a' as u8 {
-        __lafl_edges_map[2] = 1;
+        EDGES_MAP[2] = 1;
         if buf.len() > 1 && buf[1] == 'b'  as u8 {
-          __lafl_edges_map[3] = 1;
+          EDGES_MAP[3] = 1;
             //std::process::abort();
         }
       }
@@ -67,7 +67,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), Error> {
         setup_restarting_mgr::<_, _, _, _, _, _, UnixShMem, _>(stats, broker_port).expect("Failed to setup the restarter".into());
 
     let edges_observer =
-    StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { &mut __lafl_edges_map[0] as *mut u8 }, __lafl_max_edges_size as usize);
+    StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { &mut EDGES_MAP[0] as *mut u8 }, EDGES_SIZE as usize);
 
     let mut state = match state_opt {
         Some(s) => s,

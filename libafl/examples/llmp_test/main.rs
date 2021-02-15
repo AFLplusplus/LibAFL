@@ -6,7 +6,7 @@ extern crate alloc;
 use core::{convert::TryInto, time::Duration};
 use std::{thread, time};
 
-use afl::{
+use libafl::{
     bolts::{llmp, shmem::UnixShMem},
     Error,
 };

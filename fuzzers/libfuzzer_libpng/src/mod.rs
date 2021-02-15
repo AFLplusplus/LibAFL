@@ -3,7 +3,7 @@
 
 use std::{env, path::PathBuf};
 
-use afl::{
+use libafl::{
     bolts::{serdeany::RegistryBuilder, shmem::UnixShMem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::setup_restarting_mgr,
@@ -16,7 +16,7 @@ use afl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    utils::StdRand,
+    utils::{current_nanos, StdRand},
     Error, Fuzzer, StdFuzzer,
 };
 
@@ -69,7 +69,7 @@ pub fn main() {
 
 /// The actual fuzzer
 fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
-    let mut rand = StdRand::new(afl::utils::current_nanos());
+    let mut rand = StdRand::new(current_nanos());
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
