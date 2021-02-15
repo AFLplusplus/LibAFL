@@ -277,7 +277,7 @@ where
     pub fn new_default() -> Self {
         let mut scheduled = StdScheduledMutator::<C, I, R, S>::new();
         scheduled.add_mutation(mutation_bitflip);
-        /*scheduled.add_mutation(mutation_byteflip);
+        scheduled.add_mutation(mutation_byteflip);
         scheduled.add_mutation(mutation_byteinc);
         scheduled.add_mutation(mutation_bytedec);
         scheduled.add_mutation(mutation_byteneg);
@@ -307,7 +307,7 @@ where
         scheduled.add_mutation(mutation_tokenreplace);
 
         scheduled.add_mutation(mutation_crossover_insert);
-        scheduled.add_mutation(mutation_crossover_replace);*/
+        scheduled.add_mutation(mutation_crossover_replace);
         //scheduled.add_mutation(mutation_splice);
 
         HavocBytesMutator {

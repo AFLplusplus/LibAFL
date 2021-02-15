@@ -86,8 +86,8 @@ where
 #[inline]
 pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
     debug_assert!(data.len() > 0);
-    debug_assert!(from + len < data.len());
-    debug_assert!(to + len < data.len());
+    debug_assert!(from + len <= data.len());
+    debug_assert!(to + len <= data.len());
     if len != 0 && from != to {
         let ptr = data.as_mut_ptr();
         unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
@@ -99,8 +99,8 @@ pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
 pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
     debug_assert!(dst.len() > 0);
     debug_assert!(src.len() > 0);
-    debug_assert!(from + len < src.len());
-    debug_assert!(to + len < dst.len());
+    debug_assert!(from + len <= src.len());
+    debug_assert!(to + len <= dst.len());
     let dst_ptr = dst.as_mut_ptr();
     let src_ptr = src.as_ptr();
     if len != 0 {
