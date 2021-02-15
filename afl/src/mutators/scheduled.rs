@@ -7,7 +7,7 @@ use crate::{
     mutators::{Corpus, *},
     state::{HasCorpus, HasMetadata},
     utils::Rand,
-    AflError,
+    Error,
 };
 
 pub trait ScheduledMutator<C, I, R, S>:
@@ -39,7 +39,7 @@ where
         state: &mut S,
         input: &mut I,
         _stage_idx: i32,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         let num = self.iterations(rand, input);
         for _ in 0..num {
             let idx = self.schedule(self.mutations_count(), rand, input);
@@ -92,7 +92,7 @@ where
         state: &mut S,
         input: &mut I,
         _stage_idx: i32,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         self.scheduled_mutate(rand, state, input, _stage_idx)
     }
 }
@@ -201,7 +201,7 @@ where
         state: &mut S,
         input: &mut I,
         stage_idx: i32,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         self.scheduled.mutate(rand, state, input, stage_idx)?;
         /*let num = self.scheduled.iterations(rand, input);
         for _ in 0..num {

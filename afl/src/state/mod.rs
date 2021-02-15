@@ -18,7 +18,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     utils::{current_milliseconds, Rand},
-    AflError,
+    Error,
 };
 
 #[cfg(feature = "std")]
@@ -99,7 +99,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         in_dir: &Path,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
@@ -141,7 +141,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         in_dirs: &[PathBuf],
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<BytesInput, R>,
         E: Executor<BytesInput> + HasObservers<OT>,
@@ -268,7 +268,7 @@ where
         input: &I,
         observers: &OT,
         exit_kind: ExitKind,
-    ) -> Result<u32, AflError>
+    ) -> Result<u32, Error>
     where
         OT: ObserversTuple,
     {
@@ -283,7 +283,7 @@ where
         input: &I,
         executor: &mut E,
         event_mgr: &mut EM,
-    ) -> Result<(u32, u32), AflError>
+    ) -> Result<(u32, u32), Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -311,14 +311,14 @@ where
 
     /// Resets all current feedbacks
     #[inline]
-    pub fn discard_input(&mut self, input: &I) -> Result<(), AflError> {
+    pub fn discard_input(&mut self, input: &I) -> Result<(), Error> {
         // TODO: This could probably be automatic in the feedback somehow?
         self.feedbacks_mut().discard_metadata_all(&input)
     }
 
     /// Creates a new testcase, appending the metadata from each feedback
     #[inline]
-    pub fn input_to_testcase(&mut self, input: I, fitness: u32) -> Result<Testcase<I>, AflError> {
+    pub fn input_to_testcase(&mut self, input: I, fitness: u32) -> Result<Testcase<I>, Error> {
         let mut testcase = Testcase::new(input);
         testcase.set_fitness(fitness);
         self.feedbacks_mut().append_metadata_all(&mut testcase)?;
@@ -331,7 +331,7 @@ where
         &mut self,
         input: I,
         fitness: u32,
-    ) -> Result<Option<Testcase<I>>, AflError> {
+    ) -> Result<Option<Testcase<I>>, Error> {
         if fitness > 0 {
             Ok(Some(self.input_to_testcase(input, fitness)?))
         } else {
@@ -342,7 +342,7 @@ where
 
     /// Adds this input to the corpus, if it's intersting
     #[inline]
-    pub fn add_if_interesting(&mut self, input: I, fitness: u32) -> Result<Option<usize>, AflError>
+    pub fn add_if_interesting(&mut self, input: I, fitness: u32) -> Result<Option<usize>, Error>
     where
         C: Corpus<I, R>,
     {
@@ -357,7 +357,7 @@ where
 
     /// Adds this input to the objective corpus, if it's an objective
     #[inline]
-    pub fn add_if_objective(&mut self, input: I, fitness: u32) -> Result<Option<usize>, AflError>
+    pub fn add_if_objective(&mut self, input: I, fitness: u32) -> Result<Option<usize>, Error>
     where
         C: Corpus<I, R>,
     {
@@ -378,7 +378,7 @@ where
         input: I,
         executor: &mut E,
         manager: &mut EM,
-    ) -> Result<u32, AflError>
+    ) -> Result<u32, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -420,7 +420,7 @@ where
         generator: &mut G,
         manager: &mut EM,
         num: usize,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         G: Generator<I, R>,
         C: Corpus<I, R>,

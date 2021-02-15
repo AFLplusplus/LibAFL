@@ -14,13 +14,13 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::AflError;
+use crate::Error;
 
 /// An input for the target
 pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug {
     #[cfg(feature = "std")]
     /// Write this input to the file
-    fn to_file<P>(&self, path: P) -> Result<(), AflError>
+    fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
         P: AsRef<Path>,
     {
@@ -32,14 +32,14 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
 
     #[cfg(not(feature = "std"))]
     /// Write this input to the file
-    fn to_file<P>(&self, _path: P) -> Result<(), AflError>
+    fn to_file<P>(&self, _path: P) -> Result<(), Error>
 where {
-        Err(AflError::NotImplemented("Not suppored in no_std".into()))
+        Err(Error::NotImplemented("Not suppored in no_std".into()))
     }
 
     /// Load the contents of this input from a file
     #[cfg(feature = "std")]
-    fn from_file<P>(path: P) -> Result<Self, AflError>
+    fn from_file<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
@@ -51,9 +51,9 @@ where {
 
     /// Write this input to the file
     #[cfg(not(feature = "std"))]
-    fn from_file<P>(_path: P) -> Result<Self, AflError>
+    fn from_file<P>(_path: P) -> Result<Self, Error>
 where {
-        Err(AflError::NotImplemented("Not suppored in no_std".into()))
+        Err(Error::NotImplemented("Not suppored in no_std".into()))
     }
 }
 

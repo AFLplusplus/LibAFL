@@ -67,7 +67,7 @@ use std::{
 };
 
 use super::shmem::{ShMem, ShMemDescription};
-use crate::AflError;
+use crate::Error;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -140,7 +140,7 @@ const fn llmp_align(to_align: usize) -> usize {
 /// If the content of the env is _NULL, returns None
 #[cfg(feature = "std")]
 #[inline]
-fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, AflError> {
+fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
     let msg_offset_str = env::var(&format!("{}_OFFSET", env_name))?;
     Ok(if msg_offset_str == _NULL_ENV_STR {
         None
@@ -191,7 +191,7 @@ unsafe fn llmp_next_msg_ptr_checked<SH: ShMem>(
     map: &mut LlmpSharedMap<SH>,
     last_msg: *const LlmpMsg,
     alloc_size: usize,
-) -> Result<*mut LlmpMsg, AflError> {
+) -> Result<*mut LlmpMsg, Error> {
     let page = map.page_mut();
     let map_size = map.shmem.map().len();
     let msg_begin_min = (page as *const u8).offset(size_of::<LlmpPage>() as isize);
@@ -202,7 +202,7 @@ unsafe fn llmp_next_msg_ptr_checked<SH: ShMem>(
     if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
         Ok(next)
     } else {
-        Err(AflError::IllegalState(format!(
+        Err(Error::IllegalState(format!(
             "Inconsistent data on sharedmap, or Bug (next_ptr was {:x}, sharedmap page was {:x})",
             next_ptr as usize, page as usize
         )))
@@ -265,12 +265,12 @@ impl LlmpMsg {
 
     /// Gets the buffer from this message as slice, with the corrent length.
     #[inline]
-    pub fn as_slice<SH: ShMem>(&self, map: &mut LlmpSharedMap<SH>) -> Result<&[u8], AflError> {
+    pub fn as_slice<SH: ShMem>(&self, map: &mut LlmpSharedMap<SH>) -> Result<&[u8], Error> {
         unsafe {
             if self.in_map(map) {
                 Ok(self.as_slice_unsafe())
             } else {
-                Err(AflError::IllegalState("Current message not in page. The sharedmap get tampered with or we have a BUG.".into()))
+                Err(Error::IllegalState("Current message not in page. The sharedmap get tampered with or we have a BUG.".into()))
             }
         }
     }
@@ -314,7 +314,7 @@ where
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
-    pub fn on_port(port: u16) -> Result<Self, AflError> {
+    pub fn on_port(port: u16) -> Result<Self, Error> {
         match TcpListener::bind(format!("127.0.0.1:{}", port)) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
@@ -332,14 +332,14 @@ where
                             client: LlmpClient::create_attach_to_tcp(port)?,
                         })
                     }
-                    _ => Err(AflError::File(e)),
+                    _ => Err(Error::File(e)),
                 }
             }
         }
     }
 
     /// Describe this in a reproducable fashion, if it's a client
-    pub fn describe(&self) -> Result<LlmpClientDescription, AflError> {
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(match self {
             LlmpConnection::IsClient { client } => client.describe()?,
             _ => todo!("Only client can be described atm."),
@@ -349,14 +349,14 @@ where
     /// Recreate an existing client from the stored description
     pub fn existing_client_from_description(
         description: &LlmpClientDescription,
-    ) -> Result<LlmpConnection<SH>, AflError> {
+    ) -> Result<LlmpConnection<SH>, Error> {
         Ok(LlmpConnection::IsClient {
             client: LlmpClient::existing_client_from_description(description)?,
         })
     }
 
     /// Sends the given buffer over this connection, no matter if client or broker.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         match self {
             LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf),
             LlmpConnection::IsClient { client } => client.send_buf(tag, buf),
@@ -428,7 +428,7 @@ impl<SH> LlmpSender<SH>
 where
     SH: ShMem,
 {
-    pub fn new(id: u32, keep_pages_forever: bool) -> Result<Self, AflError> {
+    pub fn new(id: u32, keep_pages_forever: bool) -> Result<Self, Error> {
         Ok(Self {
             id,
             last_msg_sent: ptr::null_mut(),
@@ -451,7 +451,7 @@ where
 
     /// Reattach to a vacant out_map, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
-    pub fn on_existing_from_env(env_name: &str) -> Result<Self, AflError> {
+    pub fn on_existing_from_env(env_name: &str) -> Result<Self, Error> {
         let msg_sent_offset = msg_offset_from_env(env_name)?;
         Self::on_existing_map(SH::existing_from_env(env_name)?, msg_sent_offset)
     }
@@ -459,7 +459,7 @@ where
     /// Store the info to this sender to env.
     /// A new client can reattach to it using on_existing_from_env
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), AflError> {
+    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_map = self.out_maps.last().unwrap();
         current_out_map.shmem.write_to_env(env_name)?;
         current_out_map.msg_to_env(self.last_msg_sent, env_name)
@@ -491,7 +491,7 @@ where
     pub fn on_existing_map(
         current_out_map: SH,
         last_msg_sent_offset: Option<u64>,
-    ) -> Result<Self, AflError> {
+    ) -> Result<Self, Error> {
         let mut out_map = LlmpSharedMap::existing(current_out_map);
         let last_msg_sent = match last_msg_sent_offset {
             Some(offset) => out_map.msg_from_offset(offset)?,
@@ -529,7 +529,7 @@ where
     /// The normal alloc will fail if there is not enough space for buf_len_padded + EOP
     /// So if alloc_next fails, create new page if necessary, use this function,
     /// place EOP, commit EOP, reset, alloc again on the new space.
-    unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, AflError> {
+    unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, Error> {
         let mut map = self.out_maps.last_mut().unwrap();
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
@@ -650,7 +650,7 @@ where
     /// After commiting, the msg shall no longer be altered!
     /// It will be read by the consuming threads (broker->clients or client->broker)
     #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
-    unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), AflError> {
+    unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
         if self.last_msg_sent == msg {
             panic!("Message sent twice!");
         }
@@ -659,7 +659,7 @@ where
         }
         let page = self.out_maps.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
-            return Err(AflError::Unknown(format!(
+            return Err(Error::Unknown(format!(
                 "Llmp Message {:?} is null or not in current page",
                 msg
             )));
@@ -673,7 +673,7 @@ where
     }
 
     /// listener about it using a EOP message.
-    unsafe fn handle_out_eop(&mut self) -> Result<(), AflError> {
+    unsafe fn handle_out_eop(&mut self) -> Result<(), Error> {
         let old_map = self.out_maps.last_mut().unwrap().page_mut();
 
         // Create a new shard page.
@@ -710,7 +710,7 @@ where
     }
 
     /// Allocates the next space on this sender page
-    pub unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, AflError> {
+    pub unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         match self.alloc_next_if_space(buf_len) {
             Some(msg) => return Ok(msg),
             _ => (),
@@ -721,7 +721,7 @@ where
 
         match self.alloc_next_if_space(buf_len) {
             Some(msg) => Ok(msg),
-            None => Err(AflError::Unknown(format!(
+            None => Err(Error::Unknown(format!(
                 "Error allocating {} bytes in shmap",
                 buf_len
             ))),
@@ -738,14 +738,14 @@ where
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         // Make sure we don't reuse already allocated tags
         if tag == LLMP_TAG_NEW_SHM_CLIENT
             || tag == LLMP_TAG_END_OF_PAGE
             || tag == LLMP_TAG_UNINITIALIZED
             || tag == LLMP_TAG_UNSET
         {
-            return Err(AflError::Unknown(format!(
+            return Err(Error::Unknown(format!(
                 "Reserved tag supplied to send_buf ({:#X})",
                 tag
             )));
@@ -760,7 +760,7 @@ where
     }
 
     // Describe this cient in a way, that it can be restored later with `Self::on_existing_from_description`
-    pub fn describe(&self) -> Result<LlmpDescription, AflError> {
+    pub fn describe(&self) -> Result<LlmpDescription, Error> {
         let map = self.out_maps.last().unwrap();
         let last_message_offset = if self.last_msg_sent.is_null() {
             None
@@ -774,7 +774,7 @@ where
     }
 
     // Create this client on an existing map from the given description. acquired with `self.describe`
-    pub fn on_existing_from_description(description: &LlmpDescription) -> Result<Self, AflError> {
+    pub fn on_existing_from_description(description: &LlmpDescription) -> Result<Self, Error> {
         Self::on_existing_map(
             SH::existing_from_description(&description.shmem)?,
             description.last_message_offset,
@@ -802,7 +802,7 @@ where
 {
     /// Reattach to a vacant recv_map, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
-    pub fn on_existing_from_env(env_name: &str) -> Result<Self, AflError> {
+    pub fn on_existing_from_env(env_name: &str) -> Result<Self, Error> {
         Self::on_existing_map(
             SH::existing_from_env(env_name)?,
             msg_offset_from_env(env_name)?,
@@ -812,7 +812,7 @@ where
     /// Store the info to this receiver to env.
     /// A new client can reattach to it using on_existing_from_env
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), AflError> {
+    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_map = &self.current_recv_map;
         current_out_map.shmem.write_to_env(env_name)?;
         current_out_map.msg_to_env(self.last_msg_recvd, env_name)
@@ -824,7 +824,7 @@ where
     pub fn on_existing_map(
         current_sender_map: SH,
         last_msg_recvd_offset: Option<u64>,
-    ) -> Result<Self, AflError> {
+    ) -> Result<Self, Error> {
         let mut current_recv_map = LlmpSharedMap::existing(current_sender_map);
         let last_msg_recvd = match last_msg_recvd_offset {
             Some(offset) => current_recv_map.msg_from_offset(offset)?,
@@ -841,7 +841,7 @@ where
     // Never inline, to not get some strange effects
     /// Read next message.
     #[inline(never)]
-    unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, AflError> {
+    unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         /* DBG("recv %p %p\n", page, last_msg); */
         compiler_fence(Ordering::SeqCst);
         let page = self.current_recv_map.page_mut();
@@ -871,7 +871,7 @@ where
         match ret {
             Some(msg) => {
                 if !(*msg).in_map(&mut self.current_recv_map) {
-                    return Err(AflError::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
+                    return Err(Error::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
                 }
                 // Handle special, LLMP internal, messages.
                 match (*msg).tag {
@@ -923,7 +923,7 @@ where
 
     /// Blocks/spins until the next message gets posted to the page,
     /// then returns that message.
-    pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, AflError> {
+    pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
         let mut current_msg_id = 0;
         let page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
@@ -946,7 +946,7 @@ where
 
     /// Returns the next message, tag, buf, if avaliable, else None
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, AflError> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         unsafe {
             Ok(match self.recv()? {
                 Some(msg) => Some((
@@ -961,7 +961,7 @@ where
 
     /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), AflError> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), Error> {
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
@@ -973,7 +973,7 @@ where
     }
 
     // Describe this cient in a way, that it can be restored later with `Self::on_existing_from_description`
-    pub fn describe(&self) -> Result<LlmpDescription, AflError> {
+    pub fn describe(&self) -> Result<LlmpDescription, Error> {
         let map = &self.current_recv_map;
         let last_message_offset = if self.last_msg_recvd.is_null() {
             None
@@ -987,7 +987,7 @@ where
     }
 
     // Create this client on an existing map from the given description. acquired with `self.describe`
-    pub fn on_existing_from_description(description: &LlmpDescription) -> Result<Self, AflError> {
+    pub fn on_existing_from_description(description: &LlmpDescription) -> Result<Self, Error> {
         Self::on_existing_map(
             SH::existing_from_description(&description.shmem)?,
             description.last_message_offset,
@@ -1054,14 +1054,14 @@ where
 
     /// Gets the offset of a message on this here page.
     /// Will return IllegalArgument error if msg is not on page.
-    pub fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, AflError> {
+    pub fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
         unsafe {
             let page = self.page();
             if llmp_msg_in_page(page, msg) {
                 // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
                 Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
             } else {
-                Err(AflError::IllegalArgument(format!(
+                Err(Error::IllegalArgument(format!(
                     "Message (0x{:X}) not in page (0x{:X})",
                     page as u64, msg as u64
                 )))
@@ -1072,7 +1072,7 @@ where
     /// Retrieve the stored msg from env_name + _OFFSET.
     /// It will restore the stored offset by env_name and return the message.
     #[cfg(feature = "std")]
-    pub fn msg_from_env(&mut self, map_env_name: &str) -> Result<*mut LlmpMsg, AflError> {
+    pub fn msg_from_env(&mut self, map_env_name: &str) -> Result<*mut LlmpMsg, Error> {
         match msg_offset_from_env(map_env_name)? {
             Some(offset) => self.msg_from_offset(offset),
             None => Ok(ptr::null_mut()),
@@ -1082,7 +1082,7 @@ where
     /// Store this msg offset to env_name + _OFFSET env variable.
     /// It can be restored using msg_from_env with the same env_name later.
     #[cfg(feature = "std")]
-    pub fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), AflError> {
+    pub fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
             env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR)
         } else {
@@ -1096,12 +1096,12 @@ where
 
     /// Gets this message from this page, at the indicated offset.
     /// Will return IllegalArgument error if the offset is out of bounds.
-    pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, AflError> {
+    pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         unsafe {
             let page = self.page_mut();
             let page_size = self.shmem.map().len() - size_of::<LlmpPage>();
             if offset as isize > page_size as isize {
-                Err(AflError::IllegalArgument(format!(
+                Err(Error::IllegalArgument(format!(
                     "Msg offset out of bounds (size: {}, requested offset: {})",
                     page_size, offset
                 )))
@@ -1136,7 +1136,7 @@ where
     SH: ShMem,
 {
     /// Create and initialize a new llmp_broker
-    pub fn new() -> Result<Self, AflError> {
+    pub fn new() -> Result<Self, Error> {
         let broker = LlmpBroker {
             llmp_out: LlmpSender {
                 id: 0,
@@ -1153,7 +1153,7 @@ where
     }
 
     /// Allocate the next message on the outgoing map
-    unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, AflError> {
+    unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         self.llmp_out.alloc_next(buf_len)
     }
 
@@ -1172,7 +1172,7 @@ where
     }
 
     /// For internal use: Forward the current message to the out map.
-    unsafe fn forward_msg(&mut self, msg: *mut LlmpMsg) -> Result<(), AflError> {
+    unsafe fn forward_msg(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
         let mut out: *mut LlmpMsg = self.alloc_next((*msg).buf_len_padded as usize)?;
 
         /* Copy over the whole message.
@@ -1193,9 +1193,9 @@ where
     /// The broker walks all pages and looks for changes, then broadcasts them on
     /// its own shared page, once.
     #[inline]
-    pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<(), AflError>
+    pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<(), Error>
     where
-        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
+        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         compiler_fence(Ordering::SeqCst);
         for i in 0..self.llmp_clients.len() {
@@ -1211,7 +1211,7 @@ where
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>) -> !
     where
-        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
+        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         loop {
             compiler_fence(Ordering::SeqCst);
@@ -1235,7 +1235,7 @@ where
     }
 
     /// Broadcasts the given buf to all lients
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         self.llmp_out.send_buf(tag, buf)
     }
 
@@ -1245,7 +1245,7 @@ where
     pub fn launch_tcp_listener_on(
         &mut self,
         port: u16,
-    ) -> Result<thread::JoinHandle<()>, AflError> {
+    ) -> Result<thread::JoinHandle<()>, Error> {
         let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
         // accept connections and process them, spawning a new thread for each one
         println!("Server listening on port {}", port);
@@ -1257,7 +1257,7 @@ where
     pub fn launch_tcp_listener(
         &mut self,
         listener: TcpListener,
-    ) -> Result<thread::JoinHandle<()>, AflError> {
+    ) -> Result<thread::JoinHandle<()>, Error> {
         // Later in the execution, after the initial map filled up,
         // the current broacast map will will point to a different map.
         // However, the original map is (as of now) never freed, new clients will start
@@ -1336,9 +1336,9 @@ where
         &mut self,
         client_id: u32,
         on_new_msg: &mut F,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
-        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, AflError>,
+        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         let mut next_id = self.llmp_clients.len() as u32;
 
@@ -1365,7 +1365,7 @@ where
                         size_of::<LlmpPayloadSharedMapInfo>()
                     );
                     #[cfg(not(feature = "std"))]
-                    return Err(AflError::Unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
+                    return Err(Error::Unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
                        (*msg).buf_len_padded,
                         size_of::<LlmpPayloadSharedMapInfo>()
                     )));
@@ -1388,7 +1388,7 @@ where
                             #[cfg(feature = "std")]
                             println!("Error adding client! Ignoring: {:?}", e);
                             #[cfg(not(feature = "std"))]
-                            return Err(AflError::Unknown(format!(
+                            return Err(Error::Unknown(format!(
                                 "Error adding client! PANIC! {:?}",
                                 e
                             )));
@@ -1448,7 +1448,7 @@ where
         last_msg_sent_offset: Option<u64>,
         current_broker_map: SH,
         last_msg_recvd_offset: Option<u64>,
-    ) -> Result<Self, AflError> {
+    ) -> Result<Self, Error> {
         Ok(Self {
             receiver: LlmpReceiver::on_existing_map(current_broker_map, last_msg_recvd_offset)?,
             sender: LlmpSender::on_existing_map(current_out_map, last_msg_sent_offset)?,
@@ -1457,7 +1457,7 @@ where
 
     /// Recreate this client from a previous client.to_env
     #[cfg(feature = "std")]
-    pub fn on_existing_from_env(env_name: &str) -> Result<Self, AflError> {
+    pub fn on_existing_from_env(env_name: &str) -> Result<Self, Error> {
         Ok(Self {
             sender: LlmpSender::on_existing_from_env(&format!("{}_SENDER", env_name))?,
             receiver: LlmpReceiver::on_existing_from_env(&format!("{}_RECEIVER", env_name))?,
@@ -1467,13 +1467,13 @@ where
     /// Write the current state to env.
     /// A new client can attach to exactly the same state by calling on_existing_map.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), AflError> {
+    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         self.sender.to_env(&format!("{}_SENDER", env_name))?;
         self.receiver.to_env(&format!("{}_RECEIVER", env_name))
     }
 
     /// Describe this client in a way that it can be recreated, for example after crash
-    fn describe(&self) -> Result<LlmpClientDescription, AflError> {
+    fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(LlmpClientDescription {
             sender: self.sender.describe()?,
             receiver: self.receiver.describe()?,
@@ -1483,7 +1483,7 @@ where
     /// Create an existing client from description
     fn existing_client_from_description(
         description: &LlmpClientDescription,
-    ) -> Result<Self, AflError> {
+    ) -> Result<Self, Error> {
         Ok(Self {
             sender: LlmpSender::on_existing_from_description(&description.sender)?,
             receiver: LlmpReceiver::on_existing_from_description(&description.receiver)?,
@@ -1502,7 +1502,7 @@ where
     }
 
     /// Creates a new LlmpClient
-    pub fn new(initial_broker_map: LlmpSharedMap<SH>) -> Result<Self, AflError> {
+    pub fn new(initial_broker_map: LlmpSharedMap<SH>) -> Result<Self, Error> {
         Ok(Self {
             sender: LlmpSender {
                 id: 0,
@@ -1524,12 +1524,12 @@ where
     }
 
     /// Commits a msg to the client's out map
-    pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), AflError> {
+    pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
         self.sender.send(msg)
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), AflError> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         self.sender.send_buf(tag, buf)
     }
 
@@ -1538,7 +1538,7 @@ where
         &mut self,
         shm_str: &[u8; 20],
         shm_id: usize,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         // We write this by hand to get around checks in send_buf
         unsafe {
             let msg = self
@@ -1555,45 +1555,45 @@ where
     /// A client receives a broadcast message.
     /// Returns null if no message is availiable
     #[inline]
-    pub unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, AflError> {
+    pub unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         self.receiver.recv()
     }
 
     /// A client blocks/spins until the next message gets posted to the page,
     /// then returns that message.
     #[inline]
-    pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, AflError> {
+    pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
         self.receiver.recv_blocking()
     }
 
     /// The current page could have changed in recv (EOP)
     /// Alloc the next message, internally handling end of page by allocating a new one.
     #[inline]
-    pub unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, AflError> {
+    pub unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         self.sender.alloc_next(buf_len)
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, AflError> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         self.receiver.recv_buf()
     }
 
     /// Receives a buf from the broker, looping until a messages becomes avaliable
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), AflError> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), Error> {
         self.receiver.recv_buf_blocking()
     }
 
     #[cfg(feature = "std")]
     /// Creates a new LlmpClient, reading the map id and len from env
-    pub fn create_using_env(env_var: &str) -> Result<Self, AflError> {
+    pub fn create_using_env(env_var: &str) -> Result<Self, Error> {
         Self::new(LlmpSharedMap::existing(SH::existing_from_env(env_var)?))
     }
 
     #[cfg(feature = "std")]
     /// Create a LlmpClient, getting the ID from a given port
-    pub fn create_attach_to_tcp(port: u16) -> Result<Self, AflError> {
+    pub fn create_attach_to_tcp(port: u16) -> Result<Self, Error> {
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
         println!("Connected to port {}", port);
 
@@ -1624,18 +1624,18 @@ mod tests {
         Tag,
     };
     #[cfg(feature = "std")]
-    use crate::bolts::shmem::AflShmem;
+    use crate::bolts::shmem::UnixShMem;
 
     #[cfg(feature = "std")]
     #[test]
     pub fn llmp_connection() {
-        let mut broker = match LlmpConnection::<AflShmem>::on_port(1337).unwrap() {
+        let mut broker = match LlmpConnection::<UnixShMem>::on_port(1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
             IsBroker { broker } => broker,
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::<AflShmem>::on_port(1337).unwrap() {
+        let mut client = match LlmpConnection::<UnixShMem>::on_port(1337).unwrap() {
             IsBroker { broker: _ } => panic!("Second connect should be a client!"),
             IsClient { client } => client,
         };
@@ -1659,7 +1659,7 @@ mod tests {
         }
 
         /* recreate the client from env, check if it still works */
-        client = LlmpClient::<AflShmem>::on_existing_from_env("_ENV_TEST").unwrap();
+        client = LlmpClient::<UnixShMem>::on_existing_from_env("_ENV_TEST").unwrap();
 
         client.send_buf(tag, &arr).unwrap();
 

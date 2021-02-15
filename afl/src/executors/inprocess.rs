@@ -16,7 +16,7 @@ use crate::{
     observers::ObserversTuple,
     state::State,
     utils::Rand,
-    AflError,
+    Error,
 };
 
 #[cfg(feature = "std")]
@@ -59,7 +59,7 @@ where
         _state: &mut State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         R: Rand,
         FT: FeedbacksTuple<I>,
@@ -87,7 +87,7 @@ where
         _state: &State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         R: Rand,
         FT: FeedbacksTuple<I>,
@@ -105,7 +105,7 @@ where
     }
 
     #[inline]
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(self, bytes.as_slice());
         Ok(ret)

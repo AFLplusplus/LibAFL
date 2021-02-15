@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::{
-    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, AflError,
+    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, Error,
 };
 
 /// A corpus able to store testcases to disk, and load them from disk, when they are being used.
@@ -73,9 +73,9 @@ where
 
     /// Gets the next entry
     #[inline]
-    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError> {
+    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
         if self.count() == 0 {
-            Err(AflError::Empty("No entries in corpus".to_owned()))
+            Err(Error::Empty("No entries in corpus".to_owned()))
         } else {
             let len = { self.entries().len() };
             let id = rand.below(len as u64) as usize;

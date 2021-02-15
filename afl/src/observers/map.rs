@@ -7,7 +7,7 @@ use crate::{
         tuples::Named,
     },
     observers::Observer,
-    AflError,
+    Error,
 };
 
 /// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
@@ -37,7 +37,7 @@ where
 
     /// Reset the map
     #[inline]
-    fn reset_map(&mut self) -> Result<(), AflError> {
+    fn reset_map(&mut self) -> Result<(), Error> {
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
@@ -67,7 +67,7 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn pre_exec(&mut self) -> Result<(), AflError> {
+    fn pre_exec(&mut self) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -157,7 +157,7 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn pre_exec(&mut self) -> Result<(), AflError> {
+    fn pre_exec(&mut self) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -271,12 +271,12 @@ where
     M: MapObserver<u8>,
 {
     #[inline]
-    fn pre_exec(&mut self) -> Result<(), AflError> {
+    fn pre_exec(&mut self) -> Result<(), Error> {
         self.reset_map()
     }
 
     #[inline]
-    fn post_exec(&mut self) -> Result<(), AflError> {
+    fn post_exec(&mut self) -> Result<(), Error> {
         for x in self.map_mut().iter_mut() {
             *x = COUNT_CLASS_LOOKUP[*x as usize];
         }

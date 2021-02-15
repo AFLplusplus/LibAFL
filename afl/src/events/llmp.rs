@@ -10,7 +10,7 @@ use std::{env, process::Command};
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-use crate::bolts::shmem::AflShmem;
+use crate::bolts::shmem::UnixShMem;
 use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, Tag},
@@ -24,7 +24,7 @@ use crate::{
     state::State,
     stats::Stats,
     utils::Rand,
-    AflError,
+    Error,
 };
 
 /// Forward this to the client
@@ -53,7 +53,7 @@ where
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-impl<I, ST> LlmpEventManager<I, AflShmem, ST>
+impl<I, ST> LlmpEventManager<I, UnixShMem, ST>
 where
     I: Input,
     ST: Stats,
@@ -62,7 +62,7 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port_std(stats: ST, port: u16) -> Result<Self, AflError> {
+    pub fn new_on_port_std(stats: ST, port: u16) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(port)?,
@@ -71,9 +71,9 @@ where
     }
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
-    /// Std uses AflShmem.
+    /// Std uses UnixShMem.
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env_std(env_name: &str) -> Result<Self, AflError> {
+    pub fn existing_client_from_env_std(env_name: &str) -> Result<Self, Error> {
         Self::existing_client_from_env(env_name)
     }
 }
@@ -100,7 +100,7 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port(stats: ST, port: u16) -> Result<Self, AflError> {
+    pub fn new_on_port(stats: ST, port: u16) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(port)?,
@@ -110,7 +110,7 @@ where
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env(env_name: &str) -> Result<Self, AflError> {
+    pub fn existing_client_from_env(env_name: &str) -> Result<Self, Error> {
         Ok(Self {
             stats: None,
             llmp: llmp::LlmpConnection::IsClient {
@@ -123,14 +123,14 @@ where
     }
 
     /// Describe the client event mgr's llmp parts in a restorable fashion
-    pub fn describe(&self) -> Result<LlmpClientDescription, AflError> {
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         self.llmp.describe()
     }
 
     /// Create an existing client from description
     pub fn existing_client_from_description(
         description: &LlmpClientDescription,
-    ) -> Result<Self, AflError> {
+    ) -> Result<Self, Error> {
         Ok(Self {
             stats: None,
             llmp: llmp::LlmpConnection::existing_client_from_description(description)?,
@@ -169,7 +169,7 @@ where
     }
 
     /// Run forever in the broker
-    pub fn broker_loop(&mut self) -> Result<(), AflError> {
+    pub fn broker_loop(&mut self) -> Result<(), Error> {
         match &mut self.llmp {
             llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = self.stats.as_mut().unwrap();
@@ -190,7 +190,7 @@ where
                     Some(Duration::from_millis(5)),
                 );
             }
-            _ => Err(AflError::IllegalState(
+            _ => Err(Error::IllegalState(
                 "Called broker loop in the client".into(),
             )),
         }
@@ -201,7 +201,7 @@ where
         stats: &mut ST,
         sender_id: u32,
         event: &Event<I>,
-    ) -> Result<BrokerEventResult, AflError> {
+    ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase {
                 input: _,
@@ -257,7 +257,7 @@ where
         state: &mut State<C, FT, I, OC, OFT, R>,
         _sender_id: u32,
         event: Event<I>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -284,7 +284,7 @@ where
                 state.add_if_interesting(input, interestingness)?;
                 Ok(())
             }
-            _ => Err(AflError::Unknown(format!(
+            _ => Err(Error::Unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
             ))),
@@ -313,7 +313,7 @@ where
     fn process<C, FT, OC, OFT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<usize, AflError>
+    ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -352,7 +352,7 @@ where
         &mut self,
         _state: &mut State<C, FT, I, OC, OFT, R>,
         event: Event<I>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -373,7 +373,7 @@ where
 pub fn serialize_state_mgr<C, FT, I, OC, OFT, R, SH, ST>(
     state: &State<C, FT, I, OC, OFT, R>,
     mgr: &LlmpEventManager<I, SH, ST>,
-) -> Result<Vec<u8>, AflError>
+) -> Result<Vec<u8>, Error>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,
@@ -390,7 +390,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 pub fn deserialize_state_mgr<C, FT, I, OC, OFT, R, SH, ST>(
     state_corpus_serialized: &[u8],
-) -> Result<(State<C, FT, I, OC, OFT, R>, LlmpEventManager<I, SH, ST>), AflError>
+) -> Result<(State<C, FT, I, OC, OFT, R>, LlmpEventManager<I, SH, ST>), Error>
 where
     C: Corpus<I, R>,
     FT: FeedbacksTuple<I>,
@@ -440,7 +440,7 @@ where
     fn on_restart<C, FT, OC, OFT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -458,7 +458,7 @@ where
     fn process<C, FT, OC, OFT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<usize, AflError>
+    ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -473,7 +473,7 @@ where
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
         event: Event<I>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -526,7 +526,7 @@ pub fn setup_restarting_mgr<I, C, FT, OC, OFT, R, SH, ST>(
         Option<State<C, FT, I, OC, OFT, R>>,
         LlmpRestartingEventManager<I, SH, ST>,
     ),
-    AflError,
+    Error,
 >
 where
     I: Input,

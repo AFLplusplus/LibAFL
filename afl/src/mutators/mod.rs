@@ -12,7 +12,7 @@ use crate::{
     inputs::Input,
     state::{HasCorpus, HasMetadata},
     utils::Rand,
-    AflError,
+    Error,
 };
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
@@ -34,7 +34,7 @@ where
         state: &mut S,
         input: &mut I,
         stage_idx: i32,
-    ) -> Result<(), AflError>;
+    ) -> Result<(), Error>;
 
     /// Post-process given the outcome of the execution
     fn post_exec(
@@ -42,7 +42,7 @@ where
         _state: &mut S,
         _is_interesting: u32,
         _stage_idx: i32,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

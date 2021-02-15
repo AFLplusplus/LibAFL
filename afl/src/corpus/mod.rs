@@ -18,7 +18,7 @@ pub use queue::QueueCorpus;
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cell::RefCell, ptr};
 
-use crate::{inputs::Input, utils::Rand, AflError};
+use crate::{inputs::Input, utils::Rand, Error};
 
 /// A way to obtain the containing testcase entries
 pub trait HasTestcaseVec<I>
@@ -52,9 +52,9 @@ where
     }
 
     /// Replaces the testcase at the given idx
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), AflError> {
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
         if self.entries_mut().len() < idx {
-            return Err(AflError::KeyNotFound(format!(
+            return Err(Error::KeyNotFound(format!(
                 "Index {} out of bounds",
                 idx
             )));
@@ -84,9 +84,9 @@ where
 
     /// Gets a random entry
     #[inline]
-    fn random_entry(&self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError> {
+    fn random_entry(&self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
         if self.count() == 0 {
-            Err(AflError::Empty("No entries in corpus".to_owned()))
+            Err(Error::Empty("No entries in corpus".to_owned()))
         } else {
             let len = { self.entries().len() };
             let id = rand.below(len as u64) as usize;
@@ -96,7 +96,7 @@ where
 
     // TODO: IntoIter
     /// Gets the next entry
-    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError>;
+    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error>;
 
     /// Returns the testacase we currently use
     fn current_testcase(&self) -> (&RefCell<Testcase<I>>, usize);

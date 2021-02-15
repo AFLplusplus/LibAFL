@@ -10,7 +10,7 @@ use crate::{
     state::State,
     stats::Stats,
     utils::Rand,
-    AflError,
+    Error,
 };
 
 /// A simple, single-threaded event manager that just logs
@@ -34,7 +34,7 @@ where
     fn process<C, FT, OC, OFT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<usize, AflError>
+    ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -54,7 +54,7 @@ where
         &mut self,
         _state: &mut State<C, FT, I, OC, OFT, R>,
         event: Event<I>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -87,7 +87,7 @@ where
         stats: &mut ST,
         _sender_id: u32,
         event: &Event<I>,
-    ) -> Result<BrokerEventResult, AflError> {
+    ) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase {
                 input: _,
@@ -137,7 +137,7 @@ where
         _state: &mut State<C, FT, I, OC, OFT, R>,
         _sender_id: u32,
         event: Event<I>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -146,7 +146,7 @@ where
         OFT: FeedbacksTuple<I>,
     {
         match event {
-            _ => Err(AflError::Unknown(format!(
+            _ => Err(Error::Unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event
             ))),

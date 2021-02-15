@@ -5,7 +5,7 @@ use std::{path::PathBuf};
 use std::io::{self, BufRead};
 
 use afl::{
-    bolts::{tuples::tuple_list, shmem::AflShmem},
+    bolts::{tuples::tuple_list, shmem::UnixShMem},
     corpus::{Corpus, InMemoryCorpus},
     events::setup_restarting_mgr,
     events::{SimpleStats},
@@ -17,7 +17,7 @@ use afl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, State},
     utils::StdRand,
-    AflError, Fuzzer, StdFuzzer,
+    Error, Fuzzer, StdFuzzer,
 };
 
 /// The name of the coverage map observer, to find it again in the observer list
@@ -53,7 +53,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
+fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), Error> {
     let mut rand = StdRand::new(0);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
@@ -64,7 +64,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), AflError> {
     
     // The restarting state will spawn the same process again as child, then restartet it each time it crashes.
     let (state_opt, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, _, _, AflShmem, _>(stats, broker_port).expect("Failed to setup the restarter".into());
+        setup_restarting_mgr::<_, _, _, _, UnixShMem, _>(stats, broker_port).expect("Failed to setup the restarter".into());
 
     let edges_observer =
     StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { &mut __lafl_edges_map[0] as *mut u8 }, __lafl_max_edges_size as usize);

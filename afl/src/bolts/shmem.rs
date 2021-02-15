@@ -3,7 +3,7 @@
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-pub use shmem::AflShmem;
+pub use shmem::UnixShMem;
 
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 
-use crate::AflError;
+use crate::Error;
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
@@ -26,19 +26,19 @@ pub struct ShMemDescription {
 /// A Shared map
 pub trait ShMem: Sized + Debug {
     /// Creates a new map with the given size
-    fn new_map(map_size: usize) -> Result<Self, AflError>;
+    fn new_map(map_size: usize) -> Result<Self, Error>;
 
     /// Creates a new reference to the same map
-    fn clone_ref(old_ref: &Self) -> Result<Self, AflError> {
+    fn clone_ref(old_ref: &Self) -> Result<Self, Error> {
         Self::existing_from_shm_slice(old_ref.shm_slice(), old_ref.map().len())
     }
 
     /// Creates a nes variable with the given name, strigified to 20 bytes.
     fn existing_from_shm_slice(map_str_bytes: &[u8; 20], map_size: usize)
-        -> Result<Self, AflError>;
+        -> Result<Self, Error>;
 
     /// Initialize from a shm_str with fixed len of 20
-    fn existing_from_shm_str(shm_str: &str, map_size: usize) -> Result<Self, AflError> {
+    fn existing_from_shm_str(shm_str: &str, map_size: usize) -> Result<Self, Error> {
         let mut slice: [u8; 20] = [0; 20];
         for (i, val) in shm_str.as_bytes().iter().enumerate() {
             slice[i] = *val;
@@ -73,13 +73,13 @@ pub trait ShMem: Sized + Debug {
     }
 
     /// Create a map from a map description
-    fn existing_from_description(description: &ShMemDescription) -> Result<Self, AflError> {
+    fn existing_from_description(description: &ShMemDescription) -> Result<Self, Error> {
         Self::existing_from_shm_slice(&description.str_bytes, description.size)
     }
 
     /// Write this map's config to env
     #[cfg(feature = "std")]
-    fn write_to_env(&self, env_name: &str) -> Result<(), AflError> {
+    fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
         let map_size = self.map().len();
         let map_size_env = format!("{}_SIZE", env_name);
         env::set_var(env_name, self.shm_str());
@@ -89,7 +89,7 @@ pub trait ShMem: Sized + Debug {
 
     /// Reads an existing map config from env vars, then maps it
     #[cfg(feature = "std")]
-    fn existing_from_env(env_name: &str) -> Result<Self, AflError> {
+    fn existing_from_env(env_name: &str) -> Result<Self, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
         Self::existing_from_shm_str(&map_shm_str, map_size)
@@ -104,7 +104,7 @@ pub mod shmem {
     use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
     use std::ffi::CStr;
 
-    use crate::AflError;
+    use crate::Error;
 
     use super::ShMem;
 
@@ -158,7 +158,7 @@ pub mod shmem {
     /// The default Sharedmap impl for unix using shmctl & shmget
     #[cfg(unix)]
     #[derive(Clone, Debug)]
-    pub struct AflShmem {
+    pub struct UnixShMem {
         pub shm_str: [u8; 20],
         pub shm_id: c_int,
         pub map: *mut u8,
@@ -166,18 +166,18 @@ pub mod shmem {
     }
 
     #[cfg(unix)]
-    impl ShMem for AflShmem {
+    impl ShMem for UnixShMem {
         fn existing_from_shm_slice(
             map_str_bytes: &[u8; 20],
             map_size: usize,
-        ) -> Result<Self, AflError> {
+        ) -> Result<Self, Error> {
             unsafe {
                 let str_bytes = map_str_bytes as *const [u8; 20] as *const libc::c_char;
                 Self::from_str(CStr::from_ptr(str_bytes), map_size)
             }
         }
 
-        fn new_map(map_size: usize) -> Result<Self, AflError> {
+        fn new_map(map_size: usize) -> Result<Self, Error> {
             Self::new(map_size)
         }
 
@@ -195,7 +195,7 @@ pub mod shmem {
     }
 
     /// Deinit sharedmaps on drop
-    impl Drop for AflShmem {
+    impl Drop for UnixShMem {
         fn drop(&mut self) {
             unsafe {
                 afl_shmem_deinit(self);
@@ -205,8 +205,8 @@ pub mod shmem {
 
     /// Create an uninitialized shmap
     #[cfg(unix)]
-    const fn afl_shmem_unitialized() -> AflShmem {
-        AflShmem {
+    const fn afl_shmem_unitialized() -> UnixShMem {
+        UnixShMem {
             shm_str: [0; 20],
             shm_id: -1,
             map: 0 as *mut c_uchar,
@@ -215,27 +215,27 @@ pub mod shmem {
     }
 
     #[cfg(unix)]
-    impl AflShmem {
-        pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, AflError> {
+    impl UnixShMem {
+        pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, Error> {
             let mut ret = afl_shmem_unitialized();
             let map = unsafe { afl_shmem_by_str(&mut ret, shm_str, map_size) };
             if map != 0 as *mut u8 {
                 Ok(ret)
             } else {
-                Err(AflError::Unknown(format!(
+                Err(Error::Unknown(format!(
                     "Could not allocate map with id {:?} and size {}",
                     shm_str, map_size
                 )))
             }
         }
 
-        pub fn new(map_size: usize) -> Result<Self, AflError> {
+        pub fn new(map_size: usize) -> Result<Self, Error> {
             let mut ret = afl_shmem_unitialized();
             let map = unsafe { afl_shmem_init(&mut ret, map_size) };
             if map != 0 as *mut u8 {
                 Ok(ret)
             } else {
-                Err(AflError::Unknown(format!(
+                Err(Error::Unknown(format!(
                     "Could not allocate map of size {}",
                     map_size
                 )))
@@ -244,7 +244,7 @@ pub mod shmem {
     }
 
     /// Deinitialize this shmem instance
-    unsafe fn afl_shmem_deinit(shm: *mut AflShmem) {
+    unsafe fn afl_shmem_deinit(shm: *mut UnixShMem) {
         if shm.is_null() || (*shm).map.is_null() {
             /* Serialized map id */
             // Not set or not initialized;
@@ -257,7 +257,7 @@ pub mod shmem {
 
     /// Functions to create Shared memory region, for observation channels and
     /// opening inputs and stuff.
-    unsafe fn afl_shmem_init(shm: *mut AflShmem, map_size: usize) -> *mut c_uchar {
+    unsafe fn afl_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
         (*shm).map_size = map_size;
         (*shm).map = 0 as *mut c_uchar;
         (*shm).shm_id = shmget(
@@ -290,7 +290,7 @@ pub mod shmem {
 
     /// Uses a shmap id string to open a shared map
     unsafe fn afl_shmem_by_str(
-        shm: *mut AflShmem,
+        shm: *mut UnixShMem,
         shm_str: &CStr,
         map_size: usize,
     ) -> *mut c_uchar {
@@ -324,7 +324,7 @@ pub mod shmem {
 mod tests {
 
     #[cfg(feature = "std")]
-    use super::{AflShmem, ShMem};
+    use super::{UnixShMem, ShMem};
 
     #[cfg(feature = "std")]
     #[test]
@@ -333,7 +333,7 @@ mod tests {
         shm_str[0] = 'A' as u8;
         shm_str[1] = 'B' as u8;
         shm_str[2] = 'C' as u8;
-        let faux_shmem = AflShmem {
+        let faux_shmem = UnixShMem {
             shm_id: 0,
             shm_str,
             map: 0 as *mut u8,

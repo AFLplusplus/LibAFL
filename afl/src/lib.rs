@@ -62,7 +62,7 @@ where
         executor: &mut E,
         state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
-    ) -> Result<usize, AflError> {
+    ) -> Result<usize, Error> {
         let (_, idx) = state.corpus_mut().next(rand)?;
 
         self.stages_mut()
@@ -78,7 +78,7 @@ where
         executor: &mut E,
         state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         let mut last = current_milliseconds();
         loop {
             self.fuzz_one(rand, executor, state, manager)?;
@@ -163,7 +163,7 @@ where
 
 /// Main error struct for AFL
 #[derive(Debug)]
-pub enum AflError {
+pub enum Error {
     /// Serialization error
     Serialize(String),
     /// File related error
@@ -187,7 +187,7 @@ pub enum AflError {
     Unknown(String),
 }
 
-impl fmt::Display for AflError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Serialize(s) => write!(f, "Error in Serialization: `{0}`", &s),
@@ -208,7 +208,7 @@ impl fmt::Display for AflError {
 }
 
 /// Stringify the postcard serializer error
-impl From<postcard::Error> for AflError {
+impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
         Self::Serialize(format!("{:?}", err))
     }
@@ -216,28 +216,28 @@ impl From<postcard::Error> for AflError {
 
 /// Create an AFL Error from io Error
 #[cfg(feature = "std")]
-impl From<io::Error> for AflError {
+impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Self::File(err)
     }
 }
 
 #[cfg(feature = "std")]
-impl From<FromUtf8Error> for AflError {
+impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
         Self::Unknown(format!("Could not convert byte to utf-8: {:?}", err))
     }
 }
 
 #[cfg(feature = "std")]
-impl From<VarError> for AflError {
+impl From<VarError> for Error {
     fn from(err: VarError) -> Self {
         Self::Empty(format!("Could not get env var: {:?}", err))
     }
 }
 
 #[cfg(feature = "std")]
-impl From<ParseIntError> for AflError {
+impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
         Self::Unknown(format!("Failed to parse Int: {:?}", err))
     }

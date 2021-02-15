@@ -12,7 +12,7 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     observers::ObserversTuple,
-    AflError,
+    Error,
 };
 
 /// Feedbacks evaluate the observers.
@@ -28,17 +28,17 @@ where
         input: &I,
         observers: &OT,
         exit_kind: ExitKind,
-    ) -> Result<u32, AflError>;
+    ) -> Result<u32, Error>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
+    fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -49,19 +49,19 @@ where
     /// Example:
     /// >> The virgin_bits map in AFL needs to be in sync with the corpus
     #[inline]
-    fn serialize_state(&mut self) -> Result<Vec<u8>, AflError> {
+    fn serialize_state(&mut self) -> Result<Vec<u8>, Error> {
         Ok(vec![])
     }
 
     /// Restore the state from a given vec, priviously stored using `serialize_state`
     #[inline]
-    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), AflError> {
+    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), Error> {
         let _ = serialized_state;
         Ok(())
     }
 
     // TODO: Restore_from
-    fn restore_from(&mut self, restore_from: Self) -> Result<(), AflError> {
+    fn restore_from(&mut self, restore_from: Self) -> Result<(), Error> {
         Ok(())
     }
     */
@@ -77,18 +77,18 @@ where
         input: &I,
         observers: &OT,
         exit_kind: ExitKind,
-    ) -> Result<u32, AflError>;
+    ) -> Result<u32, Error>;
 
     /// Write metadata for this testcase
-    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError>;
+    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error>;
 
     /// Discards metadata - the end of this input's execution
-    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError>;
+    fn discard_metadata_all(&mut self, input: &I) -> Result<(), Error>;
 
     /*
     /// Restores the state from each of the containing feedbacks in a list of the same shape.
     /// Used (prette exclusively) to restore the feedback states after a crash.
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), AflError>;
+    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error>;
     */
 }
 
@@ -102,22 +102,22 @@ where
         _: &I,
         _: &OT,
         _: ExitKind,
-    ) -> Result<u32, AflError> {
+    ) -> Result<u32, Error> {
         Ok(0)
     }
 
     #[inline]
-    fn append_metadata_all(&mut self, _testcase: &mut Testcase<I>) -> Result<(), AflError> {
+    fn append_metadata_all(&mut self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
     #[inline]
-    fn discard_metadata_all(&mut self, _input: &I) -> Result<(), AflError> {
+    fn discard_metadata_all(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
     /*
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), AflError> {
+    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error> {
         Ok(())
     }
     */
@@ -134,23 +134,23 @@ where
         input: &I,
         observers: &OT,
         exit_kind: ExitKind,
-    ) -> Result<u32, AflError> {
+    ) -> Result<u32, Error> {
         Ok(self.0.is_interesting(input, observers, exit_kind.clone())?
             + self.1.is_interesting_all(input, observers, exit_kind)?)
     }
 
-    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
+    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         self.0.append_metadata(testcase)?;
         self.1.append_metadata_all(testcase)
     }
 
-    fn discard_metadata_all(&mut self, input: &I) -> Result<(), AflError> {
+    fn discard_metadata_all(&mut self, input: &I) -> Result<(), Error> {
         self.0.discard_metadata(input)?;
         self.1.discard_metadata_all(input)
     }
 
     /*
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), AflError> {
+    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error> {
         self.0.restore_from(restore_from.0)?;
         self.1.restore_state_from_all(restore_from.1)?;
     }
@@ -170,7 +170,7 @@ where
         _input: &I,
         _observers: &OT,
         exit_kind: ExitKind,
-    ) -> Result<u32, AflError> {
+    ) -> Result<u32, Error> {
         if exit_kind == ExitKind::Crash {
             Ok(1)
         } else {

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
     inputs::Input,
-    AflError,
+    Error,
 };
 
 /// An entry in the Testcase Corpus
@@ -34,7 +34,7 @@ where
     I: Input,
 {
     /// Returns this testcase with a loaded input
-    pub fn load_input(&mut self) -> Result<&I, AflError> {
+    pub fn load_input(&mut self) -> Result<&I, Error> {
         if self.input.is_none() {
             self.input = Some(I::from_file(self.filename.as_ref().unwrap())?);
         }
@@ -42,7 +42,7 @@ where
     }
 
     /// Store the input to disk if possible
-    pub fn store_input(&mut self) -> Result<bool, AflError> {
+    pub fn store_input(&mut self) -> Result<bool, Error> {
         let fname;
         match self.filename() {
             Some(f) => {

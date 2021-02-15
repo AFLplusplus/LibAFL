@@ -82,7 +82,7 @@ macro_rules! create_serde_registry_for_trait {
             use $crate::bolts::serdeany::{
                 pack_type_id, unpack_type_id, DeserializeCallback, DeserializeCallbackSeed,
             };
-            use $crate::AflError;
+            use $crate::Error;
 
             pub struct BoxDynVisitor {}
             impl<'de> serde::de::Visitor<'de> for BoxDynVisitor {
@@ -398,8 +398,8 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn for_each(
                     &self,
-                    func: fn(&TypeId, &Box<dyn $trait_name>) -> Result<(), AflError>,
-                ) -> Result<(), AflError> {
+                    func: fn(&TypeId, &Box<dyn $trait_name>) -> Result<(), Error>,
+                ) -> Result<(), Error> {
                     for (id, h) in self.map.iter() {
                         for x in h.values() {
                             func(&pack_type_id(*id), x)?;
@@ -411,8 +411,8 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn for_each_mut(
                     &mut self,
-                    func: fn(&TypeId, &mut Box<dyn $trait_name>) -> Result<(), AflError>,
-                ) -> Result<(), AflError> {
+                    func: fn(&TypeId, &mut Box<dyn $trait_name>) -> Result<(), Error>,
+                ) -> Result<(), Error> {
                     for (id, h) in self.map.iter_mut() {
                         for x in h.values_mut() {
                             func(&pack_type_id(*id), x)?;

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::tuples::{MatchNameAndType, MatchType, Named, TupleList},
     utils::current_time,
-    AflError,
+    Error,
 };
 
 /// Observers observe different information about the target.
@@ -16,16 +16,16 @@ use crate::{
 pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'static {
     /// The testcase finished execution, calculate any changes.
     #[inline]
-    fn flush(&mut self) -> Result<(), AflError> {
+    fn flush(&mut self) -> Result<(), Error> {
         Ok(())
     }
 
     /// Resets the observer
-    fn pre_exec(&mut self) -> Result<(), AflError>;
+    fn pre_exec(&mut self) -> Result<(), Error>;
 
     /// This function is executed after each fuzz run
     #[inline]
-    fn post_exec(&mut self) -> Result<(), AflError> {
+    fn post_exec(&mut self) -> Result<(), Error> {
         Ok(())
     }
 
@@ -35,13 +35,13 @@ pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'st
     /// Example:
     /// >> The virgin_bits map in AFL needs to be in sync with the corpus
     #[inline]
-    fn serialize_state(&mut self) -> Result<Vec<u8>, AflError> {
+    fn serialize_state(&mut self) -> Result<Vec<u8>, Error> {
         Ok(vec![])
     }
 
     /// Restore the state from a given vec, priviously stored using `serialize_state`
     #[inline]
-    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), AflError> {
+    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), Error> {
         let _ = serialized_state;
         Ok(())
     }
@@ -53,29 +53,29 @@ pub trait ObserversTuple:
 {
     /// Reset all executors in the tuple
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self) -> Result<(), AflError>;
+    fn pre_exec_all(&mut self) -> Result<(), Error>;
     /// Do whatever you need to do after a run.
     /// This is called right after the last execution
-    fn post_exec_all(&mut self) -> Result<(), AflError>;
+    fn post_exec_all(&mut self) -> Result<(), Error>;
     //fn for_each(&self, f: fn(&dyn Observer));
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
 
     /// Serialize this tuple to a buf
-    fn serialize(&self) -> Result<Vec<u8>, AflError> {
+    fn serialize(&self) -> Result<Vec<u8>, Error> {
         Ok(postcard::to_allocvec(&self)?)
     }
 
     /// Deserilaize
-    fn deserialize(&self, serialized: &[u8]) -> Result<Self, AflError> {
+    fn deserialize(&self, serialized: &[u8]) -> Result<Self, Error> {
         Ok(postcard::from_bytes(serialized)?)
     }
 }
 
 impl ObserversTuple for () {
-    fn pre_exec_all(&mut self) -> Result<(), AflError> {
+    fn pre_exec_all(&mut self) -> Result<(), Error> {
         Ok(())
     }
-    fn post_exec_all(&mut self) -> Result<(), AflError> {
+    fn post_exec_all(&mut self) -> Result<(), Error> {
         Ok(())
     }
 
@@ -88,12 +88,12 @@ where
     Head: Observer,
     Tail: ObserversTuple + TupleList,
 {
-    fn pre_exec_all(&mut self) -> Result<(), AflError> {
+    fn pre_exec_all(&mut self) -> Result<(), Error> {
         self.0.pre_exec()?;
         self.1.pre_exec_all()
     }
 
-    fn post_exec_all(&mut self) -> Result<(), AflError> {
+    fn post_exec_all(&mut self) -> Result<(), Error> {
         self.0.post_exec()?;
         self.1.post_exec_all()
     }
@@ -129,13 +129,13 @@ impl TimeObserver {
 }
 
 impl Observer for TimeObserver {
-    fn pre_exec(&mut self) -> Result<(), AflError> {
+    fn pre_exec(&mut self) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
     }
 
-    fn post_exec(&mut self) -> Result<(), AflError> {
+    fn post_exec(&mut self) -> Result<(), Error> {
         self.last_runtime = Some(current_time() - self.start_time);
         Ok(())
     }

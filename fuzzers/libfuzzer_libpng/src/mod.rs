@@ -4,7 +4,7 @@
 use std::{env, path::PathBuf};
 
 use afl::{
-    bolts::{serdeany::RegistryBuilder, shmem::AflShmem, tuples::tuple_list},
+    bolts::{serdeany::RegistryBuilder, shmem::UnixShMem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
@@ -17,7 +17,7 @@ use afl::{
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
     utils::StdRand,
-    AflError, Fuzzer, StdFuzzer,
+    Error, Fuzzer, StdFuzzer,
 };
 
 /// The name of the coverage map observer, to find it again in the observer list
@@ -72,14 +72,14 @@ fn fuzz(
     corpus_dirs: Vec<PathBuf>,
     objective_dir: PathBuf,
     broker_port: u16,
-) -> Result<(), AflError> {
+) -> Result<(), Error> {
     let mut rand = StdRand::new(0);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, _, _, _, _, AflShmem, _>(stats, broker_port)
+        setup_restarting_mgr::<_, _, _, _, _, _, UnixShMem, _>(stats, broker_port)
             .expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map

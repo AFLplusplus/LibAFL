@@ -11,7 +11,7 @@ use crate::{
     stages::Stage,
     state::{HasCorpus, State},
     utils::Rand,
-    AflError,
+    Error,
 };
 
 // TODO multi mutators stage
@@ -54,7 +54,7 @@ where
         state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         let num = self.iterations(rand);
         for i in 0..num {
             let mut input_mut = state
@@ -142,7 +142,7 @@ where
         state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         self.perform_mutational(rand, executor, state, manager, corpus_idx)
     }
 }

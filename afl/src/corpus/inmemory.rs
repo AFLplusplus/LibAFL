@@ -5,7 +5,7 @@ use core::{cell::RefCell, marker::PhantomData};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, AflError,
+    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, Error,
 };
 
 /// A corpus handling all important fuzzing in memory.
@@ -41,9 +41,9 @@ where
 {
     /// Gets the next entry
     #[inline]
-    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError> {
+    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
         if self.count() == 0 {
-            Err(AflError::Empty("No entries in corpus".to_owned()))
+            Err(Error::Empty("No entries in corpus".to_owned()))
         } else {
             let len = { self.entries().len() };
             let id = rand.below(len as u64) as usize;

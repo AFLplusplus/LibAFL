@@ -5,7 +5,7 @@ use core::{cell::RefCell, marker::PhantomData};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, AflError,
+    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, Error,
 };
 
 /// A Queue-like corpus, wrapping an existing Corpus instance
@@ -64,7 +64,7 @@ where
 
     /// Gets a random entry
     #[inline]
-    fn random_entry(&self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError> {
+    fn random_entry(&self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
         self.corpus.random_entry(rand)
     }
 
@@ -76,10 +76,10 @@ where
 
     /// Gets the next entry
     #[inline]
-    fn next(&mut self, _rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), AflError> {
+    fn next(&mut self, _rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
         self.pos += 1;
         if self.corpus.count() == 0 {
-            return Err(AflError::Empty("Corpus".to_owned()));
+            return Err(Error::Empty("Corpus".to_owned()));
         }
         if self.pos > self.corpus.count() {
             // TODO: Always loop or return informational error?

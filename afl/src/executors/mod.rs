@@ -17,7 +17,7 @@ use crate::{
     observers::ObserversTuple,
     state::State,
     utils::Rand,
-    AflError,
+    Error,
 };
 
 /// How an execution finished.
@@ -41,13 +41,13 @@ where
 
     /// Reset the state of all the observes linked to this executor
     #[inline]
-    fn pre_exec_observers(&mut self) -> Result<(), AflError> {
+    fn pre_exec_observers(&mut self) -> Result<(), Error> {
         self.observers_mut().pre_exec_all()
     }
 
     /// Run the post exec hook for all the observes linked to this executor
     #[inline]
-    fn post_exec_observers(&mut self) -> Result<(), AflError> {
+    fn post_exec_observers(&mut self) -> Result<(), Error> {
         self.observers_mut().post_exec_all()
     }
 }
@@ -62,9 +62,9 @@ impl<I> Executor<I> for NopExecutor<I>
 where
     I: Input + HasTargetBytes,
 {
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError> {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().len() == 0 {
-            Err(AflError::Empty("Input Empty".into()))
+            Err(Error::Empty("Input Empty".into()))
         } else {
             Ok(ExitKind::Ok)
         }
@@ -89,7 +89,7 @@ where
         _state: &mut State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         R: Rand,
         FT: FeedbacksTuple<I>,
@@ -108,7 +108,7 @@ where
         _state: &State<C, FT, I, OC, OFT, R>,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         R: Rand,
         FT: FeedbacksTuple<I>,
@@ -121,7 +121,7 @@ where
     }
 
     /// Instruct the target about the input and run
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, AflError>;
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error>;
 }
 
 pub trait ExecutorsTuple<I>: MatchType + MatchNameAndType

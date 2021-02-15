@@ -12,7 +12,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{MapObserver, Observer, ObserversTuple},
-    AflError,
+    Error,
 };
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
@@ -108,7 +108,7 @@ where
         _input: &I,
         observers: &OT,
         _exit_kind: ExitKind,
-    ) -> Result<u32, AflError> {
+    ) -> Result<u32, Error> {
         let mut interesting = 0;
         // TODO optimize
         let observer = observers.match_name_type::<O>(&self.name).unwrap();
@@ -245,7 +245,7 @@ where
     O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting(&mut self, _input: &I) -> Result<u32, AflError> {
+    fn is_interesting(&mut self, _input: &I) -> Result<u32, Error> {
         let mut interesting = 0;
 
         // TODO optimize
@@ -266,14 +266,14 @@ where
         Ok(interesting)
     }
 
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         let meta = MapNoveltiesMetadata::new(core::mem::take(&mut self.novelties));
         testcase.add_metadata(meta);
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), AflError> {
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
         self.novelties.clear();
         Ok(())
     }

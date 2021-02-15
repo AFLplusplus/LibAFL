@@ -11,7 +11,7 @@ use crate::{
     observers::ObserversTuple,
     state::State,
     utils::Rand,
-    AflError,
+    Error,
 };
 
 /// A stage is one step in the fuzzing process.
@@ -36,7 +36,7 @@ where
         state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), AflError>;
+    ) -> Result<(), Error>;
 }
 
 pub trait StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>
@@ -58,7 +58,7 @@ where
         state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), AflError>;
+    ) -> Result<(), Error>;
     fn for_each(&self, f: fn(&dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>));
     fn for_each_mut(&mut self, f: fn(&mut dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>));
 }
@@ -82,7 +82,7 @@ where
         _state: &mut State<C, FT, I, OC, OFT, R>,
         _manager: &mut EM,
         _corpus_idx: usize,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         Ok(())
     }
     fn for_each(&self, _f: fn(&dyn Stage<C, E, EM, FT, I, OC, OFT, OT, R>)) {}
@@ -111,7 +111,7 @@ where
         state: &mut State<C, FT, I, OC, OFT, R>,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), AflError> {
+    ) -> Result<(), Error> {
         self.0.perform(rand, executor, state, manager, corpus_idx)?;
         self.1
             .perform_all(rand, executor, state, manager, corpus_idx)

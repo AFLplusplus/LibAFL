@@ -3,7 +3,7 @@ use crate::{
     mutators::Corpus,
     mutators::*,
     utils::Rand,
-    AflError,
+    Error,
 };
 
 use alloc::{borrow::ToOwned, vec::Vec};
@@ -63,7 +63,7 @@ pub enum MutationResult {
 // TODO maybe the mutator arg is not needed
 /// The generic function type that identifies mutations
 pub type MutationFunction<I, M, R, S> =
-    fn(&mut M, &mut R, &mut S, &mut I) -> Result<MutationResult, AflError>;
+    fn(&mut M, &mut R, &mut S, &mut I) -> Result<MutationResult, Error>;
 
 pub trait ComposedByMutations<C, I, R, S>
 where
@@ -131,7 +131,7 @@ pub fn mutation_bitflip<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -153,7 +153,7 @@ pub fn mutation_byteflip<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -175,7 +175,7 @@ pub fn mutation_byteinc<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -198,7 +198,7 @@ pub fn mutation_bytedec<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -221,7 +221,7 @@ pub fn mutation_byteneg<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -243,7 +243,7 @@ pub fn mutation_byterand<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -265,7 +265,7 @@ pub fn mutation_byteadd<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -292,7 +292,7 @@ pub fn mutation_wordadd<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -321,7 +321,7 @@ pub fn mutation_dwordadd<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -350,7 +350,7 @@ pub fn mutation_qwordadd<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -379,7 +379,7 @@ pub fn mutation_byteinteresting<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -402,7 +402,7 @@ pub fn mutation_wordinteresting<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -430,7 +430,7 @@ pub fn mutation_dwordinteresting<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -458,7 +458,7 @@ pub fn mutation_bytesdelete<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -481,7 +481,7 @@ pub fn mutation_bytesexpand<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     M: HasMaxSize,
     I: Input + HasBytesVec,
@@ -510,7 +510,7 @@ pub fn mutation_bytesinsert<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     M: HasMaxSize,
     I: Input + HasBytesVec,
@@ -542,7 +542,7 @@ pub fn mutation_bytesrandinsert<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     M: HasMaxSize,
     I: Input + HasBytesVec,
@@ -574,7 +574,7 @@ pub fn mutation_bytesset<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -598,7 +598,7 @@ pub fn mutation_bytesrandset<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -622,7 +622,7 @@ pub fn mutation_bytescopy<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -646,7 +646,7 @@ pub fn mutation_bytesswap<I, M, R, S>(
     rand: &mut R,
     _: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,
@@ -673,7 +673,7 @@ pub fn mutation_crossover_insert<C, I, M, R, S>(
     rand: &mut R,
     state: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     M: HasMaxSize,
     C: Corpus<I, R>,
@@ -722,7 +722,7 @@ pub fn mutation_crossover_replace<C, I, M, R, S>(
     rand: &mut R,
     state: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
@@ -776,7 +776,7 @@ pub fn mutation_splice<C, I, M, R, S>(
     rand: &mut R,
     state: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
@@ -814,7 +814,7 @@ where
 }
 
 // Converts a hex u8 to its u8 value: 'A' -> 10 etc.
-fn from_hex(hex: u8) -> Result<u8, AflError> {
+fn from_hex(hex: u8) -> Result<u8, Error> {
     if hex >= 48 && hex <= 57 {
         return Ok(hex - 48);
     }
@@ -824,11 +824,11 @@ fn from_hex(hex: u8) -> Result<u8, AflError> {
     if hex >= 97 && hex <= 102 {
         return Ok(hex - 87);
     }
-    return Err(AflError::IllegalArgument("".to_owned()));
+    return Err(Error::IllegalArgument("".to_owned()));
 }
 
 /// Decodes a dictionary token: 'foo\x41\\and\"bar' -> 'fooA\and"bar'
-pub fn str_decode(item: &str) -> Result<Vec<u8>, AflError> {
+pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
     let mut token: Vec<u8> = Vec::new();
     let item: Vec<u8> = item.as_bytes().to_vec();
     let backslash: u8 = 92; // '\\'
@@ -872,7 +872,7 @@ pub fn add_token(tokens: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
 
 /// Read a dictionary file and return the number of entries read
 #[cfg(feature = "std")]
-pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, AflError> {
+pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error> {
     let mut entries = 0;
 
     println!("Loading tokens file {:?} ...", &f);
@@ -892,13 +892,13 @@ pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, AflEr
         let pos_quote = match line.find("\"") {
             Some(x) => x,
             _ => {
-                return Err(AflError::IllegalArgument(
+                return Err(Error::IllegalArgument(
                     "Illegal line: ".to_owned() + line,
                 ))
             }
         };
         if line.chars().nth(line.len() - 1) != Some('"') {
-            return Err(AflError::IllegalArgument(
+            return Err(Error::IllegalArgument(
                 "Illegal line: ".to_owned() + line,
             ));
         }
@@ -907,7 +907,7 @@ pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, AflEr
         let item = match line.get(pos_quote + 1..line.len() - 1) {
             Some(x) => x,
             _ => {
-                return Err(AflError::IllegalArgument(
+                return Err(Error::IllegalArgument(
                     "Illegal line: ".to_owned() + line,
                 ))
             }
@@ -920,7 +920,7 @@ pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, AflEr
         let token: Vec<u8> = match str_decode(item) {
             Ok(val) => val,
             Err(_) => {
-                return Err(AflError::IllegalArgument(
+                return Err(Error::IllegalArgument(
                     "Illegal line (hex decoding): ".to_owned() + line,
                 ))
             }

@@ -6,7 +6,7 @@ use crate::{
     inputs::{HasBytesVec, Input},
     mutators::*,
     utils::Rand,
-    AflError,
+    Error,
 };
 
 use alloc::vec::Vec;
@@ -43,7 +43,7 @@ pub fn mutation_tokeninsert<I, M, R, S>(
     rand: &mut R,
     state: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     M: HasMaxSize,
     I: Input + HasBytesVec,
@@ -89,7 +89,7 @@ pub fn mutation_tokenreplace<I, M, R, S>(
     rand: &mut R,
     state: &mut S,
     input: &mut I,
-) -> Result<MutationResult, AflError>
+) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     R: Rand,

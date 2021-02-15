@@ -7,15 +7,15 @@ use core::{convert::TryInto, time::Duration};
 use std::{thread, time};
 
 use afl::{
-    bolts::{llmp, shmem::AflShmem},
-    AflError,
+    bolts::{llmp, shmem::UnixShMem},
+    Error,
 };
 
 const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
 const TAG_MATH_RESULT_V1: u32 = 0x77474331;
 
 fn adder_loop(port: u16) -> ! {
-    let mut client = llmp::LlmpClient::<AflShmem>::create_attach_to_tcp(port).unwrap();
+    let mut client = llmp::LlmpClient::<UnixShMem>::create_attach_to_tcp(port).unwrap();
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
@@ -55,7 +55,7 @@ fn broker_message_hook(
     client_id: u32,
     tag: llmp::Tag,
     message: &[u8],
-) -> Result<llmp::LlmpMsgHookResult, AflError> {
+) -> Result<llmp::LlmpMsgHookResult, Error> {
     match tag {
         TAG_SIMPLE_U32_V1 => {
             println!(
@@ -94,7 +94,7 @@ fn main() {
 
     match mode.as_str() {
         "broker" => {
-            let mut broker = llmp::LlmpBroker::<AflShmem>::new().unwrap();
+            let mut broker = llmp::LlmpBroker::<UnixShMem>::new().unwrap();
             broker
                 .launch_tcp_listener(
                     std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap(),
@@ -103,7 +103,7 @@ fn main() {
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
         }
         "ctr" => {
-            let mut client = llmp::LlmpClient::<AflShmem>::create_attach_to_tcp(port).unwrap();
+            let mut client = llmp::LlmpClient::<UnixShMem>::create_attach_to_tcp(port).unwrap();
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);

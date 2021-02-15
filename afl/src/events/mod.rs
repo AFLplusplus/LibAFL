@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Corpus, feedbacks::FeedbacksTuple, inputs::Input, observers::ObserversTuple,
-    state::State, utils::Rand, AflError,
+    state::State, utils::Rand, Error,
 };
 
 /// The log event severity
@@ -55,9 +55,9 @@ where
     /// Returns the name of this event
     fn name(&self) -> &str;
     /// This method will be called in the broker
-    fn handle_in_broker(&self) -> Result<BrokerEventResult, AflError>;
+    fn handle_in_broker(&self) -> Result<BrokerEventResult, Error>;
     /// This method will be called in the clients after handle_in_broker (unless BrokerEventResult::Handled) was returned in handle_in_broker
-    fn handle_in_client(&self) -> Result<(), AflError>;
+    fn handle_in_client(&self) -> Result<(), Error>;
 }
 */
 
@@ -158,14 +158,14 @@ where
     I: Input,
 {
     /// Fire an Event
-    //fn fire<'a>(&mut self, event: Event<I>) -> Result<(), AflError>;
+    //fn fire<'a>(&mut self, event: Event<I>) -> Result<(), Error>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process<C, FT, OC, OFT, R>(
         &mut self,
         state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<usize, AflError>
+    ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -174,7 +174,7 @@ where
         OFT: FeedbacksTuple<I>;
 
     /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, AflError>
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
         OT: ObserversTuple,
     {
@@ -182,7 +182,7 @@ where
     }
 
     /// Deserialize all observers for this type and manager
-    fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, AflError>
+    fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
         OT: ObserversTuple,
     {
@@ -194,7 +194,7 @@ where
     fn on_restart<C, FT, OC, OFT, R>(
         &mut self,
         _state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -214,7 +214,7 @@ where
         &mut self,
         _state: &mut State<C, FT, I, OC, OFT, R>,
         event: Event<I>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -235,7 +235,7 @@ where
     fn process<C, FT, OC, OFT, R>(
         &mut self,
         _state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<usize, AflError>
+    ) -> Result<usize, Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
@@ -250,7 +250,7 @@ where
         &mut self,
         _state: &mut State<C, FT, I, OC, OFT, R>,
         _event: Event<I>,
-    ) -> Result<(), AflError>
+    ) -> Result<(), Error>
     where
         C: Corpus<I, R>,
         FT: FeedbacksTuple<I>,
