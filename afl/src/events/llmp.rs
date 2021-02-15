@@ -16,13 +16,13 @@ use crate::{
         llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMem,
     },
-    executors::{HasObservers, Executor}, 
-    observers::ObserversTuple,
     corpus::Corpus,
     events::{BrokerEventResult, Event, EventManager},
     executors::ExitKind,
+    executors::{Executor, HasObservers},
     feedbacks::FeedbacksTuple,
     inputs::Input,
+    observers::ObserversTuple,
     state::State,
     stats::Stats,
     utils::Rand,
@@ -264,7 +264,7 @@ where
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
-        OT: ObserversTuple
+        OT: ObserversTuple,
     {
         match event {
             Event::NewTestcase {
@@ -329,7 +329,7 @@ where
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
-        OT: ObserversTuple
+        OT: ObserversTuple,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
@@ -352,9 +352,9 @@ where
             }
         };
         let count = events.len();
-        events
-            .drain(..)
-            .try_for_each(|(sender_id, event)| self.handle_in_client(state, sender_id, event, executor))?;
+        events.drain(..).try_for_each(|(sender_id, event)| {
+            self.handle_in_client(state, sender_id, event, executor)
+        })?;
         Ok(count)
     }
 
@@ -477,7 +477,7 @@ where
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
-        OT: ObserversTuple
+        OT: ObserversTuple,
     {
         self.llmp_mgr.process(state, executor)
     }

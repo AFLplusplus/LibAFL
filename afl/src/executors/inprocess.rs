@@ -293,13 +293,16 @@ pub mod unix_signals {
         if obj_fitness > 0 {
             if !state
                 .add_if_objective(input.clone(), obj_fitness)
-                .expect("In crash handler objective corpus add failure.".into()).is_none() {
+                .expect("In crash handler objective corpus add failure.".into())
+                .is_none()
+            {
                 mgr.fire(
                     state,
                     Event::Objective {
                         objective_size: state.objective_corpus().count(),
                     },
-                ) .expect(&format!("Could not send timeouting input {:?}", input));
+                )
+                .expect(&format!("Could not send timeouting input {:?}", input));
             }
         }
 
@@ -351,13 +354,16 @@ pub mod unix_signals {
         if obj_fitness > 0 {
             if !state
                 .add_if_objective(input.clone(), obj_fitness)
-                .expect("In timeout handler objective corpus add failure.".into()).is_none() {
+                .expect("In timeout handler objective corpus add failure.".into())
+                .is_none()
+            {
                 mgr.fire(
                     state,
                     Event::Objective {
                         objective_size: state.objective_corpus().count(),
                     },
-                ) .expect(&format!("Could not send timeouting input {:?}", input));
+                )
+                .expect(&format!("Could not send timeouting input {:?}", input));
             }
         }
 

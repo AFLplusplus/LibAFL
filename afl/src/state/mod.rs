@@ -260,7 +260,7 @@ where
     pub fn objective_feedbacks_mut(&mut self) -> &mut OFT {
         &mut self.objective_feedbacks
     }
-    
+
     /// Returns the objective corpus
     #[inline]
     pub fn objective_corpus(&self) -> &OC {

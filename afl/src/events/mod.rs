@@ -9,9 +9,14 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus, feedbacks::FeedbacksTuple, inputs::Input, observers::ObserversTuple,
-    executors::{HasObservers, Executor}, 
-    state::State, utils::Rand, Error,
+    corpus::Corpus,
+    executors::{Executor, HasObservers},
+    feedbacks::FeedbacksTuple,
+    inputs::Input,
+    observers::ObserversTuple,
+    state::State,
+    utils::Rand,
+    Error,
 };
 
 /// The log event severity
@@ -266,7 +271,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::bolts::tuples::{tuple_list};
+    use crate::bolts::tuples::tuple_list;
     use crate::events::Event;
     use crate::inputs::bytes::BytesInput;
     use crate::observers::StdMapObserver;
@@ -302,7 +307,8 @@ mod tests {
                 time: _,
                 executions: _,
             } => {
-                let o: tuple_list!(StdMapObserver::<u32>) = postcard::from_bytes(&observers_buf).unwrap();
+                let o: tuple_list!(StdMapObserver::<u32>) =
+                    postcard::from_bytes(&observers_buf).unwrap();
                 let test_observer = o.match_name_type::<StdMapObserver<u32>>("test").unwrap();
                 assert_eq!("test", test_observer.name());
             }

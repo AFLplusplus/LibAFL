@@ -54,10 +54,7 @@ where
     /// Replaces the testcase at the given idx
     fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
         if self.entries_mut().len() < idx {
-            return Err(Error::KeyNotFound(format!(
-                "Index {} out of bounds",
-                idx
-            )));
+            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
         }
         self.entries_mut()[idx] = RefCell::new(testcase);
         Ok(())

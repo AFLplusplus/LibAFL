@@ -5,10 +5,10 @@ use alloc::{string::ToString, vec::Vec};
 use crate::{
     corpus::Corpus,
     events::{BrokerEventResult, Event, EventManager},
-    executors::{HasObservers, Executor}, 
-    observers::ObserversTuple,
+    executors::{Executor, HasObservers},
     feedbacks::FeedbacksTuple,
     inputs::Input,
+    observers::ObserversTuple,
     state::State,
     stats::Stats,
     utils::Rand,
@@ -45,7 +45,7 @@ where
         R: Rand,
         OC: Corpus<I, R>,
         OFT: FeedbacksTuple<I>,
-        OT: ObserversTuple
+        OT: ObserversTuple,
     {
         let count = self.events.len();
         while self.events.len() > 0 {
@@ -88,10 +88,7 @@ where
     }
 
     // Handle arriving events in the broker
-    fn handle_in_broker(
-        stats: &mut ST,
-        event: &Event<I>,
-    ) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(stats: &mut ST, event: &Event<I>) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase {
                 input: _,

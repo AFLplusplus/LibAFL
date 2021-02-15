@@ -891,26 +891,16 @@ pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error
         }
         let pos_quote = match line.find("\"") {
             Some(x) => x,
-            _ => {
-                return Err(Error::IllegalArgument(
-                    "Illegal line: ".to_owned() + line,
-                ))
-            }
+            _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
         };
         if line.chars().nth(line.len() - 1) != Some('"') {
-            return Err(Error::IllegalArgument(
-                "Illegal line: ".to_owned() + line,
-            ));
+            return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
         }
 
         // extract item
         let item = match line.get(pos_quote + 1..line.len() - 1) {
             Some(x) => x,
-            _ => {
-                return Err(Error::IllegalArgument(
-                    "Illegal line: ".to_owned() + line,
-                ))
-            }
+            _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
         };
         if item.len() == 0 {
             continue;

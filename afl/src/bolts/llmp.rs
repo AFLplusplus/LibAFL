@@ -1242,10 +1242,7 @@ where
     #[cfg(feature = "std")]
     /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
     /// Does so on the given port.
-    pub fn launch_tcp_listener_on(
-        &mut self,
-        port: u16,
-    ) -> Result<thread::JoinHandle<()>, Error> {
+    pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
         let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
         // accept connections and process them, spawning a new thread for each one
         println!("Server listening on port {}", port);
@@ -1332,11 +1329,7 @@ where
 
     /// broker broadcast to its own page for all others to read */
     #[inline]
-    unsafe fn handle_new_msgs<F>(
-        &mut self,
-        client_id: u32,
-        on_new_msg: &mut F,
-    ) -> Result<(), Error>
+    unsafe fn handle_new_msgs<F>(&mut self, client_id: u32, on_new_msg: &mut F) -> Result<(), Error>
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {

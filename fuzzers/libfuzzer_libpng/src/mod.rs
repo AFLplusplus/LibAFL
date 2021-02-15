@@ -68,11 +68,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-fn fuzz(
-    corpus_dirs: Vec<PathBuf>,
-    objective_dir: PathBuf,
-    broker_port: u16,
-) -> Result<(), Error> {
+fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     let mut rand = StdRand::new(afl::utils::current_nanos());
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));

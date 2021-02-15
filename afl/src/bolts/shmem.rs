@@ -34,8 +34,7 @@ pub trait ShMem: Sized + Debug {
     }
 
     /// Creates a nes variable with the given name, strigified to 20 bytes.
-    fn existing_from_shm_slice(map_str_bytes: &[u8; 20], map_size: usize)
-        -> Result<Self, Error>;
+    fn existing_from_shm_slice(map_str_bytes: &[u8; 20], map_size: usize) -> Result<Self, Error>;
 
     /// Initialize from a shm_str with fixed len of 20
     fn existing_from_shm_str(shm_str: &str, map_size: usize) -> Result<Self, Error> {
@@ -324,7 +323,7 @@ pub mod shmem {
 mod tests {
 
     #[cfg(feature = "std")]
-    use super::{UnixShMem, ShMem};
+    use super::{ShMem, UnixShMem};
 
     #[cfg(feature = "std")]
     #[test]

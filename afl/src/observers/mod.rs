@@ -60,7 +60,6 @@ pub trait ObserversTuple:
 
     //fn for_each(&self, f: fn(&dyn Observer));
     //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
-
 }
 
 impl ObserversTuple for () {
