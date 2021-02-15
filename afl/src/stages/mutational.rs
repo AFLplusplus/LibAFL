@@ -81,7 +81,6 @@ where
             if fitness > 0 {
                 let observers_buf = manager.serialize_observers(observers)?;
 
-                // TODO decouple events manager and engine
                 manager.fire(
                     state,
                     Event::NewTestcase {

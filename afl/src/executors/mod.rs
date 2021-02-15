@@ -20,6 +20,7 @@ use crate::{
 };
 
 /// How an execution finished.
+#[derive(Debug, Clone)]
 pub enum ExitKind {
     Ok,
     Crash,

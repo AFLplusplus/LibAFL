@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::tuples::{Named, TupleList},
+    executors::ExitKind,
     corpus::Testcase,
     inputs::Input,
     observers::{MapObserver, Observer, ObserversTuple},
@@ -35,6 +36,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
+        exit_kind: ExitKind,
     ) -> Result<u32, AflError>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
@@ -83,6 +85,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
+        exit_kind: ExitKind,
     ) -> Result<u32, AflError>;
 
     /// Write metadata for this testcase
@@ -103,7 +106,7 @@ where
     I: Input,
 {
     #[inline]
-    fn is_interesting_all<OT: ObserversTuple>(&mut self, _: &I, _: &OT) -> Result<u32, AflError> {
+    fn is_interesting_all<OT: ObserversTuple>(&mut self, _: &I, _: &OT, _: ExitKind,) -> Result<u32, AflError> {
         Ok(0)
     }
 
@@ -134,9 +137,10 @@ where
         &mut self,
         input: &I,
         observers: &OT,
+        exit_kind: ExitKind,
     ) -> Result<u32, AflError> {
-        Ok(self.0.is_interesting(input, observers)?
-            + self.1.is_interesting_all(input, observers)?)
+        Ok(self.0.is_interesting(input, observers, exit_kind.clone())?
+            + self.1.is_interesting_all(input, observers, exit_kind)?)
     }
 
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), AflError> {
@@ -243,6 +247,7 @@ where
         &mut self,
         _input: &I,
         observers: &OT,
+        _exit_kind: ExitKind,
     ) -> Result<u32, AflError> {
         let mut interesting = 0;
         // TODO optimize

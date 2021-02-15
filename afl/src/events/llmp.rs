@@ -21,6 +21,7 @@ use crate::{
     feedbacks::FeedbacksTuple,
     inputs::Input,
     state::State,
+    executors::ExitKind,
     stats::Stats,
     utils::Rand,
     AflError,
@@ -278,7 +279,8 @@ where
                 #[cfg(feature = "std")]
                 println!("Received new Testcase");
                 let observers = postcard::from_bytes(&observers_buf)?;
-                let interestingness = state.is_interesting(&input, &observers)?;
+                // TODO include ExitKind in NewTestcase
+                let interestingness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
                 state.add_if_interesting(input, interestingness)?;
                 Ok(())
             }

@@ -12,7 +12,7 @@ use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
     corpus::{Corpus, Testcase},
     events::{Event, EventManager, LogSeverity},
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, ExitKind},
     feedbacks::FeedbacksTuple,
     generators::Generator,
     inputs::Input,
@@ -248,11 +248,11 @@ where
 
     // TODO move some of these, like evaluate_input, to FuzzingEngine
     #[inline]
-    pub fn is_interesting<OT>(&mut self, input: &I, observers: &OT) -> Result<u32, AflError>
+    pub fn is_interesting<OT>(&mut self, input: &I, observers: &OT, exit_kind: ExitKind) -> Result<u32, AflError>
     where
         OT: ObserversTuple,
     {
-        Ok(self.feedbacks_mut().is_interesting_all(input, observers)?)
+        Ok(self.feedbacks_mut().is_interesting_all(input, observers, exit_kind)?)
     }
 
     /// Runs the input and triggers observers and feedback
@@ -271,14 +271,14 @@ where
         executor.pre_exec_observers()?;
 
         executor.pre_exec(self, event_mgr, input)?;
-        executor.run_target(input)?;
+        let exit_kind = executor.run_target(input)?;
         executor.post_exec(&self, event_mgr, input)?;
 
         self.set_executions(self.executions() + 1);
         executor.post_exec_observers()?;
 
         let observers = executor.observers();
-        let fitness = self.feedbacks_mut().is_interesting_all(&input, observers)?;
+        let fitness = self.feedbacks_mut().is_interesting_all(&input, observers, exit_kind)?;
         Ok(fitness)
     }
 
