@@ -1,5 +1,7 @@
 #!/bin/sh
 
+mkdir -p ./crashes
+
 cargo build --release || exit 1
 cp ../../target/release/libfuzzer ./.libfuzzer_test.elf
 

@@ -41,6 +41,22 @@ where
         Ok(self.input.as_ref().unwrap())
     }
 
+    /// Store the input to disk if possible
+    pub fn store_input(&mut self) -> Result<bool, AflError> {
+        let fname;
+        match self.filename() {
+            Some(f) => { fname = f.clone(); },
+            None => { return Ok(false); }
+        };
+        match self.input_mut() {
+            None => Ok(false),
+            Some(i) => {
+                i.to_file(fname)?;
+                Ok(true)
+            }
+        }
+    }
+
     /// Get the input, if any
     #[inline]
     pub fn input(&self) -> &Option<I> {
