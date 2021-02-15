@@ -73,7 +73,7 @@ fn fuzz(
     objective_dir: PathBuf,
     broker_port: u16,
 ) -> Result<(), Error> {
-    let mut rand = StdRand::new(0);
+    let mut rand = StdRand::new(afl::utils::current_nanos());
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 

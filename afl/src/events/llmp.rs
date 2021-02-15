@@ -215,7 +215,7 @@ where
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
                 stats.display(event.name().to_string() + " #" + &sender_id.to_string());
-                Ok(BrokerEventResult::Handled)
+                Ok(BrokerEventResult::Forward)
             }
             Event::UpdateStats {
                 time,
