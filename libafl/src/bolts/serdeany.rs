@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 
-#[cfg(fature = "anymap_debug")]
+#[cfg(feature = "anymap_debug")]
 use serde_json;
 
 // yolo
@@ -499,3 +499,25 @@ macro_rules! create_serde_registry_for_trait {
 
 create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::SerdeAny);
 pub use serdeany_registry::*;
+
+#[macro_export]
+macro_rules! impl_serdeany {
+    ($struct_name:ident) => {
+        impl crate::bolts::serdeany::SerdeAny for $struct_name {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn as_any_mut(&mut self) -> &mut dyn Any {
+                self
+            }
+        }
+        
+        #[allow(non_snake_case)]
+        #[cfg(feature = "std")]
+        #[ctor]
+        fn $struct_name() {
+            crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
+        }
+    };
+}

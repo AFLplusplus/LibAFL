@@ -239,7 +239,7 @@ pub mod unix_signals {
     static mut EVENT_MGR_PTR: *mut c_void = ptr::null_mut();
     static mut OBSERVERS_PTR: *const c_void = ptr::null();
     /// The (unsafe) pointer to the current inmem input, for the current run.
-    /// This is neede for certain non-rust side effects, as well as unix signal handling.
+    /// This is needed for certain non-rust side effects, as well as unix signal handling.
     static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
 
     pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<C, EM, FT, I, OC, OFT, OT, R>(
@@ -267,6 +267,15 @@ pub mod unix_signals {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
             };
+            
+            #[cfg(feature = "std")]
+            {
+                println!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
 
             // TODO tell the parent to not restart
             std::process::exit(1);

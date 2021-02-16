@@ -2,7 +2,6 @@
 //! They may be inserted as part of mutations during fuzzing.
 
 use crate::{
-    bolts::serdeany::SerdeAny,
     inputs::{HasBytesVec, Input},
     mutators::*,
     utils::Rand,
@@ -21,15 +20,7 @@ pub struct TokensMetadata {
     tokens: Vec<Vec<u8>>,
 }
 
-impl SerdeAny for TokensMetadata {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
+crate::impl_serdeany!(TokensMetadata);
 
 impl TokensMetadata {
     pub fn new(tokens: Vec<Vec<u8>>) -> Self {

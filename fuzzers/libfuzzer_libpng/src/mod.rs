@@ -4,7 +4,7 @@
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{serdeany::RegistryBuilder, shmem::UnixShMem, tuples::tuple_list},
+    bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
@@ -52,8 +52,8 @@ where
 /// The main fn, parsing parameters, and starting the fuzzer
 pub fn main() {
     // Registry the metadata types used in this fuzzer
-    RegistryBuilder::register::<TokensMetadata>();
-    RegistryBuilder::finalize();
+    // Needed only on no_std
+    //RegistryBuilder::register::<TokensMetadata>();
 
     println!(
         "Workdir: {:?}",
