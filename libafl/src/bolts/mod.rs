@@ -5,3 +5,4 @@ pub mod ownedref;
 pub mod serdeany;
 pub mod shmem;
 pub mod tuples;
+pub mod bindings;

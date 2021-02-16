@@ -5,6 +5,10 @@
 #[cfg(unix)]
 pub use shmem::UnixShMem;
 
+#[cfg(feature = "std")]
+#[cfg(windows)]
+pub use shmem::Win32ShMem;
+
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
@@ -317,6 +321,29 @@ pub mod shmem {
         }
         return (*shm).map;
     }
+}
+
+#[cfg(windows)]
+#[cfg(feature = "std")]
+pub mod shmem {
+
+    use core::{mem::size_of, slice};
+    use std::ffi::CStr;
+
+    use crate::Error;
+    use super::ShMem;
+
+    /// The default Sharedmap impl for windows using shmctl & shmget
+    #[derive(Clone, Debug)]
+    pub struct Win32ShMem {
+        pub filename: [u8; 64],
+        pub handle: windows::win32::system_services::HANDLE,
+        pub map: *mut u8,
+        pub map_size: usize,
+    }
+
+    // TODO complete
+
 }
 
 #[cfg(test)]
