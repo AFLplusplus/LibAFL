@@ -86,7 +86,7 @@ fn fuzz(input: Option<Vec<PathBuf>>, broker_port: u16) -> Result<(), Error> {
 
     println!("We're a client, let's fuzz :)");
 
-    let mut mutator = HavocBytesMutator::new_default();
+    let mut mutator = HavocBytesMutator::default();
     mutator.set_max_size(4096);
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));

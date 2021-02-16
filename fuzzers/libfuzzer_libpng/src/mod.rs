@@ -84,7 +84,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             __lafl_max_edges_size as usize
         });
 
-    // If not retsrating, create a State from scratch
+    // If not restarting, create a State from scratch
     let mut state = state.unwrap_or(State::new(
         InMemoryCorpus::new(),
         tuple_list!(MaxMapFeedback::new_with_observer(
@@ -97,7 +97,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     println!("We're a client, let's fuzz :)");
 
-    // Create a PNG dictionary of not existing
+    // Create a PNG dictionary if not existing
     if state.metadata().get::<TokensMetadata>().is_none() {
         state.add_metadata(TokensMetadata::new(vec![
             vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
@@ -109,7 +109,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     }
 
     // Setup a basic mutator with a mutational stage
-    let mutator = HavocBytesMutator::new_default();
+    let mutator = HavocBytesMutator::default();
     let stage = StdMutationalStage::new(mutator);
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 

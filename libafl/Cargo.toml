@@ -3,6 +3,7 @@ name = "libafl"
 version = "0.1.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -42,7 +43,6 @@ required-features = ["std"]
 [dependencies]
 tuple_list = "0.1.2"
 hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
-libc = "0.2" # For (*nix) libc
 num = "*"
 xxhash-rust = { version = "0.8.0", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
@@ -51,3 +51,12 @@ postcard = { version = "0.5.1", features = ["alloc"] } # no_std compatible serde
 static_assertions = "1.1.0"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] } # an easy way to debug print SerdeAnyMap
 #TODO: for llmp brotli = { version = "3.3.0", default-features = false } # brotli compression
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2" # For (*nix) libc
+
+[target.'cfg(windows)'.dependencies]
+windows = "0.3.1"
+
+[target.'cfg(windows)'.build-dependencies]
+windows = "0.3.1"

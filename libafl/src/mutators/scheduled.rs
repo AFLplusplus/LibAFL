@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::{fmt, marker::PhantomData};
+use core::{fmt, default::Default, marker::PhantomData};
 use fmt::Debug;
 
 use crate::{
@@ -266,7 +266,7 @@ where
     }
 }
 
-impl<C, I, R, S> HavocBytesMutator<StdScheduledMutator<C, I, R, S>, C, I, R, S>
+impl<C, I, R, S> Default for HavocBytesMutator<StdScheduledMutator<C, I, R, S>, C, I, R, S>
 where
     C: Corpus<I, R>,
     I: Input + HasBytesVec,
@@ -274,7 +274,7 @@ where
     S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Create a new HavocBytesMutator instance wrapping StdScheduledMutator
-    pub fn new_default() -> Self {
+    fn default() -> Self {
         let mut scheduled = StdScheduledMutator::<C, I, R, S>::new();
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_byteflip);
