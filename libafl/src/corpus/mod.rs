@@ -43,6 +43,8 @@ where
     fn count(&self) -> usize {
         self.entries().len()
     }
+    
+    // TODO implement a was_fuzzed counter
 
     /// Add an entry to the corpus and return its index
     #[inline]

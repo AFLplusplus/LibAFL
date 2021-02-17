@@ -181,6 +181,82 @@ where
     }
 }
 
+macro_rules! tuple_for_each {
+    ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
+        mod $fn_name {
+            pub trait ForEach {
+                fn for_each(&self);
+            }
+
+            impl ForEach for () {
+                fn for_each(&self) { }
+            }
+            
+            impl<Head, Tail> ForEach for (Head, Tail)
+            where
+                Head: $trait_name,
+                Tail: tuple_list::TupleList + ForEach,
+            {
+                fn for_each(&self) {
+                    ($body)(&self.0);
+                    self.1.for_each();
+                }
+            }
+        }
+        {
+            use $fn_name::*;
+            
+            $tuple_name.for_each();
+        };
+    };
+}
+
+macro_rules! tuple_for_each_mut {
+    ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
+        mod $fn_name {
+            pub trait ForEachMut {
+                fn for_each_mut(&mut self);
+            }
+
+            impl ForEachMut for () {
+                fn for_each_mut(&mut self) { }
+            }
+            
+            impl<Head, Tail> ForEachMut for (Head, Tail)
+            where
+                Head: $trait_name,
+                Tail: tuple_list::TupleList + ForEachMut,
+            {
+                fn for_each_mut(&mut self) {
+                    ($body)(&mut self.0);
+                    self.1.for_each_mut();
+                }
+            }
+        }
+        {
+            use $fn_name::*;
+            
+            $tuple_name.for_each_mut();
+        };
+    };
+}
+
+/*
+pub fn test_macros() {
+  
+  let mut t = tuple_list!(1, "a");
+
+  tuple_for_each!(f1, std::fmt::Display, t, |x| {
+      println!("{}", x);
+  });
+  
+  tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
+      println!("{}", x);
+  });
+
+}
+*/
+
 /*
 
 // Define trait and implement it for several primitive types.

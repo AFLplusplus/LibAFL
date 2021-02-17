@@ -114,6 +114,17 @@ where
     pub fn pos(&self) -> usize {
         self.pos
     }
+    
+    // TODO maybe impl HasCorpus
+    #[inline]
+    pub fn corpus(&self) -> &C {
+        &self.corpus
+    }
+    
+    #[inline]
+    pub fn corpus_mut(&mut self) -> &mut C {
+        &mut self.corpus
+    }
 }
 
 #[cfg(test)]
