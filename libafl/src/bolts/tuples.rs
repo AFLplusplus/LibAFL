@@ -181,6 +181,7 @@ where
     }
 }
 
+#[macro_export]
 macro_rules! tuple_for_each {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
         mod $fn_name {
@@ -211,6 +212,7 @@ macro_rules! tuple_for_each {
     };
 }
 
+#[macro_export]
 macro_rules! tuple_for_each_mut {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
         mod $fn_name {

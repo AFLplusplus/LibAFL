@@ -33,7 +33,9 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
     #[cfg(not(feature = "std"))]
     /// Write this input to the file
     fn to_file<P>(&self, _path: P) -> Result<(), Error>
-where {
+    where
+        P: AsRef<Path>,
+    {
         Err(Error::NotImplemented("Not suppored in no_std".into()))
     }
 
@@ -52,7 +54,9 @@ where {
     /// Write this input to the file
     #[cfg(not(feature = "std"))]
     fn from_file<P>(_path: P) -> Result<Self, Error>
-where {
+    where
+        P: AsRef<Path>,
+    {
         Err(Error::NotImplemented("Not suppored in no_std".into()))
     }
 }
@@ -96,3 +100,10 @@ pub trait HasBytesVec {
     /// The internal bytes map (as mutable borrow)
     fn bytes_mut(&mut self) -> &mut Vec<u8>;
 }
+
+/// Has a length field
+pub trait HasLen {
+    /// The lenght
+    fn len(&self) -> usize;
+}
+

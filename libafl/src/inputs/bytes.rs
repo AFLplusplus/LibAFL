@@ -5,7 +5,7 @@ use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::{HasBytesVec, HasTargetBytes, Input, TargetBytes};
+use crate::inputs::{HasBytesVec, HasTargetBytes, HasLen, Input, TargetBytes};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
@@ -39,6 +39,13 @@ impl HasTargetBytes for BytesInput {
     #[inline]
     fn target_bytes(&self) -> TargetBytes {
         TargetBytes::Ref(&self.bytes)
+    }
+}
+
+impl HasLen for BytesInput {
+    #[inline]
+    fn len(&self) -> usize {
+        self.bytes.len()
     }
 }
 

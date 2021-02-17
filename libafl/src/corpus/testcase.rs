@@ -2,7 +2,7 @@
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
-use core::{convert::Into, default::Default, option::Option};
+use core::{convert::Into, default::Default, option::Option, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -26,6 +26,8 @@ where
     fitness: u32,
     /// Map of metadatas associated with this testcase
     metadatas: SerdeAnyMap,
+    /// Time needed to execute the input
+    exec_time: Option<Duration>,
 }
 
 /// Impl of a testcase
@@ -141,6 +143,7 @@ where
             filename: None,
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
+            exec_time: None,
         }
     }
 
@@ -152,6 +155,7 @@ where
             filename: Some(filename),
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
+            exec_time: None,
         }
     }
 
@@ -162,6 +166,7 @@ where
             filename: None,
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
+            exec_time: None,
         }
     }
 }
