@@ -148,13 +148,6 @@ where
         self.0.discard_metadata(input)?;
         self.1.discard_metadata_all(input)
     }
-
-    /*
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error> {
-        self.0.restore_from(restore_from.0)?;
-        self.1.restore_state_from_all(restore_from.1)?;
-    }
-    */
 }
 
 /// Is a crash feedback

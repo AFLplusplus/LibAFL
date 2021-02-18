@@ -25,16 +25,26 @@ use crate::{
 use crate::inputs::bytes::BytesInput;
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus<C, I, R>
+pub trait HasCorpus<C, I>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     I: Input,
-    R: Rand,
 {
     /// The testcase corpus
     fn corpus(&self) -> &C;
     /// The testcase corpus (mut)
     fn corpus_mut(&mut self) -> &mut C;
+}
+
+/// Trait for elements offering a rand
+pub trait HasRand<R>
+where
+    R: Rand,
+{
+    /// The rand instance
+    fn rand(&self) -> &R;
+    /// The rand instance (mut)
+    fn rand_mut(&mut self) -> &mut R;
 }
 
 /// Trait for elements offering metadata
@@ -59,13 +69,15 @@ pub trait HasMetadata {
 #[serde(bound = "FT: serde::de::DeserializeOwned")]
 pub struct State<C, FT, I, OC, OFT, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
-    OC: Corpus<I, R>,
+    OC: Corpus<I>,
     OFT: FeedbacksTuple<I>,
 {
+    /// RNG instance
+    rand: R,
     /// How many times the executor ran the harness/target
     executions: usize,
     /// The corpus
@@ -82,16 +94,16 @@ where
     /// Objective Feedbacks
     objective_feedbacks: OFT,
 
-    phantom: PhantomData<(R, I)>,
+    phantom: PhantomData<I>,
 }
 
 #[cfg(feature = "std")]
 impl<C, FT, OC, OFT, R> State<C, FT, BytesInput, OC, OFT, R>
 where
-    C: Corpus<BytesInput, R>,
+    C: Corpus<BytesInput>,
     R: Rand,
     FT: FeedbacksTuple<BytesInput>,
-    OC: Corpus<BytesInput, R>,
+    OC: Corpus<BytesInput>,
     OFT: FeedbacksTuple<BytesInput>,
 {
     pub fn load_from_directory<E, OT, EM>(
@@ -101,7 +113,7 @@ where
         in_dir: &Path,
     ) -> Result<(), Error>
     where
-        C: Corpus<BytesInput, R>,
+        C: Corpus<BytesInput>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<BytesInput>,
@@ -143,7 +155,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        C: Corpus<BytesInput, R>,
+        C: Corpus<BytesInput>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<BytesInput>,
@@ -164,13 +176,34 @@ where
     }
 }
 
-impl<C, FT, I, OC, OFT, R> HasCorpus<C, I, R> for State<C, FT, I, OC, OFT, R>
+impl<C, FT, I, OC, OFT, R> HasRand<R> for State<C, FT, I, OC, OFT, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
-    OC: Corpus<I, R>,
+    OC: Corpus<I>,
+    OFT: FeedbacksTuple<I>,
+{
+    /// The rand instance
+    fn rand(&self) -> &R {
+        &self.rand
+    }
+
+    /// The rand instance (mut)
+    fn rand_mut(&mut self) -> &mut R {
+        &mut self.rand
+    }
+}
+
+
+impl<C, FT, I, OC, OFT, R> HasCorpus<C, I> for State<C, FT, I, OC, OFT, R>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbacksTuple<I>,
+    OC: Corpus<I>,
     OFT: FeedbacksTuple<I>,
 {
     /// Returns the corpus
@@ -187,11 +220,11 @@ where
 /// Trait for elements offering metadata
 impl<C, FT, I, OC, OFT, R> HasMetadata for State<C, FT, I, OC, OFT, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
-    OC: Corpus<I, R>,
+    OC: Corpus<I>,
     OFT: FeedbacksTuple<I>,
 {
     /// Get all the metadata into an HashMap
@@ -209,11 +242,11 @@ where
 
 impl<C, FT, I, OC, OFT, R> State<C, FT, I, OC, OFT, R>
 where
-    C: Corpus<I, R>,
+    C: Corpus<I>,
     I: Input,
     R: Rand,
     FT: FeedbacksTuple<I>,
-    OC: Corpus<I, R>,
+    OC: Corpus<I>,
     OFT: FeedbacksTuple<I>,
 {
     /// Get executions
@@ -299,7 +332,7 @@ where
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        C: Corpus<I, R>,
+        C: Corpus<I>,
         EM: EventManager<I>,
     {
         executor.pre_exec_observers()?;
@@ -356,11 +389,11 @@ where
     #[inline]
     pub fn add_if_interesting(&mut self, input: I, fitness: u32) -> Result<Option<usize>, Error>
     where
-        C: Corpus<I, R>,
+        C: Corpus<I>,
     {
         if fitness > 0 {
             let testcase = self.input_to_testcase(input, fitness)?;
-            Ok(Some(self.corpus_mut().add(testcase)))
+            Ok(Some(C::add(self, testcase)?))
         } else {
             self.discard_input(&input)?;
             Ok(None)
@@ -371,7 +404,7 @@ where
     #[inline]
     pub fn add_if_objective(&mut self, input: I, fitness: u32) -> Result<Option<usize>, Error>
     where
-        C: Corpus<I, R>,
+        C: Corpus<I>,
     {
         if fitness > 0 {
             let testcase = self.input_to_testcase(input, fitness)?;
@@ -394,7 +427,7 @@ where
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        C: Corpus<I, R>,
+        C: Corpus<I>,
         EM: EventManager<I>,
     {
         let (fitness, obj_fitness) = self.evaluate_input(&input, executor, manager)?;
@@ -435,7 +468,7 @@ where
     ) -> Result<(), Error>
     where
         G: Generator<I, R>,
-        C: Corpus<I, R>,
+        C: Corpus<I>,
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<I>,

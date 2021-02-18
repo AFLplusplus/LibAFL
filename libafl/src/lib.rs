@@ -25,143 +25,14 @@ pub mod state;
 pub mod stats;
 pub mod utils;
 
+pub mod fuzzer;
+pub use fuzzer::*;
+
 use alloc::string::String;
-use core::{fmt, marker::PhantomData};
-use corpus::Corpus;
-use events::{Event, EventManager};
-use executors::{Executor, HasObservers};
-use feedbacks::FeedbacksTuple;
-use inputs::Input;
-use observers::ObserversTuple;
-use stages::StagesTuple;
-use state::{HasCorpus, State};
-use utils::{current_milliseconds, current_time, Rand};
+use core::{fmt};
 
 #[cfg(feature = "std")]
 use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
-
-/// The main fuzzer trait.
-pub trait Fuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
-where
-    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
-    EM: EventManager<I>,
-    E: Executor<I> + HasObservers<OT>,
-    OC: Corpus<I, R>,
-    OFT: FeedbacksTuple<I>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
-    C: Corpus<I, R>,
-    I: Input,
-    R: Rand,
-{
-    fn stages(&self) -> &ST;
-
-    fn stages_mut(&mut self) -> &mut ST;
-
-    fn fuzz_one(
-        &mut self,
-        rand: &mut R,
-        executor: &mut E,
-        state: &mut State<C, FT, I, OC, OFT, R>,
-        manager: &mut EM,
-    ) -> Result<usize, Error> {
-        let (_, idx) = state.corpus_mut().next(rand)?;
-
-        self.stages_mut()
-            .perform_all(rand, executor, state, manager, idx)?;
-
-        manager.process(state, executor)?;
-        Ok(idx)
-    }
-
-    fn fuzz_loop(
-        &mut self,
-        rand: &mut R,
-        executor: &mut E,
-        state: &mut State<C, FT, I, OC, OFT, R>,
-        manager: &mut EM,
-    ) -> Result<(), Error> {
-        let mut last = current_milliseconds();
-        loop {
-            self.fuzz_one(rand, executor, state, manager)?;
-            let cur = current_milliseconds();
-            if cur - last > 60 * 100 {
-                last = cur;
-                manager.fire(
-                    state,
-                    Event::UpdateStats {
-                        executions: state.executions(),
-                        time: current_time(),
-                        phantom: PhantomData,
-                    },
-                )?
-            }
-        }
-    }
-}
-
-/// Your default fuzzer instance, for everyday use.
-#[derive(Clone, Debug)]
-pub struct StdFuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
-where
-    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
-    EM: EventManager<I>,
-    E: Executor<I> + HasObservers<OT>,
-    OC: Corpus<I, R>,
-    OFT: FeedbacksTuple<I>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
-    C: Corpus<I, R>,
-    I: Input,
-    R: Rand,
-{
-    stages: ST,
-    phantom: PhantomData<(EM, E, OC, OFT, OT, FT, C, I, R)>,
-}
-
-impl<C, E, EM, FT, ST, I, OC, OFT, OT, R> Fuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
-    for StdFuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
-where
-    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
-    EM: EventManager<I>,
-    E: Executor<I> + HasObservers<OT>,
-    OC: Corpus<I, R>,
-    OFT: FeedbacksTuple<I>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
-    C: Corpus<I, R>,
-    I: Input,
-    R: Rand,
-{
-    fn stages(&self) -> &ST {
-        &self.stages
-    }
-
-    fn stages_mut(&mut self) -> &mut ST {
-        &mut self.stages
-    }
-}
-
-impl<C, E, EM, FT, ST, I, OC, OFT, OT, R> StdFuzzer<C, E, EM, FT, ST, I, OC, OFT, OT, R>
-where
-    ST: StagesTuple<C, E, EM, FT, I, OC, OFT, OT, R>,
-    EM: EventManager<I>,
-    E: Executor<I> + HasObservers<OT>,
-    OC: Corpus<I, R>,
-    OFT: FeedbacksTuple<I>,
-    OT: ObserversTuple,
-    FT: FeedbacksTuple<I>,
-    C: Corpus<I, R>,
-    I: Input,
-    R: Rand,
-{
-    pub fn new(stages: ST) -> Self {
-        Self {
-            stages: stages,
-            phantom: PhantomData,
-        }
-    }
-}
 
 /// Main error struct for AFL
 #[derive(Debug)]
