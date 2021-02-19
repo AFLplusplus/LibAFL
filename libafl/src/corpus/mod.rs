@@ -5,6 +5,7 @@ pub use testcase::Testcase;
 
 use alloc::{vec::Vec};
 use core::{cell::RefCell};
+use serde::{Serialize, Deserialize};
 
 use crate::{
     inputs::Input,
@@ -101,6 +102,8 @@ impl CorpusScheduler for RandCorpusScheduler {
     }
 }
 
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryCorpus<I>
 where
     I: Input,
@@ -108,7 +111,7 @@ where
     entries: Vec<RefCell<Testcase<I>>>,
 }
 
-impl<I, SC> Corpus<I> for InMemoryCorpus<I>
+impl<I> Corpus<I> for InMemoryCorpus<I>
 where
     I: Input,
 {
@@ -151,54 +154,4 @@ where
     fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
         Ok(&self.entries[idx])
     }
-
-    /*/// Add an entry to the corpus and return its index
-    #[inline]
-    fn add<R, S>(state: &mut S, testcase: Testcase<I>) -> Result<usize, Error>
-    where
-        S: HasCorpus<Self, I> + HasRand<R>,
-        R: Rand
-    {
-        state.corpus_mut().entries.push(RefCell::new(testcase));
-        let idx = state.corpus().entries.len() - 1;
-        // Scheduler hook
-        SC::on_add(state, idx, state.corpus().entries[idx].borrow())?;
-        Ok(idx)
-    }
-
-    /// Replaces the testcase at the given idx
-    #[inline]
-    fn replace<R, S>(state: &mut S, idx: usize, testcase: Testcase<I>) -> Result<(), Error>
-    where
-        S: HasCorpus<Self, I> + HasRand<R>,
-        R: Rand
-    {
-        if state.corpus().entries.len() < idx {
-            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
-        }
-        state.corpus_mut().entries[idx] = RefCell::new(testcase);
-        // Scheduler hook
-        SC::on_replace(state, idx, state.corpus().entries[idx])?;
-        Ok(())
-    }
-
-    /// Removes an entry from the corpus, returning it if it was present.
-    #[inline]
-    fn remove<R, S>(state: &mut S, idx: usize) -> Result<Option<Testcase<I>>, Error>
-    where
-        S: HasCorpus<Self, I> + HasRand<R>,
-        R: Rand
-    {
-        let testcase = match state.corpus_mut()
-            .entries
-            .iter()
-            .position(|x| ptr::eq(x.as_ptr(), entry))
-        {
-            Some(i) => Some(state.corpus_mut().entries.remove(i).into_inner()),
-            None => None,
-        };
-        // Scheduler hook
-        SC::on_remove(state, idx, &testcase)?;
-        Ok(testcase)
-    }*/
 }

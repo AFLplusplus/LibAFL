@@ -3,7 +3,7 @@
 
 use crate::{
     inputs::{HasBytesVec, Input},
-    state::{HasRand, HasCorpus, HasMetadata},
+    state::{HasRand, HasMetadata},
     mutators::*,
     utils::Rand,
     Error,

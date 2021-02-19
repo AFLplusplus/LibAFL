@@ -175,7 +175,7 @@ where
     R: Rand,
 {
     scheduled: SM,
-    phantom: PhantomData<(I, R, S)>,
+    phantom: PhantomData<(C, I, R, S)>,
 }
 
 impl<C, I, R, S, SM> Mutator<I> for HavocBytesMutator<C, I, R, S, SM>
@@ -258,9 +258,8 @@ where
     }
 }
 
-impl<C, I, R, S, SM> Default for HavocBytesMutator<C, I, R, S, StdScheduledMutator<I, R, S>>
+impl<C, I, R, S> Default for HavocBytesMutator<C, I, R, S, StdScheduledMutator<I, R, S>>
 where
-    SM: ScheduledMutator<I, S> + HasMaxSize,
     I: Input + HasBytesVec,
     S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
     C: Corpus<I>,

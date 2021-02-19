@@ -10,13 +10,9 @@ use core::marker::PhantomData;
 
 use crate::{
     bolts::tuples::{MatchNameAndType, MatchType, Named, TupleList},
-    corpus::Corpus,
     events::EventManager,
-    feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::State,
-    utils::Rand,
     Error,
 };
 
@@ -84,18 +80,13 @@ where
 {
     #[inline]
     /// Called right before exexution starts
-    fn pre_exec<C, EM, FT, OC, OFT, R>(
+    fn pre_exec<EM, S>(
         &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
+        _state: &mut S,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error>
     where
-        R: Rand,
-        FT: FeedbacksTuple<I>,
-        C: Corpus<I, R>,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
         EM: EventManager<I>,
     {
         Ok(())
@@ -103,18 +94,13 @@ where
 
     #[inline]
     /// Called right after execution finished.
-    fn post_exec<C, EM, FT, OC, OFT, R>(
+    fn post_exec<EM, S>(
         &mut self,
-        _state: &State<C, FT, I, OC, OFT, R>,
+        _state: &S,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error>
     where
-        R: Rand,
-        FT: FeedbacksTuple<I>,
-        C: Corpus<I, R>,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
         EM: EventManager<I>,
     {
         Ok(())

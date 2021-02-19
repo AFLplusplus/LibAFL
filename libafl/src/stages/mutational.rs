@@ -9,7 +9,7 @@ use crate::{
     stages::Stage,
     state::{HasRand},
     utils::Rand,
-    state::HasCorpus,
+    state::{HasCorpus, Evaluator},
     Error,
 };
 
@@ -43,7 +43,7 @@ where
     where
         EM: EventManager<I>,
         E: Executor<I>,
-        S: HasCorpus<C, I>,
+        S: HasCorpus<C, I> + Evaluator<I>,
         C: Corpus<I>
     {
         let num = self.iterations(state);
@@ -57,7 +57,7 @@ where
             self.mutator_mut()
                 .mutate(state, &mut input_mut, i as i32)?;
 
-            let fitness = state.process_input(input_mut, executor, manager)?;
+            let fitness = state.evaluate_input(input_mut, executor, manager)?;
 
             self.mutator_mut().post_exec(state, fitness, i as i32)?;
         }
@@ -121,7 +121,7 @@ where
     where
         EM: EventManager<I>,
         E: Executor<I>,
-        S: HasCorpus<C, I>,
+        S: HasCorpus<C, I> + Evaluator<I>,
         C: Corpus<I>
     {
         self.perform_mutational(executor, state, manager, corpus_idx)

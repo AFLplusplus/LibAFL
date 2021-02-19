@@ -6,7 +6,7 @@ use crate::{
     executors::{Executor},
     inputs::Input,
     stages::StagesTuple,
-    state::{HasRand, HasCorpus},
+    state::{HasRand, HasCorpus, HasExecutions},
     utils::{Rand, current_milliseconds, current_time},
     Error
 };
@@ -70,6 +70,7 @@ where
 {
     scheduler: CS,
     stages: ST,
+    phantom: PhantomData<I>
 }
 
 impl<CS, ST, I> HasStages<ST, I> for StdFuzzer<CS, ST, I>
@@ -139,7 +140,7 @@ where
     where
         EM: EventManager<I>,
         E: Executor<I>,
-        S: HasCorpus<C, I> + HasRand<R>,
+        S: HasCorpus<C, I> + HasRand<R> + HasExecutions,
         C: Corpus<I>,
         R: Rand
     {
@@ -152,7 +153,7 @@ where
                 manager.fire(
                     state,
                     Event::UpdateStats {
-                        executions: state.executions(),
+                        executions: *state.executions(),
                         time: current_time(),
                         phantom: PhantomData,
                     },
@@ -173,6 +174,7 @@ where
         Self {
             scheduler: scheduler,
             stages: stages,
+            phantom: PhantomData
         }
     }
 }

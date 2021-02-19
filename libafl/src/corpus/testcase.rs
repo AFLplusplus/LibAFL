@@ -159,6 +159,18 @@ where
         }
     }
 
+    /// Create a new Testcase instace given an input and a fitness
+    #[inline]
+    pub fn with_fitness(input: I, fitness: u32) -> Self {
+        Testcase {
+            input: Some(input.into()),
+            filename: None,
+            fitness: fitness,
+            metadatas: SerdeAnyMap::new(),
+            exec_time: None,
+        }
+    }
+
     #[inline]
     pub fn default() -> Self {
         Testcase {

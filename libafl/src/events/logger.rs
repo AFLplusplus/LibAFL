@@ -3,15 +3,10 @@ use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 #[cfg(unix)]
 use crate::{
-    corpus::Corpus,
     events::{BrokerEventResult, Event, EventManager},
-    executors::{Executor, HasObservers},
-    feedbacks::FeedbacksTuple,
+    executors::{Executor},
     inputs::Input,
-    observers::ObserversTuple,
-    state::State,
     stats::Stats,
-    utils::Rand,
     Error,
 };
 
@@ -33,19 +28,13 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<C, E, FT, OC, OFT, OT, R>(
+    fn process<E, S>(
         &mut self,
-        state: &mut State<C, FT, I, OC, OFT, R>,
+        state: &mut S,
         _executor: &mut E,
     ) -> Result<usize, Error>
     where
-        C: Corpus<I, R>,
-        E: Executor<I> + HasObservers<OT>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-        OT: ObserversTuple,
+        E: Executor<I>
     {
         let count = self.events.len();
         while self.events.len() > 0 {
@@ -55,17 +44,11 @@ where
         Ok(count)
     }
 
-    fn fire<C, FT, OC, OFT, R>(
+    fn fire<S>(
         &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
+        _state: &mut S,
         event: Event<I>,
     ) -> Result<(), Error>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
     {
         match Self::handle_in_broker(&mut self.stats, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
@@ -132,18 +115,11 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client<C, FT, OC, OFT, R>(
+    fn handle_in_client<S>(
         &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
+        _state: &mut S,
         event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-    {
+    ) -> Result<(), Error> {
         match event {
             _ => Err(Error::Unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
