@@ -22,16 +22,18 @@ where
     I: Input,
 {
     /// Mutate a given input
-    fn mutate<S>(
+    fn mutate<F, S>(
         &mut self,
+        fuzzer: &F,
         state: &mut S,
         input: &mut I,
         stage_idx: i32,
     ) -> Result<(), Error>;
 
     /// Post-process given the outcome of the execution
-    fn post_exec<S>(
+    fn post_exec<F, S>(
         &mut self,
+        _fuzzer: &F,
         _state: &mut S,
         _is_interesting: u32,
         _stage_idx: i32,

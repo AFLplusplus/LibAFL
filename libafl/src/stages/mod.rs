@@ -17,10 +17,11 @@ where
     I: Input
 {
     /// Run the stage
-    fn perform<E, EM, S>(
+    fn perform<E, EM, F, S>(
         &self,
-        executor: &mut E,
+        fuzzer: &F,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>
@@ -33,10 +34,11 @@ pub trait StagesTuple<I>
 where
     I: Input
 {
-    fn perform_all<E, EM, S>(
+    fn perform_all<E, EM, F, S>(
         &self,
-        executor: &mut E,
+        fuzzer: &F,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>
@@ -49,10 +51,11 @@ impl<I> StagesTuple<I> for ()
 where
     I: Input
 {
-    fn perform_all<E, EM, S>(
+    fn perform_all<E, EM, F, S>(
         &self,
-        executor: &mut E,
+        fuzzer: &F,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>
@@ -70,10 +73,11 @@ where
     Tail: StagesTuple<I> + TupleList,
     I: Input
 {
-    fn perform_all<E, EM, S>(
+    fn perform_all<E, EM, F, S>(
         &self,
-        executor: &mut E,
+        fuzzer: &F,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>
@@ -81,7 +85,7 @@ where
         EM: EventManager<I>,
         E: Executor<I>
     {
-        self.0.perform(executor, state, manager, corpus_idx)?;
-        self.1 .perform_all(executor, state, manager, corpus_idx)
+        self.0.perform(fuzzer, state, executor, manager, corpus_idx)?;
+        self.1 .perform_all(fuzzer, state, executor, manager, corpus_idx)
     }
 }

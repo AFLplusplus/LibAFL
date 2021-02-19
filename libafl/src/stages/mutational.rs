@@ -33,10 +33,11 @@ where
     fn iterations<S>(&mut self, state: &mut S) -> usize;
 
     /// Runs this (mutational) stage for the given testcase
-    fn perform_mutational<E, EM, S, C>(
+    fn perform_mutational<C, E, EM, F, S>(
         &self,
-        executor: &mut E,
+        fuzzer: &F,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>
@@ -111,10 +112,11 @@ where
     I: Input,
 {
     #[inline]
-    fn perform<E, EM, S, C>(
+    fn perform<C, E, EM, F, S>(
         &self,
-        executor: &mut E,
+        fuzzer: &F,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>
@@ -124,7 +126,7 @@ where
         S: HasCorpus<C, I> + Evaluator<I>,
         C: Corpus<I>
     {
-        self.perform_mutational(executor, state, manager, corpus_idx)
+        self.perform_mutational(fuzzer, state, executor, manager, corpus_idx)
     }
 }
 

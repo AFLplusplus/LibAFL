@@ -34,8 +34,9 @@ where
 
     /// New default implementation for mutate
     /// Implementations must forward mutate() to this method
-    fn scheduled_mutate(
+    fn scheduled_mutate<F>(
         &mut self,
+        fuzzer: &F,
         state: &mut S,
         input: &mut I,
         _stage_idx: i32,

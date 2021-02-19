@@ -27,21 +27,21 @@ pub enum MutationResult {
 
 // TODO maybe the mutator arg is not needed
 /// The generic function type that identifies mutations
-pub type MutationFunction<I, M, S> =
-    fn(&mut M, &mut S, &mut I) -> Result<MutationResult, Error>;
+pub type MutationFunction<I, F, M, S> =
+    fn(&mut M, &F, &mut S, &mut I) -> Result<MutationResult, Error>;
 
-pub trait ComposedByMutations<I, S>
+pub trait ComposedByMutations<I, F, S>
 where
     I: Input,
 {
     /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, S>;
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, F, Self, S>;
 
     /// Get the number of mutations
     fn mutations_count(&self) -> usize;
 
     /// Add a mutation
-    fn add_mutation(&mut self, mutation: MutationFunction<I, Self, S>);
+    fn add_mutation(&mut self, mutation: MutationFunction<I, F, Self, S>);
 }
 
 /// Mem move in the own vec
@@ -939,6 +939,7 @@ pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error
     Ok(entries)
 }
 
+/*
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "std")]
@@ -1055,3 +1056,4 @@ token2="B"
         */
     }
 }
+*/
