@@ -9,6 +9,7 @@ use crate::{
     stages::Stage,
     state::{HasRand},
     utils::Rand,
+    state::HasCorpus,
     Error,
 };
 
@@ -32,7 +33,7 @@ where
     fn iterations<S>(&mut self, state: &mut S) -> usize;
 
     /// Runs this (mutational) stage for the given testcase
-    fn perform_mutational<E, EM, S>(
+    fn perform_mutational<E, EM, S, C>(
         &self,
         executor: &mut E,
         state: &mut S,
@@ -41,13 +42,15 @@ where
     ) -> Result<(), Error>
     where
         EM: EventManager<I>,
-        E: Executor<I>
+        E: Executor<I>,
+        S: HasCorpus<C, I>,
+        C: Corpus<I>
     {
         let num = self.iterations(state);
         for i in 0..num {
             let mut input_mut = state
                 .corpus()
-                .get(corpus_idx)
+                .get(corpus_idx)?
                 .borrow_mut()
                 .load_input()?
                 .clone();
@@ -108,7 +111,7 @@ where
     I: Input,
 {
     #[inline]
-    fn perform<E, EM, S>(
+    fn perform<E, EM, S, C>(
         &self,
         executor: &mut E,
         state: &mut S,
@@ -117,7 +120,9 @@ where
     ) -> Result<(), Error>
     where
         EM: EventManager<I>,
-        E: Executor<I>
+        E: Executor<I>,
+        S: HasCorpus<C, I>,
+        C: Corpus<I>
     {
         self.perform_mutational(executor, state, manager, corpus_idx)
     }

@@ -66,8 +66,8 @@ where
 
 impl<Head, Tail, I> StagesTuple<I> for (Head, Tail)
 where
-    Head: Stage,
-    Tail: StagesTuple + TupleList,
+    Head: Stage<I>,
+    Tail: StagesTuple<I> + TupleList,
     I: Input
 {
     fn perform_all<E, EM, S>(

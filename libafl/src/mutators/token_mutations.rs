@@ -3,6 +3,7 @@
 
 use crate::{
     inputs::{HasBytesVec, Input},
+    state::{HasRand, HasCorpus, HasMetadata},
     mutators::*,
     utils::Rand,
     Error,
@@ -31,15 +32,14 @@ impl TokensMetadata {
 /// Insert a dictionary token
 pub fn mutation_tokeninsert<I, M, R, S>(
     mutator: &mut M,
-    rand: &mut R,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
 where
     M: HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R>,
     R: Rand,
-    S: HasMetadata,
 {
     let meta;
     match state.metadata().get::<TokensMetadata>() {
@@ -53,10 +53,10 @@ where
     if meta.tokens.len() == 0 {
         return Ok(MutationResult::Skipped);
     }
-    let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
+    let token = &meta.tokens[state.rand_mut().below(meta.tokens.len() as u64) as usize];
 
     let size = input.bytes().len();
-    let off = rand.below((size + 1) as u64) as usize;
+    let off = state.rand_mut().below((size + 1) as u64) as usize;
     let mut len = token.len();
 
     if size + len > mutator.max_size() {
@@ -77,14 +77,14 @@ where
 /// Overwrite with a dictionary token
 pub fn mutation_tokenreplace<I, M, R, S>(
     _: &mut M,
-    rand: &mut R,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
 where
+    M: HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R>,
     R: Rand,
-    S: HasMetadata,
 {
     let size = input.bytes().len();
     if size == 0 {
@@ -103,9 +103,9 @@ where
     if meta.tokens.len() == 0 {
         return Ok(MutationResult::Skipped);
     }
-    let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
+    let token = &meta.tokens[state.rand_mut().below(meta.tokens.len() as u64) as usize];
 
-    let off = rand.below(size as u64) as usize;
+    let off = state.rand_mut().below(size as u64) as usize;
 
     let mut len = token.len();
     if off + len > size {

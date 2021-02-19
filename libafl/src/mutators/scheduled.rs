@@ -1,72 +1,69 @@
+use crate::inputs::HasBytesVec;
 use alloc::vec::Vec;
 use core::{fmt, default::Default, marker::PhantomData};
 use fmt::Debug;
 
 use crate::{
-    inputs::{HasBytesVec, Input},
-    mutators::{Corpus, *},
-    state::{HasCorpus, HasMetadata},
+    inputs::{Input},
+    mutators::{Mutator, HasMaxSize, DEFAULT_MAX_SIZE},
+    state::{HasRand, HasCorpus, HasMetadata},
+    corpus::Corpus,
     utils::Rand,
     Error,
 };
 
-pub trait ScheduledMutator<C, I, R, S>:
-    Mutator<C, I, R, S> + ComposedByMutations<C, I, R, S>
+pub use crate::mutators::mutations::*;
+pub use crate::mutators::token_mutations::*;
+
+pub trait ScheduledMutator<I, S>: Mutator<I> + ComposedByMutations<I, S>
 where
-    C: Corpus<I, R>,
     I: Input,
-    R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    #[inline]
-    fn iterations(&mut self, rand: &mut R, _input: &I) -> u64 {
-        1 << (1 + rand.below(6))
-    }
+    fn iterations(&mut self, state: &mut S, input: &I) -> u64;
+    //{
+    //    1 << (1 + state.rand_mut().below(6))
+    //}
 
     /// Get the next mutation to apply
-    #[inline]
-    fn schedule(&mut self, mutations_count: usize, rand: &mut R, _input: &I) -> usize {
-        debug_assert!(mutations_count > 0);
-        rand.below(mutations_count as u64) as usize
-    }
+    fn schedule(&mut self, mutations_count: usize, state: &mut S, input: &I) -> usize;
+    //{
+    //    debug_assert!(mutations_count > 0);
+    //    rand.below(mutations_count as u64) as usize
+    //}
 
     /// New default implementation for mutate
     /// Implementations must forward mutate() to this method
     fn scheduled_mutate(
         &mut self,
-        rand: &mut R,
         state: &mut S,
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<(), Error> {
-        let num = self.iterations(rand, input);
+        let num = self.iterations(state, input);
         for _ in 0..num {
-            let idx = self.schedule(self.mutations_count(), rand, input);
-            self.mutation_by_idx(idx)(self, rand, state, input)?;
+            let idx = self.schedule(self.mutations_count(), state, input);
+            self.mutation_by_idx(idx)(self, state, input)?;
         }
         Ok(())
     }
 }
 
 #[derive(Clone)]
-pub struct StdScheduledMutator<C, I, R, S>
+pub struct StdScheduledMutator<I, R, S>
 where
-    C: Corpus<I, R>,
-    I: Input,
-    R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
-{
-    mutations: Vec<MutationFunction<I, Self, R, S>>,
+I: Input,
+R: Rand,
+S: HasRand<R>,{
+    mutations: Vec<MutationFunction<I, Self, S>>,
     max_size: usize,
 }
 
-impl<C, I, R, S> Debug for StdScheduledMutator<C, I, R, S>
+impl<I, R, S> Debug for StdScheduledMutator<I, R, S>
 where
-    C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
+    S: HasRand<R>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -79,12 +76,11 @@ where
     }
 }
 
-impl<C, I, R, S> Mutator<C, I, R, S> for StdScheduledMutator<C, I, R, S>
+impl<I, R, S> Mutator<I> for StdScheduledMutator<I, R, S>
 where
-    C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
+    S: HasRand<R>,
 {
     fn mutate(
         &mut self,
@@ -93,19 +89,18 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<(), Error> {
-        self.scheduled_mutate(rand, state, input, _stage_idx)
+        self.scheduled_mutate(state, input, _stage_idx)
     }
 }
 
-impl<C, I, R, S> ComposedByMutations<C, I, R, S> for StdScheduledMutator<C, I, R, S>
+impl<I, R, S> ComposedByMutations<I, S> for StdScheduledMutator<I, R, S>
 where
-    C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
+    S: HasRand<R>,
 {
     #[inline]
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, R, S> {
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, S> {
         self.mutations[index]
     }
 
@@ -115,27 +110,25 @@ where
     }
 
     #[inline]
-    fn add_mutation(&mut self, mutation: MutationFunction<I, Self, R, S>) {
+    fn add_mutation(&mut self, mutation: MutationFunction<I, Self, S>) {
         self.mutations.push(mutation)
     }
 }
 
-impl<C, I, R, S> ScheduledMutator<C, I, R, S> for StdScheduledMutator<C, I, R, S>
+impl<I, R, S> ScheduledMutator<I, S> for StdScheduledMutator<I, R, S>
 where
-    C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
+    S: HasRand<R>,
 {
     // Just use the default methods
 }
 
-impl<C, I, R, S> HasMaxSize for StdScheduledMutator<C, I, R, S>
+impl<I, R, S> HasMaxSize for StdScheduledMutator<I, R, S>
 where
-    C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
+    S: HasRand<R>,
 {
     #[inline]
     fn max_size(&self) -> usize {
@@ -148,12 +141,11 @@ where
     }
 }
 
-impl<C, I, R, S> StdScheduledMutator<C, I, R, S>
+impl<I, R, S> StdScheduledMutator<I, R, S>
 where
-    C: Corpus<I, R>,
     I: Input,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
+    S: HasRand<R>,
 {
     /// Create a new StdScheduledMutator instance without mutations and corpus
     pub fn new() -> Self {
@@ -164,7 +156,7 @@ where
     }
 
     /// Create a new StdScheduledMutator instance specifying mutations
-    pub fn with_mutations(mutations: Vec<MutationFunction<I, Self, R, S>>) -> Self {
+    pub fn with_mutations(mutations: Vec<MutationFunction<I, Self, S>>) -> Self {
         StdScheduledMutator {
             mutations: mutations,
             max_size: DEFAULT_MAX_SIZE,
@@ -172,27 +164,27 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
 /// Schedule some selected byte level mutations given a ScheduledMutator type
-pub struct HavocBytesMutator<SM, C, I, R, S>
+#[derive(Clone, Debug)]
+pub struct HavocBytesMutator<C, I, R, S, SM>
 where
-    SM: ScheduledMutator<C, I, R, S> + HasMaxSize,
-    C: Corpus<I, R>,
+    SM: ScheduledMutator<I, S> + HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    C: Corpus<I>,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
 {
     scheduled: SM,
-    phantom: PhantomData<(C, I, R, S)>,
+    phantom: PhantomData<(I, R, S)>,
 }
 
-impl<SM, C, I, R, S> Mutator<C, I, R, S> for HavocBytesMutator<SM, C, I, R, S>
+impl<C, I, R, S, SM> Mutator<I> for HavocBytesMutator<C, I, R, S, SM>
 where
-    SM: ScheduledMutator<C, I, R, S> + HasMaxSize,
-    C: Corpus<I, R>,
+    SM: ScheduledMutator<I, S> + HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    C: Corpus<I>,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Mutate bytes
     fn mutate(
@@ -202,10 +194,10 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<(), Error> {
-        self.scheduled.mutate(rand, state, input, stage_idx)?;
-        /*let num = self.scheduled.iterations(rand, input);
+        self.scheduled.mutate(state, input, stage_idx)?;
+        /*let num = self.scheduled.iterations(state, input);
         for _ in 0..num {
-            let idx = self.scheduled.schedule(14, rand, input);
+            let idx = self.scheduled.schedule(14, state, input);
             let mutation = match idx {
                 0 => mutation_bitflip,
                 1 => mutation_byteflip,
@@ -222,19 +214,19 @@ where
                 11 => mutation_dwordinteresting,
                 _ => mutation_splice,
             };
-            mutation(self, rand, state, input)?;
+            mutation(self, state, input)?;
         }*/
         Ok(())
     }
 }
 
-impl<SM, C, I, R, S> HasMaxSize for HavocBytesMutator<SM, C, I, R, S>
+impl<C, I, R, S, SM> HasMaxSize for HavocBytesMutator<C, I, R, S, SM>
 where
-    SM: ScheduledMutator<C, I, R, S> + HasMaxSize,
-    C: Corpus<I, R>,
+    SM: ScheduledMutator<I, S> + HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    C: Corpus<I>,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
 {
     #[inline]
     fn max_size(&self) -> usize {
@@ -247,13 +239,13 @@ where
     }
 }
 
-impl<SM, C, I, R, S> HavocBytesMutator<SM, C, I, R, S>
+impl<C, I, R, S, SM> HavocBytesMutator<C, I, R, S, SM>
 where
-    SM: ScheduledMutator<C, I, R, S> + HasMaxSize,
-    C: Corpus<I, R>,
+    SM: ScheduledMutator<I, S> + HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    C: Corpus<I>,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Create a new HavocBytesMutator instance given a ScheduledMutator to wrap
     pub fn new(mut scheduled: SM) -> Self {
@@ -266,16 +258,17 @@ where
     }
 }
 
-impl<C, I, R, S> Default for HavocBytesMutator<StdScheduledMutator<C, I, R, S>, C, I, R, S>
+impl<C, I, R, S, SM> Default for HavocBytesMutator<C, I, R, S, StdScheduledMutator<I, R, S>>
 where
-    C: Corpus<I, R>,
+    SM: ScheduledMutator<I, S> + HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    C: Corpus<I>,
     R: Rand,
-    S: HasCorpus<C, I, R> + HasMetadata,
 {
     /// Create a new HavocBytesMutator instance wrapping StdScheduledMutator
     fn default() -> Self {
-        let mut scheduled = StdScheduledMutator::<C, I, R, S>::new();
+        let mut scheduled = StdScheduledMutator::<I, R, S>::new();
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_byteflip);
         scheduled.add_mutation(mutation_byteinc);
@@ -317,6 +310,7 @@ where
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -390,3 +384,4 @@ mod tests {
         }
     }
 }
+*/
