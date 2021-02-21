@@ -1,7 +1,7 @@
 use crate::bolts::llmp::LlmpSender;
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
 use crate::bolts::llmp::LlmpReceiver;
@@ -22,7 +22,7 @@ use crate::{
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
-    state::{IfInteresting},
+    state::IfInteresting,
     stats::Stats,
     Error,
 };
@@ -258,7 +258,7 @@ where
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        S: IfInteresting<I>
+        S: IfInteresting<I>,
     {
         match event {
             Event::NewTestcase {
@@ -293,7 +293,7 @@ where
     }
 }
 
-impl<I, SH, ST> EventManager<I> for LlmpEventManager<I, SH, ST>
+impl<I, SH, ST> EventManager<E, I, S> for LlmpEventManager<I, SH, ST>
 where
     I: Input,
     SH: ShMem,
@@ -311,15 +311,11 @@ where
         }
     }
 
-    fn process<E, OT, S>(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error>
+    fn process<E, OT, S>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        S: IfInteresting<I>
+        S: IfInteresting<I>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
@@ -348,11 +344,7 @@ where
         Ok(count)
     }
 
-    fn fire<S>(
-        &mut self,
-        _state: &mut S,
-        event: Event<I>,
-    ) -> Result<(), Error> {
+    fn fire<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
@@ -407,7 +399,7 @@ where
     sender: LlmpSender<SH>,
 }
 
-impl<I, SH, ST> EventManager<I> for LlmpRestartingEventManager<I, SH, ST>
+impl<I, SH, ST> EventManager<E, I, S> for LlmpRestartingEventManager<I, SH, ST>
 where
     I: Input,
     SH: ShMem,
@@ -421,10 +413,7 @@ where
     }
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
-    fn on_restart<S>(
-        &mut self,
-        state: &mut S,
-    ) -> Result<(), Error>
+    fn on_restart<S>(&mut self, state: &mut S) -> Result<(), Error>
     where
         S: Serialize,
     {
@@ -435,24 +424,16 @@ where
             .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
     }
 
-    fn process<E, OT, S>(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error>
+    fn process<E, OT, S>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        S: IfInteresting<I>
+        S: IfInteresting<I>,
     {
         self.llmp_mgr.process(state, executor)
     }
 
-    fn fire<S>(
-        &mut self,
-        state: &mut S,
-        event: Event<I>,
-    ) -> Result<(), Error>    {
+    fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)
     }
@@ -493,13 +474,7 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
     //mgr: &mut LlmpEventManager<I, SH, ST>,
     stats: ST,
     broker_port: u16,
-) -> Result<
-    (
-        Option<S>,
-        LlmpRestartingEventManager<I, SH, ST>,
-    ),
-    Error,
->
+) -> Result<(Option<S>, LlmpRestartingEventManager<I, SH, ST>), Error>
 where
     I: Input,
     S: DeserializeOwned,
@@ -562,8 +537,7 @@ where
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (state, mgr): (S, LlmpEventManager<I, SH, ST>) =
-                deserialize_state_mgr(&msg)?;
+            let (state, mgr): (S, LlmpEventManager<I, SH, ST>) = deserialize_state_mgr(&msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }

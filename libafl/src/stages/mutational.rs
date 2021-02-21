@@ -2,14 +2,14 @@ use core::marker::PhantomData;
 
 use crate::{
     events::EventManager,
-    executors::{Executor},
+    executors::Executor,
     inputs::Input,
     mutators::Mutator,
     stages::Corpus,
     stages::Stage,
-    state::{HasRand},
+    state::HasRand,
+    state::{Evaluator, HasCorpus},
     utils::Rand,
-    state::{HasCorpus, Evaluator},
     Error,
 };
 
@@ -45,7 +45,7 @@ where
         EM: EventManager<I>,
         E: Executor<I>,
         S: HasCorpus<C, I> + Evaluator<I>,
-        C: Corpus<I>
+        C: Corpus<I>,
     {
         let num = self.iterations(state);
         for i in 0..num {
@@ -56,11 +56,12 @@ where
                 .load_input()?
                 .clone();
             self.mutator_mut()
-                .mutate(state, &mut input_mut, i as i32)?;
+                .mutate(fuzzer, state, &mut input_mut, i as i32)?;
 
             let fitness = state.evaluate_input(input_mut, executor, manager)?;
 
-            self.mutator_mut().post_exec(state, fitness, i as i32)?;
+            self.mutator_mut()
+                .post_exec(fuzzer, state, fitness, i as i32)?;
         }
         Ok(())
     }
@@ -100,7 +101,7 @@ where
     fn iterations<R, S>(&mut self, state: &mut S) -> usize
     where
         S: HasRand<R>,
-        R: Rand
+        R: Rand,
     {
         1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
     }
@@ -124,7 +125,7 @@ where
         EM: EventManager<I>,
         E: Executor<I>,
         S: HasCorpus<C, I> + Evaluator<I>,
-        C: Corpus<I>
+        C: Corpus<I>,
     {
         self.perform_mutational(fuzzer, state, executor, manager, corpus_idx)
     }

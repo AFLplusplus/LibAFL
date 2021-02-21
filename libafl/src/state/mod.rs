@@ -17,7 +17,7 @@ use crate::{
     generators::Generator,
     inputs::Input,
     observers::ObserversTuple,
-    utils::{current_milliseconds, Rand},
+    utils::Rand,
     Error,
 };
 
@@ -80,7 +80,7 @@ pub trait HasMetadata {
 pub trait HasFeedbacks<FT, I>
 where
     FT: FeedbacksTuple<I>,
-    I: Input
+    I: Input,
 {
     /// The feedbacks tuple
     fn feedbacks(&self) -> &FT;
@@ -97,7 +97,11 @@ where
 
     /// Creates a new testcase, appending the metadata from each feedback
     #[inline]
-    fn testcase_with_feedbacks_metadata(&mut self, input: I, fitness: u32) -> Result<Testcase<I>, Error> {
+    fn testcase_with_feedbacks_metadata(
+        &mut self,
+        input: I,
+        fitness: u32,
+    ) -> Result<Testcase<I>, Error> {
         let mut testcase = Testcase::with_fitness(input, fitness);
         self.feedbacks_mut().append_metadata_all(&mut testcase)?;
         Ok(testcase)
@@ -108,7 +112,7 @@ where
 pub trait HasObjectives<FT, I>
 where
     FT: FeedbacksTuple<I>,
-    I: Input
+    I: Input,
 {
     /// The objective feedbacks tuple
     fn objectives(&self) -> &FT;
@@ -118,8 +122,7 @@ where
 }
 
 /// Trait for the execution counter
-pub trait HasExecutions
-{
+pub trait HasExecutions {
     /// The executions counter
     fn executions(&self) -> &usize;
 
@@ -128,8 +131,7 @@ pub trait HasExecutions
 }
 
 /// Trait for the starting time
-pub trait HasStartTime
-{
+pub trait HasStartTime {
     /// The starting time
     fn start_time(&self) -> &Duration;
 
@@ -140,7 +142,7 @@ pub trait HasStartTime
 /// Add to the state if interesting
 pub trait IfInteresting<I>
 where
-    I: Input
+    I: Input,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn is_interesting<OT>(
@@ -205,7 +207,6 @@ where
     phantom: PhantomData<I>,
 }
 
-
 impl<C, FT, I, OFT, R, SC> HasRand<R> for State<C, FT, I, OFT, R, SC>
 where
     C: Corpus<I>,
@@ -227,7 +228,6 @@ where
         &mut self.rand
     }
 }
-
 
 impl<C, FT, I, OFT, R, SC> HasCorpus<C, I> for State<C, FT, I, OFT, R, SC>
 where
@@ -471,7 +471,6 @@ where
     }
 }
 
-
 #[cfg(feature = "std")]
 impl<C, FT, OFT, R, SC> State<C, FT, BytesInput, OFT, R, SC>
 where
@@ -551,7 +550,6 @@ where
     }
 }
 
-
 impl<C, FT, I, OFT, R, SC> State<C, FT, I, OFT, R, SC>
 where
     C: Corpus<I>,
@@ -584,13 +582,14 @@ where
         executor.post_exec_observers()?;
 
         let observers = executor.observers();
-        
         let fitness = self
             .feedbacks_mut()
             .is_interesting_all(&input, observers, exit_kind)?;
-        
-        let is_solution = self.objectives_mut().is_interesting_all(&input, observers, exit_kind.clone())? > 0;
 
+        let is_solution =
+            self.objectives_mut()
+                .is_interesting_all(&input, observers, exit_kind.clone())?
+                > 0;
         Ok((fitness, is_solution))
     }
 
@@ -629,7 +628,7 @@ where
         Ok(())
     }
 
-    pub fn new(rand: R, corpus: C, feedbacks: FT, solutions: SC,  objectives: OFT) -> Self {
+    pub fn new(rand: R, corpus: C, feedbacks: FT, solutions: SC, objectives: OFT) -> Self {
         Self {
             rand,
             executions: 0,

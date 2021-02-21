@@ -1,21 +1,20 @@
-use core::{marker::PhantomData};
- 
 use crate::{
-    corpus::{CorpusScheduler, Corpus},
+    corpus::{Corpus, CorpusScheduler},
     events::{Event, EventManager},
-    executors::{Executor},
+    executors::Executor,
     inputs::Input,
     stages::StagesTuple,
-    state::{HasRand, HasCorpus, HasExecutions},
-    utils::{Rand, current_milliseconds, current_time},
-    Error
+    state::{HasCorpus, HasExecutions, HasRand},
+    utils::{current_milliseconds, current_time, Rand},
+    Error,
 };
+use core::marker::PhantomData;
 
 /// Holds a set of stages
 pub trait HasStages<ST, I>
 where
     ST: StagesTuple<I>,
-    I: Input
+    I: Input,
 {
     fn stages(&self) -> &ST;
 
@@ -37,12 +36,12 @@ pub trait Fuzzer<CS, ST, I>: HasCorpusScheduler<CS> + HasStages<ST, I>
 where
     CS: CorpusScheduler,
     ST: StagesTuple<I>,
-    I: Input
+    I: Input,
 {
     fn fuzz_one<E, EM, S>(
-        &mut self,
-        executor: &mut E,
+        &self,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
@@ -50,9 +49,9 @@ where
         E: Executor<I>;
 
     fn fuzz_loop<E, EM, S>(
-        &mut self,
-        executor: &mut E,
+        &self,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
@@ -66,18 +65,18 @@ pub struct StdFuzzer<CS, ST, I>
 where
     CS: CorpusScheduler,
     ST: StagesTuple<I>,
-    I: Input
+    I: Input,
 {
     scheduler: CS,
     stages: ST,
-    phantom: PhantomData<I>
+    phantom: PhantomData<I>,
 }
 
 impl<CS, ST, I> HasStages<ST, I> for StdFuzzer<CS, ST, I>
 where
     CS: CorpusScheduler,
     ST: StagesTuple<I>,
-    I: Input
+    I: Input,
 {
     fn stages(&self) -> &ST {
         &self.stages
@@ -92,7 +91,7 @@ impl<CS, ST, I> HasCorpusScheduler<CS> for StdFuzzer<CS, ST, I>
 where
     CS: CorpusScheduler,
     ST: StagesTuple<I>,
-    I: Input
+    I: Input,
 {
     fn scheduler(&self) -> &CS {
         &self.scheduler
@@ -107,12 +106,12 @@ impl<CS, ST, I> Fuzzer<CS, ST, I> for StdFuzzer<CS, ST, I>
 where
     CS: CorpusScheduler,
     ST: StagesTuple<I>,
-    I: Input
+    I: Input,
 {
     fn fuzz_one<C, E, EM, R, S>(
-        &mut self,
-        executor: &mut E,
+        &self,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
@@ -120,21 +119,21 @@ where
         E: Executor<I>,
         S: HasCorpus<C, I> + HasRand<R>,
         C: Corpus<I>,
-        R: Rand
+        R: Rand,
     {
         let idx = self.scheduler().next(state)?;
 
         self.stages()
-            .perform_all(executor, state, manager, idx)?;
+            .perform_all(self, state, executor, manager, idx)?;
 
         manager.process(state, executor)?;
         Ok(idx)
     }
 
     fn fuzz_loop<C, E, EM, R, S>(
-        &mut self,
-        executor: &mut E,
+        &self,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
@@ -142,11 +141,11 @@ where
         E: Executor<I>,
         S: HasCorpus<C, I> + HasRand<R> + HasExecutions,
         C: Corpus<I>,
-        R: Rand
+        R: Rand,
     {
         let mut last = current_milliseconds();
         loop {
-            self.fuzz_one(executor, state, manager)?;
+            self.fuzz_one(state, executor, manager)?;
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
@@ -163,18 +162,17 @@ where
     }
 }
 
-
 impl<CS, ST, I> StdFuzzer<CS, ST, I>
 where
     CS: CorpusScheduler,
     ST: StagesTuple<I>,
-    I: Input
+    I: Input,
 {
     pub fn new(scheduler: CS, stages: ST) -> Self {
         Self {
             scheduler: scheduler,
             stages: stages,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }

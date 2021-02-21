@@ -3,9 +3,9 @@
 pub mod testcase;
 pub use testcase::Testcase;
 
-use alloc::{vec::Vec};
-use core::{cell::RefCell};
-use serde::{Serialize, Deserialize};
+use alloc::vec::Vec;
+use core::cell::RefCell;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     inputs::Input,
@@ -36,36 +36,50 @@ where
 }
 
 pub trait CorpusScheduler {
-
     /// Add an entry to the corpus and return its index
-    fn on_add<C, I, R, S>(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error>
+    fn on_add<C, I, R, S>(
+        &self,
+        state: &mut S,
+        idx: usize,
+        testcase: &Testcase<I>,
+    ) -> Result<(), Error>
     where
         S: HasCorpus<C, I> + HasRand<R>,
         C: Corpus<I>,
         I: Input,
-        R: Rand
+        R: Rand,
     {
         Ok(())
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace<C, I, R, S>(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error>
+    fn on_replace<C, I, R, S>(
+        &self,
+        state: &mut S,
+        idx: usize,
+        testcase: &Testcase<I>,
+    ) -> Result<(), Error>
     where
         S: HasCorpus<C, I> + HasRand<R>,
         C: Corpus<I>,
         I: Input,
-        R: Rand
+        R: Rand,
     {
         Ok(())
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn on_remove<C, I, R, S>(&self, state: &mut S, idx: usize, testcase: &Option<Testcase<I>>) -> Result<(), Error>
+    fn on_remove<C, I, R, S>(
+        &self,
+        state: &mut S,
+        idx: usize,
+        testcase: &Option<Testcase<I>>,
+    ) -> Result<(), Error>
     where
         S: HasCorpus<C, I> + HasRand<R>,
         C: Corpus<I>,
         I: Input,
-        R: Rand
+        R: Rand,
     {
         Ok(())
     }
@@ -78,9 +92,9 @@ pub trait CorpusScheduler {
         C: Corpus<I>,
         I: Input,
         R: Rand;
-
 }
 
+/*
 pub struct RandCorpusScheduler {}
 
 impl CorpusScheduler for RandCorpusScheduler {
@@ -90,7 +104,7 @@ impl CorpusScheduler for RandCorpusScheduler {
         S: HasCorpus<C, I> + HasRand<R>,
         C: Corpus<I>,
         I: Input,
-        R: Rand
+        R: Rand,
     {
         if state.corpus().count() == 0 {
             Err(Error::Empty("No entries in corpus".to_owned()))
@@ -101,6 +115,7 @@ impl CorpusScheduler for RandCorpusScheduler {
         }
     }
 }
+*/
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -115,7 +130,6 @@ impl<I> Corpus<I> for InMemoryCorpus<I>
 where
     I: Input,
 {
-
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {

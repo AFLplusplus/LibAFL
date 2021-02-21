@@ -1,10 +1,10 @@
 use alloc::{string::ToString, vec::Vec};
+use core::marker::PhantomData;
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
 use crate::{
     events::{BrokerEventResult, Event, EventManager},
-    executors::{Executor},
     inputs::Input,
     stats::Stats,
     Error,
@@ -12,7 +12,7 @@ use crate::{
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
-pub struct LoggerEventManager<I, ST>
+pub struct LoggerEventManager<E, I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -21,21 +21,15 @@ where
     stats: ST,
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
+    phantom: PhantomData<(E, S)>,
 }
 
-impl<I, ST> EventManager<I> for LoggerEventManager<I, ST>
+impl<E, I, S, ST> EventManager<E, I, S> for LoggerEventManager<E, I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<E, S>(
-        &mut self,
-        state: &mut S,
-        _executor: &mut E,
-    ) -> Result<usize, Error>
-    where
-        E: Executor<I>
-    {
+    fn process(&mut self, state: &mut S, _executor: &mut E) -> Result<usize, Error> {
         let count = self.events.len();
         while self.events.len() > 0 {
             let event = self.events.pop().unwrap();
@@ -44,12 +38,7 @@ where
         Ok(count)
     }
 
-    fn fire<S>(
-        &mut self,
-        _state: &mut S,
-        event: Event<I>,
-    ) -> Result<(), Error>
-    {
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.stats, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
@@ -58,7 +47,7 @@ where
     }
 }
 
-impl<I, ST> LoggerEventManager<I, ST>
+impl<E, I, S, ST> LoggerEventManager<E, I, S, ST>
 where
     I: Input,
     ST: Stats, //TODO CE: CustomEvent,
@@ -67,6 +56,7 @@ where
         Self {
             stats: stats,
             events: vec![],
+            phantom: PhantomData,
         }
     }
 
@@ -115,11 +105,7 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client<S>(
-        &mut self,
-        _state: &mut S,
-        event: Event<I>,
-    ) -> Result<(), Error> {
+    fn handle_in_client(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         match event {
             _ => Err(Error::Unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",

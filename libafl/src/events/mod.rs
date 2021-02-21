@@ -9,10 +9,7 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    executors::{Executor},
-    inputs::Input,
-    observers::ObserversTuple,
-    Error,
+    executors::Executor, inputs::Input, observers::ObserversTuple, state::IfInteresting, Error,
 };
 
 /// The log event severity
@@ -149,7 +146,7 @@ where
 
 /// EventManager is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<I>
+pub trait EventManager<E, I, S>
 where
     I: Input,
 {
@@ -158,13 +155,7 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<E, S>(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error>
-    where
-        E: Executor<I>;
+    fn process(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>;
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
@@ -184,10 +175,7 @@ where
 
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
-    fn on_restart<S>(
-        &mut self,
-        _state: &mut S,
-    ) -> Result<(), Error> {
+    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 
@@ -196,38 +184,26 @@ where
     fn await_restart_safe(&mut self) {}
 
     /// Send off an event to the broker
-    fn fire<S>(
-        &mut self,
-        state: &mut S,
-        event: Event<I>,
-    ) -> Result<(), Error>;
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
-pub struct NopEventManager<I> {
-    phantom: PhantomData<I>,
+pub struct NopEventManager<E, I, S> {
+    phantom: PhantomData<(E, I, S)>,
 }
-impl<I> EventManager<I> for NopEventManager<I>
+impl<E, I, S> EventManager<E, I, S> for NopEventManager<E, I, S>
 where
     I: Input,
 {
-    fn process<E, S>(
-        &mut self,
-        _state: &mut S,
-        _executor: &mut E,
-    ) -> Result<usize, Error>
+    fn process(&mut self, _state: &mut S, _executor: &mut E) -> Result<usize, Error>
     where
         E: Executor<I>,
     {
         Ok(0)
     }
 
-    fn fire<S>(
-        &mut self,
-        _state: &mut S,
-        _event: Event<I>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }

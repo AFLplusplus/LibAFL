@@ -2,90 +2,64 @@ pub mod mutational;
 pub use mutational::StdMutationalStage;
 
 use crate::{
-    bolts::tuples::TupleList,
-    corpus::Corpus,
-    events::EventManager,
-    executors::{Executor},
-    inputs::Input,
-    Error,
+    bolts::tuples::TupleList, corpus::Corpus, events::EventManager, executors::Executor,
+    inputs::Input, Error,
 };
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<I>
-where
-    I: Input
-{
+pub trait Stage<E, EM, F, S> {
     /// Run the stage
-    fn perform<E, EM, F, S>(
+    fn perform(
         &self,
         fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>;
+    ) -> Result<(), Error>;
 }
 
-pub trait StagesTuple<I>
-where
-    I: Input
-{
-    fn perform_all<E, EM, F, S>(
+pub trait StagesTuple<E, EM, F, S> {
+    fn perform_all(
         &self,
         fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>;
+    ) -> Result<(), Error>;
 }
 
-impl<I> StagesTuple<I> for ()
-where
-    I: Input
-{
-    fn perform_all<E, EM, F, S>(
+impl<E, EM, F, S> StagesTuple<E, EM, F, S> for () {
+    fn perform_all(
         &self,
         fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>
-    {
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<Head, Tail, I> StagesTuple<I> for (Head, Tail)
+impl<Head, Tail, E, EM, F, S> StagesTuple<E, EM, F, S> for (Head, Tail)
 where
-    Head: Stage<I>,
-    Tail: StagesTuple<I> + TupleList,
-    I: Input
+    Head: Stage<E, EM, F, S>,
+    Tail: StagesTuple<E, EM, F, S> + TupleList,
 {
-    fn perform_all<E, EM, F, S>(
+    fn perform_all(
         &self,
         fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>
-    {
-        self.0.perform(fuzzer, state, executor, manager, corpus_idx)?;
-        self.1 .perform_all(fuzzer, state, executor, manager, corpus_idx)
+    ) -> Result<(), Error> {
+        self.0
+            .perform(fuzzer, state, executor, manager, corpus_idx)?;
+        self.1
+            .perform_all(fuzzer, state, executor, manager, corpus_idx)
     }
 }
