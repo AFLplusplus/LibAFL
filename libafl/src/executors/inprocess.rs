@@ -249,7 +249,10 @@ pub mod unix_signals {
             .is_interesting_all(&input, observers, ExitKind::Crash)
             .expect("In crash handler objectives failure.".into());
         if obj_fitness > 0 {
-            state.solutions_mut().add(Testcase::new(input.clone())).expect("In crash handler solutions failure.".into());
+            state
+                .solutions_mut()
+                .add(Testcase::new(input.clone()))
+                .expect("In crash handler solutions failure.".into());
             mgr.fire(
                 state,
                 Event::Objective {
@@ -302,7 +305,10 @@ pub mod unix_signals {
             .is_interesting_all(&input, observers, ExitKind::Crash)
             .expect("In timeout handler objectives failure.".into());
         if obj_fitness > 0 {
-            state.solutions_mut().add(Testcase::new(input.clone())).expect("In timeout handler solutions failure.".into());
+            state
+                .solutions_mut()
+                .add(Testcase::new(input.clone()))
+                .expect("In timeout handler solutions failure.".into());
             mgr.fire(
                 state,
                 Event::Objective {

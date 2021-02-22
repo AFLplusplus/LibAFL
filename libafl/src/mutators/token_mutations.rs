@@ -53,7 +53,7 @@ where
         meta.unwrap().tokens.len()
     };
     let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
-    
+
     let size = input.bytes().len();
     let off = state.rand_mut().below((size + 1) as u64) as usize;
 

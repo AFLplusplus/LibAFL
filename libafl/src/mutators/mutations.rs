@@ -711,7 +711,13 @@ where
         }
     }
 
-    let other_size = state.corpus().get(idx)?.borrow_mut().load_input()?.bytes().len();
+    let other_size = state
+        .corpus()
+        .get(idx)?
+        .borrow_mut()
+        .load_input()?
+        .bytes()
+        .len();
     if other_size < 2 {
         return Ok(MutationResult::Skipped);
     }
@@ -761,8 +767,14 @@ where
             return Ok(MutationResult::Skipped);
         }
     }
-    
-    let other_size = state.corpus().get(idx)?.borrow_mut().load_input()?.bytes().len();
+
+    let other_size = state
+        .corpus()
+        .get(idx)?
+        .borrow_mut()
+        .load_input()?
+        .bytes()
+        .len();
     if other_size < 2 {
         return Ok(MutationResult::Skipped);
     }
@@ -838,7 +850,7 @@ where
     let split_at = state
         .rand_mut()
         .between(first_diff as u64, last_diff as u64) as usize;
-    
+
     let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
     let other = other_testcase.load_input()?;
     input

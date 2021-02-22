@@ -59,8 +59,7 @@ where
 
             let fitness = state.evaluate_input(input_mut, executor, manager)?;
 
-            self.mutator()
-                .post_exec(fuzzer, state, fitness, i as i32)?;
+            self.mutator().post_exec(fuzzer, state, fitness, i as i32)?;
         }
         Ok(())
     }

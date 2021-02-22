@@ -3,11 +3,21 @@
 pub mod testcase;
 pub use testcase::Testcase;
 
-use alloc::vec::Vec;
-use core::cell::RefCell;
-use serde::{Deserialize, Serialize};
+pub mod inmemory;
+pub use inmemory::InMemoryCorpus;
 
-use crate::{inputs::Input, Error};
+pub mod queue;
+pub use queue::QueueCorpusScheduler;
+
+use core::cell::RefCell;
+use core::marker::PhantomData;
+
+use crate::{
+    inputs::Input,
+    state::{HasCorpus, HasRand},
+    utils::Rand,
+    Error,
+};
 
 /// Corpus with all current testcases
 pub trait Corpus<I>: serde::Serialize + serde::de::DeserializeOwned
@@ -46,7 +56,12 @@ where
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace(&self, _state: &mut S, _idx: usize, _testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &self,
+        _state: &mut S,
+        _idx: usize,
+        _testcase: &Testcase<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
@@ -65,89 +80,34 @@ where
     fn next(&self, state: &mut S) -> Result<usize, Error>;
 }
 
-/*
-pub struct RandCorpusScheduler {}
+pub struct RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
+    phantom: PhantomData<(C, I, R, S)>,
+}
 
-impl CorpusScheduler for RandCorpusScheduler {
+impl<C, I, R, S> CorpusScheduler<I, S> for RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
     /// Gets the next entry at random
-    fn next<C, I, R, S>(state: &mut S) -> Result<usize, Error>
-    where
-        S: HasCorpus<C, I> + HasRand<R>,
-        C: Corpus<I>,
-        I: Input,
-        R: Rand,
-    {
+    fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::Empty("No entries in corpus".to_owned()))
         } else {
             let len = state.corpus().count();
             let id = state.rand_mut().below(len as u64) as usize;
+            *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
         }
     }
 }
-*/
 
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct InMemoryCorpus<I>
-where
-    I: Input,
-{
-    entries: Vec<RefCell<Testcase<I>>>,
-    current: Option<usize>,
-}
-
-impl<I> Corpus<I> for InMemoryCorpus<I>
-where
-    I: Input,
-{
-    /// Returns the number of elements
-    #[inline]
-    fn count(&self) -> usize {
-        self.entries.len()
-    }
-
-    /// Add an entry to the corpus and return its index
-    #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
-        self.entries.push(RefCell::new(testcase));
-        Ok(self.entries.len() - 1)
-    }
-
-    /// Replaces the testcase at the given idx
-    #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
-        if idx >= self.entries.len() {
-            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
-        }
-        self.entries[idx] = RefCell::new(testcase);
-        Ok(())
-    }
-
-    /// Removes an entry from the corpus, returning it if it was present.
-    #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
-        if idx >= self.entries.len() {
-            Ok(None)
-        } else {
-            Ok(Some(self.entries.remove(idx).into_inner()))
-        }
-    }
-
-    /// Get by id
-    #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
-        Ok(&self.entries[idx])
-    }
-
-    /// Current testcase scheduled
-    fn current(&self) -> &Option<usize> {
-        &self.current
-    }
-
-    /// Current testcase scheduled (mut)
-    fn current_mut(&mut self) -> &mut Option<usize> {
-        &mut self.current
-    }
-}
+pub type StdCorpusScheduler<C, I, R, S> = RandCorpusScheduler<C, I, R, S>;

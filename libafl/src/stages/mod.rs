@@ -1,7 +1,7 @@
 pub mod mutational;
 pub use mutational::StdMutationalStage;
 
-use crate::{bolts::tuples::TupleList,  Error};
+use crate::{bolts::tuples::TupleList, Error};
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -29,14 +29,7 @@ pub trait StagesTuple<E, EM, F, S> {
 }
 
 impl<E, EM, F, S> StagesTuple<E, EM, F, S> for () {
-    fn perform_all(
-        &self,
-        _: &F,
-        _: &mut S,
-        _: &mut E,
-        _: &mut EM,
-        _: usize,
-    ) -> Result<(), Error> {
+    fn perform_all(&self, _: &F, _: &mut S, _: &mut E, _: &mut EM, _: usize) -> Result<(), Error> {
         Ok(())
     }
 }
