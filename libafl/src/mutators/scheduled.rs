@@ -15,27 +15,20 @@ use crate::{
 pub use crate::mutators::mutations::*;
 pub use crate::mutators::token_mutations::*;
 
-pub trait ScheduledMutator<F, I, S>: Mutator<I> + ComposedByMutations<F, I, S>
+pub trait ScheduledMutator<F, I, S>: Mutator<F, I, S> + ComposedByMutations<F, I, S>
 where
     I: Input,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&mut self, state: &mut S, input: &I) -> u64;
-    //{
-    //    1 << (1 + state.rand_mut().below(6))
-    //}
+    fn iterations(&self, state: &mut S, input: &I) -> u64;
 
     /// Get the next mutation to apply
-    fn schedule(&mut self, mutations_count: usize, state: &mut S, input: &I) -> usize;
-    //{
-    //    debug_assert!(mutations_count > 0);
-    //    rand.below(mutations_count as u64) as usize
-    //}
+    fn schedule(&self, mutations_count: usize, state: &mut S, input: &I) -> usize;
 
     /// New default implementation for mutate
     /// Implementations must forward mutate() to this method
     fn scheduled_mutate(
-        &mut self,
+        &self,
         fuzzer: &F,
         state: &mut S,
         input: &mut I,
@@ -50,18 +43,22 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct StdScheduledMutator<F, I, S>
+pub struct StdScheduledMutator<F, I, R, S>
 where
     I: Input,
+    S: HasRand<R>,
+    R: Rand,
 {
     mutations: Vec<MutationFunction<F, I, Self, S>>,
     max_size: usize,
+    phantom: PhantomData<R>,
 }
 
-impl<F, I, S> Debug for StdScheduledMutator<F, I, S>
+impl<F, I, R, S> Debug for StdScheduledMutator<F, I, R, S>
 where
     I: Input,
+    S: HasRand<R>,
+    R: Rand,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -74,12 +71,14 @@ where
     }
 }
 
-impl<F, I, S> Mutator<I> for StdScheduledMutator<F, I, S>
+impl<F, I, R, S> Mutator<F, I, S> for StdScheduledMutator<F, I, R, S>
 where
     I: Input,
+    S: HasRand<R>,
+    R: Rand,
 {
     fn mutate(
-        &mut self,
+        &self,
         fuzzer: &F,
         state: &mut S,
         input: &mut I,
@@ -89,9 +88,11 @@ where
     }
 }
 
-impl<F, I, S> ComposedByMutations<F, I, S> for StdScheduledMutator<F, I, S>
+impl<F, I, R, S> ComposedByMutations<F, I, S> for StdScheduledMutator<F, I, R, S>
 where
     I: Input,
+    S: HasRand<R>,
+    R: Rand,
 {
     #[inline]
     fn mutation_by_idx(&self, index: usize) -> MutationFunction<F, I, Self, S> {
@@ -109,16 +110,29 @@ where
     }
 }
 
-impl<F, I, S> ScheduledMutator<F, I, S> for StdScheduledMutator<F, I, S>
+impl<F, I, R, S> ScheduledMutator<F, I, S> for StdScheduledMutator<F, I, R, S>
 where
     I: Input,
+    S: HasRand<R>,
+    R: Rand,
 {
-    // Just use the default methods
+    /// Compute the number of iterations used to apply stacked mutations
+    fn iterations(&self, state: &mut S, input: &I) -> u64 {
+        1 << (1 + state.rand_mut().below(6))
+    }
+
+    /// Get the next mutation to apply
+    fn schedule(&self, mutations_count: usize, state: &mut S, input: &I) -> usize {
+        debug_assert!(mutations_count > 0);
+        state.rand_mut().below(mutations_count as u64) as usize
+    }
 }
 
-impl<F, I, S> HasMaxSize for StdScheduledMutator<F, I, S>
+impl<F, I, R, S> HasMaxSize for StdScheduledMutator<F, I, R, S>
 where
     I: Input,
+    S: HasRand<R>,
+    R: Rand,
 {
     #[inline]
     fn max_size(&self) -> usize {
@@ -131,15 +145,18 @@ where
     }
 }
 
-impl<F, I, S> StdScheduledMutator<F, I, S>
+impl<F, I, R, S> StdScheduledMutator<F, I, R, S>
 where
     I: Input,
+    S: HasRand<R>,
+    R: Rand,
 {
     /// Create a new StdScheduledMutator instance without mutations and corpus
     pub fn new() -> Self {
         Self {
             mutations: vec![],
             max_size: DEFAULT_MAX_SIZE,
+            phantom: PhantomData,
         }
     }
 
@@ -148,6 +165,7 @@ where
         StdScheduledMutator {
             mutations: mutations,
             max_size: DEFAULT_MAX_SIZE,
+            phantom: PhantomData,
         }
     }
 }
@@ -166,7 +184,7 @@ where
     phantom: PhantomData<(C, F, I, R, S)>,
 }
 
-impl<C, F, I, R, S, SM> Mutator<I> for HavocBytesMutator<C, F, I, R, S, SM>
+impl<C, F, I, R, S, SM> Mutator<F, I, S> for HavocBytesMutator<C, F, I, R, S, SM>
 where
     SM: ScheduledMutator<F, I, S> + HasMaxSize,
     I: Input + HasBytesVec,
@@ -176,8 +194,8 @@ where
 {
     /// Mutate bytes
     fn mutate(
-        &mut self,
-        fuzzer: &mut F,
+        &self,
+        fuzzer: &F,
         state: &mut S,
         input: &mut I,
         stage_idx: i32,
@@ -246,7 +264,7 @@ where
     }
 }
 
-impl<C, F, I, R, S> Default for HavocBytesMutator<C, F, I, R, S, StdScheduledMutator<F, I, S>>
+impl<C, F, I, R, S> Default for HavocBytesMutator<C, F, I, R, S, StdScheduledMutator<F, I, R, S>>
 where
     I: Input + HasBytesVec,
     S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
@@ -255,7 +273,7 @@ where
 {
     /// Create a new HavocBytesMutator instance wrapping StdScheduledMutator
     fn default() -> Self {
-        let mut scheduled = StdScheduledMutator::<F, I, S>::new();
+        let mut scheduled = StdScheduledMutator::<F, I, R, S>::new();
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_byteflip);
         scheduled.add_mutation(mutation_byteinc);
@@ -283,8 +301,8 @@ where
         scheduled.add_mutation(mutation_bytescopy);
         scheduled.add_mutation(mutation_bytesswap);
 
-        scheduled.add_mutation(mutation_tokeninsert);
-        scheduled.add_mutation(mutation_tokenreplace);
+        //scheduled.add_mutation(mutation_tokeninsert);
+        //scheduled.add_mutation(mutation_tokenreplace);
 
         scheduled.add_mutation(mutation_crossover_insert);
         scheduled.add_mutation(mutation_crossover_replace);

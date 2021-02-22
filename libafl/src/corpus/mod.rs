@@ -7,12 +7,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    inputs::Input,
-    state::{HasCorpus, HasRand},
-    utils::Rand,
-    Error,
-};
+use crate::{inputs::Input, Error};
 
 /// Corpus with all current testcases
 pub trait Corpus<I>: serde::Serialize + serde::de::DeserializeOwned
@@ -33,65 +28,41 @@ where
 
     /// Get by id
     fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error>;
+
+    /// Current testcase scheduled
+    fn current(&self) -> &Option<usize>;
+
+    /// Current testcase scheduled (mut)
+    fn current_mut(&mut self) -> &mut Option<usize>;
 }
 
-pub trait CorpusScheduler {
+pub trait CorpusScheduler<I, S>
+where
+    I: Input,
+{
     /// Add an entry to the corpus and return its index
-    fn on_add<C, I, R, S>(
-        &self,
-        state: &mut S,
-        idx: usize,
-        testcase: &Testcase<I>,
-    ) -> Result<(), Error>
-    where
-        S: HasCorpus<C, I> + HasRand<R>,
-        C: Corpus<I>,
-        I: Input,
-        R: Rand,
-    {
+    fn on_add(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace<C, I, R, S>(
-        &self,
-        state: &mut S,
-        idx: usize,
-        testcase: &Testcase<I>,
-    ) -> Result<(), Error>
-    where
-        S: HasCorpus<C, I> + HasRand<R>,
-        C: Corpus<I>,
-        I: Input,
-        R: Rand,
-    {
+    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn on_remove<C, I, R, S>(
+    fn on_remove(
         &self,
         state: &mut S,
         idx: usize,
         testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error>
-    where
-        S: HasCorpus<C, I> + HasRand<R>,
-        C: Corpus<I>,
-        I: Input,
-        R: Rand,
-    {
+    ) -> Result<(), Error> {
         Ok(())
     }
 
     // TODO: IntoIter
     /// Gets the next entry
-    fn next<C, I, R, S>(&self, state: &mut S) -> Result<usize, Error>
-    where
-        S: HasCorpus<C, I> + HasRand<R>,
-        C: Corpus<I>,
-        I: Input,
-        R: Rand;
+    fn next(&self, state: &mut S) -> Result<usize, Error>;
 }
 
 /*
@@ -124,6 +95,7 @@ where
     I: Input,
 {
     entries: Vec<RefCell<Testcase<I>>>,
+    current: Option<usize>,
 }
 
 impl<I> Corpus<I> for InMemoryCorpus<I>
@@ -167,5 +139,15 @@ where
     #[inline]
     fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
         Ok(&self.entries[idx])
+    }
+
+    /// Current testcase scheduled
+    fn current(&self) -> &Option<usize> {
+        &self.current
+    }
+
+    /// Current testcase scheduled (mut)
+    fn current_mut(&mut self) -> &mut Option<usize> {
+        &mut self.current
     }
 }

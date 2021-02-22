@@ -29,7 +29,7 @@ pub mod fuzzer;
 pub use fuzzer::*;
 
 use alloc::string::String;
-use core::{fmt};
+use core::fmt;
 
 #[cfg(feature = "std")]
 use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};

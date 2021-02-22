@@ -7,32 +7,24 @@ pub use mutations::*;
 pub mod token_mutations;
 pub use token_mutations::*;
 
-use crate::{
-    inputs::Input,
-    Error,
-};
+use crate::{inputs::Input, Error};
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<I>
+pub trait Mutator<F, I, S>
 where
     I: Input,
 {
     /// Mutate a given input
-    fn mutate<F, S>(
-        &mut self,
-        fuzzer: &F,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<(), Error>;
+    fn mutate(&self, fuzzer: &F, state: &mut S, input: &mut I, stage_idx: i32)
+        -> Result<(), Error>;
 
     /// Post-process given the outcome of the execution
-    fn post_exec<F, S>(
-        &mut self,
+    fn post_exec(
+        &self,
         _fuzzer: &F,
         _state: &mut S,
         _is_interesting: u32,

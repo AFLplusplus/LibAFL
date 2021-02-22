@@ -56,7 +56,7 @@ where
     #[inline]
     fn pre_exec<EM, S>(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error>
     where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
@@ -69,7 +69,7 @@ where
     #[inline]
     fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
     where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
@@ -132,7 +132,7 @@ where
         _event_mgr: &mut EM,
     ) -> Self
     where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
@@ -200,7 +200,7 @@ pub mod unix_signals {
         info: siginfo_t,
         _void: c_void,
     ) where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
@@ -273,7 +273,7 @@ pub mod unix_signals {
         info: siginfo_t,
         _void: c_void,
     ) where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
@@ -346,7 +346,7 @@ pub mod unix_signals {
 
     pub unsafe fn setup_crash_handlers<EM, I, OC, OFT, OT, R, S>()
     where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,

@@ -5,14 +5,16 @@ use core::marker::PhantomData;
 #[cfg(unix)]
 use crate::{
     events::{BrokerEventResult, Event, EventManager},
+    executors::{Executor, HasObservers},
     inputs::Input,
+    observers::ObserversTuple,
     stats::Stats,
     Error,
 };
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
-pub struct LoggerEventManager<E, I, S, ST>
+pub struct LoggerEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -21,15 +23,19 @@ where
     stats: ST,
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
-    phantom: PhantomData<(E, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<E, I, S, ST> EventManager<E, I, S> for LoggerEventManager<E, I, S, ST>
+impl<I, S, ST> EventManager<I, S> for LoggerEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process(&mut self, state: &mut S, _executor: &mut E) -> Result<usize, Error> {
+    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    where
+        E: Executor<I> + HasObservers<OT>,
+        OT: ObserversTuple,
+    {
         let count = self.events.len();
         while self.events.len() > 0 {
             let event = self.events.pop().unwrap();
@@ -47,7 +53,7 @@ where
     }
 }
 
-impl<E, I, S, ST> LoggerEventManager<E, I, S, ST>
+impl<I, S, ST> LoggerEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //TODO CE: CustomEvent,

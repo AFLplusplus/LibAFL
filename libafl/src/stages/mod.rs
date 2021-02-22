@@ -1,10 +1,7 @@
 pub mod mutational;
 pub use mutational::StdMutationalStage;
 
-use crate::{
-    bolts::tuples::TupleList, corpus::Corpus, events::EventManager, executors::Executor,
-    inputs::Input, Error,
-};
+use crate::{bolts::tuples::TupleList, corpus::Corpus, Error};
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.

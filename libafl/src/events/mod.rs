@@ -9,7 +9,10 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    executors::Executor, inputs::Input, observers::ObserversTuple, state::IfInteresting, Error,
+    executors::{Executor, HasObservers},
+    inputs::Input,
+    observers::ObserversTuple,
+    Error,
 };
 
 /// The log event severity
@@ -146,7 +149,7 @@ where
 
 /// EventManager is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<E, I, S>
+pub trait EventManager<I, S>
 where
     I: Input,
 {
@@ -155,7 +158,10 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>;
+    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    where
+        E: Executor<I> + HasObservers<OT>,
+        OT: ObserversTuple;
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
@@ -189,16 +195,17 @@ where
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
-pub struct NopEventManager<E, I, S> {
-    phantom: PhantomData<(E, I, S)>,
+pub struct NopEventManager<I, S> {
+    phantom: PhantomData<(I, S)>,
 }
-impl<E, I, S> EventManager<E, I, S> for NopEventManager<E, I, S>
+impl<I, S> EventManager<I, S> for NopEventManager<I, S>
 where
     I: Input,
 {
-    fn process(&mut self, _state: &mut S, _executor: &mut E) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
     where
-        E: Executor<I>,
+        E: Executor<I> + HasObservers<OT>,
+        OT: ObserversTuple,
     {
         Ok(0)
     }

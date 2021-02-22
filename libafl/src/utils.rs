@@ -1,7 +1,7 @@
 //! Utility functions for AFL
 
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]

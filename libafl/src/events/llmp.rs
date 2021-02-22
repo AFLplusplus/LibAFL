@@ -39,23 +39,25 @@ const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
 #[derive(Clone, Debug)]
-pub struct LlmpEventManager<I, SH, ST>
+pub struct LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
+    S: IfInteresting<I>,
     SH: ShMem,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
     stats: Option<ST>,
     llmp: llmp::LlmpConnection<SH>,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(I, S)>,
 }
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-impl<I, ST> LlmpEventManager<I, UnixShMem, ST>
+impl<I, S, ST> LlmpEventManager<I, S, UnixShMem, ST>
 where
     I: Input,
+    S: IfInteresting<I>,
     ST: Stats,
 {
     /// Create llmp on a port
@@ -78,9 +80,10 @@ where
     }
 }
 
-impl<I, SH, ST> Drop for LlmpEventManager<I, SH, ST>
+impl<I, S, SH, ST> Drop for LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
+    S: IfInteresting<I>,
     SH: ShMem,
     ST: Stats,
 {
@@ -90,9 +93,10 @@ where
     }
 }
 
-impl<I, SH, ST> LlmpEventManager<I, SH, ST>
+impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
+    S: IfInteresting<I>,
     SH: ShMem,
     ST: Stats,
 {
@@ -248,7 +252,7 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client<E, OT, S>(
+    fn handle_in_client<E, OT>(
         &mut self,
         state: &mut S,
         sender_id: u32,
@@ -258,7 +262,6 @@ where
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        S: IfInteresting<I>,
     {
         match event {
             Event::NewTestcase {
@@ -293,9 +296,10 @@ where
     }
 }
 
-impl<I, SH, ST> EventManager<E, I, S> for LlmpEventManager<I, SH, ST>
+impl<I, S, SH, ST> EventManager<I, S> for LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
+    S: IfInteresting<I>,
     SH: ShMem,
     ST: Stats, //CE: CustomEvent<I>,
 {
@@ -311,11 +315,10 @@ where
         }
     }
 
-    fn process<E, OT, S>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        S: IfInteresting<I>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
@@ -344,7 +347,7 @@ where
         Ok(count)
     }
 
-    fn fire<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
@@ -356,11 +359,11 @@ where
 /// This method is needed when the fuzzer run crashes and has to restart.
 pub fn serialize_state_mgr<I, S, SH, ST>(
     state: &S,
-    mgr: &LlmpEventManager<I, SH, ST>,
+    mgr: &LlmpEventManager<I, S, SH, ST>,
 ) -> Result<Vec<u8>, Error>
 where
     I: Input,
-    S: Serialize,
+    S: Serialize + IfInteresting<I>,
     SH: ShMem,
     ST: Stats,
 {
@@ -370,10 +373,10 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 pub fn deserialize_state_mgr<I, S, SH, ST>(
     state_corpus_serialized: &[u8],
-) -> Result<(S, LlmpEventManager<I, SH, ST>), Error>
+) -> Result<(S, LlmpEventManager<I, S, SH, ST>), Error>
 where
     I: Input,
-    S: DeserializeOwned,
+    S: DeserializeOwned + IfInteresting<I>,
     SH: ShMem,
     ST: Stats,
 {
@@ -386,22 +389,24 @@ where
 
 /// A manager that can restart on the fly, storing states in-between (in `on_resatrt`)
 #[derive(Clone, Debug)]
-pub struct LlmpRestartingEventManager<I, SH, ST>
+pub struct LlmpRestartingEventManager<I, S, SH, ST>
 where
     I: Input,
+    S: IfInteresting<I>,
     SH: ShMem,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
     /// The embedded llmp event manager
-    llmp_mgr: LlmpEventManager<I, SH, ST>,
+    llmp_mgr: LlmpEventManager<I, S, SH, ST>,
     /// The sender to serialize the state for the next runner
     sender: LlmpSender<SH>,
 }
 
-impl<I, SH, ST> EventManager<E, I, S> for LlmpRestartingEventManager<I, SH, ST>
+impl<I, S, SH, ST> EventManager<I, S> for LlmpRestartingEventManager<I, S, SH, ST>
 where
     I: Input,
+    S: IfInteresting<I> + Serialize,
     SH: ShMem,
     ST: Stats, //CE: CustomEvent<I>,
 {
@@ -413,10 +418,7 @@ where
     }
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
-    fn on_restart<S>(&mut self, state: &mut S) -> Result<(), Error>
-    where
-        S: Serialize,
-    {
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         unsafe { self.sender.reset() };
         let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
@@ -424,16 +426,15 @@ where
             .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
     }
 
-    fn process<E, OT, S>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        S: IfInteresting<I>,
     {
         self.llmp_mgr.process(state, executor)
     }
 
-    fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)
     }
@@ -445,14 +446,15 @@ const _ENV_FUZZER_RECEIVER: &str = &"_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
 
-impl<I, SH, ST> LlmpRestartingEventManager<I, SH, ST>
+impl<I, S, SH, ST> LlmpRestartingEventManager<I, S, SH, ST>
 where
     I: Input,
+    S: IfInteresting<I>,
     SH: ShMem,
     ST: Stats, //CE: CustomEvent<I>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
-    pub fn new(llmp_mgr: LlmpEventManager<I, SH, ST>, sender: LlmpSender<SH>) -> Self {
+    pub fn new(llmp_mgr: LlmpEventManager<I, S, SH, ST>, sender: LlmpSender<SH>) -> Self {
         Self { llmp_mgr, sender }
     }
 
@@ -471,13 +473,13 @@ where
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 pub fn setup_restarting_mgr<I, S, SH, ST>(
-    //mgr: &mut LlmpEventManager<I, SH, ST>,
+    //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     broker_port: u16,
-) -> Result<(Option<S>, LlmpRestartingEventManager<I, SH, ST>), Error>
+) -> Result<(Option<S>, LlmpRestartingEventManager<I, S, SH, ST>), Error>
 where
     I: Input,
-    S: DeserializeOwned,
+    S: DeserializeOwned + IfInteresting<I>,
     SH: ShMem,
     ST: Stats,
 {
@@ -485,7 +487,7 @@ where
 
     // We start ourself as child process to actually fuzz
     if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-        mgr = LlmpEventManager::<I, SH, ST>::new_on_port(stats, broker_port)?;
+        mgr = LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?;
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
@@ -528,7 +530,7 @@ where
         None => {
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
-            let client_mgr = LlmpEventManager::<I, SH, ST>::existing_client_from_env(
+            let client_mgr = LlmpEventManager::<I, S, SH, ST>::existing_client_from_env(
                 _ENV_FUZZER_BROKER_CLIENT_INITIAL,
             )?;
 
@@ -537,7 +539,7 @@ where
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (state, mgr): (S, LlmpEventManager<I, SH, ST>) = deserialize_state_mgr(&msg)?;
+            let (state, mgr): (S, LlmpEventManager<I, S, SH, ST>) = deserialize_state_mgr(&msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }

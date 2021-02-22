@@ -87,21 +87,16 @@ where
         _input: &I,
     ) -> Result<(), Error>
     where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
     {
         Ok(())
     }
 
     #[inline]
     /// Called right after execution finished.
-    fn post_exec<EM, S>(
-        &mut self,
-        _state: &S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error>
+    fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
     where
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
     {
         Ok(())
     }

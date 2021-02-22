@@ -1,14 +1,14 @@
 use core::marker::PhantomData;
 
 use crate::{
+    corpus::Corpus,
     events::EventManager,
-    executors::Executor,
+    executors::{Executor, HasObservers},
     inputs::Input,
     mutators::Mutator,
-    stages::Corpus,
+    observers::ObserversTuple,
     stages::Stage,
-    state::HasRand,
-    state::{Evaluator, HasCorpus},
+    state::{Evaluator, HasCorpus, HasRand},
     utils::Rand,
     Error,
 };
@@ -18,10 +18,15 @@ use crate::{
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<I, M>: Stage<I>
+pub trait MutationalStage<C, E, EM, F, I, M, OT, S>: Stage<E, EM, F, S>
 where
-    M: Mutator<I>,
+    M: Mutator<F, I, S>,
     I: Input,
+    S: HasCorpus<C, I> + Evaluator<I>,
+    C: Corpus<I>,
+    EM: EventManager<I, S>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -30,23 +35,17 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations<S>(&mut self, state: &mut S) -> usize;
+    fn iterations(&mut self, state: &mut S) -> usize;
 
     /// Runs this (mutational) stage for the given testcase
-    fn perform_mutational<C, E, EM, F, S>(
+    fn perform_mutational(
         &self,
         fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>,
-        S: HasCorpus<C, I> + Evaluator<I>,
-        C: Corpus<I>,
-    {
+    ) -> Result<(), Error> {
         let num = self.iterations(state);
         for i in 0..num {
             let mut input_mut = state
@@ -71,19 +70,32 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<I, M>
+pub struct StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
 where
-    M: Mutator<I>,
+    M: Mutator<F, I, S>,
     I: Input,
+    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    C: Corpus<I>,
+    EM: EventManager<I, S>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    R: Rand,
 {
     mutator: M,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(C, E, EM, F, I, OT, R, S)>,
 }
 
-impl<I, M> MutationalStage<I, M> for StdMutationalStage<I, M>
+impl<C, E, EM, F, I, M, OT, R, S> MutationalStage<C, E, EM, F, I, M, OT, S>
+    for StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
 where
-    M: Mutator<I>,
+    M: Mutator<F, I, S>,
     I: Input,
+    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    C: Corpus<I>,
+    EM: EventManager<I, S>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    R: Rand,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -98,43 +110,46 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations<R, S>(&mut self, state: &mut S) -> usize
-    where
-        S: HasRand<R>,
-        R: Rand,
-    {
+    fn iterations(&mut self, state: &mut S) -> usize {
         1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
     }
 }
 
-impl<I, M> Stage<I> for StdMutationalStage<I, M>
+impl<C, E, EM, F, I, M, OT, R, S> Stage<E, EM, F, S>
+    for StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
 where
-    M: Mutator<I>,
+    M: Mutator<F, I, S>,
     I: Input,
+    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    C: Corpus<I>,
+    EM: EventManager<I, S>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    R: Rand,
 {
     #[inline]
-    fn perform<C, E, EM, F, S>(
+    fn perform(
         &self,
         fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>,
-        S: HasCorpus<C, I> + Evaluator<I>,
-        C: Corpus<I>,
-    {
+    ) -> Result<(), Error> {
         self.perform_mutational(fuzzer, state, executor, manager, corpus_idx)
     }
 }
 
-impl<I, M> StdMutationalStage<I, M>
+impl<C, E, EM, F, I, M, OT, R, S> StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
 where
-    M: Mutator<I>,
+    M: Mutator<F, I, S>,
     I: Input,
+    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    C: Corpus<I>,
+    EM: EventManager<I, S>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
+    R: Rand,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {

@@ -1,9 +1,9 @@
 //! Compare the speed of rand implementations
 
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use libafl::utils::{
     Lehmer64Rand, Rand, RomuDuoJrRand, RomuTrioRand, XorShift64Rand, Xoshiro256StarRand,
 };
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut xorshift = XorShift64Rand::new(1);

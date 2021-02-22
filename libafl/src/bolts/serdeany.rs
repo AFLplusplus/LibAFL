@@ -512,7 +512,7 @@ macro_rules! impl_serdeany {
                 self
             }
         }
-        
+
         #[allow(non_snake_case)]
         #[cfg(feature = "std")]
         #[ctor]

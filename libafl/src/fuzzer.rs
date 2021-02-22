@@ -1,20 +1,20 @@
 use crate::{
-    corpus::{Corpus, CorpusScheduler},
+    corpus::CorpusScheduler,
     events::{Event, EventManager},
-    executors::Executor,
+    executors::{Executor, HasObservers},
     inputs::Input,
+    observers::ObserversTuple,
     stages::StagesTuple,
-    state::{HasCorpus, HasExecutions, HasRand},
-    utils::{current_milliseconds, current_time, Rand},
+    state::HasExecutions,
+    utils::{current_milliseconds, current_time},
     Error,
 };
 use core::marker::PhantomData;
 
 /// Holds a set of stages
-pub trait HasStages<ST, I>
+pub trait HasStages<ST, E, EM, S>: Sized
 where
-    ST: StagesTuple<I>,
-    I: Input,
+    ST: StagesTuple<E, EM, Self, S>,
 {
     fn stages(&self) -> &ST;
 
@@ -22,9 +22,10 @@ where
 }
 
 /// Holds a scheduler
-pub trait HasCorpusScheduler<CS>
+pub trait HasCorpusScheduler<CS, I, S>
 where
-    CS: CorpusScheduler,
+    CS: CorpusScheduler<I, S>,
+    I: Input,
 {
     fn scheduler(&self) -> &CS;
 
@@ -32,50 +33,29 @@ where
 }
 
 /// The main fuzzer trait.
-pub trait Fuzzer<CS, ST, I>: HasCorpusScheduler<CS> + HasStages<ST, I>
-where
-    CS: CorpusScheduler,
-    ST: StagesTuple<I>,
-    I: Input,
-{
-    fn fuzz_one<E, EM, S>(
-        &self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-    ) -> Result<usize, Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>;
+pub trait Fuzzer<E, EM, S> {
+    fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
 
-    fn fuzz_loop<E, EM, S>(
-        &self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-    ) -> Result<usize, Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>;
+    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
 }
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Clone, Debug)]
-pub struct StdFuzzer<CS, ST, I>
+pub struct StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
-    CS: CorpusScheduler,
-    ST: StagesTuple<I>,
+    CS: CorpusScheduler<I, S>,
+    ST: StagesTuple<E, EM, Self, S>,
     I: Input,
 {
     scheduler: CS,
     stages: ST,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(E, EM, I, OT, S)>,
 }
 
-impl<CS, ST, I> HasStages<ST, I> for StdFuzzer<CS, ST, I>
+impl<CS, ST, E, EM, I, OT, S> HasStages<ST, E, EM, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
-    CS: CorpusScheduler,
-    ST: StagesTuple<I>,
+    CS: CorpusScheduler<I, S>,
+    ST: StagesTuple<E, EM, Self, S>,
     I: Input,
 {
     fn stages(&self) -> &ST {
@@ -87,10 +67,10 @@ where
     }
 }
 
-impl<CS, ST, I> HasCorpusScheduler<CS> for StdFuzzer<CS, ST, I>
+impl<CS, ST, E, EM, I, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
-    CS: CorpusScheduler,
-    ST: StagesTuple<I>,
+    CS: CorpusScheduler<I, S>,
+    ST: StagesTuple<E, EM, Self, S>,
     I: Input,
 {
     fn scheduler(&self) -> &CS {
@@ -102,25 +82,17 @@ where
     }
 }
 
-impl<CS, ST, I> Fuzzer<CS, ST, I> for StdFuzzer<CS, ST, I>
+impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
-    CS: CorpusScheduler,
-    ST: StagesTuple<I>,
+    CS: CorpusScheduler<I, S>,
+    S: HasExecutions,
+    ST: StagesTuple<E, EM, Self, S>,
+    EM: EventManager<I, S>,
+    E: Executor<I> + HasObservers<OT>,
+    OT: ObserversTuple,
     I: Input,
 {
-    fn fuzz_one<C, E, EM, R, S>(
-        &self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-    ) -> Result<usize, Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>,
-        S: HasCorpus<C, I> + HasRand<R>,
-        C: Corpus<I>,
-        R: Rand,
-    {
+    fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
         let idx = self.scheduler().next(state)?;
 
         self.stages()
@@ -130,19 +102,7 @@ where
         Ok(idx)
     }
 
-    fn fuzz_loop<C, E, EM, R, S>(
-        &self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-    ) -> Result<usize, Error>
-    where
-        EM: EventManager<I>,
-        E: Executor<I>,
-        S: HasCorpus<C, I> + HasRand<R> + HasExecutions,
-        C: Corpus<I>,
-        R: Rand,
-    {
+    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
         let mut last = current_milliseconds();
         loop {
             self.fuzz_one(state, executor, manager)?;
@@ -162,10 +122,10 @@ where
     }
 }
 
-impl<CS, ST, I> StdFuzzer<CS, ST, I>
+impl<CS, ST, E, EM, I, OT, S> StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
-    CS: CorpusScheduler,
-    ST: StagesTuple<I>,
+    CS: CorpusScheduler<I, S>,
+    ST: StagesTuple<E, EM, Self, S>,
     I: Input,
 {
     pub fn new(scheduler: CS, stages: ST) -> Self {

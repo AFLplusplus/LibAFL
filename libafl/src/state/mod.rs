@@ -159,20 +159,21 @@ where
 }
 
 /// Evaluate an input modyfing the state of the fuzzer and returning a fitness
-pub trait Evaluator<I>
+pub trait Evaluator<I>: Sized
 where
     I: Input,
 {
     /// Runs the input and triggers observers and feedback
-    fn evaluate_input<E, EM>(
+    fn evaluate_input<E, EM, OT>(
         &mut self,
         input: I,
         executor: &mut E,
         event_mgr: &mut EM,
     ) -> Result<u32, Error>
     where
-        E: Executor<I>,
-        EM: EventManager<I>;
+        E: Executor<I> + HasObservers<OT>,
+        OT: ObserversTuple,
+        EM: EventManager<I, Self>;
 }
 
 /// The state a fuzz run.
@@ -442,7 +443,7 @@ where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
         C: Corpus<I>,
-        EM: EventManager<I>,
+        EM: EventManager<I, Self>,
     {
         let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
         let observers = executor.observers();
@@ -490,7 +491,7 @@ where
         C: Corpus<BytesInput>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
-        EM: EventManager<BytesInput>,
+        EM: EventManager<BytesInput, Self>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -532,7 +533,7 @@ where
         C: Corpus<BytesInput>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
-        EM: EventManager<BytesInput>,
+        EM: EventManager<BytesInput, Self>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(executor, manager, in_dir)?;
@@ -570,7 +571,7 @@ where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
         C: Corpus<I>,
-        EM: EventManager<I>,
+        EM: EventManager<I, Self>,
     {
         executor.pre_exec_observers()?;
 
@@ -606,7 +607,7 @@ where
         C: Corpus<I>,
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        EM: EventManager<I>,
+        EM: EventManager<I, Self>,
     {
         let mut added = 0;
         for _ in 0..num {

@@ -330,8 +330,8 @@ pub mod shmem {
     use core::{mem::size_of, slice};
     use std::ffi::CStr;
 
-    use crate::Error;
     use super::ShMem;
+    use crate::Error;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
@@ -343,7 +343,6 @@ pub mod shmem {
     }
 
     // TODO complete
-
 }
 
 #[cfg(test)]

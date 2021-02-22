@@ -3,8 +3,8 @@
 
 use crate::{
     inputs::{HasBytesVec, Input},
-    state::{HasRand, HasMetadata},
     mutators::*,
+    state::{HasMetadata, HasRand},
     utils::Rand,
     Error,
 };
