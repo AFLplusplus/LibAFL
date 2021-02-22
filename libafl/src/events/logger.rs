@@ -31,7 +31,7 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, state: &mut S, _executor: &mut E) -> Result<usize, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,

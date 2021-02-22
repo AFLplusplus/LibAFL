@@ -117,12 +117,12 @@ where
     R: Rand,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, input: &I) -> u64 {
+    fn iterations(&self, state: &mut S, _: &I) -> u64 {
         1 << (1 + state.rand_mut().below(6))
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, mutations_count: usize, state: &mut S, input: &I) -> usize {
+    fn schedule(&self, mutations_count: usize, state: &mut S, _: &I) -> usize {
         debug_assert!(mutations_count > 0);
         state.rand_mut().below(mutations_count as u64) as usize
     }
@@ -301,8 +301,8 @@ where
         scheduled.add_mutation(mutation_bytescopy);
         scheduled.add_mutation(mutation_bytesswap);
 
-        //scheduled.add_mutation(mutation_tokeninsert);
-        //scheduled.add_mutation(mutation_tokenreplace);
+        scheduled.add_mutation(mutation_tokeninsert);
+        scheduled.add_mutation(mutation_tokenreplace);
 
         scheduled.add_mutation(mutation_crossover_insert);
         scheduled.add_mutation(mutation_crossover_replace);

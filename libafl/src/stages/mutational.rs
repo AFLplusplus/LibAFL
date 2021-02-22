@@ -35,7 +35,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&mut self, state: &mut S) -> usize;
+    fn iterations(&self, state: &mut S) -> usize;
 
     /// Runs this (mutational) stage for the given testcase
     fn perform_mutational(
@@ -54,12 +54,12 @@ where
                 .borrow_mut()
                 .load_input()?
                 .clone();
-            self.mutator_mut()
+            self.mutator()
                 .mutate(fuzzer, state, &mut input_mut, i as i32)?;
 
             let fitness = state.evaluate_input(input_mut, executor, manager)?;
 
-            self.mutator_mut()
+            self.mutator()
                 .post_exec(fuzzer, state, fitness, i as i32)?;
         }
         Ok(())
@@ -110,7 +110,7 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&mut self, state: &mut S) -> usize {
+    fn iterations(&self, state: &mut S) -> usize {
         1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
     }
 }

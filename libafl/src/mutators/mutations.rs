@@ -125,7 +125,7 @@ const INTERESTING_32: [i32; 27] = [
 /// Bitflip mutation for inputs with a bytes vector
 pub fn mutation_bitflip<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -148,7 +148,7 @@ where
 
 pub fn mutation_byteflip<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -171,7 +171,7 @@ where
 
 pub fn mutation_byteinc<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -195,7 +195,7 @@ where
 
 pub fn mutation_bytedec<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -219,7 +219,7 @@ where
 
 pub fn mutation_byteneg<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -242,7 +242,7 @@ where
 
 pub fn mutation_byterand<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -265,7 +265,7 @@ where
 
 pub fn mutation_byteadd<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -293,7 +293,7 @@ where
 
 pub fn mutation_wordadd<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -323,7 +323,7 @@ where
 
 pub fn mutation_dwordadd<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -353,7 +353,7 @@ where
 
 pub fn mutation_qwordadd<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -383,7 +383,7 @@ where
 
 pub fn mutation_byteinteresting<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -407,7 +407,7 @@ where
 
 pub fn mutation_wordinteresting<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -437,7 +437,7 @@ where
 
 pub fn mutation_dwordinteresting<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -467,7 +467,7 @@ where
 
 pub fn mutation_bytesdelete<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -490,7 +490,7 @@ where
 
 pub fn mutation_bytesexpand<F, I, M, R, S>(
     mutator: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -520,7 +520,7 @@ where
 
 pub fn mutation_bytesinsert<F, I, M, R, S>(
     mutator: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -553,7 +553,7 @@ where
 
 pub fn mutation_bytesrandinsert<F, I, M, R, S>(
     mutator: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -586,7 +586,7 @@ where
 
 pub fn mutation_bytesset<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -611,7 +611,7 @@ where
 
 pub fn mutation_bytesrandset<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -636,7 +636,7 @@ where
 
 pub fn mutation_bytescopy<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -661,7 +661,7 @@ where
 
 pub fn mutation_bytesswap<F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -689,7 +689,7 @@ where
 /// Crossover insert mutation
 pub fn mutation_crossover_insert<C, F, I, M, R, S>(
     mutator: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -703,18 +703,15 @@ where
     let size = input.bytes().len();
 
     // We don't want to use the testcase we're already using for splicing
-    let idx = state.rand_mut().below(state.corpus().count() as u64) as usize;
+    let count = state.corpus().count();
+    let idx = state.rand_mut().below(count as u64) as usize;
     if let Some(cur) = state.corpus().current() {
         if idx == *cur {
             return Ok(MutationResult::Skipped);
         }
     }
-    let other_testcase = state.corpus().get(idx)?;
 
-    let mut other_ref = other_testcase.borrow_mut();
-    let other = other_ref.load_input()?;
-
-    let other_size = other.bytes().len();
+    let other_size = state.corpus().get(idx)?.borrow_mut().load_input()?.bytes().len();
     if other_size < 2 {
         return Ok(MutationResult::Skipped);
     }
@@ -722,6 +719,9 @@ where
     let from = state.rand_mut().below(other_size as u64) as usize;
     let to = state.rand_mut().below(size as u64) as usize;
     let mut len = state.rand_mut().below((other_size - from) as u64) as usize;
+
+    let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+    let other = other_testcase.load_input()?;
 
     if size + len > mutator.max_size() {
         if mutator.max_size() > size {
@@ -741,7 +741,7 @@ where
 /// Crossover replace mutation
 pub fn mutation_crossover_replace<C, F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -754,18 +754,15 @@ where
     let size = input.bytes().len();
 
     // We don't want to use the testcase we're already using for splicing
-    let idx = state.rand_mut().below(state.corpus().count() as u64) as usize;
+    let count = state.corpus().count();
+    let idx = state.rand_mut().below(count as u64) as usize;
     if let Some(cur) = state.corpus().current() {
         if idx == *cur {
             return Ok(MutationResult::Skipped);
         }
     }
-    let other_testcase = state.corpus().get(idx)?;
-
-    let mut other_ref = other_testcase.borrow_mut();
-    let other = other_ref.load_input()?;
-
-    let other_size = other.bytes().len();
+    
+    let other_size = state.corpus().get(idx)?.borrow_mut().load_input()?.bytes().len();
     if other_size < 2 {
         return Ok(MutationResult::Skipped);
     }
@@ -773,6 +770,9 @@ where
     let from = state.rand_mut().below(other_size as u64) as usize;
     let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
     let to = state.rand_mut().below((size - len) as u64) as usize;
+
+    let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+    let other = other_testcase.load_input()?;
 
     buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
 
@@ -798,7 +798,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 /// Splicing mutation from AFL
 pub fn mutation_splice<C, F, I, M, R, S>(
     _: &M,
-    fuzzer: &F,
+    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -809,33 +809,38 @@ where
     S: HasRand<R> + HasCorpus<C, I>,
 {
     // We don't want to use the testcase we're already using for splicing
-    let idx = state.rand_mut().below(state.corpus().count() as u64) as usize;
+    let count = state.corpus().count();
+    let idx = state.rand_mut().below(count as u64) as usize;
     if let Some(cur) = state.corpus().current() {
         if idx == *cur {
             return Ok(MutationResult::Skipped);
         }
     }
-    let other_testcase = state.corpus().get(idx)?;
 
-    let mut other_ref = other_testcase.borrow_mut();
-    let other = other_ref.load_input()?;
+    let (first_diff, last_diff) = {
+        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other = other_testcase.load_input()?;
 
-    let mut counter = 0;
-    let (first_diff, last_diff) = loop {
-        let (f, l) = locate_diffs(input.bytes(), other.bytes());
+        let mut counter = 0;
+        loop {
+            let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
-        if f != l && f >= 0 && l >= 2 {
-            break (f, l);
+            if f != l && f >= 0 && l >= 2 {
+                break (f, l);
+            }
+            if counter == 3 {
+                return Ok(MutationResult::Skipped);
+            }
+            counter += 1;
         }
-        if counter == 3 {
-            return Ok(MutationResult::Skipped);
-        }
-        counter += 1;
     };
 
     let split_at = state
         .rand_mut()
         .between(first_diff as u64, last_diff as u64) as usize;
+    
+    let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+    let other = other_testcase.load_input()?;
     input
         .bytes_mut()
         .splice(split_at.., other.bytes()[split_at..].iter().cloned());

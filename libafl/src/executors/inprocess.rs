@@ -249,7 +249,7 @@ pub mod unix_signals {
             .is_interesting_all(&input, observers, ExitKind::Crash)
             .expect("In crash handler objectives failure.".into());
         if obj_fitness > 0 {
-            state.solutions_mut().add(Testcase::new(*input));
+            state.solutions_mut().add(Testcase::new(input.clone())).expect("In crash handler solutions failure.".into());
             mgr.fire(
                 state,
                 Event::Objective {
@@ -270,7 +270,7 @@ pub mod unix_signals {
 
     unsafe fn inmem_handle_timeout<EM, I, OC, OFT, OT, R, S>(
         _sig: c_int,
-        info: siginfo_t,
+        _info: siginfo_t,
         _void: c_void,
     ) where
         EM: EventManager<I, S>,
@@ -302,7 +302,7 @@ pub mod unix_signals {
             .is_interesting_all(&input, observers, ExitKind::Crash)
             .expect("In timeout handler objectives failure.".into());
         if obj_fitness > 0 {
-            state.solutions_mut().add(Testcase::new(*input));
+            state.solutions_mut().add(Testcase::new(input.clone())).expect("In timeout handler solutions failure.".into());
             mgr.fire(
                 state,
                 Event::Objective {

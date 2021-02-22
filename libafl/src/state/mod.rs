@@ -453,7 +453,7 @@ where
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
 
-        if let idx = Some(self.add_if_interesting(&input, fitness)?) {
+        if !self.add_if_interesting(&input, fitness)?.is_none() {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
                 self,
@@ -577,7 +577,7 @@ where
 
         executor.pre_exec(self, event_mgr, input)?;
         let exit_kind = executor.run_target(input)?;
-        executor.post_exec(&self, event_mgr, input)?;
+        //executor.post_exec(&self, event_mgr, input)?;
 
         *self.executions_mut() += 1;
         executor.post_exec_observers()?;
@@ -585,18 +585,17 @@ where
         let observers = executor.observers();
         let fitness = self
             .feedbacks_mut()
-            .is_interesting_all(&input, observers, exit_kind)?;
+            .is_interesting_all(&input, observers, exit_kind.clone())?;
 
         let is_solution =
             self.objectives_mut()
-                .is_interesting_all(&input, observers, exit_kind.clone())?
+                .is_interesting_all(&input, observers, exit_kind)?
                 > 0;
         Ok((fitness, is_solution))
     }
 
     pub fn generate_initial_inputs<G, E, OT, EM>(
         &mut self,
-        rand: &mut R,
         executor: &mut E,
         generator: &mut G,
         manager: &mut EM,

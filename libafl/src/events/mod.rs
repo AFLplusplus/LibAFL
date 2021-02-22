@@ -202,7 +202,7 @@ impl<I, S> EventManager<I, S> for NopEventManager<I, S>
 where
     I: Input,
 {
-    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, _state: &mut S, _executor: &mut E) -> Result<usize, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,

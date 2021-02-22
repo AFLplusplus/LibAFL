@@ -41,21 +41,21 @@ where
     I: Input,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_add(&self, _state: &mut S, _idx: usize, _testcase: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(&self, _state: &mut S, _idx: usize, _testcase: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     fn on_remove(
         &self,
-        state: &mut S,
-        idx: usize,
-        testcase: &Option<Testcase<I>>,
+        _state: &mut S,
+        _idx: usize,
+        _testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         Ok(())
     }
