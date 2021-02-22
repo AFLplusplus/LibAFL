@@ -1,74 +1,86 @@
 //! In-memory corpus, keeps all test cases in memory at all times
 
-use alloc::{borrow::ToOwned, vec::Vec};
-use core::{cell::RefCell, marker::PhantomData};
+use alloc::vec::Vec;
+use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, Error,
-};
+use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
 
-/// A corpus handling all important fuzzing in memory.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// A corpus handling all in memory.
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct InMemoryCorpus<I, R>
+pub struct InMemoryCorpus<I>
 where
     I: Input,
-    R: Rand,
 {
     entries: Vec<RefCell<Testcase<I>>>,
-    pos: usize,
-    phantom: PhantomData<R>,
+    current: Option<usize>,
 }
 
-impl<I, R> HasTestcaseVec<I> for InMemoryCorpus<I, R>
+impl<I> Corpus<I> for InMemoryCorpus<I>
 where
     I: Input,
-    R: Rand,
 {
-    fn entries(&self) -> &[RefCell<Testcase<I>>] {
-        &self.entries
-    }
-    fn entries_mut(&mut self) -> &mut Vec<RefCell<Testcase<I>>> {
-        &mut self.entries
-    }
-}
-
-impl<I, R> Corpus<I, R> for InMemoryCorpus<I, R>
-where
-    I: Input,
-    R: Rand,
-{
-    /// Gets the next entry
+    /// Returns the number of elements
     #[inline]
-    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
-        if self.count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
+    fn count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Add an entry to the corpus and return its index
+    #[inline]
+    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
+        self.entries.push(RefCell::new(testcase));
+        Ok(self.entries.len() - 1)
+    }
+
+    /// Replaces the testcase at the given idx
+    #[inline]
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+        if idx >= self.entries.len() {
+            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
+        }
+        self.entries[idx] = RefCell::new(testcase);
+        Ok(())
+    }
+
+    /// Removes an entry from the corpus, returning it if it was present.
+    #[inline]
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+        if idx >= self.entries.len() {
+            Ok(None)
         } else {
-            let len = { self.entries().len() };
-            let id = rand.below(len as u64) as usize;
-            self.pos = id;
-            Ok((self.get(id), id))
+            Ok(Some(self.entries.remove(idx).into_inner()))
         }
     }
 
-    /// Returns the testacase we currently use
+    /// Get by id
     #[inline]
-    fn current_testcase(&self) -> (&RefCell<Testcase<I>>, usize) {
-        (self.get(self.pos), self.pos)
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+        Ok(&self.entries[idx])
+    }
+
+    /// Current testcase scheduled
+    #[inline]
+    fn current(&self) -> &Option<usize> {
+        &self.current
+    }
+
+    /// Current testcase scheduled (mut)
+    #[inline]
+    fn current_mut(&mut self) -> &mut Option<usize> {
+        &mut self.current
     }
 }
 
-impl<I, R> InMemoryCorpus<I, R>
+impl<I> InMemoryCorpus<I>
 where
     I: Input,
-    R: Rand,
 {
     pub fn new() -> Self {
         Self {
             entries: vec![],
-            pos: 0,
-            phantom: PhantomData,
+            current: None,
         }
     }
 }

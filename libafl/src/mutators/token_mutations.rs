@@ -4,6 +4,7 @@
 use crate::{
     inputs::{HasBytesVec, Input},
     mutators::*,
+    state::{HasMetadata, HasRand},
     utils::Rand,
     Error,
 };
@@ -30,33 +31,33 @@ impl TokensMetadata {
 
 /// Insert a dictionary token
 pub fn mutation_tokeninsert<I, M, R, S>(
-    mutator: &mut M,
-    rand: &mut R,
+    mutator: &M,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
 where
     M: HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R>,
     R: Rand,
-    S: HasMetadata,
 {
-    let meta;
-    match state.metadata().get::<TokensMetadata>() {
-        Some(t) => {
-            meta = t;
-        }
-        None => {
+    let tokens_len = {
+        let meta = state.metadata().get::<TokensMetadata>();
+        if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
+        if meta.unwrap().tokens.len() == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        meta.unwrap().tokens.len()
     };
-    if meta.tokens.len() == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-    let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
+    let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
     let size = input.bytes().len();
-    let off = rand.below((size + 1) as u64) as usize;
+    let off = state.rand_mut().below((size + 1) as u64) as usize;
+
+    let meta = state.metadata().get::<TokensMetadata>().unwrap();
+    let token = &meta.tokens[token_idx];
     let mut len = token.len();
 
     if size + len > mutator.max_size() {
@@ -76,37 +77,37 @@ where
 
 /// Overwrite with a dictionary token
 pub fn mutation_tokenreplace<I, M, R, S>(
-    _: &mut M,
-    rand: &mut R,
+    _: &M,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
 where
+    M: HasMaxSize,
     I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R>,
     R: Rand,
-    S: HasMetadata,
 {
     let size = input.bytes().len();
     if size == 0 {
         return Ok(MutationResult::Skipped);
     }
 
-    let meta;
-    match state.metadata().get::<TokensMetadata>() {
-        Some(t) => {
-            meta = t;
-        }
-        None => {
+    let tokens_len = {
+        let meta = state.metadata().get::<TokensMetadata>();
+        if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
+        if meta.unwrap().tokens.len() == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        meta.unwrap().tokens.len()
     };
-    if meta.tokens.len() == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-    let token = &meta.tokens[rand.below(meta.tokens.len() as u64) as usize];
+    let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
-    let off = rand.below(size as u64) as usize;
+    let off = state.rand_mut().below(size as u64) as usize;
 
+    let meta = state.metadata().get::<TokensMetadata>().unwrap();
+    let token = &meta.tokens[token_idx];
     let mut len = token.len();
     if off + len > size {
         len = size - off;

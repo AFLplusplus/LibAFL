@@ -106,4 +106,3 @@ pub trait HasLen {
     /// The lenght
     fn len(&self) -> usize;
 }
-

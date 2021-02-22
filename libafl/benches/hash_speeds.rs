@@ -6,8 +6,8 @@ use std::hash::Hasher;
 use xxhash_rust::const_xxh3;
 use xxhash_rust::xxh3;
 
-use libafl::utils::{Rand, StdRand};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use libafl::utils::{Rand, StdRand};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rand = StdRand::new(0);

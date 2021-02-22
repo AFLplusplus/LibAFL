@@ -1,23 +1,20 @@
 use alloc::{string::ToString, vec::Vec};
+use core::marker::PhantomData;
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
 use crate::{
-    corpus::Corpus,
     events::{BrokerEventResult, Event, EventManager},
     executors::{Executor, HasObservers},
-    feedbacks::FeedbacksTuple,
     inputs::Input,
     observers::ObserversTuple,
-    state::State,
     stats::Stats,
-    utils::Rand,
     Error,
 };
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
-pub struct LoggerEventManager<I, ST>
+pub struct LoggerEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -26,25 +23,17 @@ where
     stats: ST,
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
+    phantom: PhantomData<S>,
 }
 
-impl<I, ST> EventManager<I> for LoggerEventManager<I, ST>
+impl<I, S, ST> EventManager<I, S> for LoggerEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<C, E, FT, OC, OFT, OT, R>(
-        &mut self,
-        state: &mut State<C, FT, I, OC, OFT, R>,
-        _executor: &mut E,
-    ) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, state: &mut S, _executor: &mut E) -> Result<usize, Error>
     where
-        C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
         OT: ObserversTuple,
     {
         let count = self.events.len();
@@ -55,18 +44,7 @@ where
         Ok(count)
     }
 
-    fn fire<C, FT, OC, OFT, R>(
-        &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
-        event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-    {
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.stats, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
@@ -75,7 +53,7 @@ where
     }
 }
 
-impl<I, ST> LoggerEventManager<I, ST>
+impl<I, S, ST> LoggerEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //TODO CE: CustomEvent,
@@ -84,6 +62,7 @@ where
         Self {
             stats: stats,
             events: vec![],
+            phantom: PhantomData,
         }
     }
 
@@ -132,18 +111,7 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client<C, FT, OC, OFT, R>(
-        &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
-        event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-    {
+    fn handle_in_client(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         match event {
             _ => Err(Error::Unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",

@@ -9,13 +9,9 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
     executors::{Executor, HasObservers},
-    feedbacks::FeedbacksTuple,
     inputs::Input,
     observers::ObserversTuple,
-    state::State,
-    utils::Rand,
     Error,
 };
 
@@ -153,7 +149,7 @@ where
 
 /// EventManager is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<I>
+pub trait EventManager<I, S>
 where
     I: Input,
 {
@@ -162,18 +158,9 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<C, E, FT, OC, OFT, OT, R>(
-        &mut self,
-        state: &mut State<C, FT, I, OC, OFT, R>,
-        executor: &mut E,
-    ) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
     where
-        C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
         OT: ObserversTuple;
 
     /// Serialize all observers for this type and manager
@@ -194,17 +181,7 @@ where
 
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
-    fn on_restart<C, FT, OC, OFT, R>(
-        &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
-    ) -> Result<(), Error>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-    {
+    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 
@@ -213,57 +190,27 @@ where
     fn await_restart_safe(&mut self) {}
 
     /// Send off an event to the broker
-    fn fire<C, FT, OC, OFT, R>(
-        &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
-        event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>;
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
-pub struct NopEventManager<I> {
-    phantom: PhantomData<I>,
+pub struct NopEventManager<I, S> {
+    phantom: PhantomData<(I, S)>,
 }
-impl<I> EventManager<I> for NopEventManager<I>
+impl<I, S> EventManager<I, S> for NopEventManager<I, S>
 where
     I: Input,
 {
-    fn process<C, E, FT, OC, OFT, OT, R>(
-        &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
-        _executor: &mut E,
-    ) -> Result<usize, Error>
+    fn process<E, OT>(&mut self, _state: &mut S, _executor: &mut E) -> Result<usize, Error>
     where
-        C: Corpus<I, R>,
         E: Executor<I> + HasObservers<OT>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
         OT: ObserversTuple,
     {
         Ok(0)
     }
 
-    fn fire<C, FT, OC, OFT, R>(
-        &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
-        _event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        C: Corpus<I, R>,
-        FT: FeedbacksTuple<I>,
-        R: Rand,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-    {
+    fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }

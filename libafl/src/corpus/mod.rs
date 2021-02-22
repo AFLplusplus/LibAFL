@@ -1,5 +1,4 @@
 //! Corpuses contain the testcases, either in mem, on disk, or somewhere else.
-//! They will hand out the next fuzz target, potentially doing basic scheduling.
 
 pub mod testcase;
 pub use testcase::Testcase;
@@ -13,90 +12,121 @@ pub mod ondisk;
 pub use ondisk::OnDiskCorpus;
 
 pub mod queue;
-pub use queue::QueueCorpus;
+pub use queue::QueueCorpusScheduler;
 
-use alloc::{borrow::ToOwned, vec::Vec};
-use core::{cell::RefCell, ptr};
+use core::cell::RefCell;
+use core::marker::PhantomData;
 
-use crate::{inputs::Input, utils::Rand, Error};
-
-/// A way to obtain the containing testcase entries
-pub trait HasTestcaseVec<I>
-where
-    I: Input,
-{
-    /// Get the entries vector field
-    fn entries(&self) -> &[RefCell<Testcase<I>>];
-
-    /// Get the entries vector field (mutable)
-    fn entries_mut(&mut self) -> &mut Vec<RefCell<Testcase<I>>>;
-}
+use crate::{
+    inputs::Input,
+    state::{HasCorpus, HasRand},
+    utils::Rand,
+    Error,
+};
 
 /// Corpus with all current testcases
-pub trait Corpus<I, R>: HasTestcaseVec<I> + serde::Serialize + serde::de::DeserializeOwned
+pub trait Corpus<I>: serde::Serialize + serde::de::DeserializeOwned
 where
     I: Input,
-    R: Rand,
 {
     /// Returns the number of elements
-    #[inline]
-    fn count(&self) -> usize {
-        self.entries().len()
-    }
-    
-    // TODO implement a was_fuzzed counter
+    fn count(&self) -> usize;
 
     /// Add an entry to the corpus and return its index
-    #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> usize {
-        self.entries_mut().push(RefCell::new(testcase));
-        self.entries().len() - 1
-    }
+    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
 
     /// Replaces the testcase at the given idx
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
-        if self.entries_mut().len() < idx {
-            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
-        }
-        self.entries_mut()[idx] = RefCell::new(testcase);
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error>;
+
+    /// Removes an entry from the corpus, returning it if it was present.
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error>;
+
+    /// Get by id
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error>;
+
+    /// Current testcase scheduled
+    fn current(&self) -> &Option<usize>;
+
+    /// Current testcase scheduled (mut)
+    fn current_mut(&mut self) -> &mut Option<usize>;
+}
+
+pub trait CorpusScheduler<I, S>
+where
+    I: Input,
+{
+    /// Add an entry to the corpus and return its index
+    fn on_add(&self, _state: &mut S, _idx: usize, _testcase: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Get by id
-    #[inline]
-    fn get(&self, idx: usize) -> &RefCell<Testcase<I>> {
-        &self.entries()[idx]
+    /// Replaces the testcase at the given idx
+    fn on_replace(
+        &self,
+        _state: &mut S,
+        _idx: usize,
+        _testcase: &Testcase<I>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
-    #[inline]
-    fn remove(&mut self, entry: &Testcase<I>) -> Option<Testcase<I>> {
-        match self
-            .entries()
-            .iter()
-            .position(|x| ptr::eq(x.as_ptr(), entry))
-        {
-            Some(i) => Some(self.entries_mut().remove(i).into_inner()),
-            None => None,
-        }
-    }
-
-    /// Gets a random entry
-    #[inline]
-    fn random_entry(&self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
-        if self.count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
-        } else {
-            let len = { self.entries().len() };
-            let id = rand.below(len as u64) as usize;
-            Ok((self.get(id), id))
-        }
+    fn on_remove(
+        &self,
+        _state: &mut S,
+        _idx: usize,
+        _testcase: &Option<Testcase<I>>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 
     // TODO: IntoIter
     /// Gets the next entry
-    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error>;
-
-    /// Returns the testacase we currently use
-    fn current_testcase(&self) -> (&RefCell<Testcase<I>>, usize);
+    fn next(&self, state: &mut S) -> Result<usize, Error>;
 }
+
+pub struct RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
+    phantom: PhantomData<(C, I, R, S)>,
+}
+
+impl<C, I, R, S> CorpusScheduler<I, S> for RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
+    /// Gets the next entry at random
+    fn next(&self, state: &mut S) -> Result<usize, Error> {
+        if state.corpus().count() == 0 {
+            Err(Error::Empty("No entries in corpus".to_owned()))
+        } else {
+            let len = state.corpus().count();
+            let id = state.rand_mut().below(len as u64) as usize;
+            *state.corpus_mut().current_mut() = Some(id);
+            Ok(id)
+        }
+    }
+}
+
+impl<C, I, R, S> RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+pub type StdCorpusScheduler<C, I, R, S> = RandCorpusScheduler<C, I, R, S>;

@@ -5,7 +5,7 @@ use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::{HasBytesVec, HasTargetBytes, HasLen, Input, TargetBytes};
+use crate::inputs::{HasBytesVec, HasLen, HasTargetBytes, Input, TargetBytes};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]

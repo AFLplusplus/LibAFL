@@ -190,9 +190,9 @@ macro_rules! tuple_for_each {
             }
 
             impl ForEach for () {
-                fn for_each(&self) { }
+                fn for_each(&self) {}
             }
-            
+
             impl<Head, Tail> ForEach for (Head, Tail)
             where
                 Head: $trait_name,
@@ -206,7 +206,7 @@ macro_rules! tuple_for_each {
         }
         {
             use $fn_name::*;
-            
+
             $tuple_name.for_each();
         };
     };
@@ -221,9 +221,9 @@ macro_rules! tuple_for_each_mut {
             }
 
             impl ForEachMut for () {
-                fn for_each_mut(&mut self) { }
+                fn for_each_mut(&mut self) {}
             }
-            
+
             impl<Head, Tail> ForEachMut for (Head, Tail)
             where
                 Head: $trait_name,
@@ -237,7 +237,7 @@ macro_rules! tuple_for_each_mut {
         }
         {
             use $fn_name::*;
-            
+
             $tuple_name.for_each_mut();
         };
     };
@@ -245,13 +245,13 @@ macro_rules! tuple_for_each_mut {
 
 /*
 pub fn test_macros() {
-  
+
   let mut t = tuple_list!(1, "a");
 
   tuple_for_each!(f1, std::fmt::Display, t, |x| {
       println!("{}", x);
   });
-  
+
   tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
       println!("{}", x);
   });

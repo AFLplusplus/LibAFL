@@ -14,8 +14,7 @@ use crate::{
     feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::State,
-    utils::Rand,
+    state::{HasObjectives, HasSolutions},
     Error,
 };
 
@@ -54,52 +53,27 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec<C, EM, FT, OC, OFT, R>(
-        &mut self,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error>
+    fn pre_exec<EM, S>(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error>
     where
-        R: Rand,
-        FT: FeedbacksTuple<I>,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-        C: Corpus<I, R>,
-        EM: EventManager<I>,
+        EM: EventManager<I, S>,
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs::<C, EM, FT, I, OC, OFT, OT, R>(
-                _state,
-                _event_mgr,
-                self.observers(),
-                _input,
-            );
+            set_oncrash_ptrs(state, event_mgr, self.observers(), input);
         }
         Ok(())
     }
 
     #[inline]
-    fn post_exec<C, EM, FT, OC, OFT, R>(
-        &mut self,
-        _state: &State<C, FT, I, OC, OFT, R>,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error>
+    fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
     where
-        R: Rand,
-        FT: FeedbacksTuple<I>,
-        C: Corpus<I, R>,
-        EM: EventManager<I>,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
+        EM: EventManager<I, S>,
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            reset_oncrash_ptrs::<C, EM, FT, I, OT, R>();
+            reset_oncrash_ptrs();
         }
         Ok(())
     }
@@ -148,28 +122,24 @@ where
     /// depnding on different corpus or state.
     /// * `name` - the name of this executor (to address it along the way)
     /// * `harness_fn` - the harness, executiong the function
-    /// * `on_crash_fn` - When an in-mem harness crashes, it may safe some state to continue fuzzing later.
-    ///                   Do that that in this function. The program will crash afterwards.
     /// * `observers` - the observers observing the target during execution
-    pub fn new<C, EM, FT, OC, OFT, R>(
+    pub fn new<EM, OC, OFT, S>(
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
-        _state: &mut State<C, FT, I, OC, OFT, R>,
+        _state: &mut S,
         _event_mgr: &mut EM,
     ) -> Self
     where
-        R: Rand,
-        FT: FeedbacksTuple<I>,
-        OC: Corpus<I, R>,
+        EM: EventManager<I, S>,
+        OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
-        C: Corpus<I, R>,
-        EM: EventManager<I>,
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
     {
         #[cfg(feature = "std")]
         #[cfg(unix)]
         unsafe {
-            setup_crash_handlers::<C, EM, FT, I, OC, OFT, OT, R>();
+            setup_crash_handlers::<EM, I, OC, OFT, OT, S>();
         }
 
         Self {
@@ -180,25 +150,6 @@ where
         }
     }
 }
-
-/*
-unsafe fn tidy_up_on_exit<EM>(mgr: &EM)
-where
-EM: EventManager<I>,
-I: Input,
-{
-
-            match manager.llmp {
-            IsClient { client } => {
-                let map = client.out_maps.last().unwrap();
-                /// wait until we can drop the message safely.
-                map.await_save_to_unmap_blocking();
-                /// Make sure all pages are unmapped.
-                drop(manager);
-            }
-            _ => (),
-        }
-}*/
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
@@ -219,14 +170,13 @@ pub mod unix_signals {
     };
 
     use crate::{
-        corpus::Corpus,
+        corpus::{Corpus, Testcase},
         events::{Event, EventManager},
         executors::ExitKind,
         feedbacks::FeedbacksTuple,
         inputs::Input,
         observers::ObserversTuple,
-        state::State,
-        utils::Rand,
+        state::{HasObjectives, HasSolutions},
     };
     /// Let's get 8 mb for now.
     const SIGNAL_STACK_SIZE: usize = 2 << 22;
@@ -242,19 +192,14 @@ pub mod unix_signals {
     /// This is needed for certain non-rust side effects, as well as unix signal handling.
     static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_crash<C, EM, FT, I, OC, OFT, OT, R>(
-        _sig: c_int,
-        info: siginfo_t,
-        _void: c_void,
-    ) where
-        EM: EventManager<I>,
-        C: Corpus<I, R>,
+    unsafe fn inmem_handle_crash<EM, I, OC, OFT, OT, S>(_sig: c_int, info: siginfo_t, _void: c_void)
+    where
+        EM: EventManager<I, S>,
         OT: ObserversTuple,
-        OC: Corpus<I, R>,
+        OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
-        FT: FeedbacksTuple<I>,
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input,
-        R: Rand,
     {
         if CURRENT_INPUT_PTR == ptr::null() {
             println!(
@@ -267,7 +212,6 @@ pub mod unix_signals {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
             };
-            
             #[cfg(feature = "std")]
             {
                 println!("Type QUIT to restart the child");
@@ -289,30 +233,26 @@ pub mod unix_signals {
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         // Make sure we don't crash in the crash handler forever.
         CURRENT_INPUT_PTR = ptr::null();
-        let state = (STATE_PTR as *mut State<C, FT, I, OC, OFT, R>)
-            .as_mut()
-            .unwrap();
+        let state = (STATE_PTR as *mut S).as_mut().unwrap();
         let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
 
         let observers = (OBSERVERS_PTR as *const OT).as_ref().unwrap();
         let obj_fitness = state
-            .objective_feedbacks_mut()
+            .objectives_mut()
             .is_interesting_all(&input, observers, ExitKind::Crash)
-            .expect("In crash handler objective feedbacks failure.".into());
+            .expect("In crash handler objectives failure.".into());
         if obj_fitness > 0 {
-            if !state
-                .add_if_objective(input.clone(), obj_fitness)
-                .expect("In crash handler objective corpus add failure.".into())
-                .is_none()
-            {
-                mgr.fire(
-                    state,
-                    Event::Objective {
-                        objective_size: state.objective_corpus().count(),
-                    },
-                )
-                .expect(&format!("Could not send timeouting input {:?}", input));
-            }
+            state
+                .solutions_mut()
+                .add(Testcase::new(input.clone()))
+                .expect("In crash handler solutions failure.".into());
+            mgr.fire(
+                state,
+                Event::Objective {
+                    objective_size: state.solutions().count(),
+                },
+            )
+            .expect("Could not send crashing input".into());
         }
 
         mgr.on_restart(state).unwrap();
@@ -324,19 +264,17 @@ pub mod unix_signals {
         std::process::exit(1);
     }
 
-    pub unsafe extern "C" fn libaflrs_executor_inmem_handle_timeout<C, EM, FT, I, OC, OFT, OT, R>(
+    unsafe fn inmem_handle_timeout<EM, I, OC, OFT, OT, S>(
         _sig: c_int,
         _info: siginfo_t,
         _void: c_void,
     ) where
-        EM: EventManager<I>,
-        C: Corpus<I, R>,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
+        EM: EventManager<I, S>,
         OT: ObserversTuple,
-        FT: FeedbacksTuple<I>,
+        OC: Corpus<I>,
+        OFT: FeedbacksTuple<I>,
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input,
-        R: Rand,
     {
         dbg!("TIMEOUT/SIGUSR2 received");
         if CURRENT_INPUT_PTR.is_null() {
@@ -350,33 +288,33 @@ pub mod unix_signals {
         let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
         // Make sure we don't crash in the crash handler forever.
         CURRENT_INPUT_PTR = ptr::null();
-        let state = (STATE_PTR as *mut State<C, FT, I, OC, OFT, R>)
-            .as_mut()
-            .unwrap();
+        let state = (STATE_PTR as *mut S).as_mut().unwrap();
         let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
 
         let observers = (OBSERVERS_PTR as *const OT).as_ref().unwrap();
         let obj_fitness = state
-            .objective_feedbacks_mut()
-            .is_interesting_all(&input, observers, ExitKind::Timeout)
-            .expect("In timeout handler objective feedbacks failure.".into());
+            .objectives_mut()
+            .is_interesting_all(&input, observers, ExitKind::Crash)
+            .expect("In timeout handler objectives failure.".into());
         if obj_fitness > 0 {
-            if !state
-                .add_if_objective(input.clone(), obj_fitness)
-                .expect("In timeout handler objective corpus add failure.".into())
-                .is_none()
-            {
-                mgr.fire(
-                    state,
-                    Event::Objective {
-                        objective_size: state.objective_corpus().count(),
-                    },
-                )
-                .expect(&format!("Could not send timeouting input {:?}", input));
-            }
+            state
+                .solutions_mut()
+                .add(Testcase::new(input.clone()))
+                .expect("In timeout handler solutions failure.".into());
+            mgr.fire(
+                state,
+                Event::Objective {
+                    objective_size: state.solutions().count(),
+                },
+            )
+            .expect("Could not send timeouting input".into());
         }
 
         mgr.on_restart(state).unwrap();
+
+        println!("Waiting for broker...");
+        mgr.await_restart_safe();
+        println!("Bye!");
 
         mgr.await_restart_safe();
 
@@ -384,21 +322,12 @@ pub mod unix_signals {
     }
 
     #[inline]
-    pub unsafe fn set_oncrash_ptrs<C, EM, FT, I, OC, OFT, OT, R>(
-        state: &mut State<C, FT, I, OC, OFT, R>,
+    pub unsafe fn set_oncrash_ptrs<EM, I, OT, S>(
+        state: &mut S,
         event_mgr: &mut EM,
         observers: &OT,
         input: &I,
-    ) where
-        EM: EventManager<I>,
-        C: Corpus<I, R>,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
-        OT: ObserversTuple,
-        FT: FeedbacksTuple<I>,
-        I: Input,
-        R: Rand,
-    {
+    ) {
         CURRENT_INPUT_PTR = input as *const _ as *const c_void;
         STATE_PTR = state as *mut _ as *mut c_void;
         EVENT_MGR_PTR = event_mgr as *mut _ as *mut c_void;
@@ -406,24 +335,21 @@ pub mod unix_signals {
     }
 
     #[inline]
-    pub unsafe fn reset_oncrash_ptrs<C, EM, FT, I, OT, R>() {
+    pub unsafe fn reset_oncrash_ptrs() {
         CURRENT_INPUT_PTR = ptr::null();
         STATE_PTR = ptr::null_mut();
         EVENT_MGR_PTR = ptr::null_mut();
-        OBSERVERS_PTR = ptr::null_mut();
+        OBSERVERS_PTR = ptr::null();
     }
 
-    // TODO clearly state that manager should be static (maybe put the 'static lifetime?)
-    pub unsafe fn setup_crash_handlers<C, EM, FT, I, OC, OFT, OT, R>()
+    pub unsafe fn setup_crash_handlers<EM, I, OC, OFT, OT, S>()
     where
-        EM: EventManager<I>,
-        C: Corpus<I, R>,
-        OC: Corpus<I, R>,
-        OFT: FeedbacksTuple<I>,
+        EM: EventManager<I, S>,
         OT: ObserversTuple,
-        FT: FeedbacksTuple<I>,
+        OC: Corpus<I>,
+        OFT: FeedbacksTuple<I>,
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input,
-        R: Rand,
     {
         // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
         if SIGNAL_STACK_PTR.is_null() {
@@ -440,8 +366,7 @@ pub mod unix_signals {
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-        sa.sa_sigaction =
-            libaflrs_executor_inmem_handle_crash::<C, EM, FT, I, OC, OFT, OT, R> as usize;
+        sa.sa_sigaction = inmem_handle_crash::<EM, I, OC, OFT, OT, S> as usize;
         for (sig, msg) in &[
             (SIGSEGV, "segfault"),
             (SIGBUS, "sigbus"),
@@ -455,8 +380,7 @@ pub mod unix_signals {
             }
         }
 
-        sa.sa_sigaction =
-            libaflrs_executor_inmem_handle_timeout::<C, EM, FT, I, OC, OFT, OT, R> as usize;
+        sa.sa_sigaction = inmem_handle_timeout::<EM, I, OC, OFT, OT, S> as usize;
         if sigaction(SIGUSR2, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up sigusr2 handler for timeouts");
         }

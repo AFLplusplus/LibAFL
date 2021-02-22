@@ -1,7 +1,7 @@
 //! Utility functions for AFL
 
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub type StdRand = RomuTrioRand;
 
 /// Ways to get random around here
-pub trait Rand: Debug + Serialize {
+pub trait Rand: Debug + Serialize + DeserializeOwned {
     // Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
 
