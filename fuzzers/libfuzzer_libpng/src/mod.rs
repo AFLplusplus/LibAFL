@@ -5,10 +5,11 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
+    fuzzer::{Fuzzer, StdFuzzer},
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
     mutators::token_mutations::TokensMetadata,
@@ -17,7 +18,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
     utils::{current_nanos, StdRand},
-    Error, Fuzzer, StdFuzzer,
+    Error,
 };
 
 /// The name of the coverage map observer, to find it again in the observer list
@@ -69,13 +70,12 @@ pub fn main() {
 
 /// The actual fuzzer
 fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
-    let mut rand = StdRand::new(current_nanos());
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, _, _, _, _, UnixShMem, _>(stats, broker_port)
+        setup_restarting_mgr::<_, _, UnixShMem, _>(stats, broker_port)
             .expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
@@ -86,6 +86,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or(State::new(
+        StdRand::new(current_nanos()),
         InMemoryCorpus::new(),
         tuple_list!(MaxMapFeedback::new_with_observer(
             &NAME_COV_MAP,
@@ -111,7 +112,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Setup a basic mutator with a mutational stage
     let mutator = HavocBytesMutator::default();
     let stage = StdMutationalStage::new(mutator);
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+    let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
 
     // Create the executor
     let mut executor = InProcessExecutor::new(
@@ -141,5 +142,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut rand, &mut executor, &mut state, &mut restarting_mgr)
+    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
+
+    Ok(())
 }

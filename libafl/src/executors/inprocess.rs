@@ -15,7 +15,6 @@ use crate::{
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     state::{HasObjectives, HasSolutions},
-    utils::Rand,
     Error,
 };
 
@@ -124,7 +123,7 @@ where
     /// * `name` - the name of this executor (to address it along the way)
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
-    pub fn new<EM, OC, OFT, R, S>(
+    pub fn new<EM, OC, OFT, S>(
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
@@ -136,12 +135,11 @@ where
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
-        R: Rand,
     {
         #[cfg(feature = "std")]
         #[cfg(unix)]
         unsafe {
-            setup_crash_handlers::<EM, I, OC, OFT, OT, R, S>();
+            setup_crash_handlers::<EM, I, OC, OFT, OT, S>();
         }
 
         Self {
@@ -179,7 +177,6 @@ pub mod unix_signals {
         inputs::Input,
         observers::ObserversTuple,
         state::{HasObjectives, HasSolutions},
-        utils::Rand,
     };
     /// Let's get 8 mb for now.
     const SIGNAL_STACK_SIZE: usize = 2 << 22;
@@ -195,18 +192,14 @@ pub mod unix_signals {
     /// This is needed for certain non-rust side effects, as well as unix signal handling.
     static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
 
-    unsafe fn inmem_handle_crash<EM, I, OC, OFT, OT, R, S>(
-        _sig: c_int,
-        info: siginfo_t,
-        _void: c_void,
-    ) where
+    unsafe fn inmem_handle_crash<EM, I, OC, OFT, OT, S>(_sig: c_int, info: siginfo_t, _void: c_void)
+    where
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input,
-        R: Rand,
     {
         if CURRENT_INPUT_PTR == ptr::null() {
             println!(
@@ -271,7 +264,7 @@ pub mod unix_signals {
         std::process::exit(1);
     }
 
-    unsafe fn inmem_handle_timeout<EM, I, OC, OFT, OT, R, S>(
+    unsafe fn inmem_handle_timeout<EM, I, OC, OFT, OT, S>(
         _sig: c_int,
         _info: siginfo_t,
         _void: c_void,
@@ -282,7 +275,6 @@ pub mod unix_signals {
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input,
-        R: Rand,
     {
         dbg!("TIMEOUT/SIGUSR2 received");
         if CURRENT_INPUT_PTR.is_null() {
@@ -350,7 +342,7 @@ pub mod unix_signals {
         OBSERVERS_PTR = ptr::null();
     }
 
-    pub unsafe fn setup_crash_handlers<EM, I, OC, OFT, OT, R, S>()
+    pub unsafe fn setup_crash_handlers<EM, I, OC, OFT, OT, S>()
     where
         EM: EventManager<I, S>,
         OT: ObserversTuple,
@@ -358,7 +350,6 @@ pub mod unix_signals {
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input,
-        R: Rand,
     {
         // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
         if SIGNAL_STACK_PTR.is_null() {
@@ -375,7 +366,7 @@ pub mod unix_signals {
         let mut sa: sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-        sa.sa_sigaction = inmem_handle_crash::<EM, I, OC, OFT, OT, R, S> as usize;
+        sa.sa_sigaction = inmem_handle_crash::<EM, I, OC, OFT, OT, S> as usize;
         for (sig, msg) in &[
             (SIGSEGV, "segfault"),
             (SIGBUS, "sigbus"),
@@ -389,7 +380,7 @@ pub mod unix_signals {
             }
         }
 
-        sa.sa_sigaction = inmem_handle_timeout::<EM, I, OC, OFT, OT, R, S> as usize;
+        sa.sa_sigaction = inmem_handle_timeout::<EM, I, OC, OFT, OT, S> as usize;
         if sigaction(SIGUSR2, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up sigusr2 handler for timeouts");
         }

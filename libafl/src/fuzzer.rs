@@ -12,9 +12,12 @@ use crate::{
 use core::marker::PhantomData;
 
 /// Holds a set of stages
-pub trait HasStages<ST, E, EM, S>: Sized
+pub trait HasStages<ST, E, EM, I, S>
 where
-    ST: StagesTuple<E, EM, Self, S>,
+    ST: StagesTuple<E, EM, I, S>,
+    E: Executor<I>,
+    EM: EventManager<I, S>,
+    I: Input,
 {
     fn stages(&self) -> &ST;
 
@@ -44,7 +47,9 @@ pub trait Fuzzer<E, EM, S> {
 pub struct StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<E, EM, Self, S>,
+    ST: StagesTuple<E, EM, I, S>,
+    E: Executor<I>,
+    EM: EventManager<I, S>,
     I: Input,
 {
     scheduler: CS,
@@ -52,10 +57,12 @@ where
     phantom: PhantomData<(E, EM, I, OT, S)>,
 }
 
-impl<CS, ST, E, EM, I, OT, S> HasStages<ST, E, EM, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
+impl<CS, ST, E, EM, I, OT, S> HasStages<ST, E, EM, I, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<E, EM, Self, S>,
+    ST: StagesTuple<E, EM, I, S>,
+    E: Executor<I>,
+    EM: EventManager<I, S>,
     I: Input,
 {
     fn stages(&self) -> &ST {
@@ -70,7 +77,9 @@ where
 impl<CS, ST, E, EM, I, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<E, EM, Self, S>,
+    ST: StagesTuple<E, EM, I, S>,
+    E: Executor<I>,
+    EM: EventManager<I, S>,
     I: Input,
 {
     fn scheduler(&self) -> &CS {
@@ -86,7 +95,7 @@ impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S> for StdFuzzer<CS, ST, E, EM, I, O
 where
     CS: CorpusScheduler<I, S>,
     S: HasExecutions,
-    ST: StagesTuple<E, EM, Self, S>,
+    ST: StagesTuple<E, EM, I, S>,
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
@@ -95,8 +104,7 @@ where
     fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
         let idx = self.scheduler().next(state)?;
 
-        self.stages()
-            .perform_all(self, state, executor, manager, idx)?;
+        self.stages().perform_all(state, executor, manager, idx)?;
 
         manager.process(state, executor)?;
         Ok(idx)
@@ -125,7 +133,9 @@ where
 impl<CS, ST, E, EM, I, OT, S> StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<E, EM, Self, S>,
+    ST: StagesTuple<E, EM, I, S>,
+    E: Executor<I>,
+    EM: EventManager<I, S>,
     I: Input,
 {
     pub fn new(scheduler: CS, stages: ST) -> Self {

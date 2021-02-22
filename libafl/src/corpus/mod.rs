@@ -6,6 +6,11 @@ pub use testcase::Testcase;
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
 
+#[cfg(feature = "std")]
+pub mod ondisk;
+#[cfg(feature = "std")]
+pub use ondisk::OnDiskCorpus;
+
 pub mod queue;
 pub use queue::QueueCorpusScheduler;
 
@@ -106,6 +111,20 @@ where
             let id = state.rand_mut().below(len as u64) as usize;
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
+        }
+    }
+}
+
+impl<C, I, R, S> RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
         }
     }
 }

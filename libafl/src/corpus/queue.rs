@@ -46,6 +46,19 @@ where
     }
 }
 
+impl<C, I, S> QueueCorpusScheduler<C, I, S>
+where
+    S: HasCorpus<C, I>,
+    C: Corpus<I>,
+    I: Input,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
 /*
 #[cfg(test)]
 #[cfg(feature = "std")]

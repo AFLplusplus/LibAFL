@@ -72,3 +72,15 @@ where
         &mut self.current
     }
 }
+
+impl<I> InMemoryCorpus<I>
+where
+    I: Input,
+{
+    pub fn new() -> Self {
+        Self {
+            entries: vec![],
+            current: None,
+        }
+    }
+}

@@ -30,9 +30,8 @@ impl TokensMetadata {
 }
 
 /// Insert a dictionary token
-pub fn mutation_tokeninsert<F, I, M, R, S>(
+pub fn mutation_tokeninsert<I, M, R, S>(
     mutator: &M,
-    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -77,9 +76,8 @@ where
 }
 
 /// Overwrite with a dictionary token
-pub fn mutation_tokenreplace<F, I, M, R, S>(
+pub fn mutation_tokenreplace<I, M, R, S>(
     _: &M,
-    _: &F,
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>

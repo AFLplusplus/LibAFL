@@ -1,104 +1,104 @@
 //! The ondisk corpus stores unused testcases to disk.
 
 use alloc::vec::Vec;
-use core::{cell::RefCell, marker::PhantomData};
+use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-use crate::{
-    corpus::Corpus, corpus::HasTestcaseVec, corpus::Testcase, inputs::Input, utils::Rand, Error,
-};
+use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
 
 /// A corpus able to store testcases to disk, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OnDiskCorpus<I, R>
+pub struct OnDiskCorpus<I>
 where
     I: Input,
-    R: Rand,
 {
     entries: Vec<RefCell<Testcase<I>>>,
+    current: Option<usize>,
     dir_path: PathBuf,
-    pos: usize,
-    phantom: PhantomData<R>,
 }
 
-#[cfg(feature = "std")]
-impl<I, R> HasTestcaseVec<I> for OnDiskCorpus<I, R>
+impl<I> Corpus<I> for OnDiskCorpus<I>
 where
     I: Input,
-    R: Rand,
 {
+    /// Returns the number of elements
     #[inline]
-    fn entries(&self) -> &[RefCell<Testcase<I>>] {
-        &self.entries
+    fn count(&self) -> usize {
+        self.entries.len()
     }
-    #[inline]
-    fn entries_mut(&mut self) -> &mut Vec<RefCell<Testcase<I>>> {
-        &mut self.entries
-    }
-}
 
-#[cfg(feature = "std")]
-impl<I, R> Corpus<I, R> for OnDiskCorpus<I, R>
-where
-    I: Input,
-    R: Rand,
-{
-    /// Add an entry and save it to disk
-    fn add(&mut self, mut entry: Testcase<I>) -> usize {
-        match entry.filename() {
+    /// Add an entry to the corpus and return its index
+    #[inline]
+    fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
+        match testcase.filename() {
             None => {
                 // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
                 let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
                 let filename_str = filename.to_str().expect("Invalid Path");
-                entry.set_filename(filename_str.into());
+                testcase.set_filename(filename_str.into());
             }
             _ => {}
         }
-        entry
+        testcase
             .store_input()
             .expect("Could not save testcase to disk".into());
-        self.entries.push(RefCell::new(entry));
-        self.entries.len() - 1
+        self.entries.push(RefCell::new(testcase));
+        Ok(self.entries.len() - 1)
     }
 
+    /// Replaces the testcase at the given idx
     #[inline]
-    fn current_testcase(&self) -> (&RefCell<Testcase<I>>, usize) {
-        (self.get(self.pos), self.pos)
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+        if idx >= self.entries.len() {
+            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
+        }
+        self.entries[idx] = RefCell::new(testcase);
+        Ok(())
     }
 
-    /// Gets the next entry
+    /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn next(&mut self, rand: &mut R) -> Result<(&RefCell<Testcase<I>>, usize), Error> {
-        if self.count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+        if idx >= self.entries.len() {
+            Ok(None)
         } else {
-            let len = { self.entries().len() };
-            let id = rand.below(len as u64) as usize;
-            self.pos = id;
-            Ok((self.get(id), id))
+            Ok(Some(self.entries.remove(idx).into_inner()))
         }
     }
 
-    // TODO save and remove files, cache, etc..., ATM use just InMemoryCorpus
+    /// Get by id
+    #[inline]
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+        Ok(&self.entries[idx])
+    }
+
+    /// Current testcase scheduled
+    #[inline]
+    fn current(&self) -> &Option<usize> {
+        &self.current
+    }
+
+    /// Current testcase scheduled (mut)
+    #[inline]
+    fn current_mut(&mut self) -> &mut Option<usize> {
+        &mut self.current
+    }
 }
 
-#[cfg(feature = "std")]
-impl<I, R> OnDiskCorpus<I, R>
+impl<I> OnDiskCorpus<I>
 where
     I: Input,
-    R: Rand,
 {
     pub fn new(dir_path: PathBuf) -> Self {
         Self {
-            dir_path: dir_path,
             entries: vec![],
-            pos: 0,
-            phantom: PhantomData,
+            current: None,
+            dir_path: dir_path,
         }
     }
 }

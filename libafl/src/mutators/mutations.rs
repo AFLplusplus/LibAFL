@@ -27,20 +27,20 @@ pub enum MutationResult {
 
 // TODO maybe the mutator arg is not needed
 /// The generic function type that identifies mutations
-pub type MutationFunction<F, I, M, S> = fn(&M, &F, &mut S, &mut I) -> Result<MutationResult, Error>;
+pub type MutationFunction<I, M, S> = fn(&M, &mut S, &mut I) -> Result<MutationResult, Error>;
 
-pub trait ComposedByMutations<F, I, S>
+pub trait ComposedByMutations<I, S>
 where
     I: Input,
 {
     /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<F, I, Self, S>;
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, S>;
 
     /// Get the number of mutations
     fn mutations_count(&self) -> usize;
 
     /// Add a mutation
-    fn add_mutation(&mut self, mutation: MutationFunction<F, I, Self, S>);
+    fn add_mutation(&mut self, mutation: MutationFunction<I, Self, S>);
 }
 
 /// Mem move in the own vec
@@ -123,9 +123,9 @@ const INTERESTING_32: [i32; 27] = [
 ];
 
 /// Bitflip mutation for inputs with a bytes vector
-pub fn mutation_bitflip<F, I, M, R, S>(
+pub fn mutation_bitflip<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -146,9 +146,9 @@ where
     }
 }
 
-pub fn mutation_byteflip<F, I, M, R, S>(
+pub fn mutation_byteflip<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -169,9 +169,9 @@ where
     }
 }
 
-pub fn mutation_byteinc<F, I, M, R, S>(
+pub fn mutation_byteinc<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -193,9 +193,9 @@ where
     }
 }
 
-pub fn mutation_bytedec<F, I, M, R, S>(
+pub fn mutation_bytedec<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -217,9 +217,9 @@ where
     }
 }
 
-pub fn mutation_byteneg<F, I, M, R, S>(
+pub fn mutation_byteneg<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -240,9 +240,9 @@ where
     }
 }
 
-pub fn mutation_byterand<F, I, M, R, S>(
+pub fn mutation_byterand<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -263,9 +263,9 @@ where
     }
 }
 
-pub fn mutation_byteadd<F, I, M, R, S>(
+pub fn mutation_byteadd<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -291,9 +291,9 @@ where
     }
 }
 
-pub fn mutation_wordadd<F, I, M, R, S>(
+pub fn mutation_wordadd<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -321,9 +321,9 @@ where
     }
 }
 
-pub fn mutation_dwordadd<F, I, M, R, S>(
+pub fn mutation_dwordadd<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -351,9 +351,9 @@ where
     }
 }
 
-pub fn mutation_qwordadd<F, I, M, R, S>(
+pub fn mutation_qwordadd<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -381,9 +381,9 @@ where
     }
 }
 
-pub fn mutation_byteinteresting<F, I, M, R, S>(
+pub fn mutation_byteinteresting<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -405,9 +405,9 @@ where
     }
 }
 
-pub fn mutation_wordinteresting<F, I, M, R, S>(
+pub fn mutation_wordinteresting<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -435,9 +435,9 @@ where
     }
 }
 
-pub fn mutation_dwordinteresting<F, I, M, R, S>(
+pub fn mutation_dwordinteresting<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -465,9 +465,9 @@ where
     }
 }
 
-pub fn mutation_bytesdelete<F, I, M, R, S>(
+pub fn mutation_bytesdelete<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -488,9 +488,9 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesexpand<F, I, M, R, S>(
+pub fn mutation_bytesexpand<I, M, R, S>(
     mutator: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -518,9 +518,9 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesinsert<F, I, M, R, S>(
+pub fn mutation_bytesinsert<I, M, R, S>(
     mutator: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -551,9 +551,9 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesrandinsert<F, I, M, R, S>(
+pub fn mutation_bytesrandinsert<I, M, R, S>(
     mutator: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -584,9 +584,9 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesset<F, I, M, R, S>(
+pub fn mutation_bytesset<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -609,9 +609,9 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesrandset<F, I, M, R, S>(
+pub fn mutation_bytesrandset<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -634,9 +634,9 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytescopy<F, I, M, R, S>(
+pub fn mutation_bytescopy<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -659,9 +659,9 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesswap<F, I, M, R, S>(
+pub fn mutation_bytesswap<I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -687,9 +687,9 @@ where
 }
 
 /// Crossover insert mutation
-pub fn mutation_crossover_insert<C, F, I, M, R, S>(
+pub fn mutation_crossover_insert<C, I, M, R, S>(
     mutator: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -745,9 +745,9 @@ where
 }
 
 /// Crossover replace mutation
-pub fn mutation_crossover_replace<C, F, I, M, R, S>(
+pub fn mutation_crossover_replace<C, I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -808,9 +808,9 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 }
 
 /// Splicing mutation from AFL
-pub fn mutation_splice<C, F, I, M, R, S>(
+pub fn mutation_splice<C, I, M, R, S>(
     _: &M,
-    _: &F,
+
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>

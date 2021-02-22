@@ -18,9 +18,9 @@ use crate::{
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<C, E, EM, F, I, M, OT, S>: Stage<E, EM, F, S>
+pub trait MutationalStage<C, E, EM, I, M, OT, S>: Stage<E, EM, I, S>
 where
-    M: Mutator<F, I, S>,
+    M: Mutator<I, S>,
     I: Input,
     S: HasCorpus<C, I> + Evaluator<I>,
     C: Corpus<I>,
@@ -40,7 +40,6 @@ where
     /// Runs this (mutational) stage for the given testcase
     fn perform_mutational(
         &self,
-        fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
@@ -54,12 +53,11 @@ where
                 .borrow_mut()
                 .load_input()?
                 .clone();
-            self.mutator()
-                .mutate(fuzzer, state, &mut input_mut, i as i32)?;
+            self.mutator().mutate(state, &mut input_mut, i as i32)?;
 
             let fitness = state.evaluate_input(input_mut, executor, manager)?;
 
-            self.mutator().post_exec(fuzzer, state, fitness, i as i32)?;
+            self.mutator().post_exec(state, fitness, i as i32)?;
         }
         Ok(())
     }
@@ -69,9 +67,9 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
+pub struct StdMutationalStage<C, E, EM, I, M, OT, R, S>
 where
-    M: Mutator<F, I, S>,
+    M: Mutator<I, S>,
     I: Input,
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
@@ -81,13 +79,13 @@ where
     R: Rand,
 {
     mutator: M,
-    phantom: PhantomData<(C, E, EM, F, I, OT, R, S)>,
+    phantom: PhantomData<(C, E, EM, I, OT, R, S)>,
 }
 
-impl<C, E, EM, F, I, M, OT, R, S> MutationalStage<C, E, EM, F, I, M, OT, S>
-    for StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
+impl<C, E, EM, I, M, OT, R, S> MutationalStage<C, E, EM, I, M, OT, S>
+    for StdMutationalStage<C, E, EM, I, M, OT, R, S>
 where
-    M: Mutator<F, I, S>,
+    M: Mutator<I, S>,
     I: Input,
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
@@ -114,10 +112,9 @@ where
     }
 }
 
-impl<C, E, EM, F, I, M, OT, R, S> Stage<E, EM, F, S>
-    for StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
+impl<C, E, EM, I, M, OT, R, S> Stage<E, EM, I, S> for StdMutationalStage<C, E, EM, I, M, OT, R, S>
 where
-    M: Mutator<F, I, S>,
+    M: Mutator<I, S>,
     I: Input,
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
@@ -129,19 +126,18 @@ where
     #[inline]
     fn perform(
         &self,
-        fuzzer: &F,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.perform_mutational(fuzzer, state, executor, manager, corpus_idx)
+        self.perform_mutational(state, executor, manager, corpus_idx)
     }
 }
 
-impl<C, E, EM, F, I, M, OT, R, S> StdMutationalStage<C, E, EM, F, I, M, OT, R, S>
+impl<C, E, EM, I, M, OT, R, S> StdMutationalStage<C, E, EM, I, M, OT, R, S>
 where
-    M: Mutator<F, I, S>,
+    M: Mutator<I, S>,
     I: Input,
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,

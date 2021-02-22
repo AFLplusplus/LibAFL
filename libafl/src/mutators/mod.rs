@@ -14,18 +14,16 @@ use crate::{inputs::Input, Error};
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<F, I, S>
+pub trait Mutator<I, S>
 where
     I: Input,
 {
     /// Mutate a given input
-    fn mutate(&self, fuzzer: &F, state: &mut S, input: &mut I, stage_idx: i32)
-        -> Result<(), Error>;
+    fn mutate(&self, state: &mut S, input: &mut I, stage_idx: i32) -> Result<(), Error>;
 
     /// Post-process given the outcome of the execution
     fn post_exec(
         &self,
-        _fuzzer: &F,
         _state: &mut S,
         _is_interesting: u32,
         _stage_idx: i32,
