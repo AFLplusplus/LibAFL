@@ -21,10 +21,7 @@ use libafl::{
     Error,
 };
 
-/// The name of the coverage map observer, to find it again in the observer list
-const NAME_COV_MAP: &str = "cov_map";
-
-/// We will interact with a c++ target, so use external c functionality
+/// We will interact with a C++ target, so use external c functionality
 extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
@@ -37,7 +34,7 @@ extern "C" {
     static __lafl_max_edges_size: u32;
 }
 
-/// The wrapped harness function, calling out to the llvm-style libfuzzer harness
+/// The wrapped harness function, calling out to the LLVM-style harness
 fn harness<E, I>(_executor: &E, buf: &[u8]) -> ExitKind
 where
     E: Executor<I>,
@@ -50,7 +47,7 @@ where
     ExitKind::Ok
 }
 
-/// The main fn, parsing parameters, and starting the fuzzer
+/// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -80,21 +77,20 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create an observation channel using the coverage map
     let edges_observer =
-        StdMapObserver::new_from_ptr(&NAME_COV_MAP, unsafe { __lafl_edges_map }, unsafe {
+        StdMapObserver::new_from_ptr("edges", unsafe { __lafl_edges_map }, unsafe {
             __lafl_max_edges_size as usize
         });
 
     // If not restarting, create a State from scratch
-    let mut state = state.unwrap_or(State::new(
-        StdRand::new(current_nanos()),
-        InMemoryCorpus::new(),
-        tuple_list!(MaxMapFeedback::new_with_observer(
-            &NAME_COV_MAP,
-            &edges_observer
-        )),
-        OnDiskCorpus::new(objective_dir),
-        tuple_list!(CrashFeedback::new()),
-    ));
+    let mut state = state.unwrap_or_else(|| {
+        State::new(
+            StdRand::new(current_nanos()),
+            InMemoryCorpus::new(),
+            tuple_list!(MaxMapFeedback::new_with_observer("edges", &edges_observer)),
+            OnDiskCorpus::new(objective_dir),
+            tuple_list!(CrashFeedback::new()),
+        )
+    });
 
     println!("We're a client, let's fuzz :)");
 
@@ -112,11 +108,13 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Setup a basic mutator with a mutational stage
     let mutator = HavocBytesMutator::default();
     let stage = StdMutationalStage::new(mutator);
+
+    // A fuzzer with just one stage and a random policy to get testcasess from the corpus
     let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
 
-    // Create the executor
+    // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
-        "Libfuzzer",
+        "in-process(edges)",
         harness,
         tuple_list!(edges_observer),
         &mut state,
@@ -131,7 +129,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         }
     }
 
-    // in case the corpus is empty (on first run), reset
+    // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut executor, &mut restarting_mgr, &corpus_dirs)
@@ -144,5 +142,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
 
+    // Never reached
     Ok(())
 }
