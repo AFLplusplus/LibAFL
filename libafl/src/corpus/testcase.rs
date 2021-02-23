@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
-    inputs::Input,
+    inputs::{HasLen, Input},
     Error,
 };
 
@@ -28,6 +28,8 @@ where
     metadatas: SerdeAnyMap,
     /// Time needed to execute the input
     exec_time: Option<Duration>,
+    /// Cached len of the input, if any
+    cached_len: Option<usize>
 }
 
 /// Impl of a testcase
@@ -72,6 +74,7 @@ where
     /// Get the input, if any (mutable)
     #[inline]
     pub fn input_mut(&mut self) -> &mut Option<I> {
+        // self.cached_len = None;
         &mut self.input
     }
 
@@ -144,6 +147,7 @@ where
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
+            cached_len: None
         }
     }
 
@@ -156,6 +160,7 @@ where
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
+            cached_len: None
         }
     }
 
@@ -168,6 +173,7 @@ where
             fitness: fitness,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
+            cached_len: None
         }
     }
 
@@ -179,7 +185,36 @@ where
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
+            cached_len: None
         }
+    }
+}
+
+/// Impl of a testcase when the input has len
+impl<I> Testcase<I>
+where
+    I: Input + HasLen,
+{
+    /// Get the cached len
+    #[inline]
+    pub fn cached_len(&mut self) -> Result<usize, Error> {
+        Ok(match &self.input {
+            Some(i) => {
+                let l = i.len();
+                self.cached_len = Some(l);
+                l
+            },
+            None => {
+                match self.cached_len {
+                    Some(l) => l,
+                    None => {
+                      let l = self.load_input()?.len();
+                      self.cached_len = Some(l);
+                      l
+                    }
+                }
+            }
+        })
     }
 }
 

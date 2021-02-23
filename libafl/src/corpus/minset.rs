@@ -21,7 +21,7 @@ impl FavFactor for LenTimeMulFavFactor {
     where
         I: Input + HasLen
     {
-        entry.exec_time() * entry.load_input().len()
+        entry.exec_time().as_usec() * (entry.cached_len()? as u64)
     }
 }
 
