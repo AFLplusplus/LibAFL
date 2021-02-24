@@ -11,6 +11,9 @@ It is released as Free and Open Source Software under the GNU Lesser General Pub
 We collect example fuzzers in `./fuzzers`.
 The best-tested fuzzer is `./fuzzers/libfuzzer_libpng`, a clone of libfuzzer using libafl for a libpng harness.
 
+If you want to get a quick overview, run `cargo doc`.
+Feel free to open issues or contact us directly. Thank you for your support. <3
+
 ## Roadmap for release
 
 + Minset corpus scheduler
