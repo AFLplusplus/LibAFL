@@ -232,7 +232,7 @@ impl Lehmer64Rand {
 }
 
 /// Extremely quick rand implementation
-/// see https://arxiv.org/pdf/2002.11331.pdf
+/// see <https://arxiv.org/pdf/2002.11331.pdf>
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RomuTrioRand {
     x_state: u64,
@@ -274,7 +274,7 @@ impl Rand for RomuTrioRand {
     }
 }
 
-/// see https://arxiv.org/pdf/2002.11331.pdf
+/// see <https://arxiv.org/pdf/2002.11331.pdf>
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RomuDuoJrRand {
     x_state: u64,
