@@ -6,6 +6,7 @@ client_out_map. If the ringbuf is filled up, they start place a
 LLMP_AGE_END_OF_PAGE_V1 msg and alloc a new shmap.
 Once the broker mapped a page, it flags it save for unmapping.
 
+```text
 [client0]        [client1]    ...    [clientN]
   |                  |                 /
 [client0_out] [client1_out] ... [clientN_out]
@@ -14,6 +15,7 @@ Once the broker mapped a page, it flags it save for unmapping.
   |________________________________/
  \|/
 [broker]
+```
 
 After the broker received a new message for clientN, (clientN_out->current_id
 != last_message->message_id) the broker will copy the message content to its
@@ -26,6 +28,7 @@ message in its queue. The LLMP_TAG_END_PAGE_V1 buf contains the new string to
 access the shared map. The clients then switch over to read from that new
 current map.
 
+```text
 [broker]
   |
 [current_broadcast_map]
@@ -36,6 +39,7 @@ current map.
   |                  |                  |
  \|/                \|/                \|/
 [client0]        [client1]    ...    [clientN]
+```
 
 In the future, if we need zero copy, the current_broadcast_map could instead
 list the client_out_map ID an offset for each message. In that case, the clients
