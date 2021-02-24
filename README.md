@@ -15,7 +15,8 @@ The best-tested fuzzer is `./fuzzers/libfuzzer_libpng`, a clone of libfuzzer usi
 
 + Minset corpus scheduler
 + Win32 shared mem and crash handler to have Windows in-process executor
-+ Other objectives examples (e.g. maximize allocations to spot OOMs)
++ Other feedbacks examples (e.g. maximize allocations to spot OOMs)
++ Other objectives examples (e.g. execution of a given program point)
 + Fix issues for no_std
 + A macro crate with derive directives (e.g. for SerdeAny impl).
 + Good documentation
