@@ -88,7 +88,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             StdRand::new(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
-             // Feedbacks to rate the interestingness of an input
+            // Feedbacks to rate the interestingness of an input
             tuple_list!(MaxMapFeedback::new_with_observer("edges", &edges_observer)),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
@@ -137,7 +137,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
-        state 
+        state
             .load_initial_inputs(&mut executor, &mut restarting_mgr, &corpus_dirs)
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",

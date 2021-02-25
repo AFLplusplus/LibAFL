@@ -311,6 +311,7 @@ impl Rand for RomuDuoJrRand {
     }
 }
 
+/// Get the current milliseconds
 #[cfg(feature = "std")]
 pub fn current_milliseconds() -> u64 {
     SystemTime::now()
@@ -319,6 +320,7 @@ pub fn current_milliseconds() -> u64 {
         .as_millis() as u64
 }
 
+/// Returns a fixed value of 1k for no_std (for now)
 #[cfg(not(feature = "std"))]
 pub fn current_milliseconds() -> u64 {
     1000

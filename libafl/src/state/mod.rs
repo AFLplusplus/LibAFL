@@ -24,6 +24,9 @@ use crate::{
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
 
+/// The maximum size of a testcase
+pub const DEFAULT_MAX_SIZE: usize = 1048576;
+
 /// Trait for elements offering a corpus
 pub trait HasCorpus<C, I>
 where
@@ -34,6 +37,14 @@ where
     fn corpus(&self) -> &C;
     /// The testcase corpus (mut)
     fn corpus_mut(&mut self) -> &mut C;
+}
+
+/// Interact with the maximum size
+pub trait HasMaxSize {
+    /// The maximum size hint for items and mutations returned
+    fn max_size(&self) -> usize;
+    /// Sets the maximum size hint for the items and mutations
+    fn set_max_size(&mut self, max_size: usize);
 }
 
 /// Trait for elements offering a corpus of solutions
@@ -204,6 +215,8 @@ where
     objectives: OFT,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
+    /// MaxSize testcase size for mutators that appreciate it
+    max_size: usize,
 
     phantom: PhantomData<I>,
 }
@@ -359,6 +372,24 @@ where
     #[inline]
     fn executions_mut(&mut self) -> &mut usize {
         &mut self.executions
+    }
+}
+
+impl<C, FT, I, OFT, R, SC> HasMaxSize for State<C, FT, I, OFT, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbacksTuple<I>,
+    SC: Corpus<I>,
+    OFT: FeedbacksTuple<I>,
+{
+    fn max_size(&self) -> usize {
+        self.max_size
+    }
+
+    fn set_max_size(&mut self, max_size: usize) {
+        self.max_size = max_size
     }
 }
 
@@ -638,6 +669,7 @@ where
             feedbacks,
             solutions,
             objectives,
+            max_size: DEFAULT_MAX_SIZE,
             phantom: PhantomData,
         }
     }

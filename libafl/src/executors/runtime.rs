@@ -38,7 +38,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: &u32) {
     //*trace_byte = (*trace_byte).wrapping_add(1);
 }
 
-/// Called when the targetprogram starts
+/// Called when the target program starts
 #[no_mangle]
 #[inline]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {

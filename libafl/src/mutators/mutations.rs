@@ -1,8 +1,9 @@
+//! A wide variety of mutations used during fuzzing.
+
 use crate::{
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
-    mutators::*,
-    state::{HasCorpus, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
     utils::Rand,
     Error,
 };
@@ -27,20 +28,20 @@ pub enum MutationResult {
 
 // TODO maybe the mutator arg is not needed
 /// The generic function type that identifies mutations
-pub type MutationFunction<I, M, S> = fn(&M, &mut S, &mut I) -> Result<MutationResult, Error>;
+pub type MutationFunction<I, S> = fn(&mut S, &mut I) -> Result<MutationResult, Error>;
 
 pub trait ComposedByMutations<I, S>
 where
     I: Input,
 {
     /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, S>;
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, S>;
 
     /// Get the number of mutations
     fn mutations_count(&self) -> usize;
 
     /// Add a mutation
-    fn add_mutation(&mut self, mutation: MutationFunction<I, Self, S>);
+    fn add_mutation(&mut self, mutation: MutationFunction<I, S>);
 }
 
 /// Mem move in the own vec
@@ -123,15 +124,10 @@ const INTERESTING_32: [i32; 27] = [
 ];
 
 /// Bitflip mutation for inputs with a bytes vector
-pub fn mutation_bitflip<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bitflip<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
     if input.bytes().len() == 0 {
@@ -146,12 +142,7 @@ where
     }
 }
 
-pub fn mutation_byteflip<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_byteflip<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -169,12 +160,7 @@ where
     }
 }
 
-pub fn mutation_byteinc<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_byteinc<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -193,12 +179,7 @@ where
     }
 }
 
-pub fn mutation_bytedec<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytedec<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -217,12 +198,7 @@ where
     }
 }
 
-pub fn mutation_byteneg<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_byteneg<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -240,12 +216,7 @@ where
     }
 }
 
-pub fn mutation_byterand<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_byterand<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -263,12 +234,7 @@ where
     }
 }
 
-pub fn mutation_byteadd<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_byteadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -291,12 +257,7 @@ where
     }
 }
 
-pub fn mutation_wordadd<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_wordadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -321,12 +282,7 @@ where
     }
 }
 
-pub fn mutation_dwordadd<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_dwordadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -351,12 +307,7 @@ where
     }
 }
 
-pub fn mutation_qwordadd<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_qwordadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -381,9 +332,7 @@ where
     }
 }
 
-pub fn mutation_byteinteresting<I, M, R, S>(
-    _: &M,
-
+pub fn mutation_byteinteresting<I, R, S>(
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -405,9 +354,7 @@ where
     }
 }
 
-pub fn mutation_wordinteresting<I, M, R, S>(
-    _: &M,
-
+pub fn mutation_wordinteresting<I, R, S>(
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -435,9 +382,7 @@ where
     }
 }
 
-pub fn mutation_dwordinteresting<I, M, R, S>(
-    _: &M,
-
+pub fn mutation_dwordinteresting<I, R, S>(
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -465,12 +410,7 @@ where
     }
 }
 
-pub fn mutation_bytesdelete<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytesdelete<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -488,25 +428,20 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesexpand<I, M, R, S>(
-    mutator: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytesexpand<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
-    M: HasMaxSize,
     I: Input + HasBytesVec,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    let max_size = state.max_size();
     let size = input.bytes().len();
     let off = state.rand_mut().below((size + 1) as u64) as usize;
     let mut len = 1 + state.rand_mut().below(16) as usize;
 
-    if size + len > mutator.max_size() {
-        if mutator.max_size() > size {
-            len = mutator.max_size() - size;
+    if size + len > max_size {
+        if max_size > size {
+            len = max_size - size;
         } else {
             return Ok(MutationResult::Skipped);
         }
@@ -518,25 +453,23 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesinsert<I, M, R, S>(
-    mutator: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytesinsert<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
-    M: HasMaxSize,
     I: Input + HasBytesVec,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    let max_size = state.max_size();
     let size = input.bytes().len();
+    if size == 0 {
+        return Ok(MutationResult::Skipped);
+    }
     let off = state.rand_mut().below((size + 1) as u64) as usize;
     let mut len = 1 + state.rand_mut().below(16) as usize;
 
-    if size + len > mutator.max_size() {
-        if mutator.max_size() > size {
-            len = mutator.max_size() - size;
+    if size + len > max_size {
+        if max_size > size {
+            len = max_size - size;
         } else {
             return Ok(MutationResult::Skipped);
         }
@@ -551,25 +484,23 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesrandinsert<I, M, R, S>(
-    mutator: &M,
-
+pub fn mutation_bytesrandinsert<I, R, S>(
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
 where
-    M: HasMaxSize,
     I: Input + HasBytesVec,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    let max_size = state.max_size();
     let size = input.bytes().len();
     let off = state.rand_mut().below((size + 1) as u64) as usize;
     let mut len = 1 + state.rand_mut().below(16) as usize;
 
-    if size + len > mutator.max_size() {
-        if mutator.max_size() > size {
-            len = mutator.max_size() - size;
+    if size + len > max_size {
+        if max_size > size {
+            len = max_size - size;
         } else {
             return Ok(MutationResult::Skipped);
         }
@@ -584,12 +515,7 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesset<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytesset<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -609,12 +535,7 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesrandset<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytesrandset<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -634,12 +555,7 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytescopy<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytescopy<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -659,12 +575,7 @@ where
     Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesswap<I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_bytesswap<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
@@ -687,18 +598,15 @@ where
 }
 
 /// Crossover insert mutation
-pub fn mutation_crossover_insert<C, I, M, R, S>(
-    mutator: &M,
-
+pub fn mutation_crossover_insert<C, I, R, S>(
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
 where
-    M: HasMaxSize,
     C: Corpus<I>,
     I: Input + HasBytesVec,
     R: Rand,
-    S: HasRand<R> + HasCorpus<C, I>,
+    S: HasRand<R> + HasCorpus<C, I> + HasMaxSize,
 {
     let size = input.bytes().len();
 
@@ -722,6 +630,7 @@ where
         return Ok(MutationResult::Skipped);
     }
 
+    let max_size = state.max_size();
     let from = state.rand_mut().below(other_size as u64) as usize;
     let to = state.rand_mut().below(size as u64) as usize;
     let mut len = state.rand_mut().below((other_size - from) as u64) as usize;
@@ -729,9 +638,9 @@ where
     let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
     let other = other_testcase.load_input()?;
 
-    if size + len > mutator.max_size() {
-        if mutator.max_size() > size {
-            len = mutator.max_size() - size;
+    if size + len > max_size {
+        if max_size > size {
+            len = max_size - size;
         } else {
             return Ok(MutationResult::Skipped);
         }
@@ -745,9 +654,7 @@ where
 }
 
 /// Crossover replace mutation
-pub fn mutation_crossover_replace<C, I, M, R, S>(
-    _: &M,
-
+pub fn mutation_crossover_replace<C, I, R, S>(
     state: &mut S,
     input: &mut I,
 ) -> Result<MutationResult, Error>
@@ -808,12 +715,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 }
 
 /// Splicing mutation from AFL
-pub fn mutation_splice<C, I, M, R, S>(
-    _: &M,
-
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_splice<C, I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
     C: Corpus<I>,
     I: Input + HasBytesVec,
@@ -970,7 +872,6 @@ pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error
     Ok(entries)
 }
 
-/*
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "std")]
@@ -1007,17 +908,6 @@ token2="B"
         let _ = fs::remove_file("test.tkns");
     }
 
-    struct WithMaxSize {}
-    impl HasMaxSize for WithMaxSize {
-        fn max_size(&self) -> usize {
-            16000 as usize
-        }
-
-        fn set_max_size(&mut self, _max_size: usize) {
-            todo!("Not needed");
-        }
-    }
-
     #[test]
     fn test_mutators() {
         let mut inputs = vec![
@@ -1030,16 +920,16 @@ token2="B"
             BytesInput::new(vec![1; 4]),
         ];
 
-        let mut mutator = WithMaxSize {};
+        let rand = StdRand::new(1337);
+        let mut corpus = InMemoryCorpus::new();
 
-        let mut rand = StdRand::new(1337);
-        let mut corpus: InMemoryCorpus<_, StdRand> = InMemoryCorpus::new();
+        corpus
+            .add(BytesInput::new(vec![0x42; 0x1337]).into())
+            .unwrap();
 
-        corpus.add(BytesInput::new(vec![0x42; 0x1337]).into());
+        let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
 
-        let mut state = State::new(corpus, (), InMemoryCorpus::new(), ());
-
-        let mut mutations: Vec<MutationFunction<BytesInput, WithMaxSize, StdRand, _>> = vec![];
+        let mut mutations: Vec<MutationFunction<_, _>> = vec![];
 
         mutations.push(mutation_bitflip);
         mutations.push(mutation_byteflip);
@@ -1072,7 +962,7 @@ token2="B"
             for mutation in &mutations {
                 for input in inputs.iter() {
                     let mut mutant = input.clone();
-                    match mutation(&mut mutator, &mut rand, &mut state, &mut mutant).unwrap() {
+                    match mutation(&mut state, &mut mutant).unwrap() {
                         MutationResult::Mutated => new_testcases.push(mutant),
                         MutationResult::Skipped => (),
                     };
@@ -1087,4 +977,3 @@ token2="B"
         */
     }
 }
-*/

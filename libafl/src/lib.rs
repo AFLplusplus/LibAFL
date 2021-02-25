@@ -137,7 +137,7 @@ mod tests {
     };
 
     #[cfg(feature = "std")]
-    use crate::events::LoggerEventManager;
+    use crate::events::SimpleEventManager;
 
     fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
@@ -147,21 +147,22 @@ mod tests {
     fn test_fuzzer() {
         let mut rand = StdRand::new(0);
 
-        let mut corpus = InMemoryCorpus::<BytesInput, StdRand>::new();
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4]).into();
         corpus.add(testcase);
 
         let mut state = State::new(
+            rand,
             corpus,
             tuple_list!(),
-            InMemoryCorpus::<BytesInput, StdRand>::new(),
+            InMemoryCorpus::<BytesInput>::new(),
             tuple_list!(),
         );
 
         let stats = SimpleStats::new(|s| {
             println!("{}", s);
         });
-        let mut event_manager = LoggerEventManager::new(stats);
+        let mut event_manager = SimpleEventManager::new(stats);
 
         let mut executor = InProcessExecutor::new(
             "main",
@@ -185,10 +186,10 @@ mod tests {
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: State<
-            InMemoryCorpus<BytesInput, _>,
+            InMemoryCorpus<BytesInput>,
             (),
             BytesInput,
-            InMemoryCorpus<BytesInput, _>,
+            InMemoryCorpus<BytesInput>,
             (),
             StdRand,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();
