@@ -117,7 +117,6 @@ impl From<ParseIntError> for Error {
     }
 }
 
-/*
 // TODO: no_std test
 #[cfg(feature = "std")]
 #[cfg(test)]
@@ -125,7 +124,7 @@ mod tests {
 
     use crate::{
         bolts::tuples::tuple_list,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{Executor, ExitKind, InProcessExecutor},
         inputs::{BytesInput, Input},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
@@ -145,11 +144,11 @@ mod tests {
 
     #[test]
     fn test_fuzzer() {
-        let mut rand = StdRand::new(0);
+        let rand = StdRand::new(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4]).into();
-        corpus.add(testcase);
+        corpus.add(testcase).unwrap();
 
         let mut state = State::new(
             rand,
@@ -176,11 +175,11 @@ mod tests {
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);
         let stage = StdMutationalStage::new(mutator);
-        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+        let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut rand, &mut executor, &mut state, &mut event_manager)
+                .fuzz_one(&mut state, &mut executor, &mut event_manager)
                 .expect(&format!("Error in iter {}", i));
         }
 
@@ -189,16 +188,15 @@ mod tests {
             InMemoryCorpus<BytesInput>,
             (),
             BytesInput,
-            InMemoryCorpus<BytesInput>,
             (),
             StdRand,
+            InMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();
-        assert_eq!(state.executions(), state_deserialized.executions());
+        assert_eq!(state.corpus().count(), state_deserialized.corpus().count());
 
         let corpus_serialized = postcard::to_allocvec(state.corpus()).unwrap();
-        let corpus_deserialized: InMemoryCorpus<BytesInput, StdRand> =
+        let corpus_deserialized: InMemoryCorpus<BytesInput> =
             postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
         assert_eq!(state.corpus().count(), corpus_deserialized.count());
     }
 }
-*/
