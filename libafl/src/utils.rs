@@ -71,6 +71,30 @@ where
     }
 }
 
+#[cfg(feature = "std")]
+mod random_seed {
+    use super::*;
+
+    pub trait RandomSeed: Rand + Default {
+        /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+        /// Needs stdlib timer
+        fn with_random_seed() -> Self {
+            let mut rng = Self::default();
+            rng.set_seed(current_nanos());
+            rng
+        }
+    }
+
+    impl RandomSeed for Xoshiro256StarRand {}
+    impl RandomSeed for XorShift64Rand {}
+    impl RandomSeed for Lehmer64Rand {}
+    impl RandomSeed for RomuTrioRand {}
+    impl RandomSeed for RomuDuoJrRand {}
+}
+
+#[cfg(feature = "std")]
+pub use random_seed::*;
+
 const HASH_CONST: u64 = 0xa5b35705;
 const DEFAULT_SEED: u64 = 0x54d3a3130133750b;
 
@@ -149,13 +173,6 @@ impl Xoshiro256StarRand {
         ret.set_seed(seed); // TODO: Proper random seed?
         ret
     }
-
-    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-    /// Needs stdlib timer
-    #[cfg(feature = "std")]
-    pub fn preseeded() -> Self {
-        Self::new(current_nanos())
-    }
 }
 
 /// XXH3 Based, hopefully speedy, rnd implementation
@@ -195,13 +212,6 @@ impl XorShift64Rand {
         let mut ret: Self = Default::default();
         ret.set_seed(seed); // TODO: Proper random seed?
         ret
-    }
-
-    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-    /// Needs stdlib timer
-    #[cfg(feature = "std")]
-    pub fn preseeded() -> Self {
-        Self::new(current_nanos())
     }
 }
 
@@ -246,13 +256,6 @@ impl Lehmer64Rand {
         ret.set_seed(seed);
         ret
     }
-
-    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-    /// Needs stdlib timer
-    #[cfg(feature = "std")]
-    pub fn preseeded() -> Self {
-        Self::new(current_nanos())
-    }
 }
 
 /// Extremely quick rand implementation
@@ -269,13 +272,6 @@ impl RomuTrioRand {
         let mut rand = Self::default();
         rand.set_seed(seed);
         rand
-    }
-
-    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-    /// Needs stdlib timer
-    #[cfg(feature = "std")]
-    pub fn preseeded() -> Self {
-        Self::new(current_nanos())
     }
 }
 
@@ -323,13 +319,6 @@ impl RomuDuoJrRand {
         let mut rand = Self::default();
         rand.set_seed(seed);
         rand
-    }
-
-    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-    /// Needs stdlib timer
-    #[cfg(feature = "std")]
-    pub fn preseeded() -> Self {
-        Self::new(current_nanos())
     }
 }
 
@@ -401,7 +390,7 @@ impl XKCDRand {
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::utils::{Rand, StdRand};
+    use crate::utils::{Rand, StdRand, RandomSeed};
 
     #[test]
     fn test_rand() {
@@ -415,9 +404,9 @@ mod tests {
 
     #[cfg(feature = "std")]
     #[test]
-    fn test_rand_preseeded() {
+    fn test_rand_with_random_seed() {
         let mut rand_fixed = StdRand::new(0);
-        let mut rand = StdRand::preseeded();
+        let mut rand = StdRand::with_random_seed();
         assert_ne!(rand.next(), rand_fixed.next());
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
