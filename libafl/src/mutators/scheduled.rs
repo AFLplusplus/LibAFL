@@ -1,13 +1,15 @@
-use crate::inputs::HasBytesVec;
 use alloc::vec::Vec;
-use core::{default::Default, fmt, marker::PhantomData};
-use fmt::Debug;
+use core::{
+    default::Default,
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 
 use crate::{
     corpus::Corpus,
-    inputs::Input,
-    mutators::{HasMaxSize, Mutator, DEFAULT_MAX_SIZE},
-    state::{HasCorpus, HasMetadata, HasRand},
+    inputs::{HasBytesVec, Input},
+    mutators::Mutator,
+    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
     utils::Rand,
     Error,
 };
@@ -31,7 +33,7 @@ where
         let num = self.iterations(state, input);
         for _ in 0..num {
             let idx = self.schedule(self.mutations_count(), state, input);
-            self.mutation_by_idx(idx)(self, state, input)?;
+            self.mutation_by_idx(idx)(state, input)?;
         }
         Ok(())
     }
@@ -43,8 +45,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    mutations: Vec<MutationFunction<I, Self, S>>,
-    max_size: usize,
+    mutations: Vec<MutationFunction<I, S>>,
     phantom: PhantomData<R>,
 }
 
@@ -57,9 +58,8 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "StdScheduledMutator with {} Mutations, max_size: {}, for Input type {}",
+            "StdScheduledMutator with {} Mutations for Input type {}",
             self.mutations.len(),
-            self.max_size,
             core::any::type_name::<I>()
         )
     }
@@ -83,7 +83,7 @@ where
     R: Rand,
 {
     #[inline]
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, Self, S> {
+    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, S> {
         self.mutations[index]
     }
 
@@ -93,7 +93,7 @@ where
     }
 
     #[inline]
-    fn add_mutation(&mut self, mutation: MutationFunction<I, Self, S>) {
+    fn add_mutation(&mut self, mutation: MutationFunction<I, S>) {
         self.mutations.push(mutation)
     }
 }
@@ -116,23 +116,6 @@ where
     }
 }
 
-impl<I, R, S> HasMaxSize for StdScheduledMutator<I, R, S>
-where
-    I: Input,
-    S: HasRand<R>,
-    R: Rand,
-{
-    #[inline]
-    fn max_size(&self) -> usize {
-        self.max_size
-    }
-
-    #[inline]
-    fn set_max_size(&mut self, max_size: usize) {
-        self.max_size = max_size;
-    }
-}
-
 impl<I, R, S> StdScheduledMutator<I, R, S>
 where
     I: Input,
@@ -143,16 +126,14 @@ where
     pub fn new() -> Self {
         Self {
             mutations: vec![],
-            max_size: DEFAULT_MAX_SIZE,
             phantom: PhantomData,
         }
     }
 
     /// Create a new StdScheduledMutator instance specifying mutations
-    pub fn with_mutations(mutations: Vec<MutationFunction<I, Self, S>>) -> Self {
+    pub fn with_mutations(mutations: Vec<MutationFunction<I, S>>) -> Self {
         StdScheduledMutator {
             mutations: mutations,
-            max_size: DEFAULT_MAX_SIZE,
             phantom: PhantomData,
         }
     }
@@ -162,9 +143,9 @@ where
 #[derive(Clone, Debug)]
 pub struct HavocBytesMutator<C, I, R, S, SM>
 where
-    SM: ScheduledMutator<I, S> + HasMaxSize,
+    SM: ScheduledMutator<I, S>,
     I: Input + HasBytesVec,
-    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata + HasMaxSize,
     C: Corpus<I>,
     R: Rand,
 {
@@ -174,9 +155,9 @@ where
 
 impl<C, I, R, S, SM> Mutator<I, S> for HavocBytesMutator<C, I, R, S, SM>
 where
-    SM: ScheduledMutator<I, S> + HasMaxSize,
+    SM: ScheduledMutator<I, S>,
     I: Input + HasBytesVec,
-    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata + HasMaxSize,
     C: Corpus<I>,
     R: Rand,
 {
@@ -208,30 +189,11 @@ where
     }
 }
 
-impl<C, I, R, S, SM> HasMaxSize for HavocBytesMutator<C, I, R, S, SM>
-where
-    SM: ScheduledMutator<I, S> + HasMaxSize,
-    I: Input + HasBytesVec,
-    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
-    C: Corpus<I>,
-    R: Rand,
-{
-    #[inline]
-    fn max_size(&self) -> usize {
-        self.scheduled.max_size()
-    }
-
-    #[inline]
-    fn set_max_size(&mut self, max_size: usize) {
-        self.scheduled.set_max_size(max_size);
-    }
-}
-
 impl<C, I, R, S, SM> HavocBytesMutator<C, I, R, S, SM>
 where
-    SM: ScheduledMutator<I, S> + HasMaxSize,
+    SM: ScheduledMutator<I, S>,
     I: Input + HasBytesVec,
-    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata + HasMaxSize,
     C: Corpus<I>,
     R: Rand,
 {
@@ -249,7 +211,7 @@ where
 impl<C, I, R, S> Default for HavocBytesMutator<C, I, R, S, StdScheduledMutator<I, R, S>>
 where
     I: Input + HasBytesVec,
-    S: HasRand<R> + HasCorpus<C, I> + HasMetadata,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata + HasMaxSize,
     C: Corpus<I>,
     R: Rand,
 {

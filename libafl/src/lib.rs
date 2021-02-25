@@ -117,7 +117,6 @@ impl From<ParseIntError> for Error {
     }
 }
 
-/*
 // TODO: no_std test
 #[cfg(feature = "std")]
 #[cfg(test)]
@@ -125,7 +124,7 @@ mod tests {
 
     use crate::{
         bolts::tuples::tuple_list,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{Executor, ExitKind, InProcessExecutor},
         inputs::{BytesInput, Input},
         mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
@@ -137,7 +136,7 @@ mod tests {
     };
 
     #[cfg(feature = "std")]
-    use crate::events::LoggerEventManager;
+    use crate::events::SimpleEventManager;
 
     fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
         ExitKind::Ok
@@ -145,23 +144,24 @@ mod tests {
 
     #[test]
     fn test_fuzzer() {
-        let mut rand = StdRand::new(0);
+        let rand = StdRand::new(0);
 
-        let mut corpus = InMemoryCorpus::<BytesInput, StdRand>::new();
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4]).into();
-        corpus.add(testcase);
+        corpus.add(testcase).unwrap();
 
         let mut state = State::new(
+            rand,
             corpus,
             tuple_list!(),
-            InMemoryCorpus::<BytesInput, StdRand>::new(),
+            InMemoryCorpus::<BytesInput>::new(),
             tuple_list!(),
         );
 
         let stats = SimpleStats::new(|s| {
             println!("{}", s);
         });
-        let mut event_manager = LoggerEventManager::new(stats);
+        let mut event_manager = SimpleEventManager::new(stats);
 
         let mut executor = InProcessExecutor::new(
             "main",
@@ -175,29 +175,28 @@ mod tests {
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);
         let stage = StdMutationalStage::new(mutator);
-        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+        let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut rand, &mut executor, &mut state, &mut event_manager)
+                .fuzz_one(&mut state, &mut executor, &mut event_manager)
                 .expect(&format!("Error in iter {}", i));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: State<
-            InMemoryCorpus<BytesInput, _>,
+            InMemoryCorpus<BytesInput>,
             (),
             BytesInput,
-            InMemoryCorpus<BytesInput, _>,
             (),
             StdRand,
+            InMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();
-        assert_eq!(state.executions(), state_deserialized.executions());
+        assert_eq!(state.corpus().count(), state_deserialized.corpus().count());
 
         let corpus_serialized = postcard::to_allocvec(state.corpus()).unwrap();
-        let corpus_deserialized: InMemoryCorpus<BytesInput, StdRand> =
+        let corpus_deserialized: InMemoryCorpus<BytesInput> =
             postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
         assert_eq!(state.corpus().count(), corpus_deserialized.count());
     }
 }
-*/

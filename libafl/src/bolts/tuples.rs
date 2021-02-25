@@ -1,3 +1,5 @@
+//! Compiletime lists used throughout the libafl universe
+
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 use core::any::TypeId;

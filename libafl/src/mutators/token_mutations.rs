@@ -4,7 +4,7 @@
 use crate::{
     inputs::{HasBytesVec, Input},
     mutators::*,
-    state::{HasMetadata, HasRand},
+    state::{HasMaxSize, HasMetadata, HasRand},
     utils::Rand,
     Error,
 };
@@ -30,17 +30,13 @@ impl TokensMetadata {
 }
 
 /// Insert a dictionary token
-pub fn mutation_tokeninsert<I, M, R, S>(
-    mutator: &M,
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_tokeninsert<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
-    M: HasMaxSize,
     I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R>,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    let max_size = state.max_size();
     let tokens_len = {
         let meta = state.metadata().get::<TokensMetadata>();
         if meta.is_none() {
@@ -60,9 +56,9 @@ where
     let token = &meta.tokens[token_idx];
     let mut len = token.len();
 
-    if size + len > mutator.max_size() {
-        if mutator.max_size() > size {
-            len = mutator.max_size() - size;
+    if size + len > max_size {
+        if max_size > size {
+            len = max_size - size;
         } else {
             return Ok(MutationResult::Skipped);
         }
@@ -76,13 +72,8 @@ where
 }
 
 /// Overwrite with a dictionary token
-pub fn mutation_tokenreplace<I, M, R, S>(
-    _: &M,
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+pub fn mutation_tokenreplace<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
 where
-    M: HasMaxSize,
     I: Input + HasBytesVec,
     S: HasMetadata + HasRand<R>,
     R: Rand,

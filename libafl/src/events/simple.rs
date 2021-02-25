@@ -1,3 +1,4 @@
+//! A very simple event manager, that just supports log outputs, but no multiprocessing
 use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
@@ -12,7 +13,7 @@ use crate::{
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
-pub struct LoggerEventManager<I, S, ST>
+pub struct SimpleEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -24,7 +25,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<I, S, ST> EventManager<I, S> for LoggerEventManager<I, S, ST>
+impl<I, S, ST> EventManager<I, S> for SimpleEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -51,7 +52,7 @@ where
     }
 }
 
-impl<I, S, ST> LoggerEventManager<I, S, ST>
+impl<I, S, ST> SimpleEventManager<I, S, ST>
 where
     I: Input,
     ST: Stats, //TODO CE: CustomEvent,

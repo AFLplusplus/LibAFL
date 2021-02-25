@@ -1,7 +1,7 @@
 //! Eventmanager manages all events that go to other instances of the fuzzer.
 
-pub mod logger;
-pub use logger::*;
+pub mod simple;
+pub use simple::*;
 pub mod llmp;
 pub use llmp::*;
 

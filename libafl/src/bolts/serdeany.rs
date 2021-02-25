@@ -1,3 +1,4 @@
+//! Poor-rust-man's downcasts for stuff we send over the wire (or shared maps)
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use alloc::boxed::Box;
