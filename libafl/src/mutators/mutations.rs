@@ -884,6 +884,7 @@ mod tests {
     use crate::{
         corpus::{Corpus, InMemoryCorpus},
         inputs::BytesInput,
+        mutators::{mutation_tokeninsert, mutation_tokenreplace},
         state::State,
         utils::StdRand,
     };
@@ -957,6 +958,9 @@ token2="B"
         mutations.push(mutation_bytescopy);
         mutations.push(mutation_bytesswap);
 
+        mutations.push(mutation_tokeninsert);
+        mutations.push(mutation_tokenreplace);
+
         for _ in 0..2 {
             let mut new_testcases = vec![];
             for mutation in &mutations {
@@ -970,10 +974,5 @@ token2="B"
             }
             inputs.append(&mut new_testcases);
         }
-
-        /* TODO
-        scheduled.add_mutation(mutation_tokeninsert);
-        scheduled.add_mutation(mutation_tokenreplace);
-        */
     }
 }
