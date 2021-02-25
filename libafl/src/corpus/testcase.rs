@@ -29,7 +29,7 @@ where
     /// Time needed to execute the input
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
-    cached_len: Option<usize>
+    cached_len: Option<usize>,
 }
 
 /// Impl of a testcase
@@ -135,6 +135,16 @@ where
         self.metadatas.insert(meta);
     }
 
+    /// Get the execution time of the testcase
+    pub fn exec_time(&self) -> &Option<Duration> {
+        &self.exec_time
+    }
+
+    /// Get the execution time of the testcase (mut)
+    pub fn exec_time_mut(&mut self) -> &mut Option<Duration> {
+        &mut self.exec_time
+    }
+
     /// Create a new Testcase instace given an input
     #[inline]
     pub fn new<T>(input: T) -> Self
@@ -147,7 +157,7 @@ where
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
-            cached_len: None
+            cached_len: None,
         }
     }
 
@@ -160,7 +170,7 @@ where
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
-            cached_len: None
+            cached_len: None,
         }
     }
 
@@ -173,7 +183,7 @@ where
             fitness: fitness,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
-            cached_len: None
+            cached_len: None,
         }
     }
 
@@ -185,7 +195,7 @@ where
             fitness: 0,
             metadatas: SerdeAnyMap::new(),
             exec_time: None,
-            cached_len: None
+            cached_len: None,
         }
     }
 }
@@ -203,17 +213,15 @@ where
                 let l = i.len();
                 self.cached_len = Some(l);
                 l
-            },
-            None => {
-                match self.cached_len {
-                    Some(l) => l,
-                    None => {
-                      let l = self.load_input()?.len();
-                      self.cached_len = Some(l);
-                      l
-                    }
-                }
             }
+            None => match self.cached_len {
+                Some(l) => l,
+                None => {
+                    let l = self.load_input()?.len();
+                    self.cached_len = Some(l);
+                    l
+                }
+            },
         })
     }
 }

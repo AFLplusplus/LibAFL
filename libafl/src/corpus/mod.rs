@@ -14,6 +14,7 @@ pub use ondisk::OnDiskCorpus;
 pub mod queue;
 pub use queue::QueueCorpusScheduler;
 
+pub mod minset;
 use core::cell::RefCell;
 use core::marker::PhantomData;
 
@@ -56,7 +57,7 @@ where
     I: Input,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, _state: &mut S, _idx: usize, _testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_add(&self, _state: &mut S, _idx: usize) -> Result<(), Error> {
         Ok(())
     }
 
