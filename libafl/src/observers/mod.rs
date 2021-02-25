@@ -1,7 +1,10 @@
 pub mod map;
 pub use map::*;
 
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::time::Duration;
 use serde::{Deserialize, Serialize};
 

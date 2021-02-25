@@ -8,6 +8,7 @@ Welcome to libAFL
 extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
+#[cfg(feature = "std")]
 #[macro_use]
 extern crate ctor;
 

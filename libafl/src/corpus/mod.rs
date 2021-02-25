@@ -15,8 +15,9 @@ pub mod queue;
 pub use queue::QueueCorpusScheduler;
 
 pub mod minset;
-use core::cell::RefCell;
-use core::marker::PhantomData;
+
+use alloc::borrow::ToOwned;
+use core::{cell::RefCell, marker::PhantomData};
 
 use crate::{
     inputs::Input,

@@ -255,7 +255,7 @@ where
     fn handle_in_client<E, OT>(
         &mut self,
         state: &mut S,
-        sender_id: u32,
+        _sender_id: u32,
         event: Event<I>,
         _executor: &mut E,
     ) -> Result<(), Error>
@@ -275,7 +275,7 @@ where
                 // TODO: here u should match client_config, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
-                println!("Received new Testcase from {}", sender_id);
+                println!("Received new Testcase from {}", _sender_id);
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase

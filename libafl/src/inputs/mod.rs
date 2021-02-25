@@ -32,11 +32,8 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
 
     #[cfg(not(feature = "std"))]
     /// Write this input to the file
-    fn to_file<P>(&self, _path: P) -> Result<(), Error>
-    where
-        P: AsRef<Path>,
-    {
-        Err(Error::NotImplemented("Not suppored in no_std".into()))
+    fn to_file<P>(&self, _path: P) -> Result<(), Error> {
+        Err(Error::NotImplemented("Not supported in no_std".into()))
     }
 
     /// Load the contents of this input from a file
@@ -53,11 +50,8 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
 
     /// Write this input to the file
     #[cfg(not(feature = "std"))]
-    fn from_file<P>(_path: P) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        Err(Error::NotImplemented("Not suppored in no_std".into()))
+    fn from_file<P>(_path: P) -> Result<Self, Error> {
+        Err(Error::NotImplemented("Not supprted in no_std".into()))
     }
 }
 

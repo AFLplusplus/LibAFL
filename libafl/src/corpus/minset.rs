@@ -32,11 +32,11 @@ where
 
 pub struct MinimizerCorpusScheduler<C, CS, F, I, S>
 where
-CS: CorpusScheduler<I, S>,
-F: FavFactor<I>,
-I: Input,
-S: HasCorpus<C, I>,
-C: Corpus<I>
+    CS: CorpusScheduler<I, S>,
+    F: FavFactor<I>,
+    I: Input,
+    S: HasCorpus<C, I>,
+    C: Corpus<I>,
 {
     base: CS,
     phantom: PhantomData<(C, F, I, S)>,
@@ -44,11 +44,11 @@ C: Corpus<I>
 
 impl<C, CS, F, I, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<C, CS, F, I, S>
 where
-CS: CorpusScheduler<I, S>,
-F: FavFactor<I>,
-I: Input,
-S: HasCorpus<C, I>,
-C: Corpus<I>
+    CS: CorpusScheduler<I, S>,
+    F: FavFactor<I>,
+    I: Input,
+    S: HasCorpus<C, I>,
+    C: Corpus<I>,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
@@ -83,7 +83,7 @@ where
     F: FavFactor<I>,
     I: Input,
     S: HasCorpus<C, I>,
-    C: Corpus<I>
+    C: Corpus<I>,
 {
     /*pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         let entry = state.corpus().get(idx)?.borrow_mut();
@@ -94,7 +94,7 @@ where
                     continue
                 }
             }
-    
+
             let _ = self.top_rated.insert(elem, idx);
         }
     }*/

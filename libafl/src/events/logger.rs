@@ -1,8 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
 use crate::{
     events::{BrokerEventResult, Event, EventManager},
     executors::{Executor, HasObservers},

@@ -53,14 +53,19 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec<EM, S>(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error>
+    fn pre_exec<EM, S>(
+        &mut self,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error>
     where
         EM: EventManager<I, S>,
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs(state, event_mgr, self.observers(), input);
+            set_oncrash_ptrs(_state, _event_mgr, self.observers(), _input);
         }
         Ok(())
     }

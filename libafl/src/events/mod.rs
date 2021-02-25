@@ -5,6 +5,7 @@ pub use logger::*;
 pub mod llmp;
 pub use llmp::*;
 
+use alloc::{string::String, vec::Vec};
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
@@ -218,11 +219,15 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::bolts::tuples::tuple_list;
-    use crate::events::Event;
-    use crate::inputs::bytes::BytesInput;
-    use crate::observers::StdMapObserver;
-    use crate::utils::current_time;
+    use tuple_list::tuple_list_type;
+
+    use crate::{
+        bolts::tuples::{tuple_list, Named},
+        events::Event,
+        inputs::bytes::BytesInput,
+        observers::StdMapObserver,
+        utils::current_time,
+    };
 
     static mut MAP: [u32; 4] = [0; 4];
 
@@ -254,10 +259,9 @@ mod tests {
                 time: _,
                 executions: _,
             } => {
-                let o: tuple_list!(StdMapObserver::<u32>) =
+                let o: tuple_list_type!(StdMapObserver::<u32>) =
                     postcard::from_bytes(&observers_buf).unwrap();
-                let test_observer = o.match_name_type::<StdMapObserver<u32>>("test").unwrap();
-                assert_eq!("test", test_observer.name());
+                assert_eq!("test", o.0.name());
             }
             _ => panic!("mistmatch"),
         };
