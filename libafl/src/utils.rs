@@ -1,6 +1,6 @@
 //! Utility functions for AFL
 
-use core::{cell::RefCell, debug_assert, fmt::Debug, time};
+use core::{cell::RefCell, debug_assert, default::Default, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
@@ -72,6 +72,7 @@ where
 }
 
 const HASH_CONST: u64 = 0xa5b35705;
+const DEFAULT_SEED: u64 = 0x54d3a3130133750b;
 
 /// Current time
 #[cfg(feature = "std")]
@@ -99,11 +100,9 @@ pub fn current_nanos() -> u64 {
 }
 
 /// XXH3 Based, hopefully speedy, rnd implementation
-///
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Xoshiro256StarRand {
     rand_seed: [u64; 4],
-    seeded: bool,
 }
 
 impl Rand for Xoshiro256StarRand {
@@ -112,8 +111,6 @@ impl Rand for Xoshiro256StarRand {
         self.rand_seed[1] = self.rand_seed[0] ^ 0x1234567890abcdef;
         self.rand_seed[2] = self.rand_seed[0] & 0x0123456789abcdef;
         self.rand_seed[3] = self.rand_seed[0] | 0x01abcde43f567908;
-
-        self.seeded = true;
     }
 
     #[inline]
@@ -137,6 +134,14 @@ impl Rand for Xoshiro256StarRand {
     }
 }
 
+impl Default for Xoshiro256StarRand {
+    fn default() -> Self {
+        let mut xoshiro = Self { rand_seed: [0; 4] };
+        xoshiro.set_seed(DEFAULT_SEED);
+        xoshiro
+    }
+}
+
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
@@ -155,16 +160,14 @@ impl Xoshiro256StarRand {
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 ///
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct XorShift64Rand {
     rand_seed: u64,
-    seeded: bool,
 }
 
 impl Rand for XorShift64Rand {
     fn set_seed(&mut self, seed: u64) {
         self.rand_seed = seed ^ 0x1234567890abcdef;
-        self.seeded = true;
     }
 
     #[inline]
@@ -175,6 +178,14 @@ impl Rand for XorShift64Rand {
         x ^= x << 17;
         self.rand_seed = x;
         return x;
+    }
+}
+
+impl Default for XorShift64Rand {
+    fn default() -> Self {
+        Self {
+            rand_seed: DEFAULT_SEED,
+        }
     }
 }
 
@@ -196,22 +207,35 @@ impl XorShift64Rand {
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 ///
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Lehmer64Rand {
     rand_seed: u128,
-    seeded: bool,
 }
 
 impl Rand for Lehmer64Rand {
     fn set_seed(&mut self, seed: u64) {
         self.rand_seed = (seed as u128) ^ 0x1234567890abcdef;
-        self.seeded = true;
     }
 
     #[inline]
     fn next(&mut self) -> u64 {
         self.rand_seed *= 0xda942042e4dd58b5;
         return (self.rand_seed >> 64) as u64;
+    }
+}
+
+impl Default for Lehmer64Rand {
+    fn default() -> Self {
+        let mut lehmer = Self {
+            rand_seed: DEFAULT_SEED as u128,
+        };
+
+        // warm up the rng so the 64-bit DEFAULT_SEED can expand to fill 128 bits
+        for _ in 0..16 {
+            lehmer.next();
+        }
+
+        lehmer
     }
 }
 
@@ -233,7 +257,7 @@ impl Lehmer64Rand {
 
 /// Extremely quick rand implementation
 /// see <https://arxiv.org/pdf/2002.11331.pdf>
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct RomuTrioRand {
     x_state: u64,
     y_state: u64,
@@ -275,7 +299,20 @@ impl Rand for RomuTrioRand {
 }
 
 /// see <https://arxiv.org/pdf/2002.11331.pdf>
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+impl Default for RomuTrioRand {
+    fn default() -> Self {
+        let mut romutrio = Self {
+            x_state: 0,
+            y_state: 0,
+            z_state: 0,
+        };
+        romutrio.set_seed(DEFAULT_SEED);
+        romutrio
+    }
+}
+
+/// see https://arxiv.org/pdf/2002.11331.pdf
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct RomuDuoJrRand {
     x_state: u64,
     y_state: u64,
@@ -308,6 +345,17 @@ impl Rand for RomuDuoJrRand {
         self.x_state = 15241094284759029579u64.wrapping_mul(self.y_state);
         self.y_state = self.y_state.wrapping_sub(xp).rotate_left(27);
         xp
+    }
+}
+
+impl Default for RomuDuoJrRand {
+    fn default() -> Self {
+        let mut romuduo = Self {
+            x_state: 0,
+            y_state: 0,
+        };
+        romuduo.set_seed(DEFAULT_SEED);
+        romuduo
     }
 }
 
