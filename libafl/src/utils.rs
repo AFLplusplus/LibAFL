@@ -1,6 +1,6 @@
 //! Utility functions for AFL
 
-use core::{cell::RefCell, debug_assert, default::Default, fmt::Debug, time};
+use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
@@ -11,13 +11,13 @@ pub type StdRand = RomuTrioRand;
 
 /// Ways to get random around here
 pub trait Rand: Debug + Serialize + DeserializeOwned {
-    // Sets the seed of this Rand
+    /// Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
 
-    // Gets the next 64 bit value
+    /// Gets the next 64 bit value
     fn next(&mut self) -> u64;
 
-    // Gets a value below the given 64 bit val (inclusive)
+    /// Gets a value below the given 64 bit val (inclusive)
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
         if upper_bound_excl <= 1 {
             return 0;
@@ -39,7 +39,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         unbiased_rnd % upper_bound_excl
     }
 
-    // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
+    /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     fn between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
         lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
@@ -54,16 +54,16 @@ where
     /// Get the hold RefCell Rand instance
     fn rand(&self) -> &RefCell<R>;
 
-    // Gets the next 64 bit value
+    /// Gets the next 64 bit value
     fn rand_next(&mut self) -> u64 {
         self.rand().borrow_mut().next()
     }
-    // Gets a value below the given 64 bit val (inclusive)
+    /// Gets a value below the given 64 bit val (inclusive)
     fn rand_below(&mut self, upper_bound_excl: u64) -> u64 {
         self.rand().borrow_mut().below(upper_bound_excl)
     }
 
-    // Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
+    /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     fn rand_between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
         self.rand()
             .borrow_mut()
@@ -71,29 +71,55 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-mod random_seed {
-    use super::*;
-
-    pub trait RandomSeed: Rand + Default {
-        /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-        /// Needs stdlib timer
-        fn with_random_seed() -> Self {
-            let mut rng = Self::default();
-            rng.set_seed(current_nanos());
-            rng
+// helper macro for deriving Default
+macro_rules! default_rand {
+    ($rand: ty) => {
+        /// A default RNG will produce a deterministic and reproducible stream of random numbers.
+        /// Use [`RandomSeed::with_random_seed`] to generate unique RNG seeded from some source of
+        /// randomness.
+        impl core::default::Default for $rand {
+            fn default() -> Self {
+                Self::new(DEFAULT_SEED)
+            }
         }
-    }
-
-    impl RandomSeed for Xoshiro256StarRand {}
-    impl RandomSeed for XorShift64Rand {}
-    impl RandomSeed for Lehmer64Rand {}
-    impl RandomSeed for RomuTrioRand {}
-    impl RandomSeed for RomuDuoJrRand {}
+    };
 }
 
-#[cfg(feature = "std")]
-pub use random_seed::*;
+// Derive Default by calling `new(DEFAULT_SEED)` on each of the following Rand types.
+default_rand!(Xoshiro256StarRand);
+default_rand!(XorShift64Rand);
+default_rand!(Lehmer64Rand);
+default_rand!(RomuTrioRand);
+default_rand!(RomuDuoJrRand);
+
+/// Initialize Rand types from a source of randomness.
+///
+/// Default implementations are provided with the "std" feature enabled, using system time in
+/// nanoseconds as the initial seed.
+pub trait RandomSeed: Rand + Default {
+    fn with_random_seed() -> Self;
+}
+
+// helper macro to impl RandomSeed
+macro_rules! impl_randomseed {
+    ($rand: ty) => {
+        #[cfg(feature = "std")]
+        impl RandomSeed for $rand {
+            /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+            fn with_random_seed() -> Self {
+                let mut rng = Self::default();
+                rng.set_seed(current_nanos());
+                rng
+            }
+        }
+    };
+}
+
+impl_randomseed!(Xoshiro256StarRand);
+impl_randomseed!(XorShift64Rand);
+impl_randomseed!(Lehmer64Rand);
+impl_randomseed!(RomuTrioRand);
+impl_randomseed!(RomuDuoJrRand);
 
 const HASH_CONST: u64 = 0xa5b35705;
 const DEFAULT_SEED: u64 = 0x54d3a3130133750b;
@@ -104,6 +130,7 @@ const DEFAULT_SEED: u64 = 0x54d3a3130133750b;
 pub fn current_time() -> time::Duration {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
 }
+
 /// Current time (fixed fallback for no_std)
 #[cfg(not(feature = "std"))]
 #[inline]
@@ -121,6 +148,20 @@ pub fn current_nanos() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos() as u64
+}
+
+#[cfg(feature = "std")]
+/// Gets current milliseconds since UNIX_EPOCH
+pub fn current_milliseconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+#[cfg(not(feature = "std"))]
+pub fn current_milliseconds() -> u64 {
+    1000
 }
 
 /// XXH3 Based, hopefully speedy, rnd implementation
@@ -158,25 +199,16 @@ impl Rand for Xoshiro256StarRand {
     }
 }
 
-impl Default for Xoshiro256StarRand {
-    fn default() -> Self {
-        let mut xoshiro = Self { rand_seed: [0; 4] };
-        xoshiro.set_seed(DEFAULT_SEED);
-        xoshiro
-    }
-}
-
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
-        let mut ret: Self = Default::default();
-        ret.set_seed(seed); // TODO: Proper random seed?
-        ret
+        let mut rand = Self { rand_seed: [0; 4] };
+        rand.set_seed(seed); // TODO: Proper random seed?
+        rand
     }
 }
 
 /// XXH3 Based, hopefully speedy, rnd implementation
-///
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct XorShift64Rand {
     rand_seed: u64,
@@ -198,25 +230,16 @@ impl Rand for XorShift64Rand {
     }
 }
 
-impl Default for XorShift64Rand {
-    fn default() -> Self {
-        Self {
-            rand_seed: DEFAULT_SEED,
-        }
-    }
-}
-
 impl XorShift64Rand {
     /// Creates a new Xoshiro rand with the given seed
     pub fn new(seed: u64) -> Self {
-        let mut ret: Self = Default::default();
+        let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed); // TODO: Proper random seed?
         ret
     }
 }
 
 /// XXH3 Based, hopefully speedy, rnd implementation
-///
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Lehmer64Rand {
     rand_seed: u128,
@@ -234,25 +257,10 @@ impl Rand for Lehmer64Rand {
     }
 }
 
-impl Default for Lehmer64Rand {
-    fn default() -> Self {
-        let mut lehmer = Self {
-            rand_seed: DEFAULT_SEED as u128,
-        };
-
-        // warm up the rng so the 64-bit DEFAULT_SEED can expand to fill 128 bits
-        for _ in 0..16 {
-            lehmer.next();
-        }
-
-        lehmer
-    }
-}
-
 impl Lehmer64Rand {
     /// Creates a new Lehmer rand with the given seed
     pub fn new(seed: u64) -> Self {
-        let mut ret: Self = Default::default();
+        let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed);
         ret
     }
@@ -269,7 +277,11 @@ pub struct RomuTrioRand {
 
 impl RomuTrioRand {
     pub fn new(seed: u64) -> Self {
-        let mut rand = Self::default();
+        let mut rand = Self {
+            x_state: 0,
+            y_state: 0,
+            z_state: 0,
+        };
         rand.set_seed(seed);
         rand
     }
@@ -295,19 +307,6 @@ impl Rand for RomuTrioRand {
 }
 
 /// see <https://arxiv.org/pdf/2002.11331.pdf>
-impl Default for RomuTrioRand {
-    fn default() -> Self {
-        let mut romutrio = Self {
-            x_state: 0,
-            y_state: 0,
-            z_state: 0,
-        };
-        romutrio.set_seed(DEFAULT_SEED);
-        romutrio
-    }
-}
-
-/// see https://arxiv.org/pdf/2002.11331.pdf
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct RomuDuoJrRand {
     x_state: u64,
@@ -316,7 +315,10 @@ pub struct RomuDuoJrRand {
 
 impl RomuDuoJrRand {
     pub fn new(seed: u64) -> Self {
-        let mut rand = Self::default();
+        let mut rand = Self {
+            x_state: 0,
+            y_state: 0,
+        };
         rand.set_seed(seed);
         rand
     }
@@ -335,30 +337,6 @@ impl Rand for RomuDuoJrRand {
         self.y_state = self.y_state.wrapping_sub(xp).rotate_left(27);
         xp
     }
-}
-
-impl Default for RomuDuoJrRand {
-    fn default() -> Self {
-        let mut romuduo = Self {
-            x_state: 0,
-            y_state: 0,
-        };
-        romuduo.set_seed(DEFAULT_SEED);
-        romuduo
-    }
-}
-
-#[cfg(feature = "std")]
-pub fn current_milliseconds() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
-}
-
-#[cfg(not(feature = "std"))]
-pub fn current_milliseconds() -> u64 {
-    1000
 }
 
 /// fake rand, for testing purposes
@@ -390,7 +368,7 @@ impl XKCDRand {
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::utils::{Rand, StdRand, RandomSeed};
+    use crate::utils::{Rand, StdRand};
 
     #[test]
     fn test_rand() {
@@ -404,14 +382,19 @@ mod tests {
 
     #[cfg(feature = "std")]
     #[test]
-    fn test_rand_with_random_seed() {
+    fn with_random_seed() {
+        use crate::utils::RandomSeed;
+
         let mut rand_fixed = StdRand::new(0);
         let mut rand = StdRand::with_random_seed();
-        assert_ne!(rand.next(), rand_fixed.next());
-        assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(100) < 100);
-        assert_eq!(rand.below(1), 0);
-        assert_eq!(rand.between(10, 10), 10);
-        assert!(rand.between(11, 20) > 10);
+
+        for _ in 0..10000 {
+            assert_ne!(rand.next(), rand_fixed.next());
+            assert_ne!(rand.next(), rand.next());
+            assert!(rand.below(100) < 100);
+            assert_eq!(rand.below(1), 0);
+            assert_eq!(rand.between(10, 10), 10);
+            assert!(rand.between(11, 20) > 10);
+        }
     }
 }
