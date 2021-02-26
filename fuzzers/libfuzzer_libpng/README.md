@@ -1,6 +1,7 @@
 # Libfuzzer for libpng
 
 This folder contains an example fuzzer for libpng, using LLMP for fast multi-process fuzzing and crash detection.
+To show off crash detection, we added a ud2 instruction to the harness, edit harness.cc if you want a non-crashing example.
 It has been tested on Linux.
 
 ## Build
@@ -19,4 +20,6 @@ As this example uses in-process fuzzing, we added a Restarting Event Manager (`s
 This means each client will start itself again to listen for crashes and timeouts.
 By restarting the actual fuzzer, it can recover from these exit conditions.
 
-For convenience, you may just run `./test.sh` in this folder.
+In any real-world scenario, you should use `taskset` to pin each client to an empty cpu core, the lib does not pick an empty core automatically (yet).
+
+For convenience, you may just run `./test.sh` in this folder to test it.
