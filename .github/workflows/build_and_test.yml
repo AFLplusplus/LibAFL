@@ -21,7 +21,7 @@ jobs:
     - name: Build all features
       run: cd libafl && cargo build --all-features --verbose
     - name: Test all features
-      run: cd liafbl && cargo test --all-features --verbose
+      run: cd libafl && cargo test --all-features --verbose
   no-std:
     runs-on: ubuntu-latest
     steps:
