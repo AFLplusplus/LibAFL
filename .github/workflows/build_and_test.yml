@@ -6,42 +6,36 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  default:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
-  all-features-build:
+    - name: Test
+      run: cargo test --verbose
+  all-features:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Build all features
       run: cd libafl && cargo build --all-features --verbose
-  test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Test
-      run: cargo test --verbose
-  examples-build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build examples
-      run: cargo build --examples --verbose
-  no-std-build:
+    - name: Test all features
+      run: cd liafbl && cargo test --all-features --verbose
+  no-std:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Build no_std
       run: cd libafl && cargo build --no-default-features --verbose
-  no-std-test:
+    - name: Test no_std
+      run: cd libafl && cargo test --no-default-features --verbose
+  examples:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Test no_std
-      run: cd libafl && cargo test --no-default-features --verbose
+    - name: Build examples
+      run: cargo build --examples --verbose
   fmt:
     runs-on: ubuntu-latest
     steps:
