@@ -6,11 +6,11 @@ use libafl::utils::{
 };
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut xorshift = XorShift64Rand::new(1);
-    let mut xoshiro = Xoshiro256StarRand::new(1);
-    let mut romu = RomuDuoJrRand::new(1);
-    let mut lehmer = Lehmer64Rand::new(1);
-    let mut romu_trio = RomuTrioRand::new(1);
+    let mut xorshift = XorShift64Rand::with_seed(1);
+    let mut xoshiro = Xoshiro256StarRand::with_seed(1);
+    let mut romu = RomuDuoJrRand::with_seed(1);
+    let mut lehmer = Lehmer64Rand::with_seed(1);
+    let mut romu_trio = RomuTrioRand::with_seed(1);
 
     c.bench_function("xorshift", |b| b.iter(|| black_box(xorshift.next())));
     c.bench_function("xoshiro", |b| b.iter(|| black_box(xoshiro.next())));

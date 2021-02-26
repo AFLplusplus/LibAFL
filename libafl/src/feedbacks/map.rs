@@ -2,7 +2,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::marker::PhantomData;
+use core::{iter::IntoIterator, marker::PhantomData};
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
@@ -70,6 +70,23 @@ where
         } else {
             second
         }
+    }
+}
+
+/// A testcase metadata holding a list of indexes of a map
+#[derive(Serialize, Deserialize)]
+pub struct IndexesMetadata {
+    pub list: Vec<usize>,
+}
+
+crate::impl_serdeany!(IndexesMetadata);
+
+impl IntoIterator for IndexesMetadata {
+    type Item = usize;
+    type IntoIter = alloc::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.list.into_iter()
     }
 }
 

@@ -10,7 +10,6 @@ use crate::{
 };
 
 use alloc::vec::Vec;
-use core::any::Any;
 use serde::{Deserialize, Serialize};
 
 use mutations::buffer_copy;

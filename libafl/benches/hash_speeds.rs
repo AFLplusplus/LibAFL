@@ -10,7 +10,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use libafl::utils::{Rand, StdRand};
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut rand = StdRand::new(0);
+    let mut rand = StdRand::with_seed(0);
     let mut bench_vec: Vec<u8> = vec![];
     for _ in 0..2 << 16 {
         bench_vec.push(rand.below(256) as u8);

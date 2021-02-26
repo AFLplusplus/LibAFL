@@ -505,11 +505,11 @@ pub use serdeany_registry::*;
 macro_rules! impl_serdeany {
     ($struct_name:ident) => {
         impl crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn Any {
+            fn as_any(&self) -> &dyn core::any::Any {
                 self
             }
 
-            fn as_any_mut(&mut self) -> &mut dyn Any {
+            fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
                 self
             }
         }

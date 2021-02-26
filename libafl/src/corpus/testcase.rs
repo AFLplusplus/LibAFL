@@ -120,9 +120,15 @@ where
         self.fitness = fitness;
     }
 
+    /// Get all the metadatas into an HashMap
+    #[inline]
+    pub fn metadatas(&self) -> &SerdeAnyMap {
+        &self.metadatas
+    }
+
     /// Get all the metadatas into an HashMap (mutable)
     #[inline]
-    pub fn metadatas(&mut self) -> &mut SerdeAnyMap {
+    pub fn metadatas_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadatas
     }
 
