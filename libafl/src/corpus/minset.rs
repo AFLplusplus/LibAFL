@@ -129,7 +129,12 @@ where
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
             let factor = F::compute(&mut *entry)?;
-            for elem in entry.metadatas().get::<IT>().unwrap() {
+            for elem in entry.metadatas().get::<IT>().ok_or_else(|| {
+                Error::KeyNotFound(format!(
+                    "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
+                    idx
+                ))
+            })? {
                 if let Some(old_idx) = state
                     .metadata()
                     .get::<TopRatedsMetadata>()
@@ -165,7 +170,12 @@ where
             if !acc.contains(key) {
                 let idx = top_rated.map.get(key).unwrap();
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
-                for elem in entry.metadatas().get::<IT>().unwrap() {
+                for elem in entry.metadatas().get::<IT>().ok_or_else(|| {
+                    Error::KeyNotFound(format!(
+                        "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
+                        idx
+                    ))
+                })? {
                     acc.insert(elem);
                 }
 

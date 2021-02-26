@@ -410,7 +410,12 @@ where
     }
 
     /// Create new MapFeedback specifying if it must track indexes of novelties
-    pub fn new_track(name: &'static str, map_size: usize, track_indexes: bool, track_novelties: bool) -> Self {
+    pub fn new_track(
+        name: &'static str,
+        map_size: usize,
+        track_indexes: bool,
+        track_novelties: bool,
+    ) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
             phantom: PhantomData,
@@ -421,7 +426,11 @@ where
     }
 
     /// Create new MapFeedback for the observer type if it must track indexes of novelties
-    pub fn new_with_observer_track(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
+    pub fn new_with_observer_track(
+        map_observer: &O,
+        track_indexes: bool,
+        track_novelties: bool,
+    ) -> Self {
         Self {
             history_map: vec![T::default(); map_observer.map().len()],
             phantom: PhantomData,
