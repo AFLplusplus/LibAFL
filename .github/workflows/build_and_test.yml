@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
+    - name: Build all features
       run: cd libafl && cargo build --all-features --verbose
   test:
     runs-on: ubuntu-latest
@@ -28,20 +28,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Test
+    - name: Build examples
       run: cargo build --examples --verbose
   no-std-build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
+    - name: Build no_std
       run: cd libafl && cargo build --no-default-features --verbose
   no-std-test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Test
+    - name: Test no_std
       run: cd libafl && cargo test --no-default-features --verbose
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Format
+      run: cargo fmt -- --check
   docs:
     runs-on: ubuntu-latest
     steps:

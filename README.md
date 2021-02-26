@@ -20,7 +20,7 @@ Feel free to open issues or contact us directly. Thank you for your support. <3
 ## The Core Concepts
 
 We're still working on the documentation. In the meantime, you can watch the Video from last year's Rc3, here:
-[![Video explaining libAFL's core concepts](http://img.youtube.com/vi/3RWkT1Q5IV0/0.jpg)](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO")
+[![Video explaining libAFL's core concepts](http://img.youtube.com/vi/3RWkT1Q5IV0/3.jpg)](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO")
 ## Roadmap for release
 
 + Minset corpus scheduler
