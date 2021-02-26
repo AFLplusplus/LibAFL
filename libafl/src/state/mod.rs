@@ -73,9 +73,9 @@ where
 /// Trait for elements offering metadata
 pub trait HasMetadata {
     /// A map, storing all metadata
-    fn metadata(&self) -> &SerdeAnyMap;
+    fn metadatas(&self) -> &SerdeAnyMap;
     /// A map, storing all metadata (mut)
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap;
+    fn metadatas_mut(&mut self) -> &mut SerdeAnyMap;
 
     /// Add a metadata to the metadata map
     #[inline]
@@ -83,7 +83,7 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata_mut().insert(meta);
+        self.metadatas_mut().insert(meta);
     }
 
     /// Check for a metadata
@@ -92,7 +92,7 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata().get::<M>().is_some()
+        self.metadatas().get::<M>().is_some()
     }
 }
 
@@ -307,13 +307,13 @@ where
 {
     /// Get all the metadata into an HashMap
     #[inline]
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadatas(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
     /// Get all the metadata into an HashMap (mutable)
     #[inline]
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadatas_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }

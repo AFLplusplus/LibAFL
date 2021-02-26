@@ -1,14 +1,18 @@
 use crate::{
     bolts::serdeany::SerdeAny,
     corpus::{Corpus, CorpusScheduler, Testcase},
+    feedbacks::MapIndexesMetadata,
     inputs::{HasLen, Input},
-    state::{HasCorpus, HasMetadata},
+    state::{HasCorpus, HasMetadata, HasRand},
+    utils::{AsSlice, Rand},
     Error,
 };
 
-use core::{iter::IntoIterator, marker::PhantomData};
+use core::marker::PhantomData;
 use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+
+pub const DEFAULT_SKIP_NOT_FAV_PROB: u64 = 95;
 
 /// A testcase metadata saying if a testcase is favored
 #[derive(Serialize, Deserialize)]
@@ -56,29 +60,29 @@ where
     }
 }
 
-pub struct MinimizerCorpusScheduler<C, CS, F, I, IT, S>
+pub struct MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
 where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
-    IT: IntoIterator<Item = usize> + SerdeAny,
-    for<'a> &'a IT: IntoIterator<Item = usize>,
+    M: AsSlice<usize> + SerdeAny,
     S: HasCorpus<C, I> + HasMetadata,
     C: Corpus<I>,
 {
     base: CS,
-    phantom: PhantomData<(C, F, I, IT, S)>,
+    skip_not_fav_prob: u64,
+    phantom: PhantomData<(C, F, I, M, R, S)>,
 }
 
-impl<C, CS, F, I, IT, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<C, CS, F, I, IT, S>
+impl<C, CS, F, I, M, R, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
 where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
-    IT: IntoIterator<Item = usize> + SerdeAny,
-    for<'a> &'a IT: IntoIterator<Item = usize>,
-    S: HasCorpus<C, I> + HasMetadata,
+    M: AsSlice<usize> + SerdeAny,
+    S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
     C: Corpus<I>,
+    R: Rand,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
@@ -91,7 +95,7 @@ where
         self.base.on_replace(state, idx, testcase)
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning M if M was present.
     fn on_remove(
         &self,
         state: &mut S,
@@ -101,27 +105,38 @@ where
         self.base.on_remove(state, idx, testcase)
     }
 
-    // TODO: IntoIter
     /// Gets the next entry
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         self.cull(state)?;
-        self.base.next(state)
+        let mut idx = self.base.next(state)?;
+        while {
+            let has = !state
+                .corpus()
+                .get(idx)?
+                .borrow()
+                .has_metadata::<IsFavoredMetadata>();
+            has
+        } && state.rand_mut().below(100) < self.skip_not_fav_prob
+        {
+            idx = self.base.next(state)?;
+        }
+        Ok(idx)
     }
 }
 
-impl<C, CS, F, I, IT, S> MinimizerCorpusScheduler<C, CS, F, I, IT, S>
+impl<C, CS, F, I, M, R, S> MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
 where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
-    IT: IntoIterator<Item = usize> + SerdeAny,
-    for<'a> &'a IT: IntoIterator<Item = usize>,
-    S: HasCorpus<C, I> + HasMetadata,
+    M: AsSlice<usize> + SerdeAny,
+    S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
     C: Corpus<I>,
+    R: Rand,
 {
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
-        if state.metadata().get::<TopRatedsMetadata>().is_none() {
+        if state.metadatas().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());
         }
 
@@ -129,31 +144,32 @@ where
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
             let factor = F::compute(&mut *entry)?;
-            for elem in entry.metadatas().get::<IT>().ok_or_else(|| {
+            let meta = entry.metadatas().get::<M>().ok_or_else(|| {
                 Error::KeyNotFound(format!(
                     "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
                     idx
                 ))
-            })? {
+            })?;
+            for elem in meta.as_slice() {
                 if let Some(old_idx) = state
-                    .metadata()
+                    .metadatas()
                     .get::<TopRatedsMetadata>()
                     .unwrap()
                     .map
-                    .get(&elem)
+                    .get(elem)
                 {
                     if factor > F::compute(&mut *state.corpus().get(*old_idx)?.borrow_mut())? {
                         continue;
                     }
                 }
 
-                new_favoreds.push((elem, idx));
+                new_favoreds.push((*elem, idx));
             }
         }
 
         for pair in new_favoreds {
             state
-                .metadata_mut()
+                .metadatas_mut()
                 .get_mut::<TopRatedsMetadata>()
                 .unwrap()
                 .map
@@ -164,19 +180,20 @@ where
 
     pub fn cull(&self, state: &mut S) -> Result<(), Error> {
         let mut acc = HashSet::new();
-        let top_rated = state.metadata().get::<TopRatedsMetadata>().unwrap();
+        let top_rated = state.metadatas().get::<TopRatedsMetadata>().unwrap();
 
         for key in top_rated.map.keys() {
             if !acc.contains(key) {
                 let idx = top_rated.map.get(key).unwrap();
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
-                for elem in entry.metadatas().get::<IT>().ok_or_else(|| {
+                let meta = entry.metadatas().get::<M>().ok_or_else(|| {
                     Error::KeyNotFound(format!(
                         "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
                         idx
                     ))
-                })? {
-                    acc.insert(elem);
+                })?;
+                for elem in meta.as_slice() {
+                    acc.insert(*elem);
                 }
 
                 entry.add_metadata(IsFavoredMetadata {});
@@ -189,7 +206,22 @@ where
     pub fn new(base: CS) -> Self {
         Self {
             base: base,
+            skip_not_fav_prob: DEFAULT_SKIP_NOT_FAV_PROB,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn with_skip_prob(base: CS, skip_not_fav_prob: u64) -> Self {
+        Self {
+            base: base,
+            skip_not_fav_prob: skip_not_fav_prob,
             phantom: PhantomData,
         }
     }
 }
+
+pub type LenTimeMinimizerCorpusScheduler<C, CS, I, M, R, S> =
+    MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, M, R, S>;
+
+pub type IndexesLenTimeMinimizerCorpusScheduler<C, CS, I, R, S> =
+    MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, R, S>;
