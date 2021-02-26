@@ -85,6 +85,15 @@ pub trait HasMetadata {
     {
         self.metadata_mut().insert(meta);
     }
+
+    /// Check for a metadata
+    #[inline]
+    fn has_metadata<M>(&self) -> bool
+    where
+        M: SerdeAny,
+    {
+        self.metadata().get::<M>().is_some()
+    }
 }
 
 /// Trait for elements offering a feedbacks tuple

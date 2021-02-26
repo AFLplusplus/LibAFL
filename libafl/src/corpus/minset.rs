@@ -82,6 +82,7 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        self.update_score(state, idx)?;
         self.base.on_add(state, idx)
     }
 
@@ -103,6 +104,7 @@ where
     // TODO: IntoIter
     /// Gets the next entry
     fn next(&self, state: &mut S) -> Result<usize, Error> {
+        self.cull(state)?;
         self.base.next(state)
     }
 }
@@ -118,12 +120,16 @@ where
     C: Corpus<I>,
 {
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        // Create a new top rated meta if not existing
+        if state.metadata().get::<TopRatedsMetadata>().is_none() {
+            state.add_metadata(TopRatedsMetadata::new());
+        }
+
         let mut new_favoreds = vec![];
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
             let factor = F::compute(&mut *entry)?;
             for elem in entry.metadatas().get::<IT>().unwrap() {
-                // TODO proper check for TopRatedsMetadata and create a new one if not present
                 if let Some(old_idx) = state
                     .metadata()
                     .get::<TopRatedsMetadata>()
