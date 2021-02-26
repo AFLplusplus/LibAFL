@@ -11,31 +11,37 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cd libafl && cargo build --verbose
-  build-all:
+      run: cargo build --verbose
+  all-features-build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cd libafl &&cargo build --no-default-features --features runtime --features std --features anymapdbg --verbose
+      run: cargo build --all-features --verbose
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cd libafl && cargo test --verbose
-  build-no-std:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cd libafl && cargo build --no-default-features --verbose
-  test-no-std:
+      run: cargo test --verbose
+  examples-build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cd libafl && cargo test --no-default-features --verbose
+      run: cargo build --examples --verbose
+  no-std-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --no-default-features --verbose
+  no-std-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Test
+      run: cargo test --no-default-features --verbose
   docs:
     runs-on: ubuntu-latest
     steps:

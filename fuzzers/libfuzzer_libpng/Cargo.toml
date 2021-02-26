@@ -11,11 +11,11 @@ build = "build.rs"
 default = ["std"]
 std = []
 
-[profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
-debug = true
+#[profile.release]
+#lto = true
+#codegen-units = 1
+#opt-level = 3
+#debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
@@ -24,8 +24,8 @@ num_cpus = "1.0"
 [dependencies]
 libafl = { path = "../../libafl/" }
 
-[[bin]]
+[[example]]
 name = "libfuzzer_libpng"
-path = "./src/mod.rs"
+path = "./src/fuzzer.rs"
 test = false
 bench = false

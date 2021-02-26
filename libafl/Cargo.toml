@@ -24,10 +24,10 @@ harness = false
 name = "hash_speeds"
 harness = false
 
-[profile.release]
-lto = true
-opt-level = 3
-debug = true
+#[profile.release]
+#lto = true
+#opt-level = 3
+#debug = true
 
 [features]
 default = ["std", "anymapdbg"]
