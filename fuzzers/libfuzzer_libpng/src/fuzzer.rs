@@ -85,7 +85,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mut state = state.unwrap_or_else(|| {
         State::new(
             // RNG
-            StdRand::new(current_nanos()),
+            StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input

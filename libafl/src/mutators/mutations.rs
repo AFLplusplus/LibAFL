@@ -921,7 +921,7 @@ token2="B"
             BytesInput::new(vec![1; 4]),
         ];
 
-        let rand = StdRand::new(1337);
+        let rand = StdRand::with_seed(1337);
         let mut corpus = InMemoryCorpus::new();
 
         corpus

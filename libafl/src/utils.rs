@@ -10,6 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub type StdRand = RomuTrioRand;
 
 /// Ways to get random around here
+/// Please note that these are not cryptographically secure
+/// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
 pub trait Rand: Debug + Serialize + DeserializeOwned {
     /// Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
@@ -74,12 +76,17 @@ where
 // helper macro for deriving Default
 macro_rules! default_rand {
     ($rand: ty) => {
-        /// A default RNG will produce a deterministic and reproducible stream of random numbers.
-        /// Use [`RandomSeed::with_random_seed`] to generate unique RNG seeded from some source of
-        /// randomness.
+        /// A default RNG will usually produce a nondeterministic stream of random numbers.
+        /// As we do not have any way to get random seeds for no_std, they have to be reproducible there.
+        /// Use [`RandomSeed::with_seed`] to generate a reproducible RNG.
         impl core::default::Default for $rand {
+            #[cfg(feature = "std")]
             fn default() -> Self {
-                Self::new(DEFAULT_SEED)
+                Self::new()
+            }
+            #[cfg(not(feature = "std"))]
+            fn default() -> Self {
+                Self::with_seed(0xAF1)
             }
         }
     };
@@ -97,7 +104,7 @@ default_rand!(RomuDuoJrRand);
 /// Default implementations are provided with the "std" feature enabled, using system time in
 /// nanoseconds as the initial seed.
 pub trait RandomSeed: Rand + Default {
-    fn with_random_seed() -> Self;
+    fn new() -> Self;
 }
 
 // helper macro to impl RandomSeed
@@ -106,10 +113,8 @@ macro_rules! impl_randomseed {
         #[cfg(feature = "std")]
         impl RandomSeed for $rand {
             /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-            fn with_random_seed() -> Self {
-                let mut rng = Self::default();
-                rng.set_seed(current_nanos());
-                rng
+            fn new() -> Self {
+                Self::with_seed(current_nanos())
             }
         }
     };
@@ -122,7 +127,6 @@ impl_randomseed!(RomuTrioRand);
 impl_randomseed!(RomuDuoJrRand);
 
 const HASH_CONST: u64 = 0xa5b35705;
-const DEFAULT_SEED: u64 = 0x54d3a3130133750b;
 
 /// Current time
 #[cfg(feature = "std")]
@@ -201,7 +205,7 @@ impl Rand for Xoshiro256StarRand {
 
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
-    pub fn new(seed: u64) -> Self {
+    pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self { rand_seed: [0; 4] };
         rand.set_seed(seed); // TODO: Proper random seed?
         rand
@@ -232,7 +236,7 @@ impl Rand for XorShift64Rand {
 
 impl XorShift64Rand {
     /// Creates a new Xoshiro rand with the given seed
-    pub fn new(seed: u64) -> Self {
+    pub fn with_seed(seed: u64) -> Self {
         let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed); // TODO: Proper random seed?
         ret
@@ -259,7 +263,7 @@ impl Rand for Lehmer64Rand {
 
 impl Lehmer64Rand {
     /// Creates a new Lehmer rand with the given seed
-    pub fn new(seed: u64) -> Self {
+    pub fn with_seed(seed: u64) -> Self {
         let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed);
         ret
@@ -276,7 +280,7 @@ pub struct RomuTrioRand {
 }
 
 impl RomuTrioRand {
-    pub fn new(seed: u64) -> Self {
+    pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
             y_state: 0,
@@ -314,7 +318,7 @@ pub struct RomuDuoJrRand {
 }
 
 impl RomuDuoJrRand {
-    pub fn new(seed: u64) -> Self {
+    pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
             y_state: 0,
@@ -357,10 +361,15 @@ impl Rand for XKCDRand {
     }
 }
 
+/// A test rng that will return the same value (chose by fair dice roll) for testing.
 #[cfg(test)]
 impl XKCDRand {
     pub fn new() -> Self {
-        Self { val: 4 }
+        Self::with_seed(4)
+    }
+
+    pub fn with_seed(seed: u64) -> Self {
+        Self { val: seed }
     }
 }
 
@@ -368,11 +377,9 @@ impl XKCDRand {
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::utils::{Rand, StdRand};
+    use crate::utils::{Rand, *};
 
-    #[test]
-    fn test_rand() {
-        let mut rand = StdRand::new(0);
+    fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);
@@ -380,21 +387,26 @@ mod tests {
         assert!(rand.between(11, 20) > 10);
     }
 
+    #[test]
+    fn test_rands() {
+        // see cargo bench for speed comparisons
+        test_single_rand(&mut StdRand::with_seed(0));
+        test_single_rand(&mut RomuTrioRand::with_seed(0));
+        test_single_rand(&mut RomuDuoJrRand::with_seed(0));
+        test_single_rand(&mut XorShift64Rand::with_seed(0));
+        test_single_rand(&mut Xoshiro256StarRand::with_seed(0));
+    }
+
     #[cfg(feature = "std")]
     #[test]
-    fn with_random_seed() {
+    fn test_random_seed() {
         use crate::utils::RandomSeed;
 
-        let mut rand_fixed = StdRand::new(0);
-        let mut rand = StdRand::with_random_seed();
+        let mut rand_fixed = StdRand::with_seed(0);
+        let mut rand = StdRand::new();
 
-        for _ in 0..10000 {
-            assert_ne!(rand.next(), rand_fixed.next());
-            assert_ne!(rand.next(), rand.next());
-            assert!(rand.below(100) < 100);
-            assert_eq!(rand.below(1), 0);
-            assert_eq!(rand.between(10, 10), 10);
-            assert!(rand.between(11, 20) > 10);
-        }
+        // The seed should be reasonably random so these never fail
+        assert_ne!(rand.next(), rand_fixed.next());
+        test_single_rand(&mut rand);
     }
 }

@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_input() {
-        let mut rand = StdRand::new(0);
+        let mut rand = StdRand::with_seed(0);
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(100) < 100);
         assert_eq!(rand.below(1), 0);

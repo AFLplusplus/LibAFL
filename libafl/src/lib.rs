@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_fuzzer() {
-        let rand = StdRand::new(0);
+        let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4]).into();
