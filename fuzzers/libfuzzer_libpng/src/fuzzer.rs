@@ -7,7 +7,7 @@ use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        RandCorpusScheduler,
+        RandCorpusScheduler,QueueCorpusScheduler
     },
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
@@ -119,8 +119,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let stage = StdMutationalStage::new(mutator);
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(RandCorpusScheduler::new());
-    //let scheduler = RandCorpusScheduler::new();
+    //let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(RandCorpusScheduler::new());
+    let scheduler = QueueCorpusScheduler::new();
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
@@ -139,6 +139,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             println!("Warning: LLVMFuzzerInitialize failed with -1")
         }
     }
+    
+    std::thread::sleep_ms(2000);
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
@@ -150,7 +152,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             ));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
-
+    
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
 
     // Never reached

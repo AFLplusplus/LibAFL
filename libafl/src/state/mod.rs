@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, Testcase, CorpusScheduler},
     events::{Event, EventManager, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::FeedbacksTuple,
@@ -175,7 +175,10 @@ where
         OT: ObserversTuple;
 
     /// Adds this input to the corpus, if it's intersting, and return the index
-    fn add_if_interesting(&mut self, input: &I, fitness: u32) -> Result<Option<usize>, Error>;
+    fn add_if_interesting<CS>(&mut self, input: &I, fitness: u32, scheduler: &CS) -> Result<Option<usize>, Error>
+    where
+        CS: CorpusScheduler<I, Self>,
+        Self: Sized;
 }
 
 /// Evaluate an input modyfing the state of the fuzzer and returning a fitness
@@ -184,16 +187,18 @@ where
     I: Input,
 {
     /// Runs the input and triggers observers and feedback
-    fn evaluate_input<E, EM, OT>(
+    fn evaluate_input<CS, E, EM, OT>(
         &mut self,
         input: I,
         executor: &mut E,
-        event_mgr: &mut EM,
+        manager: &mut EM,
+        scheduler: &CS,
     ) -> Result<u32, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
-        EM: EventManager<I, Self>;
+        EM: EventManager<I, Self>,
+        CS: CorpusScheduler<I, Self>;
 }
 
 /// The state a fuzz run.
@@ -450,10 +455,15 @@ where
 
     /// Adds this input to the corpus, if it's intersting, and return the index
     #[inline]
-    fn add_if_interesting(&mut self, input: &I, fitness: u32) -> Result<Option<usize>, Error> {
+    fn add_if_interesting<CS>(&mut self, input: &I, fitness: u32, scheduler: &CS) -> Result<Option<usize>, Error>
+    where
+        CS: CorpusScheduler<I, Self>
+    {
         if fitness > 0 {
             let testcase = self.testcase_with_feedbacks_metadata(input.clone(), fitness)?;
-            Ok(Some(self.corpus.add(testcase)?)) // TODO scheduler hook
+            let idx = self.corpus.add(testcase)?;
+            scheduler.on_add(self, idx)?;
+            Ok(Some(idx))
         } else {
             self.discard_feedbacks_metadata(input)?;
             Ok(None)
@@ -472,18 +482,20 @@ where
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
-    fn evaluate_input<E, EM, OT>(
+    fn evaluate_input<CS, E, EM, OT>(
         &mut self,
         // TODO probably we can take a ref to input and pass a cloned one to add_if_interesting
         input: I,
         executor: &mut E,
         manager: &mut EM,
+        scheduler: &CS,
     ) -> Result<u32, Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
         C: Corpus<I>,
         EM: EventManager<I, Self>,
+        CS: CorpusScheduler<I, Self>
     {
         let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
         let observers = executor.observers();
@@ -493,7 +505,7 @@ where
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
 
-        if !self.add_if_interesting(&input, fitness)?.is_none() {
+        if !self.add_if_interesting(&input, fitness, scheduler)?.is_none() {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
                 self,
@@ -521,17 +533,18 @@ where
     SC: Corpus<BytesInput>,
     OFT: FeedbacksTuple<BytesInput>,
 {
-    pub fn load_from_directory<E, OT, EM>(
+    pub fn load_from_directory<CS, E, OT, EM>(
         &mut self,
         executor: &mut E,
         manager: &mut EM,
+        scheduler: &CS,
         in_dir: &Path,
     ) -> Result<(), Error>
     where
-        C: Corpus<BytesInput>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<BytesInput, Self>,
+        CS: CorpusScheduler<BytesInput, Self>
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -549,34 +562,35 @@ where
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
                 let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
-                if self.add_if_interesting(&input, fitness)?.is_none() {
+                if self.add_if_interesting(&input, fitness, scheduler)?.is_none() {
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
                 if is_solution {
                     println!("File {:?} is a solution, however will be not considered as it is an initial testcase.", &path);
                 }
             } else if attr.is_dir() {
-                self.load_from_directory(executor, manager, &path)?;
+                self.load_from_directory(executor, manager, scheduler, &path)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn load_initial_inputs<E, OT, EM>(
+    pub fn load_initial_inputs<CS, E, OT, EM>(
         &mut self,
         executor: &mut E,
         manager: &mut EM,
+        scheduler: &CS,
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        C: Corpus<BytesInput>,
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<BytesInput, Self>,
+        CS: CorpusScheduler<BytesInput, Self>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(executor, manager, in_dir)?;
+            self.load_from_directory(executor, manager, scheduler, in_dir)?;
         }
         manager.fire(
             self,
@@ -634,11 +648,12 @@ where
         Ok((fitness, is_solution))
     }
 
-    pub fn generate_initial_inputs<G, E, OT, EM>(
+    pub fn generate_initial_inputs<CS, G, E, OT, EM>(
         &mut self,
         executor: &mut E,
         generator: &mut G,
         manager: &mut EM,
+        scheduler: &CS,
         num: usize,
     ) -> Result<(), Error>
     where
@@ -647,11 +662,12 @@ where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<I, Self>,
+        CS: CorpusScheduler<I, Self>
     {
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let fitness = self.evaluate_input(input, executor, manager)?;
+            let fitness = self.evaluate_input(input, executor, manager, scheduler)?;
             if fitness > 0 {
                 added += 1;
             }

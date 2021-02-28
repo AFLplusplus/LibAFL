@@ -179,6 +179,9 @@ where
     }
 
     pub fn cull(&self, state: &mut S) -> Result<(), Error> {
+        if state.metadatas().get::<TopRatedsMetadata>().is_none() {
+            return Ok(());
+        }
         let mut acc = HashSet::new();
         let top_rated = state.metadatas().get::<TopRatedsMetadata>().unwrap();
 
