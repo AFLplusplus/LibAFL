@@ -27,7 +27,7 @@ We're still working on the documentation. In the meantime, you can watch the Vid
 + Win32 shared mem and crash handler to have Windows in-process executor
 + Other feedbacks examples (e.g. maximize allocations to spot OOMs)
 + Other objectives examples (e.g. execution of a given program point)
-+ A macro crate with derive directives (e.g. for SerdeAny impl).
++ ~~A macro crate with derive directives (e.g. for SerdeAny impl)~~ just `derive(SerdeAny)`, missing doc.
 + Good documentation
 
 For further TODOs, see [TODO.md](./TODO.md)
