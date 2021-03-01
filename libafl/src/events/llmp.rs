@@ -113,6 +113,15 @@ where
         })
     }
 
+    #[cfg(all(feature = "std", unix))]
+    pub fn new_on_domain_socket(stats: ST, filename: &str) -> Result<Self, Error> {
+        Ok(Self {
+            stats: Some(stats),
+            llmp: llmp::LlmpConnection::on_domain_socket(filename)?,
+            phantom: PhantomData,
+        })
+    }
+
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
     pub fn existing_client_from_env(env_name: &str) -> Result<Self, Error> {

@@ -4,6 +4,8 @@ Welcome to libAFL
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#![cfg_attr(target_os = "android", feature(unix_socket_ancillary_data))]
+
 #[macro_use]
 extern crate alloc;
 #[macro_use]
