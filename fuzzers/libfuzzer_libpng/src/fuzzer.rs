@@ -16,7 +16,7 @@ use libafl::{
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
     mutators::token_mutations::TokensMetadata,
-    observers::StdMapObserver,
+    observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -79,10 +79,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             .expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
-    let edges_observer =
-        StdMapObserver::new_from_ptr("edges", unsafe { __lafl_edges_map }, unsafe {
-            __lafl_max_edges_size as usize
-        });
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+        "edges",
+        unsafe { __lafl_edges_map },
+        unsafe { __lafl_max_edges_size as usize },
+    ));
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
