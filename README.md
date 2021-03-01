@@ -23,11 +23,11 @@ We're still working on the documentation. In the meantime, you can watch the Vid
 [![Video explaining libAFL's core concepts](http://img.youtube.com/vi/3RWkT1Q5IV0/3.jpg)](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO")
 ## Roadmap for release
 
-+ Minset corpus scheduler
++ ~~Minset corpus scheduler~~ still doc missing
 + Win32 shared mem and crash handler to have Windows in-process executor
 + Other feedbacks examples (e.g. maximize allocations to spot OOMs)
 + Other objectives examples (e.g. execution of a given program point)
-+ A macro crate with derive directives (e.g. for SerdeAny impl).
++ ~~A macro crate with derive directives (e.g. for SerdeAny impl)~~ just `derive(SerdeAny)`, missing doc.
 + Good documentation
 
 For further TODOs, see [TODO.md](./TODO.md)

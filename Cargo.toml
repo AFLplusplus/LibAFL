@@ -8,6 +8,7 @@ debug = true
 [workspace]
 members = [
     "libafl",
+    "libafl_derive",
 
     #example fuzzers
     "fuzzers/libfuzzer_libpng",
