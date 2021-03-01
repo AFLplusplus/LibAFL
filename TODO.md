@@ -1,6 +1,6 @@
 # TODOs
 
-- [ ] Minset corpus scheduler
+- [x] ~~Minset corpus scheduler~~ still doc missing
 - [ ] Win32 shared mem and crash handler to have Windows in-process executor
 - [ ] Other feedbacks examples (e.g. maximize allocations to spot OOMs)
 - [ ] Other objectives examples (e.g. execution of a given program point)
