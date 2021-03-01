@@ -14,10 +14,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
-    mutators::{
-        scheduled::HavocBytesMutator,
-        token_mutations::Tokens,
-    },
+    mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
     observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},

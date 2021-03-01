@@ -806,11 +806,6 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "std")]
-    use std::fs;
-
-    #[cfg(feature = "std")]
-    use crate::mutators::read_tokens_file;
 
     use super::*;
     use crate::{
@@ -820,26 +815,6 @@ mod tests {
         state::State,
         utils::StdRand,
     };
-
-    #[cfg(feature = "std")]
-    #[test]
-    fn test_read_tokens() {
-        let _ = fs::remove_file("test.tkns");
-        let data = r###"
-# comment
-token1@123="AAA"
-token1="A\x41A"
-"A\AA"
-token2="B"
-        "###;
-        fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let mut v: Vec<Vec<u8>> = Vec::new();
-        let res = read_tokens_file(&"test.tkns".to_string(), &mut v).unwrap();
-        #[cfg(feature = "std")]
-        println!("Token file entries: {:?}", res);
-        assert_eq!(res, 2);
-        let _ = fs::remove_file("test.tkns");
-    }
 
     #[test]
     fn test_mutators() {

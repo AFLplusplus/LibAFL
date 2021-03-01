@@ -24,7 +24,7 @@ use mutations::buffer_copy;
 /// A state metadata holding a list of tokens
 #[derive(Serialize, Deserialize)]
 pub struct Tokens {
-    tokens: Vec<Vec<u8>>,
+    token_vec: Vec<Vec<u8>>,
 }
 
 crate::impl_serdeany!(Tokens);
@@ -32,8 +32,8 @@ crate::impl_serdeany!(Tokens);
 /// The metadata used for token mutators
 impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
-    pub fn new(tokens: Vec<Vec<u8>>) -> Self {
-        Self { tokens: tokens }
+    pub fn new(token_vec: Vec<Vec<u8>>) -> Self {
+        Self { token_vec }
     }
 
     /// Creates a new instance from a file
@@ -50,10 +50,10 @@ impl Tokens {
     /// Adds a token to a dictionary, checking it is not a duplicate
     /// Returns `false` if the token was already present and did not get added.
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
-        if self.tokens.contains(token) {
+        if self.token_vec.contains(token) {
             return false;
         }
-        self.tokens.push(token.to_vec());
+        self.token_vec.push(token.to_vec());
         return true;
     }
 
@@ -114,6 +114,11 @@ impl Tokens {
 
         Ok(entries)
     }
+
+    /// Gets the tokens stored in this db
+    pub fn tokens(&self) -> &[Vec<u8>] {
+        return &self.token_vec;
+    }
 }
 
 /// Insert a dictionary token
@@ -129,10 +134,10 @@ where
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
-        if meta.unwrap().tokens.len() == 0 {
+        if meta.unwrap().tokens().len() == 0 {
             return Ok(MutationResult::Skipped);
         }
-        meta.unwrap().tokens.len()
+        meta.unwrap().tokens().len()
     };
     let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
@@ -140,7 +145,7 @@ where
     let off = state.rand_mut().below((size + 1) as u64) as usize;
 
     let meta = state.metadatas().get::<Tokens>().unwrap();
-    let token = &meta.tokens[token_idx];
+    let token = &meta.tokens()[token_idx];
     let mut len = token.len();
 
     if size + len > max_size {
@@ -175,17 +180,17 @@ where
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
-        if meta.unwrap().tokens.len() == 0 {
+        if meta.unwrap().tokens().len() == 0 {
             return Ok(MutationResult::Skipped);
         }
-        meta.unwrap().tokens.len()
+        meta.unwrap().tokens().len()
     };
     let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
     let off = state.rand_mut().below(size as u64) as usize;
 
     let meta = state.metadatas().get::<Tokens>().unwrap();
-    let token = &meta.tokens[token_idx];
+    let token = &meta.tokens()[token_idx];
     let mut len = token.len();
     if off + len > size {
         len = size - off;
@@ -194,4 +199,31 @@ where
     buffer_copy(input.bytes_mut(), token, 0, off, len);
 
     Ok(MutationResult::Mutated)
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "std")]
+    use std::fs;
+
+    use super::Tokens;
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_read_tokens() {
+        let _ = fs::remove_file("test.tkns");
+        let data = r###"
+# comment
+token1@123="AAA"
+token1="A\x41A"
+"A\AA"
+token2="B"
+        "###;
+        fs::write("test.tkns", data).expect("Unable to write test.tkns");
+        let tokens = Tokens::from_tokens_file(&"test.tkns").unwrap();
+        #[cfg(feature = "std")]
+        println!("Token file entries: {:?}", tokens.tokens());
+        assert_eq!(tokens.tokens().len(), 2);
+        let _ = fs::remove_file("test.tkns");
+    }
 }
