@@ -11,13 +11,6 @@ use crate::{
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::cmp::{max, min};
 
-use std::path::Path;
-#[cfg(feature = "std")]
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
-
 /// The result of a mutation.
 /// If the mutation got skipped, the target
 /// will not be executed with the returned input.
@@ -809,71 +802,6 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
     }
 
     return Ok(token);
-}
-
-/// Adds a token to a dictionary, checking it is not a duplicate
-pub fn add_token(tokens: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
-    if tokens.contains(token) {
-        return 0;
-    }
-    tokens.push(token.to_vec());
-    return 1;
-}
-
-/// Read a dictionary file and return the number of entries read
-#[cfg(feature = "std")]
-pub fn read_tokens_file<P>(file: P, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error>
-where
-    P: AsRef<Path>,
-{
-    let mut entries = 0;
-
-    // println!("Loading tokens file {:?} ...", file);
-
-    let file = File::open(file)?; // panic if not found
-    let reader = BufReader::new(file);
-
-    for line in reader.lines() {
-        let line = line.unwrap();
-        let line = line.trim_start().trim_end();
-
-        // we are only interested in '"..."', not prefixed 'foo = '
-        let start = line.chars().nth(0);
-        if line.len() == 0 || start == Some('#') {
-            continue;
-        }
-        let pos_quote = match line.find("\"") {
-            Some(x) => x,
-            _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
-        };
-        if line.chars().nth(line.len() - 1) != Some('"') {
-            return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
-        }
-
-        // extract item
-        let item = match line.get(pos_quote + 1..line.len() - 1) {
-            Some(x) => x,
-            _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
-        };
-        if item.len() == 0 {
-            continue;
-        }
-
-        // decode
-        let token: Vec<u8> = match str_decode(item) {
-            Ok(val) => val,
-            Err(_) => {
-                return Err(Error::IllegalArgument(
-                    "Illegal line (hex decoding): ".to_owned() + line,
-                ))
-            }
-        };
-
-        // add
-        entries += add_token(tokens, &token);
-    }
-
-    Ok(entries)
 }
 
 #[cfg(test)]

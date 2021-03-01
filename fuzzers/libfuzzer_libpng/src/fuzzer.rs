@@ -7,16 +7,18 @@ use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler, RandCorpusScheduler,
+        QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
-    mutators::scheduled::HavocBytesMutator,
-    mutators::token_mutations::Tokens,
-    observers::StdMapObserver,
+    mutators::{
+        scheduled::HavocBytesMutator,
+        token_mutations::Tokens,
+    },
+    observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -79,10 +81,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             .expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
-    let edges_observer =
-        StdMapObserver::new_from_ptr("edges", unsafe { __lafl_edges_map }, unsafe {
-            __lafl_max_edges_size as usize
-        });
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+        "edges",
+        unsafe { __lafl_edges_map },
+        unsafe { __lafl_max_edges_size as usize },
+    ));
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -92,10 +95,14 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(MaxMapFeedback::new_with_observer(&edges_observer)),
+            tuple_list!(MaxMapFeedback::new_with_observer_track(
+                &edges_observer,
+                true,
+                false
+            )),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new(objective_dir),
+            OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
             tuple_list!(CrashFeedback::new()),
         )
@@ -119,8 +126,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let stage = StdMutationalStage::new(mutator);
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
-    //let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(RandCorpusScheduler::new());
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
@@ -140,12 +146,15 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         }
     }
 
-    std::thread::sleep_ms(2000);
-
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, &corpus_dirs)
+            .load_initial_inputs(
+                &mut executor,
+                &mut restarting_mgr,
+                fuzzer.scheduler(),
+                &corpus_dirs,
+            )
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs

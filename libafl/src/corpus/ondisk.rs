@@ -5,7 +5,7 @@ use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
 
@@ -94,11 +94,14 @@ impl<I> OnDiskCorpus<I>
 where
     I: Input,
 {
-    pub fn new(dir_path: PathBuf) -> Self {
-        Self {
+    /// Creates the OnDiskCorpus.
+    /// Will error, if `std::fs::create_dir_all` failed for `dir_path`.
+    pub fn new(dir_path: PathBuf) -> Result<Self, Error> {
+        fs::create_dir_all(&dir_path)?;
+        Ok(Self {
             entries: vec![],
             current: None,
             dir_path: dir_path,
-        }
+        })
     }
 }

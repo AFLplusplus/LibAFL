@@ -20,8 +20,6 @@
 
 #include <vector>
 
-#define HAS_BUG 1
-
 #define PNG_INTERNAL
 #include "png.h"
 
@@ -61,7 +59,7 @@ struct PngObjectHandler {
       png_free(png_ptr, row_ptr);
     if (end_info_ptr)
       png_destroy_read_struct(&png_ptr, &info_ptr, &end_info_ptr);
-    else if (info_ptr) 
+    else if (info_ptr)
       png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
     else
       png_destroy_read_struct(&png_ptr, nullptr, nullptr);
@@ -159,8 +157,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   // This is going to be too slow.
   if (width && height > 100000000 / width) {
     PNG_CLEANUP
-    if (HAS_BUG)
+#ifdef HAS_DUMMY_CRASH
+    asm("ud2");
+ #ifdef __aarch64__
+      asm volatile (".word 0xf7f0a000\n");
+ #else
       asm("ud2");
+ #endif
+#endif
     return 0;
   }
 

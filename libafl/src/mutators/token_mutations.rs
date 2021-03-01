@@ -1,6 +1,7 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 
+#[cfg(feature = "std")]
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -63,7 +64,6 @@ impl Tokens {
         P: AsRef<Path>,
     {
         let mut entries = 0;
-        let tokens = &mut self.tokens;
 
         // println!("Loading tokens file {:?} ...", file);
 
