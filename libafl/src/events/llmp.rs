@@ -17,12 +17,12 @@ use crate::{
         llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMem,
     },
+    corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
     executors::ExitKind,
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
-    corpus::CorpusScheduler,
     state::IfInteresting,
     stats::Stats,
     Error,
@@ -284,7 +284,10 @@ where
                 // TODO include ExitKind in NewTestcase
                 let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
                 if fitness > 0 {
-                    if !state.add_if_interesting(&input, fitness, scheduler)?.is_none() {
+                    if !state
+                        .add_if_interesting(&input, fitness, scheduler)?
+                        .is_none()
+                    {
                         #[cfg(feature = "std")]
                         println!("Added received Testcase");
                     }
@@ -318,11 +321,16 @@ where
         }
     }
 
-    fn process<CS, E, OT>(&mut self, state: &mut S, executor: &mut E, scheduler: &CS) -> Result<usize, Error>
+    fn process<CS, E, OT>(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        scheduler: &CS,
+    ) -> Result<usize, Error>
     where
         CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple
+        OT: ObserversTuple,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
@@ -430,11 +438,16 @@ where
             .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
     }
 
-    fn process<CS, E, OT>(&mut self, state: &mut S, executor: &mut E, scheduler: &CS) -> Result<usize, Error>
+    fn process<CS, E, OT>(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        scheduler: &CS,
+    ) -> Result<usize, Error>
     where
         CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple
+        OT: ObserversTuple,
     {
         self.llmp_mgr.process(state, executor, scheduler)
     }

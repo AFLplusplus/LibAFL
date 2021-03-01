@@ -6,12 +6,13 @@ use std::{env, path::PathBuf};
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler
+        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
+        QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer, HasCorpusScheduler},
+    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
     mutators::token_mutations::TokensMetadata,
@@ -91,7 +92,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(MaxMapFeedback::new_with_observer_track(&edges_observer, true, false)),
+            tuple_list!(MaxMapFeedback::new_with_observer_track(
+                &edges_observer,
+                true,
+                false
+            )),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir),
@@ -142,14 +147,19 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, fuzzer.scheduler(), &corpus_dirs)
+            .load_initial_inputs(
+                &mut executor,
+                &mut restarting_mgr,
+                fuzzer.scheduler(),
+                &corpus_dirs,
+            )
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
             ));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
-    
+
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
 
     // Never reached

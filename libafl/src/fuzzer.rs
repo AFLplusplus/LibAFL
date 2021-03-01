@@ -105,7 +105,8 @@ where
     fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
         let idx = self.scheduler().next(state)?;
 
-        self.stages().perform_all(state, executor, manager, self.scheduler(), idx)?;
+        self.stages()
+            .perform_all(state, executor, manager, self.scheduler(), idx)?;
 
         manager.process(state, executor, self.scheduler())?;
         Ok(idx)

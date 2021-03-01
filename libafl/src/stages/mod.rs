@@ -7,7 +7,7 @@ use crate::{
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<CS, E, EM,  I, S>
+pub trait Stage<CS, E, EM, I, S>
 where
     EM: EventManager<I, S>,
     E: Executor<I>,
@@ -24,7 +24,7 @@ where
     ) -> Result<(), Error>;
 }
 
-pub trait StagesTuple<CS, E, EM,  I, S>
+pub trait StagesTuple<CS, E, EM, I, S>
 where
     EM: EventManager<I, S>,
     E: Executor<I>,
@@ -40,7 +40,7 @@ where
     ) -> Result<(), Error>;
 }
 
-impl<CS, E, EM,  I, S> StagesTuple<CS, E, EM,  I, S> for ()
+impl<CS, E, EM, I, S> StagesTuple<CS, E, EM, I, S> for ()
 where
     EM: EventManager<I, S>,
     E: Executor<I>,
@@ -51,10 +51,10 @@ where
     }
 }
 
-impl<Head, Tail, CS, E, EM, I, S> StagesTuple<CS, E, EM,  I, S> for (Head, Tail)
+impl<Head, Tail, CS, E, EM, I, S> StagesTuple<CS, E, EM, I, S> for (Head, Tail)
 where
-    Head: Stage<CS, E, EM,  I, S>,
-    Tail: StagesTuple<CS, E, EM,  I, S> + TupleList,
+    Head: Stage<CS, E, EM, I, S>,
+    Tail: StagesTuple<CS, E, EM, I, S> + TupleList,
     EM: EventManager<I, S>,
     E: Executor<I>,
     I: Input,
@@ -67,7 +67,9 @@ where
         scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.0.perform(state, executor, manager, scheduler, corpus_idx)?;
-        self.1.perform_all(state, executor, manager, scheduler, corpus_idx)
+        self.0
+            .perform(state, executor, manager, scheduler, corpus_idx)?;
+        self.1
+            .perform_all(state, executor, manager, scheduler, corpus_idx)
     }
 }

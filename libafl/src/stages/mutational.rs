@@ -27,7 +27,7 @@ where
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
-    CS: CorpusScheduler<I, S>
+    CS: CorpusScheduler<I, S>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -116,7 +116,8 @@ where
     }
 }
 
-impl<C, CS, E, EM, I, M, OT, R, S> Stage<CS, E, EM, I, S> for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+impl<C, CS, E, EM, I, M, OT, R, S> Stage<CS, E, EM, I, S>
+    for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,

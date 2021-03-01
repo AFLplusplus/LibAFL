@@ -10,9 +10,9 @@ use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::CorpusScheduler,
     executors::{Executor, HasObservers},
     inputs::Input,
-    corpus::{ CorpusScheduler},
     observers::ObserversTuple,
     Error,
 };
@@ -160,7 +160,12 @@ where
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<CS, E, OT>(&mut self, state: &mut S, executor: &mut E, scheduler: &CS) -> Result<usize, Error>
+    fn process<CS, E, OT>(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        scheduler: &CS,
+    ) -> Result<usize, Error>
     where
         CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
@@ -205,7 +210,12 @@ impl<I, S> EventManager<I, S> for NopEventManager<I, S>
 where
     I: Input,
 {
-    fn process<CS, E, OT>(&mut self, _state: &mut S, _executor: &mut E, _scheduler: &CS) -> Result<usize, Error>
+    fn process<CS, E, OT>(
+        &mut self,
+        _state: &mut S,
+        _executor: &mut E,
+        _scheduler: &CS,
+    ) -> Result<usize, Error>
     where
         CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
