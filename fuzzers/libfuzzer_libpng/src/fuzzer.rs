@@ -92,7 +92,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             tuple_list!(MaxMapFeedback::new_with_observer(&edges_observer)),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new(objective_dir),
+            OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
             tuple_list!(CrashFeedback::new()),
         )
