@@ -1,5 +1,6 @@
 use crate::bolts::{llmp::LlmpSender, shmem::HasFd};
 use alloc::{string::ToString, vec::Vec};
+use libc::fork;
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -25,6 +26,7 @@ use crate::{
     observers::ObserversTuple,
     state::IfInteresting,
     stats::Stats,
+    utils,
     Error,
 };
 
@@ -496,6 +498,8 @@ where
     }
 }
 
+
+
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
@@ -513,10 +517,10 @@ where
     let mut mgr;
 
     // We start ourself as child process to actually fuzz
-    if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+    let (sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+        let path = std::env::current_dir()?;
         #[cfg(target_os = "android")]
         {
-            let path = std::env::current_dir()?;
             mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
                 stats,
                 &format!("{}/.llmp_socket", path.display()).to_string(),
@@ -549,21 +553,34 @@ where
             // Client->parent loop
             loop {
                 dbg!("Spawning next client (id {})", ctr);
+
+                // On Unix, we fork (todo: measure if that is actually faster.)
+                #[cfg(unix)]
+                match unsafe {utils::fork()?} {
+                    utils::ForkResult::Parent(pid) => (),
+                    utils::ForkResult::Child => {
+                        break (sender, receiver)
+                    }
+                }
+
+                // On windows, we spawn ourself again
+                #[cfg(windows)]
                 Command::new(env::current_exe()?)
                     .current_dir(env::current_dir()?)
                     .args(env::args())
                     .status()?;
+
                 ctr += 1;
             }
         }
-    }
+    } else {
+        // We are the newly started fuzzing instance, first, connect to our own restore map.
+        // A sender and a receiver for single communication
+        (LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?,
+        LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?)
+    };
 
     println!("We're a client, let's fuzz :)");
-
-    // We are the fuzzing instance, first, connect to our own restore map.
-    // A sender and a receiver for single communication
-    let mut receiver = LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?;
-    let sender = LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?;
 
     // If we're restarting, deserialize the old state.
     let (state, mut mgr) = match receiver.recv_buf()? {

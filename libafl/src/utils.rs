@@ -378,6 +378,50 @@ impl XKCDRand {
     }
 }
 
+
+#[cfg(unix)]
+struct ChildHandle {
+    child_pid: pid_t;
+}
+
+impl ChildHandle {
+    pub fn status(pid_t) {
+
+    }
+}
+
+
+
+#[cfg(unix)]
+/// The ForkResult
+pub enum ForkResult {
+    Parent(ChildHandle),
+    Child,
+}
+
+/// Unix has forks.
+#[cfg(unix)]
+pub unsafe fn fork() -> Result<ForkResult, Error> {
+    let ret = libc::fork();
+    if ret < 0 {
+        Err(Error::Unknown("Fork failed"))
+    } else if ret == 0 {
+        Ok(ForkResult::Child)
+    } else {
+        Ok(ForkResult::Parent(ret))
+    }
+}
+
+/// Executes the current process from the beginning, as subprocess.
+/// use `start_self.status()?` to wait for the child
+pub fn startable_self() -> Command {
+    Command::new(env::current_exe()?)
+    .current_dir(env::current_dir()?)
+    .args(env::args())
+}
+
+
+
 #[cfg(test)]
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
