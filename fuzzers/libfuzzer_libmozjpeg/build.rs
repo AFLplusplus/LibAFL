@@ -4,8 +4,7 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-const LIBMOZJPEG_URL: &str =
-    "https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz";
+const LIBMOZJPEG_URL: &str = "https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz";
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -47,7 +46,8 @@ fn main() {
             .args(&[
                 "-G\"Unix Makefiles\"",
                 "--disable-shared",
-                "{}", &libmozjpeg,
+                "{}", 
+                &libmozjpeg,
                 "CC=clang",
                 "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
                 "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
