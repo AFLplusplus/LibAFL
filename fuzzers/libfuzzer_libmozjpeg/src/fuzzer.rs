@@ -9,7 +9,7 @@ use libafl::{
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
     mutators::token_mutations::Tokens,

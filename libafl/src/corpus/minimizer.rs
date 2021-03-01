@@ -136,7 +136,7 @@ where
 {
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
-        if state.metadatas().get::<TopRatedsMetadata>().is_none() {
+        if state.metadata().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());
         }
 
@@ -144,7 +144,7 @@ where
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
             let factor = F::compute(&mut *entry)?;
-            let meta = entry.metadatas().get::<M>().ok_or_else(|| {
+            let meta = entry.metadata().get::<M>().ok_or_else(|| {
                 Error::KeyNotFound(format!(
                     "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
                     idx
@@ -152,7 +152,7 @@ where
             })?;
             for elem in meta.as_slice() {
                 if let Some(old_idx) = state
-                    .metadatas()
+                    .metadata()
                     .get::<TopRatedsMetadata>()
                     .unwrap()
                     .map
@@ -169,7 +169,7 @@ where
 
         for pair in new_favoreds {
             state
-                .metadatas_mut()
+                .metadata_mut()
                 .get_mut::<TopRatedsMetadata>()
                 .unwrap()
                 .map
@@ -179,17 +179,17 @@ where
     }
 
     pub fn cull(&self, state: &mut S) -> Result<(), Error> {
-        if state.metadatas().get::<TopRatedsMetadata>().is_none() {
+        if state.metadata().get::<TopRatedsMetadata>().is_none() {
             return Ok(());
         }
         let mut acc = HashSet::new();
-        let top_rated = state.metadatas().get::<TopRatedsMetadata>().unwrap();
+        let top_rated = state.metadata().get::<TopRatedsMetadata>().unwrap();
 
         for key in top_rated.map.keys() {
             if !acc.contains(key) {
                 let idx = top_rated.map.get(key).unwrap();
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
-                let meta = entry.metadatas().get::<M>().ok_or_else(|| {
+                let meta = entry.metadata().get::<M>().ok_or_else(|| {
                     Error::KeyNotFound(format!(
                         "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
                         idx

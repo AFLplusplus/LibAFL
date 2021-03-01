@@ -130,7 +130,7 @@ where
 {
     let max_size = state.max_size();
     let tokens_len = {
-        let meta = state.metadatas().get::<Tokens>();
+        let meta = state.metadata().get::<Tokens>();
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -144,7 +144,7 @@ where
     let size = input.bytes().len();
     let off = state.rand_mut().below((size + 1) as u64) as usize;
 
-    let meta = state.metadatas().get::<Tokens>().unwrap();
+    let meta = state.metadata().get::<Tokens>().unwrap();
     let token = &meta.tokens()[token_idx];
     let mut len = token.len();
 
@@ -176,7 +176,7 @@ where
     }
 
     let tokens_len = {
-        let meta = state.metadatas().get::<Tokens>();
+        let meta = state.metadata().get::<Tokens>();
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -189,7 +189,7 @@ where
 
     let off = state.rand_mut().below(size as u64) as usize;
 
-    let meta = state.metadatas().get::<Tokens>().unwrap();
+    let meta = state.metadata().get::<Tokens>().unwrap();
     let token = &meta.tokens()[token_idx];
     let mut len = token.len();
     if off + len > size {
