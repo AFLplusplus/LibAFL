@@ -8,7 +8,7 @@ It has been tested on Linux.
 
 To build this example, run `cargo build --example libfuzzer_libpng --release`.
 This will call (the build.rs)[./builld.rs], which in turn downloads a libpng archive from the web.
-Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the c++ harness)[./harness.cc] and the instrumented `libpng`.
+Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the C++ harness)[./harness.cc] and the instrumented `libpng`.
 Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng`.
 
 ## Run
@@ -20,6 +20,6 @@ As this example uses in-process fuzzing, we added a Restarting Event Manager (`s
 This means each client will start itself again to listen for crashes and timeouts.
 By restarting the actual fuzzer, it can recover from these exit conditions.
 
-In any real-world scenario, you should use `taskset` to pin each client to an empty cpu core, the lib does not pick an empty core automatically (yet).
+In any real-world scenario, you should use `taskset` to pin each client to an empty CPU core, the lib does not pick an empty core automatically (yet).
 
 For convenience, you may just run `./test.sh` in this folder to test it.

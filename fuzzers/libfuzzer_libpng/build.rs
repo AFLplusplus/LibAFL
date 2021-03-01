@@ -95,6 +95,7 @@ fn main() {
     cc::Build::new()
         .include(&libpng_path)
         .flag("-fsanitize-coverage=trace-pc-guard")
+        // .define("HAS_DUMMY_CRASH", "1")
         .file("./harness.cc")
         .compile("libfuzzer-harness");
 

@@ -20,8 +20,6 @@
 
 #include <vector>
 
-#define HAS_BUG 1
-
 #define PNG_INTERNAL
 #include "png.h"
 
@@ -159,8 +157,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   // This is going to be too slow.
   if (width && height > 100000000 / width) {
     PNG_CLEANUP
-    if (HAS_BUG)
-      asm("ud2");
+#ifdef HAS_DUMMY_CRASH
+    asm("ud2");
+#endif
     return 0;
   }
 

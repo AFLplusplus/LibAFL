@@ -7,6 +7,11 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub trait AsSlice<T> {
+    /// Convert to a slice
+    fn as_slice(&self) -> &[T];
+}
+
 pub type StdRand = RomuTrioRand;
 
 /// Ways to get random around here

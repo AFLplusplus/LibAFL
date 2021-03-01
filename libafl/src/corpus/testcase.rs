@@ -6,8 +6,9 @@ use core::{convert::Into, default::Default, option::Option, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serdeany::{SerdeAny, SerdeAnyMap},
+    bolts::serdeany::SerdeAnyMap,
     inputs::{HasLen, Input},
+    state::HasMetadata,
     Error,
 };
 
@@ -30,6 +31,23 @@ where
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
     cached_len: Option<usize>,
+}
+
+impl<I> HasMetadata for Testcase<I>
+where
+    I: Input,
+{
+    /// Get all the metadatas into an HashMap
+    #[inline]
+    fn metadatas(&self) -> &SerdeAnyMap {
+        &self.metadatas
+    }
+
+    /// Get all the metadatas into an HashMap (mutable)
+    #[inline]
+    fn metadatas_mut(&mut self) -> &mut SerdeAnyMap {
+        &mut self.metadatas
+    }
 }
 
 /// Impl of a testcase
@@ -118,27 +136,6 @@ where
     #[inline]
     pub fn set_fitness(&mut self, fitness: u32) {
         self.fitness = fitness;
-    }
-
-    /// Get all the metadatas into an HashMap
-    #[inline]
-    pub fn metadatas(&self) -> &SerdeAnyMap {
-        &self.metadatas
-    }
-
-    /// Get all the metadatas into an HashMap (mutable)
-    #[inline]
-    pub fn metadatas_mut(&mut self) -> &mut SerdeAnyMap {
-        &mut self.metadatas
-    }
-
-    /// Add a metadata
-    #[inline]
-    pub fn add_metadata<M>(&mut self, meta: M)
-    where
-        M: SerdeAny,
-    {
-        self.metadatas.insert(meta);
     }
 
     /// Get the execution time of the testcase

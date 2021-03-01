@@ -14,7 +14,12 @@ pub use ondisk::OnDiskCorpus;
 pub mod queue;
 pub use queue::QueueCorpusScheduler;
 
-pub mod minset;
+pub mod minimizer;
+pub use minimizer::{
+    FavFactor, IndexesLenTimeMinimizerCorpusScheduler, IsFavoredMetadata,
+    LenTimeMinimizerCorpusScheduler, LenTimeMulFavFactor, MinimizerCorpusScheduler,
+    TopRatedsMetadata,
+};
 
 use alloc::borrow::ToOwned;
 use core::{cell::RefCell, marker::PhantomData};
@@ -82,7 +87,6 @@ where
         Ok(())
     }
 
-    // TODO: IntoIter
     /// Gets the next entry
     fn next(&self, state: &mut S) -> Result<usize, Error>;
 }

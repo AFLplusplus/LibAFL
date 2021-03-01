@@ -13,14 +13,13 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{MapObserver, Observer, ObserversTuple},
+    state::HasMetadata,
+    utils::AsSlice,
     Error,
 };
 
 pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
 pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
-
-//pub type MaxMapTrackerFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
-//pub type MinMapTrackerFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
 
 /// A Reducer function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
@@ -74,122 +73,6 @@ where
     }
 }
 
-/*
-/// The most common AFL-like feedback type
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<T, R, O>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    R: Reducer<T>,
-    O: MapObserver<T>,
-{
-    /// Contains information about untouched entries
-    history_map: Vec<T>,
-    /// Name identifier of this instance
-    name: String,
-    /// Phantom Data of Reducer
-    phantom: PhantomData<(R, O)>,
-}
-
-impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
-where
-    T: Integer
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + core::fmt::Debug,
-    R: Reducer<T>,
-    O: MapObserver<T>,
-    I: Input,
-{
-    fn is_interesting<OT: ObserversTuple>(
-        &mut self,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: ExitKind,
-    ) -> Result<u32, Error> {
-        let mut interesting = 0;
-        // TODO optimize
-        let observer = observers.match_name_type::<O>(&self.name).unwrap();
-        let size = observer.usable_count();
-        //println!("count: {:?}, map: {:?}, history: {:?}", size, observer.map(), &self.history_map);
-        for i in 0..size {
-            let history = self.history_map[i];
-            let item = observer.map()[i];
-            let reduced = R::reduce(history, item);
-            if history != reduced {
-                self.history_map[i] = reduced;
-                interesting += 1;
-            }
-        }
-
-        //println!("..interesting: {:?}, new_history: {:?}\n", interesting, &self.history_map);
-        //std::thread::sleep(std::time::Duration::from_millis(100));
-
-        Ok(interesting)
-    }
-}
-
-impl<T, R, O> Named for MapFeedback<T, R, O>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    R: Reducer<T>,
-    O: MapObserver<T>,
-{
-    #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-impl<T, R, O> MapFeedback<T, R, O>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    R: Reducer<T>,
-    O: MapObserver<T> + Observer,
-{
-    /// Create new MapFeedback
-    pub fn new(name: &'static str, map_size: usize) -> Self {
-        Self {
-            history_map: vec![T::default(); map_size],
-            phantom: PhantomData,
-            name: name.to_string(),
-        }
-    }
-
-    /// Create new MapFeedback for the observer type.
-    /// Name should match that of the observer.
-    pub fn new_with_observer(name: &'static str, map_observer: &O) -> Self {
-        debug_assert_eq!(name, map_observer.name());
-        Self {
-            history_map: vec![T::default(); map_observer.map().len()],
-            phantom: PhantomData,
-            name: name.to_string(),
-        }
-    }
-}
-
-impl<T, R, O> MapFeedback<T, R, O>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    R: Reducer<T>,
-    O: MapObserver<T>,
-{
-    /// Create new MapFeedback using a map observer, and a map.
-    /// The map can be shared.
-    pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
-        Self {
-            history_map: history_map,
-            name: name.to_string(),
-            phantom: PhantomData,
-        }
-    }
-}
-*/
-
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Serialize, Deserialize)]
 pub struct MapIndexesMetadata {
@@ -198,12 +81,10 @@ pub struct MapIndexesMetadata {
 
 crate::impl_serdeany!(MapIndexesMetadata);
 
-impl IntoIterator for MapIndexesMetadata {
-    type Item = usize;
-    type IntoIter = alloc::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.list.into_iter()
+impl AsSlice<usize> for MapIndexesMetadata {
+    /// Convert to a slice
+    fn as_slice(&self) -> &[usize] {
+        self.list.as_slice()
     }
 }
 
@@ -221,15 +102,12 @@ pub struct MapNoveltiesMetadata {
 
 crate::impl_serdeany!(MapNoveltiesMetadata);
 
-impl IntoIterator for MapNoveltiesMetadata {
-    type Item = usize;
-    type IntoIter = alloc::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.list.into_iter()
+impl AsSlice<usize> for MapNoveltiesMetadata {
+    /// Convert to a slice
+    fn as_slice(&self) -> &[usize] {
+        self.list.as_slice()
     }
 }
-
 impl MapNoveltiesMetadata {
     pub fn new(list: Vec<usize>) -> Self {
         Self { list }

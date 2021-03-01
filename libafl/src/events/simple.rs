@@ -3,6 +3,7 @@ use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use crate::{
+    corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -30,8 +31,14 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<E, OT>(&mut self, state: &mut S, _executor: &mut E) -> Result<usize, Error>
+    fn process<CS, E, OT>(
+        &mut self,
+        state: &mut S,
+        _executor: &mut E,
+        _scheduler: &CS,
+    ) -> Result<usize, Error>
     where
+        CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
     {
