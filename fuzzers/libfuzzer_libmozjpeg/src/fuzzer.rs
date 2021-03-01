@@ -92,7 +92,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             tuple_list!(MaxMapFeedback::new_with_observer(&edges_observer)),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new(objective_dir)?,
+            OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
             tuple_list!(CrashFeedback::new()),
         )
@@ -132,7 +132,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, &corpus_dirs)
+            .load_initial_inputs(
+                &mut executor,
+                &mut restarting_mgr,
+                fuzzer.scheduler(),
+                &corpus_dirs,
+            )
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
