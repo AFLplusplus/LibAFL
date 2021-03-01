@@ -10,7 +10,7 @@ It is released as Free and Open Source Software under the GNU Lesser General Pub
 
 ## Example usages
 
-We collect example fuzzers in `./fuzzers`. They can be build using `cargo build --example [fuzzer_name]`
+We collect example fuzzers in `./fuzzers`. They can be build using `cargo build --example [fuzzer_name] --release`
 The best-tested fuzzer is `./fuzzers/libfuzzer_libpng`, a clone of libfuzzer using libafl for a libpng harness.
 See its readme [here](./fuzzers/libfuzzer_libpng/README.md).
 

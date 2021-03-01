@@ -5,7 +5,10 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
+    corpus::{
+        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
+        RandCorpusScheduler,QueueCorpusScheduler
+    },
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
@@ -101,7 +104,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     println!("We're a client, let's fuzz :)");
 
     // Create a PNG dictionary if not existing
-    if state.metadata().get::<TokensMetadata>().is_none() {
+    if state.metadatas().get::<TokensMetadata>().is_none() {
         state.add_metadata(TokensMetadata::new(vec![
             vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
             "IHDR".as_bytes().to_vec(),
@@ -115,8 +118,10 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mutator = HavocBytesMutator::default();
     let stage = StdMutationalStage::new(mutator);
 
-    // A fuzzer with just one stage and a random policy to get testcasess from the corpus
-    let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
+    // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
+    //let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(RandCorpusScheduler::new());
+    let scheduler = QueueCorpusScheduler::new();
+    let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
@@ -134,6 +139,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             println!("Warning: LLVMFuzzerInitialize failed with -1")
         }
     }
+    
+    std::thread::sleep_ms(2000);
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
@@ -145,7 +152,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             ));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
-
+    
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
 
     // Never reached
