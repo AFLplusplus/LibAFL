@@ -4,7 +4,7 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-const LIBPNG_URL: &str =
+const LIBMOZJPEG_URL: &str =
     "https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz";
 
 fn main() {
@@ -30,7 +30,7 @@ fn main() {
             // Download libmozjpeg
             Command::new("wget")
                 .arg("-c")
-                .arg(LIBPNG_URL)
+                .arg(LIBMOZJPEG_URL)
                 .arg("-O")
                 .arg(&libmozjpeg_tar)
                 .status()
@@ -42,15 +42,17 @@ fn main() {
             .arg(&libmozjpeg_tar)
             .status()
             .unwrap();
+        println!("{}",&libmozjpeg);
+        println!("{}",&out_dir_path.display());
         Command::new(format!("{}/cmake", &libmozjpeg))
             .current_dir(&out_dir_path)
             .args(&[
                 "-G\"Unix Makefiles\"",
                 "--disable-shared",
+                "{}", &libmozjpeg,
                 "CC=clang",
                 "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
                 "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
-                "mozjpeg-4.0.3",
             ])
             .env("CC", "clang")
             .env("CXX", "clang++")
@@ -62,9 +64,7 @@ fn main() {
                 "CXXFLAGS",
                 "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
             )
-            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
-            .status()
-            .unwrap();
+            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard");
         Command::new("make")
             .current_dir(&libmozjpeg_path)
             //.arg(&format!("-j{}", num_cpus::get()))
