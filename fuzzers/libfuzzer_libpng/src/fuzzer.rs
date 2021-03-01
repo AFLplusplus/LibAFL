@@ -6,8 +6,7 @@ use std::{env, path::PathBuf};
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        RandCorpusScheduler,QueueCorpusScheduler
+        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler
     },
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
@@ -92,7 +91,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(MaxMapFeedback::new_with_observer(&edges_observer)),
+            tuple_list!(MaxMapFeedback::new_with_observer_track(&edges_observer, true, false)),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir),
@@ -119,8 +118,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let stage = StdMutationalStage::new(mutator);
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
-    //let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(RandCorpusScheduler::new());
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    //let scheduler = QueueCorpusScheduler::new();
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
@@ -139,8 +138,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             println!("Warning: LLVMFuzzerInitialize failed with -1")
         }
     }
-    
-    std::thread::sleep_ms(2000);
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
