@@ -1,6 +1,12 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
+
 use crate::{
     inputs::{HasBytesVec, Input},
     mutators::*,
@@ -16,15 +22,97 @@ use mutations::buffer_copy;
 
 /// A state metadata holding a list of tokens
 #[derive(Serialize, Deserialize)]
-pub struct TokensMetadata {
+pub struct Tokens {
     tokens: Vec<Vec<u8>>,
 }
 
-crate::impl_serdeany!(TokensMetadata);
+crate::impl_serdeany!(Tokens);
 
-impl TokensMetadata {
+/// The metadata used for token mutators
+impl Tokens {
+    /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
     pub fn new(tokens: Vec<Vec<u8>>) -> Self {
         Self { tokens: tokens }
+    }
+
+    /// Creates a new instance from a file
+    #[cfg(feature = "std")]
+    pub fn from_tokens_file<P>(file: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut ret = Self::new(vec![]);
+        ret.add_tokens_from_file(file)?;
+        Ok(ret)
+    }
+
+    /// Adds a token to a dictionary, checking it is not a duplicate
+    /// Returns `false` if the token was already present and did not get added.
+    pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
+        if self.tokens.contains(token) {
+            return false;
+        }
+        self.tokens.push(token.to_vec());
+        return true;
+    }
+
+    /// Reads a tokens file, returning the count of new entries read
+    #[cfg(feature = "std")]
+    pub fn add_tokens_from_file<P>(&mut self, file: P) -> Result<u32, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut entries = 0;
+        let tokens = &mut self.tokens;
+
+        // println!("Loading tokens file {:?} ...", file);
+
+        let file = File::open(file)?; // panic if not found
+        let reader = BufReader::new(file);
+
+        for line in reader.lines() {
+            let line = line.unwrap();
+            let line = line.trim_start().trim_end();
+
+            // we are only interested in '"..."', not prefixed 'foo = '
+            let start = line.chars().nth(0);
+            if line.len() == 0 || start == Some('#') {
+                continue;
+            }
+            let pos_quote = match line.find("\"") {
+                Some(x) => x,
+                _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+            };
+            if line.chars().nth(line.len() - 1) != Some('"') {
+                return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
+            }
+
+            // extract item
+            let item = match line.get(pos_quote + 1..line.len() - 1) {
+                Some(x) => x,
+                _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+            };
+            if item.len() == 0 {
+                continue;
+            }
+
+            // decode
+            let token: Vec<u8> = match str_decode(item) {
+                Ok(val) => val,
+                Err(_) => {
+                    return Err(Error::IllegalArgument(
+                        "Illegal line (hex decoding): ".to_owned() + line,
+                    ))
+                }
+            };
+
+            // add
+            if self.add_token(&token) {
+                entries += 1;
+            }
+        }
+
+        Ok(entries)
     }
 }
 
@@ -37,7 +125,7 @@ where
 {
     let max_size = state.max_size();
     let tokens_len = {
-        let meta = state.metadatas().get::<TokensMetadata>();
+        let meta = state.metadatas().get::<Tokens>();
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -51,7 +139,7 @@ where
     let size = input.bytes().len();
     let off = state.rand_mut().below((size + 1) as u64) as usize;
 
-    let meta = state.metadatas().get::<TokensMetadata>().unwrap();
+    let meta = state.metadatas().get::<Tokens>().unwrap();
     let token = &meta.tokens[token_idx];
     let mut len = token.len();
 
@@ -83,7 +171,7 @@ where
     }
 
     let tokens_len = {
-        let meta = state.metadatas().get::<TokensMetadata>();
+        let meta = state.metadatas().get::<Tokens>();
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -96,7 +184,7 @@ where
 
     let off = state.rand_mut().below(size as u64) as usize;
 
-    let meta = state.metadatas().get::<TokensMetadata>().unwrap();
+    let meta = state.metadatas().get::<Tokens>().unwrap();
     let token = &meta.tokens[token_idx];
     let mut len = token.len();
     if off + len > size {

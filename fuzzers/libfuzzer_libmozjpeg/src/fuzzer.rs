@@ -12,7 +12,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
-    mutators::token_mutations::TokensMetadata,
+    mutators::token_mutations::Tokens,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
@@ -51,7 +51,7 @@ where
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<TokensMetadata>();
+    //RegistryBuilder::register::<Tokens>();
 
     println!(
         "Workdir: {:?}",
@@ -100,23 +100,9 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     println!("We're a client, let's fuzz :)");
 
-    // Create a JPEG dictionary if not existing
-    if state.metadata().get::<TokensMetadata>().is_none() {
-        state.add_metadata(TokensMetadata::new(vec![
-            vec![0xff, 0xd8, 0xff], // JPEG header
-            vec![0xff, 0xc0],
-            vec![0xff, 0xc2],
-            vec![0xff, 0xc4],
-            vec![0xff, 0xd0],
-            vec![0xff, 0xd8],
-            vec![0xff, 0xd9],
-            vec![0xff, 0xda],
-            vec![0xff, 0xdb],
-            vec![0xff, 0xdd],
-            vec![0xff, 0xe0],
-            vec![0xff, 0xe1],
-            vec![0xff, 0xfe],
-        ]));
+    // Add the JPEG tokens if not existing
+    if state.metadata().get::<Tokens>().is_none() {
+        state.add_metadata(Tokens::from_tokens_file("./jpeg.dict")?);
     }
 
     // Setup a basic mutator with a mutational stage

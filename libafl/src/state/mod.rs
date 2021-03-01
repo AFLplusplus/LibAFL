@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
-    corpus::{Corpus, Testcase, CorpusScheduler},
+    corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventManager, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::FeedbacksTuple,
@@ -175,7 +175,12 @@ where
         OT: ObserversTuple;
 
     /// Adds this input to the corpus, if it's intersting, and return the index
-    fn add_if_interesting<CS>(&mut self, input: &I, fitness: u32, scheduler: &CS) -> Result<Option<usize>, Error>
+    fn add_if_interesting<CS>(
+        &mut self,
+        input: &I,
+        fitness: u32,
+        scheduler: &CS,
+    ) -> Result<Option<usize>, Error>
     where
         CS: CorpusScheduler<I, Self>,
         Self: Sized;
@@ -455,9 +460,14 @@ where
 
     /// Adds this input to the corpus, if it's intersting, and return the index
     #[inline]
-    fn add_if_interesting<CS>(&mut self, input: &I, fitness: u32, scheduler: &CS) -> Result<Option<usize>, Error>
+    fn add_if_interesting<CS>(
+        &mut self,
+        input: &I,
+        fitness: u32,
+        scheduler: &CS,
+    ) -> Result<Option<usize>, Error>
     where
-        CS: CorpusScheduler<I, Self>
+        CS: CorpusScheduler<I, Self>,
     {
         if fitness > 0 {
             let testcase = self.testcase_with_feedbacks_metadata(input.clone(), fitness)?;
@@ -495,7 +505,7 @@ where
         OT: ObserversTuple,
         C: Corpus<I>,
         EM: EventManager<I, Self>,
-        CS: CorpusScheduler<I, Self>
+        CS: CorpusScheduler<I, Self>,
     {
         let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
         let observers = executor.observers();
@@ -505,7 +515,10 @@ where
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
 
-        if !self.add_if_interesting(&input, fitness, scheduler)?.is_none() {
+        if !self
+            .add_if_interesting(&input, fitness, scheduler)?
+            .is_none()
+        {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
                 self,
@@ -544,7 +557,7 @@ where
         E: Executor<BytesInput> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<BytesInput, Self>,
-        CS: CorpusScheduler<BytesInput, Self>
+        CS: CorpusScheduler<BytesInput, Self>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -562,7 +575,10 @@ where
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
                 let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
-                if self.add_if_interesting(&input, fitness, scheduler)?.is_none() {
+                if self
+                    .add_if_interesting(&input, fitness, scheduler)?
+                    .is_none()
+                {
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
                 if is_solution {
@@ -662,7 +678,7 @@ where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
         EM: EventManager<I, Self>,
-        CS: CorpusScheduler<I, Self>
+        CS: CorpusScheduler<I, Self>,
     {
         let mut added = 0;
         for _ in 0..num {

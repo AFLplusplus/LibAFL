@@ -11,6 +11,7 @@ use crate::{
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::cmp::{max, min};
 
+use std::path::Path;
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -821,12 +822,15 @@ pub fn add_token(tokens: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
 
 /// Read a dictionary file and return the number of entries read
 #[cfg(feature = "std")]
-pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error> {
+pub fn read_tokens_file<P>(file: P, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error>
+where
+    P: AsRef<Path>,
+{
     let mut entries = 0;
 
-    println!("Loading tokens file {:?} ...", &f);
+    // println!("Loading tokens file {:?} ...", file);
 
-    let file = File::open(&f)?; // panic if not found
+    let file = File::open(file)?; // panic if not found
     let reader = BufReader::new(file);
 
     for line in reader.lines() {

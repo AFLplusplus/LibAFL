@@ -281,7 +281,10 @@ where
                 // TODO include ExitKind in NewTestcase
                 let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
                 if fitness > 0 {
-                    if !state.add_if_interesting(&input, fitness, scheduler)?.is_none() {
+                    if !state
+                        .add_if_interesting(&input, fitness, scheduler)?
+                        .is_none()
+                    {
                         #[cfg(feature = "std")]
                         println!("Added received Testcase");
                     }

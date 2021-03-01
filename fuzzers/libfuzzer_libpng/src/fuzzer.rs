@@ -7,7 +7,7 @@ use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        RandCorpusScheduler,QueueCorpusScheduler
+        QueueCorpusScheduler, RandCorpusScheduler,
     },
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
@@ -15,7 +15,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::Input,
     mutators::scheduled::HavocBytesMutator,
-    mutators::token_mutations::TokensMetadata,
+    mutators::token_mutations::Tokens,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
@@ -54,7 +54,7 @@ where
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<TokensMetadata>();
+    //RegistryBuilder::register::<Tokens>();
 
     println!(
         "Workdir: {:?}",
@@ -104,8 +104,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     println!("We're a client, let's fuzz :)");
 
     // Create a PNG dictionary if not existing
-    if state.metadatas().get::<TokensMetadata>().is_none() {
-        state.add_metadata(TokensMetadata::new(vec![
+    if state.metadatas().get::<Tokens>().is_none() {
+        state.add_metadata(Tokens::new(vec![
             vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
             "IHDR".as_bytes().to_vec(),
             "IDAT".as_bytes().to_vec(),
@@ -139,7 +139,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             println!("Warning: LLVMFuzzerInitialize failed with -1")
         }
     }
-    
+
     std::thread::sleep_ms(2000);
 
     // In case the corpus is empty (on first run), reset
@@ -152,7 +152,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             ));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
-    
+
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
 
     // Never reached
