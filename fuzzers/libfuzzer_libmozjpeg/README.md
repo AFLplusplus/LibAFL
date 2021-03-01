@@ -1,14 +1,14 @@
-# Libfuzzer for libpng
+# Libfuzzer for libmozjpeg
 
-This folder contains an example fuzzer for libpng, using LLMP for fast multi-process fuzzing and crash detection.
+This folder contains an example fuzzer for libmozjpeg, using LLMP for fast multi-process fuzzing and crash detection.
 It has been tested on Linux.
 
 ## Build
 
-To build this example, run `cargo build --example libfuzzer_libpng --release`.
-This will call (the build.rs)[./builld.rs], which in turn downloads a libpng archive from the web.
-Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the c++ harness)[./harness.cc] and the instrumented `libpng`.
-Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng`.
+To build this example, run `cargo build --example libfuzzer_libmozjpeg --release`.
+This will call (the build.rs)[./builld.rs], which in turn downloads a libmozjpeg archive from the web.
+Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the c++ harness)[./harness.cc] and the instrumented `libmozjpeg`.
+Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libmozjpeg`.
 
 ## Run
 
@@ -19,4 +19,10 @@ As this example uses in-process fuzzing, we added a Restarting Event Manager (`s
 This means each client will start itself again to listen for crashes and timeouts.
 By restarting the actual fuzzer, it can recover from these exit conditions.
 
-For convenience, you may just run `./test.sh` in this folder.
+For convenience, you may just run `./test.sh` in this folder or:
+
+broker.sh - starts the broker
+start.sh - starts as many clients as there are cores
+stop.sh - stop everything
+
+
