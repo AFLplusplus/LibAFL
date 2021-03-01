@@ -384,7 +384,7 @@ where
         }
     }
 
-    #[cfg(all(feature = "std", unix))]
+    #[cfg(all(feature = "std", target_os = "android"))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
         match UnixListener::bind(filename) {
             Ok(listener) => {

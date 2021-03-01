@@ -113,7 +113,7 @@ where
         })
     }
 
-    #[cfg(all(feature = "std", unix))]
+    #[cfg(all(feature = "std", target_os = "android"))]
     pub fn new_on_domain_socket(stats: ST, filename: &str) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
