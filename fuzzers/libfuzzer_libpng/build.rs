@@ -46,9 +46,7 @@ fn main() {
             .current_dir(&libpng_path)
             .args(&[
                 "--disable-shared",
-                "CC=clang",
-                "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-                "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
+                &format!("--host={}",env::var("TARGET").unwrap())[..],
             ])
             .env("CC", "clang")
             .env("CXX", "clang++")
@@ -60,30 +58,11 @@ fn main() {
                 "CXXFLAGS",
                 "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
             )
-            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
+            .env("LDFLAGS", format!("-g -fPIE -fsanitize-coverage=trace-pc-guard {}", env::var("LDFLAGS").unwrap()))
             .status()
             .unwrap();
         Command::new("make")
             .current_dir(&libpng_path)
-            //.arg(&format!("-j{}", num_cpus::get()))
-            .args(&[
-                "CC=clang",
-                "CXX=clang++",
-                "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-                "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
-                "CXXFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            ])
-            .env("CC", "clang")
-            .env("CXX", "clang++")
-            .env(
-                "CFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            )
-            .env(
-                "CXXFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            )
-            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
             .status()
             .unwrap();
     }
@@ -94,6 +73,7 @@ fn main() {
 
     cc::Build::new()
         .include(&libpng_path)
+        .cpp(true)
         .flag("-fsanitize-coverage=trace-pc-guard")
         // .define("HAS_DUMMY_CRASH", "1")
         .file("./harness.cc")
@@ -108,7 +88,8 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=z");
 
     //For the C++ harness
-    println!("cargo:rustc-link-lib=static=stdc++");
+    //must by dylib for android
+    println!("cargo:rustc-link-lib=dylib=stdc++");
 
     println!("cargo:rerun-if-changed=build.rs");
 }
