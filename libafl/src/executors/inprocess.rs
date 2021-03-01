@@ -207,15 +207,10 @@ pub mod unix_signals {
         I: Input,
     {
         if CURRENT_INPUT_PTR == ptr::null() {
-
             #[cfg(target_os = "android")]
-            let si_addr = {
-                ((info._pad[0] as usize) | ((info._pad[1] as usize) << 32)) as usize
-            };
+            let si_addr = { ((info._pad[0] as usize) | ((info._pad[1] as usize) << 32)) as usize };
             #[cfg(not(target_os = "android"))]
-            let si_addr = {
-                info.si_addr() as usize
-            };
+            let si_addr = { info.si_addr() as usize };
 
             println!(
                 "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",

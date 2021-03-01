@@ -50,7 +50,7 @@ fn main() {
             .current_dir(&libpng_path)
             .args(&[
                 "--disable-shared",
-                &format!("--host={}",env::var("TARGET").unwrap())[..],
+                &format!("--host={}", env::var("TARGET").unwrap())[..],
             ])
             .env("CC", "clang")
             .env("CXX", "clang++")
@@ -62,7 +62,10 @@ fn main() {
                 "CXXFLAGS",
                 "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
             )
-            .env("LDFLAGS", format!("-g -fPIE -fsanitize-coverage=trace-pc-guard {}", ldflags))
+            .env(
+                "LDFLAGS",
+                format!("-g -fPIE -fsanitize-coverage=trace-pc-guard {}", ldflags),
+            )
             .status()
             .unwrap();
         Command::new("make")
