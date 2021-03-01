@@ -42,8 +42,6 @@ fn main() {
             .arg(&libmozjpeg_tar)
             .status()
             .unwrap();
-        println!("{}",&libmozjpeg);
-        println!("{}",&out_dir_path.display());
         Command::new(format!("{}/cmake", &libmozjpeg))
             .current_dir(&out_dir_path)
             .args(&[
