@@ -273,7 +273,7 @@ pub mod shmem {
             return 0 as *mut c_uchar;
         }
         snprintf(
-            (*shm).shm_str.as_mut_ptr() as *mut u8,
+            (*shm).shm_str.as_mut_ptr() as *mut c_char,
             size_of::<[c_char; 20]>() as c_ulong,
             b"%d\x00" as *const u8 as *const c_char,
             (*shm).shm_id,
