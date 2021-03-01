@@ -25,7 +25,7 @@ fn main() {
     std::env::set_var("CXX", "clang++");
     let ldflags = match env::var("LDFLAGS") {
         Ok(val) => val,
-        Err(e) => "".to_string(),
+        Err(_) => "".to_string(),
     };
 
     if !libpng_path.is_dir() {
