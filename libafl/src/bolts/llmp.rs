@@ -70,8 +70,10 @@ use std::{
     thread,
 };
 
+#[cfg(unix)]
+use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(target_os = "android")]
-use std::os::unix::net::{UnixListener, UnixStream, SocketAncillary, AncillaryData};
+use std::os::unix::net::{SocketAncillary, AncillaryData};
 
 use super::shmem::{ShMem, ShMemDescription};
 use crate::Error;
