@@ -12,6 +12,15 @@ extern crate static_assertions;
 #[macro_use]
 extern crate ctor;
 
+// Re-export derive(SerdeAny)
+#[cfg(feature = "libafl_derive")]
+#[allow(unused_imports)]
+#[macro_use]
+extern crate libafl_derive;
+#[cfg(feature = "libafl_derive")]
+#[doc(hidden)]
+pub use libafl_derive::*;
+
 pub mod bolts;
 pub mod corpus;
 pub mod events;
