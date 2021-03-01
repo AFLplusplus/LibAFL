@@ -32,7 +32,7 @@ where
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
-                    if *cur + 1 > state.corpus().count() {
+                    if *cur + 1 >= state.corpus().count() {
                         0
                     } else {
                         *cur + 1
