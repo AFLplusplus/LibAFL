@@ -11,12 +11,6 @@ use crate::{
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::cmp::{max, min};
 
-#[cfg(feature = "std")]
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
-
 /// The result of a mutation.
 /// If the mutation got skipped, the target
 /// will not be executed with the returned input.
@@ -810,75 +804,8 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
     return Ok(token);
 }
 
-/// Adds a token to a dictionary, checking it is not a duplicate
-pub fn add_token(tokens: &mut Vec<Vec<u8>>, token: &Vec<u8>) -> u32 {
-    if tokens.contains(token) {
-        return 0;
-    }
-    tokens.push(token.to_vec());
-    return 1;
-}
-
-/// Read a dictionary file and return the number of entries read
-#[cfg(feature = "std")]
-pub fn read_tokens_file(f: &str, tokens: &mut Vec<Vec<u8>>) -> Result<u32, Error> {
-    let mut entries = 0;
-
-    println!("Loading tokens file {:?} ...", &f);
-
-    let file = File::open(&f)?; // panic if not found
-    let reader = BufReader::new(file);
-
-    for line in reader.lines() {
-        let line = line.unwrap();
-        let line = line.trim_start().trim_end();
-
-        // we are only interested in '"..."', not prefixed 'foo = '
-        let start = line.chars().nth(0);
-        if line.len() == 0 || start == Some('#') {
-            continue;
-        }
-        let pos_quote = match line.find("\"") {
-            Some(x) => x,
-            _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
-        };
-        if line.chars().nth(line.len() - 1) != Some('"') {
-            return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
-        }
-
-        // extract item
-        let item = match line.get(pos_quote + 1..line.len() - 1) {
-            Some(x) => x,
-            _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
-        };
-        if item.len() == 0 {
-            continue;
-        }
-
-        // decode
-        let token: Vec<u8> = match str_decode(item) {
-            Ok(val) => val,
-            Err(_) => {
-                return Err(Error::IllegalArgument(
-                    "Illegal line (hex decoding): ".to_owned() + line,
-                ))
-            }
-        };
-
-        // add
-        entries += add_token(tokens, &token);
-    }
-
-    Ok(entries)
-}
-
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "std")]
-    use std::fs;
-
-    #[cfg(feature = "std")]
-    use crate::mutators::read_tokens_file;
 
     use super::*;
     use crate::{
@@ -888,26 +815,6 @@ mod tests {
         state::State,
         utils::StdRand,
     };
-
-    #[cfg(feature = "std")]
-    #[test]
-    fn test_read_tokens() {
-        let _ = fs::remove_file("test.tkns");
-        let data = r###"
-# comment
-token1@123="AAA"
-token1="A\x41A"
-"A\AA"
-token2="B"
-        "###;
-        fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let mut v: Vec<Vec<u8>> = Vec::new();
-        let res = read_tokens_file(&"test.tkns".to_string(), &mut v).unwrap();
-        #[cfg(feature = "std")]
-        println!("Token file entries: {:?}", res);
-        assert_eq!(res, 2);
-        let _ = fs::remove_file("test.tkns");
-    }
 
     #[test]
     fn test_mutators() {

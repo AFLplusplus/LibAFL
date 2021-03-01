@@ -46,5 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Test
+    - name: Build Docs
       run: cargo doc
+    - name: Test Docs
+      run: cargo test --doc
