@@ -23,6 +23,10 @@ fn main() {
     // Enforce clang for its -fsanitize-coverage support.
     std::env::set_var("CC", "clang");
     std::env::set_var("CXX", "clang++");
+    let ldflags = match env::var("LDFLAGS") {
+        Ok(val) => val,
+        Err(e) => "".to_string(),
+    };
 
     if !libpng_path.is_dir() {
         if !Path::new(&libpng_tar).is_file() {
@@ -58,7 +62,7 @@ fn main() {
                 "CXXFLAGS",
                 "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
             )
-            .env("LDFLAGS", format!("-g -fPIE -fsanitize-coverage=trace-pc-guard {}", env::var("LDFLAGS").unwrap()))
+            .env("LDFLAGS", format!("-g -fPIE -fsanitize-coverage=trace-pc-guard {}", ldflags))
             .status()
             .unwrap();
         Command::new("make")
