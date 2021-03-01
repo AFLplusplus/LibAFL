@@ -25,8 +25,8 @@ where
     filename: Option<String>,
     /// Accumulated fitness from all the feedbacks
     fitness: u32,
-    /// Map of metadatas associated with this testcase
-    metadatas: SerdeAnyMap,
+    /// Map of metadata associated with this testcase
+    metadata: SerdeAnyMap,
     /// Time needed to execute the input
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
@@ -37,16 +37,16 @@ impl<I> HasMetadata for Testcase<I>
 where
     I: Input,
 {
-    /// Get all the metadatas into an HashMap
+    /// Get all the metadata into an HashMap
     #[inline]
-    fn metadatas(&self) -> &SerdeAnyMap {
-        &self.metadatas
+    fn metadata(&self) -> &SerdeAnyMap {
+        &self.metadata
     }
 
-    /// Get all the metadatas into an HashMap (mutable)
+    /// Get all the metadata into an HashMap (mutable)
     #[inline]
-    fn metadatas_mut(&mut self) -> &mut SerdeAnyMap {
-        &mut self.metadatas
+    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+        &mut self.metadata
     }
 }
 
@@ -158,7 +158,7 @@ where
             input: Some(input.into()),
             filename: None,
             fitness: 0,
-            metadatas: SerdeAnyMap::new(),
+            metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
         }
@@ -171,7 +171,7 @@ where
             input: Some(input),
             filename: Some(filename),
             fitness: 0,
-            metadatas: SerdeAnyMap::new(),
+            metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
         }
@@ -184,7 +184,7 @@ where
             input: Some(input.into()),
             filename: None,
             fitness: fitness,
-            metadatas: SerdeAnyMap::new(),
+            metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
         }
@@ -196,7 +196,7 @@ where
             input: None,
             filename: None,
             fitness: 0,
-            metadatas: SerdeAnyMap::new(),
+            metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
         }

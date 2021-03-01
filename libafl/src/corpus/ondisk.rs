@@ -37,7 +37,7 @@ where
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
         match testcase.filename() {
             None => {
-                // TODO walk entry metadatas to ask for pices of filename (e.g. :havoc in AFL)
+                // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
                 let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
                 let filename_str = filename.to_str().expect("Invalid Path");
                 testcase.set_filename(filename_str.into());

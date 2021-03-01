@@ -73,7 +73,7 @@ where
     I: Input,
 {
     // TODO use an ID to keep track of the original index in the sender Corpus
-    // The sender can then use it to send Testcase metadatas with CustomEvent
+    // The sender can then use it to send Testcase metadata with CustomEvent
     /// A fuzzer found a new testcase. Rejoice!
     NewTestcase {
         /// The input for the new testcase
