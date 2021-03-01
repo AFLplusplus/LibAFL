@@ -70,7 +70,7 @@ use std::{
     thread,
 };
 
-#[cfg(unix)]
+#[cfg(target_os = "android")]
 use std::os::unix::net::{UnixListener, UnixStream, SocketAncillary, AncillaryData};
 
 use super::shmem::{ShMem, ShMemDescription};
@@ -1698,7 +1698,7 @@ where
         Ok(ret)
     }
 
-    #[cfg(all(feature = "std", unix))]
+    #[cfg(all(feature = "std", target_os = "android"))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
         let mut stream = UnixStream::connect(filename)?;
