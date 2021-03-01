@@ -22,6 +22,7 @@ use crate::{
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
+    corpus::CorpusScheduler,
     state::IfInteresting,
     stats::Stats,
     Error,
@@ -252,14 +253,16 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client<E, OT>(
+    fn handle_in_client<CS, E, OT>(
         &mut self,
         state: &mut S,
         _sender_id: u32,
         event: Event<I>,
         _executor: &mut E,
+        scheduler: &CS,
     ) -> Result<(), Error>
     where
+        CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
     {
@@ -315,10 +318,11 @@ where
         }
     }
 
-    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    fn process<CS, E, OT>(&mut self, state: &mut S, executor: &mut E, scheduler: &CS) -> Result<usize, Error>
     where
+        CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        OT: ObserversTuple
     {
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
@@ -342,7 +346,7 @@ where
         };
         let count = events.len();
         events.drain(..).try_for_each(|(sender_id, event)| {
-            self.handle_in_client(state, sender_id, event, executor)
+            self.handle_in_client(state, sender_id, event, executor, scheduler)
         })?;
         Ok(count)
     }
@@ -426,12 +430,13 @@ where
             .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
     }
 
-    fn process<E, OT>(&mut self, state: &mut S, executor: &mut E) -> Result<usize, Error>
+    fn process<CS, E, OT>(&mut self, state: &mut S, executor: &mut E, scheduler: &CS) -> Result<usize, Error>
     where
+        CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        OT: ObserversTuple
     {
-        self.llmp_mgr.process(state, executor)
+        self.llmp_mgr.process(state, executor, scheduler)
     }
 
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {

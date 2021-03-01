@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusScheduler},
     events::EventManager,
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -18,7 +18,7 @@ use crate::{
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<C, E, EM, I, M, OT, S>: Stage<E, EM, I, S>
+pub trait MutationalStage<C, CS, E, EM, I, M, OT, S>: Stage<CS, E, EM, I, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -27,6 +27,7 @@ where
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    CS: CorpusScheduler<I, S>
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -43,6 +44,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
+        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let num = self.iterations(state);
@@ -67,7 +69,7 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<C, E, EM, I, M, OT, R, S>
+pub struct StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -76,14 +78,15 @@ where
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    CS: CorpusScheduler<I, S>,
     R: Rand,
 {
     mutator: M,
-    phantom: PhantomData<(C, E, EM, I, OT, R, S)>,
+    phantom: PhantomData<(C, CS, E, EM, I, OT, R, S)>,
 }
 
-impl<C, E, EM, I, M, OT, R, S> MutationalStage<C, E, EM, I, M, OT, S>
-    for StdMutationalStage<C, E, EM, I, M, OT, R, S>
+impl<C, CS, E, EM, I, M, OT, R, S> MutationalStage<C, CS, E, EM, I, M, OT, S>
+    for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -92,6 +95,7 @@ where
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    CS: CorpusScheduler<I, S>,
     R: Rand,
 {
     /// The mutator, added to this stage
@@ -112,7 +116,7 @@ where
     }
 }
 
-impl<C, E, EM, I, M, OT, R, S> Stage<E, EM, I, S> for StdMutationalStage<C, E, EM, I, M, OT, R, S>
+impl<C, CS, E, EM, I, M, OT, R, S> Stage<CS, E, EM, I, S> for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -121,6 +125,7 @@ where
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    CS: CorpusScheduler<I, S>,
     R: Rand,
 {
     #[inline]
@@ -129,13 +134,14 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
+        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.perform_mutational(state, executor, manager, corpus_idx)
+        self.perform_mutational(state, executor, manager, scheduler, corpus_idx)
     }
 }
 
-impl<C, E, EM, I, M, OT, R, S> StdMutationalStage<C, E, EM, I, M, OT, R, S>
+impl<C, CS, E, EM, I, M, OT, R, S> StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -144,6 +150,7 @@ where
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
     OT: ObserversTuple,
+    CS: CorpusScheduler<I, S>,
     R: Rand,
 {
     /// Creates a new default mutational stage

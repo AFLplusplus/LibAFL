@@ -600,7 +600,7 @@ where
                 phantom: PhantomData,
             },
         )?;
-        manager.process(self, executor)?;
+        manager.process(self, executor, scheduler)?;
         Ok(())
     }
 }
@@ -680,7 +680,7 @@ where
                 phantom: PhantomData,
             },
         )?;
-        manager.process(self, executor)?;
+        manager.process(self, executor, scheduler)?;
         Ok(())
     }
 

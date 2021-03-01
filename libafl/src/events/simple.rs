@@ -7,6 +7,7 @@ use crate::{
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
+    corpus::CorpusScheduler,
     stats::Stats,
     Error,
 };
@@ -30,10 +31,11 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<E, OT>(&mut self, state: &mut S, _executor: &mut E) -> Result<usize, Error>
+    fn process<CS, E, OT>(&mut self, state: &mut S, _executor: &mut E, _scheduler: &CS) -> Result<usize, Error>
     where
+        CS: CorpusScheduler<I, S>,
         E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        OT: ObserversTuple
     {
         let count = self.events.len();
         while self.events.len() > 0 {
