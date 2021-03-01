@@ -46,7 +46,6 @@ fn main() {
             .args(&[
                 "-G\"Unix Makefiles\"",
                 "--disable-shared",
-                "{}", 
                 &libmozjpeg,
                 "CC=clang",
                 "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
