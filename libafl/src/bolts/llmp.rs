@@ -1312,6 +1312,7 @@ where
         self.shutting_down = true;
     }
 
+    #[cfg(all(feature = "std", unix))]
     pub unsafe fn handle_signal(_sig: c_int, info: siginfo_t, _void: c_void) {
         if !CURRENT_BROKER_PTR.is_null() {
             let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>)
@@ -1328,6 +1329,7 @@ where
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
+        #[cfg(all(feature = "std", unix))]
         unsafe {
             CURRENT_BROKER_PTR = self as *const _ as *const c_void;
 
