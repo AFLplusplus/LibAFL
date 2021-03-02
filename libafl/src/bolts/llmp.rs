@@ -72,8 +72,16 @@ use std::{
 
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
-#[cfg(target_os = "android")]
-use std::os::unix::net::{SocketAncillary, AncillaryData};
+#[cfg(unix)]
+use nix:: {
+    sys::uio::IoVec,
+    sys::socket::{sendmsg, recvmsg, ControlMessage, ControlMessageOwned, MsgFlags},
+    cmsg_space,
+};
+use std::os::unix::{
+    io::AsRawFd,
+    prelude::RawFd,
+};
 
 use super::shmem::{ShMem, ShMemDescription};
 use crate::Error;
@@ -396,7 +404,6 @@ where
                 Ok(LlmpConnection::IsBroker { broker })
             }
             Err(e) => {
-                dbg!("UnixListener::bind error: {:?}", &e);
                 match e.kind() {
                     std::io::ErrorKind::AddrInUse => {
                         // We are the client :)
@@ -1343,6 +1350,7 @@ where
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
         let broadcast_str_initial = client_out_map_mem.shm_slice().clone();
+        let broadcast_fd_initial = client_out_map_mem.shm_get_id();
 
         let llmp_tcp_id = self.llmp_clients.len() as u32;
 
@@ -1401,17 +1409,55 @@ where
                     },
                     ListenerStream::Unix(stream, addr) => {
                         unsafe {
-                            let msg = new_client_sender
-                                .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
-                                .expect("Could not allocate a new message in shared map.");
-                            (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
-                            let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                            //(*pageinfo).shm_str = new_client_map_str;
-                            (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
-                            match new_client_sender.send(msg) {
-                                Ok(()) => (),
-                                Err(e) => println!("Error forwarding client on map: {:?}", e),
+                            dbg!("New connection", addr);
+
+                            match sendmsg(
+                                stream.as_raw_fd(),
+                                &[IoVec::from_slice(b"\x00")],
+                                &[ControlMessage::ScmRights(&[broadcast_fd_initial])],
+                                MsgFlags::empty(),
+                                None) {
+                                Ok(_) => {},
+                                Err(err) => {
+                                    dbg!("Error sending fd over stream: {}", err);
+                                    continue;
+                                }
                             };
+
+                            let mut buf = [0u8; 5];
+                            let mut cmsgspace = cmsg_space!([RawFd; 1]);
+                            let msg = recvmsg(
+                                stream.as_raw_fd(),
+                                &[IoVec::from_mut_slice(&mut buf[..])],
+                                Some(&mut cmsgspace),
+                                MsgFlags::empty())
+                                .unwrap();
+
+                            for cmsg in msg.cmsgs() {
+                                if let ControlMessageOwned::ScmRights(fds) = cmsg {
+                                    for fd in fds {
+                                        let mut fdstr = [0u8; 20];
+                                        match write!(&mut fdstr[..], "{}", fd) {
+                                            Ok(_) => {},
+                                            Err(_) => {
+                                                dbg!("error converting fd to string");
+                                            }
+                                        }
+
+                                        let msg = new_client_sender
+                                            .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
+                                            .expect("Could not allocate a new message in shared map.");
+                                        (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+                                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+                                        (*pageinfo).shm_str = fdstr;
+                                        (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
+                                        match new_client_sender.send(msg) {
+                                            Ok(()) => (),
+                                            Err(e) => println!("Error forwarding client on map: {:?}", e),
+                                        };
+                                    }
+                                }
+                            }
                         }
 
                     },
@@ -1703,27 +1749,48 @@ where
     #[cfg(all(feature = "std", target_os = "android"))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
-        let mut stream = UnixStream::connect(filename)?;
+        let stream = UnixStream::connect(filename)?;
         println!("Connected to socket {}", filename);
 
-        let new_broker_map_str: [u8; 20] = Default::default();
+        let mut buf = [0u8; 5];
+        let mut cmsgspace = cmsg_space!([RawFd; 1]);
+        let msg = recvmsg(
+            stream.as_raw_fd(),
+            &[IoVec::from_mut_slice(&mut buf[..])],
+            Some(&mut cmsgspace),
+            MsgFlags::empty())
+            .unwrap();
 
-        let bufs = &mut [][..];
-        let mut ancillary_buffer = [0; 128];
-        let mut ancillary = SocketAncillary::new(&mut ancillary_buffer[..]);
-
-        stream.recv_vectored_with_ancillary(bufs, &mut ancillary)?;
-        for ancillary_result in ancillary.messages() {
-            if let AncillaryData::ScmRights(scm_rights) = ancillary_result.unwrap() {
-                for fd in scm_rights {
-                    dbg!("Received fd: {}", fd);
+        for cmsg in msg.cmsgs() {
+            if let ControlMessageOwned::ScmRights(fds) = cmsg {
+                for fd in fds {
+                    let mut fdstr = [0u8; 20];
+                    match write!(&mut fdstr[..], "{}", fd) {
+                        Ok(_) => {},
+                        Err(_) => {
+                            dbg!("error converting fd to string");
+                        }
+                    }
 
                     let ret = Self::new(LlmpSharedMap::existing(SH::existing_from_shm_slice(
-                        &new_broker_map_str,
+                        &fdstr,
                         LLMP_PREF_INITIAL_MAP_SIZE,
                     )?))?;
 
-                    stream.write(ret.sender.out_maps.first().unwrap().shmem.shm_slice())?;
+                    match sendmsg(
+                        stream.as_raw_fd(),
+                        &[IoVec::from_slice(b"\x00")],
+                        &[ControlMessage::ScmRights(&[
+                            ret.sender.out_maps.first().unwrap().shmem.shm_get_id()
+                        ])],
+                        MsgFlags::empty(),
+                        None) {
+                        Ok(_) => {},
+                        Err(err) => {
+                            dbg!("Error sending fd over stream {}", err);
+                            continue;
+                        }
+                    };
                     return Ok(ret);
                 }
             }

@@ -504,7 +504,13 @@ where
 
     // We start ourself as child process to actually fuzz
     if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-        mgr = LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?;
+        let path = std::env::current_dir()?;
+        mgr = if cfg!(target_os = "android") {
+            LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(stats, &format!("{}/.llmp_socket", path.display()).to_string())?
+        } else {
+            LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?
+        };
+
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
