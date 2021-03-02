@@ -1338,7 +1338,7 @@ where
 
         // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
         let signal_stack_size = 2 << 22;
-        // TODO: We leak the signal stack. Removing the signal handlers, then freeing this mem on teardown, would be more correct.
+        // TODO: We leak the signal stack. Removing the signal handlers, then freeing this mem on teardown would be more correct.
         let signal_stack_ptr = malloc(signal_stack_size);
         if signal_stack_ptr.is_null() {
             panic!(
