@@ -106,7 +106,7 @@ pub trait ShMem: Sized + Debug {
 #[cfg(feature = "std")]
 pub mod unix_shmem {
 
-    use core::{mem::size_of, slice};
+    use core::{mem::size_of, slice, ptr};
     use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void, off_t, size_t};
     use std::ffi::CStr;
     use std::ffi::CString;
