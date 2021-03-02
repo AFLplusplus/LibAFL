@@ -1,8 +1,12 @@
 //! Utility functions for AFL
 
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
+use libc::pid_t;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{env, process::Command};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
+
+use crate::Error;
 
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -378,19 +382,21 @@ impl XKCDRand {
     }
 }
 
+/// Child Process Handle
+#[cfg(unix)]
+pub struct ChildHandle {
+    pid: pid_t,
+}
 
 #[cfg(unix)]
-struct ChildHandle {
-    child_pid: pid_t;
-}
-
 impl ChildHandle {
-    pub fn status(pid_t) {
-
+    /// Block until the child exited and the status code becomes available
+    pub fn status(&self) -> i32 {
+        let mut status = -1;
+        unsafe { libc::waitpid(self.pid, &mut status, 0); }
+        status
     }
 }
-
-
 
 #[cfg(unix)]
 /// The ForkResult
@@ -402,25 +408,24 @@ pub enum ForkResult {
 /// Unix has forks.
 #[cfg(unix)]
 pub unsafe fn fork() -> Result<ForkResult, Error> {
-    let ret = libc::fork();
-    if ret < 0 {
-        Err(Error::Unknown("Fork failed"))
-    } else if ret == 0 {
+    let pid = libc::fork();
+    if pid < 0 {
+        Err(Error::Unknown("Fork failed".to_string()))
+    } else if pid == 0 {
         Ok(ForkResult::Child)
     } else {
-        Ok(ForkResult::Parent(ret))
+        Ok(ForkResult::Parent(ChildHandle { pid }))
     }
 }
 
 /// Executes the current process from the beginning, as subprocess.
 /// use `start_self.status()?` to wait for the child
-pub fn startable_self() -> Command {
-    Command::new(env::current_exe()?)
-    .current_dir(env::current_dir()?)
-    .args(env::args())
+pub fn startable_self() -> Result<Command, Error> {
+    let mut startable = Command::new(env::current_exe()?);
+    startable.current_dir(env::current_dir()?)
+        .args(env::args());
+    Ok(startable)
 }
-
-
 
 #[cfg(test)]
 mod tests {

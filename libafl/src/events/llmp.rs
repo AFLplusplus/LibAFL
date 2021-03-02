@@ -1,12 +1,12 @@
 use crate::bolts::{llmp::LlmpSender, shmem::HasFd};
 use alloc::{string::ToString, vec::Vec};
-use libc::fork;
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
 use crate::bolts::llmp::LlmpReceiver;
 
+#[cfg(windows)]
 #[cfg(feature = "std")]
 use std::{env, process::Command};
 
@@ -26,8 +26,7 @@ use crate::{
     observers::ObserversTuple,
     state::IfInteresting,
     stats::Stats,
-    utils,
-    Error,
+    utils, Error,
 };
 
 /// Forward this to the client
@@ -498,8 +497,6 @@ where
     }
 }
 
-
-
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
@@ -556,12 +553,10 @@ where
 
                 // On Unix, we fork (todo: measure if that is actually faster.)
                 #[cfg(unix)]
-                match unsafe {utils::fork()?} {
-                    utils::ForkResult::Parent(pid) => (),
-                    utils::ForkResult::Child => {
-                        break (sender, receiver)
-                    }
-                }
+                let _ = match unsafe {utils::fork()}? {
+                    utils::ForkResult::Parent(handle) => handle.status(),
+                    utils::ForkResult::Child => break (sender, receiver),
+                };
 
                 // On windows, we spawn ourself again
                 #[cfg(windows)]
@@ -576,8 +571,10 @@ where
     } else {
         // We are the newly started fuzzing instance, first, connect to our own restore map.
         // A sender and a receiver for single communication
-        (LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?,
-        LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?)
+        (
+            LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?,
+            LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?,
+        )
     };
 
     println!("We're a client, let's fuzz :)");
