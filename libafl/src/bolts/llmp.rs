@@ -118,7 +118,6 @@ pub type Tag = u32;
 /// Abstraction for listeners
 #[cfg(feature = "std")]
 pub enum Listener {
-
     Tcp(TcpListener),
     Unix(UnixListener),
 }
