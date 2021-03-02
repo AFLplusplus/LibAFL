@@ -76,8 +76,9 @@ use nix::{
     sys::socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
     sys::uio::IoVec,
 };
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
 use std::os::unix::net::{UnixListener, UnixStream};
+#[cfg(all(feature = "std", unix))]
 use std::os::unix::{io::AsRawFd, prelude::RawFd};
 
 use super::shmem::{ShMem, ShMemDescription};
