@@ -57,6 +57,7 @@ use core::{
     cmp::max,
     fmt::Debug,
     mem::size_of,
+    mem::zeroed,
     ptr, slice,
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
@@ -80,6 +81,12 @@ use nix::{
 use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(all(feature = "std", unix))]
 use std::os::unix::{io::AsRawFd, prelude::RawFd};
+
+#[cfg(all(feature = "std", unix))]
+use libc::{
+    c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO, SIGTERM, SIGQUIT, SIGINT,
+};
 
 use super::shmem::{ShMem, ShMemDescription};
 use crate::Error;
@@ -395,6 +402,7 @@ where
             Ok(listener) => {
                 dbg!("We're the broker");
                 let mut broker = LlmpBroker::new()?;
+                broker.socket_name = filename.to_string();
                 let _listener_thread = broker.launch_listener(Listener::Unix(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
@@ -1211,7 +1219,15 @@ where
     /// This allows us to intercept messages right in the broker
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SH>>,
+    /// This is the socket name, when unix domain sockets are used.
+    socket_name: String,
+    /// This flag is used to indicate that shutdown has been requested by the SIGINT and SIGTERM
+    /// handlers
+    shutting_down: bool,
 }
+
+/// used to access the current broker in signal handler.
+static mut CURRENT_BROKER_PTR: *const c_void = ptr::null();
 
 /// The broker forwards all messages to its own bus-like broadcast map.
 /// It may intercept messages passing through.
@@ -1231,6 +1247,8 @@ where
                 keep_pages_forever: true,
             },
             llmp_clients: vec![],
+            socket_name: "".to_string(),
+            shutting_down: false,
         };
 
         Ok(broker)
@@ -1290,14 +1308,55 @@ where
         Ok(())
     }
 
+    pub fn shutdown(&mut self) {
+        self.shutting_down = true;
+    }
+
+    pub unsafe fn handle_signal(_sig: c_int, info: siginfo_t, _void: c_void) {
+        if ! CURRENT_BROKER_PTR.is_null() {
+            let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>).as_mut().unwrap();
+            broker.shutdown();
+        };
+
+    }
+
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
     /// Never returns. Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
-    pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>) -> !
+    pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        loop {
+
+        unsafe {
+            CURRENT_BROKER_PTR = self as *const _ as *const c_void;
+
+            // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
+            let signal_stack_size = 2 << 22;
+            let signal_stack_ptr = malloc(signal_stack_size);
+            if signal_stack_ptr.is_null() {
+                panic!(
+                    "Failed to allocate signal stack with {} bytes!",
+                    signal_stack_size
+                );
+            }
+            sigaltstack(signal_stack_ptr as _, ptr::null_mut() as _);
+
+            let mut sa: sigaction = zeroed();
+            libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
+            sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
+            sa.sa_sigaction = LlmpBroker::<SH>::handle_signal as usize;
+            for (sig, msg) in &[
+                (SIGTERM, "segterm"),
+                (SIGINT, "sigint"),
+                (SIGQUIT, "sigquit"),
+            ] {
+                if sigaction(*sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
+                    panic!("Could not set up {} handler", &msg);
+                }
+            }
+        }
+        while !self.shutting_down {
             compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
@@ -1314,7 +1373,7 @@ where
                 }
                 None => (),
             }
-        }
+        };
     }
 
     /// Broadcasts the given buf to all lients
@@ -1535,6 +1594,22 @@ where
                 };
                 if should_forward_msg {
                     self.forward_msg(msg)?;
+                }
+            }
+        }
+    }
+}
+
+impl<SH> Drop for LlmpBroker<SH>
+where
+    SH: ShMem,
+{
+    fn drop(&mut self) {
+        if self.socket_name != "".to_string() {
+            match std::fs::remove_file(&self.socket_name) {
+                Ok(_) => {},
+                Err(err) => {
+                    dbg!("failed to close socket: {}", err);
                 }
             }
         }

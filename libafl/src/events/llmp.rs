@@ -200,6 +200,8 @@ where
                     },
                     Some(Duration::from_millis(5)),
                 );
+
+                Ok(())
             }
             _ => Err(Error::IllegalState(
                 "Called broker loop in the client".into(),
@@ -518,6 +520,7 @@ where
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
             mgr.broker_loop()?;
+            return Err(Error::ShuttingDown);
         } else {
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
