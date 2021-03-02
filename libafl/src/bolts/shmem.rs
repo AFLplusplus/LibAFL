@@ -116,7 +116,7 @@ pub mod unix_shmem {
     use super::ShMem;
 
     #[cfg(target_os = "android")]
-    use libc::{PROT_READ, PROT_WRITE, MAP_SHARED, O_RDWR};
+    use libc::{MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
 
     #[cfg(unix)]
     extern "C" {
@@ -137,7 +137,14 @@ pub mod unix_shmem {
         #[cfg(all(feature = "std", target_os = "android"))]
         fn close(fd: c_int) -> c_int;
         #[cfg(all(feature = "std", target_os = "android"))]
-        fn mmap(addr: *mut c_void, len: size_t, prot: c_int, flags: c_int, fd: c_int, offset: off_t) -> *mut c_void;
+        fn mmap(
+            addr: *mut c_void,
+            len: size_t,
+            prot: c_int,
+            flags: c_int,
+            fd: c_int,
+            offset: off_t,
+        ) -> *mut c_void;
 
     }
 
@@ -182,15 +189,15 @@ pub mod unix_shmem {
     #[cfg(target_os = "android")]
     unsafe fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int {
         let path = CString::new(ASHMEM_DEVICE).expect("CString::new failed!");
-        let fd = open(path.as_ptr(),
-                      O_RDWR);
+        let fd = open(path.as_ptr(), O_RDWR);
 
-        let mut ourkey :[c_char; 20] = [0; 20];
+        let mut ourkey: [c_char; 20] = [0; 20];
         snprintf(
             ourkey.as_mut_ptr() as *mut c_char,
             size_of::<[c_char; 20]>() as c_ulong,
             b"%d\x00" as *const u8 as *const c_char,
-            __key);
+            __key,
+        );
 
         print!("ourkey: {:?}\n", ourkey);
         if ioctl(fd, ASHMEM_SET_NAME, &ourkey) != 0 {
@@ -222,7 +229,8 @@ pub mod unix_shmem {
             PROT_READ | PROT_WRITE,
             MAP_SHARED,
             __shmid,
-            0);
+            0,
+        );
         if ptr == usize::MAX as *mut c_void {
             return 0 as *mut c_void;
         }
@@ -355,7 +363,6 @@ pub mod unix_shmem {
             }
         }
     }
-
 
     /// Deinitialize this shmem instance
     unsafe fn afl_shmem_deinit(shm: *mut UnixShMem) {
