@@ -394,7 +394,7 @@ where
         }
     }
 
-    #[cfg(all(feature = "std", target_os = "android"))]
+    #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
         match UnixListener::bind(filename) {
             Ok(listener) => {
@@ -1746,7 +1746,7 @@ where
         Ok(ret)
     }
 
-    #[cfg(all(feature = "std", target_os = "android"))]
+    #[cfg(all(feature = "std", unix))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
         let stream = UnixStream::connect(filename)?;
