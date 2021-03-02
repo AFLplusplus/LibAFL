@@ -41,7 +41,7 @@ where
 /// Mem move in the own vec
 #[inline]
 pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
-    debug_assert!(data.len() > 0);
+    debug_assert!(!data.is_empty());
     debug_assert!(from + len <= data.len());
     debug_assert!(to + len <= data.len());
     if len != 0 && from != to {
@@ -53,8 +53,8 @@ pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
 /// Mem move between vecs
 #[inline]
 pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
-    debug_assert!(dst.len() > 0);
-    debug_assert!(src.len() > 0);
+    debug_assert!(!dst.is_empty());
+    debug_assert!(!src.is_empty());
     debug_assert!(from + len <= src.len());
     debug_assert!(to + len <= dst.len());
     let dst_ptr = dst.as_mut_ptr();
@@ -124,7 +124,7 @@ where
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let bit = state.rand_mut().below((input.bytes().len() << 3) as u64) as usize;
@@ -142,7 +142,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -160,7 +160,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -179,7 +179,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -198,7 +198,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -216,7 +216,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -234,7 +234,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -335,7 +335,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;

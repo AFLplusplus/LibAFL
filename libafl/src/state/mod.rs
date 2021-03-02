@@ -515,9 +515,9 @@ where
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
 
-        if !self
+        if self
             .add_if_interesting(&input, fitness, scheduler)?
-            .is_none()
+            .is_some()
         {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
@@ -564,7 +564,7 @@ where
             let path = entry.path();
             let attributes = fs::metadata(&path);
 
-            if !attributes.is_ok() {
+            if attributes.is_err() {
                 continue;
             }
 

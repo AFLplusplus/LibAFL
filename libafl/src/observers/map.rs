@@ -118,7 +118,7 @@ where
 {
     /// Creates a new MapObserver
     pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
-        let initial = if map.len() > 0 { map[0] } else { T::default() };
+        let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
             name: name.to_string(),
@@ -128,13 +128,15 @@ where
 
     /// Creates a new MapObserver from a raw pointer
     pub fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
-        unsafe {
-            let initial = if len > 0 { *map_ptr } else { T::default() };
-            StdMapObserver {
-                map: ArrayMut::Cptr((map_ptr, len)),
-                name: name.to_string(),
-                initial,
-            }
+        let initial = if len > 0 {
+            unsafe { *map_ptr }
+        } else {
+            T::default()
+        };
+        StdMapObserver {
+            map: ArrayMut::Cptr((map_ptr, len)),
+            name: name.to_string(),
+            initial,
         }
     }
 }
@@ -229,14 +231,16 @@ where
         max_len: usize,
         size_ptr: *const usize,
     ) -> Self {
-        unsafe {
-            let initial = if max_len > 0 { *map_ptr } else { T::default() };
-            VariableMapObserver {
-                map: ArrayMut::Cptr((map_ptr, max_len)),
-                size: Cptr::Cptr(size_ptr),
-                name: name.into(),
-                initial,
-            }
+        let initial = if max_len > 0 {
+            unsafe { *map_ptr }
+        } else {
+            T::default()
+        };
+        VariableMapObserver {
+            map: ArrayMut::Cptr((map_ptr, max_len)),
+            size: Cptr::Cptr(size_ptr),
+            name: name.into(),
+            initial,
         }
     }
 }

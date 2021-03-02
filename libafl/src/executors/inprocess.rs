@@ -77,9 +77,7 @@ where
     {
         #[cfg(unix)]
         #[cfg(feature = "std")]
-        unsafe {
-            reset_oncrash_ptrs();
-        }
+        reset_oncrash_ptrs();
         Ok(())
     }
 
@@ -206,7 +204,7 @@ pub mod unix_signals {
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input,
     {
-        if CURRENT_INPUT_PTR == ptr::null() {
+        if CURRENT_INPUT_PTR.is_null() {
             #[cfg(target_os = "android")]
             let si_addr = { ((info._pad[0] as usize) | ((info._pad[1] as usize) << 32)) as usize };
             #[cfg(not(target_os = "android"))]
@@ -250,19 +248,19 @@ pub mod unix_signals {
         let obj_fitness = state
             .objectives_mut()
             .is_interesting_all(&input, observers, ExitKind::Crash)
-            .expect("In crash handler objectives failure.".into());
+            .expect("In crash handler objectives failure.");
         if obj_fitness > 0 {
             state
                 .solutions_mut()
                 .add(Testcase::new(input.clone()))
-                .expect("In crash handler solutions failure.".into());
+                .expect("In crash handler solutions failure.");
             mgr.fire(
                 state,
                 Event::Objective {
                     objective_size: state.solutions().count(),
                 },
             )
-            .expect("Could not send crashing input".into());
+            .expect("Could not send crashing input");
         }
 
         mgr.on_restart(state).unwrap();
@@ -305,19 +303,19 @@ pub mod unix_signals {
         let obj_fitness = state
             .objectives_mut()
             .is_interesting_all(&input, observers, ExitKind::Crash)
-            .expect("In timeout handler objectives failure.".into());
+            .expect("In timeout handler objectives failure.");
         if obj_fitness > 0 {
             state
                 .solutions_mut()
                 .add(Testcase::new(input.clone()))
-                .expect("In timeout handler solutions failure.".into());
+                .expect("In timeout handler solutions failure.");
             mgr.fire(
                 state,
                 Event::Objective {
                     objective_size: state.solutions().count(),
                 },
             )
-            .expect("Could not send timeouting input".into());
+            .expect("Could not send timeouting input");
         }
 
         mgr.on_restart(state).unwrap();
@@ -331,6 +329,10 @@ pub mod unix_signals {
         std::process::exit(1);
     }
 
+    /// Sets the oncrash pointers before executing a single testcase
+    /// # Safety
+    /// As long as no signals are called, this is fine.
+    /// Once a signal occurs, the pointer needs to be up to date.
     #[inline]
     pub unsafe fn set_oncrash_ptrs<EM, I, OT, S>(
         state: &mut S,
@@ -344,14 +346,20 @@ pub mod unix_signals {
         OBSERVERS_PTR = observers as *const _ as *const c_void;
     }
 
+    /// Resets the oncrash pointers to null
     #[inline]
-    pub unsafe fn reset_oncrash_ptrs() {
-        CURRENT_INPUT_PTR = ptr::null();
-        STATE_PTR = ptr::null_mut();
-        EVENT_MGR_PTR = ptr::null_mut();
-        OBSERVERS_PTR = ptr::null();
+    pub fn reset_oncrash_ptrs() {
+        unsafe {
+            CURRENT_INPUT_PTR = ptr::null();
+            STATE_PTR = ptr::null_mut();
+            EVENT_MGR_PTR = ptr::null_mut();
+            OBSERVERS_PTR = ptr::null();
+        }
     }
 
+    /// Sets up the crash handler
+    /// # Safety
+    /// Everything using signals is unsafe. Don't do it unless you really need to.
     pub unsafe fn setup_crash_handlers<EM, I, OC, OFT, OT, S>()
     where
         EM: EventManager<I, S>,

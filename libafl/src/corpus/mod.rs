@@ -128,10 +128,23 @@ where
     I: Input,
     R: Rand,
 {
+    /// Create a new RandCorpusScheduler that just schedules randomly.
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
         }
+    }
+}
+
+impl<C, I, R, S> Default for RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 

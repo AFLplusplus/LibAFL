@@ -71,7 +71,6 @@ macro_rules! create_serde_registry_for_trait {
         pub mod $mod_name {
 
             use alloc::boxed::Box;
-            use alloc::string::String;
             use core::any::{Any, TypeId};
             use core::fmt;
             use postcard;
@@ -260,7 +259,7 @@ macro_rules! create_serde_registry_for_trait {
 
             impl NamedSerdeAnyMap {
                 #[inline]
-                pub fn get<T>(&self, name: &String) -> Option<&T>
+                pub fn get<T>(&self, name: &str) -> Option<&T>
                 where
                     T: Any,
                 {
@@ -273,11 +272,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 #[inline]
-                pub fn by_typeid(
-                    &self,
-                    name: &String,
-                    typeid: &TypeId,
-                ) -> Option<&dyn $trait_name> {
+                pub fn by_typeid(&self, name: &str, typeid: &TypeId) -> Option<&dyn $trait_name> {
                     match self.map.get(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => h
@@ -287,7 +282,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 #[inline]
-                pub fn get_mut<T>(&mut self, name: &String) -> Option<&mut T>
+                pub fn get_mut<T>(&mut self, name: &str) -> Option<&mut T>
                 where
                     T: Any,
                 {
@@ -302,7 +297,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn by_typeid_mut(
                     &mut self,
-                    name: &String,
+                    name: &str,
                     typeid: &TypeId,
                 ) -> Option<&mut dyn $trait_name> {
                     match self.map.get_mut(&unpack_type_id(*typeid)) {
@@ -423,7 +418,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 #[inline]
-                pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &String) {
+                pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &str) {
                     let id = unpack_type_id((*val).type_id());
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
@@ -448,7 +443,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 #[inline]
-                pub fn contains<T>(&self, name: &String) -> bool
+                pub fn contains<T>(&self, name: &str) -> bool
                 where
                     T: Any,
                 {

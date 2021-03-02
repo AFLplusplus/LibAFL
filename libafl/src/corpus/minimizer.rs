@@ -37,6 +37,12 @@ impl TopRatedsMetadata {
     }
 }
 
+impl Default for TopRatedsMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait FavFactor<I>
 where
     I: Input,

@@ -35,18 +35,15 @@ where
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
-        match testcase.filename() {
-            None => {
-                // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
-                let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
-                let filename_str = filename.to_str().expect("Invalid Path");
-                testcase.set_filename(filename_str.into());
-            }
-            _ => {}
-        }
+        if let None = testcase.filename() {
+            // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
+            let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
+            let filename_str = filename.to_str().expect("Invalid Path");
+            testcase.set_filename(filename_str.into());
+        };
         testcase
             .store_input()
-            .expect("Could not save testcase to disk".into());
+            .expect("Could not save testcase to disk");
         self.entries.push(RefCell::new(testcase));
         Ok(self.entries.len() - 1)
     }

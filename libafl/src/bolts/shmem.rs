@@ -71,7 +71,7 @@ pub trait ShMem: Sized + Debug {
     fn description(&self) -> ShMemDescription {
         ShMemDescription {
             size: self.map().len(),
-            str_bytes: self.shm_slice().clone(),
+            str_bytes: *self.shm_slice(),
         }
     }
 
@@ -103,7 +103,7 @@ pub trait ShMem: Sized + Debug {
 #[cfg(feature = "std")]
 pub mod shmem {
 
-    use core::{mem::size_of, slice};
+    use core::{mem::size_of, ptr, slice};
     use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
     use std::ffi::CStr;
 
@@ -222,7 +222,7 @@ pub mod shmem {
         pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, Error> {
             let mut ret = afl_shmem_unitialized();
             let map = unsafe { afl_shmem_by_str(&mut ret, shm_str, map_size) };
-            if map != 0 as *mut u8 {
+            if !map.is_null() {
                 Ok(ret)
             } else {
                 Err(Error::Unknown(format!(
@@ -235,7 +235,7 @@ pub mod shmem {
         pub fn new(map_size: usize) -> Result<Self, Error> {
             let mut ret = afl_shmem_unitialized();
             let map = unsafe { afl_shmem_init(&mut ret, map_size) };
-            if map != 0 as *mut u8 {
+            if !map.is_null() {
                 Ok(ret)
             } else {
                 Err(Error::Unknown(format!(
@@ -253,24 +253,24 @@ pub mod shmem {
             // Not set or not initialized;
             return;
         }
-        (*shm).shm_str[0 as usize] = '\u{0}' as u8;
-        shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
-        (*shm).map = 0 as *mut c_uchar;
+        (*shm).shm_str[0 as usize] = 0u8;
+        shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
+        (*shm).map = ptr::null_mut();
     }
 
     /// Functions to create Shared memory region, for observation channels and
     /// opening inputs and stuff.
     unsafe fn afl_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
         (*shm).map_size = map_size;
-        (*shm).map = 0 as *mut c_uchar;
+        (*shm).map = ptr::null_mut();
         (*shm).shm_id = shmget(
             0 as c_int,
             map_size as c_ulong,
             0o1000 as c_int | 0o2000 as c_int | 0o600 as c_int,
         );
         if (*shm).shm_id < 0 as c_int {
-            (*shm).shm_str[0] = '\u{0}' as u8;
-            return 0 as *mut c_uchar;
+            (*shm).shm_str[0] = 0u8;
+            return ptr::null_mut();
         }
         snprintf(
             (*shm).shm_str.as_mut_ptr() as *mut c_char,
@@ -280,13 +280,13 @@ pub mod shmem {
         );
         (*shm).shm_str
             [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_int as c_ulong) as usize] =
-            '\u{0}' as u8;
-        (*shm).map = shmat((*shm).shm_id, 0 as *const c_void, 0 as c_int) as *mut c_uchar;
+            0u8;
+        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
         if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar || (*shm).map.is_null() {
-            shmctl((*shm).shm_id, 0 as c_int, 0 as *mut shmid_ds);
+            shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
             (*shm).shm_id = -(1 as c_int);
-            (*shm).shm_str[0 as c_int as usize] = '\u{0}' as u8;
-            return 0 as *mut c_uchar;
+            (*shm).shm_str[0 as c_int as usize] = 0u8;
+            return ptr::null_mut();
         }
         return (*shm).map;
     }
@@ -297,10 +297,10 @@ pub mod shmem {
         shm_str: &CStr,
         map_size: usize,
     ) -> *mut c_uchar {
-        if shm.is_null() || shm_str.to_bytes().len() == 0 || map_size == 0 {
-            return 0 as *mut c_uchar;
+        if shm.is_null() || shm_str.to_bytes().is_empty() || map_size == 0 {
+            return ptr::null_mut();
         }
-        (*shm).map = 0 as *mut c_uchar;
+        (*shm).map = ptr::null_mut();
         (*shm).map_size = map_size;
         strncpy(
             (*shm).shm_str.as_mut_ptr() as *mut c_char,
@@ -312,12 +312,12 @@ pub mod shmem {
             .expect(&format!("illegal shm_str {:?}", shm_str))
             .parse::<i32>()
             .unwrap();
-        (*shm).map = shmat((*shm).shm_id, 0 as *const c_void, 0 as c_int) as *mut c_uchar;
+        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
         if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar {
-            (*shm).map = 0 as *mut c_uchar;
+            (*shm).map = ptr::null_mut();
             (*shm).map_size = 0;
-            (*shm).shm_str[0] = '\u{0}' as u8;
-            return 0 as *mut c_uchar;
+            (*shm).shm_str[0] = 0u8;
+            return ptr::null_mut();
         }
         return (*shm).map;
     }

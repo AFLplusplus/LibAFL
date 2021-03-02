@@ -43,7 +43,7 @@ where
         OT: ObserversTuple,
     {
         let count = self.events.len();
-        while self.events.len() > 0 {
+        while !self.events.is_empty() {
             let event = self.events.pop().unwrap();
             self.handle_in_client(state, event)?;
         }
@@ -118,11 +118,9 @@ where
 
     // Handle arriving events in the client
     fn handle_in_client(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        match event {
-            _ => Err(Error::Unknown(format!(
-                "Received illegal message that message should not have arrived: {:?}.",
-                event
-            ))),
-        }
+        Err(Error::Unknown(format!(
+            "Received illegal message that message should not have arrived: {:?}.",
+            event
+        )))
     }
 }

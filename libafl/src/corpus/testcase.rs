@@ -181,7 +181,7 @@ where
     #[inline]
     pub fn with_fitness(input: I, fitness: u32) -> Self {
         Testcase {
-            input: Some(input.into()),
+            input: Some(input),
             filename: None,
             fitness: fitness,
             metadata: SerdeAnyMap::new(),

@@ -184,3 +184,9 @@ impl CrashFeedback {
         Self {}
     }
 }
+
+impl Default for CrashFeedback {
+    fn default() -> Self {
+        Self::new()
+    }
+}

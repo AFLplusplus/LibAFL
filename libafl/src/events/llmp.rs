@@ -167,10 +167,7 @@ where
 
     /// Returns if we are the broker
     pub fn is_broker(&self) -> bool {
-        match self.llmp {
-            llmp::LlmpConnection::IsBroker { broker: _ } => true,
-            _ => false,
-        }
+        matches!(self.llmp, llmp::LlmpConnection::IsBroker { broker: _ })
     }
 
     /// Run forever in the broker
@@ -284,9 +281,9 @@ where
                 // TODO include ExitKind in NewTestcase
                 let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
                 if fitness > 0 {
-                    if !state
+                    if state
                         .add_if_interesting(&input, fitness, scheduler)?
-                        .is_none()
+                        .is_some()
                     {
                         #[cfg(feature = "std")]
                         println!("Added received Testcase");
@@ -312,12 +309,9 @@ where
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     fn await_restart_safe(&mut self) {
-        match &self.llmp {
-            llmp::LlmpConnection::IsClient { client } => {
-                // wait until we can drop the message safely.
-                client.await_save_to_unmap_blocking();
-            }
-            _ => (),
+        if let llmp::LlmpConnection::IsClient { client } = &self.llmp {
+            // wait until we can drop the message safely.
+            client.await_save_to_unmap_blocking();
         }
     }
 

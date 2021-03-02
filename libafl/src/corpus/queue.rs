@@ -59,6 +59,17 @@ where
     }
 }
 
+impl<C, I, S> Default for QueueCorpusScheduler<C, I, S>
+where
+    S: HasCorpus<C, I>,
+    C: Corpus<I>,
+    I: Input,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /*
 #[cfg(test)]
 #[cfg(feature = "std")]

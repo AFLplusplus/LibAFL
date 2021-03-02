@@ -97,6 +97,10 @@ pub trait HasBytesVec {
 
 /// Has a length field
 pub trait HasLen {
-    /// The lenght
+    /// The length
     fn len(&self) -> usize;
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }

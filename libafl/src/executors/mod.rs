@@ -59,7 +59,7 @@ where
     I: Input + HasTargetBytes,
 {
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        if input.target_bytes().as_slice().len() == 0 {
+        if input.target_bytes().as_slice().is_empty() {
             Err(Error::Empty("Input Empty".into()))
         } else {
             Ok(ExitKind::Ok)

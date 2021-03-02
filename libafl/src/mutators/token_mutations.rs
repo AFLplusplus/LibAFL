@@ -76,10 +76,10 @@ impl Tokens {
 
             // we are only interested in '"..."', not prefixed 'foo = '
             let start = line.chars().nth(0);
-            if line.len() == 0 || start == Some('#') {
+            if line.is_empty() || start == Some('#') {
                 continue;
             }
-            let pos_quote = match line.find("\"") {
+            let pos_quote = match line.find('\"') {
                 Some(x) => x,
                 _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
             };
@@ -92,7 +92,7 @@ impl Tokens {
                 Some(x) => x,
                 _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
             };
-            if item.len() == 0 {
+            if item.is_empty() {
                 continue;
             }
 
@@ -134,7 +134,7 @@ where
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
-        if meta.unwrap().tokens().len() == 0 {
+        if meta.unwrap().tokens().is_empty() {
             return Ok(MutationResult::Skipped);
         }
         meta.unwrap().tokens().len()
@@ -180,7 +180,7 @@ where
         if meta.is_none() {
             return Ok(MutationResult::Skipped);
         }
-        if meta.unwrap().tokens().len() == 0 {
+        if meta.unwrap().tokens().is_empty() {
             return Ok(MutationResult::Skipped);
         }
         meta.unwrap().tokens().len()
