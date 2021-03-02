@@ -96,8 +96,8 @@ fn main() {
         "broker" => {
             let mut broker = llmp::LlmpBroker::<UnixShMem>::new().unwrap();
             broker
-                .launch_tcp_listener(
-                    std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap(),
+                .launch_listener(
+                    llmp::Listener::Tcp(std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap()),
                 )
                 .unwrap();
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))

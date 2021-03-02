@@ -115,12 +115,13 @@ const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 pub type Tag = u32;
 
 /// Abstraction for listeners
-enum Listener {
+pub enum Listener {
+
     Tcp(TcpListener),
     Unix(UnixListener),
 }
 
-enum ListenerStream {
+pub enum ListenerStream {
     Tcp(TcpStream, std::net::SocketAddr),
     Unix(UnixStream, std::os::unix::net::SocketAddr),
     Empty(),
@@ -1330,7 +1331,7 @@ where
 
     #[cfg(feature = "std")]
     /// Launches a thread using a listener socket, on which new clients may connect to this broker
-    fn launch_listener(&mut self, listener: Listener) -> Result<thread::JoinHandle<()>, Error> {
+    pub fn launch_listener(&mut self, listener: Listener) -> Result<thread::JoinHandle<()>, Error> {
         // Later in the execution, after the initial map filled up,
         // the current broacast map will will point to a different map.
         // However, the original map is (as of now) never freed, new clients will start
