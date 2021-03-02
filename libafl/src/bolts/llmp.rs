@@ -402,7 +402,7 @@ where
             Ok(listener) => {
                 dbg!("We're the broker");
                 let mut broker = LlmpBroker::new()?;
-                broker.socket_name = filename.to_string();
+                broker.socket_name = Some(filename.to_string());
                 let _listener_thread = broker.launch_listener(Listener::Unix(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
@@ -1220,13 +1220,14 @@ where
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SH>>,
     /// This is the socket name, when unix domain sockets are used.
-    socket_name: String,
+    socket_name: Option<String>,
     /// This flag is used to indicate that shutdown has been requested by the SIGINT and SIGTERM
     /// handlers
     shutting_down: bool,
 }
 
 /// used to access the current broker in signal handler.
+#[cfg(all(feature = "std", unix))]
 static mut CURRENT_BROKER_PTR: *const c_void = ptr::null();
 
 /// The broker forwards all messages to its own bus-like broadcast map.
@@ -1247,7 +1248,7 @@ where
                 keep_pages_forever: true,
             },
             llmp_clients: vec![],
-            socket_name: String::default(),
+            socket_name: None,
             shutting_down: false,
         };
 
@@ -1313,7 +1314,7 @@ where
     }
 
     #[cfg(all(feature = "std", unix))]
-    pub unsafe fn handle_signal(_sig: c_int, info: siginfo_t, _void: c_void) {
+    pub unsafe fn handle_signal(_sig: c_int, _: siginfo_t, _: c_void) {
         if !CURRENT_BROKER_PTR.is_null() {
             let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>)
                 .as_mut()
@@ -1607,13 +1608,14 @@ where
     SH: ShMem,
 {
     fn drop(&mut self) {
-        if self.socket_name != String::default() {
-            match std::fs::remove_file(&self.socket_name) {
+        match &self.socket_name {
+            Some(name) => match std::fs::remove_file(&name) {
                 Ok(_) => {}
                 Err(err) => {
                     dbg!("failed to close socket: {}", err);
                 }
-            }
+            },
+            None => {}
         }
     }
 }
