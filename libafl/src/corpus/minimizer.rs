@@ -214,7 +214,7 @@ where
 
     pub fn new(base: CS) -> Self {
         Self {
-            base: base,
+            base,
             skip_not_fav_prob: DEFAULT_SKIP_NOT_FAV_PROB,
             phantom: PhantomData,
         }
@@ -222,8 +222,8 @@ where
 
     pub fn with_skip_prob(base: CS, skip_not_fav_prob: u64) -> Self {
         Self {
-            base: base,
-            skip_not_fav_prob: skip_not_fav_prob,
+            base,
+            skip_not_fav_prob,
             phantom: PhantomData,
         }
     }

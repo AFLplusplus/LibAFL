@@ -767,7 +767,7 @@ fn from_hex(hex: u8) -> Result<u8, Error> {
     if hex >= 97 && hex <= 102 {
         return Ok(hex - 87);
     }
-    return Err(Error::IllegalArgument("".to_owned()));
+    Err(Error::IllegalArgument("".to_owned()))
 }
 
 /// Decodes a dictionary token: 'foo\x41\\and\"bar' -> 'fooA\and"bar'
@@ -801,7 +801,7 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
         }
     }
 
-    return Ok(token);
+    Ok(token)
 }
 
 #[cfg(test)]

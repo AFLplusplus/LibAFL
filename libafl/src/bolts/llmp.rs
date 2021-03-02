@@ -120,8 +120,8 @@ unsafe fn shmem2page<SH: ShMem>(afl_shmem: &SH) -> *const LlmpPage {
 #[inline]
 unsafe fn llmp_msg_in_page(page: *const LlmpPage, msg: *const LlmpMsg) -> bool {
     /* DBG("llmp_msg_in_page %p within %p-%p\n", msg, page, page + page->size_total); */
-    return (page as *const u8) < msg as *const u8
-        && (page as *const u8).offset((*page).size_total as isize) > msg as *const u8;
+    (page as *const u8) < msg as *const u8
+        && (page as *const u8).add((*page).size_total) > msg as *const u8
 }
 
 /// allign to LLMP_PREF_ALIGNNMENT=64 bytes
@@ -198,9 +198,9 @@ unsafe fn llmp_next_msg_ptr_checked<SH: ShMem>(
 ) -> Result<*mut LlmpMsg, Error> {
     let page = map.page_mut();
     let map_size = map.shmem.map().len();
-    let msg_begin_min = (page as *const u8).offset(size_of::<LlmpPage>() as isize);
+    let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
     // We still need space for this msg (alloc_size).
-    let msg_begin_max = (page as *const u8).offset((map_size - alloc_size) as isize);
+    let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
     let next = _llmp_next_msg_ptr(last_msg);
     let next_ptr = next as *const u8;
     if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
@@ -217,9 +217,9 @@ unsafe fn llmp_next_msg_ptr_checked<SH: ShMem>(
 #[inline]
 unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
     /* DBG("_llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
-    return (last_msg as *mut u8)
-        .offset(size_of::<LlmpMsg>() as isize)
-        .offset((*last_msg).buf_len_padded as isize) as *mut LlmpMsg;
+    (last_msg as *mut u8)
+        .add(size_of::<LlmpMsg>())
+        .add((*last_msg).buf_len_padded as usize) as *mut LlmpMsg
 }
 
 /// Description of a shared map.
@@ -262,6 +262,7 @@ pub struct LlmpMsg {
 /// The message we receive
 impl LlmpMsg {
     /// Gets the buffer from this message as slice, with the corrent length.
+    /// # Safety
     /// This is unsafe if somebody has access to shared mem pages on the system.
     pub unsafe fn as_slice_unsafe(&self) -> &[u8] {
         slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize)
@@ -285,14 +286,13 @@ impl LlmpMsg {
         unsafe {
             let map_size = map.shmem.map().len();
             let buf_ptr = self.buf.as_ptr();
-            if buf_ptr > (map.page_mut() as *const u8).offset(size_of::<LlmpPage>() as isize)
+            if buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
                 && buf_ptr
-                    <= (map.page_mut() as *const u8)
-                        .offset((map_size - size_of::<LlmpMsg>() as usize) as isize)
+                    <= (map.page_mut() as *const u8).add(map_size - size_of::<LlmpMsg>() as usize)
             {
                 // The message header is in the page. Continue with checking the body.
                 let len = self.buf_len_padded as usize + size_of::<LlmpMsg>();
-                buf_ptr <= (map.page_mut() as *const u8).offset((map_size - len) as isize)
+                buf_ptr <= (map.page_mut() as *const u8).add(map_size - len)
             } else {
                 false
             }
@@ -448,6 +448,8 @@ where
     /// Completely reset the current sender map.
     /// Afterwards, no receiver should read from it at a different location.
     /// This is only useful if all connected llmp parties start over, for example after a crash.
+    /// # Safety
+    /// Only safe if you really really restart the page on everything connected
     pub unsafe fn reset(&mut self) {
         _llmp_page_init(&mut self.out_maps.last_mut().unwrap().shmem, self.id, true);
         self.last_msg_sent = ptr::null_mut();
@@ -640,7 +642,7 @@ where
             panic!("Allocated new message without calling send() inbetween. ret: {:?}, page: {:?}, complete_msg_size: {:?}, size_used: {:?}, last_msg: {:?}", ret, page,
                 buf_len_padded, (*page).size_used, last_msg);
         }
-        (*page).size_used = (*page).size_used + complete_msg_size;
+        (*page).size_used += complete_msg_size;
         (*ret).buf_len_padded = buf_len_padded as u64;
         (*ret).buf_len = buf_len as u64;
         /* DBG("Returning new message at %p with len %ld, TAG was %x", ret, ret->buf_len_padded, ret->tag); */
@@ -714,16 +716,17 @@ where
     }
 
     /// Allocates the next space on this sender page
-    pub unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
-        match self.alloc_next_if_space(buf_len) {
-            Some(msg) => return Ok(msg),
-            _ => (),
+    pub fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
+        if let Some(msg) = unsafe { self.alloc_next_if_space(buf_len) } {
+            return Ok(msg);
         };
 
         /* no more space left! We'll have to start a new page */
-        self.handle_out_eop()?;
+        unsafe {
+            self.handle_out_eop()?;
+        }
 
-        match self.alloc_next_if_space(buf_len) {
+        match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
             None => Err(Error::Unknown(format!(
                 "Error allocating {} bytes in shmap",
@@ -733,6 +736,8 @@ where
     }
 
     /// Cancel send of the next message, this allows us to allocate a new message without sending this one.
+    /// # Safety
+    /// They msg pointer may no longer be used after `cancel_send`
     pub unsafe fn cancel_send(&mut self, msg: *mut LlmpMsg) {
         /* DBG("Client %d cancels send of msg at %p with tag 0x%X and size %ld", client->id, msg, msg->tag,
          * msg->buf_len_padded); */
@@ -1047,11 +1052,15 @@ where
     }
 
     /// Get the unsafe ptr to this page, situated on the shared map
+    /// # Safety
+    /// The unsafe page pointer is obviously unsafe.
     pub unsafe fn page_mut(&mut self) -> *mut LlmpPage {
         shmem2page_mut(&mut self.shmem)
     }
 
     /// Get the unsafe ptr to this page, situated on the shared map
+    /// # Safety
+    /// The unsafe page pointer is obviously unsafe.
     pub unsafe fn page(&self) -> *const LlmpPage {
         shmem2page(&self.shmem)
     }
@@ -1250,7 +1259,7 @@ where
         let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
         // accept connections and process them, spawning a new thread for each one
         println!("Server listening on port {}", port);
-        return self.launch_tcp_listener(listener);
+        self.launch_tcp_listener(listener)
     }
 
     #[cfg(feature = "std")]

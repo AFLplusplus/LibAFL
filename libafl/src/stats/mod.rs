@@ -187,7 +187,7 @@ where
 {
     pub fn new(print_fn: F) -> Self {
         Self {
-            print_fn: print_fn,
+            print_fn,
             start_time: current_time(),
             corpus_size: 0,
             client_stats: vec![],
@@ -196,8 +196,8 @@ where
 
     pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
         Self {
-            print_fn: print_fn,
-            start_time: start_time,
+            print_fn,
+            start_time,
             corpus_size: 0,
             client_stats: vec![],
         }

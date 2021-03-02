@@ -3,11 +3,11 @@
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-pub use shmem::UnixShMem;
+pub use unix_shmem::UnixShMem;
 
 #[cfg(feature = "std")]
 #[cfg(windows)]
-pub use shmem::Win32ShMem;
+pub use unix_shmem::Win32ShMem;
 
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
@@ -101,7 +101,7 @@ pub trait ShMem: Sized + Debug {
 
 #[cfg(unix)]
 #[cfg(feature = "std")]
-pub mod shmem {
+pub mod unix_shmem {
 
     use core::{mem::size_of, ptr, slice};
     use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
@@ -288,7 +288,7 @@ pub mod shmem {
             (*shm).shm_str[0 as c_int as usize] = 0u8;
             return ptr::null_mut();
         }
-        return (*shm).map;
+        (*shm).map
     }
 
     /// Uses a shmap id string to open a shared map
@@ -319,7 +319,7 @@ pub mod shmem {
             (*shm).shm_str[0] = 0u8;
             return ptr::null_mut();
         }
-        return (*shm).map;
+        (*shm).map
     }
 }
 

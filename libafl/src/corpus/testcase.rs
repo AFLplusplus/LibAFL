@@ -183,7 +183,7 @@ where
         Testcase {
             input: Some(input),
             filename: None,
-            fitness: fitness,
+            fitness,
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,

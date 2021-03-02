@@ -66,7 +66,7 @@ where
 {
     pub fn new(stats: ST) -> Self {
         Self {
-            stats: stats,
+            stats,
             events: vec![],
             phantom: PhantomData,
         }

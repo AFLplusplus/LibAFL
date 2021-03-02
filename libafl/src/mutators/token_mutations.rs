@@ -54,7 +54,7 @@ impl Tokens {
             return false;
         }
         self.token_vec.push(token.to_vec());
-        return true;
+        true
     }
 
     /// Reads a tokens file, returning the count of new entries read
@@ -117,7 +117,7 @@ impl Tokens {
 
     /// Gets the tokens stored in this db
     pub fn tokens(&self) -> &[Vec<u8>] {
-        return &self.token_vec;
+        &self.token_vec
     }
 }
 

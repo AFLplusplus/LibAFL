@@ -339,6 +339,6 @@ where
 {
     /// Creates a new MapObserver
     pub fn new(base: M) -> Self {
-        Self { base: base }
+        Self { base }
     }
 }

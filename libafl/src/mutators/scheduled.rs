@@ -133,7 +133,7 @@ where
     /// Create a new StdScheduledMutator instance specifying mutations
     pub fn with_mutations(mutations: Vec<MutationFunction<I, S>>) -> Self {
         StdScheduledMutator {
-            mutations: mutations,
+            mutations,
             phantom: PhantomData,
         }
     }
@@ -202,7 +202,7 @@ where
         scheduled.add_mutation(mutation_bitflip);
         scheduled.add_mutation(mutation_splice);
         Self {
-            scheduled: scheduled,
+            scheduled,
             phantom: PhantomData,
         }
     }
@@ -253,7 +253,7 @@ where
         //scheduled.add_mutation(mutation_splice);
 
         HavocBytesMutator {
-            scheduled: scheduled,
+            scheduled,
             phantom: PhantomData,
         }
     }

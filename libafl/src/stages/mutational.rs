@@ -157,7 +157,7 @@ where
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
         Self {
-            mutator: mutator,
+            mutator,
             phantom: PhantomData,
         }
     }

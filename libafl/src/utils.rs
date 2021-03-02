@@ -204,7 +204,7 @@ impl Rand for Xoshiro256StarRand {
 
         self.rand_seed[3] = self.rand_seed[3].rotate_left(45);
 
-        return ret;
+        ret
     }
 }
 
@@ -235,7 +235,7 @@ impl Rand for XorShift64Rand {
         x ^= x >> 7;
         x ^= x << 17;
         self.rand_seed = x;
-        return x;
+        x
     }
 }
 
@@ -262,7 +262,7 @@ impl Rand for Lehmer64Rand {
     #[inline]
     fn next(&mut self) -> u64 {
         self.rand_seed *= 0xda942042e4dd58b5;
-        return (self.rand_seed >> 64) as u64;
+        (self.rand_seed >> 64) as u64
     }
 }
 

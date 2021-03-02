@@ -68,12 +68,8 @@ pub trait MatchType {
 }
 
 impl MatchType for () {
-    fn match_type<T: 'static>(&self, _f: fn(t: &T)) {
-        ()
-    }
-    fn match_type_mut<T: 'static>(&mut self, _f: fn(t: &mut T)) {
-        ()
-    }
+    fn match_type<T: 'static>(&self, _f: fn(t: &T)) {}
+    fn match_type_mut<T: 'static>(&mut self, _f: fn(t: &mut T)) {}
 }
 
 impl<Head, Tail> MatchType for (Head, Tail)
@@ -182,7 +178,7 @@ where
 
     fn append(self, value: T) -> Self::AppendResult {
         let (head, tail) = self;
-        return (head, tail.append(value));
+        (head, tail.append(value))
     }
 }
 

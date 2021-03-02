@@ -523,7 +523,7 @@ where
             manager.fire(
                 self,
                 Event::NewTestcase {
-                    input: input,
+                    input,
                     observers_buf,
                     corpus_size: self.corpus().count() + 1,
                     client_config: "TODO".into(),

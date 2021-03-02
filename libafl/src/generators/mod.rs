@@ -61,7 +61,7 @@ where
 {
     pub fn new(max_size: usize) -> Self {
         Self {
-            max_size: max_size,
+            max_size,
             phantom: PhantomData,
         }
     }
@@ -103,7 +103,7 @@ where
 {
     pub fn new(max_size: usize) -> Self {
         Self {
-            max_size: max_size,
+            max_size,
             phantom: PhantomData,
         }
     }

@@ -323,7 +323,7 @@ where
     /// The map can be shared.
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
-            history_map: history_map,
+            history_map,
             name: name.to_string(),
             indexes: None,
             novelties: None,

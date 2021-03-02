@@ -105,7 +105,7 @@ macro_rules! create_serde_registry_for_trait {
                             .get(&id)
                             .expect("Cannot deserialize an unregistered type")
                     };
-                    let seed = DeserializeCallbackSeed::<dyn $trait_name> { cb: cb };
+                    let seed = DeserializeCallbackSeed::<dyn $trait_name> { cb };
                     let obj: Self::Value = visitor.next_element_seed(seed)?.unwrap();
                     Ok(obj)
                 }
