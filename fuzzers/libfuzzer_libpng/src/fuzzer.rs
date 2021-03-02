@@ -76,14 +76,14 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let (state, mut restarting_mgr) =
         match setup_restarting_mgr::<_, _, UnixShMem, _>(stats, broker_port) {
             Ok(res) => res,
-            Err(err) => {
-                match err {
-                    Error::ShuttingDown => { return Ok(()); },
-                    _ => {
-                        panic!(format!("Failed to setup the restarter: {}", err));
-                    }
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
                 }
-            }
+                _ => {
+                    panic!(format!("Failed to setup the restarter: {}", err));
+                }
+            },
         };
 
     // Create an observation channel using the coverage map

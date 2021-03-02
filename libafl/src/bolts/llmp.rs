@@ -84,8 +84,8 @@ use std::os::unix::{io::AsRawFd, prelude::RawFd};
 
 #[cfg(all(feature = "std", unix))]
 use libc::{
-    c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK,
-    SA_SIGINFO, SIGTERM, SIGQUIT, SIGINT,
+    c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK, SA_SIGINFO,
+    SIGINT, SIGQUIT, SIGTERM,
 };
 
 use super::shmem::{ShMem, ShMemDescription};
@@ -1313,11 +1313,12 @@ where
     }
 
     pub unsafe fn handle_signal(_sig: c_int, info: siginfo_t, _void: c_void) {
-        if ! CURRENT_BROKER_PTR.is_null() {
-            let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>).as_mut().unwrap();
+        if !CURRENT_BROKER_PTR.is_null() {
+            let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>)
+                .as_mut()
+                .unwrap();
             broker.shutdown();
         };
-
     }
 
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
@@ -1327,7 +1328,6 @@ where
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-
         unsafe {
             CURRENT_BROKER_PTR = self as *const _ as *const c_void;
 
@@ -1373,7 +1373,7 @@ where
                 }
                 None => (),
             }
-        };
+        }
     }
 
     /// Broadcasts the given buf to all lients
@@ -1607,7 +1607,7 @@ where
     fn drop(&mut self) {
         if self.socket_name != "".to_string() {
             match std::fs::remove_file(&self.socket_name) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(err) => {
                     dbg!("failed to close socket: {}", err);
                 }
