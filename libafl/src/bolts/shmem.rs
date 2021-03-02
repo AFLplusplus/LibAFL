@@ -107,16 +107,16 @@ pub trait ShMem: Sized + Debug {
 pub mod unix_shmem {
 
     use core::{mem::size_of, ptr, slice};
-    use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void, off_t, size_t};
+    use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
+    #[cfg(target_os = "android")]
+    use libc::{off_t, size_t, MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
     use std::ffi::CStr;
+    #[cfg(target_os = "android")]
     use std::ffi::CString;
 
     use crate::Error;
 
     use super::ShMem;
-
-    #[cfg(target_os = "android")]
-    use libc::{MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
 
     #[cfg(unix)]
     extern "C" {

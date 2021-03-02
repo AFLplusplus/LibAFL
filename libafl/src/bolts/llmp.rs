@@ -52,12 +52,11 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 
 */
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{
     cmp::max,
     fmt::Debug,
     mem::size_of,
-    mem::zeroed,
     ptr, slice,
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
@@ -65,12 +64,14 @@ use core::{
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
-    env,
+    env, fs,
     io::{Read, Write},
+    mem::zeroed,
     net::{TcpListener, TcpStream},
     thread,
 };
 
+#[cfg(feature = "std")]
 #[cfg(unix)]
 use nix::{
     cmsg_space,
@@ -1603,13 +1604,14 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<SH> Drop for LlmpBroker<SH>
 where
     SH: ShMem,
 {
     fn drop(&mut self) {
         match &self.socket_name {
-            Some(name) => match std::fs::remove_file(&name) {
+            Some(name) => match fs::remove_file(&name) {
                 Ok(_) => {}
                 Err(err) => {
                     dbg!("failed to close socket: {}", err);
