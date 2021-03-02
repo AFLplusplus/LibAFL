@@ -328,18 +328,15 @@ where
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
         match &mut self.llmp {
-            llmp::LlmpConnection::IsClient { client } => loop {
-                match client.recv_buf()? {
-                    Some((sender_id, tag, msg)) => {
-                        if tag == _LLMP_TAG_EVENT_TO_BROKER {
-                            continue;
-                        }
-                        let event: Event<I> = postcard::from_bytes(msg)?;
-                        events.push((sender_id, event));
+            llmp::LlmpConnection::IsClient { client } => {
+                while let Some((sender_id, tag, msg)) = client.recv_buf()? {
+                    if tag == _LLMP_TAG_EVENT_TO_BROKER {
+                        continue;
                     }
-                    None => break,
+                    let event: Event<I> = postcard::from_bytes(msg)?;
+                    events.push((sender_id, event));
                 }
-            },
+            }
             _ => {
                 #[cfg(feature = "std")]
                 dbg!("Skipping process in broker");

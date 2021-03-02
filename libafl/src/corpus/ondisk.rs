@@ -35,7 +35,7 @@ where
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
-        if let None = testcase.filename() {
+        if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
             let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
             let filename_str = filename.to_str().expect("Invalid Path");

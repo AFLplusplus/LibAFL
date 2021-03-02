@@ -139,6 +139,17 @@ where
     }
 }
 
+impl<I, R, S> Default for StdScheduledMutator<I, R, S>
+where
+    I: Input,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Schedule some selected byte level mutations given a ScheduledMutator type
 #[derive(Clone, Debug)]
 pub struct HavocBytesMutator<C, I, R, S, SM>

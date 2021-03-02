@@ -1232,10 +1232,9 @@ where
                 .expect("An error occurred when brokering. Exiting.");
 
             #[cfg(feature = "std")]
-            match sleep_time {
-                Some(time) => thread::sleep(time),
-                None => (),
-            }
+            if let Some(time) = sleep_time {
+                thread::sleep(time)
+            };
 
             #[cfg(not(feature = "std"))]
             match sleep_time {
@@ -1407,10 +1406,9 @@ where
 
                 let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
                 let msg_buf = (*msg).as_slice(map)?;
-                match (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
-                    LlmpMsgHookResult::Handled => should_forward_msg = false,
-                    _ => (),
-                }
+                if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
+                    should_forward_msg = false
+                };
                 if should_forward_msg {
                     self.forward_msg(msg)?;
                 }
@@ -1574,6 +1572,8 @@ where
 
     /// The current page could have changed in recv (EOP)
     /// Alloc the next message, internally handling end of page by allocating a new one.
+    /// # Safety
+    /// Should be safe, but returns an unsafe ptr
     #[inline]
     pub unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         self.sender.alloc_next(buf_len)

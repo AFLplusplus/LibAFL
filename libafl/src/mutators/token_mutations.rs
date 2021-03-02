@@ -75,7 +75,7 @@ impl Tokens {
             let line = line.trim_start().trim_end();
 
             // we are only interested in '"..."', not prefixed 'foo = '
-            let start = line.chars().nth(0);
+            let start = line.chars().next();
             if line.is_empty() || start == Some('#') {
                 continue;
             }

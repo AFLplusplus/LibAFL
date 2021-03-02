@@ -46,7 +46,7 @@ pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
     debug_assert!(to + len <= data.len());
     if len != 0 && from != to {
         let ptr = data.as_mut_ptr();
-        unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
+        unsafe { core::ptr::copy(ptr.add(from), ptr.add(to), len) }
     }
 }
 
@@ -60,13 +60,7 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
     let dst_ptr = dst.as_mut_ptr();
     let src_ptr = src.as_ptr();
     if len != 0 {
-        unsafe {
-            core::ptr::copy(
-                src_ptr.offset(from as isize),
-                dst_ptr.offset(to as isize),
-                len,
-            )
-        }
+        unsafe { core::ptr::copy(src_ptr.add(from), dst_ptr.add(to), len) }
     }
 }
 
