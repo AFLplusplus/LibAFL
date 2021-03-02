@@ -1247,7 +1247,7 @@ where
                 keep_pages_forever: true,
             },
             llmp_clients: vec![],
-            socket_name: "".to_string(),
+            socket_name: String::default(),
             shutting_down: false,
         };
 
@@ -1607,7 +1607,7 @@ where
     SH: ShMem,
 {
     fn drop(&mut self) {
-        if self.socket_name != "".to_string() {
+        if self.socket_name != String::default() {
             match std::fs::remove_file(&self.socket_name) {
                 Ok(_) => {}
                 Err(err) => {
