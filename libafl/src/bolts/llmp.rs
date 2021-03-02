@@ -1316,19 +1316,51 @@ where
 
     /// Called from an interrupt: Sets broker `shutting_down` flag to `true`.
     /// Currently only supported on `std` unix systems.
-    pub fn shutdown(&mut self) {
+    fn shutdown(&mut self) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
         compiler_fence(Ordering::SeqCst);
     }
 
     #[cfg(all(feature = "std", unix))]
-    pub unsafe fn handle_signal(_sig: c_int, _: siginfo_t, _: c_void) {
+    unsafe fn handle_signal(_sig: c_int, _: siginfo_t, _: c_void) {
         if !CURRENT_BROKER_PTR.is_null() {
             let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>)
                 .as_mut()
                 .unwrap();
             broker.shutdown();
         };
+    }
+
+    /// For proper cleanup on sigint, we set up a sigint handler
+    #[cfg(all(feature = "std", unix))]
+    unsafe fn setup_sigint_handler(&mut self) {
+        CURRENT_BROKER_PTR = self as *const _ as *const c_void;
+
+        // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
+        let signal_stack_size = 2 << 22;
+        // TODO: We leak the signal stack. Removing the signal handlers, then freeing this mem on teardown, would be more correct.
+        let signal_stack_ptr = malloc(signal_stack_size);
+        if signal_stack_ptr.is_null() {
+            panic!(
+                "Failed to allocate signal stack with {} bytes!",
+                signal_stack_size
+            );
+        }
+        sigaltstack(signal_stack_ptr as _, ptr::null_mut() as _);
+
+        let mut sa: sigaction = zeroed();
+        libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
+        sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
+        sa.sa_sigaction = LlmpBroker::<SH>::handle_signal as usize;
+        for (sig, msg) in &[
+            (SIGTERM, "segterm"),
+            (SIGINT, "sigint"),
+            (SIGQUIT, "sigquit"),
+        ] {
+            if sigaction(*sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
+                panic!("Could not set up {} handler", &msg);
+            }
+        }
     }
 
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
@@ -1340,33 +1372,9 @@ where
     {
         #[cfg(all(feature = "std", unix))]
         unsafe {
-            CURRENT_BROKER_PTR = self as *const _ as *const c_void;
+            self.setup_sigint_handler()
+        };
 
-            // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
-            let signal_stack_size = 2 << 22;
-            let signal_stack_ptr = malloc(signal_stack_size);
-            if signal_stack_ptr.is_null() {
-                panic!(
-                    "Failed to allocate signal stack with {} bytes!",
-                    signal_stack_size
-                );
-            }
-            sigaltstack(signal_stack_ptr as _, ptr::null_mut() as _);
-
-            let mut sa: sigaction = zeroed();
-            libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
-            sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-            sa.sa_sigaction = LlmpBroker::<SH>::handle_signal as usize;
-            for (sig, msg) in &[
-                (SIGTERM, "segterm"),
-                (SIGINT, "sigint"),
-                (SIGQUIT, "sigquit"),
-            ] {
-                if sigaction(*sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
-                    panic!("Could not set up {} handler", &msg);
-                }
-            }
-        }
         while unsafe { !ptr::read_volatile(&self.shutting_down) } {
             compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
