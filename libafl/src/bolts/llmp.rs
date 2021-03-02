@@ -80,21 +80,26 @@ use nix::{
     },
 };
 #[cfg(all(feature = "std", unix))]
-use std::os::unix::{
-    net::{UnixListener, UnixStream},
-    {io::AsRawFd, prelude::RawFd},
+use std::{
+    ffi::CStr,
+    os::unix::{
+        net::{UnixListener, UnixStream},
+        {io::AsRawFd, prelude::RawFd},
+    },
 };
 
 #[cfg(all(feature = "std", unix))]
 use libc::{
-    c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK, SA_SIGINFO,
-    SIGINT, SIGQUIT, SIGTERM,
+    c_char, c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO, SIGINT, SIGQUIT, SIGTERM,
 };
 
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription},
     Error,
 };
+
+use super::shmem::HasShmId;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -401,31 +406,6 @@ where
         }
     }
 
-    #[cfg(all(feature = "std", unix))]
-    pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
-        match UnixListener::bind(filename) {
-            Ok(listener) => {
-                dbg!("We're the broker");
-                let mut broker = LlmpBroker::new()?;
-                broker.socket_name = Some(filename.to_string());
-                let _listener_thread = broker.launch_listener(Listener::Unix(listener))?;
-                Ok(LlmpConnection::IsBroker { broker })
-            }
-            Err(e) => {
-                match e.kind() {
-                    std::io::ErrorKind::AddrInUse => {
-                        // We are the client :)
-                        dbg!("We're the client", e);
-                        Ok(LlmpConnection::IsClient {
-                            client: LlmpClient::create_attach_to_unix(filename)?,
-                        })
-                    }
-                    _ => Err(Error::File(e)),
-                }
-            }
-        }
-    }
-
     /// Describe this in a reproducable fashion, if it's a client
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(match self {
@@ -448,6 +428,36 @@ where
         match self {
             LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf),
             LlmpConnection::IsClient { client } => client.send_buf(tag, buf),
+        }
+    }
+}
+
+impl<SH> LlmpConnection<SH>
+where
+    SH: ShMem + HasShmId,
+{
+    #[cfg(all(feature = "std", unix))]
+    pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
+        match UnixListener::bind(filename) {
+            Ok(listener) => {
+                dbg!("We're the broker");
+                let mut broker = LlmpBroker::new()?;
+                broker.socket_name = Some(filename.to_string());
+                let _listener_thread = broker.launch_listener(Listener::Unix(listener))?;
+                Ok(LlmpConnection::IsBroker { broker })
+            }
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::AddrInUse => {
+                        // We are the client :)
+                        dbg!("We're the client", e);
+                        Ok(LlmpConnection::IsClient {
+                            client: LlmpClient::create_attach_to_unix(filename)?,
+                        })
+                    }
+                    _ => Err(Error::File(e)),
+                }
+            }
         }
     }
 }
@@ -1420,7 +1430,6 @@ where
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
         let broadcast_str_initial = client_out_map_mem.shm_slice().clone();
-        let broadcast_fd_initial = client_out_map_mem.shm_get_id();
 
         let llmp_tcp_id = self.llmp_clients.len() as u32;
 
@@ -1479,6 +1488,16 @@ where
                     }
                     ListenerStream::Unix(stream, addr) => unsafe {
                         dbg!("New connection", addr);
+
+                        let broadcast_fd_initial: i32 =
+                            CStr::from_ptr(broadcast_str_initial.as_ptr() as *const c_char)
+                                .to_string_lossy()
+                                .into_owned()
+                                .parse()
+                                .expect(&format!(
+                                    "ShmId is not a valid int file descriptor: {:?}",
+                                    broadcast_str_initial
+                                ));
 
                         match sendmsg(
                             stream.as_raw_fd(),
@@ -1834,7 +1853,15 @@ where
         stream.write(ret.sender.out_maps.first().unwrap().shmem.shm_slice())?;
         Ok(ret)
     }
+}
 
+/// `n` clients connect to a broker. They share an outgoing map with the broker,
+/// and get incoming messages from the shared broker bus
+/// If the Shm has a fd, we can attach to it.
+impl<SH> LlmpClient<SH>
+where
+    SH: ShMem + HasShmId,
+{
     #[cfg(all(feature = "std", unix))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
@@ -1876,7 +1903,7 @@ where
                             .first()
                             .unwrap()
                             .shmem
-                            .shm_get_id()])],
+                            .shm_id()])],
                         MsgFlags::empty(),
                         None,
                     ) {

@@ -1,4 +1,4 @@
-use crate::bolts::llmp::LlmpSender;
+use crate::bolts::{llmp::LlmpSender, shmem::HasShmId};
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
@@ -109,15 +109,6 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(port)?,
-            phantom: PhantomData,
-        })
-    }
-
-    #[cfg(all(feature = "std", unix))]
-    pub fn new_on_domain_socket(stats: ST, filename: &str) -> Result<Self, Error> {
-        Ok(Self {
-            stats: Some(stats),
-            llmp: llmp::LlmpConnection::on_domain_socket(filename)?,
             phantom: PhantomData,
         })
     }
@@ -306,6 +297,23 @@ where
                 event.name()
             ))),
         }
+    }
+}
+
+impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
+where
+    I: Input,
+    S: IfInteresting<I>,
+    SH: ShMem + HasShmId,
+    ST: Stats,
+{
+    #[cfg(all(feature = "std", unix))]
+    pub fn new_on_domain_socket(stats: ST, filename: &str) -> Result<Self, Error> {
+        Ok(Self {
+            stats: Some(stats),
+            llmp: llmp::LlmpConnection::on_domain_socket(filename)?,
+            phantom: PhantomData,
+        })
     }
 }
 
@@ -499,7 +507,7 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SH: ShMem,
+    SH: ShMem + HasShmId, // Todo: HasShmId is only needed for Android
     ST: Stats,
 {
     let mut mgr;
