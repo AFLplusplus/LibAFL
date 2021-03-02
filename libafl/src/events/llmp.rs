@@ -506,7 +506,10 @@ where
     if std::env::var(_ENV_FUZZER_SENDER).is_err() {
         let path = std::env::current_dir()?;
         mgr = if cfg!(target_os = "android") {
-            LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(stats, &format!("{}/.llmp_socket", path.display()).to_string())?
+            LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
+                stats,
+                &format!("{}/.llmp_socket", path.display()).to_string(),
+            )?
         } else {
             LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?
         };

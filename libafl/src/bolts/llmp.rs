@@ -71,17 +71,14 @@ use std::{
 };
 
 #[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
-#[cfg(unix)]
-use nix:: {
-    sys::uio::IoVec,
-    sys::socket::{sendmsg, recvmsg, ControlMessage, ControlMessageOwned, MsgFlags},
+use nix::{
     cmsg_space,
+    sys::socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
+    sys::uio::IoVec,
 };
-use std::os::unix::{
-    io::AsRawFd,
-    prelude::RawFd,
-};
+#[cfg(unix)]
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::{io::AsRawFd, prelude::RawFd};
 
 use super::shmem::{ShMem, ShMemDescription};
 use crate::Error;
@@ -132,26 +129,20 @@ enum ListenerStream {
 impl Listener {
     fn accept(&self) -> ListenerStream {
         match self {
-            Listener::Tcp(inner) => {
-                match inner.accept() {
-                    Ok(res) => {
-                        ListenerStream::Tcp(res.0, res.1)
-                    },
-                    Err(err) => {
-                        dbg!("Ignoring failed accept", err);
-                        ListenerStream::Empty()
-                    }
+            Listener::Tcp(inner) => match inner.accept() {
+                Ok(res) => ListenerStream::Tcp(res.0, res.1),
+                Err(err) => {
+                    dbg!("Ignoring failed accept", err);
+                    ListenerStream::Empty()
                 }
             },
-            Listener::Unix(inner) => {
-                match inner.accept() {
-                    Ok(res) => ListenerStream::Unix(res.0, res.1),
-                    Err(err) => {
-                        dbg!("Ignoring failed accept", err);
-                        ListenerStream::Empty()
-                    }
+            Listener::Unix(inner) => match inner.accept() {
+                Ok(res) => ListenerStream::Unix(res.0, res.1),
+                Err(err) => {
+                    dbg!("Ignoring failed accept", err);
+                    ListenerStream::Empty()
                 }
-            }
+            },
         }
     }
 }
@@ -1339,10 +1330,7 @@ where
 
     #[cfg(feature = "std")]
     /// Launches a thread using a listener socket, on which new clients may connect to this broker
-    fn launch_listener(
-        &mut self,
-        listener: Listener,
-    ) -> Result<thread::JoinHandle<()>, Error> {
+    fn launch_listener(&mut self, listener: Listener) -> Result<thread::JoinHandle<()>, Error> {
         // Later in the execution, after the initial map filled up,
         // the current broacast map will will point to a different map.
         // However, the original map is (as of now) never freed, new clients will start
@@ -1406,66 +1394,67 @@ where
                                 Err(e) => println!("Error forwarding client on map: {:?}", e),
                             };
                         }
-                    },
-                    ListenerStream::Unix(stream, addr) => {
-                        unsafe {
-                            dbg!("New connection", addr);
+                    }
+                    ListenerStream::Unix(stream, addr) => unsafe {
+                        dbg!("New connection", addr);
 
-                            match sendmsg(
-                                stream.as_raw_fd(),
-                                &[IoVec::from_slice(b"\x00")],
-                                &[ControlMessage::ScmRights(&[broadcast_fd_initial])],
-                                MsgFlags::empty(),
-                                None) {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    dbg!("Error sending fd over stream: {}", err);
-                                    continue;
-                                }
-                            };
+                        match sendmsg(
+                            stream.as_raw_fd(),
+                            &[IoVec::from_slice(b"\x00")],
+                            &[ControlMessage::ScmRights(&[broadcast_fd_initial])],
+                            MsgFlags::empty(),
+                            None,
+                        ) {
+                            Ok(_) => {}
+                            Err(err) => {
+                                dbg!("Error sending fd over stream: {}", err);
+                                continue;
+                            }
+                        };
 
-                            let mut buf = [0u8; 5];
-                            let mut cmsgspace = cmsg_space!([RawFd; 1]);
-                            let msg = recvmsg(
-                                stream.as_raw_fd(),
-                                &[IoVec::from_mut_slice(&mut buf[..])],
-                                Some(&mut cmsgspace),
-                                MsgFlags::empty())
-                                .unwrap();
+                        let mut buf = [0u8; 5];
+                        let mut cmsgspace = cmsg_space!([RawFd; 1]);
+                        let msg = recvmsg(
+                            stream.as_raw_fd(),
+                            &[IoVec::from_mut_slice(&mut buf[..])],
+                            Some(&mut cmsgspace),
+                            MsgFlags::empty(),
+                        )
+                        .unwrap();
 
-                            for cmsg in msg.cmsgs() {
-                                if let ControlMessageOwned::ScmRights(fds) = cmsg {
-                                    for fd in fds {
-                                        let mut fdstr = [0u8; 20];
-                                        match write!(&mut fdstr[..], "{}", fd) {
-                                            Ok(_) => {},
-                                            Err(_) => {
-                                                dbg!("error converting fd to string");
-                                            }
+                        for cmsg in msg.cmsgs() {
+                            if let ControlMessageOwned::ScmRights(fds) = cmsg {
+                                for fd in fds {
+                                    let mut fdstr = [0u8; 20];
+                                    match write!(&mut fdstr[..], "{}", fd) {
+                                        Ok(_) => {}
+                                        Err(_) => {
+                                            dbg!("error converting fd to string");
                                         }
-
-                                        let msg = new_client_sender
-                                            .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
-                                            .expect("Could not allocate a new message in shared map.");
-                                        (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
-                                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                                        (*pageinfo).shm_str = fdstr;
-                                        (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
-                                        match new_client_sender.send(msg) {
-                                            Ok(()) => (),
-                                            Err(e) => println!("Error forwarding client on map: {:?}", e),
-                                        };
                                     }
+
+                                    let msg = new_client_sender
+                                        .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
+                                        .expect("Could not allocate a new message in shared map.");
+                                    (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+                                    let pageinfo =
+                                        (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+                                    (*pageinfo).shm_str = fdstr;
+                                    (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
+                                    match new_client_sender.send(msg) {
+                                        Ok(()) => (),
+                                        Err(e) => {
+                                            println!("Error forwarding client on map: {:?}", e)
+                                        }
+                                    };
                                 }
                             }
                         }
-
                     },
                     ListenerStream::Empty() => {
                         continue;
                     }
                 };
-
             }
         }))
     }
@@ -1758,15 +1747,16 @@ where
             stream.as_raw_fd(),
             &[IoVec::from_mut_slice(&mut buf[..])],
             Some(&mut cmsgspace),
-            MsgFlags::empty())
-            .unwrap();
+            MsgFlags::empty(),
+        )
+        .unwrap();
 
         for cmsg in msg.cmsgs() {
             if let ControlMessageOwned::ScmRights(fds) = cmsg {
                 for fd in fds {
                     let mut fdstr = [0u8; 20];
                     match write!(&mut fdstr[..], "{}", fd) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(_) => {
                             dbg!("error converting fd to string");
                         }
@@ -1780,12 +1770,17 @@ where
                     match sendmsg(
                         stream.as_raw_fd(),
                         &[IoVec::from_slice(b"\x00")],
-                        &[ControlMessage::ScmRights(&[
-                            ret.sender.out_maps.first().unwrap().shmem.shm_get_id()
-                        ])],
+                        &[ControlMessage::ScmRights(&[ret
+                            .sender
+                            .out_maps
+                            .first()
+                            .unwrap()
+                            .shmem
+                            .shm_get_id()])],
                         MsgFlags::empty(),
-                        None) {
-                        Ok(_) => {},
+                        None,
+                    ) {
+                        Ok(_) => {}
                         Err(err) => {
                             dbg!("Error sending fd over stream {}", err);
                             continue;
