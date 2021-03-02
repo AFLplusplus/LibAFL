@@ -71,17 +71,19 @@ use std::{
     thread,
 };
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
 use nix::{
     cmsg_space,
-    sys::socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
-    sys::uio::IoVec,
+    sys::{
+        socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
+        uio::IoVec,
+    },
 };
 #[cfg(all(feature = "std", unix))]
-use std::os::unix::net::{UnixListener, UnixStream};
-#[cfg(all(feature = "std", unix))]
-use std::os::unix::{io::AsRawFd, prelude::RawFd};
+use std::os::unix::{
+    net::{UnixListener, UnixStream},
+    {io::AsRawFd, prelude::RawFd},
+};
 
 #[cfg(all(feature = "std", unix))]
 use libc::{
@@ -89,8 +91,10 @@ use libc::{
     SIGINT, SIGQUIT, SIGTERM,
 };
 
-use super::shmem::{ShMem, ShMemDescription};
-use crate::Error;
+use crate::{
+    bolts::shmem::{ShMem, ShMemDescription},
+    Error,
+};
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -1310,8 +1314,11 @@ where
         Ok(())
     }
 
+    /// Called from an interrupt: Sets broker `shutting_down` flag to `true`.
+    /// Currently only supported on `std` unix systems.
     pub fn shutdown(&mut self) {
-        self.shutting_down = true;
+        compiler_fence(Ordering::SeqCst);
+        unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
     }
 
     #[cfg(all(feature = "std", unix))]
@@ -1360,7 +1367,7 @@ where
                 }
             }
         }
-        while !self.shutting_down {
+        while unsafe { !ptr::read_volatile(&self.shutting_down) } {
             compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
