@@ -115,18 +115,21 @@ const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 pub type Tag = u32;
 
 /// Abstraction for listeners
+#[cfg(feature = "std")]
 pub enum Listener {
 
     Tcp(TcpListener),
     Unix(UnixListener),
 }
 
+#[cfg(feature = "std")]
 pub enum ListenerStream {
     Tcp(TcpStream, std::net::SocketAddr),
     Unix(UnixStream, std::os::unix::net::SocketAddr),
     Empty(),
 }
 
+#[cfg(feature = "std")]
 impl Listener {
     fn accept(&self) -> ListenerStream {
         match self {
