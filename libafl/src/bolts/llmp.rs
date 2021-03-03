@@ -74,7 +74,6 @@ use std::{
 #[cfg(all(feature = "std", unix))]
 use nix::{
     cmsg_space,
-    mem::zeroed,
     sys::{
         socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
         uio::IoVec,
@@ -83,7 +82,9 @@ use nix::{
 #[cfg(all(feature = "std", unix))]
 use std::{
     ffi::CStr,
+    mem::zeroed,
     os::unix::{
+        self,
         net::{UnixListener, UnixStream},
         {io::AsRawFd, prelude::RawFd},
     },
