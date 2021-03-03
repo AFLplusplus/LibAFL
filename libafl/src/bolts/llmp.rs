@@ -65,8 +65,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     env, fs,
-    net::SocketAddr,
     io::{Read, Write},
+    net::SocketAddr,
     net::{TcpListener, TcpStream},
     thread,
 };
