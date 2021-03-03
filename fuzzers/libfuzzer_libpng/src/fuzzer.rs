@@ -81,7 +81,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
                     return Ok(());
                 }
                 _ => {
-                    panic!(format!("Failed to setup the restarter: {}", err));
+                    panic!("Failed to setup the restarter: {}", err);
                 }
             },
         };
