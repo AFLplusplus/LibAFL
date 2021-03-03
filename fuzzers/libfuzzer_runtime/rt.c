@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <malloc.h>
 
 #define MAP_SIZE 65536
 
@@ -8,9 +9,11 @@ char **orig_argv;
 char **orig_envp;
 
 uint8_t  __lafl_dummy_map[MAP_SIZE];
+size_t  __lafl_dummy_map_usize[MAP_SIZE];
 
 uint8_t *__lafl_edges_map = __lafl_dummy_map;
 uint8_t *__lafl_cmp_map = __lafl_dummy_map;
+size_t *__lafl_alloc_map = __lafl_dummy_map_usize;
 
 uint32_t __lafl_max_edges_size = 0;
 
@@ -126,6 +129,36 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
   }
 
 }
+
+static void *(*old_malloc_hook) (size_t, const void *);
+
+void *__lafl_malloc(size_t size, const void *caller)
+{
+    void *result;
+    
+    uintptr_t k = (uintptr_t)caller;
+    k = (k >> 4) ^ (k << 8);
+    k &= MAP_SIZE - 1;
+    __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
+
+    __malloc_hook = old_malloc_hook;
+
+    result = malloc(size);
+
+    old_malloc_hook = __malloc_hook;
+    __malloc_hook = __lafl_malloc;
+
+    return result;
+}
+
+static void afl_libfuzzer_malloc_init(void)
+{
+    old_malloc_hook = __malloc_hook;
+    __malloc_hook = my_malloc_hook;
+}
+
+/* Override initializing hook from the C library. */
+void (*__malloc_initialize_hook) (void) = afl_libfuzzer_malloc_init;
 
 static void afl_libfuzzer_copy_args(int argc, char** argv, char** envp) {
    orig_argc = argc;
