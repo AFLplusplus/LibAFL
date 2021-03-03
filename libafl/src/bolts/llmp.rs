@@ -1930,22 +1930,20 @@ where
 }
 
 #[cfg(test)]
+#[cfg(all(unix, feature = "std"))]
 mod tests {
 
-    #[cfg(feature = "std")]
     use std::{thread::sleep, time::Duration};
 
-    #[cfg(feature = "std")]
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
-    #[cfg(feature = "std")]
+
     use crate::bolts::shmem::UnixShMem;
 
-    #[cfg(feature = "std")]
     #[test]
     pub fn llmp_connection() {
         let mut broker = match LlmpConnection::<UnixShMem>::on_port(1337).unwrap() {

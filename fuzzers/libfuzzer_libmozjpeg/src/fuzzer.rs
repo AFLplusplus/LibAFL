@@ -3,6 +3,7 @@
 
 use std::{env, path::PathBuf};
 
+#[cfg(unix)]
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
@@ -69,11 +70,7 @@ pub fn main() {
 
 /// Not supported on windows right now
 #[cfg(windows)]
-fn fuzz(
-    _corpus_dirs: Vec<PathBuf>,
-    _objective_dir: PathBuf,
-    _broker_port: u16,
-) -> Result<(), Error> {
+fn fuzz(_corpus_dirs: Vec<PathBuf>, _objective_dir: PathBuf, _broker_port: u16) -> Result<(), ()> {
     todo!("Example not supported on Windows");
 }
 

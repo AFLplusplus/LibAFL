@@ -3,17 +3,21 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
+#[cfg(all(unix, feature = "std"))]
 use core::{convert::TryInto, time::Duration};
+#[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 
+#[cfg(all(unix, feature = "std"))]
 use libafl::{
     bolts::{llmp, shmem::UnixShMem},
     Error,
 };
 
-const TAG_SIMPLE_U32_V1: u32 = 0x51300321;
-const TAG_MATH_RESULT_V1: u32 = 0x77474331;
+const _TAG_SIMPLE_U32_V1: u32 = 0x51300321;
+const _TAG_MATH_RESULT_V1: u32 = 0x77474331;
 
+#[cfg(all(unix, feature = "std"))]
 fn adder_loop(port: u16) -> ! {
     let mut client = llmp::LlmpClient::<UnixShMem>::create_attach_to_tcp(port).unwrap();
     let mut last_result: u32 = 0;
@@ -27,7 +31,7 @@ fn adder_loop(port: u16) -> ! {
             };
             msg_counter += 1;
             match tag {
-                TAG_SIMPLE_U32_V1 => {
+                _TAG_SIMPLE_U32_V1 => {
                     current_result =
                         current_result.wrapping_add(u32::from_le_bytes(buf.try_into().unwrap()));
                 }
@@ -42,7 +46,7 @@ fn adder_loop(port: u16) -> ! {
             );
 
             client
-                .send_buf(TAG_MATH_RESULT_V1, &current_result.to_le_bytes())
+                .send_buf(_TAG_MATH_RESULT_V1, &current_result.to_le_bytes())
                 .unwrap();
             last_result = current_result;
         }
@@ -51,13 +55,14 @@ fn adder_loop(port: u16) -> ! {
     }
 }
 
+#[cfg(all(unix, feature = "std"))]
 fn broker_message_hook(
     client_id: u32,
     tag: llmp::Tag,
     message: &[u8],
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
     match tag {
-        TAG_SIMPLE_U32_V1 => {
+        _TAG_SIMPLE_U32_V1 => {
             println!(
                 "Client {:?} sent message: {:?}",
                 client_id,
@@ -65,7 +70,7 @@ fn broker_message_hook(
             );
             Ok(llmp::LlmpMsgHookResult::ForwardToClients)
         }
-        TAG_MATH_RESULT_V1 => {
+        _TAG_MATH_RESULT_V1 => {
             println!(
                 "Adder Client has this current result: {:?}",
                 u32::from_le_bytes(message.try_into().unwrap())
@@ -79,6 +84,12 @@ fn broker_message_hook(
     }
 }
 
+#[cfg(not(unix))]
+fn main() {
+    todo!("LLMP is not yet supported on this platform.");
+}
+
+#[cfg(unix)]
 fn main() {
     /* The main node has a broker, and a few worker threads */
 
@@ -108,7 +119,7 @@ fn main() {
             loop {
                 counter = counter.wrapping_add(1);
                 client
-                    .send_buf(TAG_SIMPLE_U32_V1, &counter.to_le_bytes())
+                    .send_buf(_TAG_SIMPLE_U32_V1, &counter.to_le_bytes())
                     .unwrap();
                 println!("CTR Client writing {}", counter);
                 thread::sleep(Duration::from_secs(1))

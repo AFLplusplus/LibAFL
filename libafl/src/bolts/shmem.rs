@@ -463,10 +463,10 @@ pub mod shmem {
 #[cfg(test)]
 mod tests {
 
-    #[cfg(feature = "std")]
+    #[cfg(all(unix, feature = "std"))]
     use super::{ShMem, UnixShMem};
 
-    #[cfg(feature = "std")]
+    #[cfg(all(unix, feature = "std"))]
     #[test]
     fn test_str_conversions() {
         let mut shm_str: [u8; 20] = [0; 20];

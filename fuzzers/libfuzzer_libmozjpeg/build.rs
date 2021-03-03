@@ -11,7 +11,7 @@ const LIBMOZJPEG_URL: &str = "https://github.com/mozilla/mozjpeg/archive/v4.0.3.
 fn main() {
     if cfg!(windows) {
         println!("cargo:warning=Skipping libmozjpeg example on Windows");
-        exit(1);
+        exit(0);
     }
 
     let out_dir = env::var_os("OUT_DIR").unwrap();

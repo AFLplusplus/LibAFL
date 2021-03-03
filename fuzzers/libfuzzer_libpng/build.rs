@@ -12,7 +12,7 @@ const LIBPNG_URL: &str =
 fn main() {
     if cfg!(windows) {
         println!("cargo:warning=Skipping libpng example on Windows");
-        exit(1);
+        exit(0);
     }
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
