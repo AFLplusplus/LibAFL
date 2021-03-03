@@ -30,7 +30,6 @@ use crate::{
     observers::ObserversTuple,
     state::IfInteresting,
     stats::Stats,
-
     Error,
 };
 

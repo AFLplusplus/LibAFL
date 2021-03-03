@@ -18,9 +18,9 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
+    - name: Windows Build
       run: cargo build --verbose
-    - name: Test
+    - name: Windows Test
       run: cargo test --verbose
   all-features:
     runs-on: ubuntu-latest

@@ -9,8 +9,9 @@ use crate::Error;
 
 #[cfg(feature = "std")]
 use std::{
+    env,
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
-    env, process::Command,
 };
 
 pub trait AsSlice<T> {
