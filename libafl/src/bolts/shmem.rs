@@ -1,12 +1,10 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
 pub use unix_shmem::UnixShMem;
 
-#[cfg(feature = "std")]
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 pub use shmem::Win32ShMem;
 
 use alloc::string::{String, ToString};
@@ -465,10 +463,10 @@ pub mod shmem {
 #[cfg(test)]
 mod tests {
 
-    #[cfg(feature = "std")]
+    #[cfg(all(unix, feature = "std"))]
     use super::{ShMem, UnixShMem};
 
-    #[cfg(feature = "std")]
+    #[cfg(all(unix, feature = "std"))]
     #[test]
     fn test_str_conversions() {
         let mut shm_str: [u8; 20] = [0; 20];

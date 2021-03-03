@@ -3,6 +3,7 @@
 
 use std::{env, path::PathBuf};
 
+#[cfg(unix)]
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
@@ -22,6 +23,7 @@ use libafl::{
 };
 
 /// We will interact with a C++ target, so use external c functionality
+#[cfg(unix)]
 extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
@@ -35,6 +37,7 @@ extern "C" {
 }
 
 /// The wrapped harness function, calling out to the LLVM-style harness
+#[cfg(unix)]
 fn harness<E, I>(_executor: &E, buf: &[u8]) -> ExitKind
 where
     E: Executor<I>,
@@ -65,7 +68,14 @@ pub fn main() {
     .expect("An error occurred while fuzzing");
 }
 
+/// Not supported on windows right now
+#[cfg(windows)]
+fn fuzz(_corpus_dirs: Vec<PathBuf>, _objective_dir: PathBuf, _broker_port: u16) -> Result<(), ()> {
+    todo!("Example not supported on Windows");
+}
+
 /// The actual fuzzer
+#[cfg(unix)]
 fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));

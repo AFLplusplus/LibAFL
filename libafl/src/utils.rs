@@ -4,8 +4,19 @@ use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
+#[cfg(unix)]
+use alloc::string::ToString;
+#[cfg(unix)]
+use libc::pid_t;
+
+use crate::Error;
+
 #[cfg(feature = "std")]
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    env,
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub trait AsSlice<T> {
     /// Convert to a slice
@@ -376,6 +387,53 @@ impl XKCDRand {
     pub fn with_seed(seed: u64) -> Self {
         Self { val: seed }
     }
+}
+
+/// Child Process Handle
+#[cfg(unix)]
+pub struct ChildHandle {
+    pid: pid_t,
+}
+
+#[cfg(unix)]
+impl ChildHandle {
+    /// Block until the child exited and the status code becomes available
+    pub fn status(&self) -> i32 {
+        let mut status = -1;
+        unsafe {
+            libc::waitpid(self.pid, &mut status, 0);
+        }
+        status
+    }
+}
+
+#[cfg(unix)]
+/// The ForkResult
+pub enum ForkResult {
+    Parent(ChildHandle),
+    Child,
+}
+
+/// Unix has forks.
+#[cfg(unix)]
+pub unsafe fn fork() -> Result<ForkResult, Error> {
+    let pid = libc::fork();
+    if pid < 0 {
+        Err(Error::Unknown("Fork failed".to_string()))
+    } else if pid == 0 {
+        Ok(ForkResult::Child)
+    } else {
+        Ok(ForkResult::Parent(ChildHandle { pid }))
+    }
+}
+
+/// Executes the current process from the beginning, as subprocess.
+/// use `start_self.status()?` to wait for the child
+#[cfg(feature = "std")]
+pub fn startable_self() -> Result<Command, Error> {
+    let mut startable = Command::new(env::current_exe()?);
+    startable.current_dir(env::current_dir()?).args(env::args());
+    Ok(startable)
 }
 
 #[cfg(test)]

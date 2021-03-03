@@ -74,7 +74,6 @@ use std::{
 #[cfg(all(feature = "std", unix))]
 use nix::{
     cmsg_space,
-    mem::zeroed,
     sys::{
         socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
         uio::IoVec,
@@ -83,7 +82,9 @@ use nix::{
 #[cfg(all(feature = "std", unix))]
 use std::{
     ffi::CStr,
+    mem::zeroed,
     os::unix::{
+        self,
         net::{UnixListener, UnixStream},
         {io::AsRawFd, prelude::RawFd},
     },
@@ -1330,6 +1331,7 @@ where
 
     /// Called from an interrupt: Sets broker `shutting_down` flag to `true`.
     /// Currently only supported on `std` unix systems.
+    #[cfg(all(feature = "std", unix))]
     fn shutdown(&mut self) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
         compiler_fence(Ordering::SeqCst);
@@ -1928,22 +1930,20 @@ where
 }
 
 #[cfg(test)]
+#[cfg(all(unix, feature = "std"))]
 mod tests {
 
-    #[cfg(feature = "std")]
     use std::{thread::sleep, time::Duration};
 
-    #[cfg(feature = "std")]
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
-    #[cfg(feature = "std")]
+
     use crate::bolts::shmem::UnixShMem;
 
-    #[cfg(feature = "std")]
     #[test]
     pub fn llmp_connection() {
         let mut broker = match LlmpConnection::<UnixShMem>::on_port(1337).unwrap() {
