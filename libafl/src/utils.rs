@@ -1,10 +1,13 @@
 //! Utility functions for AFL
 
-use alloc::string::ToString;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
-use libc::pid_t;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
+
+#[cfg(unix)]
+use alloc::string::ToString;
+#[cfg(unix)]
+use libc::pid_t;
 
 use crate::Error;
 

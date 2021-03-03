@@ -7,9 +7,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::bolts::llmp::LlmpReceiver;
 
 #[cfg(all(feature = "std", windows))]
-use std::{env, process::Command};
-
-#[cfg(all(feature = "std", windows))]
 use crate::utils::startable_self;
 
 #[cfg(all(feature = "std", unix))]
@@ -519,9 +516,9 @@ where
 
     // We start ourself as child process to actually fuzz
     let (sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-        let path = std::env::current_dir()?;
         #[cfg(target_os = "android")]
         {
+            let path = std::env::current_dir()?;
             mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
                 stats,
                 &format!("{}/.llmp_socket", path.display()).to_string(),
