@@ -1330,6 +1330,7 @@ where
 
     /// Called from an interrupt: Sets broker `shutting_down` flag to `true`.
     /// Currently only supported on `std` unix systems.
+    #[cfg(all(feature = "std", unix))]
     fn shutdown(&mut self) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
         compiler_fence(Ordering::SeqCst);

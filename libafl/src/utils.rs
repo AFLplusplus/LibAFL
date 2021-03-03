@@ -1,5 +1,6 @@
 //! Utility functions for AFL
 
+use alloc::string::ToString;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use libc::pid_t;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
