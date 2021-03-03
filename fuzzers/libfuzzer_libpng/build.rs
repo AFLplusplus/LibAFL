@@ -1,13 +1,20 @@
 // build.rs
 
-use std::env;
-use std::path::Path;
-use std::process::Command;
+use std::{
+    env,
+    path::Path,
+    process::{exit, Command},
+};
 
 const LIBPNG_URL: &str =
     "https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz";
 
 fn main() {
+    if cfg!(windows) {
+        println!("cargo:warning=Skipping libpng example on Windows");
+        exit(1);
+    }
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
