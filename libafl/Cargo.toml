@@ -57,6 +57,7 @@ serde_json = { version = "1.0", optional = true, default-features = false, featu
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
+nix = "0.20.0"
 
 [target.'cfg(windows)'.dependencies]
 windows = "0.3.1"

@@ -99,17 +99,27 @@ pub trait ShMem: Sized + Debug {
     }
 }
 
+/// shared maps that have an id can use this trait
+pub trait HasFd {
+    /// Retrieve the id of this shared map
+    fn shm_id(&self) -> i32;
+}
+
 #[cfg(unix)]
 #[cfg(feature = "std")]
 pub mod unix_shmem {
 
     use core::{mem::size_of, ptr, slice};
     use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
+    #[cfg(target_os = "android")]
+    use libc::{off_t, size_t, MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
     use std::ffi::CStr;
+    #[cfg(target_os = "android")]
+    use std::ffi::CString;
 
     use crate::Error;
 
-    use super::ShMem;
+    use super::{HasFd, ShMem};
 
     #[cfg(unix)]
     extern "C" {
@@ -117,12 +127,119 @@ pub mod unix_shmem {
         fn snprintf(_: *mut c_char, _: c_ulong, _: *const c_char, _: ...) -> c_int;
         #[cfg(feature = "std")]
         fn strncpy(_: *mut c_char, _: *const c_char, _: c_ulong) -> *mut c_char;
-        #[cfg(feature = "std")]
+        #[cfg(all(feature = "std", not(target_os = "android")))]
         fn shmctl(__shmid: c_int, __cmd: c_int, __buf: *mut shmid_ds) -> c_int;
-        #[cfg(feature = "std")]
+        #[cfg(all(feature = "std", not(target_os = "android")))]
         fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int;
-        #[cfg(feature = "std")]
+        #[cfg(all(feature = "std", not(target_os = "android")))]
         fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
+        #[cfg(all(feature = "std", target_os = "android"))]
+        fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
+        #[cfg(all(feature = "std", target_os = "android"))]
+        fn open(path: *const c_char, oflag: c_int, ...) -> c_int;
+        #[cfg(all(feature = "std", target_os = "android"))]
+        fn close(fd: c_int) -> c_int;
+        #[cfg(all(feature = "std", target_os = "android"))]
+        fn mmap(
+            addr: *mut c_void,
+            len: size_t,
+            prot: c_int,
+            flags: c_int,
+            fd: c_int,
+            offset: off_t,
+        ) -> *mut c_void;
+
+    }
+
+    #[cfg(target_os = "android")]
+    #[derive(Copy, Clone)]
+    #[repr(C)]
+    struct ashmem_pin {
+        pub offset: c_uint,
+        pub len: c_uint,
+    }
+
+    #[cfg(target_os = "android")]
+    const ASHMEM_GET_SIZE: c_long = 0x00007704;
+    #[cfg(target_os = "android")]
+    const ASHMEM_UNPIN: c_long = 0x40087708;
+    #[cfg(target_os = "android")]
+    const ASHMEM_SET_NAME: c_long = 0x41007701;
+    #[cfg(target_os = "android")]
+    const ASHMEM_SET_SIZE: c_long = 0x40087703;
+    #[cfg(target_os = "android")]
+    const ASHMEM_DEVICE: &str = "/dev/ashmem";
+
+    #[cfg(target_os = "android")]
+    unsafe fn shmctl(__shmid: c_int, __cmd: c_int, _buf: *mut shmid_ds) -> c_int {
+        print!("shmctl(__shmid: {})\n", __shmid);
+        if __cmd == 0 {
+            let length = ioctl(__shmid, ASHMEM_GET_SIZE);
+
+            let ap = ashmem_pin {
+                offset: 0,
+                len: length as u32,
+            };
+
+            let ret = ioctl(__shmid, ASHMEM_UNPIN, &ap);
+            close(__shmid);
+            ret
+        } else {
+            0
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    unsafe fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int {
+        let path = CString::new(ASHMEM_DEVICE).expect("CString::new failed!");
+        let fd = open(path.as_ptr(), O_RDWR);
+
+        let mut ourkey: [c_char; 20] = [0; 20];
+        snprintf(
+            ourkey.as_mut_ptr() as *mut c_char,
+            size_of::<[c_char; 20]>() as c_ulong,
+            b"%d\x00" as *const u8 as *const c_char,
+            __key,
+        );
+
+        print!("ourkey: {:?}\n", ourkey);
+        if ioctl(fd, ASHMEM_SET_NAME, &ourkey) != 0 {
+            close(fd);
+            return 0;
+        };
+
+        if ioctl(fd, ASHMEM_SET_SIZE, __size) != 0 {
+            close(fd);
+            return 0;
+        };
+
+        print!("shmget returns {}\n", fd);
+        fd
+    }
+
+    #[cfg(target_os = "android")]
+    unsafe fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void {
+        print!("shmat(__shmid: {})\n", __shmid);
+
+        let size = ioctl(__shmid, ASHMEM_GET_SIZE);
+        if size < 0 {
+            return 0 as *mut c_void;
+        }
+
+        let ptr = mmap(
+            0 as *mut c_void,
+            size as usize,
+            PROT_READ | PROT_WRITE,
+            MAP_SHARED,
+            __shmid,
+            0,
+        );
+        if ptr == usize::MAX as *mut c_void {
+            return 0 as *mut c_void;
+        }
+
+        print!("shmat() = {:?}\n", ptr);
+        ptr
     }
 
     #[cfg(unix)]
@@ -194,6 +311,12 @@ pub mod unix_shmem {
 
         fn map_mut(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+        }
+    }
+
+    impl HasFd for UnixShMem {
+        fn shm_id(&self) -> i32 {
+            self.shm_id
         }
     }
 

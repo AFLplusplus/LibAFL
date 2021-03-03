@@ -52,7 +52,7 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 
 */
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{
     cmp::max,
     fmt::Debug,
@@ -64,14 +64,42 @@ use core::{
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
-    env,
+    env, fs,
     io::{Read, Write},
+    mem::zeroed,
     net::{TcpListener, TcpStream},
     thread,
 };
 
-use super::shmem::{ShMem, ShMemDescription};
-use crate::Error;
+#[cfg(all(feature = "std", unix))]
+use nix::{
+    cmsg_space,
+    sys::{
+        socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
+        uio::IoVec,
+    },
+};
+#[cfg(all(feature = "std", unix))]
+use std::{
+    ffi::CStr,
+    os::unix::{
+        net::{UnixListener, UnixStream},
+        {io::AsRawFd, prelude::RawFd},
+    },
+};
+
+#[cfg(all(feature = "std", unix))]
+use libc::{
+    c_char, c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO, SIGINT, SIGQUIT, SIGTERM,
+};
+
+use crate::{
+    bolts::shmem::{ShMem, ShMemDescription},
+    Error,
+};
+
+use super::shmem::HasFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -103,6 +131,42 @@ const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 
 /// TAGs used thorughout llmp
 pub type Tag = u32;
+
+/// Abstraction for listeners
+#[cfg(feature = "std")]
+pub enum Listener {
+    Tcp(TcpListener),
+    Unix(UnixListener),
+}
+
+#[cfg(feature = "std")]
+pub enum ListenerStream {
+    Tcp(TcpStream, std::net::SocketAddr),
+    Unix(UnixStream, std::os::unix::net::SocketAddr),
+    Empty(),
+}
+
+#[cfg(feature = "std")]
+impl Listener {
+    fn accept(&self) -> ListenerStream {
+        match self {
+            Listener::Tcp(inner) => match inner.accept() {
+                Ok(res) => ListenerStream::Tcp(res.0, res.1),
+                Err(err) => {
+                    dbg!("Ignoring failed accept", err);
+                    ListenerStream::Empty()
+                }
+            },
+            Listener::Unix(inner) => match inner.accept() {
+                Ok(res) => ListenerStream::Unix(res.0, res.1),
+                Err(err) => {
+                    dbg!("Ignoring failed accept", err);
+                    ListenerStream::Empty()
+                }
+            },
+        }
+    }
+}
 
 /// Get sharedmem from a page
 #[inline]
@@ -324,7 +388,7 @@ where
                 // We got the port. We are the broker! :)
                 dbg!("We're the broker");
                 let mut broker = LlmpBroker::new()?;
-                let _listener_thread = broker.launch_tcp_listener(listener)?;
+                let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
             Err(e) => {
@@ -364,6 +428,36 @@ where
         match self {
             LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf),
             LlmpConnection::IsClient { client } => client.send_buf(tag, buf),
+        }
+    }
+}
+
+impl<SH> LlmpConnection<SH>
+where
+    SH: ShMem + HasFd,
+{
+    #[cfg(all(feature = "std", unix))]
+    pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
+        match UnixListener::bind(filename) {
+            Ok(listener) => {
+                dbg!("We're the broker");
+                let mut broker = LlmpBroker::new()?;
+                broker.socket_name = Some(filename.to_string());
+                let _listener_thread = broker.launch_listener(Listener::Unix(listener))?;
+                Ok(LlmpConnection::IsBroker { broker })
+            }
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::AddrInUse => {
+                        // We are the client :)
+                        dbg!("We're the client", e);
+                        Ok(LlmpConnection::IsClient {
+                            client: LlmpClient::create_attach_to_unix(filename)?,
+                        })
+                    }
+                    _ => Err(Error::File(e)),
+                }
+            }
         }
     }
 }
@@ -1140,7 +1234,16 @@ where
     /// This allows us to intercept messages right in the broker
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SH>>,
+    /// This is the socket name, when unix domain sockets are used.
+    socket_name: Option<String>,
+    /// This flag is used to indicate that shutdown has been requested by the SIGINT and SIGTERM
+    /// handlers
+    shutting_down: bool,
 }
+
+/// used to access the current broker in signal handler.
+#[cfg(all(feature = "std", unix))]
+static mut CURRENT_BROKER_PTR: *const c_void = ptr::null();
 
 /// The broker forwards all messages to its own bus-like broadcast map.
 /// It may intercept messages passing through.
@@ -1160,6 +1263,8 @@ where
                 keep_pages_forever: true,
             },
             llmp_clients: vec![],
+            socket_name: None,
+            shutting_down: false,
         };
 
         Ok(broker)
@@ -1219,14 +1324,68 @@ where
         Ok(())
     }
 
+    /// Called from an interrupt: Sets broker `shutting_down` flag to `true`.
+    /// Currently only supported on `std` unix systems.
+    fn shutdown(&mut self) {
+        unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
+        compiler_fence(Ordering::SeqCst);
+    }
+
+    #[cfg(all(feature = "std", unix))]
+    unsafe fn handle_signal(_sig: c_int, _: siginfo_t, _: c_void) {
+        if !CURRENT_BROKER_PTR.is_null() {
+            let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>)
+                .as_mut()
+                .unwrap();
+            broker.shutdown();
+        };
+    }
+
+    /// For proper cleanup on sigint, we set up a sigint handler
+    #[cfg(all(feature = "std", unix))]
+    unsafe fn setup_sigint_handler(&mut self) {
+        CURRENT_BROKER_PTR = self as *const _ as *const c_void;
+
+        // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
+        let signal_stack_size = 2 << 22;
+        // TODO: We leak the signal stack. Removing the signal handlers, then freeing this mem on teardown would be more correct.
+        let signal_stack_ptr = malloc(signal_stack_size);
+        if signal_stack_ptr.is_null() {
+            panic!(
+                "Failed to allocate signal stack with {} bytes!",
+                signal_stack_size
+            );
+        }
+        sigaltstack(signal_stack_ptr as _, ptr::null_mut() as _);
+
+        let mut sa: sigaction = zeroed();
+        libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
+        sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
+        sa.sa_sigaction = LlmpBroker::<SH>::handle_signal as usize;
+        for (sig, msg) in &[
+            (SIGTERM, "segterm"),
+            (SIGINT, "sigint"),
+            (SIGQUIT, "sigquit"),
+        ] {
+            if sigaction(*sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
+                panic!("Could not set up {} handler", &msg);
+            }
+        }
+    }
+
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
     /// Never returns. Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
-    pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>) -> !
+    pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        loop {
+        #[cfg(all(feature = "std", unix))]
+        unsafe {
+            self.setup_sigint_handler()
+        };
+
+        while unsafe { !ptr::read_volatile(&self.shutting_down) } {
             compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
@@ -1258,15 +1417,12 @@ where
         let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
         // accept connections and process them, spawning a new thread for each one
         println!("Server listening on port {}", port);
-        self.launch_tcp_listener(listener)
+        self.launch_listener(Listener::Tcp(listener))
     }
 
     #[cfg(feature = "std")]
-    /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
-    pub fn launch_tcp_listener(
-        &mut self,
-        listener: TcpListener,
-    ) -> Result<thread::JoinHandle<()>, Error> {
+    /// Launches a thread using a listener socket, on which new clients may connect to this broker
+    pub fn launch_listener(&mut self, listener: Listener) -> Result<thread::JoinHandle<()>, Error> {
         // Later in the execution, after the initial map filled up,
         // the current broacast map will will point to a different map.
         // However, the original map is (as of now) never freed, new clients will start
@@ -1298,43 +1454,108 @@ where
             };
 
             loop {
-                let (mut stream, addr) = match listener.accept() {
-                    Ok(res) => res,
-                    Err(e) => {
-                        dbg!("Ignoring failed accept", e);
-                        continue;
+                match listener.accept() {
+                    ListenerStream::Tcp(mut stream, addr) => {
+                        dbg!("New connection", addr, stream.peer_addr().unwrap());
+                        match stream.write(&broadcast_str_initial) {
+                            Ok(_) => {} // fire & forget
+                            Err(e) => {
+                                dbg!("Could not send to shmap to client", e);
+                                continue;
+                            }
+                        };
+                        let mut new_client_map_str: [u8; 20] = Default::default();
+                        match stream.read_exact(&mut new_client_map_str) {
+                            Ok(()) => (),
+                            Err(e) => {
+                                dbg!("Ignoring failed read from client", e);
+                                continue;
+                            }
+                        };
+                        unsafe {
+                            let msg = new_client_sender
+                                .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
+                                .expect("Could not allocate a new message in shared map.");
+                            (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+                            let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+                            (*pageinfo).shm_str = new_client_map_str;
+                            (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
+                            match new_client_sender.send(msg) {
+                                Ok(()) => (),
+                                Err(e) => println!("Error forwarding client on map: {:?}", e),
+                            };
+                        }
                     }
-                };
-                dbg!("New connection", addr, stream.peer_addr().unwrap());
-                match stream.write(&broadcast_str_initial) {
-                    Ok(_) => {} // fire & forget
-                    Err(e) => {
-                        dbg!("Could not send to shmap to client", e);
-                        continue;
-                    }
-                };
-                let mut new_client_map_str: [u8; 20] = Default::default();
-                match stream.read_exact(&mut new_client_map_str) {
-                    Ok(()) => (),
-                    Err(e) => {
-                        dbg!("Ignoring failed read from client", e);
-                        continue;
-                    }
-                };
+                    ListenerStream::Unix(stream, addr) => unsafe {
+                        dbg!("New connection", addr);
 
-                unsafe {
-                    let msg = new_client_sender
-                        .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
-                        .expect("Could not allocate a new message in shared map.");
-                    (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
-                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                    (*pageinfo).shm_str = new_client_map_str;
-                    (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
-                    match new_client_sender.send(msg) {
-                        Ok(()) => (),
-                        Err(e) => println!("Error forwarding client on map: {:?}", e),
-                    };
-                }
+                        let broadcast_fd_initial: i32 =
+                            CStr::from_ptr(broadcast_str_initial.as_ptr() as *const c_char)
+                                .to_string_lossy()
+                                .into_owned()
+                                .parse()
+                                .expect(&format!(
+                                    "ShmId is not a valid int file descriptor: {:?}",
+                                    broadcast_str_initial
+                                ));
+
+                        match sendmsg(
+                            stream.as_raw_fd(),
+                            &[IoVec::from_slice(b"\x00")],
+                            &[ControlMessage::ScmRights(&[broadcast_fd_initial])],
+                            MsgFlags::empty(),
+                            None,
+                        ) {
+                            Ok(_) => {}
+                            Err(err) => {
+                                dbg!("Error sending fd over stream: {}", err);
+                                continue;
+                            }
+                        };
+
+                        let mut buf = [0u8; 5];
+                        let mut cmsgspace = cmsg_space!([RawFd; 1]);
+                        let msg = recvmsg(
+                            stream.as_raw_fd(),
+                            &[IoVec::from_mut_slice(&mut buf[..])],
+                            Some(&mut cmsgspace),
+                            MsgFlags::empty(),
+                        )
+                        .unwrap();
+
+                        for cmsg in msg.cmsgs() {
+                            if let ControlMessageOwned::ScmRights(fds) = cmsg {
+                                for fd in fds {
+                                    let mut fdstr = [0u8; 20];
+                                    match write!(&mut fdstr[..], "{}", fd) {
+                                        Ok(_) => {}
+                                        Err(_) => {
+                                            dbg!("error converting fd to string");
+                                        }
+                                    }
+
+                                    let msg = new_client_sender
+                                        .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
+                                        .expect("Could not allocate a new message in shared map.");
+                                    (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+                                    let pageinfo =
+                                        (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+                                    (*pageinfo).shm_str = fdstr;
+                                    (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
+                                    match new_client_sender.send(msg) {
+                                        Ok(()) => (),
+                                        Err(e) => {
+                                            println!("Error forwarding client on map: {:?}", e)
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                    },
+                    ListenerStream::Empty() => {
+                        continue;
+                    }
+                };
             }
         }))
     }
@@ -1413,6 +1634,24 @@ where
                     self.forward_msg(msg)?;
                 }
             }
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<SH> Drop for LlmpBroker<SH>
+where
+    SH: ShMem,
+{
+    fn drop(&mut self) {
+        match &self.socket_name {
+            Some(name) => match fs::remove_file(&name) {
+                Ok(_) => {}
+                Err(err) => {
+                    dbg!("failed to close socket: {}", err);
+                }
+            },
+            None => {}
         }
     }
 }
@@ -1613,6 +1852,73 @@ where
 
         stream.write(ret.sender.out_maps.first().unwrap().shmem.shm_slice())?;
         Ok(ret)
+    }
+}
+
+/// `n` clients connect to a broker. They share an outgoing map with the broker,
+/// and get incoming messages from the shared broker bus
+/// If the Shm has a fd, we can attach to it.
+impl<SH> LlmpClient<SH>
+where
+    SH: ShMem + HasFd,
+{
+    #[cfg(all(feature = "std", unix))]
+    /// Create a LlmpClient, getting the ID from a given filename
+    pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
+        let stream = UnixStream::connect(filename)?;
+        println!("Connected to socket {}", filename);
+
+        let mut buf = [0u8; 5];
+        let mut cmsgspace = cmsg_space!([RawFd; 1]);
+        let msg = recvmsg(
+            stream.as_raw_fd(),
+            &[IoVec::from_mut_slice(&mut buf[..])],
+            Some(&mut cmsgspace),
+            MsgFlags::empty(),
+        )
+        .unwrap();
+
+        for cmsg in msg.cmsgs() {
+            if let ControlMessageOwned::ScmRights(fds) = cmsg {
+                for fd in fds {
+                    let mut fdstr = [0u8; 20];
+                    match write!(&mut fdstr[..], "{}", fd) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            dbg!("error converting fd to string");
+                        }
+                    }
+
+                    let ret = Self::new(LlmpSharedMap::existing(SH::existing_from_shm_slice(
+                        &fdstr,
+                        LLMP_PREF_INITIAL_MAP_SIZE,
+                    )?))?;
+
+                    match sendmsg(
+                        stream.as_raw_fd(),
+                        &[IoVec::from_slice(b"\x00")],
+                        &[ControlMessage::ScmRights(&[ret
+                            .sender
+                            .out_maps
+                            .first()
+                            .unwrap()
+                            .shmem
+                            .shm_id()])],
+                        MsgFlags::empty(),
+                        None,
+                    ) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            dbg!("Error sending fd over stream {}", err);
+                            continue;
+                        }
+                    };
+                    return Ok(ret);
+                }
+            }
+        }
+
+        panic!("Didn't receive a file descriptor from the broker!");
     }
 }
 

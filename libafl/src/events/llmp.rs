@@ -1,4 +1,4 @@
-use crate::bolts::llmp::LlmpSender;
+use crate::bolts::{llmp::LlmpSender, shmem::HasFd};
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
@@ -191,6 +191,8 @@ where
                     },
                     Some(Duration::from_millis(5)),
                 );
+
+                Ok(())
             }
             _ => Err(Error::IllegalState(
                 "Called broker loop in the client".into(),
@@ -295,6 +297,23 @@ where
                 event.name()
             ))),
         }
+    }
+}
+
+impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
+where
+    I: Input,
+    S: IfInteresting<I>,
+    SH: ShMem + HasFd,
+    ST: Stats,
+{
+    #[cfg(all(feature = "std", unix))]
+    pub fn new_on_domain_socket(stats: ST, filename: &str) -> Result<Self, Error> {
+        Ok(Self {
+            stats: Some(stats),
+            llmp: llmp::LlmpConnection::on_domain_socket(filename)?,
+            phantom: PhantomData,
+        })
     }
 }
 
@@ -488,18 +507,28 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SH: ShMem,
+    SH: ShMem + HasFd, // Todo: HasFd is only needed for Android
     ST: Stats,
 {
     let mut mgr;
 
     // We start ourself as child process to actually fuzz
     if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-        mgr = LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?;
+        let path = std::env::current_dir()?;
+        mgr = if cfg!(target_os = "android") {
+            LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
+                stats,
+                &format!("{}/.llmp_socket", path.display()).to_string(),
+            )?
+        } else {
+            LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?
+        };
+
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
             mgr.broker_loop()?;
+            return Err(Error::ShuttingDown);
         } else {
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 

@@ -215,7 +215,7 @@ pub mod unix_signals {
                 si_addr
             );
             // let's yolo-cat the maps for debugging, if possible.
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             match fs::read_to_string("/proc/self/maps") {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
