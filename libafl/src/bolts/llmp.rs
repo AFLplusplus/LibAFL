@@ -65,8 +65,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     env, fs,
+    net::SocketAddr,
     io::{Read, Write},
-    mem::zeroed,
     net::{TcpListener, TcpStream},
     thread,
 };
@@ -74,6 +74,7 @@ use std::{
 #[cfg(all(feature = "std", unix))]
 use nix::{
     cmsg_space,
+    mem::zeroed,
     sys::{
         socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
         uio::IoVec,
@@ -136,13 +137,15 @@ pub type Tag = u32;
 #[cfg(feature = "std")]
 pub enum Listener {
     Tcp(TcpListener),
+    #[cfg(unix)]
     Unix(UnixListener),
 }
 
 #[cfg(feature = "std")]
 pub enum ListenerStream {
-    Tcp(TcpStream, std::net::SocketAddr),
-    Unix(UnixStream, std::os::unix::net::SocketAddr),
+    Tcp(TcpStream, SocketAddr),
+    #[cfg(unix)]
+    Unix(UnixStream, unix::net::SocketAddr),
     Empty(),
 }
 
@@ -157,6 +160,7 @@ impl Listener {
                     ListenerStream::Empty()
                 }
             },
+            #[cfg(unix)]
             Listener::Unix(inner) => match inner.accept() {
                 Ok(res) => ListenerStream::Unix(res.0, res.1),
                 Err(err) => {
@@ -1486,6 +1490,7 @@ where
                             };
                         }
                     }
+                    #[cfg(unix)]
                     ListenerStream::Unix(stream, addr) => unsafe {
                         dbg!("New connection", addr);
 

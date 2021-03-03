@@ -7,7 +7,7 @@ pub use unix_shmem::UnixShMem;
 
 #[cfg(feature = "std")]
 #[cfg(windows)]
-pub use unix_shmem::Win32ShMem;
+pub use shmem::Win32ShMem;
 
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
@@ -105,8 +105,7 @@ pub trait HasFd {
     fn shm_id(&self) -> i32;
 }
 
-#[cfg(unix)]
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 
     use core::{mem::size_of, ptr, slice};
@@ -446,21 +445,16 @@ pub mod unix_shmem {
     }
 }
 
-#[cfg(windows)]
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", windows))]
 pub mod shmem {
 
-    use core::{mem::size_of, slice};
-    use std::ffi::CStr;
-
-    use super::ShMem;
-    use crate::Error;
+    //TODO use super::ShMem;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
     pub struct Win32ShMem {
         pub filename: [u8; 64],
-        pub handle: windows::win32::system_services::HANDLE,
+        //TODO pub handle: windows::win32::system_services::HANDLE,
         pub map: *mut u8,
         pub map_size: usize,
     }
