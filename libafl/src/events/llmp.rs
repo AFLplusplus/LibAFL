@@ -26,7 +26,8 @@ use crate::{
     observers::ObserversTuple,
     state::IfInteresting,
     stats::Stats,
-    utils, Error,
+    utils::{fork, ForkResult},
+    Error,
 };
 
 /// Forward this to the client
@@ -553,9 +554,9 @@ where
 
                 // On Unix, we fork (todo: measure if that is actually faster.)
                 #[cfg(unix)]
-                let _ = match unsafe { utils::fork() }? {
-                    utils::ForkResult::Parent(handle) => handle.status(),
-                    utils::ForkResult::Child => break (sender, receiver),
+                let _ = match unsafe { fork() }? {
+                    ForkResult::Parent(handle) => handle.status(),
+                    ForkResult::Child => break (sender, receiver),
                 };
 
                 // On windows, we spawn ourself again
