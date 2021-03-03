@@ -1,12 +1,10 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
 pub use unix_shmem::UnixShMem;
 
-#[cfg(feature = "std")]
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 pub use shmem::Win32ShMem;
 
 use alloc::string::{String, ToString};

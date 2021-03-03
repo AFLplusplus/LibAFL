@@ -6,12 +6,16 @@ use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "std")]
 use crate::bolts::llmp::LlmpReceiver;
 
-#[cfg(windows)]
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", windows))]
 use std::{env, process::Command};
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
+#[cfg(all(feature = "std", windows))]
+use crate::utils::startable_self;
+
+#[cfg(all(feature = "std", unix))]
+use crate::utils::{fork, ForkResult};
+
+#[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMem;
 use crate::{
     bolts::{
@@ -26,7 +30,7 @@ use crate::{
     observers::ObserversTuple,
     state::IfInteresting,
     stats::Stats,
-    utils::{fork, ForkResult},
+
     Error,
 };
 
@@ -561,10 +565,7 @@ where
 
                 // On windows, we spawn ourself again
                 #[cfg(windows)]
-                Command::new(env::current_exe()?)
-                    .current_dir(env::current_dir()?)
-                    .args(env::args())
-                    .status()?;
+                startable_self()?.status()?;
 
                 ctr += 1;
             }

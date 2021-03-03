@@ -3,13 +3,15 @@
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use libc::pid_t;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{env, process::Command};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 use crate::Error;
 
 #[cfg(feature = "std")]
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    time::{SystemTime, UNIX_EPOCH},
+    env, process::Command,
+};
 
 pub trait AsSlice<T> {
     /// Convert to a slice
@@ -422,6 +424,7 @@ pub unsafe fn fork() -> Result<ForkResult, Error> {
 
 /// Executes the current process from the beginning, as subprocess.
 /// use `start_self.status()?` to wait for the child
+#[cfg(feature = "std")]
 pub fn startable_self() -> Result<Command, Error> {
     let mut startable = Command::new(env::current_exe()?);
     startable.current_dir(env::current_dir()?).args(env::args());
