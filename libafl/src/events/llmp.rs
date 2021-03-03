@@ -553,7 +553,7 @@ where
 
                 // On Unix, we fork (todo: measure if that is actually faster.)
                 #[cfg(unix)]
-                let _ = match unsafe {utils::fork()}? {
+                let _ = match unsafe { utils::fork() }? {
                     utils::ForkResult::Parent(handle) => handle.status(),
                     utils::ForkResult::Child => break (sender, receiver),
                 };

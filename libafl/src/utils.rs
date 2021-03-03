@@ -393,7 +393,9 @@ impl ChildHandle {
     /// Block until the child exited and the status code becomes available
     pub fn status(&self) -> i32 {
         let mut status = -1;
-        unsafe { libc::waitpid(self.pid, &mut status, 0); }
+        unsafe {
+            libc::waitpid(self.pid, &mut status, 0);
+        }
         status
     }
 }
@@ -422,8 +424,7 @@ pub unsafe fn fork() -> Result<ForkResult, Error> {
 /// use `start_self.status()?` to wait for the child
 pub fn startable_self() -> Result<Command, Error> {
     let mut startable = Command::new(env::current_exe()?);
-    startable.current_dir(env::current_dir()?)
-        .args(env::args());
+    startable.current_dir(env::current_dir()?).args(env::args());
     Ok(startable)
 }
 
