@@ -1,4 +1,4 @@
-use crate::bolts::{llmp::LlmpSender, shmem::HasShmId};
+use crate::bolts::{llmp::LlmpSender, shmem::HasFd};
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
@@ -304,7 +304,7 @@ impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SH: ShMem + HasShmId,
+    SH: ShMem + HasFd,
     ST: Stats,
 {
     #[cfg(all(feature = "std", unix))]
@@ -507,7 +507,7 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SH: ShMem + HasShmId, // Todo: HasShmId is only needed for Android
+    SH: ShMem + HasFd, // Todo: HasFd is only needed for Android
     ST: Stats,
 {
     let mut mgr;

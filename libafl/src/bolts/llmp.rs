@@ -99,7 +99,7 @@ use crate::{
     Error,
 };
 
-use super::shmem::HasShmId;
+use super::shmem::HasFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -434,7 +434,7 @@ where
 
 impl<SH> LlmpConnection<SH>
 where
-    SH: ShMem + HasShmId,
+    SH: ShMem + HasFd,
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
@@ -1860,7 +1860,7 @@ where
 /// If the Shm has a fd, we can attach to it.
 impl<SH> LlmpClient<SH>
 where
-    SH: ShMem + HasShmId,
+    SH: ShMem + HasFd,
 {
     #[cfg(all(feature = "std", unix))]
     /// Create a LlmpClient, getting the ID from a given filename
