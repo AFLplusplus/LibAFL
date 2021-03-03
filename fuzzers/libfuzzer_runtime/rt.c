@@ -154,7 +154,7 @@ void *__lafl_malloc(size_t size, const void *caller)
 static void afl_libfuzzer_malloc_init(void)
 {
     old_malloc_hook = __malloc_hook;
-    __malloc_hook = my_malloc_hook;
+    __malloc_hook = __lafl_malloc;
 }
 
 /* Override initializing hook from the C library. */
