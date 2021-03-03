@@ -270,7 +270,6 @@ where
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -287,28 +286,23 @@ mod tests {
     #[test]
     fn test_mut_scheduled() {
         // With the current impl, seed of 1 will result in a split at pos 2.
-        let mut rand = XKCDRand::new();
-        let mut corpus: InMemoryCorpus<BytesInput, _> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into());
-        corpus.add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into());
+        let mut rand = XKCDRand::with_seed(5);
+        let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
+        corpus
+            .add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into())
+            .unwrap();
+        corpus
+            .add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into())
+            .unwrap();
 
-        let (testcase, _) = corpus
-            .next(&mut rand)
-            .expect("Corpus did not contain entries");
+        let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
-        let mut state = State::new(corpus, (), InMemoryCorpus::new(), ());
+        let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
 
         rand.set_seed(5);
 
-        let mut mutator = StdScheduledMutator::<
-            InMemoryCorpus<BytesInput, XKCDRand>,
-            _,
-            _,
-            State<_, (), _, InMemoryCorpus<BytesInput, XKCDRand>, (), _>,
-        >::new();
-
-        mutation_splice(&mut mutator, &mut rand, &mut state, &mut input).unwrap();
+        mutation_splice(&mut state, &mut input).unwrap();
 
         #[cfg(feature = "std")]
         println!("{:?}", input.bytes());
@@ -321,27 +315,37 @@ mod tests {
     #[test]
     fn test_havoc() {
         // With the current impl, seed of 1 will result in a split at pos 2.
-        let mut rand = StdRand::new(0x1337);
-        let mut corpus: InMemoryCorpus<BytesInput, StdRand> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into());
-        corpus.add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into());
+        let rand = StdRand::with_seed(0x1337);
+        let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
+        corpus
+            .add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into())
+            .unwrap();
+        corpus
+            .add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into())
+            .unwrap();
 
-        let (testcase, _) = corpus
-            .next(&mut rand)
-            .expect("Corpus did not contain entries");
+        let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let mut state = State::new(corpus, (), InMemoryCorpus::new(), ());
+        let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
 
-        let mut havoc = HavocBytesMutator::new(StdScheduledMutator::new());
+        let havoc = HavocBytesMutator::new(StdScheduledMutator::new());
 
         assert_eq!(input, input_prior);
 
+        let mut equal_in_a_row = 0;
+
         for i in 0..42 {
-            havoc.mutate(&mut rand, &mut state, &mut input, i).unwrap();
-            assert_ne!(input, input_prior);
+            havoc.mutate(&mut state, &mut input, i).unwrap();
+
+            // Make sure we actually mutate something, at least sometimes
+            equal_in_a_row = if input == input_prior {
+                equal_in_a_row + 1
+            } else {
+                0
+            };
+            assert_ne!(equal_in_a_row, 5);
         }
     }
 }
-*/
