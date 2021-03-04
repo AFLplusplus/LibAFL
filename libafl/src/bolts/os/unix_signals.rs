@@ -5,15 +5,14 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fmt::{Display, Formatter},
-    mem,
-    ptr,
+    mem, ptr,
     sync::Mutex,
 };
 
 use libc::{
-    c_int, malloc, sigaction, sigaltstack, stack_t, sigemptyset, SA_NODEFER, SA_ONSTACK,
-    SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGPIPE, SIGSEGV, SIGUSR2, SIGALRM, SIGHUP,
-    SIGKILL, SIGQUIT,SIGTERM, SIGINT
+    c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
+    SIGQUIT, SIGSEGV, SIGTERM, SIGUSR2,
 };
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -96,20 +95,17 @@ struct HandlerHolder {
 
 unsafe impl Send for HandlerHolder {}
 
-
 /// Let's get 8 mb for now.
 const SIGNAL_STACK_SIZE: usize = 2 << 22;
 /// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
 static mut SIGNAL_STACK_PTR: *mut c_void = ptr::null_mut();
 
-lazy_static!{
+lazy_static! {
     /// Keep track of which handler is registered for which signal
     static ref SIGNAL_HANDLERS: Mutex<HashMap<Signal, HandlerHolder>> = Mutex::new(HashMap::new());
 }
 
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: c_void) {
-
-
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
         let handlers = SIGNAL_HANDLERS.lock().unwrap();
@@ -142,9 +138,12 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     sa.sa_sigaction = handle_signal as usize;
     let signals = handler.signals();
     for sig in signals {
-        SIGNAL_HANDLERS.lock().unwrap().insert(sig, HandlerHolder {
-            handler: UnsafeCell::new(handler as *mut dyn Handler),
-        });
+        SIGNAL_HANDLERS.lock().unwrap().insert(
+            sig,
+            HandlerHolder {
+                handler: UnsafeCell::new(handler as *mut dyn Handler),
+            },
+        );
 
         if sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up {} handler", sig);

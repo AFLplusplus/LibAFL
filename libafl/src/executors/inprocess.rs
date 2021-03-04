@@ -1,10 +1,10 @@
 //! The InProcess Executor is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
-use core::{
-    marker::PhantomData,
-};
+use core::marker::PhantomData;
 
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
     bolts::tuples::Named,
     corpus::{Corpus, Testcase},
@@ -15,10 +15,6 @@ use crate::{
     observers::ObserversTuple,
     state::{HasObjectives, HasSolutions},
     Error,
-};
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::os::unix_signals::{
-    setup_signal_handler, Handler, siginfo_t, Signal, c_void
 };
 #[cfg(all(feature = "std", unix))]
 use std::{
@@ -32,14 +28,20 @@ struct InProcessExecutorHandlerData {
     event_mgr_ptr: *mut c_void,
     observers_ptr: *const c_void,
     current_input_ptr: *const c_void,
-    crash_handler: unsafe fn (Signal, siginfo_t, c_void, data: &mut Self),
-    timeout_handler: unsafe fn (Signal, siginfo_t, c_void, data: &mut Self),
+    crash_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
+    timeout_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
-unsafe fn nop_handler(_signal: Signal, _info: siginfo_t, _void: c_void, _data: &mut InProcessExecutorHandlerData) {}
+unsafe fn nop_handler(
+    _signal: Signal,
+    _info: siginfo_t,
+    _void: c_void,
+    _data: &mut InProcessExecutorHandlerData,
+) {
+}
 
 /// The inmem executor harness
 type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
@@ -70,9 +72,10 @@ where
         _state: &mut S,
         _event_mgr: &mut EM,
         input: &I,
-    ) -> Result<(), Error>
-    {
-        unsafe { GLOBAL_STATE.current_input_ptr = input as *const _ as *const c_void; }
+    ) -> Result<(), Error> {
+        unsafe {
+            GLOBAL_STATE.current_input_ptr = input as *const _ as *const c_void;
+        }
         Ok(())
     }
 
@@ -80,9 +83,10 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(self, bytes.as_slice());
-        unsafe { GLOBAL_STATE.current_input_ptr = ptr::null(); }
+        unsafe {
+            GLOBAL_STATE.current_input_ptr = ptr::null();
+        }
         Ok(ret)
-
     }
 }
 
@@ -112,7 +116,7 @@ where
     }
 }
 
-impl Handler for InProcessExecutorHandlerData{
+impl Handler for InProcessExecutorHandlerData {
     fn handle(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -126,7 +130,6 @@ impl Handler for InProcessExecutorHandlerData{
     fn signals(&self) -> Vec<Signal> {
         vec![
             Signal::SigUser2,
-
             Signal::SigAbort,
             Signal::SigBus,
             Signal::SigPipe,
@@ -137,21 +140,25 @@ impl Handler for InProcessExecutorHandlerData{
     }
 }
 
-unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, _info: siginfo_t, _void: c_void, data: &mut InProcessExecutorHandlerData)
-where
-        EM: EventManager<I, S>,
-        OT: ObserversTuple,
-        OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
-        I: Input + HasTargetBytes,
+unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
+    _signal: Signal,
+    _info: siginfo_t,
+    _void: c_void,
+    data: &mut InProcessExecutorHandlerData,
+) where
+    EM: EventManager<I, S>,
+    OT: ObserversTuple,
+    OC: Corpus<I>,
+    OFT: FeedbacksTuple<I>,
+    S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+    I: Input + HasTargetBytes,
 {
     let state = (data.state_ptr as *mut S).as_mut().unwrap();
     let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
     let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
 
     if data.current_input_ptr.is_null() {
-            dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
+        dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
     } else {
         println!("Timeout in fuzz run.");
         let _ = stdout().flush();
@@ -168,13 +175,14 @@ where
                 .solutions_mut()
                 .add(Testcase::new(input.clone()))
                 .expect("In timeout handler solutions failure.");
-            event_mgr.fire(
-                state,
-                Event::Objective {
-                    objective_size: state.solutions().count(),
-                },
-            )
-            .expect("Could not send timeouting input");
+            event_mgr
+                .fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.solutions().count(),
+                    },
+                )
+                .expect("Could not send timeouting input");
         }
 
         event_mgr.on_restart(state).unwrap();
@@ -187,24 +195,26 @@ where
 
         std::process::exit(1);
     }
-
 }
 
-unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, info: siginfo_t, _void: c_void, data: &mut InProcessExecutorHandlerData)
-where
-        EM: EventManager<I, S>,
-        OT: ObserversTuple,
-        OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
-        I: Input + HasTargetBytes,
+unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+    _signal: Signal,
+    info: siginfo_t,
+    _void: c_void,
+    data: &mut InProcessExecutorHandlerData,
+) where
+    EM: EventManager<I, S>,
+    OT: ObserversTuple,
+    OC: Corpus<I>,
+    OFT: FeedbacksTuple<I>,
+    S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+    I: Input + HasTargetBytes,
 {
     println!("Crashed with {}", _signal);
     if !data.current_input_ptr.is_null() {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
         let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
-
 
         #[cfg(feature = "std")]
         println!("Child crashed!");
@@ -225,13 +235,14 @@ where
                 .solutions_mut()
                 .add(Testcase::new(new_input))
                 .expect("In crash handler solutions failure.".into());
-            event_mgr.fire(
-                state,
-                Event::Objective {
-                    objective_size: state.solutions().count(),
-                },
-            )
-            .expect("Could not send crashing input".into());
+            event_mgr
+                .fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.solutions().count(),
+                    },
+                )
+                .expect("Could not send crashing input".into());
         }
 
         event_mgr.on_restart(state).unwrap();
@@ -273,7 +284,6 @@ where
 }
 
 static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
-
     state_ptr: ptr::null_mut(),
     event_mgr_ptr: ptr::null_mut(),
     observers_ptr: ptr::null(),
@@ -304,9 +314,8 @@ where
         EM: EventManager<I, S>,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
     {
-
         unsafe {
             let mut data = &mut GLOBAL_STATE;
             data.state_ptr = state as *mut _ as *mut c_void;
@@ -316,7 +325,7 @@ where
             data.timeout_handler = inproc_timeout_handler::<EM, I, OC, OFT, OT, S>;
 
             match setup_signal_handler(data) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(err) => {
                     println!("Failed to register signal handlers: {}", err);
                 }
