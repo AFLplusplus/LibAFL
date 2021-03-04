@@ -11,7 +11,7 @@ use std::{
 };
 
 use libc::{
-    c_int, malloc, sigaction, sigaltstack, sigemptyset, SA_NODEFER, SA_ONSTACK,
+    c_int, malloc, sigaction, sigaltstack, stack_t, sigemptyset, SA_NODEFER, SA_ONSTACK,
     SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGPIPE, SIGSEGV, SIGUSR2, SIGALRM, SIGHUP,
     SIGKILL, SIGQUIT,SIGTERM, SIGINT
 };
@@ -100,7 +100,7 @@ unsafe impl Send for HandlerHolder {}
 /// Let's get 8 mb for now.
 const SIGNAL_STACK_SIZE: usize = 2 << 22;
 /// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
-static mut SIGNAL_STACK_PTR: *const c_void = ptr::null_mut();
+static mut SIGNAL_STACK_PTR: *mut c_void = ptr::null_mut();
 
 lazy_static!{
     /// Keep track of which handler is registered for which signal
@@ -109,21 +109,21 @@ lazy_static!{
 
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: c_void) {
 
-    let signal = &Signal::try_from(sig).unwrap();
-    match SIGNAL_HANDLERS.lock().unwrap().get(signal){
-        Some(handler_holder) => {
 
-            let mut handler = &**handler_holder.handler.get();
-            handler.handle(*signal, info, void);
-        }
-        None => {}
+    let signal = &Signal::try_from(sig).unwrap();
+    let handler = {
+        let handlers = SIGNAL_HANDLERS.lock().unwrap();
+        let handler_holder = handlers.get(signal).unwrap();
+        &mut **handler_holder.handler.get()
     };
+    handler.handle(*signal, info, void);
 }
 
 pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
     // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
     if SIGNAL_STACK_PTR.is_null() {
         SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
+
         if SIGNAL_STACK_PTR.is_null() {
             panic!(
                 "Failed to allocate signal stack with {} bytes!",
@@ -131,18 +131,20 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
             );
         }
     }
-    sigaltstack(SIGNAL_STACK_PTR as _, ptr::null_mut() as _);
+    let mut ss: stack_t = mem::zeroed();
+    ss.ss_size = SIGNAL_STACK_SIZE;
+    ss.ss_sp = SIGNAL_STACK_PTR;
+    sigaltstack(&mut ss as *mut stack_t, ptr::null_mut() as _);
 
     let mut sa: sigaction = mem::zeroed();
     sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = handle_signal as usize;
     let signals = handler.signals();
-    let mut handler_holder = HandlerHolder {
-        handler: UnsafeCell::new(handler as *mut dyn Handler),
-    };
     for sig in signals {
-        SIGNAL_HANDLERS.lock().unwrap().insert(sig, handler_holder);
+        SIGNAL_HANDLERS.lock().unwrap().insert(sig, HandlerHolder {
+            handler: UnsafeCell::new(handler as *mut dyn Handler),
+        });
 
         if sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up {} handler", sig);

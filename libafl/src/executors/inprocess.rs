@@ -2,7 +2,6 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
 use core::{
-    cell::UnsafeCell,
     marker::PhantomData,
 };
 
@@ -26,31 +25,21 @@ use std::{
     fs,
     io::{stdout, Write},
     ptr,
-    sync::Mutex,
 };
-
-use lazy_static::lazy_static;
 
 struct InProcessExecutorHandlerData {
     state_ptr: *mut c_void,
     event_mgr_ptr: *mut c_void,
     observers_ptr: *const c_void,
     current_input_ptr: *const c_void,
+    crash_handler: unsafe fn (Signal, siginfo_t, c_void, data: &mut Self),
+    timeout_handler: unsafe fn (Signal, siginfo_t, c_void, data: &mut Self),
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
+unsafe impl Sync for InProcessExecutorHandlerData {}
 
-impl InProcessExecutorHandlerData {
-    fn new() -> Self {
-        InProcessExecutorHandlerData {
-            state_ptr: ptr::null_mut(),
-            event_mgr_ptr: ptr::null_mut(),
-            observers_ptr: ptr::null(),
-            current_input_ptr: ptr::null(),
-        }
-    }
-}
-
+unsafe fn nop_handler(_signal: Signal, _info: siginfo_t, _void: c_void, _data: &mut InProcessExecutorHandlerData) {}
 
 /// The inmem executor harness
 type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
@@ -67,9 +56,6 @@ where
     harness_fn: HarnessFunction<Self>,
     /// The observers, observing each run
     observers: OT,
-    current_input_ptr: *const c_void,
-    crash_handler: unsafe fn (Signal, siginfo_t, c_void),
-    timeout_handler: unsafe fn (Signal, siginfo_t, c_void),
     phantom: PhantomData<I>,
 }
 
@@ -78,7 +64,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    #[inline]
+    //#[inline]
     fn pre_exec<EM, S>(
         &mut self,
         _state: &mut S,
@@ -86,7 +72,7 @@ where
         input: &I,
     ) -> Result<(), Error>
     {
-        self.current_input_ptr = input as *const _ as *const c_void;
+        unsafe { GLOBAL_STATE.current_input_ptr = input as *const _ as *const c_void; }
         Ok(())
     }
 
@@ -94,7 +80,9 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(self, bytes.as_slice());
+        unsafe { GLOBAL_STATE.current_input_ptr = ptr::null(); }
         Ok(ret)
+
     }
 }
 
@@ -124,15 +112,14 @@ where
     }
 }
 
-impl<I, OT> Handler for InProcessExecutor<I, OT>
-where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
-{
+impl Handler for InProcessExecutorHandlerData{
     fn handle(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
-        match signal {
-            Signal::SigUser2 => (self.timeout_handler)(signal, info, void),
-            _ => (self.crash_handler)(signal, info, void),
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+            match signal {
+                Signal::SigUser2 => (data.timeout_handler)(signal, info, void, data),
+                _ => (data.crash_handler)(signal, info, void, data),
+            }
         }
     }
 
@@ -144,14 +131,13 @@ where
             Signal::SigBus,
             Signal::SigPipe,
             Signal::SigFloatingPointException,
-            Signal::SigKill,
             Signal::SigIllegalInstruction,
             Signal::SigSegmentationFault,
         ]
     }
 }
 
-unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, _info: siginfo_t, _void: c_void)
+unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, _info: siginfo_t, _void: c_void, data: &mut InProcessExecutorHandlerData)
 where
         EM: EventManager<I, S>,
         OT: ObserversTuple,
@@ -160,7 +146,6 @@ where
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
 {
-    let data = GLOBAL_STATE.lock().unwrap();
     let state = (data.state_ptr as *mut S).as_mut().unwrap();
     let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
     let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
@@ -172,6 +157,7 @@ where
         let _ = stdout().flush();
 
         let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+        data.current_input_ptr = ptr::null();
 
         let obj_fitness = state
             .objectives_mut()
@@ -204,7 +190,7 @@ where
 
 }
 
-unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, info: siginfo_t, _void: c_void)
+unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, info: siginfo_t, _void: c_void, data: &mut InProcessExecutorHandlerData)
 where
         EM: EventManager<I, S>,
         OT: ObserversTuple,
@@ -213,12 +199,50 @@ where
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
 {
-    let data = GLOBAL_STATE.lock().unwrap();
-    let state = (data.state_ptr as *mut S).as_mut().unwrap();
-    let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
-    let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+    println!("Crashed with {}", _signal);
+    if !data.current_input_ptr.is_null() {
+        let state = (data.state_ptr as *mut S).as_mut().unwrap();
+        let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+        let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
 
-    if data.current_input_ptr == ptr::null() {
+
+        #[cfg(feature = "std")]
+        println!("Child crashed!");
+        #[cfg(feature = "std")]
+        let _ = stdout().flush();
+
+        let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+        // Make sure we don't crash in the crash handler forever.
+        data.current_input_ptr = ptr::null();
+
+        let obj_fitness = state
+            .objectives_mut()
+            .is_interesting_all(&input, observers, ExitKind::Crash)
+            .expect("In crash handler objectives failure.".into());
+        if obj_fitness > 0 {
+            let new_input = input.clone();
+            state
+                .solutions_mut()
+                .add(Testcase::new(new_input))
+                .expect("In crash handler solutions failure.".into());
+            event_mgr.fire(
+                state,
+                Event::Objective {
+                    objective_size: state.solutions().count(),
+                },
+            )
+            .expect("Could not send crashing input".into());
+        }
+
+        event_mgr.on_restart(state).unwrap();
+
+        println!("Waiting for broker...");
+        event_mgr.await_restart_safe();
+        println!("Bye!");
+
+        std::process::exit(1);
+    } else {
+        println!("Double crash\n");
         #[cfg(target_os = "android")]
         let si_addr = { ((info._pad[0] as usize) | ((info._pad[1] as usize) << 32)) as usize };
         #[cfg(not(target_os = "android"))]
@@ -246,47 +270,18 @@ where
         // TODO tell the parent to not restart
         std::process::exit(1);
     }
-
-    #[cfg(feature = "std")]
-    println!("Child crashed!");
-    #[cfg(feature = "std")]
-    let _ = stdout().flush();
-
-    let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-    // Make sure we don't crash in the crash handler forever.
-    data.current_input_ptr = ptr::null();
-
-    let obj_fitness = state
-        .objectives_mut()
-        .is_interesting_all(&input, observers, ExitKind::Crash)
-        .expect("In crash handler objectives failure.".into());
-    if obj_fitness > 0 {
-        state
-            .solutions_mut()
-            .add(Testcase::new(input.clone()))
-            .expect("In crash handler solutions failure.".into());
-        event_mgr.fire(
-            state,
-            Event::Objective {
-                objective_size: state.solutions().count(),
-            },
-        )
-        .expect("Could not send crashing input".into());
-    }
-
-    event_mgr.on_restart(state).unwrap();
-
-    println!("Waiting for broker...");
-    event_mgr.await_restart_safe();
-    println!("Bye!");
-
-    std::process::exit(1);
 }
 
-lazy_static!{
-    static ref GLOBAL_STATE: Mutex<InProcessExecutorHandlerData> =
-        Mutex::new(InProcessExecutorHandlerData::new());
-}
+static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+
+    state_ptr: ptr::null_mut(),
+    event_mgr_ptr: ptr::null_mut(),
+    observers_ptr: ptr::null(),
+    current_input_ptr: ptr::null(),
+    crash_handler: nop_handler,
+    timeout_handler: nop_handler,
+};
+
 impl<I, OT> InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
@@ -312,26 +307,24 @@ where
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>
     {
 
-        let mut newobj = Self {
+        unsafe {
+            let mut data = &mut GLOBAL_STATE;
+            data.state_ptr = state as *mut _ as *mut c_void;
+            data.event_mgr_ptr = event_mgr as *mut _ as *mut c_void;
+            data.observers_ptr = &observers as *const _ as *const c_void;
+            data.crash_handler = inproc_crash_handler::<EM, I, OC, OFT, OT, S>;
+            data.timeout_handler = inproc_timeout_handler::<EM, I, OC, OFT, OT, S>;
+
+            setup_signal_handler(data);
+        }
+
+        Self {
             harness_fn,
             observers,
             name,
-            current_input_ptr: ptr::null(),
-            crash_handler: inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
-            timeout_handler: inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
             phantom: PhantomData,
-        };
-
-        let data = GLOBAL_STATE.lock().unwrap();
-        data.state_ptr = state as *mut _ as *mut c_void;
-        data.event_mgr_ptr = state as *mut _ as *mut c_void;
-
-        unsafe {
-            setup_signal_handler(&mut newobj);
         }
-        newobj
     }
-
 }
 
 #[cfg(test)]
