@@ -79,7 +79,7 @@ where
     I: Input,
 {
     #[inline]
-    /// Called right before exexution starts
+    /// Called right before execution starts
     fn pre_exec<EM, S>(
         &mut self,
         _state: &mut S,
@@ -93,7 +93,7 @@ where
     }
 
     #[inline]
-    /// Called right after execution finished.
+    /// Called right after execution finishes.
     fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
     where
         EM: EventManager<I, S>,
