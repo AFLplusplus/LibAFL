@@ -169,7 +169,7 @@ pub mod unix_shmem {
 
     #[cfg(target_os = "android")]
     unsafe fn shmctl(__shmid: c_int, __cmd: c_int, _buf: *mut shmid_ds) -> c_int {
-        print!("shmctl(__shmid: {})\n", __shmid);
+        println!("shmctl(__shmid: {})", __shmid);
         if __cmd == 0 {
             let length = ioctl(__shmid, ASHMEM_GET_SIZE);
 
@@ -199,7 +199,7 @@ pub mod unix_shmem {
             __key,
         );
 
-        print!("ourkey: {:?}\n", ourkey);
+        println!("ourkey: {:?}", ourkey);
         if ioctl(fd, ASHMEM_SET_NAME, &ourkey) != 0 {
             close(fd);
             return 0;
@@ -210,13 +210,13 @@ pub mod unix_shmem {
             return 0;
         };
 
-        print!("shmget returns {}\n", fd);
+        println!("shmget returns {}", fd);
         fd
     }
 
     #[cfg(target_os = "android")]
     unsafe fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void {
-        print!("shmat(__shmid: {})\n", __shmid);
+        println!("shmat(__shmid: {})", __shmid);
 
         let size = ioctl(__shmid, ASHMEM_GET_SIZE);
         if size < 0 {

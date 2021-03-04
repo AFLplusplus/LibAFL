@@ -97,11 +97,9 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         };
 
     // Create an observation channel using the coverage map
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
-        "edges",
-        unsafe { __lafl_edges_map },
-        unsafe { __lafl_max_edges_size as usize },
-    ));
+    let edges_observer = HitcountsMapObserver::new(unsafe {
+        StdMapObserver::new_from_ptr("edges", __lafl_edges_map, __lafl_max_edges_size as usize)
+    });
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {

@@ -5,9 +5,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(unix)]
-use alloc::string::ToString;
-#[cfg(unix)]
 use libc::pid_t;
+#[cfg(unix)]
+use std::ffi::CString;
 
 use crate::Error;
 
@@ -415,15 +415,19 @@ pub enum ForkResult {
 }
 
 /// Unix has forks.
+/// # Safety
+/// A Normal fork. Runs on in two processes. Should be memory safe in general.
 #[cfg(unix)]
 pub unsafe fn fork() -> Result<ForkResult, Error> {
-    let pid = libc::fork();
-    if pid < 0 {
-        Err(Error::Unknown("Fork failed".to_string()))
-    } else if pid == 0 {
-        Ok(ForkResult::Child)
-    } else {
-        Ok(ForkResult::Parent(ChildHandle { pid }))
+    match libc::fork() {
+        pid if pid > 0 => Ok(ForkResult::Parent(ChildHandle { pid })),
+        pid if pid < 0 => {
+            // Getting errno from rust is hard, we'll just let the libc print to stderr for now.
+            // In any case, this should usually not happen.
+            libc::perror(CString::new("Fork failed").unwrap().as_ptr());
+            Err(Error::Unknown(format!("Fork failed ({})", pid)))
+        }
+        _ => Ok(ForkResult::Child),
     }
 }
 
