@@ -66,7 +66,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     io::{Read, Write},
-    mem::zeroed,
+    net::SocketAddr,
     net::{TcpListener, TcpStream},
     thread,
 };
@@ -82,7 +82,9 @@ use nix::{
 #[cfg(all(feature = "std", unix))]
 use std::{
     ffi::CStr,
+    mem::zeroed,
     os::unix::{
+        self,
         net::{UnixListener, UnixStream},
         {io::AsRawFd, prelude::RawFd},
     },
@@ -136,13 +138,15 @@ pub type Tag = u32;
 #[cfg(feature = "std")]
 pub enum Listener {
     Tcp(TcpListener),
+    #[cfg(unix)]
     Unix(UnixListener),
 }
 
 #[cfg(feature = "std")]
 pub enum ListenerStream {
-    Tcp(TcpStream, std::net::SocketAddr),
-    Unix(UnixStream, std::os::unix::net::SocketAddr),
+    Tcp(TcpStream, SocketAddr),
+    #[cfg(unix)]
+    Unix(UnixStream, unix::net::SocketAddr),
     Empty(),
 }
 
@@ -157,6 +161,7 @@ impl Listener {
                     ListenerStream::Empty()
                 }
             },
+            #[cfg(unix)]
             Listener::Unix(inner) => match inner.accept() {
                 Ok(res) => ListenerStream::Unix(res.0, res.1),
                 Err(err) => {
@@ -971,61 +976,59 @@ where
         };
 
         // Let's see what we go here.
-        match ret {
-            Some(msg) => {
-                if !(*msg).in_map(&mut self.current_recv_map) {
-                    return Err(Error::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
-                }
-                // Handle special, LLMP internal, messages.
-                match (*msg).tag {
-                    LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
-                    LLMP_TAG_END_OF_PAGE => {
-                        #[cfg(feature = "std")]
-                        dbg!("Got end of page, allocing next");
-                        // Handle end of page
-                        if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
-                            panic!(
-                                "Illegal message length for EOP (is {}, expected {})",
-                                (*msg).buf_len_padded,
-                                size_of::<LlmpPayloadSharedMapInfo>()
-                            );
-                        }
-                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-
-                        /* We can reuse the map mem space, no need to free and calloc.
-                        However, the pageinfo points to the map we're about to unmap.
-                        Clone the contents first to be safe (probably fine in rust eitner way). */
-                        let pageinfo_cpy = (*pageinfo).clone();
-
-                        // Mark the old page save to unmap, in case we didn't so earlier.
-                        ptr::write_volatile(&mut (*page).save_to_unmap, 1);
-                        // Map the new page. The old one should be unmapped by Drop
-                        self.current_recv_map =
-                            LlmpSharedMap::existing(SH::existing_from_shm_slice(
-                                &pageinfo_cpy.shm_str,
-                                pageinfo_cpy.map_size,
-                            )?);
-                        // Mark the new page save to unmap also (it's mapped by us, the broker now)
-                        ptr::write_volatile(&mut (*page).save_to_unmap, 1);
-
-                        #[cfg(feature = "std")]
-                        dbg!("Got a new recv map", self.current_recv_map.shmem.shm_str());
-                        // After we mapped the new page, return the next message, if available
-                        return self.recv();
-                    }
-                    _ => (),
-                }
-
-                // Store the last msg for next time
-                self.last_msg_recvd = msg;
+        if let Some(msg) = ret {
+            if !(*msg).in_map(&mut self.current_recv_map) {
+                return Err(Error::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
             }
-            _ => (),
+            // Handle special, LLMP internal, messages.
+            match (*msg).tag {
+                LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
+                LLMP_TAG_END_OF_PAGE => {
+                    #[cfg(feature = "std")]
+                    dbg!("Got end of page, allocing next");
+                    // Handle end of page
+                    if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
+                        panic!(
+                            "Illegal message length for EOP (is {}, expected {})",
+                            (*msg).buf_len_padded,
+                            size_of::<LlmpPayloadSharedMapInfo>()
+                        );
+                    }
+                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+
+                    /* We can reuse the map mem space, no need to free and calloc.
+                    However, the pageinfo points to the map we're about to unmap.
+                    Clone the contents first to be safe (probably fine in rust eitner way). */
+                    let pageinfo_cpy = (*pageinfo).clone();
+
+                    // Mark the old page save to unmap, in case we didn't so earlier.
+                    ptr::write_volatile(&mut (*page).save_to_unmap, 1);
+                    // Map the new page. The old one should be unmapped by Drop
+                    self.current_recv_map = LlmpSharedMap::existing(SH::existing_from_shm_slice(
+                        &pageinfo_cpy.shm_str,
+                        pageinfo_cpy.map_size,
+                    )?);
+                    // Mark the new page save to unmap also (it's mapped by us, the broker now)
+                    ptr::write_volatile(&mut (*page).save_to_unmap, 1);
+
+                    #[cfg(feature = "std")]
+                    dbg!("Got a new recv map", self.current_recv_map.shmem.shm_str());
+                    // After we mapped the new page, return the next message, if available
+                    return self.recv();
+                }
+                _ => (),
+            }
+
+            // Store the last msg for next time
+            self.last_msg_recvd = msg;
         };
         Ok(ret)
     }
 
     /// Blocks/spins until the next message gets posted to the page,
     /// then returns that message.
+    /// # Safety
+    /// Returns a raw ptr, on the recv map. Should be safe in general
     pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
         let mut current_msg_id = 0;
         let page = self.current_recv_map.page_mut();
@@ -1326,6 +1329,7 @@ where
 
     /// Called from an interrupt: Sets broker `shutting_down` flag to `true`.
     /// Currently only supported on `std` unix systems.
+    #[cfg(all(feature = "std", unix))]
     fn shutdown(&mut self) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
         compiler_fence(Ordering::SeqCst);
@@ -1486,6 +1490,7 @@ where
                             };
                         }
                     }
+                    #[cfg(unix)]
                     ListenerStream::Unix(stream, addr) => unsafe {
                         dbg!("New connection", addr);
 
@@ -1767,6 +1772,8 @@ where
     }
 
     /// Commits a msg to the client's out map
+    /// # Safety
+    /// Needs to be called with a proper msg pointer
     pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
         self.sender.send(msg)
     }
@@ -1797,6 +1804,8 @@ where
 
     /// A client receives a broadcast message.
     /// Returns null if no message is availiable
+    /// # Safety
+    /// Should be save, unless the internal state is corrupt. Returns raw ptr.
     #[inline]
     pub unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         self.receiver.recv()
@@ -1804,6 +1813,8 @@ where
 
     /// A client blocks/spins until the next message gets posted to the page,
     /// then returns that message.
+    /// # Safety
+    /// Should be save, unless the internal state is corrupt. Returns raw ptr.
     #[inline]
     pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
         self.receiver.recv_blocking()
@@ -1850,7 +1861,7 @@ where
             LLMP_PREF_INITIAL_MAP_SIZE,
         )?))?;
 
-        stream.write(ret.sender.out_maps.first().unwrap().shmem.shm_slice())?;
+        stream.write_all(ret.sender.out_maps.first().unwrap().shmem.shm_slice())?;
         Ok(ret)
     }
 }
@@ -1923,22 +1934,20 @@ where
 }
 
 #[cfg(test)]
+#[cfg(all(unix, feature = "std"))]
 mod tests {
 
-    #[cfg(feature = "std")]
     use std::{thread::sleep, time::Duration};
 
-    #[cfg(feature = "std")]
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
-    #[cfg(feature = "std")]
+
     use crate::bolts::shmem::UnixShMem;
 
-    #[cfg(feature = "std")]
     #[test]
     pub fn llmp_connection() {
         let mut broker = match LlmpConnection::<UnixShMem>::on_port(1337).unwrap() {

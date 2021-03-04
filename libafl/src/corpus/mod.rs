@@ -39,6 +39,11 @@ where
     /// Returns the number of elements
     fn count(&self) -> usize;
 
+    /// Returns true, if no elements are in this corpus yet
+    fn is_empty(&self) -> bool {
+        self.count() == 0
+    }
+
     /// Add an entry to the corpus and return its index
     fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
 

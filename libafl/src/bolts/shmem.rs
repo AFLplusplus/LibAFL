@@ -1,13 +1,11 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
 pub use unix_shmem::UnixShMem;
 
-#[cfg(feature = "std")]
-#[cfg(windows)]
-pub use unix_shmem::Win32ShMem;
+#[cfg(all(windows, feature = "std"))]
+pub use shmem::Win32ShMem;
 
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
@@ -105,8 +103,7 @@ pub trait HasFd {
     fn shm_id(&self) -> i32;
 }
 
-#[cfg(unix)]
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 
     use core::{mem::size_of, ptr, slice};
@@ -172,7 +169,7 @@ pub mod unix_shmem {
 
     #[cfg(target_os = "android")]
     unsafe fn shmctl(__shmid: c_int, __cmd: c_int, _buf: *mut shmid_ds) -> c_int {
-        print!("shmctl(__shmid: {})\n", __shmid);
+        println!("shmctl(__shmid: {})", __shmid);
         if __cmd == 0 {
             let length = ioctl(__shmid, ASHMEM_GET_SIZE);
 
@@ -202,7 +199,7 @@ pub mod unix_shmem {
             __key,
         );
 
-        print!("ourkey: {:?}\n", ourkey);
+        println!("ourkey: {:?}", ourkey);
         if ioctl(fd, ASHMEM_SET_NAME, &ourkey) != 0 {
             close(fd);
             return 0;
@@ -213,13 +210,13 @@ pub mod unix_shmem {
             return 0;
         };
 
-        print!("shmget returns {}\n", fd);
+        println!("shmget returns {}", fd);
         fd
     }
 
     #[cfg(target_os = "android")]
     unsafe fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void {
-        print!("shmat(__shmid: {})\n", __shmid);
+        println!("shmat(__shmid: {})", __shmid);
 
         let size = ioctl(__shmid, ASHMEM_GET_SIZE);
         if size < 0 {
@@ -446,21 +443,16 @@ pub mod unix_shmem {
     }
 }
 
-#[cfg(windows)]
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", windows))]
 pub mod shmem {
 
-    use core::{mem::size_of, slice};
-    use std::ffi::CStr;
-
-    use super::ShMem;
-    use crate::Error;
+    //TODO use super::ShMem;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
     pub struct Win32ShMem {
         pub filename: [u8; 64],
-        pub handle: windows::win32::system_services::HANDLE,
+        //TODO pub handle: windows::win32::system_services::HANDLE,
         pub map: *mut u8,
         pub map_size: usize,
     }
@@ -471,10 +463,10 @@ pub mod shmem {
 #[cfg(test)]
 mod tests {
 
-    #[cfg(feature = "std")]
+    #[cfg(all(unix, feature = "std"))]
     use super::{ShMem, UnixShMem};
 
-    #[cfg(feature = "std")]
+    #[cfg(all(unix, feature = "std"))]
     #[test]
     fn test_str_conversions() {
         let mut shm_str: [u8; 20] = [0; 20];

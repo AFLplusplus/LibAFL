@@ -4,8 +4,19 @@ use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
+#[cfg(unix)]
+use libc::pid_t;
+#[cfg(all(unix, feature = "std"))]
+use std::ffi::CString;
 #[cfg(feature = "std")]
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    env,
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+#[cfg(feature = "std")]
+use crate::Error;
 
 pub trait AsSlice<T> {
     /// Convert to a slice
@@ -376,6 +387,57 @@ impl XKCDRand {
     pub fn with_seed(seed: u64) -> Self {
         Self { val: seed }
     }
+}
+
+/// Child Process Handle
+#[cfg(unix)]
+pub struct ChildHandle {
+    pid: pid_t,
+}
+
+#[cfg(unix)]
+impl ChildHandle {
+    /// Block until the child exited and the status code becomes available
+    pub fn status(&self) -> i32 {
+        let mut status = -1;
+        unsafe {
+            libc::waitpid(self.pid, &mut status, 0);
+        }
+        status
+    }
+}
+
+#[cfg(unix)]
+/// The ForkResult
+pub enum ForkResult {
+    Parent(ChildHandle),
+    Child,
+}
+
+/// Unix has forks.
+/// # Safety
+/// A Normal fork. Runs on in two processes. Should be memory safe in general.
+#[cfg(all(unix, feature = "std"))]
+pub unsafe fn fork() -> Result<ForkResult, Error> {
+    match libc::fork() {
+        pid if pid > 0 => Ok(ForkResult::Parent(ChildHandle { pid })),
+        pid if pid < 0 => {
+            // Getting errno from rust is hard, we'll just let the libc print to stderr for now.
+            // In any case, this should usually not happen.
+            libc::perror(CString::new("Fork failed").unwrap().as_ptr());
+            Err(Error::Unknown(format!("Fork failed ({})", pid)))
+        }
+        _ => Ok(ForkResult::Child),
+    }
+}
+
+/// Executes the current process from the beginning, as subprocess.
+/// use `start_self.status()?` to wait for the child
+#[cfg(feature = "std")]
+pub fn startable_self() -> Result<Command, Error> {
+    let mut startable = Command::new(env::current_exe()?);
+    startable.current_dir(env::current_dir()?).args(env::args());
+    Ok(startable)
 }
 
 #[cfg(test)]

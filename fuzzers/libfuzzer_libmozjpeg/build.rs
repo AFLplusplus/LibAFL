@@ -1,12 +1,19 @@
 // build.rs
 
-use std::env;
-use std::path::Path;
-use std::process::Command;
+use std::{
+    env,
+    path::Path,
+    process::{exit, Command},
+};
 
 const LIBMOZJPEG_URL: &str = "https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz";
 
 fn main() {
+    if cfg!(windows) {
+        println!("cargo:warning=Skipping libmozjpeg example on Windows");
+        exit(0);
+    }
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();

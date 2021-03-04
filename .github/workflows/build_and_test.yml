@@ -14,6 +14,14 @@ jobs:
       run: cargo build --verbose
     - name: Test
       run: cargo test --verbose
+  windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Windows Build
+      run: cargo build --verbose
+    - name: Windows Test
+      run: cargo test --verbose
   all-features:
     runs-on: ubuntu-latest
     steps:

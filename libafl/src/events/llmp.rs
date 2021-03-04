@@ -6,11 +6,13 @@ use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "std")]
 use crate::bolts::llmp::LlmpReceiver;
 
-#[cfg(feature = "std")]
-use std::{env, process::Command};
+#[cfg(all(feature = "std", windows))]
+use crate::utils::startable_self;
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
+use crate::utils::{fork, ForkResult};
+
+#[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMem;
 use crate::{
     bolts::{
@@ -513,15 +515,18 @@ where
     let mut mgr;
 
     // We start ourself as child process to actually fuzz
-    if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-        let path = std::env::current_dir()?;
-        mgr = if cfg!(target_os = "android") {
-            LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
+    let (sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+        #[cfg(target_os = "android")]
+        {
+            let path = std::env::current_dir()?;
+            mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
                 stats,
                 &format!("{}/.llmp_socket", path.display()).to_string(),
-            )?
-        } else {
-            LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?
+            )?;
+        };
+        #[cfg(not(target_os = "android"))]
+        {
+            mgr = LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?
         };
 
         if mgr.is_broker() {
@@ -546,21 +551,31 @@ where
             // Client->parent loop
             loop {
                 dbg!("Spawning next client (id {})", ctr);
-                Command::new(env::current_exe()?)
-                    .current_dir(env::current_dir()?)
-                    .args(env::args())
-                    .status()?;
+
+                // On Unix, we fork (todo: measure if that is actually faster.)
+                #[cfg(unix)]
+                let _ = match unsafe { fork() }? {
+                    ForkResult::Parent(handle) => handle.status(),
+                    ForkResult::Child => break (sender, receiver),
+                };
+
+                // On windows, we spawn ourself again
+                #[cfg(windows)]
+                startable_self()?.status()?;
+
                 ctr += 1;
             }
         }
-    }
+    } else {
+        // We are the newly started fuzzing instance, first, connect to our own restore map.
+        // A sender and a receiver for single communication
+        (
+            LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?,
+            LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?,
+        )
+    };
 
     println!("We're a client, let's fuzz :)");
-
-    // We are the fuzzing instance, first, connect to our own restore map.
-    // A sender and a receiver for single communication
-    let mut receiver = LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?;
-    let sender = LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?;
 
     // If we're restarting, deserialize the old state.
     let (state, mut mgr) = match receiver.recv_buf()? {
