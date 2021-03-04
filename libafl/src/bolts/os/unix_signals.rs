@@ -7,6 +7,7 @@ use std::{
     fmt::{Display, Formatter},
     mem,
     ptr,
+    sync::Mutex,
 };
 
 use libc::{
@@ -18,6 +19,8 @@ use libc::{
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Error;
+
+use lazy_static::lazy_static;
 
 pub use libc::{c_void, siginfo_t};
 
@@ -87,13 +90,11 @@ pub trait Handler {
     fn signals(&self) -> Vec<Signal>;
 }
 
-struct HandlersHolder {
-    handlers: UnsafeCell<*mut HashMap<Signal, *mut c_void>>,
-}
-
 struct HandlerHolder {
     handler: UnsafeCell<*mut dyn Handler>,
 }
+
+unsafe impl Send for HandlerHolder {}
 
 
 /// Let's get 8 mb for now.
@@ -101,18 +102,18 @@ const SIGNAL_STACK_SIZE: usize = 2 << 22;
 /// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
 static mut SIGNAL_STACK_PTR: *const c_void = ptr::null_mut();
 
-static mut SIGNAL_HANDLERS_PTR: *const c_void = ptr::null();
-/// Keep track of which handler is registered for which signal
-static mut SIGNAL_HANDLERS: HandlersHolder = HandlersHolder {handlers: UnsafeCell::new(0 as *mut HashMap<Signal, *mut c_void>)};
+lazy_static!{
+    /// Keep track of which handler is registered for which signal
+    static ref SIGNAL_HANDLERS: Mutex<HashMap<Signal, HandlerHolder>> = Mutex::new(HashMap::new());
+}
 
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: c_void) {
-    let handlers = (SIGNAL_HANDLERS_PTR as *mut HandlersHolder).as_ref().unwrap();
 
     let signal = &Signal::try_from(sig).unwrap();
-    match (&**handlers.handlers.get()).get(signal){
+    match SIGNAL_HANDLERS.lock().unwrap().get(signal){
         Some(handler_holder) => {
 
-            let handler = &mut **(*(*handler_holder as *mut HandlerHolder).as_mut().unwrap()).handler.get();
+            let mut handler = &**handler_holder.handler.get();
             handler.handle(*signal, info, void);
         }
         None => {}
@@ -132,12 +133,6 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     }
     sigaltstack(SIGNAL_STACK_PTR as _, ptr::null_mut() as _);
 
-    // Now we make sure the SIGNAL_HANDLERS hashmap is set up correctly
-    if SIGNAL_HANDLERS_PTR.is_null() {
-        *SIGNAL_HANDLERS.handlers.get() = Box::into_raw(Box::new(HashMap::new()));
-        SIGNAL_HANDLERS_PTR = (&mut SIGNAL_HANDLERS) as *mut _ as *mut c_void;
-    };
-
     let mut sa: sigaction = mem::zeroed();
     sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
@@ -146,9 +141,8 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     let mut handler_holder = HandlerHolder {
         handler: UnsafeCell::new(handler as *mut dyn Handler),
     };
-    let handler_holder_ptr = &mut handler_holder as *mut _ as *mut c_void;
     for sig in signals {
-        (&mut **SIGNAL_HANDLERS.handlers.get()).insert(sig, handler_holder_ptr);
+        SIGNAL_HANDLERS.lock().unwrap().insert(sig, handler_holder);
 
         if sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up {} handler", sig);

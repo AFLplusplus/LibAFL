@@ -26,15 +26,31 @@ use std::{
     fs,
     io::{stdout, Write},
     ptr,
+    sync::Mutex,
 };
 
-type SignalHandlerFunction = Box<dyn Fn(Signal, siginfo_t, c_void)>;
+use lazy_static::lazy_static;
 
-trait SignalHandlingExecutor {
-    fn handle_timeout(&mut self, signal: Signal, info: siginfo_t, void: c_void);
-
-    fn handle_crash(&mut self, signal: Signal, info: siginfo_t, void: c_void);
+struct InProcessExecutorHandlerData {
+    state_ptr: *mut c_void,
+    event_mgr_ptr: *mut c_void,
+    observers_ptr: *const c_void,
+    current_input_ptr: *const c_void,
 }
+
+unsafe impl Send for InProcessExecutorHandlerData {}
+
+impl InProcessExecutorHandlerData {
+    fn new() -> Self {
+        InProcessExecutorHandlerData {
+            state_ptr: ptr::null_mut(),
+            event_mgr_ptr: ptr::null_mut(),
+            observers_ptr: ptr::null(),
+            current_input_ptr: ptr::null(),
+        }
+    }
+}
+
 
 /// The inmem executor harness
 type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
@@ -52,8 +68,8 @@ where
     /// The observers, observing each run
     observers: OT,
     current_input_ptr: *const c_void,
-    crash_handler: Box<dyn Fn(Signal, siginfo_t, c_void)>,
-    timeout_handler: Box<dyn Fn(Signal, siginfo_t, c_void)>,
+    crash_handler: unsafe fn (Signal, siginfo_t, c_void),
+    timeout_handler: unsafe fn (Signal, siginfo_t, c_void),
     phantom: PhantomData<I>,
 }
 
@@ -108,22 +124,34 @@ where
     }
 }
 
-impl<I, OT> SignalHandlingExecutor for InProcessExecutor<I, OT>
+impl<I, OT> Handler for InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    fn handle_timeout(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
-        (self.timeout_handler)(signal, info, void)
+    fn handle(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
+        match signal {
+            Signal::SigUser2 => (self.timeout_handler)(signal, info, void),
+            _ => (self.crash_handler)(signal, info, void),
+        }
     }
 
-    fn handle_crash(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
-        (self.crash_handler)(signal, info, void)
-    }
+    fn signals(&self) -> Vec<Signal> {
+        vec![
+            Signal::SigUser2,
 
+            Signal::SigAbort,
+            Signal::SigBus,
+            Signal::SigPipe,
+            Signal::SigFloatingPointException,
+            Signal::SigKill,
+            Signal::SigIllegalInstruction,
+            Signal::SigSegmentationFault,
+        ]
+    }
 }
-unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, _info: siginfo_t, _void: c_void,
-                                                 state: &mut S, event_mgr: &mut EM, observers: &OT, executor: &mut InProcessExecutor<I, OT>)
+
+unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, _info: siginfo_t, _void: c_void)
 where
         EM: EventManager<I, S>,
         OT: ObserversTuple,
@@ -132,13 +160,18 @@ where
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
 {
-    if executor.current_input_ptr.is_null() {
+    let data = GLOBAL_STATE.lock().unwrap();
+    let state = (data.state_ptr as *mut S).as_mut().unwrap();
+    let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+    let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+
+    if data.current_input_ptr.is_null() {
             dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
     } else {
         println!("Timeout in fuzz run.");
         let _ = stdout().flush();
 
-        let input = (executor.current_input_ptr as *const I).as_ref().unwrap();
+        let input = (data.current_input_ptr as *const I).as_ref().unwrap();
 
         let obj_fitness = state
             .objectives_mut()
@@ -171,8 +204,7 @@ where
 
 }
 
-unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, info: siginfo_t, _void: c_void,
-                                                 state: &mut S, event_mgr: &mut EM, observers: &OT, executor: &mut InProcessExecutor<I, OT>)
+unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(_signal: Signal, info: siginfo_t, _void: c_void)
 where
         EM: EventManager<I, S>,
         OT: ObserversTuple,
@@ -181,7 +213,12 @@ where
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
 {
-    if executor.current_input_ptr == ptr::null() {
+    let data = GLOBAL_STATE.lock().unwrap();
+    let state = (data.state_ptr as *mut S).as_mut().unwrap();
+    let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+    let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+
+    if data.current_input_ptr == ptr::null() {
         #[cfg(target_os = "android")]
         let si_addr = { ((info._pad[0] as usize) | ((info._pad[1] as usize) << 32)) as usize };
         #[cfg(not(target_os = "android"))]
@@ -215,9 +252,9 @@ where
     #[cfg(feature = "std")]
     let _ = stdout().flush();
 
-    let input = (executor.current_input_ptr as *const I).as_ref().unwrap();
+    let input = (data.current_input_ptr as *const I).as_ref().unwrap();
     // Make sure we don't crash in the crash handler forever.
-    executor.current_input_ptr = ptr::null();
+    data.current_input_ptr = ptr::null();
 
     let obj_fitness = state
         .objectives_mut()
@@ -246,6 +283,10 @@ where
     std::process::exit(1);
 }
 
+lazy_static!{
+    static ref GLOBAL_STATE: Mutex<InProcessExecutorHandlerData> =
+        Mutex::new(InProcessExecutorHandlerData::new());
+}
 impl<I, OT> InProcessExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
@@ -271,25 +312,23 @@ where
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>
     {
 
-        let nop_handler = Box::new(|signal: Signal, _info: siginfo_t, _void: c_void| {});
-
         let mut newobj = Self {
             harness_fn,
             observers,
             name,
             current_input_ptr: ptr::null(),
-            crash_handler: nop_handler,
-            timeout_handler: nop_handler,
+            crash_handler: inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+            timeout_handler: inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
             phantom: PhantomData,
         };
 
-        newobj.timeout_handler = Box::new(|signal, info, void| {
-            inproc_timeout_handler(signal, info, void, state, event_mgr, &observers, &mut newobj);
-        });
-        newobj.crash_handler = Box::new(|signal, info, void| {
-            inproc_crash_handler(signal, info, void, state, event_mgr, &observers, &mut newobj);
-        });
+        let data = GLOBAL_STATE.lock().unwrap();
+        data.state_ptr = state as *mut _ as *mut c_void;
+        data.event_mgr_ptr = state as *mut _ as *mut c_void;
 
+        unsafe {
+            setup_signal_handler(&mut newobj);
+        }
         newobj
     }
 
