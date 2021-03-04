@@ -315,7 +315,12 @@ where
             data.crash_handler = inproc_crash_handler::<EM, I, OC, OFT, OT, S>;
             data.timeout_handler = inproc_timeout_handler::<EM, I, OC, OFT, OT, S>;
 
-            setup_signal_handler(data);
+            match setup_signal_handler(data) {
+                Ok(_) => {},
+                Err(err) => {
+                    println!("Failed to register signal handlers: {}", err);
+                }
+            }
         }
 
         Self {

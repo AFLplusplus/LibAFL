@@ -42,7 +42,7 @@ pub enum Signal {
     SigInterrupt = SIGINT,
 }
 
-pub static CrashSignals: &[Signal] = &[
+pub static CRASH_SIGNALS: &[Signal] = &[
     Signal::SigAbort,
     Signal::SigBus,
     Signal::SigFloatingPointException,
@@ -64,19 +64,19 @@ unsafe impl Sync for Signal {}
 impl Display for Signal {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            Signal::SigAbort => write!(f, "SIGABRT"),
-            Signal::SigBus => write!(f, "SIGBUS"),
-            Signal::SigFloatingPointException => write!(f, "SIGFPE"),
-            Signal::SigIllegalInstruction => write!(f, "SIGILL"),
-            Signal::SigPipe => write!(f, "SIGPIPE"),
-            Signal::SigSegmentationFault => write!(f, "SIGSEGV"),
-            Signal::SigUser2 => write!(f, "SIGUSR2"),
-            Signal::SigAlarm => write!(f, "SIGALRM"),
-            Signal::SigHangUp => write!(f, "SIGHUP"),
-            Signal::SigKill => write!(f, "SIGKILL"),
-            Signal::SigQuit => write!(f, "SIGQUIT"),
-            Signal::SigTerm => write!(f, "SIGTERM"),
-            Signal::SigInterrupt => write!(f, "SIGINT"),
+            Signal::SigAbort => write!(f, "SIGABRT")?,
+            Signal::SigBus => write!(f, "SIGBUS")?,
+            Signal::SigFloatingPointException => write!(f, "SIGFPE")?,
+            Signal::SigIllegalInstruction => write!(f, "SIGILL")?,
+            Signal::SigPipe => write!(f, "SIGPIPE")?,
+            Signal::SigSegmentationFault => write!(f, "SIGSEGV")?,
+            Signal::SigUser2 => write!(f, "SIGUSR2")?,
+            Signal::SigAlarm => write!(f, "SIGALRM")?,
+            Signal::SigHangUp => write!(f, "SIGHUP")?,
+            Signal::SigKill => write!(f, "SIGKILL")?,
+            Signal::SigQuit => write!(f, "SIGQUIT")?,
+            Signal::SigTerm => write!(f, "SIGTERM")?,
+            Signal::SigInterrupt => write!(f, "SIGINT")?,
         };
 
         Ok(())
