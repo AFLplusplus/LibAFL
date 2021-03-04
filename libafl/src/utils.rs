@@ -6,17 +6,17 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(unix)]
 use libc::pid_t;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 use std::ffi::CString;
-
-use crate::Error;
-
 #[cfg(feature = "std")]
 use std::{
     env,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+#[cfg(feature = "std")]
+use crate::Error;
 
 pub trait AsSlice<T> {
     /// Convert to a slice
@@ -417,7 +417,7 @@ pub enum ForkResult {
 /// Unix has forks.
 /// # Safety
 /// A Normal fork. Runs on in two processes. Should be memory safe in general.
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 pub unsafe fn fork() -> Result<ForkResult, Error> {
     match libc::fork() {
         pid if pid > 0 => Ok(ForkResult::Parent(ChildHandle { pid })),
