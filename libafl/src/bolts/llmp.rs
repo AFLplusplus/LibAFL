@@ -66,7 +66,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream, SocketAddr},
     thread,
 };
 
@@ -82,7 +82,6 @@ use nix::{
 #[cfg(all(feature = "std", unix))]
 use std::{
     ffi::CStr,
-    mem::zeroed,
     os::unix::{
         self,
         net::{UnixListener, UnixStream},
