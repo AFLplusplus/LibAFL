@@ -104,7 +104,8 @@ static mut SIGNAL_STACK_PTR: *mut c_void = ptr::null_mut();
 static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
     // We cannot use [None; 32] because it requires Copy. Ugly, but I don't think there's an
     // alternative.
-    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
 ];
 
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: c_void) {
@@ -112,7 +113,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: c_void) {
     let handler = {
         match &SIGNAL_HANDLERS[*signal as usize] {
             Some(handler_holder) => &mut **handler_holder.handler.get(),
-            None => return
+            None => return,
         }
     };
     handler.handle(*signal, info, void);
@@ -141,10 +142,9 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     sa.sa_sigaction = handle_signal as usize;
     let signals = handler.signals();
     for sig in signals {
-        SIGNAL_HANDLERS[sig as usize] =
-            Some(HandlerHolder {
-                handler: UnsafeCell::new(handler as *mut dyn Handler),
-            });
+        SIGNAL_HANDLERS[sig as usize] = Some(HandlerHolder {
+            handler: UnsafeCell::new(handler as *mut dyn Handler),
+        });
 
         if sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up {} handler", sig);
