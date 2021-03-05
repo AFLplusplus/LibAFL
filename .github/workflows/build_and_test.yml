@@ -8,6 +8,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+
+jobs_disabled:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
