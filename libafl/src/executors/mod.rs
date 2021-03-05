@@ -9,7 +9,7 @@ use core::cmp::PartialEq;
 use core::marker::PhantomData;
 
 use crate::{
-    bolts::tuples::{Named},
+    bolts::tuples::Named,
     events::EventManager,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
