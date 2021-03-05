@@ -4,9 +4,7 @@ Advanced Fuzzing Library - Slot your own fuzzers together and extend their featu
 
 LibAFL is written and maintained by Andrea Fioraldi <andreafioraldi@gmail.com> and Dominik Maier <mail@dmnk.co>.
 
-It is released as Free and Open Source Software under the GNU Lesser General Public License V3.
-
-
+It is released as Open Source Software under the [Apache v2](LICENSE-APACHE) or [MIT](LICENSE-MIT) licenses.
 
 ## Example usages
 
