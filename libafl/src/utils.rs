@@ -15,7 +15,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(unix)]
+#[cfg(any(unix, feature = "std"))]
 use crate::Error;
 
 pub trait AsSlice<T> {

@@ -92,8 +92,9 @@ use std::{
 #[cfg(all(feature = "std", unix))]
 use libc::c_char;
 
+#[cfg(unix)]
+use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
-    bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal},
     bolts::shmem::{ShMem, ShMemDescription},
     Error,
 };
@@ -127,6 +128,12 @@ const EOP_MSG_SIZE: usize =
     llmp_align(size_of::<LlmpMsg>() + size_of::<LlmpPayloadSharedMapInfo>());
 /// The header length of a llmp page in a shared map (until messages start)
 const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
+
+/// The llmp broker registers a signal handler for cleanups on `SIGINT`.
+#[cfg(unix)]
+static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHandler {
+    shutting_down: false,
+};
 
 /// TAGs used thorughout llmp
 pub type Tag = u32;
@@ -1241,10 +1248,6 @@ where
     shutting_down: bool,
 }
 
-static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHandler {
-    shutting_down: false,
-};
-
 #[cfg(unix)]
 pub struct LlmpBrokerSignalHandler {
     shutting_down: bool,
@@ -1340,6 +1343,20 @@ where
         Ok(())
     }
 
+    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
+    #[inline]
+    #[cfg(unix)]
+    fn is_shutting_down(&self) -> bool {
+        unsafe { !ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
+    }
+
+    /// Always returns true on platforms, where no shutdown signal handlers are supported
+    #[inline]
+    #[cfg(not(unix))]
+    fn is_shutting_down(&self) -> bool {
+        true
+    }
+
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
     /// Never returns. Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
@@ -1354,7 +1371,7 @@ where
             println!("Failed to setup signal handlers: {}", _e);
         }
 
-        while unsafe { !ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) } {
+        while !self.is_shutting_down() {
             compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");

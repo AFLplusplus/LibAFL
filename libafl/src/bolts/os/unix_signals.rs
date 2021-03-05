@@ -1,5 +1,3 @@
-extern crate libc;
-
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,

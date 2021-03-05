@@ -1,7 +1,9 @@
 //! The InProcess Executor is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
-use core::{marker::PhantomData, ptr};
+use core::marker::PhantomData;
+#[cfg(unix)]
+use core::ptr;
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler};
@@ -40,17 +42,17 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    //#[inline]
+    #[inline]
     fn pre_exec<EM, S>(
         &mut self,
         _state: &mut S,
         _event_mgr: &mut EM,
-        input: &I,
+        _input: &I,
     ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             unix_signal_handler::GLOBAL_STATE.current_input_ptr =
-                input as *const _ as *const c_void;
+                _input as *const _ as *const c_void;
         }
         Ok(())
     }
@@ -109,8 +111,8 @@ where
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
-        state: &mut S,
-        event_mgr: &mut EM,
+        _state: &mut S,
+        _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
         EM: EventManager<I, S>,
@@ -121,8 +123,8 @@ where
         #[cfg(unix)]
         unsafe {
             let mut data = &mut unix_signal_handler::GLOBAL_STATE;
-            data.state_ptr = state as *mut _ as *mut c_void;
-            data.event_mgr_ptr = event_mgr as *mut _ as *mut c_void;
+            data.state_ptr = _state as *mut _ as *mut c_void;
+            data.event_mgr_ptr = _event_mgr as *mut _ as *mut c_void;
             data.observers_ptr = &observers as *const _ as *const c_void;
             data.crash_handler = unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>;
             data.timeout_handler =
