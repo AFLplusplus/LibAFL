@@ -9,7 +9,7 @@ use core::cmp::PartialEq;
 use core::marker::PhantomData;
 
 use crate::{
-    bolts::tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    bolts::tuples::{Named},
     events::EventManager,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
@@ -78,8 +78,8 @@ pub trait Executor<I>: Named
 where
     I: Input,
 {
-    #[inline]
     /// Called right before exexution starts
+    #[inline]
     fn pre_exec<EM, S>(
         &mut self,
         _state: &mut S,
@@ -92,8 +92,8 @@ where
         Ok(())
     }
 
-    #[inline]
     /// Called right after execution finished.
+    #[inline]
     fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
     where
         EM: EventManager<I, S>,
@@ -103,39 +103,6 @@ where
 
     /// Instruct the target about the input and run
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error>;
-}
-
-pub trait ExecutorsTuple<I>: MatchType + MatchNameAndType
-where
-    I: Input,
-{
-    //fn for_each(&self, f: fn(&dyn Executor<I>));
-    //fn for_each_mut(&mut self, f: fn(&mut dyn Executor<I>));
-}
-
-impl<I> ExecutorsTuple<I> for ()
-where
-    I: Input,
-{
-    //fn for_each(&self, _f: fn(&dyn Executor<I>)) {}
-    //fn for_each_mut(&mut self, _f: fn(&mut dyn Executor<I>)) {}
-}
-
-impl<Head, Tail, I> ExecutorsTuple<I> for (Head, Tail)
-where
-    Head: Executor<I> + 'static,
-    Tail: ExecutorsTuple<I> + TupleList,
-    I: Input,
-{
-    /*fn for_each(&self, f: fn(&dyn Executor<I>)) {
-        f(&self.0);
-        self.1.for_each(f)
-    }
-
-    fn for_each_mut(&mut self, f: fn(&mut dyn Executor<I>)) {
-        f(&mut self.0);
-        self.1.for_each_mut(f)
-    }*/
 }
 
 #[cfg(test)]
