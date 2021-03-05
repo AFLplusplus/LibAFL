@@ -2,14 +2,12 @@ name: Build and Test
 
 on:
   push:
-    branches: [ dev, main ]
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-
-jobs_disabled:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
