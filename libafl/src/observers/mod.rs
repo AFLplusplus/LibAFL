@@ -57,12 +57,10 @@ pub trait ObserversTuple:
     /// Reset all executors in the tuple
     /// This is called right before the next execution.
     fn pre_exec_all(&mut self) -> Result<(), Error>;
+
     /// Do whatever you need to do after a run.
     /// This is called right after the last execution
     fn post_exec_all(&mut self) -> Result<(), Error>;
-
-    //fn for_each(&self, f: fn(&dyn Observer));
-    //fn for_each_mut(&mut self, f: fn(&mut dyn Observer));
 }
 
 impl ObserversTuple for () {
@@ -72,9 +70,6 @@ impl ObserversTuple for () {
     fn post_exec_all(&mut self) -> Result<(), Error> {
         Ok(())
     }
-
-    //fn for_each(&self, f: fn(&dyn Observer)) { }
-    //fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) { }
 }
 
 impl<Head, Tail> ObserversTuple for (Head, Tail)
@@ -91,16 +86,6 @@ where
         self.0.post_exec()?;
         self.1.post_exec_all()
     }
-
-    /*fn for_each(&self, f: fn(&dyn Observer)) {
-        f(&self.0);
-        self.1.for_each(f)
-    }
-
-    fn for_each_mut(&mut self, f: fn(&mut dyn Observer)) {
-        f(&mut self.0);
-        self.1.for_each_mut(f)
-    }*/
 }
 
 /// A simple observer, just overlooking the runtime of the target.
