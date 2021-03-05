@@ -417,7 +417,7 @@ pub enum ForkResult {
 /// Unix has forks.
 /// # Safety
 /// A Normal fork. Runs on in two processes. Should be memory safe in general.
-#[cfg(all(unix, feature = "std"))]
+#[cfg(unix)]
 pub unsafe fn fork() -> Result<ForkResult, Error> {
     match libc::fork() {
         pid if pid > 0 => Ok(ForkResult::Parent(ChildHandle { pid })),

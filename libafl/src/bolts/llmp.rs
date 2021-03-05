@@ -66,7 +66,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     io::{Read, Write},
-    net::{TcpListener, TcpStream, SocketAddr},
+    net::{SocketAddr, TcpListener, TcpStream},
     thread,
 };
 
@@ -93,8 +93,8 @@ use std::{
 use libc::c_char;
 
 use crate::{
+    bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal},
     bolts::shmem::{ShMem, ShMemDescription},
-    bolts::os::unix_signals::{Handler, Signal, setup_signal_handler, siginfo_t, c_void},
     Error,
 };
 
@@ -1245,24 +1245,19 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
     shutting_down: false,
 };
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(unix)]
 pub struct LlmpBrokerSignalHandler {
     shutting_down: bool,
 }
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(unix))]
 impl Handler for LlmpBrokerSignalHandler {
-
     fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: c_void) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
     }
 
     fn signals(&self) -> Vec<Signal> {
-        vec![
-            Signal::SigTerm,
-            Signal::SigInterrupt,
-            Signal::SigQuit,
-        ]
+        vec![Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit]
     }
 }
 
@@ -1352,10 +1347,10 @@ where
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        #[cfg(all(feature = "std", unix))]
+        #[cfg(all(unix))]
         unsafe {
             match setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(err) => {
                     println!("Failed to register signal handlers: {}", err);
                 }
@@ -1846,7 +1841,7 @@ impl<SH> LlmpClient<SH>
 where
     SH: ShMem + HasFd,
 {
-    #[cfg(all(feature = "std", unix))]
+    #[cfg(all(unix, feature = "std"))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
         let stream = UnixStream::connect(filename)?;
