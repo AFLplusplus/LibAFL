@@ -66,8 +66,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     io::{Read, Write},
-    net::SocketAddr,
-    net::{TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     thread,
 };
 
@@ -79,10 +78,10 @@ use nix::{
         uio::IoVec,
     },
 };
+
 #[cfg(all(feature = "std", unix))]
 use std::{
     ffi::CStr,
-    mem::zeroed,
     os::unix::{
         self,
         net::{UnixListener, UnixStream},
@@ -91,11 +90,10 @@ use std::{
 };
 
 #[cfg(all(feature = "std", unix))]
-use libc::{
-    c_char, c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK,
-    SA_SIGINFO, SIGINT, SIGQUIT, SIGTERM,
-};
+use libc::c_char;
 
+#[cfg(unix)]
+use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription},
     Error,
@@ -130,6 +128,12 @@ const EOP_MSG_SIZE: usize =
     llmp_align(size_of::<LlmpMsg>() + size_of::<LlmpPayloadSharedMapInfo>());
 /// The header length of a llmp page in a shared map (until messages start)
 const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
+
+/// The llmp broker registers a signal handler for cleanups on `SIGINT`.
+#[cfg(unix)]
+static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHandler {
+    shutting_down: false,
+};
 
 /// TAGs used thorughout llmp
 pub type Tag = u32;
@@ -873,7 +877,7 @@ where
         let last_message_offset = if self.last_msg_sent.is_null() {
             None
         } else {
-            Some(map.msg_to_offset(self.last_msg_sent)?)
+            Some(unsafe { map.msg_to_offset(self.last_msg_sent) }?)
         };
         Ok(LlmpDescription {
             shmem: map.shmem.description(),
@@ -1084,7 +1088,7 @@ where
         let last_message_offset = if self.last_msg_recvd.is_null() {
             None
         } else {
-            Some(map.msg_to_offset(self.last_msg_recvd)?)
+            Some(unsafe { map.msg_to_offset(self.last_msg_recvd) }?)
         };
         Ok(LlmpDescription {
             shmem: map.shmem.description(),
@@ -1164,18 +1168,18 @@ where
 
     /// Gets the offset of a message on this here page.
     /// Will return IllegalArgument error if msg is not on page.
-    pub fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
-        unsafe {
-            let page = self.page();
-            if llmp_msg_in_page(page, msg) {
-                // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
-                Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
-            } else {
-                Err(Error::IllegalArgument(format!(
-                    "Message (0x{:X}) not in page (0x{:X})",
-                    page as u64, msg as u64
-                )))
-            }
+    /// # Safety
+    /// This dereferences msg, make sure to pass a proper pointer to it.
+    pub unsafe fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
+        let page = self.page();
+        if llmp_msg_in_page(page, msg) {
+            // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
+            Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
+        } else {
+            Err(Error::IllegalArgument(format!(
+                "Message (0x{:X}) not in page (0x{:X})",
+                page as u64, msg as u64
+            )))
         }
     }
 
@@ -1198,7 +1202,7 @@ where
         } else {
             env::set_var(
                 &format!("{}_OFFSET", map_env_name),
-                format!("{}", self.msg_to_offset(msg)?),
+                format!("{}", unsafe { self.msg_to_offset(msg) }?),
             )
         };
         Ok(())
@@ -1244,9 +1248,21 @@ where
     shutting_down: bool,
 }
 
-/// used to access the current broker in signal handler.
-#[cfg(all(feature = "std", unix))]
-static mut CURRENT_BROKER_PTR: *const c_void = ptr::null();
+#[cfg(unix)]
+pub struct LlmpBrokerSignalHandler {
+    shutting_down: bool,
+}
+
+#[cfg(all(unix))]
+impl Handler for LlmpBrokerSignalHandler {
+    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: c_void) {
+        unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
+    }
+
+    fn signals(&self) -> Vec<Signal> {
+        vec![Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit]
+    }
+}
 
 /// The broker forwards all messages to its own bus-like broadcast map.
 /// It may intercept messages passing through.
@@ -1327,54 +1343,18 @@ where
         Ok(())
     }
 
-    /// Called from an interrupt: Sets broker `shutting_down` flag to `true`.
-    /// Currently only supported on `std` unix systems.
-    #[cfg(all(feature = "std", unix))]
-    fn shutdown(&mut self) {
-        unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
-        compiler_fence(Ordering::SeqCst);
+    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
+    #[inline]
+    #[cfg(unix)]
+    fn is_shutting_down(&self) -> bool {
+        unsafe { !ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
     }
 
-    #[cfg(all(feature = "std", unix))]
-    unsafe fn handle_signal(_sig: c_int, _: siginfo_t, _: c_void) {
-        if !CURRENT_BROKER_PTR.is_null() {
-            let broker = (CURRENT_BROKER_PTR as *mut LlmpBroker<SH>)
-                .as_mut()
-                .unwrap();
-            broker.shutdown();
-        };
-    }
-
-    /// For proper cleanup on sigint, we set up a sigint handler
-    #[cfg(all(feature = "std", unix))]
-    unsafe fn setup_sigint_handler(&mut self) {
-        CURRENT_BROKER_PTR = self as *const _ as *const c_void;
-
-        // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
-        let signal_stack_size = 2 << 22;
-        // TODO: We leak the signal stack. Removing the signal handlers, then freeing this mem on teardown would be more correct.
-        let signal_stack_ptr = malloc(signal_stack_size);
-        if signal_stack_ptr.is_null() {
-            panic!(
-                "Failed to allocate signal stack with {} bytes!",
-                signal_stack_size
-            );
-        }
-        sigaltstack(signal_stack_ptr as _, ptr::null_mut() as _);
-
-        let mut sa: sigaction = zeroed();
-        libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
-        sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-        sa.sa_sigaction = LlmpBroker::<SH>::handle_signal as usize;
-        for (sig, msg) in &[
-            (SIGTERM, "segterm"),
-            (SIGINT, "sigint"),
-            (SIGQUIT, "sigquit"),
-        ] {
-            if sigaction(*sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
-                panic!("Could not set up {} handler", &msg);
-            }
-        }
+    /// Always returns true on platforms, where no shutdown signal handlers are supported
+    #[inline]
+    #[cfg(not(unix))]
+    fn is_shutting_down(&self) -> bool {
+        true
     }
 
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
@@ -1384,12 +1364,14 @@ where
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        #[cfg(all(feature = "std", unix))]
-        unsafe {
-            self.setup_sigint_handler()
-        };
+        #[cfg(unix)]
+        if let Err(_e) = unsafe { setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) } {
+            // We can live without a proper ctrl+c signal handler. Print and ignore.
+            #[cfg(feature = "std")]
+            println!("Failed to setup signal handlers: {}", _e);
+        }
 
-        while unsafe { !ptr::read_volatile(&self.shutting_down) } {
+        while !self.is_shutting_down() {
             compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
@@ -1873,7 +1855,7 @@ impl<SH> LlmpClient<SH>
 where
     SH: ShMem + HasFd,
 {
-    #[cfg(all(feature = "std", unix))]
+    #[cfg(all(unix, feature = "std"))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
         let stream = UnixStream::connect(filename)?;

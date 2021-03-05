@@ -125,8 +125,7 @@ macro_rules! create_serde_registry_for_trait {
                         panic!("Registry is already finalized!");
                     }
 
-                    let deserializers =
-                        self.deserializers.get_or_insert_with(|| HashMap::default());
+                    let deserializers = self.deserializers.get_or_insert_with(HashMap::default);
                     deserializers.insert(unpack_type_id(TypeId::of::<T>()), |de| {
                         Ok(Box::new(erased_serde::deserialize::<T>(de)?))
                     });

@@ -235,7 +235,7 @@ pub mod unix_shmem {
             return 0 as *mut c_void;
         }
 
-        print!("shmat() = {:?}\n", ptr);
+        println!("shmat() = {:?}", ptr);
         ptr
     }
 
@@ -429,7 +429,7 @@ pub mod unix_shmem {
         );
         (*shm).shm_id = shm_str
             .to_str()
-            .expect(&format!("illegal shm_str {:?}", shm_str))
+            .unwrap_or_else(|_| panic!("illegal shm_str {:?}", shm_str))
             .parse::<i32>()
             .unwrap();
         (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
