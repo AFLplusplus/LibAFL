@@ -870,7 +870,7 @@ where
         let last_message_offset = if self.last_msg_sent.is_null() {
             None
         } else {
-            Some(map.msg_to_offset(self.last_msg_sent)?)
+            Some(unsafe { map.msg_to_offset(self.last_msg_sent) }?)
         };
         Ok(LlmpDescription {
             shmem: map.shmem.description(),
@@ -1081,7 +1081,7 @@ where
         let last_message_offset = if self.last_msg_recvd.is_null() {
             None
         } else {
-            Some(map.msg_to_offset(self.last_msg_recvd)?)
+            Some(unsafe { map.msg_to_offset(self.last_msg_recvd) }?)
         };
         Ok(LlmpDescription {
             shmem: map.shmem.description(),
@@ -1161,18 +1161,18 @@ where
 
     /// Gets the offset of a message on this here page.
     /// Will return IllegalArgument error if msg is not on page.
-    pub fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
-        unsafe {
-            let page = self.page();
-            if llmp_msg_in_page(page, msg) {
-                // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
-                Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
-            } else {
-                Err(Error::IllegalArgument(format!(
-                    "Message (0x{:X}) not in page (0x{:X})",
-                    page as u64, msg as u64
-                )))
-            }
+    /// # Safety
+    /// This dereferences msg, make sure to pass a proper pointer to it.
+    pub unsafe fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
+        let page = self.page();
+        if llmp_msg_in_page(page, msg) {
+            // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
+            Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
+        } else {
+            Err(Error::IllegalArgument(format!(
+                "Message (0x{:X}) not in page (0x{:X})",
+                page as u64, msg as u64
+            )))
         }
     }
 
@@ -1195,7 +1195,7 @@ where
         } else {
             env::set_var(
                 &format!("{}_OFFSET", map_env_name),
-                format!("{}", self.msg_to_offset(msg)?),
+                format!("{}", unsafe { self.msg_to_offset(msg) }?),
             )
         };
         Ok(())
@@ -1347,15 +1347,12 @@ where
     where
         F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        #[cfg(all(unix))]
-        unsafe {
-            match setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) {
-                Ok(_) => {}
-                Err(err) => {
-                    println!("Failed to register signal handlers: {}", err);
-                }
-            }
-        };
+        #[cfg(unix)]
+        if let Err(_e) = unsafe { setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) } {
+            // We can live without a proper ctrl+c signal handler. Print and ignore.
+            #[cfg(feature = "std")]
+            println!("Failed to setup signal handlers: {}", _e);
+        }
 
         while unsafe { !ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) } {
             compiler_fence(Ordering::SeqCst);

@@ -150,7 +150,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         tuple_list!(edges_observer),
         &mut state,
         &mut restarting_mgr,
-    );
+    )?;
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.

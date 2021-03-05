@@ -15,7 +15,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(feature = "std")]
+#[cfg(unix)]
 use crate::Error;
 
 pub trait AsSlice<T> {
@@ -424,7 +424,11 @@ pub unsafe fn fork() -> Result<ForkResult, Error> {
         pid if pid < 0 => {
             // Getting errno from rust is hard, we'll just let the libc print to stderr for now.
             // In any case, this should usually not happen.
-            libc::perror(CString::new("Fork failed").unwrap().as_ptr());
+            #[cfg(feature = "std")]
+            {
+                let err_str = CString::new("Fork failed").unwrap();
+                libc::perror(err_str.as_ptr());
+            }
             Err(Error::Unknown(format!("Fork failed ({})", pid)))
         }
         _ => Ok(ForkResult::Child),

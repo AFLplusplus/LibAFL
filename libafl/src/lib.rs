@@ -182,7 +182,8 @@ mod tests {
             //Box::new(|_, _, _, _, _| ()),
             &mut state,
             &mut event_manager,
-        );
+        )
+        .unwrap();
 
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);

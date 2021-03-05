@@ -100,17 +100,18 @@ where
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
-    /// depnding on different corpus or state.
+    /// depending on different corpus or state.
     /// * `name` - the name of this executor (to address it along the way)
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
+    /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OC, OFT, S>(
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
         state: &mut S,
         event_mgr: &mut EM,
-    ) -> Self
+    ) -> Result<Self, Error>
     where
         EM: EventManager<I, S>,
         OC: Corpus<I>,
@@ -127,25 +128,21 @@ where
             data.timeout_handler =
                 unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>;
 
-            match setup_signal_handler(data) {
-                Ok(_) => {}
-                Err(err) => {
-                    println!("Failed to register signal handlers: {}", err);
-                }
-            }
+            setup_signal_handler(data)?;
         }
 
-        Self {
+        Ok(Self {
             harness_fn,
             observers,
             name,
             phantom: PhantomData,
-        }
+        })
     }
 }
 
 #[cfg(unix)]
 mod unix_signal_handler {
+    use alloc::vec::Vec;
     use core::ptr;
     use libc::{c_void, siginfo_t};
     #[cfg(feature = "std")]
@@ -245,9 +242,12 @@ mod unix_signal_handler {
         let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
 
         if data.current_input_ptr.is_null() {
+            #[cfg(feature = "std")]
             dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
         } else {
+            #[cfg(feature = "std")]
             println!("Timeout in fuzz run.");
+            #[cfg(feature = "std")]
             let _ = stdout().flush();
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
@@ -274,19 +274,21 @@ mod unix_signal_handler {
 
             event_mgr.on_restart(state).unwrap();
 
+            #[cfg(feature = "std")]
             println!("Waiting for broker...");
             event_mgr.await_restart_safe();
+            #[cfg(feature = "std")]
             println!("Bye!");
 
             event_mgr.await_restart_safe();
 
-            std::process::exit(1);
+            libc::_exit(1);
         }
     }
 
     pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
-        info: siginfo_t,
+        _info: siginfo_t,
         _void: c_void,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -316,13 +318,13 @@ mod unix_signal_handler {
             let obj_fitness = state
                 .objectives_mut()
                 .is_interesting_all(&input, observers, ExitKind::Crash)
-                .expect("In crash handler objectives failure.".into());
+                .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();
                 state
                     .solutions_mut()
                     .add(Testcase::new(new_input))
-                    .expect("In crash handler solutions failure.".into());
+                    .expect("In crash handler solutions failure.");
                 event_mgr
                     .fire(
                         state,
@@ -330,7 +332,7 @@ mod unix_signal_handler {
                             objective_size: state.solutions().count(),
                         },
                     )
-                    .expect("Could not send crashing input".into());
+                    .expect("Could not send crashing input");
             }
 
             event_mgr.on_restart(state).unwrap();
@@ -343,18 +345,22 @@ mod unix_signal_handler {
 
             libc::_exit(1);
         } else {
-            println!("Double crash\n");
-            #[cfg(target_os = "android")]
-            let si_addr = { ((info._pad[0] as usize) | ((info._pad[1] as usize) << 32)) as usize };
-            #[cfg(not(target_os = "android"))]
-            let si_addr = { info.si_addr() as usize };
+            #[cfg(feature = "std")]
+            {
+                println!("Double crash\n");
+                #[cfg(target_os = "android")]
+                let si_addr =
+                    { ((_info._pad[0] as usize) | ((_info._pad[1] as usize) << 32)) as usize };
+                #[cfg(not(target_os = "android"))]
+                let si_addr = { _info.si_addr() as usize };
 
-            println!(
-            "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
-            si_addr
-        );
+                println!(
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
+                si_addr
+                );
+            }
             // let's yolo-cat the maps for debugging, if possible.
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "std"))]
             match fs::read_to_string("/proc/self/maps") {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
