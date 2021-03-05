@@ -21,8 +21,6 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Error;
 
-use lazy_static::lazy_static;
-
 pub use libc::{c_void, siginfo_t};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Hash, Clone, Copy)]
@@ -102,17 +100,20 @@ const SIGNAL_STACK_SIZE: usize = 2 << 22;
 /// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
 static mut SIGNAL_STACK_PTR: *mut c_void = ptr::null_mut();
 
-lazy_static! {
-    /// Keep track of which handler is registered for which signal
-    static ref SIGNAL_HANDLERS: Mutex<HashMap<Signal, HandlerHolder>> = Mutex::new(HashMap::new());
-}
+/// Keep track of which handler is registered for which signal
+static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
+    // We cannot use [None; 32] because it requires Copy. Ugly, but I don't think there's an
+    // alternative.
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+];
 
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
-        let handlers = SIGNAL_HANDLERS.lock().unwrap();
-        let handler_holder = handlers.get(signal).unwrap();
-        &mut **handler_holder.handler.get()
+        match &SIGNAL_HANDLERS[*signal as usize] {
+            Some(handler_holder) => &mut **handler_holder.handler.get(),
+            None => return
+        }
     };
     handler.handle(*signal, info, void);
 }
@@ -140,12 +141,10 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     sa.sa_sigaction = handle_signal as usize;
     let signals = handler.signals();
     for sig in signals {
-        SIGNAL_HANDLERS.lock().unwrap().insert(
-            sig,
-            HandlerHolder {
+        SIGNAL_HANDLERS[sig as usize] =
+            Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn Handler),
-            },
-        );
+            });
 
         if sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             panic!("Could not set up {} handler", sig);
