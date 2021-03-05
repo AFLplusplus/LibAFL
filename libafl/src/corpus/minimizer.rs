@@ -62,6 +62,7 @@ where
     I: Input + HasLen,
 {
     fn compute(entry: &mut Testcase<I>) -> Result<u64, Error> {
+        // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as u64 * entry.cached_len()? as u64)
     }
 }
