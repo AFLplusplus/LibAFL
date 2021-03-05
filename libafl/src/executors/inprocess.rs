@@ -51,8 +51,12 @@ where
     ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
-            unix_signal_handler::GLOBAL_STATE.current_input_ptr =
-                _input as *const _ as *const c_void;
+            let data = &mut unix_signal_handler::GLOBAL_STATE;
+            data.current_input_ptr = _input as *const _ as *const c_void;
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            data.state_ptr = _state as *mut _ as *mut c_void;
+            data.event_mgr_ptr = _event_mgr as *mut _ as *mut c_void;
         }
         Ok(())
     }
@@ -123,8 +127,6 @@ where
         #[cfg(unix)]
         unsafe {
             let mut data = &mut unix_signal_handler::GLOBAL_STATE;
-            data.state_ptr = _state as *mut _ as *mut c_void;
-            data.event_mgr_ptr = _event_mgr as *mut _ as *mut c_void;
             data.observers_ptr = &observers as *const _ as *const c_void;
             data.crash_handler = unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>;
             data.timeout_handler =
