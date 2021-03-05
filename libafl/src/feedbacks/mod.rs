@@ -41,30 +41,6 @@ where
     fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
-
-    /*
-    /// Serialize this feedback's state only, to be restored later using deserialize_state
-    /// As opposed to completely serializing the observer, this is only needed when the fuzzer is to be restarted
-    /// If no state is needed to be kept, just return an empty vec.
-    /// Example:
-    /// >> The virgin_bits map in AFL needs to be in sync with the corpus
-    #[inline]
-    fn serialize_state(&mut self) -> Result<Vec<u8>, Error> {
-        Ok(vec![])
-    }
-
-    /// Restore the state from a given vec, priviously stored using `serialize_state`
-    #[inline]
-    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), Error> {
-        let _ = serialized_state;
-        Ok(())
-    }
-
-    // TODO: Restore_from
-    fn restore_from(&mut self, restore_from: Self) -> Result<(), Error> {
-        Ok(())
-    }
-    */
 }
 
 pub trait FeedbacksTuple<I>: serde::Serialize + serde::de::DeserializeOwned
@@ -84,12 +60,6 @@ where
 
     /// Discards metadata - the end of this input's execution
     fn discard_metadata_all(&mut self, input: &I) -> Result<(), Error>;
-
-    /*
-    /// Restores the state from each of the containing feedbacks in a list of the same shape.
-    /// Used (prette exclusively) to restore the feedback states after a crash.
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error>;
-    */
 }
 
 impl<I> FeedbacksTuple<I> for ()
@@ -115,12 +85,6 @@ where
     fn discard_metadata_all(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
-
-    /*
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error> {
-        Ok(())
-    }
-    */
 }
 
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)

@@ -647,7 +647,7 @@ where
 
         executor.pre_exec(self, event_mgr, input)?;
         let exit_kind = executor.run_target(input)?;
-        //executor.post_exec(&self, event_mgr, input)?;
+        executor.post_exec(self, event_mgr, input)?;
 
         *self.executions_mut() += 1;
         executor.post_exec_observers()?;
