@@ -1,5 +1,8 @@
 pub mod mutational;
-pub use mutational::StdMutationalStage;
+pub use mutational::{MutationalStage, StdMutationalStage};
+
+//pub mod power;
+//pub use power::PowerMutationalStage;
 
 use crate::{
     bolts::tuples::TupleList, events::EventManager, executors::Executor, inputs::Input, Error,
