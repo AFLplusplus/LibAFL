@@ -1347,14 +1347,14 @@ where
     #[inline]
     #[cfg(unix)]
     fn is_shutting_down(&self) -> bool {
-        unsafe { !ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
+        unsafe { ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
     }
 
     /// Always returns true on platforms, where no shutdown signal handlers are supported
     #[inline]
     #[cfg(not(unix))]
     fn is_shutting_down(&self) -> bool {
-        true
+        false
     }
 
     /// Loops infinitely, forwarding and handling all incoming messages from clients.

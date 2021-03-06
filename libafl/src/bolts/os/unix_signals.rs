@@ -4,6 +4,8 @@ use core::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     mem, ptr,
+    ptr::write_volatile,
+    sync::atomic::{compiler_fence, Ordering},
 };
 
 #[cfg(feature = "std")]
@@ -151,9 +153,12 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     sa.sa_sigaction = handle_signal as usize;
     let signals = handler.signals();
     for sig in signals {
-        SIGNAL_HANDLERS[sig as usize] = Some(HandlerHolder {
-            handler: UnsafeCell::new(handler as *mut dyn Handler),
-        });
+        write_volatile(
+            &mut SIGNAL_HANDLERS[sig as usize],
+            Some(HandlerHolder {
+                handler: UnsafeCell::new(handler as *mut dyn Handler),
+            }),
+        );
 
         if sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
             #[cfg(feature = "std")]
@@ -164,6 +169,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
             return Err(Error::Unknown(format!("Could not set up {} handler", sig)));
         }
     }
+    compiler_fence(Ordering::SeqCst);
 
     Ok(())
 }
