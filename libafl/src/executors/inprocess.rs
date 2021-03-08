@@ -22,9 +22,6 @@ use crate::{
     Error,
 };
 
-/// The inmem executor harness
-type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
-
 /// The inmem executor simply calls a target function, then returns afterwards.
 pub struct InProcessExecutor<I, OT>
 where
@@ -34,7 +31,7 @@ where
     /// The name of this executor instance, to address it from other components
     name: &'static str,
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: HarnessFunction<Self>,
+    harness_fn: Option<Box<dyn FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind>>,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<I>,
@@ -71,7 +68,17 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
-        let ret = (self.harness_fn)(self, bytes.as_slice());
+        let mut harness = self.harness_fn.take().unwrap();
+        let ret = (harness)(self, bytes.as_slice());
+        self.harness_fn.replace(harness);
+        Ok(ret)
+    }
+
+    #[inline]
+    fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
+    where
+        EM: EventManager<I, S>,
+    {
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -80,7 +87,7 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        Ok(ret)
+        Ok(())
     }
 }
 
@@ -124,7 +131,7 @@ where
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OC, OFT, S>(
         name: &'static str,
-        harness_fn: HarnessFunction<Self>,
+        harness_fn: impl FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind + 'static,
         observers: OT,
         _state: &mut S,
         _event_mgr: &mut EM,
@@ -156,7 +163,7 @@ where
         }
 
         Ok(Self {
-            harness_fn,
+            harness_fn: Some(Box::new(harness_fn)),
             observers,
             name,
             phantom: PhantomData,
