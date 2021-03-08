@@ -12,6 +12,7 @@ members = [
 
     #example fuzzers
     "fuzzers/libfuzzer_libpng",
+    "fuzzers/frida_libpng",
     "fuzzers/libfuzzer_libmozjpeg",
     "fuzzers/libfuzzer_libpng_cmpalloc",
 ]
