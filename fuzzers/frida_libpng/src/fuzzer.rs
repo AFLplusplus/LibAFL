@@ -216,8 +216,6 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
                         }
                     }
-                    first = false;
-                }
                 instruction.keep()
             }
         });
