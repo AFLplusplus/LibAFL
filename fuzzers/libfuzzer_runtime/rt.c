@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
-#include <malloc.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define MAP_SIZE 65536
 
@@ -130,35 +131,31 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
 }
 
-static void *(*old_malloc_hook) (size_t, const void *);
+void *malloc(size_t size) {
 
-void *__lafl_malloc(size_t size, const void *caller)
-{
-    void *result;
-    
-    uintptr_t k = (uintptr_t)caller;
-    k = (k >> 4) ^ (k << 8);
-    k &= MAP_SIZE - 1;
-    __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
+  uintptr_t k = (uintptr_t)__builtin_return_address(0);
+  k = (k >> 4) ^ (k << 8);
+  k &= MAP_SIZE - 1;
+  __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
 
-    __malloc_hook = old_malloc_hook;
+  return realloc(NULL, size);
 
-    result = malloc(size);
-
-    old_malloc_hook = __malloc_hook;
-    __malloc_hook = __lafl_malloc;
-
-    return result;
 }
 
-static void afl_libfuzzer_malloc_init(void)
-{
-    old_malloc_hook = __malloc_hook;
-    __malloc_hook = __lafl_malloc;
-}
+void *calloc(size_t nmemb, size_t size) {
 
-/* Override initializing hook from the C library. */
-void (*__malloc_initialize_hook) (void) = afl_libfuzzer_malloc_init;
+  size *= nmemb;
+
+  uintptr_t k = (uintptr_t)__builtin_return_address(0);
+  k = (k >> 4) ^ (k << 8);
+  k &= MAP_SIZE - 1;
+  __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
+
+  void *result = realloc(NULL, size);
+  memset(result, 0, size);
+  return result;
+
+}
 
 static void afl_libfuzzer_copy_args(int argc, char** argv, char** envp) {
    orig_argc = argc;
