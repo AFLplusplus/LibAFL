@@ -19,6 +19,7 @@ fn main() {
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
+    std::fs::create_dir(&out_dir);
 
     println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
     println!("cargo:rerun-if-changed=harness.cc");
@@ -36,66 +37,73 @@ fn main() {
     };
 
     println!("cargo:warning=output path is {}", libpng);
-    if true { // !libpng_path.is_dir() {
-        //if !Path::new(&libpng_tar).is_file() {
-            //println!("cargo:warning=Libpng not found, downloading...");
-            //// Download libpng
-            //Command::new("wget")
-                //.arg("-c")
-                //.arg(LIBPNG_URL)
-                //.arg("-O")
-                //.arg(&libpng_tar)
-                //.status()
-                //.unwrap();
-        //}
-        //Command::new("tar")
-            //.current_dir(&out_dir_path)
-            //.arg("xvf")
-            //.arg(&libpng_tar)
-            //.status()
-            //.unwrap();
-        //Command::new(format!("{}/configure", &libpng))
-            //.current_dir(&libpng_path)
-            //.args(&[
-                //"--disable-shared",
-                //&format!("--host={}", env::var("TARGET").unwrap())[..],
-            //])
-            //.env("CC", "clang")
-            //.env("CXX", "clang++")
-            //.env(
-                //"CFLAGS",
-                ////"-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize=address -fno-omit-frame-pointer"
-                //"-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer"
-            //)
-            //.env(
-                //"CXXFLAGS",
-                ////"-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize=address -fno-omit-frame-pointer",
-                //"-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer",
-            //)
-            //.env(
-                //"LDFLAGS",
-                ////format!("-g -fPIE -fsanitize=address {}", ldflags),
-                //format!("-g -fPIE {}", ldflags),
-            //)
-            //.status()
-            //.unwrap();
+    if !libpng_path.is_dir() {
+        if !Path::new(&libpng_tar).is_file() {
+            println!("cargo:warning=Libpng not found, downloading...");
+            // Download libpng
+            Command::new("wget")
+                .arg("-c")
+                .arg(LIBPNG_URL)
+                .arg("-O")
+                .arg(&libpng_tar)
+                .status()
+                .unwrap();
+        }
+        Command::new("tar")
+            .current_dir(&out_dir_path)
+            .arg("xvf")
+            .arg(&libpng_tar)
+            .status()
+            .unwrap();
+        Command::new(format!("{}/configure", &libpng))
+            .current_dir(&libpng_path)
+            .args(&[
+                "--disable-shared",
+                &format!("--host={}", env::var("TARGET").unwrap())[..],
+            ])
+            .env("CC", "clang")
+            .env("CXX", "clang++")
+            .env(
+                "CFLAGS",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer"
+            )
+            .env(
+                "CXXFLAGS",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer",
+            )
+            .env(
+                "LDFLAGS",
+                //format!("-g -fPIE -fsanitize=address {}", ldflags),
+                format!("-g -fPIE {}", ldflags),
+            )
+            .status()
+            .unwrap();
         Command::new("make")
             .current_dir(&libpng_path)
             .status()
             .unwrap();
     }
 
-    cc::Build::new()
-        .include(&libpng_path)
-        .cpp(true)
-        // .define("HAS_DUMMY_CRASH", "1")
-        .file("./harness.cc")
-        .compile("libfuzzer-harness");
+    Command::new("clang++")
+        .current_dir(&cwd)
+        .arg("-I")
+        .arg(format!("{}", &libpng))
+        //.arg("-D")
+        //.arg("HAS_DUMMY_CRASH=1")
+        .arg("-fPIE")
+        .arg("-shared")
+        .arg("-o")
+        .arg(format!("{}/libpng-harness.so", &out_dir))
+        .arg("./harness.cc")
+        .arg(format!("{}/.libs/libpng16.a", &libpng))
+        .arg("-l")
+        .arg("z")
+        .status()
+        .unwrap();
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
     println!("cargo:rustc-link-search=native={}/.libs", &libpng);
-    println!("cargo:rustc-link-lib=static=png16");
-    //println!("cargo:rustc-link-lib=static=asan");
+    //println!("cargo:rustc-link-lib=dylib=png-harness");
 
     //Deps for libpng: -pthread -lz -lm
     println!("cargo:rustc-link-lib=dylib=m");
