@@ -8,6 +8,8 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
+use std::cell::RefCell;
+
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(windows)]
@@ -202,7 +204,7 @@ where
         }
 
         Ok(Self {
-            harness_fn: Some(harness_fn),
+            harness_fn: RefCell::new(harness_fn),
             observers,
             name,
             phantom: PhantomData,

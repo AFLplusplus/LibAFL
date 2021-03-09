@@ -170,8 +170,6 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             for instruction in basic_block {
                 if first {
                     let address = unsafe { (*instruction.get_instruction()).address };
-                    if address >= helper.base_address
-                        && address <= helper.base_address + helper.size as u64
                     {
                         let writer = _output.writer();
                         if helper.current_log_impl == 0
