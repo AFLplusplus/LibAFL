@@ -202,7 +202,7 @@ where
         }
 
         Ok(Self {
-            harness_fn: Some(Box::new(harness_fn)),
+            harness_fn: Some(harness_fn),
             observers,
             name,
             phantom: PhantomData,
