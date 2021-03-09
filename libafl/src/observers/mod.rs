@@ -9,7 +9,7 @@ use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchNameAndType, MatchType, Named, TupleList},
+    bolts::tuples::{MatchFirstType, MatchNameAndType, MatchType, Named, TupleList},
     utils::current_time,
     Error,
 };
@@ -52,7 +52,7 @@ pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'st
 
 /// A hastkel-style tuple of observers
 pub trait ObserversTuple:
-    MatchNameAndType + MatchType + serde::Serialize + serde::de::DeserializeOwned
+    MatchNameAndType + MatchType + MatchFirstType + serde::Serialize + serde::de::DeserializeOwned
 {
     /// Reset all executors in the tuple
     /// This is called right before the next execution.
@@ -104,6 +104,10 @@ impl TimeObserver {
             start_time: Duration::from_secs(0),
             last_runtime: None,
         }
+    }
+
+    pub fn last_runtime(&self) -> &Option<Duration> {
+        &self.last_runtime
     }
 }
 
