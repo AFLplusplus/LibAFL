@@ -14,9 +14,9 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
-    inputs::Input,
+    inputs::{Input, HasTargetBytes},
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, ObserversTuple},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -40,10 +40,10 @@ extern "C" {
 
 /// The wrapped harness function, calling out to the LLVM-style harness
 #[cfg(unix)]
-fn harness<E, I>(_executor: &E, buf: &[u8]) -> ExitKind
+fn harness<I, OT>(_executor: &InProcessExecutor<I, OT>, buf: &[u8]) -> ExitKind
 where
-    E: Executor<I>,
-    I: Input,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
 {
     // println!("{:?}", buf);
     unsafe {
@@ -142,10 +142,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
+    let mut harness_fn = &mut harness;
+
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
         "in-process(edges)",
-        harness,
+        harness_fn,
         tuple_list!(edges_observer, TimeObserver::new("time")),
         &mut state,
         &mut restarting_mgr,

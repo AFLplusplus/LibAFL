@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InProcessExecutor<I, OT>
+pub struct InProcessExecutor<'a, I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -31,13 +31,13 @@ where
     /// The name of this executor instance, to address it from other components
     name: &'static str,
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: Option<Box<dyn FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind>>,
+    harness_fn: Option<&'a mut dyn FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind>,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<I>,
 }
 
-impl<I, OT> Executor<I> for InProcessExecutor<I, OT>
+impl<'a, I, OT> Executor<I> for InProcessExecutor<'a, I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -68,9 +68,10 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
-        let mut harness = self.harness_fn.take().unwrap();
-        let ret = (harness)(self, bytes.as_slice());
-        self.harness_fn.replace(harness);
+        //let ret = (self.harness_fn)(self, bytes.as_slice());
+        let harness_fn = self.harness_fn.take().unwrap();
+        let ret = (harness_fn)(self, bytes.as_slice());
+        self.harness_fn.replace(harness_fn);
         Ok(ret)
     }
 
@@ -91,7 +92,7 @@ where
     }
 }
 
-impl<I, OT> Named for InProcessExecutor<I, OT>
+impl<'a, I, OT> Named for InProcessExecutor<'a, I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -101,7 +102,7 @@ where
     }
 }
 
-impl<I, OT> HasObservers<OT> for InProcessExecutor<I, OT>
+impl<'a, I, OT> HasObservers<OT> for InProcessExecutor<'a, I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -117,7 +118,7 @@ where
     }
 }
 
-impl<I, OT> InProcessExecutor<I, OT>
+impl<'a, I, OT> InProcessExecutor<'a, I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -131,7 +132,7 @@ where
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OC, OFT, S>(
         name: &'static str,
-        harness_fn: impl FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind + 'static,
+        harness_fn: &'a mut impl FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind,
         observers: OT,
         _state: &mut S,
         _event_mgr: &mut EM,
@@ -163,7 +164,7 @@ where
         }
 
         Ok(Self {
-            harness_fn: Some(Box::new(harness_fn)),
+            harness_fn: Some(harness_fn),
             observers,
             name,
             phantom: PhantomData,
