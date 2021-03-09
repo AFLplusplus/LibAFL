@@ -72,7 +72,7 @@ pub extern "C" fn fuzz_main_loop() {
         });
     let edges_feedback = MaxMapFeedback::new_with_observer(&NAME_COV_MAP, &edges_observer);
 
-    let executor = InProcessExecutor::new("QEMUFuzzer", harness, tuple_list!(edges_observer));
+    let executor = InProcessExecutor::new("QEMUFuzzer", harness, tuple_list!(edges_observer))?;
     let mut state = State::new(tuple_list!(edges_feedback));
 
     let mut engine = Engine::new(executor);

@@ -2,10 +2,14 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
 use core::marker::PhantomData;
-#[cfg(feature = "std")]
 #[cfg(unix)]
-use os_signals::set_oncrash_ptrs;
+use core::{
+    ptr::{self, write_volatile},
+    sync::atomic::{compiler_fence, Ordering},
+};
 
+#[cfg(unix)]
+use crate::bolts::os::unix_signals::{c_void, setup_signal_handler};
 use crate::{
     bolts::tuples::Named,
     corpus::Corpus,
@@ -17,17 +21,6 @@ use crate::{
     state::{HasObjectives, HasSolutions},
     Error,
 };
-
-#[cfg(feature = "std")]
-#[cfg(unix)]
-use unix_signals as os_signals;
-
-#[cfg(feature = "std")]
-#[cfg(unix)]
-use self::os_signals::reset_oncrash_ptrs;
-#[cfg(feature = "std")]
-#[cfg(unix)]
-use self::os_signals::setup_crash_handlers;
 
 /// The inmem executor harness
 type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
@@ -58,27 +51,19 @@ where
         _state: &mut S,
         _event_mgr: &mut EM,
         _input: &I,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I, S>,
-    {
+    ) -> Result<(), Error> {
         #[cfg(unix)]
-        #[cfg(feature = "std")]
         unsafe {
-            set_oncrash_ptrs(_state, _event_mgr, self.observers(), _input);
-        }
-        Ok(())
-    }
-
-    #[inline]
-    fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
-    where
-        EM: EventManager<I, S>,
-    {
-        #[cfg(unix)]
-        #[cfg(feature = "std")]
-        unsafe {
-            reset_oncrash_ptrs();
+            let data = &mut unix_signal_handler::GLOBAL_STATE;
+            write_volatile(
+                &mut data.current_input_ptr,
+                _input as *const _ as *const c_void,
+            );
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
         }
         Ok(())
     }
@@ -87,6 +72,14 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(self, bytes.as_slice());
+        #[cfg(unix)]
+        unsafe {
+            write_volatile(
+                &mut unix_signal_handler::GLOBAL_STATE.current_input_ptr,
+                ptr::null(),
+            );
+            compiler_fence(Ordering::SeqCst);
+        }
         Ok(ret)
     }
 }
@@ -124,100 +117,274 @@ where
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
-    /// depnding on different corpus or state.
+    /// depending on different corpus or state.
     /// * `name` - the name of this executor (to address it along the way)
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
+    /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OC, OFT, S>(
         name: &'static str,
         harness_fn: HarnessFunction<Self>,
         observers: OT,
         _state: &mut S,
         _event_mgr: &mut EM,
-    ) -> Self
+    ) -> Result<Self, Error>
     where
         EM: EventManager<I, S>,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
     {
-        #[cfg(feature = "std")]
         #[cfg(unix)]
         unsafe {
-            setup_crash_handlers::<EM, I, OC, OFT, OT, S>();
+            let data = &mut unix_signal_handler::GLOBAL_STATE;
+            write_volatile(
+                &mut data.observers_ptr,
+                &observers as *const _ as *const c_void,
+            );
+            write_volatile(
+                &mut data.crash_handler,
+                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+            );
+            write_volatile(
+                &mut data.timeout_handler,
+                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+            );
+
+            setup_signal_handler(data)?;
+            compiler_fence(Ordering::SeqCst);
         }
 
-        Self {
+        Ok(Self {
             harness_fn,
             observers,
             name,
             phantom: PhantomData,
-        }
+        })
     }
 }
 
-#[cfg(feature = "std")]
 #[cfg(unix)]
-pub mod unix_signals {
-
-    extern crate libc;
-
-    // Unhandled signals: SIGALRM, SIGHUP, SIGINT, SIGKILL, SIGQUIT, SIGTERM
-    use libc::{
-        c_int, c_void, malloc, sigaction, sigaltstack, siginfo_t, SA_NODEFER, SA_ONSTACK,
-        SA_SIGINFO, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGPIPE, SIGSEGV, SIGUSR2,
-    };
-
+mod unix_signal_handler {
+    use alloc::vec::Vec;
+    use core::ptr;
+    use libc::{c_void, siginfo_t};
+    #[cfg(feature = "std")]
     use std::{
         fs,
         io::{stdout, Write},
-        mem, ptr,
     };
 
     use crate::{
+        bolts::os::unix_signals::{Handler, Signal},
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
         executors::ExitKind,
         feedbacks::FeedbacksTuple,
-        inputs::Input,
+        inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
         state::{HasObjectives, HasSolutions},
     };
-    /// Let's get 8 mb for now.
-    const SIGNAL_STACK_SIZE: usize = 2 << 22;
-    /// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
-    static mut SIGNAL_STACK_PTR: *const c_void = ptr::null_mut();
 
-    /// Pointers to values only needed on crash. As the program will not continue after a crash,
-    /// we should (tm) be okay with raw pointers here,
-    static mut STATE_PTR: *mut c_void = ptr::null_mut();
-    static mut EVENT_MGR_PTR: *mut c_void = ptr::null_mut();
-    static mut OBSERVERS_PTR: *const c_void = ptr::null();
-    /// The (unsafe) pointer to the current inmem input, for the current run.
-    /// This is needed for certain non-rust side effects, as well as unix signal handling.
-    static mut CURRENT_INPUT_PTR: *const c_void = ptr::null();
+    /// Signal handling on unix systems needs some nasty unsafe.
+    pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+        /// The state ptr for signal handling
+        state_ptr: ptr::null_mut(),
+        /// The event manager ptr for signal handling
+        event_mgr_ptr: ptr::null_mut(),
+        /// The observers ptr for signal handling
+        observers_ptr: ptr::null(),
+        /// The current input for signal handling
+        current_input_ptr: ptr::null(),
+        /// The crash handler fn
+        crash_handler: nop_handler,
+        /// The timeout handler fn
+        timeout_handler: nop_handler,
+    };
 
-    unsafe fn inmem_handle_crash<EM, I, OC, OFT, OT, S>(_sig: c_int, info: siginfo_t, _void: c_void)
-    where
+    pub struct InProcessExecutorHandlerData {
+        pub state_ptr: *mut c_void,
+        pub event_mgr_ptr: *mut c_void,
+        pub observers_ptr: *const c_void,
+        pub current_input_ptr: *const c_void,
+        pub crash_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
+        pub timeout_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
+    }
+
+    unsafe impl Send for InProcessExecutorHandlerData {}
+    unsafe impl Sync for InProcessExecutorHandlerData {}
+
+    unsafe fn nop_handler(
+        _signal: Signal,
+        _info: siginfo_t,
+        _void: c_void,
+        _data: &mut InProcessExecutorHandlerData,
+    ) {
+    }
+
+    #[cfg(unix)]
+    impl Handler for InProcessExecutorHandlerData {
+        fn handle(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
+            unsafe {
+                let data = &mut GLOBAL_STATE;
+                match signal {
+                    Signal::SigUser2 => (data.timeout_handler)(signal, info, void, data),
+                    _ => (data.crash_handler)(signal, info, void, data),
+                }
+            }
+        }
+
+        fn signals(&self) -> Vec<Signal> {
+            vec![
+                Signal::SigUser2,
+                Signal::SigAbort,
+                Signal::SigBus,
+                Signal::SigPipe,
+                Signal::SigFloatingPointException,
+                Signal::SigIllegalInstruction,
+                Signal::SigSegmentationFault,
+            ]
+        }
+    }
+
+    #[cfg(unix)]
+    pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
+        _signal: Signal,
+        _info: siginfo_t,
+        _void: c_void,
+        data: &mut InProcessExecutorHandlerData,
+    ) where
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
-        I: Input,
+        I: Input + HasTargetBytes,
     {
-        if CURRENT_INPUT_PTR == ptr::null() {
-            #[cfg(target_os = "android")]
-            let si_addr = { ((info._pad[0] as usize) | ((info._pad[1] as usize) << 32)) as usize };
-            #[cfg(not(target_os = "android"))]
-            let si_addr = { info.si_addr() as usize };
+        let state = (data.state_ptr as *mut S).as_mut().unwrap();
+        let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+        let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
 
-            println!(
+        if data.current_input_ptr.is_null() {
+            #[cfg(feature = "std")]
+            dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
+        } else {
+            #[cfg(feature = "std")]
+            println!("Timeout in fuzz run.");
+            #[cfg(feature = "std")]
+            let _ = stdout().flush();
+
+            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+            data.current_input_ptr = ptr::null();
+
+            let obj_fitness = state
+                .objectives_mut()
+                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .expect("In timeout handler objectives failure.");
+            if obj_fitness > 0 {
+                state
+                    .solutions_mut()
+                    .add(Testcase::new(input.clone()))
+                    .expect("In timeout handler solutions failure.");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Could not send timeouting input");
+            }
+
+            event_mgr.on_restart(state).unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Waiting for broker...");
+            event_mgr.await_restart_safe();
+            #[cfg(feature = "std")]
+            println!("Bye!");
+
+            event_mgr.await_restart_safe();
+
+            libc::_exit(1);
+        }
+    }
+
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+        _signal: Signal,
+        _info: siginfo_t,
+        _void: c_void,
+        data: &mut InProcessExecutorHandlerData,
+    ) where
+        EM: EventManager<I, S>,
+        OT: ObserversTuple,
+        OC: Corpus<I>,
+        OFT: FeedbacksTuple<I>,
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        I: Input + HasTargetBytes,
+    {
+        #[cfg(feature = "std")]
+        println!("Crashed with {}", _signal);
+        if !data.current_input_ptr.is_null() {
+            let state = (data.state_ptr as *mut S).as_mut().unwrap();
+            let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+            let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Child crashed!");
+            #[cfg(feature = "std")]
+            let _ = stdout().flush();
+
+            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+            // Make sure we don't crash in the crash handler forever.
+            data.current_input_ptr = ptr::null();
+
+            let obj_fitness = state
+                .objectives_mut()
+                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .expect("In crash handler objectives failure.");
+            if obj_fitness > 0 {
+                let new_input = input.clone();
+                state
+                    .solutions_mut()
+                    .add(Testcase::new(new_input))
+                    .expect("In crash handler solutions failure.");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Could not send crashing input");
+            }
+
+            event_mgr.on_restart(state).unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Waiting for broker...");
+            event_mgr.await_restart_safe();
+            #[cfg(feature = "std")]
+            println!("Bye!");
+
+            libc::_exit(1);
+        } else {
+            #[cfg(feature = "std")]
+            {
+                println!("Double crash\n");
+                #[cfg(target_os = "android")]
+                let si_addr =
+                    { ((_info._pad[0] as usize) | ((_info._pad[1] as usize) << 32)) as usize };
+                #[cfg(not(target_os = "android"))]
+                let si_addr = { _info.si_addr() as usize };
+
+                println!(
                 "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
                 si_addr
-            );
+                );
+            }
             // let's yolo-cat the maps for debugging, if possible.
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "std"))]
             match fs::read_to_string("/proc/self/maps") {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
@@ -232,167 +399,7 @@ pub mod unix_signals {
             }
 
             // TODO tell the parent to not restart
-            std::process::exit(1);
-        }
-
-        #[cfg(feature = "std")]
-        println!("Child crashed!");
-        #[cfg(feature = "std")]
-        let _ = stdout().flush();
-
-        let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
-        // Make sure we don't crash in the crash handler forever.
-        CURRENT_INPUT_PTR = ptr::null();
-        let state = (STATE_PTR as *mut S).as_mut().unwrap();
-        let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
-
-        let observers = (OBSERVERS_PTR as *const OT).as_ref().unwrap();
-        let obj_fitness = state
-            .objectives_mut()
-            .is_interesting_all(&input, observers, ExitKind::Crash)
-            .expect("In crash handler objectives failure.".into());
-        if obj_fitness > 0 {
-            state
-                .solutions_mut()
-                .add(Testcase::new(input.clone()))
-                .expect("In crash handler solutions failure.".into());
-            mgr.fire(
-                state,
-                Event::Objective {
-                    objective_size: state.solutions().count(),
-                },
-            )
-            .expect("Could not send crashing input".into());
-        }
-
-        mgr.on_restart(state).unwrap();
-
-        println!("Waiting for broker...");
-        mgr.await_restart_safe();
-        println!("Bye!");
-
-        std::process::exit(1);
-    }
-
-    unsafe fn inmem_handle_timeout<EM, I, OC, OFT, OT, S>(
-        _sig: c_int,
-        _info: siginfo_t,
-        _void: c_void,
-    ) where
-        EM: EventManager<I, S>,
-        OT: ObserversTuple,
-        OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
-        I: Input,
-    {
-        dbg!("TIMEOUT/SIGUSR2 received");
-        if CURRENT_INPUT_PTR.is_null() {
-            dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
-            return;
-        }
-
-        println!("Timeout in fuzz run.");
-        let _ = stdout().flush();
-
-        let input = (CURRENT_INPUT_PTR as *const I).as_ref().unwrap();
-        // Make sure we don't crash in the crash handler forever.
-        CURRENT_INPUT_PTR = ptr::null();
-        let state = (STATE_PTR as *mut S).as_mut().unwrap();
-        let mgr = (EVENT_MGR_PTR as *mut EM).as_mut().unwrap();
-
-        let observers = (OBSERVERS_PTR as *const OT).as_ref().unwrap();
-        let obj_fitness = state
-            .objectives_mut()
-            .is_interesting_all(&input, observers, ExitKind::Crash)
-            .expect("In timeout handler objectives failure.".into());
-        if obj_fitness > 0 {
-            state
-                .solutions_mut()
-                .add(Testcase::new(input.clone()))
-                .expect("In timeout handler solutions failure.".into());
-            mgr.fire(
-                state,
-                Event::Objective {
-                    objective_size: state.solutions().count(),
-                },
-            )
-            .expect("Could not send timeouting input".into());
-        }
-
-        mgr.on_restart(state).unwrap();
-
-        println!("Waiting for broker...");
-        mgr.await_restart_safe();
-        println!("Bye!");
-
-        mgr.await_restart_safe();
-
-        std::process::exit(1);
-    }
-
-    #[inline]
-    pub unsafe fn set_oncrash_ptrs<EM, I, OT, S>(
-        state: &mut S,
-        event_mgr: &mut EM,
-        observers: &OT,
-        input: &I,
-    ) {
-        CURRENT_INPUT_PTR = input as *const _ as *const c_void;
-        STATE_PTR = state as *mut _ as *mut c_void;
-        EVENT_MGR_PTR = event_mgr as *mut _ as *mut c_void;
-        OBSERVERS_PTR = observers as *const _ as *const c_void;
-    }
-
-    #[inline]
-    pub unsafe fn reset_oncrash_ptrs() {
-        CURRENT_INPUT_PTR = ptr::null();
-        STATE_PTR = ptr::null_mut();
-        EVENT_MGR_PTR = ptr::null_mut();
-        OBSERVERS_PTR = ptr::null();
-    }
-
-    pub unsafe fn setup_crash_handlers<EM, I, OC, OFT, OT, S>()
-    where
-        EM: EventManager<I, S>,
-        OT: ObserversTuple,
-        OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
-        I: Input,
-    {
-        // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
-        if SIGNAL_STACK_PTR.is_null() {
-            SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
-            if SIGNAL_STACK_PTR.is_null() {
-                panic!(
-                    "Failed to allocate signal stack with {} bytes!",
-                    SIGNAL_STACK_SIZE
-                );
-            }
-        }
-        sigaltstack(SIGNAL_STACK_PTR as _, ptr::null_mut() as _);
-
-        let mut sa: sigaction = mem::zeroed();
-        libc::sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
-        sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-        sa.sa_sigaction = inmem_handle_crash::<EM, I, OC, OFT, OT, S> as usize;
-        for (sig, msg) in &[
-            (SIGSEGV, "segfault"),
-            (SIGBUS, "sigbus"),
-            (SIGABRT, "sigabrt"),
-            (SIGILL, "illegal instruction"),
-            (SIGFPE, "fp exception"),
-            (SIGPIPE, "pipe"),
-        ] {
-            if sigaction(*sig, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
-                panic!("Could not set up {} handler", &msg);
-            }
-        }
-
-        sa.sa_sigaction = inmem_handle_timeout::<EM, I, OC, OFT, OT, S> as usize;
-        if sigaction(SIGUSR2, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
-            panic!("Could not set up sigusr2 handler for timeouts");
+            libc::_exit(1);
         }
     }
 }

@@ -59,48 +59,62 @@ where
     }
 }
 
-/*
+impl<C, I, S> Default for QueueCorpusScheduler<C, I, S>
+where
+    S: HasCorpus<C, I>,
+    C: Corpus<I>,
+    I: Input,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
 
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     use crate::{
-        corpus::{Corpus, OnDiskCorpus, QueueCorpus, Testcase},
+        corpus::{Corpus, CorpusScheduler, OnDiskCorpus, QueueCorpusScheduler, Testcase},
         inputs::bytes::BytesInput,
+        state::{HasCorpus, State},
         utils::StdRand,
     };
 
     #[test]
     fn test_queuecorpus() {
-        let mut rand = StdRand::new(0);
-        let mut q = QueueCorpus::new(OnDiskCorpus::<BytesInput, StdRand>::new(PathBuf::from(
-            "fancy/path",
-        )));
-        let t = Testcase::with_filename(BytesInput::new(vec![0 as u8; 4]), "fancyfile".into());
-        q.add(t);
-        let filename = q
-            .next(&mut rand)
+        let rand = StdRand::with_seed(4);
+        let scheduler = QueueCorpusScheduler::new();
+
+        let mut q =
+            OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
+        let t = Testcase::with_filename(
+            BytesInput::new(vec![0 as u8; 4]),
+            "target/.test/fancy/path/fancyfile".into(),
+        );
+        q.add(t).unwrap();
+
+        let objective_q =
+            OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
+                .unwrap();
+
+        let mut state = State::new(rand, q, (), objective_q, ());
+
+        let next_idx = scheduler.next(&mut state).unwrap();
+        let filename = state
+            .corpus()
+            .get(next_idx)
             .unwrap()
-            .0
             .borrow()
             .filename()
             .as_ref()
             .unwrap()
             .to_owned();
-        assert_eq!(
-            filename,
-            q.next(&mut rand)
-                .unwrap()
-                .0
-                .borrow()
-                .filename()
-                .as_ref()
-                .unwrap()
-                .to_owned()
-        );
-        assert_eq!(filename, "fancyfile");
+
+        assert_eq!(filename, "target/.test/fancy/path/fancyfile");
+
+        fs::remove_dir_all("target/.test/fancy").unwrap();
     }
 }
-*/

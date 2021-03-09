@@ -66,6 +66,8 @@ pub enum Error {
     IllegalState(String),
     /// The argument passed to this method or function is not valid
     IllegalArgument(String),
+    /// Shutting down, not really an error.
+    ShuttingDown,
     /// Something else happened
     Unknown(String),
 }
@@ -85,6 +87,7 @@ impl fmt::Display for Error {
             Self::NotImplemented(s) => write!(f, "Not implemented: {0}", &s),
             Self::IllegalState(s) => write!(f, "Illegal state: {0}", &s),
             Self::IllegalArgument(s) => write!(f, "Illegal argument: {0}", &s),
+            Self::ShuttingDown => write!(f, "Shutting down!"),
             Self::Unknown(s) => write!(f, "Unknown error: {0}", &s),
         }
     }
@@ -179,7 +182,8 @@ mod tests {
             //Box::new(|_, _, _, _, _| ()),
             &mut state,
             &mut event_manager,
-        );
+        )
+        .unwrap();
 
         let mut mutator = StdScheduledMutator::new();
         mutator.add_mutation(mutation_bitflip);

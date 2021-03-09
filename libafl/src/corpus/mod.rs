@@ -39,6 +39,11 @@ where
     /// Returns the number of elements
     fn count(&self) -> usize;
 
+    /// Returns true, if no elements are in this corpus yet
+    fn is_empty(&self) -> bool {
+        self.count() == 0
+    }
+
     /// Add an entry to the corpus and return its index
     fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
 
@@ -128,10 +133,23 @@ where
     I: Input,
     R: Rand,
 {
+    /// Create a new RandCorpusScheduler that just schedules randomly.
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
         }
+    }
+}
+
+impl<C, I, R, S> Default for RandCorpusScheduler<C, I, R, S>
+where
+    S: HasCorpus<C, I> + HasRand<R>,
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 

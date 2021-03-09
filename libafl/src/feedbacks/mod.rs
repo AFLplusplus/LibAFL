@@ -11,9 +11,11 @@ use crate::{
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
-    observers::ObserversTuple,
+    observers::{ObserversTuple, TimeObserver},
     Error,
 };
+
+use core::time::Duration;
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
@@ -41,30 +43,6 @@ where
     fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
-
-    /*
-    /// Serialize this feedback's state only, to be restored later using deserialize_state
-    /// As opposed to completely serializing the observer, this is only needed when the fuzzer is to be restarted
-    /// If no state is needed to be kept, just return an empty vec.
-    /// Example:
-    /// >> The virgin_bits map in AFL needs to be in sync with the corpus
-    #[inline]
-    fn serialize_state(&mut self) -> Result<Vec<u8>, Error> {
-        Ok(vec![])
-    }
-
-    /// Restore the state from a given vec, priviously stored using `serialize_state`
-    #[inline]
-    fn deserialize_state(&mut self, serialized_state: &[u8]) -> Result<(), Error> {
-        let _ = serialized_state;
-        Ok(())
-    }
-
-    // TODO: Restore_from
-    fn restore_from(&mut self, restore_from: Self) -> Result<(), Error> {
-        Ok(())
-    }
-    */
 }
 
 pub trait FeedbacksTuple<I>: serde::Serialize + serde::de::DeserializeOwned
@@ -84,12 +62,6 @@ where
 
     /// Discards metadata - the end of this input's execution
     fn discard_metadata_all(&mut self, input: &I) -> Result<(), Error>;
-
-    /*
-    /// Restores the state from each of the containing feedbacks in a list of the same shape.
-    /// Used (prette exclusively) to restore the feedback states after a crash.
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error>;
-    */
 }
 
 impl<I> FeedbacksTuple<I> for ()
@@ -115,12 +87,6 @@ where
     fn discard_metadata_all(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
-
-    /*
-    fn restore_state_from_all(&mut self, restore_from: &Self) -> Result<(), Error> {
-        Ok(())
-    }
-    */
 }
 
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
@@ -182,5 +148,67 @@ impl Named for CrashFeedback {
 impl CrashFeedback {
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for CrashFeedback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Nop feedback that annotates execution time in the new testcase, if any
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeFeedback {
+    exec_time: Option<Duration>,
+}
+
+impl<I> Feedback<I> for TimeFeedback
+where
+    I: Input,
+{
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: ExitKind,
+    ) -> Result<u32, Error> {
+        let observer = observers.match_first_type::<TimeObserver>().unwrap();
+        self.exec_time = *observer.last_runtime();
+        Ok(0)
+    }
+
+    /// Append to the testcase the generated metadata in case of a new corpus item
+    #[inline]
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        *testcase.exec_time_mut() = self.exec_time;
+        self.exec_time = None;
+        Ok(())
+    }
+
+    /// Discard the stored metadata in case that the testcase is not added to the corpus
+    #[inline]
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+        self.exec_time = None;
+        Ok(())
+    }
+}
+
+impl Named for TimeFeedback {
+    #[inline]
+    fn name(&self) -> &str {
+        "TimeFeedback"
+    }
+}
+
+impl TimeFeedback {
+    pub fn new() -> Self {
+        Self { exec_time: None }
+    }
+}
+
+impl Default for TimeFeedback {
+    fn default() -> Self {
+        Self::new()
     }
 }

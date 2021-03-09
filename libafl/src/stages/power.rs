@@ -7,69 +7,15 @@ use crate::{
     inputs::Input,
     mutators::Mutator,
     observers::ObserversTuple,
-    stages::Stage,
+    stages::{Stage, MutationalStage},
     state::{Evaluator, HasCorpus, HasRand},
     utils::Rand,
     Error,
 };
 
-// TODO multi mutators stage
-
-/// A Mutational stage is the stage in a fuzzing run that mutates inputs.
-/// Mutational stages will usually have a range of mutations that are
-/// being applied to the input one by one, between executions.
-pub trait MutationalStage<C, CS, E, EM, I, M, OT, S>: Stage<CS, E, EM, I, S>
-where
-    M: Mutator<I, S>,
-    I: Input,
-    S: HasCorpus<C, I> + Evaluator<I>,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    CS: CorpusScheduler<I, S>,
-{
-    /// The mutator registered for this stage
-    fn mutator(&self) -> &M;
-
-    /// The mutator registered for this stage (mutable)
-    fn mutator_mut(&mut self) -> &mut M;
-
-    /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut S) -> usize;
-
-    /// Runs this (mutational) stage for the given testcase
-    fn perform_mutational(
-        &self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        scheduler: &CS,
-        corpus_idx: usize,
-    ) -> Result<(), Error> {
-        let num = self.iterations(state);
-        for i in 0..num {
-            let mut input_mut = state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow_mut()
-                .load_input()?
-                .clone();
-            self.mutator().mutate(state, &mut input_mut, i as i32)?;
-
-            let fitness = state.evaluate_input(input_mut, executor, manager, scheduler)?;
-
-            self.mutator().post_exec(state, fitness, i as i32)?;
-        }
-        Ok(())
-    }
-}
-
-pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
-
-/// The default mutational stage
+/// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+pub struct PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -86,7 +32,7 @@ where
 }
 
 impl<C, CS, E, EM, I, M, OT, R, S> MutationalStage<C, CS, E, EM, I, M, OT, S>
-    for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+    for PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -117,7 +63,7 @@ where
 }
 
 impl<C, CS, E, EM, I, M, OT, R, S> Stage<CS, E, EM, I, S>
-    for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+    for PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -142,7 +88,7 @@ where
     }
 }
 
-impl<C, CS, E, EM, I, M, OT, R, S> StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+impl<C, CS, E, EM, I, M, OT, R, S> PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
 where
     M: Mutator<I, S>,
     I: Input,
@@ -157,7 +103,7 @@ where
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
         Self {
-            mutator,
+            mutator: mutator,
             phantom: PhantomData,
         }
     }

@@ -15,6 +15,7 @@
 - [ ] Restart Count in Fuzzing Loop
 - [ ] LAIN / structured fuzzing example
 - [ ] Errors in the Fuzzer should exit the fuzz run
+- [ ] More informative outpus, deeper introspection (stats, what mutation did x, etc.)
 - [ ] Timeouts for executors
 - [ ] Timeout handling for llmp clients (no ping for n seconds -> treat as disconnected)
 - [ ] LLMP Cross Machine Link (2 brokers connected via TCP)

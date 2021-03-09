@@ -41,32 +41,26 @@ where
 /// Mem move in the own vec
 #[inline]
 pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
-    debug_assert!(data.len() > 0);
+    debug_assert!(!data.is_empty());
     debug_assert!(from + len <= data.len());
     debug_assert!(to + len <= data.len());
     if len != 0 && from != to {
         let ptr = data.as_mut_ptr();
-        unsafe { core::ptr::copy(ptr.offset(from as isize), ptr.offset(to as isize), len) }
+        unsafe { core::ptr::copy(ptr.add(from), ptr.add(to), len) }
     }
 }
 
 /// Mem move between vecs
 #[inline]
 pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
-    debug_assert!(dst.len() > 0);
-    debug_assert!(src.len() > 0);
+    debug_assert!(!dst.is_empty());
+    debug_assert!(!src.is_empty());
     debug_assert!(from + len <= src.len());
     debug_assert!(to + len <= dst.len());
     let dst_ptr = dst.as_mut_ptr();
     let src_ptr = src.as_ptr();
     if len != 0 {
-        unsafe {
-            core::ptr::copy(
-                src_ptr.offset(from as isize),
-                dst_ptr.offset(to as isize),
-                len,
-            )
-        }
+        unsafe { core::ptr::copy(src_ptr.add(from), dst_ptr.add(to), len) }
     }
 }
 
@@ -124,7 +118,7 @@ where
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let bit = state.rand_mut().below((input.bytes().len() << 3) as u64) as usize;
@@ -142,7 +136,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -160,7 +154,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -179,7 +173,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -198,7 +192,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -216,7 +210,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -234,7 +228,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -335,7 +329,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    if input.bytes().len() == 0 {
+    if input.bytes().is_empty() {
         Ok(MutationResult::Skipped)
     } else {
         let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
@@ -767,7 +761,7 @@ fn from_hex(hex: u8) -> Result<u8, Error> {
     if hex >= 97 && hex <= 102 {
         return Ok(hex - 87);
     }
-    return Err(Error::IllegalArgument("".to_owned()));
+    Err(Error::IllegalArgument("".to_owned()))
 }
 
 /// Decodes a dictionary token: 'foo\x41\\and\"bar' -> 'fooA\and"bar'
@@ -801,7 +795,7 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
         }
     }
 
-    return Ok(token);
+    Ok(token)
 }
 
 #[cfg(test)]

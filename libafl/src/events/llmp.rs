@@ -1,4 +1,4 @@
-use crate::bolts::llmp::LlmpSender;
+use crate::bolts::{llmp::LlmpSender, shmem::HasFd};
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
@@ -6,11 +6,13 @@ use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "std")]
 use crate::bolts::llmp::LlmpReceiver;
 
-#[cfg(feature = "std")]
-use std::{env, process::Command};
+#[cfg(all(feature = "std", windows))]
+use crate::utils::startable_self;
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
+use crate::utils::{fork, ForkResult};
+
+#[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMem;
 use crate::{
     bolts::{
@@ -167,10 +169,7 @@ where
 
     /// Returns if we are the broker
     pub fn is_broker(&self) -> bool {
-        match self.llmp {
-            llmp::LlmpConnection::IsBroker { broker: _ } => true,
-            _ => false,
-        }
+        matches!(self.llmp, llmp::LlmpConnection::IsBroker { broker: _ })
     }
 
     /// Run forever in the broker
@@ -194,6 +193,8 @@ where
                     },
                     Some(Duration::from_millis(5)),
                 );
+
+                Ok(())
             }
             _ => Err(Error::IllegalState(
                 "Called broker loop in the client".into(),
@@ -283,14 +284,13 @@ where
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
                 let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
-                if fitness > 0 {
-                    if !state
+                if fitness > 0
+                    && state
                         .add_if_interesting(&input, fitness, scheduler)?
-                        .is_none()
-                    {
-                        #[cfg(feature = "std")]
-                        println!("Added received Testcase");
-                    }
+                        .is_some()
+                {
+                    #[cfg(feature = "std")]
+                    println!("Added received Testcase");
                 }
                 Ok(())
             }
@@ -299,6 +299,23 @@ where
                 event.name()
             ))),
         }
+    }
+}
+
+impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
+where
+    I: Input,
+    S: IfInteresting<I>,
+    SH: ShMem + HasFd,
+    ST: Stats,
+{
+    #[cfg(all(feature = "std", unix))]
+    pub fn new_on_domain_socket(stats: ST, filename: &str) -> Result<Self, Error> {
+        Ok(Self {
+            stats: Some(stats),
+            llmp: llmp::LlmpConnection::on_domain_socket(filename)?,
+            phantom: PhantomData,
+        })
     }
 }
 
@@ -312,12 +329,9 @@ where
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     fn await_restart_safe(&mut self) {
-        match &self.llmp {
-            llmp::LlmpConnection::IsClient { client } => {
-                // wait until we can drop the message safely.
-                client.await_save_to_unmap_blocking();
-            }
-            _ => (),
+        if let llmp::LlmpConnection::IsClient { client } = &self.llmp {
+            // wait until we can drop the message safely.
+            client.await_save_to_unmap_blocking();
         }
     }
 
@@ -335,18 +349,15 @@ where
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
         match &mut self.llmp {
-            llmp::LlmpConnection::IsClient { client } => loop {
-                match client.recv_buf()? {
-                    Some((sender_id, tag, msg)) => {
-                        if tag == _LLMP_TAG_EVENT_TO_BROKER {
-                            continue;
-                        }
-                        let event: Event<I> = postcard::from_bytes(msg)?;
-                        events.push((sender_id, event));
+            llmp::LlmpConnection::IsClient { client } => {
+                while let Some((sender_id, tag, msg)) = client.recv_buf()? {
+                    if tag == _LLMP_TAG_EVENT_TO_BROKER {
+                        continue;
                     }
-                    None => break,
+                    let event: Event<I> = postcard::from_bytes(msg)?;
+                    events.push((sender_id, event));
                 }
-            },
+            }
             _ => {
                 #[cfg(feature = "std")]
                 dbg!("Skipping process in broker");
@@ -498,18 +509,31 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SH: ShMem,
+    SH: ShMem + HasFd, // Todo: HasFd is only needed for Android
     ST: Stats,
 {
     let mut mgr;
 
     // We start ourself as child process to actually fuzz
-    if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-        mgr = LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?;
+    let (sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+        #[cfg(target_os = "android")]
+        {
+            let path = std::env::current_dir()?;
+            mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
+                stats,
+                &format!("{}/.llmp_socket", path.display()).to_string(),
+            )?;
+        };
+        #[cfg(not(target_os = "android"))]
+        {
+            mgr = LlmpEventManager::<I, S, SH, ST>::new_on_port(stats, broker_port)?
+        };
+
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
             mgr.broker_loop()?;
+            return Err(Error::ShuttingDown);
         } else {
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
@@ -527,21 +551,31 @@ where
             // Client->parent loop
             loop {
                 dbg!("Spawning next client (id {})", ctr);
-                Command::new(env::current_exe()?)
-                    .current_dir(env::current_dir()?)
-                    .args(env::args())
-                    .status()?;
+
+                // On Unix, we fork (todo: measure if that is actually faster.)
+                #[cfg(unix)]
+                let _ = match unsafe { fork() }? {
+                    ForkResult::Parent(handle) => handle.status(),
+                    ForkResult::Child => break (sender, receiver),
+                };
+
+                // On windows, we spawn ourself again
+                #[cfg(windows)]
+                startable_self()?.status()?;
+
                 ctr += 1;
             }
         }
-    }
+    } else {
+        // We are the newly started fuzzing instance, first, connect to our own restore map.
+        // A sender and a receiver for single communication
+        (
+            LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?,
+            LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?,
+        )
+    };
 
     println!("We're a client, let's fuzz :)");
-
-    // We are the fuzzing instance, first, connect to our own restore map.
-    // A sender and a receiver for single communication
-    let mut receiver = LlmpReceiver::<SH>::on_existing_from_env(_ENV_FUZZER_RECEIVER)?;
-    let sender = LlmpSender::<SH>::on_existing_from_env(_ENV_FUZZER_SENDER)?;
 
     // If we're restarting, deserialize the old state.
     let (state, mut mgr) = match receiver.recv_buf()? {

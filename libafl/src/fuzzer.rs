@@ -142,8 +142,8 @@ where
 {
     pub fn new(scheduler: CS, stages: ST) -> Self {
         Self {
-            scheduler: scheduler,
-            stages: stages,
+            scheduler,
+            stages,
             phantom: PhantomData,
         }
     }

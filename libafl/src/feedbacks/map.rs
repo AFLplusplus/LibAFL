@@ -218,19 +218,13 @@ where
     }
 
     fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        match self.indexes.as_mut() {
-            Some(v) => {
-                let meta = MapIndexesMetadata::new(core::mem::take(v));
-                testcase.add_metadata(meta);
-            }
-            None => {}
+        if let Some(v) = self.indexes.as_mut() {
+            let meta = MapIndexesMetadata::new(core::mem::take(v));
+            testcase.add_metadata(meta);
         };
-        match self.novelties.as_mut() {
-            Some(v) => {
-                let meta = MapNoveltiesMetadata::new(core::mem::take(v));
-                testcase.add_metadata(meta);
-            }
-            None => {}
+        if let Some(v) = self.novelties.as_mut() {
+            let meta = MapNoveltiesMetadata::new(core::mem::take(v));
+            testcase.add_metadata(meta);
         };
         Ok(())
     }
@@ -329,7 +323,7 @@ where
     /// The map can be shared.
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
-            history_map: history_map,
+            history_map,
             name: name.to_string(),
             indexes: None,
             novelties: None,

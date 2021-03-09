@@ -515,15 +515,15 @@ where
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
 
-        if !self
+        if self
             .add_if_interesting(&input, fitness, scheduler)?
-            .is_none()
+            .is_some()
         {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
                 self,
                 Event::NewTestcase {
-                    input: input,
+                    input,
                     observers_buf,
                     corpus_size: self.corpus().count() + 1,
                     client_config: "TODO".into(),
@@ -564,7 +564,7 @@ where
             let path = entry.path();
             let attributes = fs::metadata(&path);
 
-            if !attributes.is_ok() {
+            if attributes.is_err() {
                 continue;
             }
 
@@ -647,7 +647,7 @@ where
 
         executor.pre_exec(self, event_mgr, input)?;
         let exit_kind = executor.run_target(input)?;
-        //executor.post_exec(&self, event_mgr, input)?;
+        executor.post_exec(self, event_mgr, input)?;
 
         *self.executions_mut() += 1;
         executor.post_exec_observers()?;

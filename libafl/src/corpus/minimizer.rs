@@ -37,6 +37,12 @@ impl TopRatedsMetadata {
     }
 }
 
+impl Default for TopRatedsMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait FavFactor<I>
 where
     I: Input,
@@ -56,6 +62,7 @@ where
     I: Input + HasLen,
 {
     fn compute(entry: &mut Testcase<I>) -> Result<u64, Error> {
+        // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as u64 * entry.cached_len()? as u64)
     }
 }
@@ -208,7 +215,7 @@ where
 
     pub fn new(base: CS) -> Self {
         Self {
-            base: base,
+            base,
             skip_not_fav_prob: DEFAULT_SKIP_NOT_FAV_PROB,
             phantom: PhantomData,
         }
@@ -216,8 +223,8 @@ where
 
     pub fn with_skip_prob(base: CS, skip_not_fav_prob: u64) -> Self {
         Self {
-            base: base,
-            skip_not_fav_prob: skip_not_fav_prob,
+            base,
+            skip_not_fav_prob,
             phantom: PhantomData,
         }
     }

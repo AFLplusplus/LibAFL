@@ -31,8 +31,8 @@ where
     }
 }
 
-impl<'a, T: Sized> Ptr<'a, T> {
-    pub fn as_ref(&self) -> &T {
+impl<'a, T: Sized> AsRef<T> for Ptr<'a, T> {
+    fn as_ref(&self) -> &T {
         match self {
             Ptr::Ref(r) => r,
             Ptr::Owned(v) => v.as_ref(),
@@ -69,15 +69,17 @@ where
     }
 }
 
-impl<'a, T: Sized> PtrMut<'a, T> {
-    pub fn as_ref(&self) -> &T {
+impl<'a, T: Sized> AsRef<T> for PtrMut<'a, T> {
+    fn as_ref(&self) -> &T {
         match self {
             PtrMut::Ref(r) => r,
             PtrMut::Owned(v) => v.as_ref(),
         }
     }
+}
 
-    pub fn as_mut(&mut self) -> &T {
+impl<'a, T: Sized> AsMut<T> for PtrMut<'a, T> {
+    fn as_mut(&mut self) -> &mut T {
         match self {
             PtrMut::Ref(r) => r,
             PtrMut::Owned(v) => v.as_mut(),
@@ -195,8 +197,8 @@ where
     }
 }
 
-impl<T: Sized> Cptr<T> {
-    pub fn as_ref(&self) -> &T {
+impl<T: Sized> AsRef<T> for Cptr<T> {
+    fn as_ref(&self) -> &T {
         match self {
             Cptr::Cptr(p) => unsafe { p.as_ref().unwrap() },
             Cptr::Owned(v) => v.as_ref(),
@@ -230,15 +232,17 @@ where
     }
 }
 
-impl<T: Sized> CptrMut<T> {
-    pub fn as_ref(&self) -> &T {
+impl<T: Sized> AsRef<T> for CptrMut<T> {
+    fn as_ref(&self) -> &T {
         match self {
             CptrMut::Cptr(p) => unsafe { p.as_ref().unwrap() },
             CptrMut::Owned(b) => b.as_ref(),
         }
     }
+}
 
-    pub fn as_mut(&mut self) -> &mut T {
+impl<T: Sized> AsMut<T> for CptrMut<T> {
+    fn as_mut(&mut self) -> &mut T {
         match self {
             CptrMut::Cptr(p) => unsafe { p.as_mut().unwrap() },
             CptrMut::Owned(b) => b.as_mut(),

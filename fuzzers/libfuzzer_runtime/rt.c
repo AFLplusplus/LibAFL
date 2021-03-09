@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define MAP_SIZE 65536
 
@@ -8,9 +10,11 @@ char **orig_argv;
 char **orig_envp;
 
 uint8_t  __lafl_dummy_map[MAP_SIZE];
+size_t  __lafl_dummy_map_usize[MAP_SIZE];
 
 uint8_t *__lafl_edges_map = __lafl_dummy_map;
 uint8_t *__lafl_cmp_map = __lafl_dummy_map;
+size_t *__lafl_alloc_map = __lafl_dummy_map_usize;
 
 uint32_t __lafl_max_edges_size = 0;
 
@@ -124,6 +128,32 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
     }
 
   }
+
+}
+
+void *malloc(size_t size) {
+
+  uintptr_t k = (uintptr_t)__builtin_return_address(0);
+  k = (k >> 4) ^ (k << 8);
+  k &= MAP_SIZE - 1;
+  __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
+
+  return realloc(NULL, size);
+
+}
+
+void *calloc(size_t nmemb, size_t size) {
+
+  size *= nmemb;
+
+  uintptr_t k = (uintptr_t)__builtin_return_address(0);
+  k = (k >> 4) ^ (k << 8);
+  k &= MAP_SIZE - 1;
+  __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
+
+  void *result = realloc(NULL, size);
+  memset(result, 0, size);
+  return result;
 
 }
 
