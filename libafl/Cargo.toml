@@ -56,11 +56,6 @@ libafl_derive = { version = "*", optional = true, path = "../libafl_derive" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] } # an easy way to debug print SerdeAnyMap
 #TODO: for llmp brotli = { version = "3.3.0", default-features = false } # brotli compression
 num_enum = "0.5.1"
-frida-gum = { path = "../../frida-rust/frida-gum", version = "0.2.1", optional = true, features = ["auto-download", "event-sink", "invocation-listener"] }
-frida-gum-sys = { path = "../../frida-rust/frida-gum-sys", version = "0.2.0", optional = true, features = ["auto-download", "event-sink", "invocation-listener"] }
-#frida-gum = { git = "https://github.com/s1341/frida-rust", branch = "autoinstall_frida_devkits", version = "0.2.1", optional = true, features = ["event-sink", "invocation-listener"] }
-#frida-gum-sys = { git = "https://github.com/s1341/frida-rust", branch = "autoinstall_frida_devkits", version = "0.2.0", optional = true, features = ["autodownload", "event-sink", "invocation-listener"] }
-lazy_static = "1.4.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc

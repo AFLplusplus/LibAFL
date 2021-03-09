@@ -8,6 +8,8 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
+use std::cell::RefCell;
+
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler};
 use crate::{
@@ -31,7 +33,7 @@ where
     /// The name of this executor instance, to address it from other components
     name: &'static str,
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: Option<&'a mut dyn FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind>,
+    harness_fn: RefCell<&'a mut dyn FnMut(&InProcessExecutor<I, OT>, &[u8]) -> ExitKind>,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<I>,
@@ -68,10 +70,7 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
-        //let ret = (self.harness_fn)(self, bytes.as_slice());
-        let harness_fn = self.harness_fn.take().unwrap();
-        let ret = (harness_fn)(self, bytes.as_slice());
-        self.harness_fn.replace(harness_fn);
+        let ret = (self.harness_fn.borrow_mut())(self, bytes.as_slice());
         Ok(ret)
     }
 
@@ -164,7 +163,7 @@ where
         }
 
         Ok(Self {
-            harness_fn: Some(harness_fn),
+            harness_fn: RefCell::new(harness_fn),
             observers,
             name,
             phantom: PhantomData,

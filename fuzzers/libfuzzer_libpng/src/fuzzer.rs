@@ -11,7 +11,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::{Input, HasTargetBytes},
@@ -142,7 +142,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
-    let mut harness_fn = &mut harness;
+    let harness_fn = &mut harness;
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
