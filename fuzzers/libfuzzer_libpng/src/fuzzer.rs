@@ -12,11 +12,11 @@ use libafl::{
     },
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
-    observers::{HitcountsMapObserver, StdMapObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -109,11 +109,10 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(MaxMapFeedback::new_with_observer_track(
-                &edges_observer,
-                true,
-                false
-            )),
+            tuple_list!(
+                MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
+                TimeFeedback::new()
+            ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
@@ -147,7 +146,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mut executor = InProcessExecutor::new(
         "in-process(edges)",
         harness,
-        tuple_list!(edges_observer),
+        tuple_list!(edges_observer, TimeObserver::new("time")),
         &mut state,
         &mut restarting_mgr,
     )?;
