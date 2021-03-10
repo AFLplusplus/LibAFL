@@ -92,6 +92,7 @@ fn main() {
         //.arg("HAS_DUMMY_CRASH=1")
         .arg("-fPIE")
         .arg("-shared")
+        .arg(if env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" { "-static-libstdc++" } else { "" })
         .arg("-o")
         .arg(format!("{}/libpng-harness.so", &out_dir))
         .arg("./harness.cc")
@@ -100,18 +101,6 @@ fn main() {
         .arg("z")
         .status()
         .unwrap();
-
-    println!("cargo:rustc-link-search=native={}", &out_dir);
-    println!("cargo:rustc-link-search=native={}/.libs", &libpng);
-    //println!("cargo:rustc-link-lib=dylib=png-harness");
-
-    //Deps for libpng: -pthread -lz -lm
-    println!("cargo:rustc-link-lib=dylib=m");
-    println!("cargo:rustc-link-lib=dylib=z");
-
-    //For the C++ harness
-    //must by dylib for android
-    println!("cargo:rustc-link-lib=dylib=stdc++");
 
     println!("cargo:rerun-if-changed=build.rs");
 }
