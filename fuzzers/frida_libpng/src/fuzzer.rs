@@ -29,6 +29,8 @@ use frida_gum::{
     InstructionWriter,
 };
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection, Register};
+#[cfg(target_arch = "aarch64")]
+use frida_gum::IndexMode;
 
 use libloading;
 
