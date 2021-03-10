@@ -24,13 +24,15 @@ use libafl::{
     Error,
 };
 
-use frida_gum::stalker::{NoneEventSink, Stalker, Transformer};
-use frida_gum::{Gum, Module, PageProtection, MemoryRange};
+use frida_gum::{InstructionWriter, stalker::{NoneEventSink, Stalker, Transformer}};
+use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection, Register};
 
 use libloading;
 
 use std::{
+    cell::RefCell,
     env,
+    ffi::c_void,
     path::PathBuf,
     ptr
 };
@@ -45,9 +47,10 @@ const MAP_SIZE: usize = 64 * 1024;
 /// An helper that feeds FridaInProcessExecutor with edge-coverage instrumentation
 struct FridaEdgeCoverageHelper<'a> {
     map: [u8; MAP_SIZE],
-    previous_pc: u64,
+    previous_pc: RefCell<u64>,
     base_address: u64,
     size: usize,
+    current_log_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
 }
@@ -58,15 +61,57 @@ impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
     }
 }
 
+/// A minimal maybe_log implementation. We insert this into the transformed instruction stream
+/// every time we need a copy that is within a direct branch of the start of the transformed basic
+/// block.
+const MAYBE_LOG_CODE_X86: [u8; 69] = [
+    0x9c,  // pushfq
+    0x50,  // push rax
+    0x51,  // push rcx
+    0x52,  // push rdx
+    0x56,  // push rsi
+
+    0x89, 0xf8,                                // mov eax, edi
+    0xc1, 0xe0, 0x08,                          // shl eax, 8
+    0xc1, 0xef, 0x04,                          // shr edi, 4
+    0x31, 0xc7,                                // xor edi, eax
+    0x0f, 0xb7, 0xc7,                          // movzx eax, di
+    0x48, 0x8d, 0x0d, 0x34, 0x00, 0x00, 0x00,  // lea rcx, sym._afl_area_ptr_ptr
+    0x48, 0x8b, 0x09,                          // mov rcx, qword [rcx]
+    0x48, 0x8d, 0x15, 0x22, 0x00, 0x00, 0x00,  // lea rdx, sym._afl_prev_loc_ptr
+    0x48, 0x8b, 0x32,                          // mov rsi, qword [rdx]
+    0x48, 0x8b, 0x36,                          // mov rsi, qword [rsi]
+    0x48, 0x31, 0xc6,                          // xor rsi, rax
+    0x48, 0x81, 0xe6, 0xff, 0x1f, 0x00, 0x00,  // and rsi, 0x1fff (8 * 1024 - 1) TODO: make this variable
+    0xfe, 0x04, 0x31,                          // inc byte [rcx + rsi]
+
+    0x48, 0xd1, 0xe8,  // shr rax, 1
+    0x48, 0x8b, 0x0a,  // mov rcx, qword [rdx]
+    0x48, 0x89, 0x01,  // mov qword [rcx], rax
+
+    0x5e,  // pop rsi
+    0x5a,  // pop rdx
+    0x59,  // pop rcx
+    0x58,  // pop rax
+    0x9d,  // popfq
+
+    0xc3,  // ret
+           // Read-only data goes here:
+           // uint64_t* afl_prev_loc_ptr
+           // uint8_t** afl_area_ptr_ptr
+           // unsigned int afl_instr_rms
+];
+
 /// The implementation of the FridaEdgeCoverageHelper
 impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
     pub fn new(gum: &'a Gum, module_name: &str) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
-            previous_pc: 0x0,
+            previous_pc: RefCell::new(0x0),
             base_address: Module::find_base_address(module_name).0 as u64,
             size: FridaEdgeCoverageHelper::get_module_size(module_name),
+            current_log_impl: 0,
             transformer: None,
         };
 
@@ -78,20 +123,30 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                     if address >= helper.base_address
                         && address <= helper.base_address + helper.size as u64
                     {
-                        instruction.put_callout(|cpu_context| {
-                            #[cfg(target_arch = "x86_64")]
-                            let mut current_pc = cpu_context.rip();
-                            #[cfg(target_arch = "aarch64")]
-                            let mut current_pc = cpu_context.pc();
+                        let writer  = _output.writer();
+                        if helper.current_log_impl == 0
+                            || !writer.can_branch_directly_to(helper.current_log_impl)
+                                || !writer.can_branch_directly_between(writer.pc() + 128, helper.current_log_impl) {
 
-                            current_pc = (current_pc >> 4) ^ (current_pc << 8);
+                            let after_log_impl = writer.code_offset() + 1;
+                            writer.put_jmp_near_label(after_log_impl);
 
-                            current_pc &= MAP_SIZE as u64 - 1;
-                            //println!("current_pc after mask: {:x}, helper.previous_pc: {:x}", current_pc, helper.previous_pc);
+                            helper.current_log_impl = writer.pc();
+                            writer.put_bytes(&MAYBE_LOG_CODE_X86);
+                            let prev_loc_pointer = helper.previous_pc.as_ptr() as *mut _ as usize;
+                            let map_pointer = helper.map.as_ptr() as usize;
 
-                            helper.map[(current_pc ^ helper.previous_pc) as usize] += 1;
-                            helper.previous_pc = current_pc >> 1;
-                        });
+                            writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
+                            writer.put_bytes(&map_pointer.to_ne_bytes());
+
+                            writer.put_label(after_log_impl);
+                        }
+                        writer.put_lea_reg_reg_offset(Register::RSP, Register::RSP, -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32));
+                        writer.put_push_reg(Register::RDI);
+                        writer.put_mov_reg_address(Register::RDI, address);
+                        writer.put_call_address(helper.current_log_impl);
+                        writer.put_pop_reg(Register::RDI);
+                        writer.put_lea_reg_reg_offset(Register::RSP, Register::RSP, frida_gum_sys::GUM_RED_ZONE_SIZE as i32);
                     }
                     first = false;
                 }
@@ -153,6 +208,8 @@ where
             self.followed = true;
             self.stalker
                 .follow_me::<NoneEventSink>(self.helper.transformer(), None);
+        } else {
+            self.stalker.activate(NativePointer(self.base.harness_mut() as *mut _ as *mut c_void))
         }
         self.base.pre_exec(state, event_mgr, input)
     }
@@ -169,6 +226,7 @@ where
     where
         EM: EventManager<I, S>,
     {
+        self.stalker.deactivate();
         self.base.post_exec(state, event_mgr, input)
     }
 }
@@ -212,7 +270,7 @@ where
 {
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH) -> Self {
         let mut stalker = Stalker::new(gum);
-        
+
         // Let's exclude the main module and libc.so at least:
         stalker.exclude(&MemoryRange::new(Module::find_base_address(&env::args().next().unwrap()), FridaEdgeCoverageHelper::get_module_size(&env::args().next().unwrap())));
         stalker.exclude(&MemoryRange::new(Module::find_base_address("libc.so"), FridaEdgeCoverageHelper::get_module_size("libc.so")));
@@ -358,6 +416,9 @@ unsafe fn fuzz(
         )?,
         &frida_helper,
     );
+    // Let's exclude the main module and libc.so at least:
+    executor.stalker.exclude(&MemoryRange::new(Module::find_base_address(&env::args().next().unwrap()), FridaEdgeCoverageHelper::get_module_size(&env::args().next().unwrap())));
+    executor.stalker.exclude(&MemoryRange::new(Module::find_base_address("libc.so"), FridaEdgeCoverageHelper::get_module_size("libc.so")));
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
