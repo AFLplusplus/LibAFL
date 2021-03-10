@@ -36,7 +36,7 @@ fn main() {
         Err(_) => "".to_string(),
     };
 
-    println!("cargo:warning=output path is {}", libpng);
+    // println!("cargo:warning=output path is {}", libpng);
     if !libpng_path.is_dir() {
         if !Path::new(&libpng_tar).is_file() {
             println!("cargo:warning=Libpng not found, downloading...");
@@ -65,11 +65,11 @@ fn main() {
             .env("CXX", "clang++")
             .env(
                 "CFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIC -fno-omit-frame-pointer",
             )
             .env(
                 "CXXFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIC -fno-omit-frame-pointer",
             )
             .env(
                 "LDFLAGS",
@@ -84,13 +84,16 @@ fn main() {
             .unwrap();
     }
 
-    Command::new("clang++")
+    let status = cc::Build::new()
+        .cpp(true)
+        .get_compiler()
+        .to_command()
         .current_dir(&cwd)
         .arg("-I")
         .arg(format!("{}", &libpng))
         //.arg("-D")
         //.arg("HAS_DUMMY_CRASH=1")
-        .arg("-fPIE")
+        .arg("-fPIC")
         .arg("-shared")
         .arg(if env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" {
             "-static-libstdc++"
@@ -105,6 +108,7 @@ fn main() {
         .arg("z")
         .status()
         .unwrap();
+    assert!(status.success());
 
     println!("cargo:rerun-if-changed=build.rs");
 }
