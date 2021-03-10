@@ -14,7 +14,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
-    inputs::{HasTargetBytes, Input},
+    inputs::{Input, HasTargetBytes},
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
     stages::mutational::StdMutationalStage,
@@ -23,17 +23,17 @@ use libafl::{
     utils::{current_nanos, StdRand},
     Error,
 };
-use std::{env, path::PathBuf, ptr};
 
 use frida_gum::stalker::{NoneEventSink, Stalker, Transformer};
-use frida_gum::{Gum, Module};
+use frida_gum::{Gum, Module, PageProtection};
 
-use lazy_static::lazy_static;
 use libloading;
 
-lazy_static! {
-    static ref GUM: Gum = unsafe { Gum::obtain() };
-}
+use std::{
+    env,
+    path::PathBuf,
+    ptr
+};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a> {
@@ -61,7 +61,7 @@ impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
 /// The implementation of the FridaEdgeCoverageHelper
 impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
-    pub fn new(module_name: &str) -> Self {
+    pub fn new(gum: &'a Gum, module_name: &str) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
             previous_pc: 0x0,
@@ -74,7 +74,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         //helper.stalker.exclude(&MemoryRange::new(Module::find_base_address(&env::args().next().unwrap()), FridaEdgeCoverageHelper::get_module_size(&env::args().next().unwrap())));
         //helper.stalker.exclude(&MemoryRange::new(Module::find_base_address("libc.so"), FridaEdgeCoverageHelper::get_module_size("libc.so")));
 
-        let transformer = Transformer::from_callback(&GUM, |basic_block, _output| {
+        let transformer = Transformer::from_callback(gum, |basic_block, _output| {
             let mut first = true;
             for instruction in basic_block {
                 if first {
@@ -113,7 +113,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         let code_size_ref = &mut code_size;
         Module::enumerate_ranges(
             module_name,
-            frida_gum::PageProtection::ReadExecute,
+            PageProtection::ReadExecute,
             move |details, _user_data| {
                 *code_size_ref = details.memory_range().size() as usize;
                 0
@@ -214,10 +214,10 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH) -> Self {
+    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH) -> Self {
         Self {
             base: base,
-            stalker: Stalker::new(&GUM),
+            stalker: Stalker::new(gum),
             helper: helper,
             followed: false,
         }
@@ -284,10 +284,11 @@ unsafe fn fuzz(
             },
         };
 
+    let gum = Gum::obtain();
     let lib = libloading::Library::new(module_name).unwrap();
     let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
         lib.get(symbol_name.as_bytes()).unwrap();
-    let mut frida_helper = FridaEdgeCoverageHelper::new(module_name);
+    let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, module_name);
 
     // Create an observation channel using the coverage map
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
@@ -345,6 +346,7 @@ unsafe fn fuzz(
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = FridaInProcessExecutor::new(
+        &gum,
         InProcessExecutor::new(
             "in-process(edges)",
             &mut frida_harness,
