@@ -138,7 +138,12 @@ void *malloc(size_t size) {
   k &= MAP_SIZE - 1;
   __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
 
-  return realloc(NULL, size);
+  // We cannot malloc in malloc.
+  // Hence, even realloc(NULL, size) would loop in an optimized build.
+  // We fall back to a stricter allocation function. Fingers crossed.
+  void *ret = NULL;
+  posix_memalign(&ret, 1<<6, size);
+  return ret;
 
 }
 
