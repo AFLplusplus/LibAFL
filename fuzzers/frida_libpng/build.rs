@@ -19,7 +19,7 @@ fn main() {
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
-    std::fs::create_dir(&out_dir);
+    std::fs::create_dir_all(&out_dir).expect(&format!("Failed to create {}", &out_dir));
 
     println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
     println!("cargo:rerun-if-changed=harness.cc");
@@ -65,7 +65,7 @@ fn main() {
             .env("CXX", "clang++")
             .env(
                 "CFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer"
+                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fno-omit-frame-pointer",
             )
             .env(
                 "CXXFLAGS",
@@ -92,7 +92,11 @@ fn main() {
         //.arg("HAS_DUMMY_CRASH=1")
         .arg("-fPIE")
         .arg("-shared")
-        .arg(if env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" { "-static-libstdc++" } else { "" })
+        .arg(if env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" {
+            "-static-libstdc++"
+        } else {
+            ""
+        })
         .arg("-o")
         .arg(format!("{}/libpng-harness.so", &out_dir))
         .arg("./harness.cc")
