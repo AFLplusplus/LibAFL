@@ -96,6 +96,23 @@ const MAYBE_LOG_CODE_X86: [u8; 69] = [
           // unsigned int afl_instr_rms
 ];
 
+/// Helper function to get the size of a module's CODE section from frida
+pub fn get_module_size(module_name: &str) -> usize {
+    let mut code_size = 0;
+    let code_size_ref = &mut code_size;
+    Module::enumerate_ranges(
+        module_name,
+        PageProtection::ReadExecute,
+        move |details, _user_data| {
+            *code_size_ref = details.memory_range().size() as usize;
+            0
+        },
+        ptr::null_mut(),
+    );
+
+    code_size
+}
+
 /// The implementation of the FridaEdgeCoverageHelper
 impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
@@ -104,7 +121,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             map: [0u8; MAP_SIZE],
             previous_pc: RefCell::new(0x0),
             base_address: Module::find_base_address(module_name).0 as u64,
-            size: FridaEdgeCoverageHelper::get_module_size(module_name),
+            size: get_module_size(module_name),
             current_log_impl: 0,
             transformer: None,
         };
@@ -161,23 +178,6 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
         helper.transformer = Some(transformer);
         helper
-    }
-
-    /// Helper function to get the size of a module's CODE section from frida
-    pub fn get_module_size(module_name: &str) -> usize {
-        let mut code_size = 0;
-        let code_size_ref = &mut code_size;
-        Module::enumerate_ranges(
-            module_name,
-            PageProtection::ReadExecute,
-            move |details, _user_data| {
-                *code_size_ref = details.memory_range().size() as usize;
-                0
-            },
-            ptr::null_mut(),
-        );
-
-        code_size
     }
 }
 
@@ -281,11 +281,11 @@ where
         // Let's exclude the main module and libc.so at least:
         stalker.exclude(&MemoryRange::new(
             Module::find_base_address(&env::args().next().unwrap()),
-            FridaEdgeCoverageHelper::get_module_size(&env::args().next().unwrap()),
+            get_module_size(&env::args().next().unwrap()),
         ));
         stalker.exclude(&MemoryRange::new(
             Module::find_base_address("libc.so"),
-            FridaEdgeCoverageHelper::get_module_size("libc.so"),
+            get_module_size("libc.so"),
         ));
 
         Self {
@@ -432,11 +432,11 @@ unsafe fn fuzz(
     // Let's exclude the main module and libc.so at least:
     executor.stalker.exclude(&MemoryRange::new(
         Module::find_base_address(&env::args().next().unwrap()),
-        FridaEdgeCoverageHelper::get_module_size(&env::args().next().unwrap()),
+        get_module_size(&env::args().next().unwrap()),
     ));
     executor.stalker.exclude(&MemoryRange::new(
         Module::find_base_address("libc.so"),
-        FridaEdgeCoverageHelper::get_module_size("libc.so"),
+        get_module_size("libc.so"),
     ));
 
     // In case the corpus is empty (on first run), reset
