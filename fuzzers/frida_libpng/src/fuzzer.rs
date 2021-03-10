@@ -25,7 +25,7 @@ use libafl::{
 };
 
 use frida_gum::stalker::{NoneEventSink, Stalker, Transformer};
-use frida_gum::{Gum, Module, PageProtection};
+use frida_gum::{Gum, Module, PageProtection, MemoryRange};
 
 use libloading;
 
@@ -69,10 +69,6 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             size: FridaEdgeCoverageHelper::get_module_size(module_name),
             transformer: None,
         };
-
-        // Let's exclude the main module and libc.so at least:
-        //helper.stalker.exclude(&MemoryRange::new(Module::find_base_address(&env::args().next().unwrap()), FridaEdgeCoverageHelper::get_module_size(&env::args().next().unwrap())));
-        //helper.stalker.exclude(&MemoryRange::new(Module::find_base_address("libc.so"), FridaEdgeCoverageHelper::get_module_size("libc.so")));
 
         let transformer = Transformer::from_callback(gum, |basic_block, _output| {
             let mut first = true;
@@ -215,9 +211,15 @@ where
     OT: ObserversTuple,
 {
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH) -> Self {
+        let mut stalker = Stalker::new(gum);
+        
+        // Let's exclude the main module and libc.so at least:
+        stalker.exclude(&MemoryRange::new(Module::find_base_address(&env::args().next().unwrap()), FridaEdgeCoverageHelper::get_module_size(&env::args().next().unwrap())));
+        stalker.exclude(&MemoryRange::new(Module::find_base_address("libc.so"), FridaEdgeCoverageHelper::get_module_size("libc.so")));
+
         Self {
             base: base,
-            stalker: Stalker::new(gum),
+            stalker: stalker,
             helper: helper,
             followed: false,
         }
