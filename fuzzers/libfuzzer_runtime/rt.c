@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAP_SIZE 65536
+#define MAP_SIZE (16*1024)
 
 int orig_argc;
 char **orig_argv;
