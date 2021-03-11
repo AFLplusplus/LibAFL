@@ -156,9 +156,10 @@ void *calloc(size_t nmemb, size_t size) {
   k &= MAP_SIZE - 1;
   __lafl_alloc_map[k] = MAX(__lafl_alloc_map[k], size);
 
-  void *result = realloc(NULL, size);
-  memset(result, 0, size);
-  return result;
+  void *ret = NULL;
+  posix_memalign(&ret, 1<<6, size);
+  memset(ret, 0, size);
+  return ret;
 
 }
 
