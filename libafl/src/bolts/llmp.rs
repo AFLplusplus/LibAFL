@@ -101,6 +101,9 @@ use crate::{
 
 use super::shmem::HasFd;
 
+/// The sender on this map is exiting (if broker exits, clients should exit gracefully);
+const LLMP_TAG_EXITING: u32 = 0x13C5171;
+
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
 /// What byte count to align messages to
@@ -987,6 +990,11 @@ where
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
                 LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
+                LLMP_TAG_EXITING => {
+                    // The other side is done.
+                    assert_eq!((*msg).buf_len, 0);
+                    return Err(Error::ShuttingDown);
+                }
                 LLMP_TAG_END_OF_PAGE => {
                     #[cfg(feature = "std")]
                     dbg!("Got end of page, allocing next");
@@ -1389,6 +1397,9 @@ where
                 None => (),
             }
         }
+        self.llmp_out
+            .send_buf(LLMP_TAG_EXITING, &[])
+            .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
     }
 
     /// Broadcasts the given buf to all lients

@@ -352,7 +352,7 @@ where
             llmp::LlmpConnection::IsClient { client } => {
                 while let Some((sender_id, tag, msg)) = client.recv_buf()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
-                        continue;
+                        panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
                     let event: Event<I> = postcard::from_bytes(msg)?;
                     events.push((sender_id, event));
