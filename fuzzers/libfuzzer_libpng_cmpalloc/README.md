@@ -1,15 +1,18 @@
-# Libfuzzer for libpng
+# Libfuzzer for libpng (cmp+alloc)
 
 This folder contains an example fuzzer for libpng, using LLMP for fast multi-process fuzzing and crash detection.
 To show off crash detection, we added a ud2 instruction to the harness, edit harness.cc if you want a non-crashing example.
 It has been tested on Linux.
 
+The difference between the normal Libfuzzer for libpng example here is that this fuzzer is not just using edge coverage as feedback but also comparisons values (-value-profile like) and allocations sizes.
+This is an example how multiple feedbacks can be combined in a fuzzer.
+
 ## Build
 
-To build this example, run `cargo build --example libfuzzer_libpng --release`.
+To build this example, run `cargo build --example libfuzzer_libpng_cmpalloc --release`.
 This will call (the build.rs)[./builld.rs], which in turn downloads a libpng archive from the web.
 Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the C++ harness)[./harness.cc] and the instrumented `libpng`.
-Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng`.
+Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng_cmpalloc`.
 
 ## Run
 
