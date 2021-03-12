@@ -70,7 +70,14 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
+        #[cfg(unix)]
+        unsafe { libc::alarm(1) };
+
         let ret = (self.harness_fn)(bytes.as_slice());
+
+        #[cfg(unix)]
+        unsafe { libc::alarm(0) };
+
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -242,14 +249,19 @@ mod unix_signal_handler {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 match signal {
-                    Signal::SigUser2 => (data.timeout_handler)(signal, info, void, data),
-                    _ => (data.crash_handler)(signal, info, void, data),
+                    Signal::SigUser2 | Signal::SigAlarm => {
+                        (data.timeout_handler)(signal, info, void, data)
+                    },
+                    _ => {
+                        (data.crash_handler)(signal, info, void, data)
+                    },
                 }
             }
         }
 
         fn signals(&self) -> Vec<Signal> {
             vec![
+                Signal::SigAlarm,
                 Signal::SigUser2,
                 Signal::SigAbort,
                 Signal::SigBus,
