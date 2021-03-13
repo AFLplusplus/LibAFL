@@ -72,13 +72,9 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
 
-        #[cfg(unix)]
-        unsafe { libc::alarm(1) };
 
         let ret = (self.harness_fn)(self, bytes.as_slice());
 
-        #[cfg(unix)]
-        unsafe { libc::alarm(0) };
 
         #[cfg(unix)]
         unsafe {
