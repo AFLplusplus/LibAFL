@@ -101,9 +101,6 @@ use crate::{
 
 use super::shmem::HasFd;
 
-/// The sender on this map is exiting (if broker exits, clients should exit gracefully);
-const LLMP_TAG_EXITING: u32 = 0x13C5171;
-
 /// We'll start off with 256 megabyte maps per fuzzer client
 const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
 /// What byte count to align messages to
@@ -111,14 +108,16 @@ const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
 const LLMP_PREF_ALIGNNMENT: usize = 64;
 
 /// A msg fresh from the press: No tag got sent by the user yet
-const LLMP_TAG_UNSET: u32 = 0xDEADAF;
+const LLMP_TAG_UNSET: Tag = 0xDEADAF;
 /// This message should not exist yet. Some bug in unsafe code!
-const LLMP_TAG_UNINITIALIZED: u32 = 0xA143AF11;
-/// The end of page mesasge
+const LLMP_TAG_UNINITIALIZED: Tag = 0xA143AF11;
+/// The end of page message
 /// When receiving this, a new sharedmap needs to be allocated.
-const LLMP_TAG_END_OF_PAGE: u32 = 0xAF1E0F1;
-/// A new client for this broekr got added.
-const LLMP_TAG_NEW_SHM_CLIENT: u32 = 0xC11E471;
+const LLMP_TAG_END_OF_PAGE: Tag = 0xAF1E0F1;
+/// A new client for this broker got added.
+const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
+/// The sender on this map is exiting (if broker exits, clients should exit gracefully);
+const LLMP_TAG_EXITING: Tag = 0x13C5171;
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -865,6 +864,7 @@ where
                 tag
             )));
         }
+
         unsafe {
             let msg = self.alloc_next(buf.len())?;
             (*msg).tag = tag;
