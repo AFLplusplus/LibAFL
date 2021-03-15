@@ -7,7 +7,10 @@ use alloc::{
 };
 use core::time::Duration;
 use serde::{Deserialize, Serialize};
+
+#[cfg(unix)]
 use std::os::raw::c_int;
+#[cfg(unix)]
 use std::ptr::null_mut;
 
 use crate::{
@@ -100,21 +103,25 @@ pub struct TimeObserver {
 }
 
 #[repr(C)]
+#[cfg(unix)]
 struct Timeval {
     pub tv_sec: i64,
     pub tv_usec: i64,
 }
 
 #[repr(C)]
+#[cfg(unix)]
 struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
 }
 
+#[cfg(unix)]
 extern "C" {
     fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
 }
 
+#[cfg(unix)]
 const ITIMER_REAL: c_int = 0;
 
 impl TimeObserver {
@@ -128,6 +135,7 @@ impl TimeObserver {
         }
     }
 
+    #[cfg(unix)]
     pub fn with_timeout(name: &'static str, tmout: u64) -> Self {
         Self {
             name: name.to_string(),
