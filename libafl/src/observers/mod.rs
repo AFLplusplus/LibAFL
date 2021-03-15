@@ -147,10 +147,10 @@ impl Observer for TimeObserver {
         #[cfg(unix)]
         match self.exec_tmout {
             Some(exec_tmout) => unsafe {
-                let milli_sec = exec_tmout.as_millis() as i64;
+                let milli_sec = exec_tmout.as_millis();
                 let it_value = Timeval {
-                    tv_sec: milli_sec / 1000,
-                    tv_usec: milli_sec % 1000,
+                    tv_sec: (milli_sec / 1000) as i64,
+                    tv_usec: (milli_sec % 1000) as i64,
                 };
                 let it_interval = Timeval {
                     tv_sec: 0,
