@@ -523,7 +523,7 @@ where
             let path = std::env::current_dir()?;
             mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
                 stats,
-                &format!("{}/.llmp_socket", path.display()).to_string(),
+                "\x00llmp_socket",
             )?;
         };
         #[cfg(not(target_os = "android"))]
