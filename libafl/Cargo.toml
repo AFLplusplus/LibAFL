@@ -60,6 +60,7 @@ num_enum = "0.5.1"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
 nix = "0.20.0"
+uds = "0.2.3"
 
 [target.'cfg(windows)'.dependencies]
 windows = "0.3.1"

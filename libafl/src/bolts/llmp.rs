@@ -93,6 +93,9 @@ use std::{
 use libc::c_char;
 
 #[cfg(unix)]
+use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
+
+#[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription},
@@ -453,7 +456,7 @@ where
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
-        match UnixListener::bind(filename) {
+        match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename).unwrap()) {
             Ok(listener) => {
                 dbg!("We're the broker");
                 let mut broker = LlmpBroker::new()?;
@@ -1876,7 +1879,7 @@ where
     #[cfg(all(unix, feature = "std"))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
-        let stream = UnixStream::connect(filename)?;
+        let stream = UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(filename).unwrap())?;
         println!("Connected to socket {}", filename);
 
         let mut buf = [0u8; 5];
