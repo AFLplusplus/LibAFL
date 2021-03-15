@@ -93,7 +93,7 @@ use std::{
 use libc::c_char;
 
 #[cfg(unix)]
-use uds::{UnixStreamExt, UnixListenerExt, UnixSocketAddr};
+use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};

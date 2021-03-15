@@ -11,7 +11,7 @@ use alloc::string::{String, ToString};
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::{env};
+use std::env;
 
 use crate::Error;
 
@@ -189,7 +189,8 @@ pub mod unix_shmem {
     unsafe fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int {
         let boot_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id").unwrap();
 
-        let path = CString::new(format!("{}{}", ASHMEM_DEVICE, boot_id).trim()).expect("CString::new failed!");
+        let path = CString::new(format!("{}{}", ASHMEM_DEVICE, boot_id).trim())
+            .expect("CString::new failed!");
         let fd = open(path.as_ptr(), O_RDWR);
 
         let mut ourkey: [c_char; 20] = [0; 20];
@@ -215,7 +216,6 @@ pub mod unix_shmem {
 
     #[cfg(target_os = "android")]
     unsafe fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void {
-
         let size = ioctl(__shmid, ASHMEM_GET_SIZE);
         if size < 0 {
             return 0 as *mut c_void;
