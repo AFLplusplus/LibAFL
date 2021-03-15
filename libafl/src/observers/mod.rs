@@ -128,6 +128,15 @@ impl TimeObserver {
         }
     }
 
+    pub fn with_timeout(name: &'static str, tmout: u64) -> Self {
+        Self {
+            name: name.to_string(),
+            start_time: Duration::from_secs(0),
+            last_runtime: None,
+            exec_tmout: Some(Duration::from_secs(tmout)),
+        }
+    }
+
     pub fn last_runtime(&self) -> &Option<Duration> {
         &self.last_runtime
     }
@@ -135,22 +144,21 @@ impl TimeObserver {
 
 impl Observer for TimeObserver {
     fn pre_exec(&mut self) -> Result<(), Error> {
-
         #[cfg(unix)]
         match self.exec_tmout {
             Some(exec_tmout) => unsafe {
                 let milli_sec = exec_tmout.as_millis() as i64;
-                let it_value = Timeval{
+                let it_value = Timeval {
                     tv_sec: milli_sec / 1000,
                     tv_usec: milli_sec % 1000,
                 };
-                let it_interval = Timeval{
+                let it_interval = Timeval {
                     tv_sec: 0,
                     tv_usec: 0,
                 };
                 setitimer(
                     ITIMER_REAL,
-                    &mut Itimerval{
+                    &mut Itimerval {
                         it_interval,
                         it_value,
                     },
@@ -171,17 +179,17 @@ impl Observer for TimeObserver {
         #[cfg(unix)]
         match self.exec_tmout {
             Some(_) => unsafe {
-                let it_value = Timeval{
+                let it_value = Timeval {
                     tv_sec: 0,
                     tv_usec: 0,
                 };
-                let it_interval = Timeval{
+                let it_interval = Timeval {
                     tv_sec: 0,
                     tv_usec: 0,
                 };
                 setitimer(
                     ITIMER_REAL,
-                    &mut Itimerval{
+                    &mut Itimerval {
                         it_interval,
                         it_value,
                     },

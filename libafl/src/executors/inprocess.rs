@@ -72,8 +72,6 @@ where
         let bytes = input.target_bytes();
 
         let ret = (self.harness_fn)(bytes.as_slice());
-
-
         #[cfg(unix)]
         unsafe {
             write_volatile(
