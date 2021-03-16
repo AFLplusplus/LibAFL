@@ -8,11 +8,6 @@ use alloc::{
 use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
-#[cfg(unix)]
-use std::os::raw::c_int;
-#[cfg(unix)]
-use std::ptr::null_mut;
-
 use crate::{
     bolts::tuples::{MatchFirstType, MatchNameAndType, MatchType, Named, TupleList},
     utils::current_time,
@@ -99,30 +94,7 @@ pub struct TimeObserver {
     name: String,
     start_time: Duration,
     last_runtime: Option<Duration>,
-    exec_tmout: Option<Duration>,
 }
-
-#[repr(C)]
-#[cfg(unix)]
-struct Timeval {
-    pub tv_sec: i64,
-    pub tv_usec: i64,
-}
-
-#[repr(C)]
-#[cfg(unix)]
-struct Itimerval {
-    pub it_interval: Timeval,
-    pub it_value: Timeval,
-}
-
-#[cfg(unix)]
-extern "C" {
-    fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
-}
-
-#[cfg(unix)]
-const ITIMER_REAL: c_int = 0;
 
 impl TimeObserver {
     /// Creates a new TimeObserver with the given name.
@@ -131,17 +103,6 @@ impl TimeObserver {
             name: name.to_string(),
             start_time: Duration::from_secs(0),
             last_runtime: None,
-            exec_tmout: None,
-        }
-    }
-
-    #[cfg(unix)]
-    pub fn with_timeout(name: &'static str, tmout: u64) -> Self {
-        Self {
-            name: name.to_string(),
-            start_time: Duration::from_secs(0),
-            last_runtime: None,
-            exec_tmout: Some(Duration::from_secs(tmout)),
         }
     }
 
@@ -152,30 +113,6 @@ impl TimeObserver {
 
 impl Observer for TimeObserver {
     fn pre_exec(&mut self) -> Result<(), Error> {
-        #[cfg(unix)]
-        match self.exec_tmout {
-            Some(exec_tmout) => unsafe {
-                let milli_sec = exec_tmout.as_millis();
-                let it_value = Timeval {
-                    tv_sec: (milli_sec / 1000) as i64,
-                    tv_usec: (milli_sec % 1000) as i64,
-                };
-                let it_interval = Timeval {
-                    tv_sec: 0,
-                    tv_usec: 0,
-                };
-                setitimer(
-                    ITIMER_REAL,
-                    &mut Itimerval {
-                        it_interval,
-                        it_value,
-                    },
-                    null_mut(),
-                );
-            },
-            None => (),
-        }
-
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
@@ -183,30 +120,6 @@ impl Observer for TimeObserver {
 
     fn post_exec(&mut self) -> Result<(), Error> {
         self.last_runtime = Some(current_time() - self.start_time);
-
-        #[cfg(unix)]
-        match self.exec_tmout {
-            Some(_) => unsafe {
-                let it_value = Timeval {
-                    tv_sec: 0,
-                    tv_usec: 0,
-                };
-                let it_interval = Timeval {
-                    tv_sec: 0,
-                    tv_usec: 0,
-                };
-                setitimer(
-                    ITIMER_REAL,
-                    &mut Itimerval {
-                        it_interval,
-                        it_value,
-                    },
-                    null_mut(),
-                );
-            },
-            None => (),
-        }
-
         Ok(())
     }
 }
