@@ -157,6 +157,46 @@ impl Default for CrashFeedback {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeoutFeedback {}
+
+impl<I> Feedback<I> for TimeoutFeedback
+where
+    I: Input,
+{
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        _input: &I,
+        _observers: &OT,
+        exit_kind: ExitKind,
+    ) -> Result<u32, Error> {
+        if exit_kind == ExitKind::Timeout {
+            Ok(1)
+        } else {
+            Ok(0)
+        }
+    }
+}
+
+impl Named for TimeoutFeedback {
+    #[inline]
+    fn name(&self) -> &str {
+        "TimeoutFeedback"
+    }
+}
+
+impl TimeoutFeedback {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for TimeoutFeedback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Nop feedback that annotates execution time in the new testcase, if any
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {

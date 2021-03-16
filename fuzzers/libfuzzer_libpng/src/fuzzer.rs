@@ -11,7 +11,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind, inprocess::TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
@@ -150,7 +150,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         &mut state,
         &mut restarting_mgr,
     )?;
-    let mut tmexecutor = TimeoutExecutor::new(executor, 2);
+
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
     unsafe {
@@ -163,7 +163,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(
-                &mut tmexecutor,
+                &mut executor,
                 &mut restarting_mgr,
                 fuzzer.scheduler(),
                 &corpus_dirs,
@@ -175,7 +175,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut tmexecutor, &mut restarting_mgr)?;
+    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
 
     // Never reached
     Ok(())
