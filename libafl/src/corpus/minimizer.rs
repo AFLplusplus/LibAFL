@@ -1,3 +1,6 @@
+//! The Minimizer schedulers are a family of corpus schedulers that feed the fuzzer
+// with testcases only from a subset of the total corpus.
+
 use crate::{
     bolts::serdeany::SerdeAny,
     corpus::{Corpus, CorpusScheduler, Testcase},
@@ -43,6 +46,7 @@ impl Default for TopRatedsMetadata {
     }
 }
 
+/// Compute the favor factor of a testcase. Lower is better.
 pub trait FavFactor<I>
 where
     I: Input,
@@ -50,6 +54,8 @@ where
     fn compute(testcase: &mut Testcase<I>) -> Result<u64, Error>;
 }
 
+/// Multiply the testcase size with the execution time.
+/// This favors small and quick testcases.
 pub struct LenTimeMulFavFactor<I>
 where
     I: Input + HasLen,
@@ -67,6 +73,9 @@ where
     }
 }
 
+/// The Minimizer scheduler employs a genetic algorithm to compute a subset of the
+/// corpus that exercise all the requested features (e.g. all the coverage seen so far)
+/// prioritizing testcases using FavFactor
 pub struct MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
 where
     CS: CorpusScheduler<I, S>,
@@ -230,8 +239,11 @@ where
     }
 }
 
+/// A MinimizerCorpusScheduler with LenTimeMulFavFactor to prioritize quick and small testcases
 pub type LenTimeMinimizerCorpusScheduler<C, CS, I, M, R, S> =
     MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, M, R, S>;
 
+/// A MinimizerCorpusScheduler with LenTimeMulFavFactor to prioritize quick and small testcases
+/// that exercise all the entries registered in the MapIndexesMetadata
 pub type IndexesLenTimeMinimizerCorpusScheduler<C, CS, I, R, S> =
     MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, R, S>;

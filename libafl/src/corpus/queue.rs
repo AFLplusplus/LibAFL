@@ -1,4 +1,4 @@
-//! The queue corpus implements an afl-like queue mechanism
+//! The queue corpus scheduler implements an AFL-like queue mechanism
 
 use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
@@ -10,6 +10,7 @@ use crate::{
     Error,
 };
 
+/// Walk the corpus in a queue-like fashion
 pub struct QueueCorpusScheduler<C, I, S>
 where
     S: HasCorpus<C, I>,
@@ -25,7 +26,7 @@ where
     C: Corpus<I>,
     I: Input,
 {
-    /// Gets the next entry at random
+    /// Gets the next entry in the queue
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::Empty("No entries in corpus".to_owned()))
