@@ -313,7 +313,7 @@ where
         self.executor.post_exec(_state, _event_mgr, _input)
     }
 
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error>{
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         self.executor.run_target(input)
     }
 }
