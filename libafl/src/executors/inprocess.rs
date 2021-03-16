@@ -241,10 +241,10 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(executor: EX, exec_tmout: u64) -> Self {
+    pub fn new(executor: EX, exec_tmout: Duration) -> Self {
         Self {
             executor,
-            exec_tmout: Duration::from_secs(exec_tmout),
+            exec_tmout,
             phantom: PhantomData,
         }
     }
@@ -285,8 +285,13 @@ where
         self.executor.pre_exec(_state, _event_mgr, _input)
     }
 
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        let run_result = self.executor.run_target(input);
+    #[inline]
+    fn post_exec<EM: EventManager<I, S>, S>(
+        &mut self,
+        _state: &S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         unsafe {
             let it_value = Timeval {
                 tv_sec: 0,
@@ -305,7 +310,11 @@ where
                 null_mut(),
             );
         }
-        run_result
+        self.executor.post_exec(_state, _event_mgr, _input)
+    }
+
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error>{
+        self.executor.run_target(input)
     }
 }
 
