@@ -228,7 +228,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    fn name(&self) -> &str{
+    fn name(&self) -> &str {
         self.executor.name()
     }
 }
@@ -256,8 +256,8 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(executor: EX, exec_tmout: u64) -> Self{
-        Self{
+    pub fn new(executor: EX, exec_tmout: u64) -> Self {
+        Self {
             executor,
             exec_tmout: Duration::from_secs(exec_tmout),
             phantom: PhantomData,
@@ -272,20 +272,25 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec<EM: EventManager<I, S>, S>(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I,) -> Result<(), Error>{
-        unsafe{
+    fn pre_exec<EM: EventManager<I, S>, S>(
+        &mut self,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
+        unsafe {
             let milli_sec = self.exec_tmout.as_millis();
-            let it_value = Timeval{
+            let it_value = Timeval {
                 tv_sec: (milli_sec / 1000) as i64,
                 tv_usec: (milli_sec % 1000) as i64,
             };
-            let it_interval = Timeval{
+            let it_interval = Timeval {
                 tv_sec: 0,
                 tv_usec: 0,
             };
             setitimer(
                 ITIMER_REAL,
-                &mut Itimerval{
+                &mut Itimerval {
                     it_interval,
                     it_value,
                 },
@@ -295,21 +300,20 @@ where
         self.executor.pre_exec(_state, _event_mgr, _input)
     }
 
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error>{
-
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let run_result = self.executor.run_target(input);
-        unsafe{
-            let it_value = Timeval{
+        unsafe {
+            let it_value = Timeval {
                 tv_sec: 0,
                 tv_usec: 0,
             };
-            let it_interval = Timeval{
+            let it_interval = Timeval {
                 tv_sec: 0,
                 tv_usec: 0,
             };
             setitimer(
                 ITIMER_REAL,
-                &mut Itimerval{
+                &mut Itimerval {
                     it_interval,
                     it_value,
                 },
@@ -319,7 +323,6 @@ where
         run_result
     }
 }
-
 
 #[cfg(unix)]
 mod unix_signal_handler {
@@ -388,9 +391,7 @@ mod unix_signal_handler {
                     Signal::SigUser2 | Signal::SigAlarm => {
                         (data.timeout_handler)(signal, info, void, data)
                     },
-                    _ => {
-                        (data.crash_handler)(signal, info, void, data)
-                    },
+                    _ => (data.crash_handler)(signal, info, void, data),
                 }
             }
         }
@@ -441,7 +442,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, ExitKind::Timeout)
                 .expect("In timeout handler objectives failure.");
             if obj_fitness > 0 {
                 state
