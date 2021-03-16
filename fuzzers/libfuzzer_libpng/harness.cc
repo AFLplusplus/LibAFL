@@ -17,6 +17,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <vector>
 
@@ -83,6 +84,7 @@ static const int kPngHeaderSize = 8;
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+  sleep(3);
   if (size < kPngHeaderSize) {
     return 0;
   }
