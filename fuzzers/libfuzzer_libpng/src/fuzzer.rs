@@ -143,7 +143,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             &mut state,
             &mut restarting_mgr,
         )?,
-        Duration::new(0, 3),
+        // 10 seconds timeout
+        Duration::new(10, 0),
     );
 
     // The actual target run starts here.

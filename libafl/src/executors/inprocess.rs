@@ -597,7 +597,6 @@ mod tests {
 
         let mut in_process_executor = InProcessExecutor::<NopInput, ()> {
             harness_fn: test_harness_fn_nop,
-            // TODO: on_crash_fn: Box::new(|_, _, _, _, _| ()),
             observers: tuple_list!(),
             name: "main",
             phantom: PhantomData,
