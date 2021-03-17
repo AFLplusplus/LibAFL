@@ -2,6 +2,14 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
 use core::marker::PhantomData;
+
+#[cfg(unix)]
+use core::time::Duration;
+#[cfg(unix)]
+use std::os::raw::c_int;
+#[cfg(unix)]
+use std::ptr::null_mut;
+
 #[cfg(unix)]
 use core::{
     ptr::{self, write_volatile},
@@ -164,6 +172,152 @@ where
     }
 }
 
+#[repr(C)]
+#[cfg(unix)]
+struct Timeval {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+#[repr(C)]
+#[cfg(unix)]
+struct Itimerval {
+    pub it_interval: Timeval,
+    pub it_value: Timeval,
+}
+
+#[cfg(unix)]
+extern "C" {
+    fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
+}
+
+#[cfg(unix)]
+const ITIMER_REAL: c_int = 0;
+
+//timeout excutor wrap a InProcessExecutor
+#[cfg(unix)]
+pub struct TimeoutExecutor<I, OT, EX>
+where
+    EX: Executor<I> + HasObservers<OT>,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    executor: EX,
+    exec_tmout: Duration,
+    phantom: PhantomData<(I, OT)>,
+}
+
+impl<I, OT, EX> Named for TimeoutExecutor<I, OT, EX>
+where
+    EX: Executor<I> + HasObservers<OT>,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    fn name(&self) -> &str {
+        self.executor.name()
+    }
+}
+
+impl<I, OT, EX> HasObservers<OT> for TimeoutExecutor<I, OT, EX>
+where
+    EX: Executor<I> + HasObservers<OT>,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        self.executor.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.executor.observers_mut()
+    }
+}
+
+impl<I, OT, EX> TimeoutExecutor<I, OT, EX>
+where
+    EX: Executor<I> + HasObservers<OT>,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    pub fn new(executor: EX, exec_tmout: Duration) -> Self {
+        Self {
+            executor,
+            exec_tmout,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I, OT, EX> Executor<I> for TimeoutExecutor<I, OT, EX>
+where
+    EX: Executor<I> + HasObservers<OT>,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn pre_exec<EM: EventManager<I, S>, S>(
+        &mut self,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
+        unsafe {
+            let milli_sec = self.exec_tmout.as_millis();
+            let it_value = Timeval {
+                tv_sec: (milli_sec / 1000) as i64,
+                tv_usec: (milli_sec % 1000) as i64,
+            };
+            let it_interval = Timeval {
+                tv_sec: 0,
+                tv_usec: 0,
+            };
+            setitimer(
+                ITIMER_REAL,
+                &mut Itimerval {
+                    it_interval,
+                    it_value,
+                },
+                null_mut(),
+            );
+        }
+        self.executor.pre_exec(_state, _event_mgr, _input)
+    }
+
+    #[inline]
+    fn post_exec<EM: EventManager<I, S>, S>(
+        &mut self,
+        _state: &S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
+        unsafe {
+            let it_value = Timeval {
+                tv_sec: 0,
+                tv_usec: 0,
+            };
+            let it_interval = Timeval {
+                tv_sec: 0,
+                tv_usec: 0,
+            };
+            setitimer(
+                ITIMER_REAL,
+                &mut Itimerval {
+                    it_interval,
+                    it_value,
+                },
+                null_mut(),
+            );
+        }
+        self.executor.post_exec(_state, _event_mgr, _input)
+    }
+
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+        self.executor.run_target(input)
+    }
+}
+
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
@@ -228,7 +382,9 @@ mod unix_signal_handler {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 match signal {
-                    Signal::SigUser2 => (data.timeout_handler)(signal, info, void, data),
+                    Signal::SigUser2 | Signal::SigAlarm => {
+                        (data.timeout_handler)(signal, info, void, data)
+                    }
                     _ => (data.crash_handler)(signal, info, void, data),
                 }
             }
@@ -236,6 +392,7 @@ mod unix_signal_handler {
 
         fn signals(&self) -> Vec<Signal> {
             vec![
+                Signal::SigAlarm,
                 Signal::SigUser2,
                 Signal::SigAbort,
                 Signal::SigBus,
@@ -279,7 +436,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, ExitKind::Timeout)
                 .expect("In timeout handler objectives failure.");
             if obj_fitness > 0 {
                 state
@@ -425,7 +582,6 @@ mod tests {
 
         let mut in_process_executor = InProcessExecutor::<NopInput, ()> {
             harness_fn: test_harness_fn_nop,
-            // TODO: on_crash_fn: Box::new(|_, _, _, _, _| ()),
             observers: tuple_list!(),
             name: "main",
             phantom: PhantomData,
