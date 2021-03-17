@@ -399,7 +399,7 @@ mod unix_signal_handler {
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
                         (data.timeout_handler)(signal, info, void, data)
-                    },
+                    }
                     _ => (data.crash_handler)(signal, info, void, data),
                 }
             }
