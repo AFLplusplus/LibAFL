@@ -12,9 +12,9 @@ use crate::{
 };
 
 #[cfg(unix)]
-use std::os::raw::c_int;
+use libc::c_int;
 #[cfg(unix)]
-use std::ptr::null_mut;
+use core::ptr::null_mut;
 
 #[repr(C)]
 #[cfg(unix)]
