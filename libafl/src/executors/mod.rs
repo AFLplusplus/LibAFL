@@ -2,6 +2,8 @@
 
 pub mod inprocess;
 pub use inprocess::InProcessExecutor;
+pub mod timeout;
+pub use timeout::TimeoutExecutor;
 #[cfg(feature = "runtime")]
 pub mod runtime;
 
