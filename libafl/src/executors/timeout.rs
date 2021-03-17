@@ -12,9 +12,9 @@ use crate::{
 };
 
 #[cfg(unix)]
-use libc::c_int;
-#[cfg(unix)]
 use core::ptr::null_mut;
+#[cfg(unix)]
+use libc::c_int;
 
 #[repr(C)]
 #[cfg(unix)]
@@ -162,4 +162,3 @@ where
         self.executor.run_target(input)
     }
 }
-

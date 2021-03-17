@@ -12,7 +12,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, TimeoutExecutor, Executor, ExitKind},
+    executors::{inprocess::InProcessExecutor, Executor, ExitKind, TimeoutExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
