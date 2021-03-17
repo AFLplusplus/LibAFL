@@ -1,6 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
+use core::time::Duration;
 use std::{env, path::PathBuf};
 
 #[cfg(unix)]
@@ -11,8 +12,8 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    executors::{inprocess::InProcessExecutor, inprocess::TimeoutExecutor, Executor, ExitKind},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
@@ -117,7 +118,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new()),
+            tuple_list!(CrashFeedback::new(), TimeoutFeedback::new()),
         )
     });
 
@@ -143,13 +144,16 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
-    let mut executor = InProcessExecutor::new(
-        "in-process(edges)",
-        harness,
-        tuple_list!(edges_observer, TimeObserver::new("time")),
-        &mut state,
-        &mut restarting_mgr,
-    )?;
+    let mut executor = TimeoutExecutor::new(
+        InProcessExecutor::new(
+            "in-process(edges)",
+            harness,
+            tuple_list!(edges_observer, TimeObserver::new("time")),
+            &mut state,
+            &mut restarting_mgr,
+        )?,
+        Duration::new(0, 3),
+    );
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
