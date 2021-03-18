@@ -191,12 +191,12 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
     let ret = match &EXCEPTION_HANDLERS[code as usize] {
         Some(handler_holder) => {
             let handler = &mut **handler_holder.handler.get();
-            handler.handle(code, exception_pointers);
+            handler.handle(ExceptionCode::try_from(code).unwrap(), exception_pointers);
             EXCEPTION_EXECUTE_HANDLER
         }
         None => EXCEPTION_CONTINUE_EXECUTION,
     };
-    if Some(prev_handler) = unsafe { PREVIOUS_HANDLER } {
+    if let Some(prev_handler) = unsafe { PREVIOUS_HANDLER } {
         prev_handler(exception_pointers)
     } else {
         ret
@@ -217,7 +217,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     compiler_fence(Ordering::SeqCst);
 
     unsafe {
-        if Some(prev) = SetUnhandledExceptionFilter(Some(handle_exception)) {
+        if let Some(prev) = SetUnhandledExceptionFilter(Some(handle_exception)) {
             PREVIOUS_HANDLER = Some(core::mem::transmute(prev as *const c_void));
         }
     }
