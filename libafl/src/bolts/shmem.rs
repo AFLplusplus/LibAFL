@@ -539,11 +539,11 @@ pub mod shmem {
         }
 
         pub fn new(map_size: usize) -> Result<Self, Error> {
-            let uuid = Uuid::new_v4();
-            let mut map_str = format!("libafl_{}", uuid.to_simple());
-            let map_str_bytes = map_str.as_mut_vec();
-            map_str_bytes[19] = 0; // Trucate to size 20
             unsafe {
+                let uuid = Uuid::new_v4();
+                let mut map_str = format!("libafl_{}", uuid.to_simple());
+                let map_str_bytes = map_str.as_mut_vec();
+                map_str_bytes[19] = 0; // Trucate to size 20
                 let handle = CreateFileMappingA(
                     HANDLE(INVALID_HANDLE_VALUE),
                     ptr::null_mut(),
