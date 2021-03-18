@@ -424,6 +424,164 @@ mod unix_signal_handler {
     }
 }
 
+#[cfg(windows)]
+mod windows_exception_handler {
+    use alloc::vec::Vec;
+    use core::ptr;
+    #[cfg(feature = "std")]
+    use std::{
+        fs,
+        io::{stdout, Write},
+    };
+
+    use crate::{
+        bolts::{
+          os::windows_exceptions::{Handler, ExceptionCode, EXCEPTION_POINTERS, CRASH_EXCEPTIONS},
+          bindings::windows::win32::system_services::ExitProcess
+        },
+        corpus::{Corpus, Testcase},
+        events::{Event, EventManager},
+        executors::ExitKind,
+        feedbacks::FeedbacksTuple,
+        inputs::{HasTargetBytes, Input},
+        observers::ObserversTuple,
+        state::{HasObjectives, HasSolutions},
+    };
+
+    /// Signal handling on unix systems needs some nasty unsafe.
+    pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+        /// The state ptr for signal handling
+        state_ptr: ptr::null_mut(),
+        /// The event manager ptr for signal handling
+        event_mgr_ptr: ptr::null_mut(),
+        /// The observers ptr for signal handling
+        observers_ptr: ptr::null(),
+        /// The current input for signal handling
+        current_input_ptr: ptr::null(),
+        /// The crash handler fn
+        crash_handler: nop_handler,
+        /// The timeout handler fn
+        timeout_handler: nop_handler,
+    };
+
+    pub struct InProcessExecutorHandlerData {
+        pub state_ptr: *mut c_void,
+        pub event_mgr_ptr: *mut c_void,
+        pub observers_ptr: *const c_void,
+        pub current_input_ptr: *const c_void,
+        pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, data: &mut Self),
+        pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, data: &mut Self),
+    }
+
+    unsafe impl Send for InProcessExecutorHandlerData {}
+    unsafe impl Sync for InProcessExecutorHandlerData {}
+
+    unsafe fn nop_handler(
+        _code: ExceptionCode,
+        _exception_pointers: *mut EXCEPTION_POINTERS,
+    ) {
+    }
+
+    impl Handler for InProcessExecutorHandlerData {
+        fn handle(&mut self, code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+            unsafe {
+                let data = &mut GLOBAL_STATE;
+                (data.crash_handler)(code, exception_pointers, data)
+            }
+        }
+
+        fn excaptions(&self) -> Vec<ExceptionCode> {
+            CRASH_EXCEPTIONS.to_vec()
+        }
+    }
+
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+        code: ExceptionCode,
+        exception_pointers: *mut EXCEPTION_POINTERS,
+        data: &mut InProcessExecutorHandlerData,
+    ) where
+        EM: EventManager<I, S>,
+        OT: ObserversTuple,
+        OC: Corpus<I>,
+        OFT: FeedbacksTuple<I>,
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        I: Input + HasTargetBytes,
+    {
+        #[cfg(feature = "std")]
+        println!("Crashed with {}", code);
+        if !data.current_input_ptr.is_null() {
+            let state = (data.state_ptr as *mut S).as_mut().unwrap();
+            let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+            let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Child crashed!");
+            #[cfg(feature = "std")]
+            let _ = stdout().flush();
+
+            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+            // Make sure we don't crash in the crash handler forever.
+            data.current_input_ptr = ptr::null();
+
+            let obj_fitness = state
+                .objectives_mut()
+                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .expect("In crash handler objectives failure.");
+            if obj_fitness > 0 {
+                let new_input = input.clone();
+                state
+                    .solutions_mut()
+                    .add(Testcase::new(new_input))
+                    .expect("In crash handler solutions failure.");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Could not send crashing input");
+            }
+
+            event_mgr.on_restart(state).unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Waiting for broker...");
+            event_mgr.await_restart_safe();
+            #[cfg(feature = "std")]
+            println!("Bye!");
+
+            unsafe { ExitProcess(1) };
+        } else {
+            #[cfg(feature = "std")]
+            {
+                println!("Double crash\n");
+                let crash_addr = exception_pointers
+        .as_mut()
+        .unwrap()
+        .exception_record.as_mut()
+        .unwrap().exception_address as usize;
+
+                println!(
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
+                    crash_addr
+                );
+            }
+            #[cfg(feature = "std")]
+            {
+                println!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
+
+            // TODO tell the parent to not restart
+            unsafe { ExitProcess(1) };
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
