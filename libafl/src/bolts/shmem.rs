@@ -549,7 +549,7 @@ pub mod shmem {
                     PAGE_TYPE::PAGE_READWRITE,
                     0,
                     map_size as u32,
-                    PSTR(map_str_bytes.as_mut()),
+                    PSTR(map_str_bytes.as_mut_ptr()),
                 );
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
