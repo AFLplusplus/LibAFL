@@ -500,7 +500,7 @@ pub mod shmem {
     impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
-                UnmapViewOfFile(self.map);
+                UnmapViewOfFile(self.map as *const c_void);
                 CloseHandle(self.handle);
             }
         }
@@ -509,14 +509,14 @@ pub mod shmem {
     impl Win32ShMem {
         pub fn from_str(map_str_bytes: &[u8; 20], map_size: usize) -> Result<Self, Error> {
             unsafe {
-                let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, false, map_str_bytes);
-                if handle == ptr::null() {
+                let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, false, map_str_bytes as *const u8);
+                if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
                         "Cannot open shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map = MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32)
+                let map = MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size)
                     as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
@@ -527,9 +527,9 @@ pub mod shmem {
             }
             Ok(Self {
                 shm_str: map_str_bytes.clone(),
-                handle,
-                map,
-                map_size,
+                handle: handle,
+                map; map,
+                map_size: map_size,
             })
         }
 
@@ -543,16 +543,16 @@ pub mod shmem {
                     ptr::null_mut(),
                     PAGE_READWRITE,
                     0,
-                    map_size,
-                    map_str_bytes,
+                    map_size as u32,
+                    map_str_bytes as *const u8,
                 );
-                if handle == ptr::null() {
+                if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
                         "Cannot create shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map = MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32)
+                let map = MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size)
                     as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
@@ -563,9 +563,9 @@ pub mod shmem {
             }
             Ok(Self {
                 shm_str: map_str_bytes[0..20].clone(),
-                handle,
-                map,
-                map_size,
+                handle: handle,
+                map: map,
+                map_size: map_size,
             })
         }
     }
