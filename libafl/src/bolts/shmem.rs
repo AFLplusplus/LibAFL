@@ -455,7 +455,7 @@ pub mod shmem {
         Error,
     };
 
-    use core::{ptr, slice, ffi::c_void};
+    use core::{ffi::c_void, ptr, slice};
     use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: isize = -1;

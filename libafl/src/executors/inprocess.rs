@@ -2,10 +2,10 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
 use core::{
+    ffi::c_void,
+    marker::PhantomData,
     ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
-    ffi::c_void,
-    marker::PhantomData
 };
 
 #[cfg(unix)]
@@ -114,7 +114,6 @@ where
         }
         Ok(())
     }
-
 }
 
 impl<'a, H, I, OT> Named for InProcessExecutor<'a, H, I, OT>
@@ -471,16 +470,16 @@ mod unix_signal_handler {
 #[cfg(windows)]
 mod windows_exception_handler {
     use alloc::vec::Vec;
-    use core::{ptr, ffi::c_void};
+    use core::{ffi::c_void, ptr};
     #[cfg(feature = "std")]
-    use std::{
-        io::{stdout, Write},
-    };
+    use std::io::{stdout, Write};
 
     use crate::{
         bolts::{
-          os::windows_exceptions::{Handler, ExceptionCode, EXCEPTION_POINTERS, CRASH_EXCEPTIONS},
-          bindings::windows::win32::system_services::ExitProcess
+            bindings::windows::win32::system_services::ExitProcess,
+            os::windows_exceptions::{
+                ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
+            },
         },
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
@@ -522,7 +521,7 @@ mod windows_exception_handler {
     unsafe fn nop_handler(
         _code: ExceptionCode,
         _exception_pointers: *mut EXCEPTION_POINTERS,
-        _data: &mut InProcessExecutorHandlerData
+        _data: &mut InProcessExecutorHandlerData,
     ) {
     }
 
@@ -601,10 +600,12 @@ mod windows_exception_handler {
             {
                 println!("Double crash\n");
                 let crash_addr = exception_pointers
-        .as_mut()
-        .unwrap()
-        .exception_record.as_mut()
-        .unwrap().exception_address as usize;
+                    .as_mut()
+                    .unwrap()
+                    .exception_record
+                    .as_mut()
+                    .unwrap()
+                    .exception_address as usize;
 
                 println!(
                 "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",

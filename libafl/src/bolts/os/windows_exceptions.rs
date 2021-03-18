@@ -1,9 +1,6 @@
 pub use crate::bolts::bindings::windows::win32::debug::EXCEPTION_POINTERS;
 
-use crate::{
-    bolts::bindings::windows::win32::debug::{SetUnhandledExceptionFilter},
-    Error,
-};
+use crate::{bolts::bindings::windows::win32::debug::SetUnhandledExceptionFilter, Error};
 
 use alloc::vec::Vec;
 use core::{
