@@ -217,7 +217,9 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     compiler_fence(Ordering::SeqCst);
 
     unsafe {
-        if let Some(prev) = SetUnhandledExceptionFilter(Some(core::mem::transmute(handle_exception as *const c_void))) {
+        if let Some(prev) = SetUnhandledExceptionFilter(Some(core::mem::transmute(
+            handle_exception as *const c_void,
+        ))) {
             PREVIOUS_HANDLER = Some(core::mem::transmute(prev as *const c_void));
         }
     }
