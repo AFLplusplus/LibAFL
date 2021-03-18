@@ -8,15 +8,14 @@
 - [x] A macro crate with derive directives (e.g. for SerdeAny impl).
 - [ ] Good documentation
 - [ ] LLMP brotli compression
-- [ ] Timeouts (timeout observer, objective)
 - [ ] AFL-Style Forkserver Executor
-- [ ] Restarting EventMgr could use forks on unix
+- [x] Restarting EventMgr could use forks on unix
 - [ ] Android Ashmem support
 - [ ] Restart Count in Fuzzing Loop
 - [ ] LAIN / structured fuzzing example
 - [ ] Errors in the Fuzzer should exit the fuzz run
 - [ ] More informative outpus, deeper introspection (stats, what mutation did x, etc.)
-- [ ] Timeouts for executors
+- [x] Timeouts for executors
 - [ ] Timeout handling for llmp clients (no ping for n seconds -> treat as disconnected)
 - [ ] LLMP Cross Machine Link (2 brokers connected via TCP)
 - [ ] "Launcher" example that spawns broker + n clients
