@@ -446,10 +446,10 @@ pub mod shmem {
     use super::ShMem;
     use crate::{
         bolts::bindings::{
+            windows::win32::system_services::HANDLE,
             windows::win32::system_services::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             },
-            windows::win32::system_services::{HANDLE},
             windows::win32::windows_programming::CloseHandle,
         },
         Error,
@@ -516,8 +516,8 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32) as *mut u8;
+                let map = MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32)
+                    as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
@@ -552,8 +552,8 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32) as *mut u8;
+                let map = MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32)
+                    as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
