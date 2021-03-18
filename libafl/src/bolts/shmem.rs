@@ -500,7 +500,7 @@ pub mod shmem {
     impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
-                UnmapViewOfFile(self.map as *const c_void);
+                UnmapViewOfFile(self.map as *mut c_void as *const c_void);
                 CloseHandle(self.handle);
             }
         }
@@ -524,18 +524,18 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
+                Ok(Self {
+                    shm_str: map_str_bytes.clone(),
+                    handle: handle,
+                    map: map,
+                    map_size: map_size,
+                })
             }
-            Ok(Self {
-                shm_str: map_str_bytes.clone(),
-                handle: handle,
-                map: map,
-                map_size: map_size,
-            })
         }
 
         pub fn new(map_size: usize) -> Result<Self, Error> {
             let uuid = Uuid::new_v4();
-            let mut map_str_bytes = format!("libafl_{}", uuid.to_simple()).as_mut_bytes();
+            let mut map_str_bytes = format!("libafl_{}", uuid.to_simple()).as_mut_vec();
             map_str_bytes[19] = 0; // Trucate to size 20
             unsafe {
                 let handle = CreateFileMappingA(
@@ -544,7 +544,7 @@ pub mod shmem {
                     PAGE_READWRITE,
                     0,
                     map_size as u32,
-                    map_str_bytes as *const u8 as *const i8,
+                    map_str_bytes.as_ptr() as *const i8,
                 );
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
@@ -560,13 +560,13 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
+                Ok(Self {
+                    shm_str: map_str_bytes[0..20].clone(),
+                    handle: handle,
+                    map: map,
+                    map_size: map_size,
+                })
             }
-            Ok(Self {
-                shm_str: map_str_bytes[0..20].clone(),
-                handle: handle,
-                map: map,
-                map_size: map_size,
-            })
         }
     }
 }
