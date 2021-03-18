@@ -460,7 +460,6 @@ pub mod shmem {
 
     const INVALID_HANDLE_VALUE: isize = -1;
     const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
-    //const PAGE_READWRITE: u32 = 0x04;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
