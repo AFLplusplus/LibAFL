@@ -513,7 +513,7 @@ mod windows_exception_handler {
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
         pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
-        pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
+        //pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
