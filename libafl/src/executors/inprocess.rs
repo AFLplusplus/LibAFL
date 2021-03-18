@@ -11,6 +11,7 @@ use core::{
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler};
+
 use crate::{
     bolts::tuples::Named,
     corpus::Corpus,
