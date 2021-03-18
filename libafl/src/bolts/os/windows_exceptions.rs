@@ -1,5 +1,7 @@
+pub use crate::bolts::bindings::windows::win32::debug::EXCEPTION_POINTERS;
+
 use crate::{
-    bolts::bindings::windows::win32::debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS},
+    bolts::bindings::windows::win32::debug::{SetUnhandledExceptionFilter},
     Error,
 };
 
