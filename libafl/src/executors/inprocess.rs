@@ -1,16 +1,17 @@
 //! The InProcess Executor is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
-use core::marker::PhantomData;
-
-#[cfg(unix)]
 use core::{
     ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
+    ffi::c_void,
+    marker::PhantomData
 };
 
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{c_void, setup_signal_handler};
+use crate::bolts::os::unix_signals::setup_signal_handler;
+#[cfg(windows)]
+use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
 use crate::{
     bolts::tuples::Named,
@@ -61,6 +62,27 @@ where
                 &mut data.current_input_ptr,
                 _input as *const _ as *const c_void,
             );
+            write_volatile(
+                &mut data.observers_ptr,
+                &self.observers as *const _ as *const c_void,
+            );
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
+        }
+        #[cfg(windows)]
+        unsafe {
+            let data = &mut windows_exception_handler::GLOBAL_STATE;
+            write_volatile(
+                &mut data.current_input_ptr,
+                _input as *const _ as *const c_void,
+            );
+            write_volatile(
+                &mut data.observers_ptr,
+                &self.observers as *const _ as *const c_void,
+            );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
@@ -74,6 +96,16 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(self, bytes.as_slice());
+        Ok(ret)
+    }
+
+    #[inline]
+    fn post_exec<EM, S>(
+        &mut self,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -82,8 +114,17 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        Ok(ret)
+        #[cfg(windows)]
+        unsafe {
+            write_volatile(
+                &mut windows_exception_handler::GLOBAL_STATE.current_input_ptr,
+                ptr::null(),
+            );
+            compiler_fence(Ordering::SeqCst);
+        }
+        Ok(())
     }
+
 }
 
 impl<I, OT> Named for InProcessExecutor<I, OT>
@@ -141,10 +182,6 @@ where
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
-                &mut data.observers_ptr,
-                &observers as *const _ as *const c_void,
-            );
-            write_volatile(
                 &mut data.crash_handler,
                 unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
             );
@@ -154,6 +191,21 @@ where
             );
 
             setup_signal_handler(data)?;
+            compiler_fence(Ordering::SeqCst);
+        }
+        #[cfg(windows)]
+        unsafe {
+            let data = &mut windows_exception_handler::GLOBAL_STATE;
+            write_volatile(
+                &mut data.crash_handler,
+                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+            );
+            //write_volatile(
+            //    &mut data.timeout_handler,
+            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+            //);
+
+            setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
         }
 
@@ -187,6 +239,8 @@ mod unix_signal_handler {
         observers::ObserversTuple,
         state::{HasObjectives, HasSolutions},
     };
+
+    // TODO merge GLOBAL_STATE with the Windows one
 
     /// Signal handling on unix systems needs some nasty unsafe.
     pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
@@ -444,8 +498,8 @@ mod windows_exception_handler {
         current_input_ptr: ptr::null(),
         /// The crash handler fn
         crash_handler: nop_handler,
-        /// The timeout handler fn
-        timeout_handler: nop_handler,
+        // The timeout handler fn
+        //timeout_handler: nop_handler,
     };
 
     pub struct InProcessExecutorHandlerData {
@@ -536,7 +590,7 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             println!("Bye!");
 
-            unsafe { ExitProcess(1) };
+            ExitProcess(1);
         } else {
             #[cfg(feature = "std")]
             {
@@ -562,7 +616,7 @@ mod windows_exception_handler {
             }
 
             // TODO tell the parent to not restart
-            unsafe { ExitProcess(1) };
+            ExitProcess(1);
         }
     }
 }

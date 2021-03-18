@@ -132,7 +132,7 @@ where
     #[inline]
     fn post_exec<EM: EventManager<I, S>, S>(
         &mut self,
-        _state: &S,
+        _state: &mut S,
         _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error> {
