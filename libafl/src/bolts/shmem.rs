@@ -318,14 +318,14 @@ pub mod unix_shmem {
     impl Drop for UnixShMem {
         fn drop(&mut self) {
             unsafe {
-                afl_shmem_deinit(self);
+                unix_shmem_deinit(self);
             }
         }
     }
 
     /// Create an uninitialized shmap
     #[cfg(unix)]
-    const fn afl_shmem_unitialized() -> UnixShMem {
+    const fn unix_shmem_unitialized() -> UnixShMem {
         UnixShMem {
             shm_str: [0; 20],
             shm_id: -1,
@@ -337,8 +337,8 @@ pub mod unix_shmem {
     #[cfg(unix)]
     impl UnixShMem {
         pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, Error> {
-            let mut ret = afl_shmem_unitialized();
-            let map = unsafe { afl_shmem_by_str(&mut ret, shm_str, map_size) };
+            let mut ret = unix_shmem_unitialized();
+            let map = unsafe { unix_shmem_by_str(&mut ret, shm_str, map_size) };
             if !map.is_null() {
                 Ok(ret)
             } else {
@@ -350,8 +350,8 @@ pub mod unix_shmem {
         }
 
         pub fn new(map_size: usize) -> Result<Self, Error> {
-            let mut ret = afl_shmem_unitialized();
-            let map = unsafe { afl_shmem_init(&mut ret, map_size) };
+            let mut ret = unix_shmem_unitialized();
+            let map = unsafe { unix_shmem_init(&mut ret, map_size) };
             if !map.is_null() {
                 Ok(ret)
             } else {
@@ -364,7 +364,7 @@ pub mod unix_shmem {
     }
 
     /// Deinitialize this shmem instance
-    unsafe fn afl_shmem_deinit(shm: *mut UnixShMem) {
+    unsafe fn unix_shmem_deinit(shm: *mut UnixShMem) {
         if shm.is_null() || (*shm).map.is_null() {
             /* Serialized map id */
             // Not set or not initialized;
@@ -377,7 +377,7 @@ pub mod unix_shmem {
 
     /// Functions to create Shared memory region, for observation channels and
     /// opening inputs and stuff.
-    unsafe fn afl_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
+    unsafe fn unix_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
         (*shm).map_size = map_size;
         (*shm).map = ptr::null_mut();
         (*shm).shm_id = shmget(
@@ -409,7 +409,7 @@ pub mod unix_shmem {
     }
 
     /// Uses a shmap id string to open a shared map
-    unsafe fn afl_shmem_by_str(
+    unsafe fn unix_shmem_by_str(
         shm: *mut UnixShMem,
         shm_str: &CStr,
         map_size: usize,
@@ -443,18 +443,130 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod shmem {
 
-    //TODO use super::ShMem;
+    use super::ShMem;
+    use crate::{
+        bolts::bindings::{
+            windows::win32::system_services::{
+                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+            },
+            windows::win32::system_services::{HANDLE, PAGE_TYPE},
+            windows::win32::windows_programming::CloseHandle,
+        },
+        Error,
+    };
+
+    use uuid::Uuid;
+
+    const INVALID_HANDLE_VALUE: i32 = -1;
+    const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
     pub struct Win32ShMem {
-        pub filename: [u8; 64],
-        //TODO pub handle: windows::win32::system_services::HANDLE,
+        pub shm_str: [u8; 20],
+        pub handle: HANDLE,
         pub map: *mut u8,
         pub map_size: usize,
     }
 
-    // TODO complete
+    impl ShMem for Win32ShMem {
+        fn existing_from_shm_slice(
+            map_str_bytes: &[u8; 20],
+            map_size: usize,
+        ) -> Result<Self, Error> {
+            Self::from_str(map_str_bytes, map_size)
+        }
+
+        fn new_map(map_size: usize) -> Result<Self, Error> {
+            Self::new(map_size)
+        }
+
+        fn shm_slice(&self) -> &[u8; 20] {
+            &self.shm_str
+        }
+
+        fn map(&self) -> &[u8] {
+            unsafe { slice::from_raw_parts(self.map, self.map_size) }
+        }
+
+        fn map_mut(&mut self) -> &mut [u8] {
+            unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+        }
+    }
+
+    /// Deinit sharedmaps on drop
+    impl Drop for Win32ShMem {
+        fn drop(&mut self) {
+            unsafe {
+                UnmapViewOfFile(self.map);
+                CloseHandle(self.hanlde);
+            }
+        }
+    }
+
+    impl Win32ShMem {
+        pub fn from_str(map_str_bytes: &[u8; 20], map_size: usize) -> Result<Self, Error> {
+            unsafe {
+                let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, false, map_str_bytes);
+                if handle == ptr::null() {
+                    return Error::Unknown(format!(
+                        "Cannot open shared memory {}",
+                        String::from_utf8_lossy(map_str_bytes)
+                    ));
+                }
+                let map =
+                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                if map == ptr::null_mut() {
+                    return Error::Unknown(format!(
+                        "Cannot map shared memory {}",
+                        String::from_utf8_lossy(map_str_bytes)
+                    ));
+                }
+            }
+            Ok(Self {
+                shm_str: name[0..20].clone(),
+                handle,
+                map,
+                map_size,
+            })
+        }
+
+        pub fn new(map_size: usize) -> Result<Self, Error> {
+            let uuid = Uuid::new_v4().unwrap();
+            let mut map_str_bytes = format!("libafl_{}", uuid.to_simple()).as_mut_bytes();
+            map_str_bytes[19] = 0; // Trucate to size 20
+            unsafe {
+                let handle = CreateFileMappingA(
+                    INVALID_HANDLE_VALUE,
+                    ptr::null_mut(),
+                    PAGE_TYPE::PAGE_READWRITE,
+                    0,
+                    map_size,
+                    map_str_bytes,
+                );
+                if handle == ptr::null() {
+                    return Error::Unknown(format!(
+                        "Cannot create shared memory {}",
+                        String::from_utf8_lossy(map_str_bytes)
+                    ));
+                }
+                let map =
+                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                if map == ptr::null_mut() {
+                    return Error::Unknown(format!(
+                        "Cannot map shared memory {}",
+                        String::from_utf8_lossy(map_str_bytes)
+                    ));
+                }
+            }
+            Ok(Self {
+                shm_str: map_str_bytes[0..20].clone(),
+                handle,
+                map,
+                map_size,
+            })
+        }
+    }
 }
 
 #[cfg(test)]
