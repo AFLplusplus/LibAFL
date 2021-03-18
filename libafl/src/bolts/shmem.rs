@@ -449,16 +449,18 @@ pub mod shmem {
             windows::win32::system_services::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             },
-            windows::win32::system_services::{HANDLE, PAGE_TYPE},
+            windows::win32::system_services::{HANDLE},
             windows::win32::windows_programming::CloseHandle,
         },
         Error,
     };
 
+    use core::{ptr, slice};
     use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: i32 = -1;
     const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
+    const PAGE_READWRITE: u32 = 0x04;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
@@ -499,7 +501,7 @@ pub mod shmem {
         fn drop(&mut self) {
             unsafe {
                 UnmapViewOfFile(self.map);
-                CloseHandle(self.hanlde);
+                CloseHandle(self.handle);
             }
         }
     }
@@ -509,22 +511,22 @@ pub mod shmem {
             unsafe {
                 let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, false, map_str_bytes);
                 if handle == ptr::null() {
-                    return Error::Unknown(format!(
+                    return Err(Error::Unknown(format!(
                         "Cannot open shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
-                    ));
+                    )));
                 }
                 let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32) as *mut u8;
                 if map == ptr::null_mut() {
-                    return Error::Unknown(format!(
+                    return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
-                    ));
+                    )));
                 }
             }
             Ok(Self {
-                shm_str: name[0..20].clone(),
+                shm_str: map_str_bytes.clone(),
                 handle,
                 map,
                 map_size,
@@ -539,24 +541,24 @@ pub mod shmem {
                 let handle = CreateFileMappingA(
                     INVALID_HANDLE_VALUE,
                     ptr::null_mut(),
-                    PAGE_TYPE::PAGE_READWRITE,
+                    PAGE_READWRITE,
                     0,
                     map_size,
                     map_str_bytes,
                 );
                 if handle == ptr::null() {
-                    return Error::Unknown(format!(
+                    return Err(Error::Unknown(format!(
                         "Cannot create shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
-                    ));
+                    )));
                 }
                 let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size as u32) as *mut u8;
                 if map == ptr::null_mut() {
-                    return Error::Unknown(format!(
+                    return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
-                    ));
+                    )));
                 }
             }
             Ok(Self {
