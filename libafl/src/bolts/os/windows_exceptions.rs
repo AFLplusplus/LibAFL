@@ -8,7 +8,6 @@ use core::{
     cell::UnsafeCell,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
-    mem, ptr,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };

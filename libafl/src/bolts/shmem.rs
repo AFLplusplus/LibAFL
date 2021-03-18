@@ -455,7 +455,7 @@ pub mod shmem {
         Error,
     };
 
-    use core::ffi::c_void;
+    use core::{ptr, slice, ffi::c_void};
     use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: isize = -1;
@@ -511,7 +511,7 @@ pub mod shmem {
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS,
                     BOOL(0),
-                    PSTR(map_str_bytes as *const u8),
+                    PSTR(map_str_bytes as *const u8 as *mut u8),
                 );
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
@@ -549,7 +549,7 @@ pub mod shmem {
                     PAGE_TYPE::PAGE_READWRITE,
                     0,
                     map_size as u32,
-                    PSTR(map_str_bytes.as_ptr()),
+                    PSTR(map_str_bytes.as_mut()),
                 );
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
