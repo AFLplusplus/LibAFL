@@ -455,10 +455,10 @@ pub mod shmem {
         Error,
     };
 
-    use core::{ptr, slice};
+    use core::{ptr, slice, ffi::c_void};
     use uuid::Uuid;
 
-    const INVALID_HANDLE_VALUE: i32 = -1;
+    const INVALID_HANDLE_VALUE: isize = -1;
     const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
     const PAGE_READWRITE: u32 = 0x04;
 
@@ -509,7 +509,7 @@ pub mod shmem {
     impl Win32ShMem {
         pub fn from_str(map_str_bytes: &[u8; 20], map_size: usize) -> Result<Self, Error> {
             unsafe {
-                let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, false, map_str_bytes as *const u8);
+                let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, false, map_str_bytes as *const u8 as *const i8);
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
                         "Cannot open shared memory {}",
@@ -528,23 +528,23 @@ pub mod shmem {
             Ok(Self {
                 shm_str: map_str_bytes.clone(),
                 handle: handle,
-                map; map,
+                map: map,
                 map_size: map_size,
             })
         }
 
         pub fn new(map_size: usize) -> Result<Self, Error> {
-            let uuid = Uuid::new_v4().unwrap();
+            let uuid = Uuid::new_v4();
             let mut map_str_bytes = format!("libafl_{}", uuid.to_simple()).as_mut_bytes();
             map_str_bytes[19] = 0; // Trucate to size 20
             unsafe {
                 let handle = CreateFileMappingA(
-                    INVALID_HANDLE_VALUE,
+                    HANDLE(INVALID_HANDLE_VALUE),
                     ptr::null_mut(),
                     PAGE_READWRITE,
                     0,
                     map_size as u32,
-                    map_str_bytes as *const u8,
+                    map_str_bytes as *const u8 as *const i8,
                 );
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
