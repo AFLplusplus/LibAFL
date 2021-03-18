@@ -412,10 +412,9 @@ mod unix_signal_handler {
 #[cfg(windows)]
 mod windows_exception_handler {
     use alloc::vec::Vec;
-    use core::ptr;
+    use core::{ptr, ffi::c_void};
     #[cfg(feature = "std")]
     use std::{
-        fs,
         io::{stdout, Write},
     };
 
@@ -454,8 +453,8 @@ mod windows_exception_handler {
         pub event_mgr_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
-        pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, data: &mut Self),
-        pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, data: &mut Self),
+        pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
+        pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
@@ -464,6 +463,7 @@ mod windows_exception_handler {
     unsafe fn nop_handler(
         _code: ExceptionCode,
         _exception_pointers: *mut EXCEPTION_POINTERS,
+        _data: &mut InProcessExecutorHandlerData
     ) {
     }
 
@@ -475,7 +475,7 @@ mod windows_exception_handler {
             }
         }
 
-        fn excaptions(&self) -> Vec<ExceptionCode> {
+        fn exceptions(&self) -> Vec<ExceptionCode> {
             CRASH_EXCEPTIONS.to_vec()
         }
     }
