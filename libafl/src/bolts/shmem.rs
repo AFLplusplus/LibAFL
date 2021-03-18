@@ -500,7 +500,7 @@ pub mod shmem {
     impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
-                UnmapViewOfFile(self.map as *mut c_void as *const c_void);
+                UnmapViewOfFile(self.map as *mut c_void);
                 CloseHandle(self.handle);
             }
         }
@@ -509,7 +509,7 @@ pub mod shmem {
     impl Win32ShMem {
         pub fn from_str(map_str_bytes: &[u8; 20], map_size: usize) -> Result<Self, Error> {
             unsafe {
-                let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, false, map_str_bytes as *const u8 as *const i8);
+                let handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, 0, map_str_bytes as *const u8 as *const i8);
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
                         "Cannot open shared memory {}",
@@ -524,12 +524,14 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                Ok(Self {
-                    shm_str: map_str_bytes.clone(),
+                let mut ret = Self {
+                    shm_str: [0; 20],
                     handle: handle,
                     map: map,
                     map_size: map_size,
-                })
+                };
+                ret.shm_str.clone_from_slice(map_str_bytes);
+                Ok(ret)
             }
         }
 
@@ -560,12 +562,14 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                Ok(Self {
-                    shm_str: map_str_bytes[0..20].clone(),
+                let mut ret = Self {
+                    shm_str: [0; 20],
                     handle: handle,
                     map: map,
                     map_size: map_size,
-                })
+                };
+                ret.shm_str.clone_from_slice(map_str_bytes[0..20]);
+                Ok(ret)
             }
         }
     }
