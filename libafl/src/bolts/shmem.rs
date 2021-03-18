@@ -446,7 +446,7 @@ pub mod shmem {
     use super::ShMem;
     use crate::{
         bolts::bindings::{
-            windows::win32::system_services::{HANDLE, BOOL},
+            windows::win32::system_services::{HANDLE, BOOL, PAGE_TYPE},
             windows::win32::system_services::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             },
@@ -460,7 +460,7 @@ pub mod shmem {
 
     const INVALID_HANDLE_VALUE: isize = -1;
     const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
-    const PAGE_READWRITE: u32 = 0x04;
+    //const PAGE_READWRITE: u32 = 0x04;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
@@ -543,7 +543,7 @@ pub mod shmem {
                 let handle = CreateFileMappingA(
                     HANDLE(INVALID_HANDLE_VALUE),
                     ptr::null_mut(),
-                    PAGE_READWRITE,
+                    PAGE_TYPE::PAGE_READWRITE,
                     0,
                     map_size as u32,
                     map_str_bytes.as_ptr() as *const i8,
