@@ -5,5 +5,6 @@ fn main() {
         windows::win32::windows_programming::CloseHandle,
         // API needed for the shared memory
         windows::win32::system_services::{CreateFileMappingA, OpenFileMappingA, MapViewOfFile, UnmapViewOfFile},
+        windows::win32::debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD, LPTOP_LEVEL_EXCEPTION_FILTER}
     );
 }
