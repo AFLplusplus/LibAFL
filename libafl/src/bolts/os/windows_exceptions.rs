@@ -69,10 +69,10 @@ pub const STATUS_ASSERTION_FAILURE: u32 = 0xC0000420;
 pub const STATUS_SXS_EARLY_DEACTIVATION: u32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: u32 = 0xC0150010;
 
-/// From https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(u32)]
 pub enum ExceptionCode {
+    // From https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode
     AccessViolation = STATUS_ACCESS_VIOLATION,
     ArrayBoundsExceeded = STATUS_ARRAY_BOUNDS_EXCEEDED,
     Breakpoint = STATUS_BREAKPOINT,
@@ -96,6 +96,29 @@ pub enum ExceptionCode {
     SingleStep = STATUS_SINGLE_STEP,
     StackOverflow = STATUS_STACK_OVERFLOW,
     UnwindConsolidate = STATUS_UNWIND_CONSOLIDATE,
+    // Addition exceptions
+    Wait0 = STATUS_WAIT_0,
+    AbandonedWait0 = STATUS_ABANDONED_WAIT_0,
+    UserAPC = STATUS_USER_APC,
+    Timeout = STATUS_TIMEOUT,
+    Pending = STATUS_PENDING,
+    SegmentNotification = STATUS_SEGMENT_NOTIFICATION,
+    FatalAppExit = STATUS_FATAL_APP_EXIT,
+    Longjump = STATUS_LONGJUMP,
+    DLLNotFound = STATUS_DLL_NOT_FOUND,
+    OrdinalNotFound = STATUS_ORDINAL_NOT_FOUND,
+    EntryPointNotFound = STATUS_ENTRYPOINT_NOT_FOUND,
+    ControlCExit = STATUS_CONTROL_C_EXIT,
+    DllInitFailed = STATUS_DLL_INIT_FAILED,
+    FltMultipleFaults = STATUS_FLOAT_MULTIPLE_FAULTS,
+    FltMultipleTraps = STATUS_FLOAT_MULTIPLE_TRAPS,
+    RegNatConsumption = STATUS_REG_NAT_CONSUMPTION,
+    HeapCorruption = STATUS_HEAP_CORRUPTION,
+    StackBufferOverrun = STATUS_STACK_BUFFER_OVERRUN,
+    InvalidCRuntimeParameter = STATUS_INVALID_CRUNTIME_PARAMETER,
+    AssertionFailure = STATUS_ASSERTION_FAILURE,
+    SXSEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
+    SXSInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
 }
 
 pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
@@ -110,6 +133,9 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::NoncontinuableException,
     ExceptionCode::PrivilegedInstruction,
     ExceptionCode::StackOverflow,
+    ExceptionCode::HeapCorruption,
+    ExceptionCode::StackBufferOverrun,
+    ExceptionCode::AssertionFailure,
 ];
 
 impl PartialEq for ExceptionCode {
@@ -148,11 +174,81 @@ impl Display for ExceptionCode {
             ExceptionCode::SingleStep => write!(f, "STATUS_SINGLE_STEP")?,
             ExceptionCode::StackOverflow => write!(f, "STATUS_STACK_OVERFLOW")?,
             ExceptionCode::UnwindConsolidate => write!(f, "STATUS_UNWIND_CONSOLIDATE")?,
+            ExceptionCode::Wait0 => write!(f, "STATUS_WAIT_0")?,
+            ExceptionCode::AbandonedWait0 => write!(f, "STATUS_ABANDONED_WAIT_0")?,
+            ExceptionCode::UserAPC => write!(f, "STATUS_USER_APC")?,
+            ExceptionCode::Timeout => write!(f, "STATUS_TIMEOUT")?,
+            ExceptionCode::Pending => write!(f, "STATUS_PENDING")?,
+            ExceptionCode::SegmentNotification => write!(f, "STATUS_SEGMENT_NOTIFICATION")?,
+            ExceptionCode::FatalAppExit => write!(f, "STATUS_FATAL_APP_EXIT")?,
+            ExceptionCode::Longjump => write!(f, "STATUS_LONGJUMP")?,
+            ExceptionCode::DLLNotFound => write!(f, "STATUS_DLL_NOT_FOUND")?,
+            ExceptionCode::OrdinalNotFound => write!(f, "STATUS_ORDINAL_NOT_FOUND")?,
+            ExceptionCode::EntryPointNotFound => write!(f, "STATUS_ENTRYPOINT_NOT_FOUND")?,
+            ExceptionCode::ControlCExit => write!(f, "STATUS_CONTROL_C_EXIT")?,
+            ExceptionCode::DllInitFailed => write!(f, "STATUS_DLL_INIT_FAILED")?,
+            ExceptionCode::FltMultipleFaults => write!(f, "STATUS_FLOAT_MULTIPLE_FAULTS")?,
+            ExceptionCode::FltMultipleTraps => write!(f, "STATUS_FLOAT_MULTIPLE_TRAPS")?,
+            ExceptionCode::RegNatConsumption => write!(f, "STATUS_REG_NAT_CONSUMPTION")?,
+            ExceptionCode::HeapCorruption => write!(f, "STATUS_HEAP_CORRUPTION")?,
+            ExceptionCode::StackBufferOverrun => write!(f, "STATUS_STACK_BUFFER_OVERRUN")?,
+            ExceptionCode::InvalidCRuntimeParameter => write!(f, "STATUS_INVALID_CRUNTIME_PARAMETER")?,
+            ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
+            ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
+            ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
         };
 
         Ok(())
     }
 }
+
+pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 45] = [
+    ExceptionCode::AccessViolation,
+    ExceptionCode::ArrayBoundsExceeded,
+    ExceptionCode::Breakpoint,
+    ExceptionCode::DatatypeMisalignment,
+    ExceptionCode::FltDenormalOperand,
+    ExceptionCode::FltDivideByZero,
+    ExceptionCode::FltInexactResult,
+    ExceptionCode::FltInvalidOperation,
+    ExceptionCode::FltOverflow,
+    ExceptionCode::FltStackCheck,
+    ExceptionCode::FltUnderflow,
+    ExceptionCode::GuardPageViolation,
+    ExceptionCode::IllegalInstruction,
+    ExceptionCode::InPageError,
+    ExceptionCode::IntegerDivideByZero,
+    ExceptionCode::IntegerOverflow,
+    ExceptionCode::InvalidDisposition,
+    ExceptionCode::InvalidHandle,
+    ExceptionCode::NoncontinuableException,
+    ExceptionCode::PrivilegedInstruction,
+    ExceptionCode::SingleStep,
+    ExceptionCode::StackOverflow,
+    ExceptionCode::UnwindConsolidate,
+    ExceptionCode::Wait0,
+    ExceptionCode::AbandonedWait0,
+    ExceptionCode::UserAPC,
+    ExceptionCode::Timeout,
+    ExceptionCode::Pending,
+    ExceptionCode::SegmentNotification,
+    ExceptionCode::FatalAppExit,
+    ExceptionCode::Longjump,
+    ExceptionCode::DLLNotFound,
+    ExceptionCode::OrdinalNotFound,
+    ExceptionCode::EntryPointNotFound,
+    ExceptionCode::ControlCExit,
+    ExceptionCode::DllInitFailed,
+    ExceptionCode::FltMultipleFaults,
+    ExceptionCode::FltMultipleTraps,
+    ExceptionCode::RegNatConsumption,
+    ExceptionCode::HeapCorruption,
+    ExceptionCode::StackBufferOverrun,
+    ExceptionCode::InvalidCRuntimeParameter,
+    ExceptionCode::AssertionFailure,
+    ExceptionCode::SXSEarlyDeactivation,
+    ExceptionCode::SXSInvalidDeactivation,
+ ];
 
 pub trait Handler {
     /// Handle an exception
@@ -172,7 +268,9 @@ struct HandlerHolder {
 unsafe impl Send for HandlerHolder {}
 
 /// Keep track of which handler is registered for which exception
-static mut EXCEPTION_HANDLERS: [Option<HandlerHolder>; 32] = [
+static mut EXCEPTION_HANDLERS: [Option<HandlerHolder>; 64] = [
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
 ];
@@ -189,13 +287,15 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
         .as_mut()
         .unwrap()
         .exception_code;
-    let ret = match &EXCEPTION_HANDLERS[code as usize] {
+    let exception_code = ExceptionCode::try_from(code).unwrap();
+    let index = EXCEPTION_CODES_MAPPING.iter().position(|x| *x == exception_code).unwrap();
+    let ret = match &EXCEPTION_HANDLERS[index] {
         Some(handler_holder) => {
             let handler = &mut **handler_holder.handler.get();
-            handler.handle(ExceptionCode::try_from(code).unwrap(), exception_pointers);
+            handler.handle(exception_code, exception_pointers);
             EXCEPTION_EXECUTE_HANDLER
         }
-        None => EXCEPTION_CONTINUE_EXECUTION,
+        None => EXCEPTION_EXECUTE_HANDLER,
     };
     if let Some(prev_handler) = PREVIOUS_HANDLER {
         prev_handler(exception_pointers)
@@ -207,9 +307,10 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
 /// Setup Win32 exception handlers in a somewhat rusty way.
 pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
     let exceptions = handler.exceptions();
-    for code in exceptions {
+    for exception_code in exceptions {
+        let index = EXCEPTION_CODES_MAPPING.iter().position(|x| *x == exception_code).unwrap();
         write_volatile(
-            &mut EXCEPTION_HANDLERS[code as usize],
+            &mut EXCEPTION_HANDLERS[index],
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn Handler),
             }),
