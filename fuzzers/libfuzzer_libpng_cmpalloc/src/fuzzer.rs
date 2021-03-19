@@ -1,7 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
-use core::time::Duration;
 use std::{env, path::PathBuf};
 
 #[cfg(unix)]
@@ -12,8 +11,8 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind, TimeoutExecutor},
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    executors::{inprocess::InProcessExecutor, Executor, ExitKind},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     inputs::Input,
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
@@ -24,6 +23,8 @@ use libafl::{
     utils::{current_nanos, StdRand},
     Error,
 };
+
+const MAP_SIZE: usize = 16 * 1024;
 
 /// We will interact with a C++ target, so use external c functionality
 #[cfg(unix)]
@@ -36,6 +37,7 @@ extern "C" {
 
     static __lafl_edges_map: *mut u8;
     static __lafl_cmp_map: *mut u8;
+    static __lafl_alloc_map: *mut usize;
     static __lafl_max_edges_size: u32;
 }
 
@@ -102,6 +104,13 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         StdMapObserver::new_from_ptr("edges", __lafl_edges_map, __lafl_max_edges_size as usize)
     });
 
+    // Create an observation channel using the cmp map
+    let cmps_observer = unsafe { StdMapObserver::new_from_ptr("cmps", __lafl_cmp_map, MAP_SIZE) };
+
+    // Create an observation channel using the allocations map
+    let allocs_observer =
+        unsafe { StdMapObserver::new_from_ptr("allocs", __lafl_alloc_map, MAP_SIZE) };
+
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
         State::new(
@@ -112,13 +121,15 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Feedbacks to rate the interestingness of an input
             tuple_list!(
                 MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
+                MaxMapFeedback::new_with_observer(&cmps_observer),
+                MaxMapFeedback::new_with_observer(&allocs_observer),
                 TimeFeedback::new()
             ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new(), TimeoutFeedback::new()),
+            tuple_list!(CrashFeedback::new()),
         )
     });
 
@@ -144,17 +155,18 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(
-            "in-process(edges)",
-            harness,
-            tuple_list!(edges_observer, TimeObserver::new("time")),
-            &mut state,
-            &mut restarting_mgr,
-        )?,
-        // 10 seconds timeout
-        Duration::new(10, 0),
-    );
+    let mut executor = InProcessExecutor::new(
+        "in-process(edges,cmps,allocs)",
+        harness,
+        tuple_list!(
+            edges_observer,
+            cmps_observer,
+            allocs_observer,
+            TimeObserver::new("time")
+        ),
+        &mut state,
+        &mut restarting_mgr,
+    )?;
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.

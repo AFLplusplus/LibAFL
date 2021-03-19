@@ -8,14 +8,16 @@ use core::{convert::TryInto, time::Duration};
 #[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 
+use libafl::bolts::llmp::Tag;
 #[cfg(all(unix, feature = "std"))]
 use libafl::{
     bolts::{llmp, shmem::UnixShMem},
     Error,
 };
 
-const _TAG_SIMPLE_U32_V1: u32 = 0x51300321;
-const _TAG_MATH_RESULT_V1: u32 = 0x77474331;
+const _TAG_SIMPLE_U32_V1: Tag = 0x51300321;
+const _TAG_MATH_RESULT_V1: Tag = 0x77474331;
+const _TAG_1MEG_V1: Tag = 0xB1111161;
 
 #[cfg(all(unix, feature = "std"))]
 fn adder_loop(port: u16) -> ! {
@@ -35,7 +37,11 @@ fn adder_loop(port: u16) -> ! {
                     current_result =
                         current_result.wrapping_add(u32::from_le_bytes(buf.try_into().unwrap()));
                 }
-                _ => println!("Adder Client ignored unknown message {}", tag),
+                _ => println!(
+                    "Adder Client ignored unknown message {} with {} bytes",
+                    tag,
+                    buf.len()
+                ),
             };
         }
 
@@ -52,6 +58,19 @@ fn adder_loop(port: u16) -> ! {
         }
 
         thread::sleep(time::Duration::from_millis(100));
+    }
+}
+
+#[cfg(all(unix, feature = "std"))]
+fn large_msg_loop(port: u16) -> ! {
+    let mut client = llmp::LlmpClient::<UnixShMem>::create_attach_to_tcp(port).unwrap();
+
+    let meg_buf = [1u8; 1 << 20];
+
+    loop {
+        client.send_buf(_TAG_1MEG_V1, &meg_buf).unwrap();
+        println!("Sending the next megabyte");
+        thread::sleep(time::Duration::from_millis(100))
     }
 }
 
@@ -95,7 +114,7 @@ fn main() {
 
     let mode = std::env::args()
         .nth(1)
-        .expect("no mode specified, chose 'broker', 'ctr', or 'adder'");
+        .expect("no mode specified, chose 'broker', 'ctr', 'adder', or 'large'");
     let port: u16 = std::env::args()
         .nth(2)
         .unwrap_or("1337".into())
@@ -127,6 +146,9 @@ fn main() {
         }
         "adder" => {
             adder_loop(port);
+        }
+        "large" => {
+            large_msg_loop(port);
         }
         _ => {
             println!("No valid mode supplied");

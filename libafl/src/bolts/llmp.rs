@@ -93,6 +93,9 @@ use std::{
 use libc::c_char;
 
 #[cfg(unix)]
+use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
+
+#[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription},
@@ -102,20 +105,26 @@ use crate::{
 use super::shmem::HasFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
-const LLMP_PREF_INITIAL_MAP_SIZE: usize = 1 << 28;
+#[cfg(not(feature = "llmp_small_maps"))]
+const LLMP_CFG_INITIAL_MAP_SIZE: usize = 1 << 28;
+/// If llmp_small_maps is set, we start off with 1 meg.
+#[cfg(feature = "llmp_small_maps")]
+const LLMP_CFG_INITIAL_MAP_SIZE: usize = 1 << 20;
 /// What byte count to align messages to
 /// LlmpMsg sizes (including header) will always be rounded up to be a multiple of this value
-const LLMP_PREF_ALIGNNMENT: usize = 64;
+const LLMP_CFG_ALIGNNMENT: usize = 64;
 
 /// A msg fresh from the press: No tag got sent by the user yet
-const LLMP_TAG_UNSET: u32 = 0xDEADAF;
+const LLMP_TAG_UNSET: Tag = 0xDEADAF;
 /// This message should not exist yet. Some bug in unsafe code!
-const LLMP_TAG_UNINITIALIZED: u32 = 0xA143AF11;
-/// The end of page mesasge
+const LLMP_TAG_UNINITIALIZED: Tag = 0xA143AF11;
+/// The end of page message
 /// When receiving this, a new sharedmap needs to be allocated.
-const LLMP_TAG_END_OF_PAGE: u32 = 0xAF1E0F1;
-/// A new client for this broekr got added.
-const LLMP_TAG_NEW_SHM_CLIENT: u32 = 0xC11E471;
+const LLMP_TAG_END_OF_PAGE: Tag = 0xAF1E0F1;
+/// A new client for this broker got added.
+const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
+/// The sender on this map is exiting (if broker exits, clients should exit gracefully);
+const LLMP_TAG_EXITING: Tag = 0x13C5171;
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -197,19 +206,19 @@ unsafe fn llmp_msg_in_page(page: *const LlmpPage, msg: *const LlmpMsg) -> bool {
         && (page as *const u8).add((*page).size_total) > msg as *const u8
 }
 
-/// allign to LLMP_PREF_ALIGNNMENT=64 bytes
+/// allign to LLMP_CFG_ALIGNNMENT=64 bytes
 #[inline]
 const fn llmp_align(to_align: usize) -> usize {
     // check if we need to align first
-    if LLMP_PREF_ALIGNNMENT == 0 {
+    if LLMP_CFG_ALIGNNMENT == 0 {
         return to_align;
     }
     // Then do the alignment
-    let modulo = to_align % LLMP_PREF_ALIGNNMENT;
+    let modulo = to_align % LLMP_CFG_ALIGNNMENT;
     if modulo == 0 {
         to_align
     } else {
-        to_align + LLMP_PREF_ALIGNNMENT - modulo
+        to_align + LLMP_CFG_ALIGNNMENT - modulo
     }
 }
 
@@ -233,7 +242,7 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
 fn new_map_size(max_alloc: usize) -> usize {
     max(
         max_alloc * 2 + EOP_MSG_SIZE + LLMP_PAGE_HEADER_LEN,
-        LLMP_PREF_INITIAL_MAP_SIZE,
+        LLMP_CFG_INITIAL_MAP_SIZE,
     )
     .next_power_of_two()
 }
@@ -447,7 +456,7 @@ where
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
-        match UnixListener::bind(filename) {
+        match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename).unwrap()) {
             Ok(listener) => {
                 dbg!("We're the broker");
                 let mut broker = LlmpBroker::new()?;
@@ -541,7 +550,7 @@ where
             last_msg_sent: ptr::null_mut(),
             out_maps: vec![LlmpSharedMap::new(
                 0,
-                SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
+                SH::new_map(new_map_size(LLMP_CFG_INITIAL_MAP_SIZE))?,
             )],
             // drop pages to the broker if it already read them
             keep_pages_forever,
@@ -571,7 +580,7 @@ where
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_map = self.out_maps.last().unwrap();
         current_out_map.shmem.write_to_env(env_name)?;
-        current_out_map.msg_to_env(self.last_msg_sent, env_name)
+        unsafe { current_out_map.msg_to_env(self.last_msg_sent, env_name) }
     }
 
     /// Waits for this sender to be save to unmap.
@@ -862,6 +871,7 @@ where
                 tag
             )));
         }
+
         unsafe {
             let msg = self.alloc_next(buf.len())?;
             (*msg).tag = tag;
@@ -927,7 +937,7 @@ where
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_map = &self.current_recv_map;
         current_out_map.shmem.write_to_env(env_name)?;
-        current_out_map.msg_to_env(self.last_msg_recvd, env_name)
+        unsafe { current_out_map.msg_to_env(self.last_msg_recvd, env_name) }
     }
 
     /// Create a Receiver, reattaching to an existing sender map.
@@ -987,6 +997,11 @@ where
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
                 LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
+                LLMP_TAG_EXITING => {
+                    // The other side is done.
+                    assert_eq!((*msg).buf_len, 0);
+                    return Err(Error::ShuttingDown);
+                }
                 LLMP_TAG_END_OF_PAGE => {
                     #[cfg(feature = "std")]
                     dbg!("Got end of page, allocing next");
@@ -1195,14 +1210,16 @@ where
 
     /// Store this msg offset to env_name + _OFFSET env variable.
     /// It can be restored using msg_from_env with the same env_name later.
+    /// # Safety
+    /// This function will dereference the msg ptr, make sure it's valid.
     #[cfg(feature = "std")]
-    pub fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
+    pub unsafe fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
             env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR)
         } else {
             env::set_var(
                 &format!("{}_OFFSET", map_env_name),
-                format!("{}", unsafe { self.msg_to_offset(msg) }?),
+                format!("{}", self.msg_to_offset(msg)?),
             )
         };
         Ok(())
@@ -1319,9 +1336,8 @@ where
         msg.copy_to_nonoverlapping(out, size_of::<LlmpMsg>() + (*msg).buf_len_padded as usize);
         (*out).buf_len_padded = actual_size;
         /* We need to replace the message ID with our own */
-        match self.llmp_out.send(out) {
-            Err(e) => panic!("Error sending msg: {:?}", e),
-            _ => (),
+        if let Err(e) = self.llmp_out.send(out) {
+            panic!("Error sending msg: {:?}", e)
         };
         self.llmp_out.last_msg_sent = out;
         Ok(())
@@ -1389,6 +1405,9 @@ where
                 None => (),
             }
         }
+        self.llmp_out
+            .send_buf(LLMP_TAG_EXITING, &[])
+            .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
     }
 
     /// Broadcasts the given buf to all lients
@@ -1422,7 +1441,7 @@ where
         // Tcp out map sends messages from background thread tcp server to foreground client
         let tcp_out_map = LlmpSharedMap::new(
             llmp_tcp_id,
-            SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
+            SH::new_map(new_map_size(LLMP_CFG_INITIAL_MAP_SIZE))?,
         );
         let tcp_out_map_str = tcp_out_map.shmem.shm_str();
         let tcp_out_map_size = tcp_out_map.shmem.map().len();
@@ -1465,7 +1484,7 @@ where
                             (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
                             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
                             (*pageinfo).shm_str = new_client_map_str;
-                            (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
+                            (*pageinfo).map_size = LLMP_CFG_INITIAL_MAP_SIZE;
                             match new_client_sender.send(msg) {
                                 Ok(()) => (),
                                 Err(e) => println!("Error forwarding client on map: {:?}", e),
@@ -1481,10 +1500,12 @@ where
                                 .to_string_lossy()
                                 .into_owned()
                                 .parse()
-                                .expect(&format!(
-                                    "ShmId is not a valid int file descriptor: {:?}",
-                                    broadcast_str_initial
-                                ));
+                                .unwrap_or_else(|_| {
+                                    panic!(
+                                        "ShmId is not a valid int file descriptor: {:?}",
+                                        broadcast_str_initial
+                                    )
+                                });
 
                         match sendmsg(
                             stream.as_raw_fd(),
@@ -1528,7 +1549,7 @@ where
                                     let pageinfo =
                                         (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
                                     (*pageinfo).shm_str = fdstr;
-                                    (*pageinfo).map_size = LLMP_PREF_INITIAL_MAP_SIZE;
+                                    (*pageinfo).map_size = LLMP_CFG_INITIAL_MAP_SIZE;
                                     match new_client_sender.send(msg) {
                                         Ok(()) => (),
                                         Err(e) => {
@@ -1739,7 +1760,7 @@ where
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::new(
                     0,
-                    SH::new_map(new_map_size(LLMP_PREF_INITIAL_MAP_SIZE))?,
+                    SH::new_map(new_map_size(LLMP_CFG_INITIAL_MAP_SIZE))?,
                 )],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
@@ -1840,7 +1861,7 @@ where
 
         let ret = Self::new(LlmpSharedMap::existing(SH::existing_from_shm_slice(
             &new_broker_map_str,
-            LLMP_PREF_INITIAL_MAP_SIZE,
+            LLMP_CFG_INITIAL_MAP_SIZE,
         )?))?;
 
         stream.write_all(ret.sender.out_maps.first().unwrap().shmem.shm_slice())?;
@@ -1858,7 +1879,7 @@ where
     #[cfg(all(unix, feature = "std"))]
     /// Create a LlmpClient, getting the ID from a given filename
     pub fn create_attach_to_unix(filename: &str) -> Result<Self, Error> {
-        let stream = UnixStream::connect(filename)?;
+        let stream = UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(filename).unwrap())?;
         println!("Connected to socket {}", filename);
 
         let mut buf = [0u8; 5];
@@ -1884,7 +1905,7 @@ where
 
                     let ret = Self::new(LlmpSharedMap::existing(SH::existing_from_shm_slice(
                         &fdstr,
-                        LLMP_PREF_INITIAL_MAP_SIZE,
+                        LLMP_CFG_INITIAL_MAP_SIZE,
                     )?))?;
 
                     match sendmsg(

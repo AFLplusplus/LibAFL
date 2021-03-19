@@ -2,6 +2,8 @@
 
 pub mod inprocess;
 pub use inprocess::InProcessExecutor;
+pub mod timeout;
+pub use timeout::TimeoutExecutor;
 #[cfg(feature = "runtime")]
 pub mod runtime;
 
@@ -94,7 +96,12 @@ where
 
     /// Called right after execution finished.
     #[inline]
-    fn post_exec<EM, S>(&mut self, _state: &S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
+    fn post_exec<EM, S>(
+        &mut self,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error>
     where
         EM: EventManager<I, S>,
     {

@@ -1,7 +1,9 @@
-use crate::bolts::{llmp::LlmpSender, shmem::HasFd};
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
+
+#[cfg(feature = "std")]
+use core::ptr::read_volatile;
 
 #[cfg(feature = "std")]
 use crate::bolts::llmp::LlmpReceiver;
@@ -16,8 +18,8 @@ use crate::utils::{fork, ForkResult};
 use crate::bolts::shmem::UnixShMem;
 use crate::{
     bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, Tag},
-        shmem::ShMem,
+        llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
+        shmem::{HasFd, ShMem},
     },
     corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
@@ -352,7 +354,7 @@ where
             llmp::LlmpConnection::IsClient { client } => {
                 while let Some((sender_id, tag, msg)) = client.recv_buf()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
-                        continue;
+                        panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
                     let event: Event<I> = postcard::from_bytes(msg)?;
                     events.push((sender_id, event));
@@ -519,10 +521,7 @@ where
         #[cfg(target_os = "android")]
         {
             let path = std::env::current_dir()?;
-            mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(
-                stats,
-                &format!("{}/.llmp_socket", path.display()).to_string(),
-            )?;
+            mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(stats, "\x00llmp_socket")?;
         };
         #[cfg(not(target_os = "android"))]
         {
@@ -535,6 +534,7 @@ where
             mgr.broker_loop()?;
             return Err(Error::ShuttingDown);
         } else {
+            // We are the fuzzer respawner in a llmp client
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
             // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
@@ -547,7 +547,7 @@ where
             sender.to_env(_ENV_FUZZER_SENDER)?;
             receiver.to_env(_ENV_FUZZER_RECEIVER)?;
 
-            let mut ctr = 0;
+            let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
                 dbg!("Spawning next client (id {})", ctr);
@@ -563,7 +563,12 @@ where
                 #[cfg(windows)]
                 startable_self()?.status()?;
 
-                ctr += 1;
+                if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
+                    // Storing state in the last round did not work
+                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client!");
+                }
+
+                ctr = ctr.wrapping_add(1);
             }
         }
     } else {

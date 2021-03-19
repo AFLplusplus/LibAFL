@@ -63,6 +63,8 @@ where
     fn current_mut(&mut self) -> &mut Option<usize>;
 }
 
+/// The scheduler define how the fuzzer requests a testcase from the corpus.
+/// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
 pub trait CorpusScheduler<I, S>
 where
     I: Input,
@@ -96,6 +98,7 @@ where
     fn next(&self, state: &mut S) -> Result<usize, Error>;
 }
 
+/// Feed the fuzzer simpply with a random testcase on request
 pub struct RandCorpusScheduler<C, I, R, S>
 where
     S: HasCorpus<C, I> + HasRand<R>,

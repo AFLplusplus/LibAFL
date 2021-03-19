@@ -1,15 +1,18 @@
 //! The InProcess Executor is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
-use core::marker::PhantomData;
-#[cfg(unix)]
 use core::{
+    ffi::c_void,
+    marker::PhantomData,
     ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{c_void, setup_signal_handler};
+use crate::bolts::os::unix_signals::setup_signal_handler;
+#[cfg(windows)]
+use crate::bolts::os::windows_exceptions::setup_exception_handler;
+
 use crate::{
     bolts::tuples::Named,
     corpus::Corpus,
@@ -59,6 +62,27 @@ where
                 &mut data.current_input_ptr,
                 _input as *const _ as *const c_void,
             );
+            write_volatile(
+                &mut data.observers_ptr,
+                &self.observers as *const _ as *const c_void,
+            );
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
+        }
+        #[cfg(windows)]
+        unsafe {
+            let data = &mut windows_exception_handler::GLOBAL_STATE;
+            write_volatile(
+                &mut data.current_input_ptr,
+                _input as *const _ as *const c_void,
+            );
+            write_volatile(
+                &mut data.observers_ptr,
+                &self.observers as *const _ as *const c_void,
+            );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
@@ -72,6 +96,16 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(self, bytes.as_slice());
+        Ok(ret)
+    }
+
+    #[inline]
+    fn post_exec<EM, S>(
+        &mut self,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -80,7 +114,15 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        Ok(ret)
+        #[cfg(windows)]
+        unsafe {
+            write_volatile(
+                &mut windows_exception_handler::GLOBAL_STATE.current_input_ptr,
+                ptr::null(),
+            );
+            compiler_fence(Ordering::SeqCst);
+        }
+        Ok(())
     }
 }
 
@@ -139,10 +181,6 @@ where
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
-                &mut data.observers_ptr,
-                &observers as *const _ as *const c_void,
-            );
-            write_volatile(
                 &mut data.crash_handler,
                 unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
             );
@@ -152,6 +190,21 @@ where
             );
 
             setup_signal_handler(data)?;
+            compiler_fence(Ordering::SeqCst);
+        }
+        #[cfg(windows)]
+        unsafe {
+            let data = &mut windows_exception_handler::GLOBAL_STATE;
+            write_volatile(
+                &mut data.crash_handler,
+                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+            );
+            //write_volatile(
+            //    &mut data.timeout_handler,
+            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+            //);
+
+            setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
         }
 
@@ -185,6 +238,8 @@ mod unix_signal_handler {
         observers::ObserversTuple,
         state::{HasObjectives, HasSolutions},
     };
+
+    // TODO merge GLOBAL_STATE with the Windows one
 
     /// Signal handling on unix systems needs some nasty unsafe.
     pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
@@ -228,7 +283,9 @@ mod unix_signal_handler {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 match signal {
-                    Signal::SigUser2 => (data.timeout_handler)(signal, info, void, data),
+                    Signal::SigUser2 | Signal::SigAlarm => {
+                        (data.timeout_handler)(signal, info, void, data)
+                    }
                     _ => (data.crash_handler)(signal, info, void, data),
                 }
             }
@@ -236,6 +293,7 @@ mod unix_signal_handler {
 
         fn signals(&self) -> Vec<Signal> {
             vec![
+                Signal::SigAlarm,
                 Signal::SigUser2,
                 Signal::SigAbort,
                 Signal::SigBus,
@@ -279,7 +337,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, ExitKind::Timeout)
                 .expect("In timeout handler objectives failure.");
             if obj_fitness > 0 {
                 state
@@ -404,6 +462,166 @@ mod unix_signal_handler {
     }
 }
 
+#[cfg(windows)]
+mod windows_exception_handler {
+    use alloc::vec::Vec;
+    use core::{ffi::c_void, ptr};
+    #[cfg(feature = "std")]
+    use std::io::{stdout, Write};
+
+    use crate::{
+        bolts::{
+            bindings::windows::win32::system_services::ExitProcess,
+            os::windows_exceptions::{
+                ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
+            },
+        },
+        corpus::{Corpus, Testcase},
+        events::{Event, EventManager},
+        executors::ExitKind,
+        feedbacks::FeedbacksTuple,
+        inputs::{HasTargetBytes, Input},
+        observers::ObserversTuple,
+        state::{HasObjectives, HasSolutions},
+    };
+
+    /// Signal handling on unix systems needs some nasty unsafe.
+    pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+        /// The state ptr for signal handling
+        state_ptr: ptr::null_mut(),
+        /// The event manager ptr for signal handling
+        event_mgr_ptr: ptr::null_mut(),
+        /// The observers ptr for signal handling
+        observers_ptr: ptr::null(),
+        /// The current input for signal handling
+        current_input_ptr: ptr::null(),
+        /// The crash handler fn
+        crash_handler: nop_handler,
+        // The timeout handler fn
+        //timeout_handler: nop_handler,
+    };
+
+    pub struct InProcessExecutorHandlerData {
+        pub state_ptr: *mut c_void,
+        pub event_mgr_ptr: *mut c_void,
+        pub observers_ptr: *const c_void,
+        pub current_input_ptr: *const c_void,
+        pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
+        //pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
+    }
+
+    unsafe impl Send for InProcessExecutorHandlerData {}
+    unsafe impl Sync for InProcessExecutorHandlerData {}
+
+    unsafe fn nop_handler(
+        _code: ExceptionCode,
+        _exception_pointers: *mut EXCEPTION_POINTERS,
+        _data: &mut InProcessExecutorHandlerData,
+    ) {
+    }
+
+    impl Handler for InProcessExecutorHandlerData {
+        fn handle(&mut self, code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+            unsafe {
+                let data = &mut GLOBAL_STATE;
+                (data.crash_handler)(code, exception_pointers, data)
+            }
+        }
+
+        fn exceptions(&self) -> Vec<ExceptionCode> {
+            CRASH_EXCEPTIONS.to_vec()
+        }
+    }
+
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+        code: ExceptionCode,
+        exception_pointers: *mut EXCEPTION_POINTERS,
+        data: &mut InProcessExecutorHandlerData,
+    ) where
+        EM: EventManager<I, S>,
+        OT: ObserversTuple,
+        OC: Corpus<I>,
+        OFT: FeedbacksTuple<I>,
+        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        I: Input + HasTargetBytes,
+    {
+        #[cfg(feature = "std")]
+        println!("Crashed with {}", code);
+        if !data.current_input_ptr.is_null() {
+            let state = (data.state_ptr as *mut S).as_mut().unwrap();
+            let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+            let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Child crashed!");
+            #[cfg(feature = "std")]
+            let _ = stdout().flush();
+
+            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+            // Make sure we don't crash in the crash handler forever.
+            data.current_input_ptr = ptr::null();
+
+            let obj_fitness = state
+                .objectives_mut()
+                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .expect("In crash handler objectives failure.");
+            if obj_fitness > 0 {
+                let new_input = input.clone();
+                state
+                    .solutions_mut()
+                    .add(Testcase::new(new_input))
+                    .expect("In crash handler solutions failure.");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Could not send crashing input");
+            }
+
+            event_mgr.on_restart(state).unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Waiting for broker...");
+            event_mgr.await_restart_safe();
+            #[cfg(feature = "std")]
+            println!("Bye!");
+
+            ExitProcess(1);
+        } else {
+            #[cfg(feature = "std")]
+            {
+                println!("Double crash\n");
+                let crash_addr = exception_pointers
+                    .as_mut()
+                    .unwrap()
+                    .exception_record
+                    .as_mut()
+                    .unwrap()
+                    .exception_address as usize;
+
+                println!(
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
+                    crash_addr
+                );
+            }
+            #[cfg(feature = "std")]
+            {
+                println!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
+
+            // TODO tell the parent to not restart
+            ExitProcess(1);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -425,7 +643,6 @@ mod tests {
 
         let mut in_process_executor = InProcessExecutor::<NopInput, ()> {
             harness_fn: test_harness_fn_nop,
-            // TODO: on_crash_fn: Box::new(|_, _, _, _, _| ()),
             observers: tuple_list!(),
             name: "main",
             phantom: PhantomData,

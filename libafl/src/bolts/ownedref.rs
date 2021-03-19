@@ -1,6 +1,11 @@
+//! Wrappers that abstracts references (or pointers) and owned data accesses.
+// The serialization is towards owned, allowing to serialize pointers without troubles.
+
 use alloc::{boxed::Box, vec::Vec};
+use core::{clone::Clone, fmt::Debug};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+/// Wrap a reference and convert to a Box on serialize
 #[derive(Clone, Debug)]
 pub enum Ptr<'a, T: 'a + ?Sized> {
     Ref(&'a T),
@@ -40,6 +45,8 @@ impl<'a, T: Sized> AsRef<T> for Ptr<'a, T> {
     }
 }
 
+/// Wrap a mutable reference and convert to a Box on serialize
+#[derive(Debug)]
 pub enum PtrMut<'a, T: 'a + ?Sized> {
     Ref(&'a mut T),
     Owned(Box<T>),
@@ -87,6 +94,8 @@ impl<'a, T: Sized> AsMut<T> for PtrMut<'a, T> {
     }
 }
 
+/// Wrap a slice and convert to a Vec on serialize
+#[derive(Clone, Debug)]
 pub enum Slice<'a, T: 'a + Sized> {
     Ref(&'a [T]),
     Owned(Vec<T>),
@@ -125,6 +134,8 @@ impl<'a, T: Sized> Slice<'a, T> {
     }
 }
 
+/// Wrap a mutable slice and convert to a Vec on serialize
+#[derive(Debug)]
 pub enum SliceMut<'a, T: 'a + Sized> {
     Ref(&'a mut [T]),
     Owned(Vec<T>),
@@ -170,6 +181,7 @@ impl<'a, T: Sized> SliceMut<'a, T> {
     }
 }
 
+/// Wrap a C-style pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
 pub enum Cptr<T: Sized> {
     Cptr(*const T),
@@ -206,6 +218,8 @@ impl<T: Sized> AsRef<T> for Cptr<T> {
     }
 }
 
+/// Wrap a C-style mutable pointer and convert to a Box on serialize
+#[derive(Clone, Debug)]
 pub enum CptrMut<T: Sized> {
     Cptr(*mut T),
     Owned(Box<T>),
@@ -250,6 +264,8 @@ impl<T: Sized> AsMut<T> for CptrMut<T> {
     }
 }
 
+/// Wrap a C-style pointer to an array (with size= and convert to a Vec on serialize
+#[derive(Clone, Debug)]
 pub enum Array<T: Sized> {
     Cptr((*const T, usize)),
     Owned(Vec<T>),
@@ -285,6 +301,7 @@ impl<T: Sized> Array<T> {
     }
 }
 
+/// Wrap a C-style mutable pointer to an array (with size= and convert to a Vec on serialize
 #[derive(Clone, Debug)]
 pub enum ArrayMut<T: Sized> {
     Cptr((*mut T, usize)),

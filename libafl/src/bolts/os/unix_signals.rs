@@ -22,7 +22,7 @@ use crate::Error;
 
 pub use libc::{c_void, siginfo_t};
 
-#[derive(IntoPrimitive, TryFromPrimitive, Hash, Clone, Copy)]
+#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
 pub enum Signal {
     SigAbort = SIGABRT,
