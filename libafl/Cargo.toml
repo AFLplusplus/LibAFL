@@ -63,7 +63,8 @@ nix = "0.20.0"
 uds = "0.2.3"
 
 [target.'cfg(windows)'.dependencies]
-windows = "0.3.1"
+windows = "0.4.0"
+uuid = { version = "0.8", features = ["v4"] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows = "0.3.1"
+windows = "0.4.0"
