@@ -189,7 +189,9 @@ impl Display for ExceptionCode {
             ExceptionCode::RegNatConsumption => write!(f, "STATUS_REG_NAT_CONSUMPTION")?,
             ExceptionCode::HeapCorruption => write!(f, "STATUS_HEAP_CORRUPTION")?,
             ExceptionCode::StackBufferOverrun => write!(f, "STATUS_STACK_BUFFER_OVERRUN")?,
-            ExceptionCode::InvalidCRuntimeParameter => write!(f, "STATUS_INVALID_CRUNTIME_PARAMETER")?,
+            ExceptionCode::InvalidCRuntimeParameter => {
+                write!(f, "STATUS_INVALID_CRUNTIME_PARAMETER")?
+            }
             ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
             ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
             ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
@@ -245,7 +247,7 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 45] = [
     ExceptionCode::AssertionFailure,
     ExceptionCode::SXSEarlyDeactivation,
     ExceptionCode::SXSInvalidDeactivation,
- ];
+];
 
 pub trait Handler {
     /// Handle an exception
@@ -285,7 +287,10 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
         .unwrap()
         .exception_code;
     let exception_code = ExceptionCode::try_from(code).unwrap();
-    let index = EXCEPTION_CODES_MAPPING.iter().position(|x| *x == exception_code).unwrap();
+    let index = EXCEPTION_CODES_MAPPING
+        .iter()
+        .position(|x| *x == exception_code)
+        .unwrap();
     let ret = match &EXCEPTION_HANDLERS[index] {
         Some(handler_holder) => {
             let handler = &mut **handler_holder.handler.get();
@@ -305,7 +310,10 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
 pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
     let exceptions = handler.exceptions();
     for exception_code in exceptions {
-        let index = EXCEPTION_CODES_MAPPING.iter().position(|x| *x == exception_code).unwrap();
+        let index = EXCEPTION_CODES_MAPPING
+            .iter()
+            .position(|x| *x == exception_code)
+            .unwrap();
         write_volatile(
             &mut EXCEPTION_HANDLERS[index],
             Some(HandlerHolder {
