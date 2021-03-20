@@ -131,6 +131,10 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
 }
 
+#ifdef _WIN32
+#define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ?0 :errno)
+#endif
+
 void *malloc(size_t size) {
 
   uintptr_t k = (uintptr_t)__builtin_return_address(0);
