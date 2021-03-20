@@ -15,4 +15,5 @@ members = [
     "fuzzers/frida_libpng",
     "fuzzers/libfuzzer_libmozjpeg",
     "fuzzers/libfuzzer_libpng_cmpalloc",
+    "fuzzers/libfuzzer_windows",
 ]

@@ -16,10 +16,14 @@ use crate::utils::{fork, ForkResult};
 
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMem;
+
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::shmem::HasFd;
+
 use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
-        shmem::{HasFd, ShMem},
+        shmem::ShMem,
     },
     corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
@@ -308,7 +312,7 @@ impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SH: ShMem + HasFd,
+    SH: ShMem,
     ST: Stats,
 {
     #[cfg(all(feature = "std", unix))]
@@ -511,7 +515,7 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SH: ShMem + HasFd, // Todo: HasFd is only needed for Android
+    SH: ShMem, // Todo: HasFd is only needed for Android
     ST: Stats,
 {
     let mut mgr;
