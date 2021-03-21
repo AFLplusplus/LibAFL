@@ -370,7 +370,7 @@ pub mod unix_shmem {
             // Not set or not initialized;
             return;
         }
-        (*shm).shm_str[0_usize] = 0u8;
+        (*shm).shm_str[0 as usize] = 0u8;
         shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
         (*shm).map = ptr::null_mut();
     }
