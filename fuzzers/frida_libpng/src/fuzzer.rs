@@ -24,13 +24,15 @@ use libafl::{
     Error,
 };
 
-use frida_gum::{
-    stalker::{NoneEventSink, Stalker, Transformer},
-    InstructionWriter,
-};
-use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection, Register};
+#[cfg(target_arch = "x86_64")]
+use frida_gum::instruction_writer::X86Regsiter;
 #[cfg(target_arch = "aarch64")]
-use frida_gum::IndexMode;
+use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
+use frida_gum::{
+    instruction_writer::InstructionWriter,
+    stalker::{NoneEventSink, Stalker, Transformer},
+};
+use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 
 use libloading;
 
@@ -64,15 +66,10 @@ impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
 pub fn get_module_size(module_name: &str) -> usize {
     let mut code_size = 0;
     let code_size_ref = &mut code_size;
-    Module::enumerate_ranges(
-        module_name,
-        PageProtection::ReadExecute,
-        move |details, _user_data| {
-            *code_size_ref = details.memory_range().size() as usize;
-            0
-        },
-        ptr::null_mut(),
-    );
+    Module::enumerate_ranges(module_name, PageProtection::ReadExecute, move |details| {
+        *code_size_ref = details.memory_range().size() as usize;
+        true
+    });
 
     code_size
 }
@@ -82,48 +79,44 @@ pub fn get_module_size(module_name: &str) -> usize {
 /// block.
 #[cfg(target_arch = "x86_64")]
 const MAYBE_LOG_CODE: [u8; 69] = [
-    0x9c,  // pushfq
-    0x50,  // push rax
-    0x51,  // push rcx
-    0x52,  // push rdx
-    0x56,  // push rsi
-
-    0x89, 0xf8,                                // mov eax, edi
-    0xc1, 0xe0, 0x08,                          // shl eax, 8
-    0xc1, 0xef, 0x04,                          // shr edi, 4
-    0x31, 0xc7,                                // xor edi, eax
-    0x0f, 0xb7, 0xc7,                          // movzx eax, di
-    0x48, 0x8d, 0x0d, 0x34, 0x00, 0x00, 0x00,  // lea rcx, sym._afl_area_ptr_ptr
-    0x48, 0x8b, 0x09,                          // mov rcx, qword [rcx]
-    0x48, 0x8d, 0x15, 0x22, 0x00, 0x00, 0x00,  // lea rdx, sym._afl_prev_loc_ptr
-    0x48, 0x8b, 0x32,                          // mov rsi, qword [rdx]
-    0x48, 0x8b, 0x36,                          // mov rsi, qword [rsi]
-    0x48, 0x31, 0xc6,                          // xor rsi, rax
-    0x48, 0x81, 0xe6, 0xff, 0x1f, 0x00, 0x00,  // and rsi, 0x1fff (8 * 1024 - 1) TODO: make this variable
-    0xfe, 0x04, 0x31,                          // inc byte [rcx + rsi]
-
-    0x48, 0xd1, 0xe8,  // shr rax, 1
-    0x48, 0x8b, 0x0a,  // mov rcx, qword [rdx]
-    0x48, 0x89, 0x01,  // mov qword [rcx], rax
-
-    0x5e,  // pop rsi
-    0x5a,  // pop rdx
-    0x59,  // pop rcx
-    0x58,  // pop rax
-    0x9d,  // popfq
-
-    0xc3,  // ret
-           // Read-only data goes here:
-           // uint64_t* afl_prev_loc_ptr
-           // uint8_t** afl_area_ptr_ptr
-           // unsigned int afl_instr_rms
+    0x9c, // pushfq
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x56, // push rsi
+    0x89, 0xf8, // mov eax, edi
+    0xc1, 0xe0, 0x08, // shl eax, 8
+    0xc1, 0xef, 0x04, // shr edi, 4
+    0x31, 0xc7, // xor edi, eax
+    0x0f, 0xb7, 0xc7, // movzx eax, di
+    0x48, 0x8d, 0x0d, 0x34, 0x00, 0x00, 0x00, // lea rcx, sym._afl_area_ptr_ptr
+    0x48, 0x8b, 0x09, // mov rcx, qword [rcx]
+    0x48, 0x8d, 0x15, 0x22, 0x00, 0x00, 0x00, // lea rdx, sym._afl_prev_loc_ptr
+    0x48, 0x8b, 0x32, // mov rsi, qword [rdx]
+    0x48, 0x8b, 0x36, // mov rsi, qword [rsi]
+    0x48, 0x31, 0xc6, // xor rsi, rax
+    0x48, 0x81, 0xe6, 0xff, 0x1f, 0x00,
+    0x00, // and rsi, 0x1fff (8 * 1024 - 1) TODO: make this variable
+    0xfe, 0x04, 0x31, // inc byte [rcx + rsi]
+    0x48, 0xd1, 0xe8, // shr rax, 1
+    0x48, 0x8b, 0x0a, // mov rcx, qword [rdx]
+    0x48, 0x89, 0x01, // mov qword [rcx], rax
+    0x5e, // pop rsi
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+    0x9d, // popfq
+    0xc3, // ret
+          // Read-only data goes here:
+          // uint64_t* afl_prev_loc_ptr
+          // uint8_t** afl_area_ptr_ptr
+          // unsigned int afl_instr_rms
 ];
 
 #[cfg(target_arch = "aarch64")]
 const MAYBE_LOG_CODE: [u8; 104] = [
     0xE1, 0x0B, 0xBF, 0xA9, // stp x1, x2, [sp, -0x10]!
     0xE3, 0x13, 0xBF, 0xA9, // stp x3, x4, [sp, -0x10]!
-
     0xE1, 0x03, 0x00, 0xAA, // mov x1, x0
     0x00, 0xDC, 0x78, 0xD3, // lsl x0, x0, #8
     0x21, 0xFC, 0x44, 0xD3, // lsr x1, x1, #4
@@ -140,10 +133,8 @@ const MAYBE_LOG_CODE: [u8; 104] = [
     0x24, 0x00, 0x00, 0x39, // strb w4, [x1, #0]
     0x00, 0xFC, 0x41, 0xD3, // lsr x0, x0, #1
     0x40, 0x00, 0x00, 0xF9, // str x0, [x2]
-
     0xE3, 0x13, 0xc1, 0xA8, // ldp x3, x4, [sp], #0x10
     0xE1, 0x0B, 0xc1, 0xA8, // ldp x1, x2, [sp], #0x10
-
     0xC0, 0x03, 0x5F, 0xD6, // ret
     0x1f, 0x20, 0x03, 0xD5, // nop
     0x1f, 0x20, 0x03, 0xD5, // nop
@@ -169,7 +160,9 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             let mut first = true;
             for instruction in basic_block {
                 if first {
-                    let address = unsafe { (*instruction.get_instruction()).address };
+                    let address = unsafe { (*instruction.instr()).address };
+                    if address >= helper.base_address
+                        && address <= helper.base_address + helper.size as u64
                     {
                         let writer = _output.writer();
                         if helper.current_log_impl == 0
@@ -198,20 +191,39 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                         }
                         #[cfg(target_arch = "x86_64")]
                         {
-                            writer.put_lea_reg_reg_offset(Register::RSP, Register::RSP, -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32));
-                            writer.put_push_reg(Register::RDI);
-                            writer.put_mov_reg_address(Register::RDI, address);
+                            writer.put_lea_reg_reg_offset(
+                                X86Register::RSP,
+                                X86Register::RSP,
+                                -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
+                            );
+                            writer.put_push_reg(X86Register::RDI);
+                            writer.put_mov_reg_address(X86Register::RDI, address);
                             writer.put_call_address(helper.current_log_impl);
-                            writer.put_pop_reg(Register::RDI);
-                            writer.put_lea_reg_reg_offset(Register::RSP, Register::RSP, frida_gum_sys::GUM_RED_ZONE_SIZE as i32);
+                            writer.put_pop_reg(X86Register::RDI);
+                            writer.put_lea_reg_reg_offset(
+                                X86Register::RSP,
+                                X86Register::RSP,
+                                frida_gum_sys::GUM_RED_ZONE_SIZE as i32,
+                            );
                         }
                         #[cfg(target_arch = "aarch64")]
                         {
-                            writer.put_stp_reg_reg_reg_offset(Register::LR, Register::X0, Register::SP, -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64, IndexMode::PreAdjust);
-                            writer.put_ldr_reg_u64(Register::X0, address);
+                            writer.put_stp_reg_reg_reg_offset(
+                                Aarch64Register::Lr,
+                                Aarch64Register::X0,
+                                Aarch64Register::Sp,
+                                -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                                IndexMode::PreAdjust,
+                            );
+                            writer.put_ldr_reg_u64(Aarch64Register::X0, address);
                             writer.put_bl_imm(helper.current_log_impl);
-                            writer.put_ldp_reg_reg_reg_offset(Register::LR, Register::X0, Register::SP, 16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64, IndexMode::PostAdjust);
-
+                            writer.put_ldp_reg_reg_reg_offset(
+                                Aarch64Register::Lr,
+                                Aarch64Register::X0,
+                                Aarch64Register::Sp,
+                                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                                IndexMode::PostAdjust,
+                            );
                         }
                     }
                 instruction.keep()
