@@ -1018,7 +1018,7 @@ where
                     /* We can reuse the map mem space, no need to free and calloc.
                     However, the pageinfo points to the map we're about to unmap.
                     Clone the contents first to be safe (probably fine in rust eitner way). */
-                    let pageinfo_cpy = *pageinfo;
+                    let pageinfo_cpy = (*pageinfo).clone();
 
                     // Mark the old page save to unmap, in case we didn't so earlier.
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
@@ -1434,7 +1434,7 @@ where
         // to read from the initial map id.
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
-        let broadcast_str_initial = *client_out_map_mem.shm_slice();
+        let broadcast_str_initial = client_out_map_mem.shm_slice().clone();
 
         let llmp_tcp_id = self.llmp_clients.len() as u32;
 

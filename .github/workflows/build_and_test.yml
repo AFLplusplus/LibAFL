@@ -10,27 +10,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
-    strategy:
-      matrix:
-          os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Cache cargo registry
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: clippy-cargo-${{ hashFiles('**/Cargo.toml') }}
-      - name: Add clippy
-        run: rustup component add clippy
-      - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all
   ubuntu:
     runs-on: ubuntu-latest
     steps:
