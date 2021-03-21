@@ -160,28 +160,16 @@ pub fn current_time() -> time::Duration {
     time::Duration::from_millis(1)
 }
 
-#[cfg(feature = "std")]
-#[inline]
 /// Gets current nanoseconds since UNIX_EPOCH
+#[inline]
 pub fn current_nanos() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64
+    current_time().as_nanos() as u64
 }
 
-#[cfg(feature = "std")]
 /// Gets current milliseconds since UNIX_EPOCH
+#[inline]
 pub fn current_milliseconds() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
-}
-
-#[cfg(not(feature = "std"))]
-pub fn current_milliseconds() -> u64 {
-    1000
+    current_time().as_millis() as u64
 }
 
 /// XXH3 Based, hopefully speedy, rnd implementation

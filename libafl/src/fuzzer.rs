@@ -6,10 +6,15 @@ use crate::{
     observers::ObserversTuple,
     stages::StagesTuple,
     state::HasExecutions,
-    utils::{current_milliseconds, current_time},
+    utils::current_time,
     Error,
 };
-use core::marker::PhantomData;
+
+use core::{marker::PhantomData, time::Duration};
+use std::ops::Sub;
+
+/// Send a stats update all 6 (or more) seconds
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(6 * 1000);
 
 /// Holds a set of stages
 pub trait HasStages<CS, E, EM, I, S, ST>
@@ -38,9 +43,55 @@ where
 
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, S> {
+    /// Fuzz for a single iteration
+    /// Returns the index of the last fuzzed corpus item
     fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
 
-    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
+    /// Fuzz forever (or until stopped)
+    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<(), Error> {
+        let mut last = current_time();
+        let stats_timeout = STATS_TIMEOUT_DEFAULT;
+        loop {
+            self.fuzz_one(state, executor, manager)?;
+            last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
+        }
+    }
+
+    /// Fuzz for n iterations
+    /// Returns the index of the last fuzzed corpus item
+    fn fuzz_loop_for(
+        &self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        iters: u64,
+    ) -> Result<usize, Error> {
+        if iters == 0 {
+            return Err(Error::IllegalArgument(
+                "Cannot fuzz for 0 iterations!".to_string(),
+            ));
+        }
+
+        let mut ret = 0;
+        let mut last = current_time();
+        let stats_timeout = STATS_TIMEOUT_DEFAULT;
+
+        for _ in 0..iters {
+            ret = self.fuzz_one(state, executor, manager)?;
+            last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
+        }
+        Ok(ret)
+    }
+
+    /// Given the last time, if stats_timeout seconds passed, send off an info/stats/heartbeat message to the broker.
+    /// Returns the new `last` time (so the old one, unless `stats_timeout` time has passed and stats have been sent)
+    /// Will return an Error, if the stats could not be sent.
+    fn maybe_report_stats(
+        state: &mut S,
+        manager: &mut EM,
+        last: Duration,
+        stats_timeout: Duration,
+    ) -> Result<Duration, Error>;
 }
 
 /// Your default fuzzer instance, for everyday use.
@@ -102,6 +153,31 @@ where
     OT: ObserversTuple,
     I: Input,
 {
+    #[inline]
+    fn maybe_report_stats(
+        state: &mut S,
+        manager: &mut EM,
+        last: Duration,
+        stats_timeout: Duration,
+    ) -> Result<Duration, Error> {
+        let cur = current_time();
+        if cur.sub(last) > stats_timeout {
+            //println!("Fire {:?} {:?} {:?}", cur, last, stats_timeout);
+            manager.fire(
+                state,
+                Event::UpdateStats {
+                    executions: *state.executions(),
+                    time: cur,
+                    phantom: PhantomData,
+                },
+            )?;
+            Ok(cur)
+        } else {
+            if cur.as_millis() % 1000 == 0 {}
+            Ok(last)
+        }
+    }
+
     fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
         let idx = self.scheduler().next(state)?;
 
@@ -110,25 +186,6 @@ where
 
         manager.process(state, executor, self.scheduler())?;
         Ok(idx)
-    }
-
-    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
-        let mut last = current_milliseconds();
-        loop {
-            self.fuzz_one(state, executor, manager)?;
-            let cur = current_milliseconds();
-            if cur - last > 60 * 100 {
-                last = cur;
-                manager.fire(
-                    state,
-                    Event::UpdateStats {
-                        executions: *state.executions(),
-                        time: current_time(),
-                        phantom: PhantomData,
-                    },
-                )?
-            }
-        }
     }
 }
 
