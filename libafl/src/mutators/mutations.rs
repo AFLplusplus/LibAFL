@@ -20,6 +20,36 @@ pub enum MutationResult {
     Skipped,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum MutationType {
+    MutationBitflip,
+    MutationByteflip,
+    MutationByteinc,
+    MutationBytedec,
+    MutationByteneg,
+    MutationByterand,
+    MutationByteadd,
+    MutationWordadd,
+    MutationDwordadd,
+    MutationQwordadd,
+    MutationByteinteresting,
+    MutationWordinteresting,
+    MutationDwordinteresting,
+    MutationBytesdelete,
+    MutationBytesexpand,
+    MutationBytesinsert,
+    MutationBytesrandinsert,
+    MutationBytesset,
+    MutationBytesrandset,
+    MutationBytescopy,
+    MutationBytesswap,
+    MutationTokenInsert,
+    MutationTokenReplace,
+    MutationCrossoverInsert,
+    MutationCrossoverReplace,
+    MutationSplice,
+}
+
 // TODO maybe the mutator arg is not needed
 /// The generic function type that identifies mutations
 pub type MutationFunction<I, S> = fn(&mut S, &mut I) -> Result<MutationResult, Error>;
@@ -29,13 +59,13 @@ where
     I: Input,
 {
     /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, S>;
+    fn mutation_by_idx(&self, index: usize) -> (MutationFunction<I, S>, MutationType);
 
     /// Get the number of mutations
     fn mutations_count(&self) -> usize;
 
     /// Add a mutation
-    fn add_mutation(&mut self, mutation: MutationFunction<I, S>);
+    fn add_mutation(&mut self, mutation: (MutationFunction<I, S>, MutationType));
 }
 
 /// Mem move in the own vec

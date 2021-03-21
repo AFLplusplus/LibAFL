@@ -198,7 +198,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<u32, Error>
+    ) -> Result<(u32, Option<usize>), Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -499,7 +499,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<u32, Error>
+    ) -> Result<(u32, Option<usize>), Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -514,18 +514,19 @@ where
             // If the input is a solution, add it to the respective corpus
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
-
+        let corpus_index : Option<usize> = None;
         if self
             .add_if_interesting(&input, fitness, scheduler)?
             .is_some()
         {
             let observers_buf = manager.serialize_observers(observers)?;
+            let corpus_index = self.corpus().count() + 1;
             manager.fire(
                 self,
                 Event::NewTestcase {
                     input,
                     observers_buf,
-                    corpus_size: self.corpus().count() + 1,
+                    corpus_size: corpus_index,
                     client_config: "TODO".into(),
                     time: crate::utils::current_time(),
                     executions: *self.executions(),
@@ -533,7 +534,7 @@ where
             )?;
         }
 
-        Ok(fitness)
+        Ok((fitness, corpus_index))
     }
 }
 
@@ -683,7 +684,7 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let fitness = self.evaluate_input(input, executor, manager, scheduler)?;
+            let (fitness, _) = self.evaluate_input(input, executor, manager, scheduler)?;
             if fitness > 0 {
                 added += 1;
             }

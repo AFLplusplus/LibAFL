@@ -8,7 +8,7 @@ use core::{
 use crate::{
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
-    mutators::Mutator,
+    mutators::{Mutator,MutationType},
     state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
     utils::Rand,
     Error,
@@ -17,7 +17,15 @@ use crate::{
 pub use crate::mutators::mutations::*;
 pub use crate::mutators::token_mutations::*;
 
-pub trait ScheduledMutator<I, S>: Mutator<I, S> + ComposedByMutations<I, S>
+pub trait LogMutations
+{
+    fn log_clear(&mut self);
+
+    fn log_mutation(&mut self, mutation_type : MutationType);
+}
+
+
+pub trait ScheduledMutator<I, S>: Mutator<I, S> + ComposedByMutations<I, S> + LogMutations
 where
     I: Input,
 {
@@ -29,11 +37,13 @@ where
 
     /// New default implementation for mutate
     /// Implementations must forward mutate() to this method
-    fn scheduled_mutate(&self, state: &mut S, input: &mut I, _stage_idx: i32) -> Result<(), Error> {
+    fn scheduled_mutate(&mut self, state: &mut S, input: &mut I, _stage_idx: i32) -> Result<(), Error> {
         let num = self.iterations(state, input);
         for _ in 0..num {
-            let idx = self.schedule(self.mutations_count(), state, input);
-            self.mutation_by_idx(idx)(state, input)?;
+            let idx = self.schedule(self.mutations_count(), state, input);//log it in schedule
+            let (mutation_fp, mutation_type) = self.mutation_by_idx(idx);
+            self.log_mutation(mutation_type);
+            mutation_fp(state, input)?;
         }
         Ok(())
     }
@@ -45,7 +55,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    mutations: Vec<MutationFunction<I, S>>,
+    mutations: Vec<(MutationFunction<I, S>, MutationType)>,
+    mutation_log: Vec<MutationType>,
     phantom: PhantomData<R>,
 }
 
@@ -71,7 +82,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
-    fn mutate(&self, state: &mut S, input: &mut I, _stage_idx: i32) -> Result<(), Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I, _stage_idx: i32) -> Result<(), Error> {
         self.scheduled_mutate(state, input, _stage_idx)
     }
 }
@@ -83,7 +94,7 @@ where
     R: Rand,
 {
     #[inline]
-    fn mutation_by_idx(&self, index: usize) -> MutationFunction<I, S> {
+    fn mutation_by_idx(&self, index: usize) -> (MutationFunction<I, S>, MutationType) {
         self.mutations[index]
     }
 
@@ -93,8 +104,24 @@ where
     }
 
     #[inline]
-    fn add_mutation(&mut self, mutation: MutationFunction<I, S>) {
+    fn add_mutation(&mut self, mutation: (MutationFunction<I, S>, MutationType)) {
         self.mutations.push(mutation)
+    }
+}
+
+impl<I,R,S> LogMutations for StdScheduledMutator<I, R, S>
+where
+    I: Input,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn log_clear(&mut self){
+        self.mutation_log.clear();
+    }
+
+    #[inline]
+    fn log_mutation(&mut self, mutation_type : MutationType){
+        self.mutation_log.push(mutation_type)
     }
 }
 
@@ -126,14 +153,16 @@ where
     pub fn new() -> Self {
         Self {
             mutations: vec![],
+            mutation_log: vec![],
             phantom: PhantomData,
         }
     }
 
     /// Create a new StdScheduledMutator instance specifying mutations
-    pub fn with_mutations(mutations: Vec<MutationFunction<I, S>>) -> Self {
+    pub fn with_mutations(mutations: Vec<(MutationFunction<I, S>, MutationType)>) -> Self {
         StdScheduledMutator {
             mutations,
+            mutation_log: vec![],
             phantom: PhantomData,
         }
     }
@@ -173,7 +202,7 @@ where
     R: Rand,
 {
     /// Mutate bytes
-    fn mutate(&self, state: &mut S, input: &mut I, stage_idx: i32) -> Result<(), Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I, stage_idx: i32) -> Result<(), Error> {
         self.scheduled.mutate(state, input, stage_idx)?;
         /*let num = self.scheduled.iterations(state, input);
         for _ in 0..num {
@@ -210,8 +239,8 @@ where
 {
     /// Create a new HavocBytesMutator instance given a ScheduledMutator to wrap
     pub fn new(mut scheduled: SM) -> Self {
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_splice);
+        scheduled.add_mutation((mutation_bitflip, MutationType::MutationBitflip));
+        scheduled.add_mutation((mutation_splice, MutationType::MutationSplice));
         Self {
             scheduled,
             phantom: PhantomData,
@@ -229,38 +258,38 @@ where
     /// Create a new HavocBytesMutator instance wrapping StdScheduledMutator
     fn default() -> Self {
         let mut scheduled = StdScheduledMutator::<I, R, S>::new();
-        scheduled.add_mutation(mutation_bitflip);
-        scheduled.add_mutation(mutation_byteflip);
-        scheduled.add_mutation(mutation_byteinc);
-        scheduled.add_mutation(mutation_bytedec);
-        scheduled.add_mutation(mutation_byteneg);
-        scheduled.add_mutation(mutation_byterand);
+        scheduled.add_mutation((mutation_bitflip, MutationType::MutationBitflip));
+        scheduled.add_mutation((mutation_byteflip, MutationType::MutationByteflip));
+        scheduled.add_mutation((mutation_byteinc, MutationType::MutationByteinc));
+        scheduled.add_mutation((mutation_bytedec, MutationType::MutationBytedec));
+        scheduled.add_mutation((mutation_byteneg, MutationType::MutationByteneg));
+        scheduled.add_mutation((mutation_byterand, MutationType::MutationByterand));
 
-        scheduled.add_mutation(mutation_byteadd);
-        scheduled.add_mutation(mutation_wordadd);
-        scheduled.add_mutation(mutation_dwordadd);
-        scheduled.add_mutation(mutation_qwordadd);
-        scheduled.add_mutation(mutation_byteinteresting);
-        scheduled.add_mutation(mutation_wordinteresting);
-        scheduled.add_mutation(mutation_dwordinteresting);
+        scheduled.add_mutation((mutation_byteadd, MutationType::MutationByteadd));
+        scheduled.add_mutation((mutation_wordadd, MutationType::MutationWordadd));
+        scheduled.add_mutation((mutation_dwordadd, MutationType::MutationDwordadd));
+        scheduled.add_mutation((mutation_qwordadd, MutationType::MutationQwordadd));
+        scheduled.add_mutation((mutation_byteinteresting, MutationType::MutationByteinteresting));
+        scheduled.add_mutation((mutation_wordinteresting, MutationType::MutationWordinteresting));
+        scheduled.add_mutation((mutation_dwordinteresting, MutationType::MutationDwordinteresting));
 
-        scheduled.add_mutation(mutation_bytesdelete);
-        scheduled.add_mutation(mutation_bytesdelete);
-        scheduled.add_mutation(mutation_bytesdelete);
-        scheduled.add_mutation(mutation_bytesdelete);
-        scheduled.add_mutation(mutation_bytesexpand);
-        scheduled.add_mutation(mutation_bytesinsert);
-        scheduled.add_mutation(mutation_bytesrandinsert);
-        scheduled.add_mutation(mutation_bytesset);
-        scheduled.add_mutation(mutation_bytesrandset);
-        scheduled.add_mutation(mutation_bytescopy);
-        scheduled.add_mutation(mutation_bytesswap);
+        scheduled.add_mutation((mutation_bytesdelete, MutationType::MutationBytesdelete));
+        scheduled.add_mutation((mutation_bytesdelete, MutationType::MutationBytesdelete));
+        scheduled.add_mutation((mutation_bytesdelete, MutationType::MutationBytesdelete));
+        scheduled.add_mutation((mutation_bytesdelete, MutationType::MutationBytesdelete));
+        scheduled.add_mutation((mutation_bytesexpand, MutationType::MutationBytesexpand));
+        scheduled.add_mutation((mutation_bytesinsert, MutationType::MutationBytesinsert));
+        scheduled.add_mutation((mutation_bytesrandinsert, MutationType::MutationBytesrandinsert));
+        scheduled.add_mutation((mutation_bytesset, MutationType::MutationBytesset));
+        scheduled.add_mutation((mutation_bytesrandset, MutationType::MutationBytesrandset));
+        scheduled.add_mutation((mutation_bytescopy, MutationType::MutationBytescopy));
+        scheduled.add_mutation((mutation_bytesswap, MutationType::MutationBytesswap));
 
-        scheduled.add_mutation(mutation_tokeninsert);
-        scheduled.add_mutation(mutation_tokenreplace);
+        scheduled.add_mutation((mutation_tokeninsert, MutationType::MutationTokenInsert));
+        scheduled.add_mutation((mutation_tokenreplace, MutationType::MutationTokenReplace));
 
-        scheduled.add_mutation(mutation_crossover_insert);
-        scheduled.add_mutation(mutation_crossover_replace);
+        scheduled.add_mutation((mutation_crossover_insert, MutationType::MutationCrossoverInsert));
+        scheduled.add_mutation((mutation_crossover_replace, MutationType::MutationCrossoverReplace));
         //scheduled.add_mutation(mutation_splice);
 
         HavocBytesMutator {

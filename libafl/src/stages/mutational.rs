@@ -56,8 +56,8 @@ where
                 .load_input()?
                 .clone();
             self.mutator().mutate(state, &mut input_mut, i as i32)?;
-
-            let fitness = state.evaluate_input(input_mut, executor, manager, scheduler)?;
+            let corpus_idx : Option<u32>;
+            let (fitness, corpus_index) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
 
             self.mutator().post_exec(state, fitness, i as i32)?;
         }

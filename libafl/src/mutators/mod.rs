@@ -19,7 +19,7 @@ where
     I: Input,
 {
     /// Mutate a given input
-    fn mutate(&self, state: &mut S, input: &mut I, stage_idx: i32) -> Result<(), Error>;
+    fn mutate(&mut self, state: &mut S, input: &mut I, stage_idx: i32) -> Result<(), Error>;
 
     /// Post-process given the outcome of the execution
     fn post_exec(
