@@ -440,7 +440,7 @@ mod unix_signal_handler {
             }
             // let's yolo-cat the maps for debugging, if possible.
             #[cfg(all(target_os = "linux", feature = "std"))]
-            match fs::read_to_string("/proc/self/maps") {
+            match std::fs::read_to_string("/proc/self/maps") {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
             };
