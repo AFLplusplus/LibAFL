@@ -40,7 +40,7 @@ where
 
     /// Runs this (mutational) stage for the given testcase
     fn perform_mutational(
-        &self,
+        &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
@@ -55,11 +55,11 @@ where
                 .borrow_mut()
                 .load_input()?
                 .clone();
-            self.mutator().mutate(state, &mut input_mut, i as i32)?;
+            self.mutator_mut().mutate(state, &mut input_mut, i as i32)?;
             let corpus_idx : Option<u32>;
             let (fitness, corpus_index) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
 
-            self.mutator().post_exec(state, fitness, i as i32)?;
+            self.mutator_mut().post_exec(state, fitness, i as i32)?;
         }
         Ok(())
     }
@@ -131,7 +131,7 @@ where
 {
     #[inline]
     fn perform(
-        &self,
+        &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,

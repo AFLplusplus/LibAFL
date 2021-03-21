@@ -38,9 +38,9 @@ where
 
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, S> {
-    fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
+    fn fuzz_one(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
 
-    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
+    fn fuzz_loop(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
 }
 
 /// Your default fuzzer instance, for everyday use.
@@ -102,17 +102,17 @@ where
     OT: ObserversTuple,
     I: Input,
 {
-    fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
+    fn fuzz_one(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
         let idx = self.scheduler().next(state)?;
 
-        self.stages()
+        self.stages_mut()
             .perform_all(state, executor, manager, self.scheduler(), idx)?;
 
         manager.process(state, executor, self.scheduler())?;
         Ok(idx)
     }
 
-    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
+    fn fuzz_loop(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
         let mut last = current_milliseconds();
         loop {
             self.fuzz_one(state, executor, manager)?;
