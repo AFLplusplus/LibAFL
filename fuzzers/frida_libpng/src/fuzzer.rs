@@ -36,7 +36,7 @@ use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 
 use libloading;
 
-use std::{cell::RefCell, env, ffi::c_void, path::PathBuf, ptr};
+use std::{cell::RefCell, env, ffi::c_void, path::PathBuf};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a> {
@@ -160,6 +160,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             let mut first = true;
             for instruction in basic_block {
                 if first {
+                    first = false;
                     let address = unsafe { (*instruction.instr()).address };
                     if address >= helper.base_address
                         && address <= helper.base_address + helper.size as u64
@@ -226,6 +227,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                             );
                         }
                     }
+                }
                 instruction.keep()
             }
         });
@@ -283,7 +285,7 @@ where
 
     /// Called right after execution finished.
     #[inline]
-    fn post_exec<EM, S>(&mut self, state: &S, event_mgr: &mut EM, input: &I) -> Result<(), Error>
+    fn post_exec<EM, S>(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error>
     where
         EM: EventManager<I, S>,
     {

@@ -19,10 +19,7 @@ fn main() {
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
-<<<<<<< HEAD
     std::fs::create_dir_all(&out_dir).expect(&format!("Failed to create {}", &out_dir));
-=======
->>>>>>> b6a43d8 (frida: initial working (but slow + buggy) frida helper)
 
     println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
     println!("cargo:rerun-if-changed=harness.cc");

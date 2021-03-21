@@ -112,7 +112,7 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        Ok(())
+        Ok(ExitKind::Ok)
     }
 }
 
