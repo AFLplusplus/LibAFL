@@ -223,10 +223,7 @@ mod unix_signal_handler {
     use core::ptr;
     use libc::{c_void, siginfo_t};
     #[cfg(feature = "std")]
-    use std::{
-        fs,
-        io::{stdout, Write},
-    };
+    use std::io::{stdout, Write};
 
     use crate::{
         bolts::os::unix_signals::{Handler, Signal},

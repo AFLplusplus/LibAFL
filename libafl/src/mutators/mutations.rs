@@ -752,13 +752,13 @@ where
 
 // Converts a hex u8 to its u8 value: 'A' -> 10 etc.
 fn from_hex(hex: u8) -> Result<u8, Error> {
-    if hex >= 48 && hex <= 57 {
+    if (48..=57).contains(&hex) {
         return Ok(hex - 48);
     }
-    if hex >= 65 && hex <= 70 {
+    if (65..=70).contains(&hex) {
         return Ok(hex - 55);
     }
-    if hex >= 97 && hex <= 102 {
+    if (97..=102).contains(&hex) {
         return Ok(hex - 87);
     }
     Err(Error::IllegalArgument("".to_owned()))
@@ -781,17 +781,15 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
             decoded += from_hex(c)?;
             token.push(decoded);
             take_next_two = 0;
-        } else {
-            if c != backslash || take_next {
-                if take_next && (c == 120 || c == 88) {
-                    take_next_two = 1;
-                } else {
-                    token.push(c);
-                }
-                take_next = false;
+        } else if c != backslash || take_next {
+            if take_next && (c == 120 || c == 88) {
+                take_next_two = 1;
             } else {
-                take_next = true;
+                token.push(c);
             }
+            take_next = false;
+        } else {
+            take_next = true;
         }
     }
 
