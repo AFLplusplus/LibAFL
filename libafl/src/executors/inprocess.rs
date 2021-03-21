@@ -223,10 +223,7 @@ mod unix_signal_handler {
     use core::ptr;
     use libc::{c_void, siginfo_t};
     #[cfg(feature = "std")]
-    use std::{
-        fs,
-        io::{stdout, Write},
-    };
+    use std::io::{stdout, Write};
 
     use crate::{
         bolts::os::unix_signals::{Handler, Signal},
@@ -443,7 +440,7 @@ mod unix_signal_handler {
             }
             // let's yolo-cat the maps for debugging, if possible.
             #[cfg(all(target_os = "linux", feature = "std"))]
-            match fs::read_to_string("/proc/self/maps") {
+            match std::fs::read_to_string("/proc/self/maps") {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
             };
