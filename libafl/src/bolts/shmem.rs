@@ -20,9 +20,9 @@ use crate::Error;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct ShMemDescription {
     /// Size of this map
-    size: usize,
+    pub size: usize,
     /// of name of this map, as fixed 20 bytes c-string
-    str_bytes: [u8; 20],
+    pub str_bytes: [u8; 20],
 }
 
 /// A Shared map
