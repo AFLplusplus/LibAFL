@@ -49,7 +49,14 @@ where
     E: Executor<I>,
     I: Input,
 {
-    fn perform_all(&mut self, _: &mut S, _: &mut E, _: &mut EM, _: &CS, _: usize) -> Result<(), Error> {
+    fn perform_all(
+        &mut self,
+        _: &mut S,
+        _: &mut E,
+        _: &mut EM,
+        _: &CS,
+        _: usize,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

@@ -56,9 +56,11 @@ where
                 .load_input()?
                 .clone();
             self.mutator_mut().mutate(state, &mut input_mut, i as i32)?;
-            let (fitness, corpus_idx) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
+            let (fitness, corpus_idx) =
+                state.evaluate_input(input_mut, executor, manager, scheduler)?;
 
-            self.mutator_mut().post_exec(state, fitness, i as i32, corpus_idx)?;
+            self.mutator_mut()
+                .post_exec(state, fitness, i as i32, corpus_idx)?;
         }
         Ok(())
     }

@@ -23,11 +23,11 @@ where
 
     /// Post-process given the outcome of the execution
     fn post_exec(
-        &self,
+        &mut self,
         _state: &mut S,
         _is_interesting: u32,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>
+        _corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
         Ok(())
     }
