@@ -192,18 +192,19 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                         }
                         #[cfg(target_arch = "x86_64")]
                         {
+                            println!("here");
                             writer.put_lea_reg_reg_offset(
-                                X86Register::RSP,
-                                X86Register::RSP,
+                                X86Register::Rsp,
+                                X86Register::Rsp,
                                 -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
                             );
-                            writer.put_push_reg(X86Register::RDI);
-                            writer.put_mov_reg_address(X86Register::RDI, address);
+                            writer.put_push_reg(X86Register::Rdi);
+                            writer.put_mov_reg_address(X86Register::Rdi, address);
                             writer.put_call_address(helper.current_log_impl);
-                            writer.put_pop_reg(X86Register::RDI);
+                            writer.put_pop_reg(X86Register::Rdi);
                             writer.put_lea_reg_reg_offset(
-                                X86Register::RSP,
-                                X86Register::RSP,
+                                X86Register::Rsp,
+                                X86Register::Rsp,
                                 frida_gum_sys::GUM_RED_ZONE_SIZE as i32,
                             );
                         }
