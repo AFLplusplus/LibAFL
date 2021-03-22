@@ -312,7 +312,7 @@ impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SH: ShMem,
+    SH: ShMem + HasFd,
     ST: Stats,
 {
     #[cfg(all(feature = "std", unix))]
