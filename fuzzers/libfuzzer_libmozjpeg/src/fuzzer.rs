@@ -36,20 +36,6 @@ extern "C" {
     static __lafl_max_edges_size: u32;
 }
 
-/// The wrapped harness function, calling out to the LLVM-style harness
-#[cfg(unix)]
-fn harness<E, I>(_executor: &E, buf: &[u8]) -> ExitKind
-where
-    E: Executor<I>,
-    I: Input,
-{
-    // println!("{:?}", buf);
-    unsafe {
-        LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len());
-    }
-    ExitKind::Ok
-}
-
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -121,10 +107,16 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // A fuzzer with just one stage and a random policy to get testcasess from the corpus
     let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
 
+    // The wrapped harness function, calling out to the LLVM-style harness
+    let mut harness = |buf: &[u8]| {
+        unsafe { LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len()) };
+        ExitKind::Ok
+    };
+
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
         "in-process(edges)",
-        harness,
+        &mut harness,
         tuple_list!(edges_observer),
         &mut state,
         &mut restarting_mgr,

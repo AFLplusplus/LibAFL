@@ -126,6 +126,16 @@ where
         }
     }
 
+    /// Creates a new MapObserver with an owned map
+    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: ArrayMut::Owned(map),
+            name: name.to_string(),
+            initial,
+        }
+    }
+
     /// Creates a new MapObserver from a raw pointer
     /// # Safety
     /// Will dereference the map_ptr with up to len elements.

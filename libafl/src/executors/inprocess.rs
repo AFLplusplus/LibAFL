@@ -25,26 +25,25 @@ use crate::{
     Error,
 };
 
-/// The inmem executor harness
-type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
-
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InProcessExecutor<I, OT>
+pub struct InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
     /// The name of this executor instance, to address it from other components
     name: &'static str,
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: HarnessFunction<Self>,
+    harness_fn: &'a mut H,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<I>,
 }
 
-impl<I, OT> Executor<I> for InProcessExecutor<I, OT>
+impl<'a, H, I, OT> Executor<I> for InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -95,7 +94,7 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
-        let ret = (self.harness_fn)(self, bytes.as_slice());
+        let ret = (self.harness_fn)(bytes.as_slice());
         Ok(ret)
     }
 
@@ -126,8 +125,9 @@ where
     }
 }
 
-impl<I, OT> Named for InProcessExecutor<I, OT>
+impl<'a, H, I, OT> Named for InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -136,8 +136,9 @@ where
     }
 }
 
-impl<I, OT> HasObservers<OT> for InProcessExecutor<I, OT>
+impl<'a, H, I, OT> HasObservers<OT> for InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -152,8 +153,9 @@ where
     }
 }
 
-impl<I, OT> InProcessExecutor<I, OT>
+impl<'a, H, I, OT> InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -166,7 +168,7 @@ where
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OC, OFT, S>(
         name: &'static str,
-        harness_fn: HarnessFunction<Self>,
+        harness_fn: &'a mut H,
         observers: OT,
         _state: &mut S,
         _event_mgr: &mut EM,
@@ -214,6 +216,18 @@ where
             name,
             phantom: PhantomData,
         })
+    }
+
+    /// Retrieve the harness function.
+    #[inline]
+    pub fn harness(&self) -> &H {
+        self.harness_fn
+    }
+
+    /// Retrieve the harness function for a mutable reference.
+    #[inline]
+    pub fn harness_mut(&mut self) -> &mut H {
+        self.harness_fn
     }
 }
 
@@ -627,19 +641,15 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         executors::{Executor, ExitKind, InProcessExecutor},
-        inputs::Input,
+        inputs::NopInput,
     };
-
-    fn test_harness_fn_nop<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
-        ExitKind::Ok
-    }
 
     #[test]
     fn test_inmem_exec() {
-        use crate::inputs::NopInput;
+        let mut harness = |_buf: &[u8]| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<NopInput, ()> {
-            harness_fn: test_harness_fn_nop,
+        let mut in_process_executor = InProcessExecutor::<_, NopInput, ()> {
+            harness_fn: &mut harness,
             observers: tuple_list!(),
             name: "main",
             phantom: PhantomData,
