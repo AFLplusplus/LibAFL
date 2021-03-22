@@ -67,7 +67,7 @@ jobs:
       run: where.exe cargo
     - name: Add clang path to $PATH env
       if: runner.os == 'Windows'
-      run: echo 'C:\msys64\mingw64\bin' >> $GITHUB_PATH
+      run: echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
     - name: Try if clang works
       run: clang -v
     - name: Windows Test
