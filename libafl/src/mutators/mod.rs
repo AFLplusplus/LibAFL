@@ -27,6 +27,7 @@ where
         _state: &mut S,
         _is_interesting: u32,
         _stage_idx: i32,
+        _corpus_idx: Option<usize>
     ) -> Result<(), Error> {
         Ok(())
     }

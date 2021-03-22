@@ -25,7 +25,7 @@ pub trait LogMutations
 }
 
 
-pub trait ScheduledMutator<I, S>: Mutator<I, S> + ComposedByMutations<I, S> + LogMutations
+pub trait ScheduledMutator<I, S>: ComposedByMutations<I, S> + LogMutations + Mutator<I, S>
 where
     I: Input,
 {
@@ -40,7 +40,7 @@ where
     fn scheduled_mutate(&mut self, state: &mut S, input: &mut I, _stage_idx: i32) -> Result<(), Error> {
         let num = self.iterations(state, input);
         for _ in 0..num {
-            let idx = self.schedule(self.mutations_count(), state, input);//log it in schedule
+            let idx = self.schedule(self.mutations_count(), state, input);
             let (mutation_fp, mutation_type) = self.mutation_by_idx(idx);
             self.log_mutation(mutation_type);
             mutation_fp(state, input)?;
@@ -84,6 +84,16 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I, _stage_idx: i32) -> Result<(), Error> {
         self.scheduled_mutate(state, input, _stage_idx)
+    }
+
+    fn post_exec(
+        &self,
+        _state: &mut S,
+        _is_interesting: u32,
+        _stage_idx: i32,
+        _corpus_idx: Option<usize>
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -226,6 +236,16 @@ where
             mutation(self, state, input)?;
         }*/
         Ok(())
+    }
+
+    fn post_exec(
+        &self,
+        state: &mut S,
+        is_interesting: u32,
+        stage_idx: i32,
+        corpus_idx: Option<usize>
+    ) -> Result<(), Error> {
+        self.scheduled.post_exec(state,is_interesting,stage_idx,corpus_idx)
     }
 }
 

@@ -514,19 +514,19 @@ where
             // If the input is a solution, add it to the respective corpus
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
-        let corpus_index : Option<usize> = None;
+        let corpus_idx : Option<usize> = None;
         if self
             .add_if_interesting(&input, fitness, scheduler)?
             .is_some()
         {
             let observers_buf = manager.serialize_observers(observers)?;
-            let corpus_index = self.corpus().count() + 1;
+            let corpus_idx = self.corpus().count() + 1;
             manager.fire(
                 self,
                 Event::NewTestcase {
                     input,
                     observers_buf,
-                    corpus_size: corpus_index,
+                    corpus_size: corpus_idx,
                     client_config: "TODO".into(),
                     time: crate::utils::current_time(),
                     executions: *self.executions(),
@@ -534,7 +534,7 @@ where
             )?;
         }
 
-        Ok((fitness, corpus_index))
+        Ok((fitness, corpus_idx))
     }
 }
 
