@@ -63,5 +63,9 @@ jobs:
     - uses: actions/checkout@v2
     - name: Windows Build
       run: cargo build --verbose
+    - name: Add clang path to $PATH env
+      shell: bash
+      if: runner.os == 'Windows'
+      run: echo "PATH=$PATH:C:\msys64\mingw64\bin" >> $GITHUB_ENV
     - name: Windows Test
       run: cargo test --verbose
