@@ -520,8 +520,7 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
@@ -559,8 +558,7 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
