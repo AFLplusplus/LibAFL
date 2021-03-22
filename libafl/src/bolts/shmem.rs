@@ -98,7 +98,7 @@ pub trait ShMem: Sized + Debug {
 }
 
 /// shared maps that have an id can use this trait
-#[cfg(all(unix, feature = "std"))]
+//#[cfg(all(unix, feature = "std"))]
 pub trait HasFd {
     /// Retrieve the id of this shared map
     fn shm_id(&self) -> i32;

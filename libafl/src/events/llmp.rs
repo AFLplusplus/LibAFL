@@ -308,6 +308,7 @@ where
     }
 }
 
+#[cfg(all(feature = "std", unix))]
 impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
