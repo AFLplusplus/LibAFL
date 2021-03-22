@@ -65,17 +65,10 @@ jobs:
     #  run: cargo build --verbose
     - name: find cargo location
       run: where.exe cargo
-    - name: More path test
-      run: echo "::add-path::C:\msys64\mingw64\bin"
     - name: Add clang path to $PATH env
-      shell: bash
       if: runner.os == 'Windows'
-      run: echo 'PATH="$PATH:C:\msys64\mingw64\bin"' >> $GITHUB_ENV
+      run: echo 'C:\msys64\mingw64\bin' >> $GITHUB_PATH
     - name: Try if clang works
-      shell: bash
-      if: runner.os == 'Windows'
-      run: PATH="$PATH:C:\msys64\mingw64\bin" clang -v
-    - name: Windows Test
-      run: PATH="$PATH:C:\msys64\mingw64\bin" C:\Rust\.cargo\bin\cargo.exe test --verbose
-    - name: More Clang test
       run: clang -v
+    - name: Windows Test
+      run: C:\Rust\.cargo\bin\cargo.exe test --verbose
