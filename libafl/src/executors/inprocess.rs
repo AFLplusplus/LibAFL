@@ -94,8 +94,17 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
-
         let ret = (self.harness_fn)(bytes.as_slice());
+        Ok(ret)
+    }
+
+    #[inline]
+    fn post_exec<EM, S>(
+        &mut self,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -112,7 +121,7 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        Ok(ExitKind::Ok)
+        Ok(())
     }
 }
 
@@ -635,19 +644,15 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         executors::{Executor, ExitKind, InProcessExecutor},
-        inputs::Input,
+        inputs::NopInput,
     };
-
-    fn test_harness_fn_nop<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
-        ExitKind::Ok
-    }
 
     #[test]
     fn test_inmem_exec() {
-        use crate::inputs::NopInput;
+        let mut harness = |_buf: &[u8]| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<NopInput, ()> {
-            harness_fn: test_harness_fn_nop,
+        let mut in_process_executor = InProcessExecutor::<_, NopInput, ()> {
+            harness_fn: &mut harness,
             observers: tuple_list!(),
             name: "main",
             phantom: PhantomData,
@@ -656,4 +661,3 @@ mod tests {
         assert!(in_process_executor.run_target(&mut input).is_ok());
     }
 }
-

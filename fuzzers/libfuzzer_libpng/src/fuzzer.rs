@@ -12,7 +12,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
@@ -138,7 +138,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
             "in-process(edges)",
-            harness,
+            &mut harness,
             tuple_list!(edges_observer, TimeObserver::new("time")),
             &mut state,
             &mut restarting_mgr,

@@ -285,7 +285,12 @@ where
 
     /// Called right after execution finished.
     #[inline]
-    fn post_exec<EM, S>(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error>
+    fn post_exec<EM, S>(
+        &mut self,
+        state: &mut S,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error>
     where
         EM: EventManager<I, S>,
     {
