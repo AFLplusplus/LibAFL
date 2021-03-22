@@ -451,6 +451,7 @@ where
     }
 }
 
+#[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpConnection<SH>
 where
     SH: ShMem + HasFd,
@@ -1889,6 +1890,7 @@ where
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
 /// and get incoming messages from the shared broker bus
 /// If the Shm has a fd, we can attach to it.
+#[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpClient<SH>
 where
     SH: ShMem + HasFd,

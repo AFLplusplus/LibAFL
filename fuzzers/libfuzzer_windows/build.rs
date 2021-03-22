@@ -1,7 +1,7 @@
 // build.rs
 
 #[cfg(windows)]
-use std::{env, path::Path};
+use std::env;
 
 #[cfg(not(windows))]
 fn main() {
@@ -33,6 +33,12 @@ fn main() {
         .cpp(true)
         .flag("-fsanitize-coverage=trace-pc-guard")
         // .define("HAS_DUMMY_CRASH", "1")
+        .flag("-Wno-void-pointer-to-int-cast")
+        .flag("-Wno-pointer-to-int-cast")
+        .flag("-Wno-int-to-pointer-cast")
+        .flag("-Wno-sign-compare")
+        .flag("-Wno-format")
+        .flag("-Wno-unused-variable")
         .file("./harness.cc")
         .compile("windows-harness");
 
