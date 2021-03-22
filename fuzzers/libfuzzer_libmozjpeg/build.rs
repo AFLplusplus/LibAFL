@@ -48,16 +48,13 @@ fn main() {
             .arg(&libmozjpeg_tar)
             .status()
             .unwrap();
-        Command::new(format!("{}/cmake", &libmozjpeg))
-            .current_dir(&out_dir_path)
-            .args(&[
-                "-G\"Unix Makefiles\"",
-                "--disable-shared",
-                &libmozjpeg,
-                "CC=clang",
-                "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-                "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
-            ])
+        //println!("cargo:warning=Running cmake on {}", &libmozjpeg);
+
+        Command::new("cmake")
+            .current_dir(&libmozjpeg_path)
+            .args(&["-G", "Unix Makefiles", "--disable-shared"])
+            .arg(&libmozjpeg)
+            .env("OPT_LEVEL", "3")
             .env("CC", "clang")
             .env("CXX", "clang++")
             .env(
@@ -68,13 +65,17 @@ fn main() {
                 "CXXFLAGS",
                 "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
             )
-            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard");
+            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
+            .status()
+            .unwrap();
+
         Command::new("make")
             .current_dir(&libmozjpeg_path)
             //.arg(&format!("-j{}", num_cpus::get()))
             .args(&[
                 "CC=clang",
                 "CXX=clang++",
+                "OPT_LEVEL=3",
                 "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
                 "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
                 "CXXFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
