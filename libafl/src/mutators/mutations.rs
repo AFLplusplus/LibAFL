@@ -3,70 +3,17 @@
 use crate::{
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
+    mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
     utils::Rand,
     Error,
 };
 
 use alloc::{borrow::ToOwned, vec::Vec};
-use core::cmp::{max, min};
-
-/// The result of a mutation.
-/// If the mutation got skipped, the target
-/// will not be executed with the returned input.
-#[derive(Clone, Copy, Debug)]
-pub enum MutationResult {
-    Mutated,
-    Skipped,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum MutationType {
-    MutationBitflip,
-    MutationByteflip,
-    MutationByteinc,
-    MutationBytedec,
-    MutationByteneg,
-    MutationByterand,
-    MutationByteadd,
-    MutationWordadd,
-    MutationDwordadd,
-    MutationQwordadd,
-    MutationByteinteresting,
-    MutationWordinteresting,
-    MutationDwordinteresting,
-    MutationBytesdelete,
-    MutationBytesexpand,
-    MutationBytesinsert,
-    MutationBytesrandinsert,
-    MutationBytesset,
-    MutationBytesrandset,
-    MutationBytescopy,
-    MutationBytesswap,
-    MutationTokenInsert,
-    MutationTokenReplace,
-    MutationCrossoverInsert,
-    MutationCrossoverReplace,
-    MutationSplice,
-}
-
-// TODO maybe the mutator arg is not needed
-/// The generic function type that identifies mutations
-pub type MutationFunction<I, S> = fn(&mut S, &mut I) -> Result<MutationResult, Error>;
-
-pub trait ComposedByMutations<I, S>
-where
-    I: Input,
-{
-    /// Get a mutation by index
-    fn mutation_by_idx(&self, index: usize) -> (MutationFunction<I, S>, MutationType);
-
-    /// Get the number of mutations
-    fn mutations_count(&self) -> usize;
-
-    /// Add a mutation
-    fn add_mutation(&mut self, mutation: (MutationFunction<I, S>, MutationType));
-}
+use core::{
+    cmp::{max, min},
+    marker::PhantomData,
+};
 
 /// Mem move in the own vec
 #[inline]
@@ -142,578 +89,1275 @@ const INTERESTING_32: [i32; 27] = [
 ];
 
 /// Bitflip mutation for inputs with a bytes vector
-pub fn mutation_bitflip<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+#[derive(Default)]
+pub struct BitFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for BitFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let bit = state.rand_mut().below((input.bytes().len() << 3) as u64) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                *input.bytes_mut().get_unchecked_mut(bit >> 3) ^= (128 >> (bit & 7)) as u8;
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> BitFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Byteflip mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct ByteFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for ByteFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                *input.bytes_mut().get_unchecked_mut(idx) ^= 0xff;
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> ByteFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Byte increment mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct ByteIncMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for ByteIncMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx);
+                *ptr = (*ptr).wrapping_add(1);
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> ByteIncMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Byte decrement mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct ByteDecMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for ByteDecMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx);
+                *ptr = (*ptr).wrapping_sub(1);
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> ByteDecMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Byte negate mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct ByteNegMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for ByteNegMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                *input.bytes_mut().get_unchecked_mut(idx) = !(*input.bytes().get_unchecked(idx));
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> ByteNegMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Byte random mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct ByteRandMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for ByteRandMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                *input.bytes_mut().get_unchecked_mut(idx) = state.rand_mut().below(256) as u8;
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> ByteRandMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Byte add mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct ByteAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for ByteAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut u8;
+                let num = 1 + state.rand_mut().below(ARITH_MAX) as u8;
+                match state.rand_mut().below(2) {
+                    0 => *ptr = (*ptr).wrapping_add(num),
+                    _ => *ptr = (*ptr).wrapping_sub(num),
+                };
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> ByteAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Word add mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct WordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for WordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().len() < 2 {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
+                let num = 1 + state.rand_mut().below(ARITH_MAX) as u16;
+                match state.rand_mut().below(4) {
+                    0 => *ptr = (*ptr).wrapping_add(num),
+                    1 => *ptr = (*ptr).wrapping_sub(num),
+                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
+                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
+                };
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> WordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Dword add mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct DwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for DwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().len() < 4 {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
+                let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
+                match state.rand_mut().below(4) {
+                    0 => *ptr = (*ptr).wrapping_add(num),
+                    1 => *ptr = (*ptr).wrapping_sub(num),
+                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
+                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
+                };
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> DwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Qword add mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct QwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for QwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().len() < 8 {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64 - 7) as usize;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u64;
+                let num = 1 + state.rand_mut().below(ARITH_MAX) as u64;
+                match state.rand_mut().below(4) {
+                    0 => *ptr = (*ptr).wrapping_add(num),
+                    1 => *ptr = (*ptr).wrapping_sub(num),
+                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
+                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
+                };
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> QwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Byte interesting mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct ByteInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for ByteInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
+            let val =
+                INTERESTING_8[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u8;
+            unsafe {
+                // Moar speed, no bound check
+                *input.bytes_mut().get_unchecked_mut(idx) = val;
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> ByteInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Word interesting mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct WordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for WordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().len() < 2 {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
+            let val =
+                INTERESTING_16[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u16;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
+                if state.rand_mut().below(2) == 0 {
+                    *ptr = val;
+                } else {
+                    *ptr = val.swap_bytes();
+                }
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> WordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Dword interesting mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct DwordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for DwordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.bytes().len() < 4 {
+            Ok(MutationResult::Skipped)
+        } else {
+            let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
+            let val =
+                INTERESTING_32[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u32;
+            unsafe {
+                // Moar speed, no bound check
+                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
+                if state.rand_mut().below(2) == 0 {
+                    *ptr = val;
+                } else {
+                    *ptr = val.swap_bytes();
+                }
+            }
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl<I, R, S> DwordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Bytes delete mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesDeleteMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for BytesDeleteMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+        if size <= 2 {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let off = state.rand_mut().below(size as u64) as usize;
+        let len = state.rand_mut().below((size - off) as u64) as usize;
+        input.bytes_mut().drain(off..off + len);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> BytesDeleteMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Bytes expand mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesExpandMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let bit = state.rand_mut().below((input.bytes().len() << 3) as u64) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            *input.bytes_mut().get_unchecked_mut(bit >> 3) ^= (128 >> (bit & 7)) as u8;
-        }
-        Ok(MutationResult::Mutated)
-    }
+    phantom: PhantomData<(I, R, S)>,
 }
 
-pub fn mutation_byteflip<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+impl<I, R, S> Mutator<I, S> for BytesExpandMutator<I, R, S>
 where
     I: Input + HasBytesVec,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            *input.bytes_mut().get_unchecked_mut(idx) ^= 0xff;
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let max_size = state.max_size();
+        let size = input.bytes().len();
+        let off = state.rand_mut().below((size + 1) as u64) as usize;
+        let mut len = 1 + state.rand_mut().below(16) as usize;
 
-pub fn mutation_byteinc<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx);
-            *ptr = (*ptr).wrapping_add(1);
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_bytedec<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx);
-            *ptr = (*ptr).wrapping_sub(1);
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_byteneg<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            *input.bytes_mut().get_unchecked_mut(idx) = !(*input.bytes().get_unchecked(idx));
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_byterand<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            *input.bytes_mut().get_unchecked_mut(idx) = state.rand_mut().below(256) as u8;
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_byteadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut u8;
-            let num = 1 + state.rand_mut().below(ARITH_MAX) as u8;
-            match state.rand_mut().below(2) {
-                0 => *ptr = (*ptr).wrapping_add(num),
-                _ => *ptr = (*ptr).wrapping_sub(num),
-            };
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_wordadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().len() < 2 {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
-            let num = 1 + state.rand_mut().below(ARITH_MAX) as u16;
-            match state.rand_mut().below(4) {
-                0 => *ptr = (*ptr).wrapping_add(num),
-                1 => *ptr = (*ptr).wrapping_sub(num),
-                2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-            };
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_dwordadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().len() < 4 {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
-            let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
-            match state.rand_mut().below(4) {
-                0 => *ptr = (*ptr).wrapping_add(num),
-                1 => *ptr = (*ptr).wrapping_sub(num),
-                2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-            };
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_qwordadd<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().len() < 8 {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64 - 7) as usize;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u64;
-            let num = 1 + state.rand_mut().below(ARITH_MAX) as u64;
-            match state.rand_mut().below(4) {
-                0 => *ptr = (*ptr).wrapping_add(num),
-                1 => *ptr = (*ptr).wrapping_sub(num),
-                2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-            };
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_byteinteresting<I, R, S>(
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().is_empty() {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        let val = INTERESTING_8[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u8;
-        unsafe {
-            // Moar speed, no bound check
-            *input.bytes_mut().get_unchecked_mut(idx) = val;
-        }
-        Ok(MutationResult::Mutated)
-    }
-}
-
-pub fn mutation_wordinteresting<I, R, S>(
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    if input.bytes().len() < 2 {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
-        let val =
-            INTERESTING_16[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u16;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
-            if state.rand_mut().below(2) == 0 {
-                *ptr = val;
+        if size + len > max_size {
+            if max_size > size {
+                len = max_size - size;
             } else {
-                *ptr = val.swap_bytes();
+                return Ok(MutationResult::Skipped);
             }
         }
+
+        input.bytes_mut().resize(size + len, 0);
+        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+
         Ok(MutationResult::Mutated)
     }
 }
 
-pub fn mutation_dwordinteresting<I, R, S>(
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+impl<I, R, S> BytesExpandMutator<I, R, S>
 where
     I: Input + HasBytesVec,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    if input.bytes().len() < 4 {
-        Ok(MutationResult::Skipped)
-    } else {
-        let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
-        let val =
-            INTERESTING_32[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u32;
-        unsafe {
-            // Moar speed, no bound check
-            let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
-            if state.rand_mut().below(2) == 0 {
-                *ptr = val;
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Bytes insert mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesInsertMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for BytesInsertMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let max_size = state.max_size();
+        let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        let off = state.rand_mut().below((size + 1) as u64) as usize;
+        let mut len = 1 + state.rand_mut().below(16) as usize;
+
+        if size + len > max_size {
+            if max_size > size {
+                len = max_size - size;
             } else {
-                *ptr = val.swap_bytes();
+                return Ok(MutationResult::Skipped);
             }
         }
+
+        let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
+
+        input.bytes_mut().resize(size + len, 0);
+        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+        buffer_set(input.bytes_mut(), off, len, val);
+
         Ok(MutationResult::Mutated)
     }
 }
 
-pub fn mutation_bytesdelete<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
-where
-    I: Input + HasBytesVec,
-    S: HasRand<R>,
-    R: Rand,
-{
-    let size = input.bytes().len();
-    if size <= 2 {
-        return Ok(MutationResult::Skipped);
-    }
-
-    let off = state.rand_mut().below(size as u64) as usize;
-    let len = state.rand_mut().below((size - off) as u64) as usize;
-    input.bytes_mut().drain(off..off + len);
-
-    Ok(MutationResult::Mutated)
-}
-
-pub fn mutation_bytesexpand<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+impl<I, R, S> BytesInsertMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    let max_size = state.max_size();
-    let size = input.bytes().len();
-    let off = state.rand_mut().below((size + 1) as u64) as usize;
-    let mut len = 1 + state.rand_mut().below(16) as usize;
-
-    if size + len > max_size {
-        if max_size > size {
-            len = max_size - size;
-        } else {
-            return Ok(MutationResult::Skipped);
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
         }
     }
-
-    input.bytes_mut().resize(size + len, 0);
-    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-
-    Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesinsert<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+/// Bytes random insert mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesRandInsertMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    let max_size = state.max_size();
-    let size = input.bytes().len();
-    if size == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-    let off = state.rand_mut().below((size + 1) as u64) as usize;
-    let mut len = 1 + state.rand_mut().below(16) as usize;
-
-    if size + len > max_size {
-        if max_size > size {
-            len = max_size - size;
-        } else {
-            return Ok(MutationResult::Skipped);
-        }
-    }
-
-    let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
-
-    input.bytes_mut().resize(size + len, 0);
-    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-    buffer_set(input.bytes_mut(), off, len, val);
-
-    Ok(MutationResult::Mutated)
+    phantom: PhantomData<(I, R, S)>,
 }
 
-pub fn mutation_bytesrandinsert<I, R, S>(
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+impl<I, R, S> Mutator<I, S> for BytesRandInsertMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    let max_size = state.max_size();
-    let size = input.bytes().len();
-    let off = state.rand_mut().below((size + 1) as u64) as usize;
-    let mut len = 1 + state.rand_mut().below(16) as usize;
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let max_size = state.max_size();
+        let size = input.bytes().len();
+        let off = state.rand_mut().below((size + 1) as u64) as usize;
+        let mut len = 1 + state.rand_mut().below(16) as usize;
 
-    if size + len > max_size {
-        if max_size > size {
-            len = max_size - size;
-        } else {
-            return Ok(MutationResult::Skipped);
+        if size + len > max_size {
+            if max_size > size {
+                len = max_size - size;
+            } else {
+                return Ok(MutationResult::Skipped);
+            }
+        }
+
+        let val = state.rand_mut().below(256) as u8;
+
+        input.bytes_mut().resize(size + len, 0);
+        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+        buffer_set(input.bytes_mut(), off, len, val);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> BytesRandInsertMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
         }
     }
-
-    let val = state.rand_mut().below(256) as u8;
-
-    input.bytes_mut().resize(size + len, 0);
-    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-    buffer_set(input.bytes_mut(), off, len, val);
-
-    Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesset<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+/// Bytes set mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesSetMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
     R: Rand,
 {
-    let size = input.bytes().len();
-    if size == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-    let off = state.rand_mut().below(size as u64) as usize;
-    let len = 1 + state.rand_mut().below(min(16, size - off) as u64) as usize;
-
-    let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
-
-    buffer_set(input.bytes_mut(), off, len, val);
-
-    Ok(MutationResult::Mutated)
+    phantom: PhantomData<(I, R, S)>,
 }
 
-pub fn mutation_bytesrandset<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+impl<I, R, S> Mutator<I, S> for BytesSetMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
     R: Rand,
 {
-    let size = input.bytes().len();
-    if size == 0 {
-        return Ok(MutationResult::Skipped);
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        let off = state.rand_mut().below(size as u64) as usize;
+        let len = 1 + state.rand_mut().below(min(16, size - off) as u64) as usize;
+
+        let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
+
+        buffer_set(input.bytes_mut(), off, len, val);
+
+        Ok(MutationResult::Mutated)
     }
-    let off = state.rand_mut().below(size as u64) as usize;
-    let len = 1 + state.rand_mut().below(min(16, size - off) as u64) as usize;
-
-    let val = state.rand_mut().below(256) as u8;
-
-    buffer_set(input.bytes_mut(), off, len, val);
-
-    Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytescopy<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+impl<I, R, S> BytesSetMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
     R: Rand,
 {
-    let size = input.bytes().len();
-    if size <= 1 {
-        return Ok(MutationResult::Skipped);
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
     }
-
-    let from = state.rand_mut().below(input.bytes().len() as u64) as usize;
-    let to = state.rand_mut().below(input.bytes().len() as u64) as usize;
-    let len = 1 + state.rand_mut().below((size - max(from, to)) as u64) as usize;
-
-    buffer_self_copy(input.bytes_mut(), from, to, len);
-
-    Ok(MutationResult::Mutated)
 }
 
-pub fn mutation_bytesswap<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+/// Bytes random set mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesRandSetMutator<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasRand<R>,
     R: Rand,
 {
-    let size = input.bytes().len();
-    if size <= 1 {
-        return Ok(MutationResult::Skipped);
-    }
-
-    let first = state.rand_mut().below(input.bytes().len() as u64) as usize;
-    let second = state.rand_mut().below(input.bytes().len() as u64) as usize;
-    let len = 1 + state.rand_mut().below((size - max(first, second)) as u64) as usize;
-
-    let tmp = input.bytes()[first..(first + len)].to_vec();
-    buffer_self_copy(input.bytes_mut(), second, first, len);
-    buffer_copy(input.bytes_mut(), &tmp, 0, second, len);
-
-    Ok(MutationResult::Mutated)
+    phantom: PhantomData<(I, R, S)>,
 }
 
-/// Crossover insert mutation
-pub fn mutation_crossover_insert<C, I, R, S>(
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+impl<I, R, S> Mutator<I, S> for BytesRandSetMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        let off = state.rand_mut().below(size as u64) as usize;
+        let len = 1 + state.rand_mut().below(min(16, size - off) as u64) as usize;
+
+        let val = state.rand_mut().below(256) as u8;
+
+        buffer_set(input.bytes_mut(), off, len, val);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> BytesRandSetMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Bytes copy mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for BytesCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+        if size <= 1 {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let from = state.rand_mut().below(input.bytes().len() as u64) as usize;
+        let to = state.rand_mut().below(input.bytes().len() as u64) as usize;
+        let len = 1 + state.rand_mut().below((size - max(from, to)) as u64) as usize;
+
+        buffer_self_copy(input.bytes_mut(), from, to, len);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> BytesCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Bytes swap mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesSwapMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for BytesSwapMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+        if size <= 1 {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let first = state.rand_mut().below(input.bytes().len() as u64) as usize;
+        let second = state.rand_mut().below(input.bytes().len() as u64) as usize;
+        let len = 1 + state.rand_mut().below((size - max(first, second)) as u64) as usize;
+
+        let tmp = input.bytes()[first..(first + len)].to_vec();
+        buffer_self_copy(input.bytes_mut(), second, first, len);
+        buffer_copy(input.bytes_mut(), &tmp, 0, second, len);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> BytesSwapMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Crossover insert mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct CrossoverInsertMutator<C, I, R, S>
 where
     C: Corpus<I>,
     I: Input + HasBytesVec,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I> + HasMaxSize,
 {
-    let size = input.bytes().len();
-
-    // We don't want to use the testcase we're already using for splicing
-    let count = state.corpus().count();
-    let idx = state.rand_mut().below(count as u64) as usize;
-    if let Some(cur) = state.corpus().current() {
-        if idx == *cur {
-            return Ok(MutationResult::Skipped);
-        }
-    }
-
-    let other_size = state
-        .corpus()
-        .get(idx)?
-        .borrow_mut()
-        .load_input()?
-        .bytes()
-        .len();
-    if other_size < 2 {
-        return Ok(MutationResult::Skipped);
-    }
-
-    let max_size = state.max_size();
-    let from = state.rand_mut().below(other_size as u64) as usize;
-    let to = state.rand_mut().below(size as u64) as usize;
-    let mut len = state.rand_mut().below((other_size - from) as u64) as usize;
-
-    let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-    let other = other_testcase.load_input()?;
-
-    if size + len > max_size {
-        if max_size > size {
-            len = max_size - size;
-        } else {
-            return Ok(MutationResult::Skipped);
-        }
-    }
-
-    input.bytes_mut().resize(size + len, 0);
-    buffer_self_copy(input.bytes_mut(), to, to + len, size - to);
-    buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
-
-    Ok(MutationResult::Mutated)
+    phantom: PhantomData<(C, I, R, S)>,
 }
 
-/// Crossover replace mutation
-pub fn mutation_crossover_replace<C, I, R, S>(
-    state: &mut S,
-    input: &mut I,
-) -> Result<MutationResult, Error>
+impl<C, I, R, S> Mutator<I, S> for CrossoverInsertMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I> + HasMaxSize,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+
+        // We don't want to use the testcase we're already using for splicing
+        let count = state.corpus().count();
+        let idx = state.rand_mut().below(count as u64) as usize;
+        if let Some(cur) = state.corpus().current() {
+            if idx == *cur {
+                return Ok(MutationResult::Skipped);
+            }
+        }
+
+        let other_size = state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .load_input()?
+            .bytes()
+            .len();
+        if other_size < 2 {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let max_size = state.max_size();
+        let from = state.rand_mut().below(other_size as u64) as usize;
+        let to = state.rand_mut().below(size as u64) as usize;
+        let mut len = state.rand_mut().below((other_size - from) as u64) as usize;
+
+        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other = other_testcase.load_input()?;
+
+        if size + len > max_size {
+            if max_size > size {
+                len = max_size - size;
+            } else {
+                return Ok(MutationResult::Skipped);
+            }
+        }
+
+        input.bytes_mut().resize(size + len, 0);
+        buffer_self_copy(input.bytes_mut(), to, to + len, size - to);
+        buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<C, I, R, S> CrossoverInsertMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I> + HasMaxSize,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Crossover replace mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct CrossoverReplaceMutator<C, I, R, S>
 where
     C: Corpus<I>,
     I: Input + HasBytesVec,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
 {
-    let size = input.bytes().len();
+    phantom: PhantomData<(C, I, R, S)>,
+}
 
-    // We don't want to use the testcase we're already using for splicing
-    let count = state.corpus().count();
-    let idx = state.rand_mut().below(count as u64) as usize;
-    if let Some(cur) = state.corpus().current() {
-        if idx == *cur {
+impl<C, I, R, S> Mutator<I, S> for CrossoverReplaceMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I>,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+
+        // We don't want to use the testcase we're already using for splicing
+        let count = state.corpus().count();
+        let idx = state.rand_mut().below(count as u64) as usize;
+        if let Some(cur) = state.corpus().current() {
+            if idx == *cur {
+                return Ok(MutationResult::Skipped);
+            }
+        }
+
+        let other_size = state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .load_input()?
+            .bytes()
+            .len();
+        if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
+
+        let from = state.rand_mut().below(other_size as u64) as usize;
+        let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
+        let to = state.rand_mut().below((size - len) as u64) as usize;
+
+        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other = other_testcase.load_input()?;
+
+        buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
+
+        Ok(MutationResult::Mutated)
     }
+}
 
-    let other_size = state
-        .corpus()
-        .get(idx)?
-        .borrow_mut()
-        .load_input()?
-        .bytes()
-        .len();
-    if other_size < 2 {
-        return Ok(MutationResult::Skipped);
+impl<C, I, R, S> CrossoverReplaceMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I>,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
     }
-
-    let from = state.rand_mut().below(other_size as u64) as usize;
-    let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
-    let to = state.rand_mut().below((size - len) as u64) as usize;
-
-    let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-    let other = other_testcase.load_input()?;
-
-    buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
-
-    Ok(MutationResult::Mutated)
 }
 
 /// Returns the first and last diff position between the given vectors, stopping at the min len
@@ -732,52 +1376,84 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     (first_diff, last_diff)
 }
 
-/// Splicing mutation from AFL
-pub fn mutation_splice<C, I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+/// Splice mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct SpliceMutator<C, I, R, S>
 where
     C: Corpus<I>,
     I: Input + HasBytesVec,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
 {
-    // We don't want to use the testcase we're already using for splicing
-    let count = state.corpus().count();
-    let idx = state.rand_mut().below(count as u64) as usize;
-    if let Some(cur) = state.corpus().current() {
-        if idx == *cur {
-            return Ok(MutationResult::Skipped);
-        }
-    }
+    phantom: PhantomData<(C, I, R, S)>,
+}
 
-    let (first_diff, last_diff) = {
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
-
-        let mut counter = 0;
-        loop {
-            let (f, l) = locate_diffs(input.bytes(), other.bytes());
-
-            if f != l && f >= 0 && l >= 2 {
-                break (f, l);
-            }
-            if counter == 3 {
+impl<C, I, R, S> Mutator<I, S> for SpliceMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I>,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        // We don't want to use the testcase we're already using for splicing
+        let count = state.corpus().count();
+        let idx = state.rand_mut().below(count as u64) as usize;
+        if let Some(cur) = state.corpus().current() {
+            if idx == *cur {
                 return Ok(MutationResult::Skipped);
             }
-            counter += 1;
         }
-    };
 
-    let split_at = state
-        .rand_mut()
-        .between(first_diff as u64, last_diff as u64) as usize;
+        let (first_diff, last_diff) = {
+            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let other = other_testcase.load_input()?;
 
-    let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-    let other = other_testcase.load_input()?;
-    input
-        .bytes_mut()
-        .splice(split_at.., other.bytes()[split_at..].iter().cloned());
+            let mut counter = 0;
+            loop {
+                let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
-    Ok(MutationResult::Mutated)
+                if f != l && f >= 0 && l >= 2 {
+                    break (f, l);
+                }
+                if counter == 3 {
+                    return Ok(MutationResult::Skipped);
+                }
+                counter += 1;
+            }
+        };
+
+        let split_at = state
+            .rand_mut()
+            .between(first_diff as u64, last_diff as u64) as usize;
+
+        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other = other_testcase.load_input()?;
+        input
+            .bytes_mut()
+            .splice(split_at.., other.bytes()[split_at..].iter().cloned());
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<C, I, R, S> SpliceMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I>,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
 }
 
 // Converts a hex u8 to its u8 value: 'A' -> 10 etc.
