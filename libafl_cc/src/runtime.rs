@@ -13,11 +13,13 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
-    if start == stop || *start != 0 { return }
-    
+    if start == stop || *start != 0 {
+        return;
+    }
+
     while start < stop {
         MAX_EDGES_NUM += 1;
-        *start = (MAX_EDGES_NUM & (MAP_SIZE -1)) as u32;
+        *start = (MAX_EDGES_NUM & (MAP_SIZE - 1)) as u32;
         start = start.offset(1);
     }
 }

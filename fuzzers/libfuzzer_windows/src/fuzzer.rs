@@ -1,6 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
+#[cfg(windows)]
 use std::{env, path::PathBuf};
 
 #[cfg(windows)]
@@ -24,7 +25,7 @@ use libafl::{
 };
 
 /// We will interact with a C++ target, so use external c functionality
-//#[cfg(unix)]
+#[cfg(windows)]
 extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
@@ -43,10 +44,16 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
+    #[cfg(windows)]
     println!(
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
+
+    #[cfg(not(windows))]
+    todo!("Example currently only supports Windows.");
+
+    #[cfg(windows)]
     fuzz(
         vec![PathBuf::from("./corpus")],
         PathBuf::from("./crashes"),

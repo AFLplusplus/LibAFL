@@ -1,10 +1,15 @@
 // build.rs
 
-use std::{
-    env,
-    path::Path,
-};
+#[cfg(windows)]
+use std::{env, path::Path};
 
+#[cfg(not(windows))]
+fn main() {
+    println!("cargo:warning=Skipping libpng windows example on non-Windows");
+    return;
+}
+
+#[cfg(windows)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
