@@ -1,6 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
+#[cfg(unix)]
 use core::time::Duration;
 use std::{env, path::PathBuf};
 

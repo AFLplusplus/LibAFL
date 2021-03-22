@@ -1,7 +1,9 @@
 //! A TimeoutExecutor set a timeout before each target run
 
+#[cfg(unix)]
 use core::{marker::PhantomData, time::Duration};
 
+#[cfg(unix)]
 use crate::{
     bolts::tuples::Named,
     events::EventManager,
@@ -39,6 +41,7 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout excutor is a wrapper that set a timeout before each run
+#[cfg(unix)]
 pub struct TimeoutExecutor<E, I, OT>
 where
     E: Executor<I> + HasObservers<OT>,
@@ -50,6 +53,7 @@ where
     phantom: PhantomData<(I, OT)>,
 }
 
+#[cfg(unix)]
 impl<E, I, OT> Named for TimeoutExecutor<E, I, OT>
 where
     E: Executor<I> + HasObservers<OT>,
@@ -61,6 +65,7 @@ where
     }
 }
 
+#[cfg(unix)]
 impl<E, I, OT> HasObservers<OT> for TimeoutExecutor<E, I, OT>
 where
     E: Executor<I> + HasObservers<OT>,
@@ -78,6 +83,7 @@ where
     }
 }
 
+#[cfg(unix)]
 impl<E, I, OT> TimeoutExecutor<E, I, OT>
 where
     E: Executor<I> + HasObservers<OT>,
@@ -93,6 +99,7 @@ where
     }
 }
 
+#[cfg(unix)]
 impl<E, I, OT> Executor<I> for TimeoutExecutor<E, I, OT>
 where
     E: Executor<I> + HasObservers<OT>,

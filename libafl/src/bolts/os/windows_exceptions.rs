@@ -14,7 +14,7 @@ use std::os::raw::{c_long, c_void};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
+//const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 

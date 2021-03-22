@@ -11,7 +11,7 @@ const LIBPNG_URL: &str =
 
 fn main() {
     if cfg!(windows) {
-        println!("cargo:warning=Skipping libpng example on Windows");
+        println!("cargo:warning=Skipping libpng frida example on Windows");
         exit(0);
     }
 

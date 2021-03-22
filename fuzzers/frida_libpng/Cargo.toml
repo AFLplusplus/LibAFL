@@ -22,7 +22,7 @@ frida = ["frida-gum", "frida-gum-sys"]
 cc = { version = "1.0", features = ["parallel"] }
 num_cpus = "1.0"
 
-[dependencies]
+[target.'cfg(unix)'.dependencies]
 libafl = { path = "../../libafl/" }
 #frida-gum = { path = "../../../frida-rust/frida-gum", version = "0.2.3", optional = true, features = ["auto-download", "event-sink", "invocation-listener"] }
 #frida-gum-sys = { path = "../../../frida-rust/frida-gum-sys", version = "0.2.2", optional = true, features = ["auto-download", "event-sink", "invocation-listener"] }
@@ -34,6 +34,6 @@ libloading = "0.7.0"
 
 [[example]]
 name = "frida_libpng"
-path = "./src/fuzzer.rs"
+path = "./src/main.rs"
 test = false
 bench = false

@@ -23,6 +23,7 @@ use libafl::{
     Error,
 };
 
+#[cfg(unix)]
 const MAP_SIZE: usize = 16 * 1024;
 
 /// We will interact with a C++ target, so use external c functionality
