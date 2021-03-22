@@ -102,7 +102,7 @@ use crate::{
     Error,
 };
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 use super::shmem::HasFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
