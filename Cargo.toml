@@ -8,6 +8,7 @@ debug = true
 members = [
     "libafl",
     "libafl_derive",
+    "libafl_cc",
 
     #example fuzzers
     "fuzzers/libfuzzer_libpng",
