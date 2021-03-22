@@ -20,9 +20,9 @@ use crate::Error;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct ShMemDescription {
     /// Size of this map
-    size: usize,
+    pub size: usize,
     /// of name of this map, as fixed 20 bytes c-string
-    str_bytes: [u8; 20],
+    pub str_bytes: [u8; 20],
 }
 
 /// A Shared map
@@ -370,7 +370,7 @@ pub mod unix_shmem {
             // Not set or not initialized;
             return;
         }
-        (*shm).shm_str[0 as usize] = 0u8;
+        (*shm).shm_str[0_usize] = 0u8;
         shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
         (*shm).map = ptr::null_mut();
     }

@@ -15,7 +15,7 @@ fn main() {
     }
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
+    //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
 
@@ -24,7 +24,7 @@ fn main() {
 
     let libmozjpeg = format!("{}/mozjpeg-4.0.3", &out_dir);
     let libmozjpeg_path = Path::new(&libmozjpeg);
-    let libmozjpeg_tar = format!("{}/v4.0.3.tar.gz", &cwd);
+    let libmozjpeg_tar = format!("{}/v4.0.3.tar.gz", &out_dir);
 
     // Enforce clang for its -fsanitize-coverage support.
     std::env::set_var("CC", "clang");
@@ -48,16 +48,13 @@ fn main() {
             .arg(&libmozjpeg_tar)
             .status()
             .unwrap();
-        Command::new(format!("{}/cmake", &libmozjpeg))
-            .current_dir(&out_dir_path)
-            .args(&[
-                "-G\"Unix Makefiles\"",
-                "--disable-shared",
-                &libmozjpeg,
-                "CC=clang",
-                "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-                "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
-            ])
+        //println!("cargo:warning=Running cmake on {}", &libmozjpeg);
+
+        Command::new("cmake")
+            .current_dir(&libmozjpeg_path)
+            .args(&["-G", "Unix Makefiles", "--disable-shared"])
+            .arg(&libmozjpeg)
+            .env("OPT_LEVEL", "3")
             .env("CC", "clang")
             .env("CXX", "clang++")
             .env(
@@ -68,13 +65,17 @@ fn main() {
                 "CXXFLAGS",
                 "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
             )
-            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard");
+            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
+            .status()
+            .unwrap();
+
         Command::new("make")
             .current_dir(&libmozjpeg_path)
             //.arg(&format!("-j{}", num_cpus::get()))
             .args(&[
                 "CC=clang",
                 "CXX=clang++",
+                "OPT_LEVEL=3",
                 "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
                 "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
                 "CXXFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",

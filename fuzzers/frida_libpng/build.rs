@@ -16,15 +16,17 @@ fn main() {
     }
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
+    let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
+    std::fs::create_dir_all(&out_dir).expect(&format!("Failed to create {}", &out_dir));
 
     println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
     println!("cargo:rerun-if-changed=harness.cc");
 
     let libpng = format!("{}/libpng-1.6.37", &out_dir);
     let libpng_path = Path::new(&libpng);
-    let libpng_tar = format!("{}/libpng-1.6.37.tar.xz", &out_dir);
+    let libpng_tar = format!("{}/libpng-1.6.37.tar.xz", &cwd);
 
     // Enforce clang for its -fsanitize-coverage support.
     std::env::set_var("CC", "clang");
@@ -34,6 +36,7 @@ fn main() {
         Err(_) => "".to_string(),
     };
 
+    // println!("cargo:warning=output path is {}", libpng);
     if !libpng_path.is_dir() {
         if !Path::new(&libpng_tar).is_file() {
             println!("cargo:warning=Libpng not found, downloading...");
@@ -48,7 +51,7 @@ fn main() {
         }
         Command::new("tar")
             .current_dir(&out_dir_path)
-            .arg("-xvf")
+            .arg("xvf")
             .arg(&libpng_tar)
             .status()
             .unwrap();
@@ -62,15 +65,16 @@ fn main() {
             .env("CXX", "clang++")
             .env(
                 "CFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIC -fno-omit-frame-pointer",
             )
             .env(
                 "CXXFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
+                "-O3 -g -D_DEFAULT_SOURCE -fPIC -fno-omit-frame-pointer",
             )
             .env(
                 "LDFLAGS",
-                format!("-g -fPIE -fsanitize-coverage=trace-pc-guard {}", ldflags),
+                //format!("-g -fPIE -fsanitize=address {}", ldflags),
+                format!("-g -fPIE {}", ldflags),
             )
             .status()
             .unwrap();
@@ -80,29 +84,31 @@ fn main() {
             .unwrap();
     }
 
-    cc::Build::new()
-        .file("../libfuzzer_runtime/rt.c")
-        .compile("libfuzzer-sys");
-
-    cc::Build::new()
-        .include(&libpng_path)
+    let status = cc::Build::new()
         .cpp(true)
-        .flag("-fsanitize-coverage=trace-pc-guard")
-        // .define("HAS_DUMMY_CRASH", "1")
-        .file("./harness.cc")
-        .compile("libfuzzer-harness");
-
-    println!("cargo:rustc-link-search=native={}", &out_dir);
-    println!("cargo:rustc-link-search=native={}/.libs", &libpng);
-    println!("cargo:rustc-link-lib=static=png16");
-
-    //Deps for libpng: -pthread -lz -lm
-    println!("cargo:rustc-link-lib=dylib=m");
-    println!("cargo:rustc-link-lib=dylib=z");
-
-    //For the C++ harness
-    //must by dylib for android
-    println!("cargo:rustc-link-lib=dylib=stdc++");
+        .get_compiler()
+        .to_command()
+        .current_dir(&cwd)
+        .arg("-I")
+        .arg(format!("{}", &libpng))
+        //.arg("-D")
+        //.arg("HAS_DUMMY_CRASH=1")
+        .arg("-fPIC")
+        .arg("-shared")
+        .arg(if env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" {
+            "-static-libstdc++"
+        } else {
+            ""
+        })
+        .arg("-o")
+        .arg(format!("{}/libpng-harness.so", &out_dir))
+        .arg("./harness.cc")
+        .arg(format!("{}/.libs/libpng16.a", &libpng))
+        .arg("-l")
+        .arg("z")
+        .status()
+        .unwrap();
+    assert!(status.success());
 
     println!("cargo:rerun-if-changed=build.rs");
 }

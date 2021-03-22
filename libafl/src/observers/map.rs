@@ -1,4 +1,7 @@
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -121,6 +124,16 @@ where
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
+            name: name.to_string(),
+            initial,
+        }
+    }
+
+    /// Creates a new MapObserver with an owned map
+    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: ArrayMut::Owned(map),
             name: name.to_string(),
             initial,
         }
