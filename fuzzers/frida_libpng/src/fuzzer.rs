@@ -25,7 +25,7 @@ use libafl::{
 };
 
 #[cfg(target_arch = "x86_64")]
-use frida_gum::instruction_writer::X86Regsiter;
+use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
