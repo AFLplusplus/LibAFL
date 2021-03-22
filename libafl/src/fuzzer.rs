@@ -37,10 +37,10 @@ where
 }
 
 /// The main fuzzer trait.
-pub trait Fuzzer<E, EM, S> {
-    fn fuzz_one(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
+pub trait Fuzzer<E, EM, S, CS> {
+    fn fuzz_one(&mut self, state: &mut S, executor: &mut E, manager: &mut EM, scheduler :&CS) -> Result<usize, Error>;
 
-    fn fuzz_loop(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
+    fn fuzz_loop(&mut self, state: &mut S, executor: &mut E, manager: &mut EM, scheduler :&CS) -> Result<usize, Error>;
 }
 
 /// Your default fuzzer instance, for everyday use.
@@ -53,9 +53,8 @@ where
     EM: EventManager<I, S>,
     I: Input,
 {
-    scheduler: CS,
     stages: ST,
-    phantom: PhantomData<(E, EM, I, OT, S)>,
+    phantom: PhantomData<(CS, E, EM, I, OT, S)>,
 }
 
 impl<CS, ST, E, EM, I, OT, S> HasStages<CS, E, EM, I, S, ST> for StdFuzzer<CS, ST, E, EM, I, OT, S>
@@ -75,6 +74,7 @@ where
     }
 }
 
+/*
 impl<CS, ST, E, EM, I, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
@@ -91,8 +91,9 @@ where
         &mut self.scheduler
     }
 }
+*/
 
-impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
+impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S, CS> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     S: HasExecutions,
@@ -102,20 +103,20 @@ where
     OT: ObserversTuple,
     I: Input,
 {
-    fn fuzz_one(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
-        let idx = self.scheduler().next(state)?;
+    fn fuzz_one(&mut self, state: &mut S, executor: &mut E, manager: &mut EM, scheduler: &CS) -> Result<usize, Error> {
+        let idx = scheduler.next(state)?;
 
         self.stages_mut()
-            .perform_all(state, executor, manager, self.scheduler(), idx)?;
+            .perform_all(state, executor, manager, scheduler, idx)?;
 
-        manager.process(state, executor, self.scheduler())?;
+        manager.process(state, executor, scheduler)?;
         Ok(idx)
     }
 
-    fn fuzz_loop(&mut self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
+    fn fuzz_loop(&mut self, state: &mut S, executor: &mut E, manager: &mut EM, scheduler: &CS) -> Result<usize, Error> {
         let mut last = current_milliseconds();
         loop {
-            self.fuzz_one(state, executor, manager)?;
+            self.fuzz_one(state, executor, manager, scheduler)?;
             let cur = current_milliseconds();
             if cur - last > 60 * 100 {
                 last = cur;
@@ -140,9 +141,8 @@ where
     EM: EventManager<I, S>,
     I: Input,
 {
-    pub fn new(scheduler: CS, stages: ST) -> Self {
+    pub fn new(stages: ST) -> Self {
         Self {
-            scheduler,
             stages,
             phantom: PhantomData,
         }

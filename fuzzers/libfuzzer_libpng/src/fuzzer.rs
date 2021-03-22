@@ -14,7 +14,7 @@ use libafl::{
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind, TimeoutExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     inputs::Input,
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -141,7 +141,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
-    let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = TimeoutExecutor::new(
@@ -170,7 +170,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             .load_initial_inputs(
                 &mut executor,
                 &mut restarting_mgr,
-                fuzzer.scheduler(),
+                &scheduler,
                 &corpus_dirs,
             )
             .expect(&format!(
@@ -180,7 +180,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
+    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached
     Ok(())
