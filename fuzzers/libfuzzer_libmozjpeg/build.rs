@@ -15,7 +15,7 @@ fn main() {
     }
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
+    //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
 
@@ -24,7 +24,7 @@ fn main() {
 
     let libmozjpeg = format!("{}/mozjpeg-4.0.3", &out_dir);
     let libmozjpeg_path = Path::new(&libmozjpeg);
-    let libmozjpeg_tar = format!("{}/v4.0.3.tar.gz", &cwd);
+    let libmozjpeg_tar = format!("{}/v4.0.3.tar.gz", &out_dir);
 
     // Enforce clang for its -fsanitize-coverage support.
     std::env::set_var("CC", "clang");
