@@ -104,7 +104,6 @@ pub trait HasFd {
     fn shm_id(&self) -> i32;
 }
 
-
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 

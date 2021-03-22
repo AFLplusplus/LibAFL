@@ -1,7 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
-use core::time::Duration;
 use std::{env, path::PathBuf};
 
 #[cfg(windows)]
@@ -12,10 +11,9 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
-    inputs::Input,
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
@@ -37,20 +35,6 @@ extern "C" {
     static __lafl_edges_map: *mut u8;
     static __lafl_cmp_map: *mut u8;
     static __lafl_max_edges_size: u32;
-}
-
-/// The wrapped harness function, calling out to the LLVM-style harness
-//#[cfg(unix)]
-fn harness<E, I>(_executor: &E, buf: &[u8]) -> ExitKind
-where
-    E: Executor<I>,
-    I: Input,
-{
-    // println!("{:?}", buf);
-    unsafe {
-        LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len());
-    }
-    ExitKind::Ok
 }
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
@@ -80,6 +64,12 @@ pub fn main() {
 /// The actual fuzzer
 #[cfg(windows)]
 fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
+    // The wrapped harness function, calling out to the LLVM-style harness
+    let mut harness = |buf: &[u8]| {
+        unsafe { LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len()) };
+        ExitKind::Ok
+    };
+
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
@@ -144,17 +134,13 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(
-            "in-process(edges)",
-            harness,
-            tuple_list!(edges_observer, TimeObserver::new("time")),
-            &mut state,
-            &mut restarting_mgr,
-        )?,
-        // 10 seconds timeout
-        Duration::new(10, 0),
-    );
+    let mut executor = InProcessExecutor::new(
+        "in-process(edges)",
+        &mut harness,
+        tuple_list!(edges_observer, TimeObserver::new("time")),
+        &mut state,
+        &mut restarting_mgr,
+    )?;
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.

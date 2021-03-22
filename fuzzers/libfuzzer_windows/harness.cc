@@ -211,7 +211,8 @@ int load_stbi(const uint8_t *data, int size)
   int channels;
 
   const unsigned char * img = stbi_load_from_memory(data, size, &w, &h, &channels, 0);
-  if(img) stbi_image_free(img);
+  if (img) { stbi_image_free((void *)img); }
+  // STBI_FREE((void *)img); }
 
   return 0;
 }

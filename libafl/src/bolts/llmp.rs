@@ -453,7 +453,7 @@ where
 
 impl<SH> LlmpConnection<SH>
 where
-    SH: ShMem,// + HasFd,
+    SH: ShMem, // + HasFd,
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
