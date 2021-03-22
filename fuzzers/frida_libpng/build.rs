@@ -90,7 +90,7 @@ fn main() {
         .to_command()
         .current_dir(&cwd)
         .arg("-I")
-        .arg(format!("{}", &libpng))
+        .arg(&libpng)
         //.arg("-D")
         //.arg("HAS_DUMMY_CRASH=1")
         .arg("-fPIC")

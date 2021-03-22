@@ -521,8 +521,8 @@ pub mod shmem {
                     )));
                 }
                 let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
-                if map == ptr::null_mut() {
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
@@ -560,7 +560,7 @@ pub mod shmem {
                     )));
                 }
                 let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
@@ -569,9 +569,9 @@ pub mod shmem {
                 }
                 let mut ret = Self {
                     shm_str: [0; 20],
-                    handle: handle,
-                    map: map,
-                    map_size: map_size,
+                    handle,
+                    map,
+                    map_size,
                 };
                 ret.shm_str.clone_from_slice(&map_str_bytes[0..20]);
                 Ok(ret)
