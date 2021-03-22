@@ -72,6 +72,6 @@ jobs:
     - name: Try if clang works
       shell: bash
       if: runner.os == 'Windows'
-      run: clang -v
+      run: PATH=$PATH:C:\msys64\mingw64\bin clang -v
     - name: Windows Test
-      run: $(where.exe cargo) test --verbose
+      run: PATH=$PATH:C:\msys64\mingw64\bin C:\Rust\.cargo\bin\cargo.exe test --verbose
