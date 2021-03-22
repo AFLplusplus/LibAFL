@@ -10,8 +10,8 @@ use crate::{
     Error,
 };
 
+use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
-use std::ops::Sub;
 
 /// Send a stats update all 6 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(6 * 1000);
@@ -161,7 +161,7 @@ where
         stats_timeout: Duration,
     ) -> Result<Duration, Error> {
         let cur = current_time();
-        if cur.sub(last) > stats_timeout {
+        if cur - last > stats_timeout {
             //println!("Fire {:?} {:?} {:?}", cur, last, stats_timeout);
             manager.fire(
                 state,

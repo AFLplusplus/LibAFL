@@ -206,6 +206,7 @@ mod tests {
     #[cfg(feature = "std")]
     use std::fs;
 
+    #[cfg(feature = "std")]
     use super::Tokens;
 
     #[cfg(feature = "std")]

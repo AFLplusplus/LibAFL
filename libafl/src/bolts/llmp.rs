@@ -89,10 +89,10 @@ use std::{
     },
 };
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(unix, feature = "std"))]
 use libc::c_char;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 #[cfg(unix)]
