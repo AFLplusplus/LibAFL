@@ -98,6 +98,7 @@ pub trait ShMem: Sized + Debug {
 }
 
 /// shared maps that have an id can use this trait
+//#[cfg(all(unix, feature = "std"))]
 pub trait HasFd {
     /// Retrieve the id of this shared map
     fn shm_id(&self) -> i32;
@@ -519,9 +520,8 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
-                if map == ptr::null_mut() {
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
@@ -558,8 +558,7 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
@@ -568,9 +567,9 @@ pub mod shmem {
                 }
                 let mut ret = Self {
                     shm_str: [0; 20],
-                    handle: handle,
-                    map: map,
-                    map_size: map_size,
+                    handle,
+                    map,
+                    map_size,
                 };
                 ret.shm_str.clone_from_slice(&map_str_bytes[0..20]);
                 Ok(ret)
