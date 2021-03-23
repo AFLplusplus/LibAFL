@@ -100,6 +100,8 @@ impl CompilerWrapper for ClangWrapper {
             }
         }
 
+        println!("{:?}", self.args);
+
         Ok(())
     }
 }
@@ -122,10 +124,12 @@ impl ClangWrapper {
 
 #[cfg(test)]
 mod tests {
+    use crate::{ClangWrapper, CompilerWrapper};
+
     #[test]
     fn test_clang_version() {
         ClangWrapper::new("clang", "clang++")
-            .from_args(vec!["my-clang", "-v"])
+            .from_args(vec!["my-clang".into(), "-v".into()])
             .unwrap()
             .compile()
             .unwrap();
