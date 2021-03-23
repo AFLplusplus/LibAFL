@@ -75,7 +75,7 @@ impl CompilerWrapper for ClangWrapper {
 
         let mut linking = true;
         // Detect stray -v calls from ./configure scripts.
-        if args.len() == 1 && args[1] == "-v" {
+        if args.len() > 1 && args[1] == "-v" {
             linking = false;
         }
 

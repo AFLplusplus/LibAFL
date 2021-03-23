@@ -3,6 +3,7 @@ name = "libfuzzer_libpng"
 version = "0.1.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,21 +11,21 @@ edition = "2018"
 default = ["std"]
 std = []
 
-[profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
-debug = true
+#[profile.release]
+#lto = true
+#codegen-units = 1
+#opt-level = 3
+#debug = true
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+num_cpus = "1.0"
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-# TODO Include it only when building cc
-libafl_cc = { path = "../../libafl_cc/" }
 
-[lib]
+[[example]]
 name = "libfuzzer_libpng"
 path = "./src/fuzzer.rs"
 test = false
 bench = false
-crate-type = ["staticlib"]
-
