@@ -9,13 +9,30 @@ pub enum Error {
 /// Wrap a compiler hijacking its arguments
 pub trait CompilerWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
-    fn from_args<'a>(&'a mut self, args: Vec<String>) -> Result<&'a mut Self, Error>;
+    fn from_args<'a>(&'a mut self, args: &[String]) -> Result<&'a mut Self, Error>;
 
     /// Add a compiler argument
     fn add_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error>;
 
+    /// Add a compiler argument only when compiling
+    fn add_cc_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error>;
+
+    /// Add a compiler argument only when linking
+    fn add_link_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error>;
+
+    /// Command to run the compiler
+    fn command(&mut self) -> Result<Vec<String>, Error>;
+
+    /// Get if in linking mode
+    fn is_linking(&self) -> bool;
+
     /// Run the compiler
-    fn compile(&mut self) -> Result<(), Error>;
+    fn run(&mut self) -> Result<(), Error> {
+        // TODO subproc
+        let args = self.command()?;
+        println!("{:?}", args);
+        Ok(())
+    }
 }
 
 /// Wrap Clang
@@ -30,11 +47,13 @@ pub struct ClangWrapper {
     x_set: bool,
     bit_mode: u32,
 
-    args: Vec<String>,
+    base_args: Vec<String>,
+    cc_args: Vec<String>,
+    link_args: Vec<String>,
 }
 
 impl CompilerWrapper for ClangWrapper {
-    fn from_args<'a>(&'a mut self, args: Vec<String>) -> Result<&'a mut Self, Error> {
+    fn from_args<'a>(&'a mut self, args: &[String]) -> Result<&'a mut Self, Error> {
         let mut new_args = vec![];
         if args.len() < 1 {
             return Err(Error::InvalidArguments(
@@ -83,26 +102,43 @@ impl CompilerWrapper for ClangWrapper {
         // Fuzzing define common among tools
         new_args.push("-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1".into());
 
-        self.args = new_args;
+        self.base_args = new_args;
         Ok(self)
     }
 
     fn add_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error> {
-        self.args.push(arg);
+        self.base_args.push(arg);
         Ok(self)
     }
 
-    fn compile(&mut self) -> Result<(), Error> {
+    fn add_cc_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error> {
+        self.cc_args.push(arg);
+        Ok(self)
+    }
+
+    fn add_link_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error> {
+        self.link_args.push(arg);
+        Ok(self)
+    }
+
+    fn command(&mut self) -> Result<Vec<String>, Error> {
+        let mut args = self.base_args.clone();
         if self.linking {
             if self.x_set {
-                self.args.push("-x".into());
-                self.args.push("none".into());
+                args.push("-x".into());
+                args.push("none".into());
             }
+
+            args.extend_from_slice(self.link_args.as_slice());
+        } else {
+            args.extend_from_slice(self.cc_args.as_slice());
         }
 
-        println!("{:?}", self.args);
+        Ok(args)
+    }
 
-        Ok(())
+    fn is_linking(&self) -> bool {
+        self.linking
     }
 }
 
@@ -117,8 +153,15 @@ impl ClangWrapper {
             linking: false,
             x_set: false,
             bit_mode: 0,
-            args: vec![],
+            base_args: vec![],
+            cc_args: vec![],
+            link_args: vec![],
         }
+    }
+
+    pub fn dont_optimize<'a>(&'a mut self) -> &'a mut Self {
+        self.optimize = false;
+        self
     }
 }
 
@@ -129,9 +172,9 @@ mod tests {
     #[test]
     fn test_clang_version() {
         ClangWrapper::new("clang", "clang++")
-            .from_args(vec!["my-clang".into(), "-v".into()])
+            .from_args(&["my-clang".into(), "-v".into()])
             .unwrap()
-            .compile()
+            .run()
             .unwrap();
     }
 }
