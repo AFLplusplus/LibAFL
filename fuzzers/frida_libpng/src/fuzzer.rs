@@ -34,8 +34,6 @@ use frida_gum::{
 };
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 
-use libloading;
-
 use std::{cell::RefCell, env, ffi::c_void, path::PathBuf};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
@@ -351,9 +349,9 @@ where
         ));
 
         Self {
-            base: base,
-            stalker: stalker,
-            helper: helper,
+            base,
+            stalker,
+            helper,
             followed: false,
         }
     }
@@ -464,10 +462,10 @@ unsafe fn fuzz(
     if state.metadata().get::<Tokens>().is_none() {
         state.add_metadata(Tokens::new(vec![
             vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
-            "IHDR".as_bytes().to_vec(),
-            "IDAT".as_bytes().to_vec(),
-            "PLTE".as_bytes().to_vec(),
-            "IEND".as_bytes().to_vec(),
+            b"IHDR".to_vec(),
+            b"IDAT".to_vec(),
+            b"PLTE".to_vec(),
+            b"IEND".to_vec(),
         ]));
     }
 

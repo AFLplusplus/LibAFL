@@ -307,6 +307,8 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
 }
 
 /// Setup Win32 exception handlers in a somewhat rusty way.
+/// # Safety
+/// Exception handlers are usually ugly, handle with care!
 pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
     let exceptions = handler.exceptions();
     for exception_code in exceptions {

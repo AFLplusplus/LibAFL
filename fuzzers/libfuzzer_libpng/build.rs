@@ -89,6 +89,10 @@ fn main() {
         .include(&libpng_path)
         .cpp(true)
         .flag("-fsanitize-coverage=trace-pc-guard")
+        .flag("-Wno-void-pointer-to-int-cast")
+        .flag("-Wno-int-to-pointer-cast")
+        .flag("-Wno-sign-compare")
+        .flag("-Wno-format")
         // .define("HAS_DUMMY_CRASH", "1")
         .file("./harness.cc")
         .compile("libfuzzer-harness");
