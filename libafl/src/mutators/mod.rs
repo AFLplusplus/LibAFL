@@ -8,7 +8,7 @@ pub use mutations::*;
 //pub use token_mutations::*;
 
 use crate::{
-    bolts::tuples::{HasLen, TupleList},
+    bolts::tuples::{HasLen, TupleList, Named},
     inputs::Input,
     Error,
 };
@@ -68,6 +68,10 @@ where
         corpus_idx: Option<usize>,
     ) -> Result<(), Error>;
 
+    fn get_name(
+        &self, index: usize,
+    ) -> Result<&str, Error>;
+
     fn get_and_mutate(
         &mut self,
         index: usize,
@@ -107,6 +111,12 @@ where
         Ok(())
     }
 
+    fn get_name(
+        &self, _index: usize,
+    ) -> Result<&str, Error>{
+        Ok("")
+    }
+
     fn get_and_mutate(
         &mut self,
         _index: usize,
@@ -130,7 +140,7 @@ where
 
 impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
 where
-    Head: Mutator<I, S>,
+    Head: Mutator<I, S> + Named,
     Tail: MutatorsTuple<I, S> + TupleList,
     I: Input,
 {
@@ -156,6 +166,16 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec(state, stage_idx, corpus_idx)?;
         self.1.post_exec_all(state, stage_idx, corpus_idx)
+    }
+
+    fn get_name(
+        &self, index: usize,
+    ) -> Result<&str, Error>{
+        if index == 0 {
+            Ok(self.0.name())
+        }else{
+            self.1.get_name(index)
+        }
     }
 
     fn get_and_mutate(
