@@ -1,6 +1,7 @@
 //! A wide variety of mutations used during fuzzing.
 
 use crate::{
+    bolts::tuples::Named,
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator},
@@ -124,6 +125,18 @@ where
     }
 }
 
+impl<I, R, S> Named for BitFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BitFlipMutator"
+    }
+}
+
+
 impl<I, R, S> BitFlipMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -170,6 +183,17 @@ where
             }
             Ok(MutationResult::Mutated)
         }
+    }
+}
+
+impl<I, R, S> Named for ByteFlipMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "ByteFlipMutator"
     }
 }
 
@@ -223,6 +247,17 @@ where
     }
 }
 
+impl<I, R, S> Named for ByteIncMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "ByteIncMutator"
+    }
+}
+
 impl<I, R, S> ByteIncMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -270,6 +305,17 @@ where
             }
             Ok(MutationResult::Mutated)
         }
+    }
+}
+
+impl<I, R, S> Named for ByteDecMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "ByteDecMutator"
     }
 }
 
@@ -322,6 +368,17 @@ where
     }
 }
 
+impl<I, R, S> Named for ByteNegMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "ByteNegMutator"
+    }
+}
+
 impl<I, R, S> ByteNegMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -368,6 +425,17 @@ where
             }
             Ok(MutationResult::Mutated)
         }
+    }
+}
+
+impl<I, R, S> Named for ByteRandMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "ByteRandMutator"
     }
 }
 
@@ -422,6 +490,17 @@ where
             }
             Ok(MutationResult::Mutated)
         }
+    }
+}
+
+impl<I, R, S> Named for ByteAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "ByteAddMutator"
     }
 }
 
@@ -481,6 +560,17 @@ where
     }
 }
 
+impl<I, R, S> Named for WordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "WordAddMutator"
+    }
+}
+
 impl<I, R, S> WordAddMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -534,6 +624,17 @@ where
             }
             Ok(MutationResult::Mutated)
         }
+    }
+}
+
+impl<I, R, S> Named for DwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "DwordAddMutator"
     }
 }
 
@@ -593,6 +694,17 @@ where
     }
 }
 
+impl<I, R, S> Named for QwordAddMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "QwordAddMutator"
+    }
+}
+
 impl<I, R, S> QwordAddMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -641,6 +753,17 @@ where
             }
             Ok(MutationResult::Mutated)
         }
+    }
+}
+
+impl<I, R, S> Named for ByteInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "ByteInterestingMutator"
     }
 }
 
@@ -700,6 +823,17 @@ where
     }
 }
 
+impl<I, R, S> Named for WordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "WordInterestingMutator"
+    }
+}
+
 impl<I, R, S> WordInterestingMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -756,6 +890,17 @@ where
     }
 }
 
+impl<I, R, S> Named for DwordInterestingMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "DwordInterestingMutator"
+    }
+}
+
 impl<I, R, S> DwordInterestingMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -802,6 +947,17 @@ where
         input.bytes_mut().drain(off..off + len);
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> Named for BytesDeleteMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesDeleteMutator"
     }
 }
 
@@ -858,6 +1014,17 @@ where
         buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> Named for BytesExpandMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesExpandMutator"
     }
 }
 
@@ -923,6 +1090,17 @@ where
     }
 }
 
+impl<I, R, S> Named for BytesInsertMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesInsertMutator"
+    }
+}
+
 impl<I, R, S> BytesInsertMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -982,6 +1160,17 @@ where
     }
 }
 
+impl<I, R, S> Named for BytesRandInsertMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesRandInsertMutator"
+    }
+}
+
 impl<I, R, S> BytesRandInsertMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -1030,6 +1219,17 @@ where
         buffer_set(input.bytes_mut(), off, len, val);
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> Named for BytesSetMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesSetMutator"
     }
 }
 
@@ -1084,6 +1284,17 @@ where
     }
 }
 
+impl<I, R, S> Named for BytesRandSetMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesRandSetMutator"
+    }
+}
+
 impl<I, R, S> BytesRandSetMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -1132,6 +1343,17 @@ where
         buffer_self_copy(input.bytes_mut(), from, to, len);
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> Named for BytesCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesCopyMutator"
     }
 }
 
@@ -1185,6 +1407,17 @@ where
         buffer_copy(input.bytes_mut(), &tmp, 0, second, len);
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> Named for BytesSwapMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R>,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesSwapMutator"
     }
 }
 
@@ -1272,6 +1505,18 @@ where
     }
 }
 
+impl<C, I, R, S> Named for CrossoverInsertMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I> + HasMaxSize,
+{
+    fn name(&self) -> &str {
+        "CrossoverInsertMutator"
+    }
+}
+
 impl<C, I, R, S> CrossoverInsertMutator<C, I, R, S>
 where
     C: Corpus<I>,
@@ -1343,6 +1588,18 @@ where
         buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<C, I, R, S> Named for CrossoverReplaceMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I>,
+{
+    fn name(&self) -> &str {
+        "CrossoverReplaceMutator"
     }
 }
 
@@ -1439,6 +1696,18 @@ where
             .splice(split_at.., other.bytes()[split_at..].iter().cloned());
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<C, I, R, S> Named for SpliceMutator<C, I, R, S>
+where
+    C: Corpus<I>,
+    I: Input + HasBytesVec,
+    R: Rand,
+    S: HasRand<R> + HasCorpus<C, I>,
+{
+    fn name(&self) -> &str {
+        "SpliceMutator"
     }
 }
 
