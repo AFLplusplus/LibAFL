@@ -6,10 +6,29 @@ It has been tested on Linux.
 
 ## Build
 
-To build this example, run `cargo build --example libfuzzer_libpng --release`.
-This will call (the build.rs)[./builld.rs], which in turn downloads a libpng archive from the web.
-Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the C++ harness)[./harness.cc] and the instrumented `libpng`.
-Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng`.
+To build this example, run `cargo build --release`.
+This will build the library with the fuzzer (src/lib.rs) with the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback.
+In addition, it will build also two C and C++ compiler wrappers (bin/c(c/xx).rs) that you must use to compile the target.
+
+Then download libpng from https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz and unpack the archive.
+
+Now compile it with:
+
+```
+cd libpng-1.6.37
+./configure
+make CC=/path/to/libfuzzer_libpng/target/release/cc -j `nproc`
+```
+
+You can find the static lib at `libpng-1.6.37/.libs/libpng16.a`.
+
+Now, we have to build the libfuzzer harness and link all togheter to create our fuzzer binary.
+
+```
+/path/to/libfuzzer_libpng/target/debug/cxx /path/to/libfuzzer_libpng/harness.cc libpng-1.6.37/.libs/libpng16.a -I libpng-1.6.37/ -o fuzzer -lz -lm
+```
+
+Afterwards, the fuzzer will be ready to run simply executing `./fuzzer`.
 
 ## Run
 
