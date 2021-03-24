@@ -120,10 +120,11 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
+    pub fn new(name: &'static str, map: &'static mut [T], len: usize) -> Self {
+        assert!(map.len() >= len);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
+            map: ArrayMut::Cptr((map.as_mut_ptr(), len)),
             name: name.to_string(),
             initial,
         }

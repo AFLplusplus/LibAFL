@@ -18,13 +18,10 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
+libafl_targets = { path = "../../libafl_targets/" }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 
 [lib]
 name = "libfuzzer_libpng"
-path = "./src/fuzzer.rs"
-test = false
-bench = false
 crate-type = ["staticlib"]
-

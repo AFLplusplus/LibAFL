@@ -5,7 +5,6 @@
 use core::time::Duration;
 use std::{env, path::PathBuf};
 
-#[cfg(unix)]
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
     corpus::{
@@ -25,21 +24,10 @@ use libafl::{
     Error,
 };
 
-/// We will interact with a C++ target, so use external c functionality
-#[cfg(unix)]
-extern "C" {
-    /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
-    fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
-    // afl_libfuzzer_init calls LLVMFUzzerInitialize()
-    fn afl_libfuzzer_init() -> i32;
-
-    static __lafl_edges_map: *mut u8;
-    static __lafl_cmp_map: *mut u8;
-    static __lafl_max_edges_size: u32;
-}
-
-/// The main fn, usually parsing parameters, and starting the fuzzer
+/// The main fn, no_mangle as it is a C main
+#[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -85,7 +73,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create an observation channel using the coverage map
     let edges_observer = HitcountsMapObserver::new(unsafe {
-        StdMapObserver::new_from_ptr("edges", __lafl_edges_map, __lafl_max_edges_size as usize)
+        StdMapObserver::new("edges", &mut EDGES_MAP, MAX_EDGES_NUM)
     });
 
     // If not restarting, create a State from scratch
@@ -131,7 +119,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |buf: &[u8]| {
-        unsafe { LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len()) };
+        libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
 
@@ -150,10 +138,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
-    unsafe {
-        if afl_libfuzzer_init() == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
-        }
+    if libfuzzer_initialize() == -1 {
+        println!("Warning: LLVMFuzzerInitialize failed with -1")
     }
 
     // In case the corpus is empty (on first run), reset
