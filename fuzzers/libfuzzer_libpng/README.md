@@ -41,4 +41,3 @@ By restarting the actual fuzzer, it can recover from these exit conditions.
 
 In any real-world scenario, you should use `taskset` to pin each client to an empty CPU core, the lib does not pick an empty core automatically (yet).
 
-For convenience, you may just run `./test.sh` in this folder to test it.
