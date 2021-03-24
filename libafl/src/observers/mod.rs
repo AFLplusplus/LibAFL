@@ -75,7 +75,7 @@ impl ObserversTuple for () {
 impl<Head, Tail> ObserversTuple for (Head, Tail)
 where
     Head: Observer,
-    Tail: ObserversTuple + TupleList,
+    Tail: ObserversTuple,
 {
     fn pre_exec_all(&mut self) -> Result<(), Error> {
         self.0.pre_exec()?;

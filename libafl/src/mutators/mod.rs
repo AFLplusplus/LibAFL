@@ -131,7 +131,7 @@ where
 impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
 where
     Head: Mutator<I, S>,
-    Tail: MutatorsTuple<I, S> + TupleList,
+    Tail: MutatorsTuple<I, S>,
     I: Input,
 {
     fn mutate_all(

@@ -19,7 +19,7 @@ impl HasLen for () {
 
 impl<Head, Tail> HasLen for (Head, Tail)
 where
-    Tail: TupleList + HasLen,
+    Tail: HasLen,
 {
     fn len(&self) -> usize {
         1 + self.1.len()
@@ -43,7 +43,7 @@ impl MatchFirstType for () {
 impl<Head, Tail> MatchFirstType for (Head, Tail)
 where
     Head: 'static,
-    Tail: TupleList + MatchFirstType,
+    Tail: MatchFirstType,
 {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
@@ -75,7 +75,7 @@ impl MatchType for () {
 impl<Head, Tail> MatchType for (Head, Tail)
 where
     Head: 'static,
-    Tail: TupleList + MatchType,
+    Tail: MatchType,
 {
     fn match_type<T: 'static>(&self, f: fn(t: &T)) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
@@ -115,7 +115,7 @@ impl MatchNameAndType for () {
 impl<Head, Tail> MatchNameAndType for (Head, Tail)
 where
     Head: 'static + Named,
-    Tail: TupleList + MatchNameAndType,
+    Tail: MatchNameAndType,
 {
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
