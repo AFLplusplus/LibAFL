@@ -7,6 +7,7 @@ fn main() {
         let mut dir = env::current_exe().unwrap();
         dir.pop();
         ClangWrapper::new("clang", "clang++")
+            .is_cpp()
             .from_args(&args)
             .unwrap()
             .add_arg("-fsanitize-coverage=trace-pc-guard".into())

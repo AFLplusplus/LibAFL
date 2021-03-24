@@ -1,8 +1,9 @@
-use std::{string::String, vec::Vec};
+use std::{process::Command, string::String, vec::Vec};
 
 #[derive(Debug)]
 pub enum Error {
     InvalidArguments(String),
+    IOError(std::io::Error),
     Unknown(String),
 }
 
@@ -28,9 +29,18 @@ pub trait CompilerWrapper {
 
     /// Run the compiler
     fn run(&mut self) -> Result<(), Error> {
-        // TODO subproc
         let args = self.command()?;
-        println!("{:?}", args);
+        dbg!(&args);
+        if args.len() < 1 {
+            return Err(Error::InvalidArguments(
+                "The number of arguments cannot be 0".into(),
+            ));
+        }
+        let status = match Command::new(&args[0]).args(&args[1..]).status() {
+            Ok(s) => s,
+            Err(e) => return Err(Error::IOError(e)),
+        };
+        dbg!(status);
         Ok(())
     }
 }
@@ -63,12 +73,7 @@ impl CompilerWrapper for ClangWrapper {
 
         self.name = args[0].clone();
         // Detect C++ compiler looking at the wrapper name
-        self.is_cpp = self.name.ends_with("++");
-        if self.is_cpp {
-            new_args.push(self.wrapped_cxx.clone());
-        } else {
-            new_args.push(self.wrapped_cc.clone());
-        }
+        self.is_cpp = self.is_cpp || self.name.ends_with("++");
 
         // Sancov flag
         // new_args.push("-fsanitize-coverage=trace-pc-guard".into());
@@ -122,7 +127,13 @@ impl CompilerWrapper for ClangWrapper {
     }
 
     fn command(&mut self) -> Result<Vec<String>, Error> {
-        let mut args = self.base_args.clone();
+        let mut args = vec![];
+        if self.is_cpp {
+            args.push(self.wrapped_cxx.clone());
+        } else {
+            args.push(self.wrapped_cc.clone());
+        }
+        args.extend_from_slice(self.base_args.as_slice());
         if self.linking {
             if self.x_set {
                 args.push("-x".into());
@@ -161,6 +172,11 @@ impl ClangWrapper {
 
     pub fn dont_optimize<'a>(&'a mut self) -> &'a mut Self {
         self.optimize = false;
+        self
+    }
+
+    pub fn is_cpp<'a>(&'a mut self) -> &'a mut Self {
+        self.is_cpp = true;
         self
     }
 }
