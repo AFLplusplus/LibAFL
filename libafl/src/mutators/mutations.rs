@@ -136,7 +136,6 @@ where
     }
 }
 
-
 impl<I, R, S> BitFlipMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -953,7 +952,7 @@ where
 impl<I, R, S> Named for BytesDeleteMutator<I, R, S>
 where
     I: Input + HasBytesVec,
-    S: HasRand<R> + HasMaxSize,
+    S: HasRand<R>,
     R: Rand,
 {
     fn name(&self) -> &str {

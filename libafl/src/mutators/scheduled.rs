@@ -271,7 +271,8 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SM> ComposedByMutations<I, MT, S> for LoggerScheduledMutator<C, I, MT, R, S, SM>
+impl<C, I, MT, R, S, SM> ComposedByMutations<I, MT, S>
+    for LoggerScheduledMutator<C, I, MT, R, S, SM>
 where
     C: Corpus<I>,
     I: Input,
@@ -291,7 +292,6 @@ where
     }
 }
 
-
 impl<C, I, MT, R, S, SM> ScheduledMutator<I, MT, S> for LoggerScheduledMutator<C, I, MT, R, S, SM>
 where
     C: Corpus<I>,
@@ -309,7 +309,9 @@ where
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> usize {
         debug_assert!(!self.scheduled.mutations().is_empty());
-        state.rand_mut().below(self.scheduled.mutations().len() as u64) as usize
+        state
+            .rand_mut()
+            .below(self.scheduled.mutations().len() as u64) as usize
     }
 
     fn scheduled_mutate(
@@ -333,7 +335,6 @@ where
         }
         Ok(r)
     }
-    
 }
 
 impl<C, I, MT, R, S, SM> LoggerScheduledMutator<C, I, MT, R, S, SM>
@@ -354,7 +355,6 @@ where
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
