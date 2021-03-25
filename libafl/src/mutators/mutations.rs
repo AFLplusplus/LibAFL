@@ -1777,13 +1777,49 @@ mod tests {
 
     use super::*;
     use crate::{
+        bolts::tuples::tuple_list,
         corpus::{Corpus, InMemoryCorpus},
         inputs::BytesInput,
-        mutators::{scheduled::havoc_mutations, MutatorsTuple},
+        mutators::MutatorsTuple,
         bolts::tuples::HasLen,
-        state::State,
+        state::{HasMetadata, State},
         utils::StdRand,
     };
+
+    fn test_mutations<C, I, R, S>() -> impl MutatorsTuple<I, S>
+    where
+        I: Input + HasBytesVec,
+        S: HasRand<R> + HasCorpus<C, I> + HasMetadata + HasMaxSize,
+        C: Corpus<I>,
+        R: Rand,
+    {
+        tuple_list!(
+            BitFlipMutator::new(),
+            ByteFlipMutator::new(),
+            ByteIncMutator::new(),
+            ByteDecMutator::new(),
+            ByteNegMutator::new(),
+            ByteRandMutator::new(),
+            ByteAddMutator::new(),
+            WordAddMutator::new(),
+            DwordAddMutator::new(),
+            QwordAddMutator::new(),
+            ByteInterestingMutator::new(),
+            WordInterestingMutator::new(),
+            DwordInterestingMutator::new(),
+            BytesDeleteMutator::new(),
+            BytesDeleteMutator::new(),
+            BytesDeleteMutator::new(),
+            BytesDeleteMutator::new(),
+            BytesExpandMutator::new(),
+            BytesInsertMutator::new(),
+            BytesRandInsertMutator::new(),
+            BytesSetMutator::new(),
+            BytesRandSetMutator::new(),
+            BytesCopyMutator::new(),
+            BytesSwapMutator::new(),
+        )
+    }
 
     #[test]
     fn test_mutators() {
@@ -1806,7 +1842,7 @@ mod tests {
 
         let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
 
-        let mut mutations = havoc_mutations();
+        let mut mutations = test_mutations();
         for _ in 0..2 {
             let mut new_testcases = vec![];
             for idx in 0..(mutations.len()) {
