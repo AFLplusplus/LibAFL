@@ -139,7 +139,7 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{Executor, ExitKind, InProcessExecutor},
         inputs::{BytesInput, Input},
-        mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
+        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, State},
         stats::SimpleStats,
@@ -185,14 +185,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut mutator = StdScheduledMutator::new();
-        mutator.add_mutation(mutation_bitflip);
+        let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
         let stage = StdMutationalStage::new(mutator);
-        let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
+        let scheduler = RandCorpusScheduler::new();
+        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut state, &mut executor, &mut event_manager)
+                .fuzz_one(&mut state, &mut executor, &mut event_manager, &scheduler)
                 .expect(&format!("Error in iter {}", i));
         }
 

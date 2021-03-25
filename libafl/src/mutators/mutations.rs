@@ -1779,7 +1779,8 @@ mod tests {
     use crate::{
         corpus::{Corpus, InMemoryCorpus},
         inputs::BytesInput,
-        mutators::{mutation_tokeninsert, mutation_tokenreplace},
+        mutators::{scheduled::havoc_mutations, MutatorsTuple},
+        bolts::tuples::HasLen,
         state::State,
         utils::StdRand,
     };
@@ -1805,43 +1806,13 @@ mod tests {
 
         let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
 
-        let mut mutations: Vec<MutationFunction<_, _>> = vec![];
-
-        mutations.push(mutation_bitflip);
-        mutations.push(mutation_byteflip);
-        mutations.push(mutation_byteinc);
-        mutations.push(mutation_bytedec);
-        mutations.push(mutation_byteneg);
-        mutations.push(mutation_byterand);
-        mutations.push(mutation_byteadd);
-        mutations.push(mutation_wordadd);
-        mutations.push(mutation_dwordadd);
-        mutations.push(mutation_qwordadd);
-        mutations.push(mutation_byteinteresting);
-        mutations.push(mutation_wordinteresting);
-        mutations.push(mutation_dwordinteresting);
-
-        mutations.push(mutation_bytesdelete);
-        mutations.push(mutation_bytesdelete);
-        mutations.push(mutation_bytesdelete);
-        mutations.push(mutation_bytesdelete);
-        mutations.push(mutation_bytesexpand);
-        mutations.push(mutation_bytesinsert);
-        mutations.push(mutation_bytesrandinsert);
-        mutations.push(mutation_bytesset);
-        mutations.push(mutation_bytesrandset);
-        mutations.push(mutation_bytescopy);
-        mutations.push(mutation_bytesswap);
-
-        mutations.push(mutation_tokeninsert);
-        mutations.push(mutation_tokenreplace);
-
+        let mut mutations = havoc_mutations();
         for _ in 0..2 {
             let mut new_testcases = vec![];
-            for mutation in &mutations {
+            for idx in 0..(mutations.len()) {
                 for input in inputs.iter() {
                     let mut mutant = input.clone();
-                    match mutation(&mut state, &mut mutant).unwrap() {
+                    match mutations.get_and_mutate(idx, &mut state, &mut mutant, 0).unwrap() {
                         MutationResult::Mutated => new_testcases.push(mutant),
                         MutationResult::Skipped => (),
                     };

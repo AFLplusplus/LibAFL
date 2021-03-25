@@ -386,7 +386,8 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{BytesInput, HasBytesVec},
         mutators::{
-            scheduled::{mutation_splice, HavocBytesMutator, StdScheduledMutator},
+            mutations::SpliceMutator,
+            scheduled::{havoc_mutations, StdScheduledMutator},
             Mutator,
         },
         state::State,
@@ -412,7 +413,8 @@ mod tests {
 
         rand.set_seed(5);
 
-        mutation_splice(&mut state, &mut input).unwrap();
+        let mut splice = SpliceMutator::new();
+        splice.mutate(&mut state, &mut input, 0).unwrap();
 
         #[cfg(feature = "std")]
         println!("{:?}", input.bytes());
@@ -440,7 +442,7 @@ mod tests {
 
         let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
 
-        let havoc = HavocBytesMutator::new(StdScheduledMutator::new());
+        let mut havoc = StdScheduledMutator::new(havoc_mutations());
 
         assert_eq!(input, input_prior);
 
