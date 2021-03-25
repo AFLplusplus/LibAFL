@@ -1,12 +1,11 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
-#[cfg(unix)]
 use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{shmem::UnixShMem, tuples::tuple_list},
+    bolts::{shmem::StdShMem, tuples::tuple_list},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
@@ -46,21 +45,14 @@ pub fn main() {
     .expect("An error occurred while fuzzing");
 }
 
-/// Not supported on windows right now
-#[cfg(windows)]
-fn fuzz(_corpus_dirs: Vec<PathBuf>, _objective_dir: PathBuf, _broker_port: u16) -> Result<(), ()> {
-    todo!("Example not supported on Windows");
-}
-
 /// The actual fuzzer
-#[cfg(unix)]
 fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr::<_, _, UnixShMem, _>(stats, broker_port) {
+        match setup_restarting_mgr::<_, _, StdShMem, _>(stats, broker_port) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
@@ -139,7 +131,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
-    if libfuzzer_initialize() == -1 {
+	let args: Vec<String> = env::args().collect();
+    if libfuzzer_initialize(&args) == -1 {
         println!("Warning: LLVMFuzzerInitialize failed with -1")
     }
 

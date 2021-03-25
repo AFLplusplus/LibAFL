@@ -3,10 +3,7 @@
 pub mod inprocess;
 pub use inprocess::InProcessExecutor;
 pub mod timeout;
-#[cfg(unix)]
 pub use timeout::TimeoutExecutor;
-#[cfg(feature = "runtime")]
-pub mod runtime;
 
 use core::cmp::PartialEq;
 use core::marker::PhantomData;

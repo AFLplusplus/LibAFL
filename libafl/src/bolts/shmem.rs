@@ -3,9 +3,13 @@
 
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::UnixShMem;
+#[cfg(all(feature = "std", unix))]
+pub type StdShMem = UnixShMem;
 
 #[cfg(all(windows, feature = "std"))]
-pub use shmem::Win32ShMem;
+pub use win32_shmem::Win32ShMem;
+#[cfg(all(windows, feature = "std"))]
+pub type StdShMem = Win32ShMem;
 
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
@@ -442,7 +446,7 @@ pub mod unix_shmem {
 }
 
 #[cfg(all(feature = "std", windows))]
-pub mod shmem {
+pub mod win32_shmem {
 
     use super::ShMem;
     use crate::{
