@@ -131,7 +131,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
-	let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
         println!("Warning: LLVMFuzzerInitialize failed with -1")
     }

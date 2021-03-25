@@ -31,6 +31,8 @@
 #define EXTERNAL_FUNC(Name, Default)                                   \
   __pragma(comment(linker, "/alternatename:" WIN_SYM_PREFIX STRINGIFY( \
                                Name) "=" WIN_SYM_PREFIX STRINGIFY(Default)))
+
+#define CHECK_WEAK_FN(Name) (Name != &Name##Def)
 #else
 // Declare external functions as weak to allow them to default to a specified
 // function if not defined explicitly. We must use weak symbols because clang's
@@ -38,21 +40,20 @@
 // https://bugs.llvm.org/show_bug.cgi?id=40218 for more details.
 #define EXTERNAL_FUNC(Name, Default) \
   __attribute__((weak, alias(STRINGIFY(Default))))
+
+#define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif  // LIBFUZZER_MSVC
 
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)         \
-  RETURN_TYPE NAME##Def FUNC_SIG {                          \
-    printf("ERROR: Function \"%s\" not defined.\n", #NAME); \
-    exit(1);                                                \
-  }                                                         \
+  RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
   EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
-
 #else
 
 // Declare these symbols as weak to allow them to be optionally defined.
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                            \
   __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
 
+#define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif
 
 EXT_FUNC(LLVMFuzzerInitialize, int, (int *argc, char ***argv), false);
@@ -68,11 +69,11 @@ EXT_FUNC(LLVMFuzzerCustomCrossOver, size_t,
 #undef EXT_FUNC
 
 int libafl_targets_has_libfuzzer_init() {
-  return LLVMFuzzerInitialize != NULL;
+  return CHECK_WEAK_FN(LLVMFuzzerInitialize);
 }
 
 int libafl_targets_libfuzzer_init(int *argc, char ***argv) {
-  if (LLVMFuzzerInitialize) {
+  if (libafl_targets_has_libfuzzer_init()) {
     return LLVMFuzzerInitialize(argc, argv);
   } else {
    return 0;

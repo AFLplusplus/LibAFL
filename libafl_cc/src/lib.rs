@@ -7,6 +7,17 @@ pub enum Error {
     Unknown(String),
 }
 
+// TODO macOS
+#[cfg(windows)]
+pub const LIB_EXT: &'static str = "lib";
+#[cfg(not(windows))]
+pub const LIB_EXT: &'static str = "a";
+
+#[cfg(windows)]
+pub const LIB_PREFIX: &'static str = "";
+#[cfg(not(windows))]
+pub const LIB_PREFIX: &'static str = "lib";
+
 /// Wrap a compiler hijacking its arguments
 pub trait CompilerWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments

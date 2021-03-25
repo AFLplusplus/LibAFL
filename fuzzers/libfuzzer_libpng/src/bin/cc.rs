@@ -1,4 +1,4 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper};
+use libafl_cc::{ClangWrapper, CompilerWrapper, LIB_EXT, LIB_PREFIX};
 use std::env;
 
 fn main() {
@@ -11,7 +11,11 @@ fn main() {
             .unwrap()
             .add_arg("-fsanitize-coverage=trace-pc-guard".into())
             .unwrap()
-            .add_link_arg(dir.join("liblibfuzzer_libpng.a").display().to_string())
+            .add_link_arg(
+                dir.join(format!("{}libfuzzer_libpng.{}", LIB_PREFIX, LIB_EXT))
+                    .display()
+                    .to_string(),
+            )
             .unwrap()
             .run()
             .unwrap();
