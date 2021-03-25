@@ -13,9 +13,10 @@ use libafl::{
     events::{setup_restarting_mgr, EventManager},
     executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
-    mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
+    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
@@ -470,12 +471,12 @@ unsafe fn fuzz(
     }
 
     // Setup a basic mutator with a mutational stage
-    let mutator = HavocBytesMutator::default();
+    let mutator = StdScheduledMutator::new(havoc_mutations());
     let stage = StdMutationalStage::new(mutator);
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
-    let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = FridaInProcessExecutor::new(
@@ -502,12 +503,7 @@ unsafe fn fuzz(
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut executor,
-                &mut restarting_mgr,
-                fuzzer.scheduler(),
-                &corpus_dirs,
-            )
+            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
@@ -515,7 +511,7 @@ unsafe fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
+    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached
     Ok(())

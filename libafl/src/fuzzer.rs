@@ -42,17 +42,29 @@ where
 }
 
 /// The main fuzzer trait.
-pub trait Fuzzer<E, EM, S> {
+pub trait Fuzzer<E, EM, S, CS> {
     /// Fuzz for a single iteration
     /// Returns the index of the last fuzzed corpus item
-    fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error>;
+    fn fuzz_one(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        scheduler: &CS,
+    ) -> Result<usize, Error>;
 
     /// Fuzz forever (or until stopped)
-    fn fuzz_loop(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<(), Error> {
+    fn fuzz_loop(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        scheduler: &CS,
+    ) -> Result<usize, Error> {
         let mut last = current_time();
         let stats_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
-            self.fuzz_one(state, executor, manager)?;
+            self.fuzz_one(state, executor, manager, scheduler)?;
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
     }
@@ -60,10 +72,11 @@ pub trait Fuzzer<E, EM, S> {
     /// Fuzz for n iterations
     /// Returns the index of the last fuzzed corpus item
     fn fuzz_loop_for(
-        &self,
+        &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
+        scheduler: &CS,
         iters: u64,
     ) -> Result<usize, Error> {
         if iters == 0 {
@@ -77,7 +90,7 @@ pub trait Fuzzer<E, EM, S> {
         let stats_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
-            ret = self.fuzz_one(state, executor, manager)?;
+            ret = self.fuzz_one(state, executor, manager, scheduler)?;
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
         Ok(ret)
@@ -104,9 +117,8 @@ where
     EM: EventManager<I, S>,
     I: Input,
 {
-    scheduler: CS,
     stages: ST,
-    phantom: PhantomData<(E, EM, I, OT, S)>,
+    phantom: PhantomData<(CS, E, EM, I, OT, S)>,
 }
 
 impl<CS, ST, E, EM, I, OT, S> HasStages<CS, E, EM, I, S, ST> for StdFuzzer<CS, ST, E, EM, I, OT, S>
@@ -126,6 +138,7 @@ where
     }
 }
 
+/*
 impl<CS, ST, E, EM, I, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
@@ -142,8 +155,9 @@ where
         &mut self.scheduler
     }
 }
+*/
 
-impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
+impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S, CS> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     S: HasExecutions,
@@ -178,13 +192,19 @@ where
         }
     }
 
-    fn fuzz_one(&self, state: &mut S, executor: &mut E, manager: &mut EM) -> Result<usize, Error> {
-        let idx = self.scheduler().next(state)?;
+    fn fuzz_one(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        scheduler: &CS,
+    ) -> Result<usize, Error> {
+        let idx = scheduler.next(state)?;
 
-        self.stages()
-            .perform_all(state, executor, manager, self.scheduler(), idx)?;
+        self.stages_mut()
+            .perform_all(state, executor, manager, scheduler, idx)?;
 
-        manager.process(state, executor, self.scheduler())?;
+        manager.process(state, executor, scheduler)?;
         Ok(idx)
     }
 }
@@ -197,9 +217,8 @@ where
     EM: EventManager<I, S>,
     I: Input,
 {
-    pub fn new(scheduler: CS, stages: ST) -> Self {
+    pub fn new(stages: ST) -> Self {
         Self {
-            scheduler,
             stages,
             phantom: PhantomData,
         }

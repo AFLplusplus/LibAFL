@@ -198,7 +198,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<u32, Error>
+    ) -> Result<(u32, Option<usize>), Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -499,7 +499,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<u32, Error>
+    ) -> Result<(u32, Option<usize>), Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -514,11 +514,8 @@ where
             // If the input is a solution, add it to the respective corpus
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
-
-        if self
-            .add_if_interesting(&input, fitness, scheduler)?
-            .is_some()
-        {
+        let corpus_idx = self.add_if_interesting(&input, fitness, scheduler)?;
+        if corpus_idx.is_some() {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
                 self,
@@ -533,7 +530,7 @@ where
             )?;
         }
 
-        Ok(fitness)
+        Ok((fitness, corpus_idx))
     }
 }
 
@@ -683,7 +680,7 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let fitness = self.evaluate_input(input, executor, manager, scheduler)?;
+            let (fitness, _) = self.evaluate_input(input, executor, manager, scheduler)?;
             if fitness > 0 {
                 added += 1;
             }

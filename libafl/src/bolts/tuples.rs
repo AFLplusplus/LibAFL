@@ -4,6 +4,8 @@ pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 use core::any::TypeId;
 
+use xxhash_rust::const_xxh3::xxh3_64;
+
 pub trait HasLen {
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool {
@@ -19,10 +21,56 @@ impl HasLen for () {
 
 impl<Head, Tail> HasLen for (Head, Tail)
 where
-    Tail: TupleList + HasLen,
+    Tail: HasLen,
 {
     fn len(&self) -> usize {
         1 + self.1.len()
+    }
+}
+
+pub trait HasNameId {
+    fn const_name(&self) -> &'static str;
+
+    fn name_id(&self) -> u64 {
+        xxh3_64(self.const_name().as_bytes())
+    }
+}
+
+pub trait HasNameIdTuple: HasLen {
+    fn get_const_name(&self, index: usize) -> Option<&'static str>;
+
+    fn get_name_id(&self, index: usize) -> Option<u64>;
+}
+
+impl HasNameIdTuple for () {
+    fn get_const_name(&self, _index: usize) -> Option<&'static str> {
+        None
+    }
+
+    fn get_name_id(&self, _index: usize) -> Option<u64> {
+        None
+    }
+}
+
+impl<Head, Tail> HasNameIdTuple for (Head, Tail)
+where
+    Head: 'static + HasNameId,
+    Tail: HasNameIdTuple,
+{
+    fn get_const_name(&self, index: usize) -> Option<&'static str> {
+        if index == 0 {
+            Some(self.0.const_name())
+        } else {
+            self.1.get_const_name(index - 1)
+        }
+    }
+
+    fn get_name_id(&self, index: usize) -> Option<u64> {
+        if index == 0 {
+            Some(self.0.name_id())
+        } else {
+            self.1.get_name_id(index - 1)
+        }
     }
 }
 
@@ -43,7 +91,7 @@ impl MatchFirstType for () {
 impl<Head, Tail> MatchFirstType for (Head, Tail)
 where
     Head: 'static,
-    Tail: TupleList + MatchFirstType,
+    Tail: MatchFirstType,
 {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
@@ -75,7 +123,7 @@ impl MatchType for () {
 impl<Head, Tail> MatchType for (Head, Tail)
 where
     Head: 'static,
-    Tail: TupleList + MatchType,
+    Tail: MatchType,
 {
     fn match_type<T: 'static>(&self, f: fn(t: &T)) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
@@ -98,6 +146,30 @@ pub trait Named {
     fn name(&self) -> &str;
 }
 
+pub trait NamedTuple: HasLen {
+    fn get_name(&self, index: usize) -> Option<&str>;
+}
+
+impl NamedTuple for () {
+    fn get_name(&self, _index: usize) -> Option<&str> {
+        None
+    }
+}
+
+impl<Head, Tail> NamedTuple for (Head, Tail)
+where
+    Head: 'static + Named,
+    Tail: NamedTuple,
+{
+    fn get_name(&self, index: usize) -> Option<&str> {
+        if index == 0 {
+            Some(self.0.name())
+        } else {
+            self.1.get_name(index - 1)
+        }
+    }
+}
+
 pub trait MatchNameAndType {
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T>;
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T>;
@@ -115,7 +187,7 @@ impl MatchNameAndType for () {
 impl<Head, Tail> MatchNameAndType for (Head, Tail)
 where
     Head: 'static + Named,
-    Tail: TupleList + MatchNameAndType,
+    Tail: MatchNameAndType,
 {
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {

@@ -7,7 +7,7 @@ pub use map::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{Named, TupleList},
+    bolts::tuples::Named,
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
@@ -92,7 +92,7 @@ where
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
 where
     Head: Feedback<I>,
-    Tail: FeedbacksTuple<I> + TupleList,
+    Tail: FeedbacksTuple<I>,
     I: Input,
 {
     fn is_interesting_all<OT: ObserversTuple>(

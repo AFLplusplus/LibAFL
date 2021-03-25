@@ -15,7 +15,7 @@ use libafl::{
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
@@ -122,12 +122,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     }
 
     // Setup a basic mutator with a mutational stage
-    let mutator = HavocBytesMutator::default();
+    let mutator = StdScheduledMutator::new(havoc_mutations());
     let stage = StdMutationalStage::new(mutator);
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
-    let fuzzer = StdFuzzer::new(scheduler, tuple_list!(stage));
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |buf: &[u8]| {
@@ -159,12 +159,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut executor,
-                &mut restarting_mgr,
-                fuzzer.scheduler(),
-                &corpus_dirs,
-            )
+            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
@@ -172,7 +167,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
+    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached
     Ok(())
