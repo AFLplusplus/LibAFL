@@ -6,16 +6,14 @@ use std::{env, path::PathBuf};
 #[cfg(unix)]
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, OnDiskCorpus},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::token_mutations::Tokens,
+    observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -109,7 +107,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
                 MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
                 MaxMapFeedback::new_with_observer(&cmps_observer),
                 MaxMapFeedback::new_with_observer(&allocs_observer),
-                TimeFeedback::new()
             ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
@@ -136,8 +133,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let stage = StdMutationalStage::new(mutator);
 
-    // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = RandCorpusScheduler::new();
+    // A fuzzer with just one stage and a random policy to get testcasess from the corpus
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     // The wrapped harness function, calling out to the LLVM-style harness
@@ -148,14 +145,9 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
-        "in-process(edges,cmps,allocs)",
+        "in-process(edges)",
         &mut harness,
-        tuple_list!(
-            edges_observer,
-            cmps_observer,
-            allocs_observer,
-            TimeObserver::new("time")
-        ),
+        tuple_list!(edges_observer, cmps_observer, allocs_observer),
         &mut state,
         &mut restarting_mgr,
     )?;
