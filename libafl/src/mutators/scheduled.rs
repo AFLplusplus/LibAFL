@@ -298,6 +298,8 @@ where
             let meta = MutationsMetadata::new(log);
             testcase.add_metadata(meta);
         };
+        // Always reset the log for each run
+        self.mutation_log.clear();
         Ok(())
     }
 }
