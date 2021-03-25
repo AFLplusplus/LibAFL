@@ -20,9 +20,9 @@ use crate::Error;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct ShMemDescription {
     /// Size of this map
-    size: usize,
+    pub size: usize,
     /// of name of this map, as fixed 20 bytes c-string
-    str_bytes: [u8; 20],
+    pub str_bytes: [u8; 20],
 }
 
 /// A Shared map
@@ -98,6 +98,7 @@ pub trait ShMem: Sized + Debug {
 }
 
 /// shared maps that have an id can use this trait
+//#[cfg(all(unix, feature = "std"))]
 pub trait HasFd {
     /// Retrieve the id of this shared map
     fn shm_id(&self) -> i32;
@@ -370,7 +371,7 @@ pub mod unix_shmem {
             // Not set or not initialized;
             return;
         }
-        (*shm).shm_str[0 as usize] = 0u8;
+        (*shm).shm_str[0_usize] = 0u8;
         shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
         (*shm).map = ptr::null_mut();
     }
@@ -519,9 +520,8 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
-                if map == ptr::null_mut() {
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
@@ -558,8 +558,7 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
@@ -568,9 +567,9 @@ pub mod shmem {
                 }
                 let mut ret = Self {
                     shm_str: [0; 20],
-                    handle: handle,
-                    map: map,
-                    map_size: map_size,
+                    handle,
+                    map,
+                    map_size,
                 };
                 ret.shm_str.clone_from_slice(&map_str_bytes[0..20]);
                 Ok(ret)

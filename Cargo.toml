@@ -1,4 +1,3 @@
-
 [profile.release]
 lto = true
 codegen-units = 1
@@ -9,9 +8,16 @@ debug = true
 members = [
     "libafl",
     "libafl_derive",
+    "libafl_cc",
+    "libafl_targets",
 
     #example fuzzers
-    "fuzzers/libfuzzer_libpng",
+    #"fuzzers/libfuzzer_libpng",
+    "fuzzers/frida_libpng",
     "fuzzers/libfuzzer_libmozjpeg",
     "fuzzers/libfuzzer_libpng_cmpalloc",
+    "fuzzers/libfuzzer_windows",
+]
+exclude = [
+    "fuzzers/libfuzzer_libpng",
 ]

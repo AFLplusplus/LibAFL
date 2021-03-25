@@ -137,8 +137,8 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
-        executors::{Executor, ExitKind, InProcessExecutor},
-        inputs::{BytesInput, Input},
+        executors::{ExitKind, InProcessExecutor},
+        inputs::BytesInput,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, State},
@@ -149,10 +149,6 @@ mod tests {
 
     #[cfg(feature = "std")]
     use crate::events::SimpleEventManager;
-
-    fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
-        ExitKind::Ok
-    }
 
     #[test]
     fn test_fuzzer() {
@@ -175,9 +171,10 @@ mod tests {
         });
         let mut event_manager = SimpleEventManager::new(stats);
 
+        let mut harness = |_buf: &[u8]| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
             "main",
-            harness,
+            &mut harness,
             tuple_list!(),
             //Box::new(|_, _, _, _, _| ()),
             &mut state,
