@@ -286,7 +286,7 @@ where
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
             let mut log = Vec::<Vec<u8>>::new();
             for idx in self.mutation_log.iter() {
-                let name = String::from(self.scheduled.mutations().get_name(*idx)?).into_bytes();
+                let name = self.scheduled.mutations().get_name(*idx)?.as_bytes().to_vec();
                 log.push(name)
             }
             let meta = MutationsMetadata::new(core::mem::take(log.as_mut()));

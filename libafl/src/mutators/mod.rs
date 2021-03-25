@@ -168,7 +168,7 @@ where
         if index == 0 {
             Ok(self.0.name())
         } else {
-            self.1.get_name(index)
+            self.1.get_name(index - 1)
         }
     }
 
