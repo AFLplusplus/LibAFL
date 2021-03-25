@@ -145,7 +145,7 @@ mod tests {
     fn test_observer_serde() {
         let obv = tuple_list!(
             TimeObserver::new("time"),
-            StdMapObserver::new("map", unsafe { &mut MAP },  unsafe { MAP.len() })
+            StdMapObserver::new("map", unsafe { &mut MAP }, unsafe { MAP.len() })
         );
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{:?}", vec);

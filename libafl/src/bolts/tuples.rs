@@ -61,7 +61,7 @@ where
         if index == 0 {
             Some(self.0.const_name())
         } else {
-            self.1.get_const_name(index -1)
+            self.1.get_const_name(index - 1)
         }
     }
 
@@ -69,7 +69,7 @@ where
         if index == 0 {
             Some(self.0.name_id())
         } else {
-            self.1.get_name_id(index -1)
+            self.1.get_name_id(index - 1)
         }
     }
 }
@@ -165,7 +165,7 @@ where
         if index == 0 {
             Some(self.0.name())
         } else {
-            self.1.get_name(index -1)
+            self.1.get_name(index - 1)
         }
     }
 }

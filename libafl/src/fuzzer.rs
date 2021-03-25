@@ -192,7 +192,13 @@ where
         }
     }
 
-    fn fuzz_one(&mut self, state: &mut S, executor: &mut E, manager: &mut EM, scheduler: &CS) -> Result<usize, Error> {
+    fn fuzz_one(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        scheduler: &CS,
+    ) -> Result<usize, Error> {
         let idx = scheduler.next(state)?;
 
         self.stages_mut()

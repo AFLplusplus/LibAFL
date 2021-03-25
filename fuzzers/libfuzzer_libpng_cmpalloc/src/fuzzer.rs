@@ -6,7 +6,7 @@ use std::{env, path::PathBuf};
 #[cfg(unix)]
 use libafl::{
     bolts::{shmem::UnixShMem, tuples::tuple_list},
-    corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
