@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use alloc::string::String;
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
