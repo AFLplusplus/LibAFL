@@ -10,9 +10,9 @@ use libafl::{
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     inputs::Input,
-    mutators::scheduled::HavocBytesMutator,
+    mutators::scheduled::{StdScheduledMutator, havoc_mutations},
     mutators::token_mutations::Tokens,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
@@ -115,11 +115,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     }
 
     // Setup a basic mutator with a mutational stage
-    let mutator = HavocBytesMutator::default();
+    let mutator = StdScheduledMutator::new(havoc_mutations());
     let stage = StdMutationalStage::new(mutator);
 
+    let scheduler = RandCorpusScheduler::new();
     // A fuzzer with just one stage and a random policy to get testcasess from the corpus
-    let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
+    let fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
@@ -144,7 +145,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             .load_initial_inputs(
                 &mut executor,
                 &mut restarting_mgr,
-                fuzzer.scheduler(),
+                &scheduler,
                 &corpus_dirs,
             )
             .expect(&format!(
@@ -154,7 +155,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr)?;
+    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached
     Ok(())
