@@ -1,6 +1,5 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -8,6 +7,7 @@ use std::{
     path::Path,
 };
 
+use core::marker::PhantomData;
 use crate::{
     inputs::{HasBytesVec, Input},
     mutators::*,
@@ -121,85 +121,156 @@ impl Tokens {
     }
 }
 
-/// Insert a dictionary token
-pub fn mutation_tokeninsert<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+#[derive(Default)]
+pub struct TokenInsert<I, R, S>
 where
     I: Input + HasBytesVec,
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    let max_size = state.max_size();
-    let tokens_len = {
-        let meta = state.metadata().get::<Tokens>();
-        if meta.is_none() {
-            return Ok(MutationResult::Skipped);
-        }
-        if meta.unwrap().tokens().is_empty() {
-            return Ok(MutationResult::Skipped);
-        }
-        meta.unwrap().tokens().len()
-    };
-    let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
-
-    let size = input.bytes().len();
-    let off = state.rand_mut().below((size + 1) as u64) as usize;
-
-    let meta = state.metadata().get::<Tokens>().unwrap();
-    let token = &meta.tokens()[token_idx];
-    let mut len = token.len();
-
-    if size + len > max_size {
-        if max_size > size {
-            len = max_size - size;
-        } else {
-            return Ok(MutationResult::Skipped);
-        }
-    }
-
-    input.bytes_mut().resize(size + len, 0);
-    buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-    buffer_copy(input.bytes_mut(), token, 0, off, len);
-
-    Ok(MutationResult::Mutated)
+    phantom: PhantomData<(I, R, S)>,
 }
 
-/// Overwrite with a dictionary token
-pub fn mutation_tokenreplace<I, R, S>(state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+impl<I, R, S> Mutator<I, S> for TokenInsert<I, R, S>
 where
     I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R>,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    let size = input.bytes().len();
-    if size == 0 {
-        return Ok(MutationResult::Skipped);
-    }
-
-    let tokens_len = {
-        let meta = state.metadata().get::<Tokens>();
-        if meta.is_none() {
-            return Ok(MutationResult::Skipped);
+    fn mutate(&mut self, state:&mut S, input: &mut I, _stage_idx: i32,) -> Result<MutationResult, Error>{
+        let max_size = state.max_size();
+        let tokens_len = {
+            let meta = state.metadata().get::<Tokens>();
+            if meta.is_none() {
+                return Ok(MutationResult::Skipped);
+            }
+            if meta.unwrap().tokens().is_empty() {
+                return Ok(MutationResult::Skipped);
+            }
+            meta.unwrap().tokens().len()
+        };
+        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+    
+        let size = input.bytes().len();
+        let off = state.rand_mut().below((size + 1) as u64) as usize;
+    
+        let meta = state.metadata().get::<Tokens>().unwrap();
+        let token = &meta.tokens()[token_idx];
+        let mut len = token.len();
+    
+        if size + len > max_size {
+            if max_size > size {
+                len = max_size - size;
+            } else {
+                return Ok(MutationResult::Skipped);
+            }
         }
-        if meta.unwrap().tokens().is_empty() {
-            return Ok(MutationResult::Skipped);
-        }
-        meta.unwrap().tokens().len()
-    };
-    let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
-
-    let off = state.rand_mut().below(size as u64) as usize;
-
-    let meta = state.metadata().get::<Tokens>().unwrap();
-    let token = &meta.tokens()[token_idx];
-    let mut len = token.len();
-    if off + len > size {
-        len = size - off;
+    
+        input.bytes_mut().resize(size + len, 0);
+        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+        buffer_copy(input.bytes_mut(), token, 0, off, len);
+    
+        Ok(MutationResult::Mutated)
     }
-
-    buffer_copy(input.bytes_mut(), token, 0, off, len);
-
-    Ok(MutationResult::Mutated)
 }
+
+impl<I, R, S> Named for TokenInsert<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn name(&self) -> &str{
+        "TokenInsert"
+    }
+}
+
+impl<I, R, S> TokenInsert<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    pub fn new() -> Self{
+        Self{
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct TokenReplace<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for TokenReplace<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn mutate(&mut self, state:&mut S, input: &mut I, _stage_idx: i32,) -> Result<MutationResult, Error>{
+        let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+    
+        let tokens_len = {
+            let meta = state.metadata().get::<Tokens>();
+            if meta.is_none() {
+                return Ok(MutationResult::Skipped);
+            }
+            if meta.unwrap().tokens().is_empty() {
+                return Ok(MutationResult::Skipped);
+            }
+            meta.unwrap().tokens().len()
+        };
+        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+    
+        let off = state.rand_mut().below(size as u64) as usize;
+    
+        let meta = state.metadata().get::<Tokens>().unwrap();
+        let token = &meta.tokens()[token_idx];
+        let mut len = token.len();
+        if off + len > size {
+            len = size - off;
+        }
+    
+        buffer_copy(input.bytes_mut(), token, 0, off, len);
+    
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> Named for TokenReplace<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn name(&self) -> &str{
+        "TokenReplace"
+    }
+}
+
+impl<I, R, S> TokenReplace<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasMetadata + HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    pub fn new() -> Self{
+        Self{
+            phantom: PhantomData,
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub use crate::mutators::mutations::*;
-//pub use crate::mutators::token_mutations::*;
+pub use crate::mutators::token_mutations::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct MutationsMetadata {
@@ -194,8 +194,32 @@ where
 {
     tuple_list!(
         BitFlipMutator::new(),
-        //...
-        // TODO complete this
+        ByteFlipMutator::new(),
+        ByteIncMutator::new(),
+        ByteDecMutator::new(),
+        ByteNegMutator::new(),
+        ByteRandMutator::new(),
+        ByteAddMutator::new(),
+        WordAddMutator::new(),
+        DwordAddMutator::new(),
+        QwordAddMutator::new(),
+        ByteInterestingMutator::new(),
+        WordInterestingMutator::new(),
+        DwordInterestingMutator::new(),
+        BytesDeleteMutator::new(),
+        BytesDeleteMutator::new(),
+        BytesDeleteMutator::new(),
+        BytesDeleteMutator::new(),
+        BytesExpandMutator::new(),
+        BytesInsertMutator::new(),
+        BytesRandInsertMutator::new(),
+        BytesSetMutator::new(),
+        BytesRandSetMutator::new(),
+        BytesCopyMutator::new(),
+        BytesSwapMutator::new(),
+        TokenInsert::new(),
+        TokenReplace::new(),
+        CrossoverInsertMutator::new(),
         CrossoverReplaceMutator::new(),
     )
 }
