@@ -20,19 +20,19 @@ pub use crate::mutators::token_mutations::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct MutationsMetadata {
-    pub list: Vec<String>,
+    pub list: Vec<Vec<u8>>,
 }
 
 crate::impl_serdeany!(MutationsMetadata);
 
-impl AsSlice<String> for MutationsMetadata {
-    fn as_slice(&self) -> &[String] {
+impl AsSlice<Vec<u8>> for MutationsMetadata {
+    fn as_slice(&self) -> &[Vec<u8>] {
         self.list.as_slice()
     }
 }
 
 impl MutationsMetadata {
-    pub fn new(list: Vec<String>) -> Self {
+    pub fn new(list: Vec<Vec<u8>>) -> Self {
         Self { list }
     }
 }
@@ -284,9 +284,10 @@ where
     ) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
-            let mut log = Vec::<String>::new();
+            let mut log = Vec::<Vec<u8>>::new();
             for idx in self.mutation_log.iter() {
-                log.push(String::from(self.scheduled.mutations().get_name(*idx)?))
+                let name = String::from(self.scheduled.mutations().get_name(*idx)?).into_bytes();
+                log.push(name)
             }
             let meta = MutationsMetadata::new(core::mem::take(log.as_mut()));
             testcase.add_metadata(meta);
