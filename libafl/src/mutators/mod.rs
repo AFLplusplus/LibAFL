@@ -68,8 +68,6 @@ where
         corpus_idx: Option<usize>,
     ) -> Result<(), Error>;
 
-    fn get_name(&self, index: usize) -> Result<&str, Error>;
-
     fn get_and_mutate(
         &mut self,
         index: usize,
@@ -107,10 +105,6 @@ where
         _corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
         Ok(())
-    }
-
-    fn get_name(&self, _index: usize) -> Result<&str, Error> {
-        Ok("")
     }
 
     fn get_and_mutate(
@@ -162,14 +156,6 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec(state, stage_idx, corpus_idx)?;
         self.1.post_exec_all(state, stage_idx, corpus_idx)
-    }
-
-    fn get_name(&self, index: usize) -> Result<&str, Error> {
-        if index == 0 {
-            Ok(self.0.name())
-        } else {
-            self.1.get_name(index - 1)
-        }
     }
 
     fn get_and_mutate(

@@ -6,7 +6,7 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::tuple_list,
+    bolts::tuples::{tuple_list, NamedTuple},
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator, MutatorsTuple},
@@ -229,7 +229,7 @@ pub struct LoggerScheduledMutator<C, I, MT, R, S, SM>
 where
     C: Corpus<I>,
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple<I, S> + NamedTuple,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
@@ -243,7 +243,7 @@ impl<C, I, MT, R, S, SM> Debug for LoggerScheduledMutator<C, I, MT, R, S, SM>
 where
     C: Corpus<I>,
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple<I, S> + NamedTuple,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
@@ -262,7 +262,7 @@ impl<C, I, MT, R, S, SM> Mutator<I, S> for LoggerScheduledMutator<C, I, MT, R, S
 where
     C: Corpus<I>,
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple<I, S> + NamedTuple,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
@@ -285,16 +285,17 @@ where
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
             let mut log = Vec::<Vec<u8>>::new();
-            for idx in self.mutation_log.iter() {
+            while let Some(idx) = self.mutation_log.pop() {
                 let name = self
                     .scheduled
                     .mutations()
-                    .get_name(*idx)?
+                    .get_name(idx)
+                    .unwrap() // TODO maybe return an Error on None
                     .as_bytes()
                     .to_vec();
                 log.push(name)
             }
-            let meta = MutationsMetadata::new(core::mem::take(log.as_mut()));
+            let meta = MutationsMetadata::new(log);
             testcase.add_metadata(meta);
         };
         Ok(())
@@ -306,7 +307,7 @@ impl<C, I, MT, R, S, SM> ComposedByMutations<I, MT, S>
 where
     C: Corpus<I>,
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple<I, S> + NamedTuple,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
@@ -326,7 +327,7 @@ impl<C, I, MT, R, S, SM> ScheduledMutator<I, MT, S> for LoggerScheduledMutator<C
 where
     C: Corpus<I>,
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple<I, S> + NamedTuple,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
@@ -371,7 +372,7 @@ impl<C, I, MT, R, S, SM> LoggerScheduledMutator<C, I, MT, R, S, SM>
 where
     C: Corpus<I>,
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple<I, S> + NamedTuple,
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
