@@ -7,7 +7,7 @@ pub use map::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{Named},
+    bolts::tuples::Named,
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,

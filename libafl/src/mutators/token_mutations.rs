@@ -7,7 +7,6 @@ use std::{
     path::Path,
 };
 
-use core::marker::PhantomData;
 use crate::{
     inputs::{HasBytesVec, Input},
     mutators::*,
@@ -15,6 +14,7 @@ use crate::{
     utils::Rand,
     Error,
 };
+use core::marker::PhantomData;
 
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
@@ -137,7 +137,12 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    fn mutate(&mut self, state:&mut S, input: &mut I, _stage_idx: i32,) -> Result<MutationResult, Error>{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let tokens_len = {
             let meta = state.metadata().get::<Tokens>();
@@ -150,14 +155,14 @@ where
             meta.unwrap().tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
-    
+
         let size = input.bytes().len();
         let off = state.rand_mut().below((size + 1) as u64) as usize;
-    
+
         let meta = state.metadata().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
         let mut len = token.len();
-    
+
         if size + len > max_size {
             if max_size > size {
                 len = max_size - size;
@@ -165,11 +170,11 @@ where
                 return Ok(MutationResult::Skipped);
             }
         }
-    
+
         input.bytes_mut().resize(size + len, 0);
         buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
         buffer_copy(input.bytes_mut(), token, 0, off, len);
-    
+
         Ok(MutationResult::Mutated)
     }
 }
@@ -180,7 +185,7 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    fn name(&self) -> &str{
+    fn name(&self) -> &str {
         "TokenInsert"
     }
 }
@@ -191,8 +196,8 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    pub fn new() -> Self{
-        Self{
+    pub fn new() -> Self {
+        Self {
             phantom: PhantomData,
         }
     }
@@ -214,12 +219,17 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    fn mutate(&mut self, state:&mut S, input: &mut I, _stage_idx: i32,) -> Result<MutationResult, Error>{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
-    
+
         let tokens_len = {
             let meta = state.metadata().get::<Tokens>();
             if meta.is_none() {
@@ -231,18 +241,18 @@ where
             meta.unwrap().tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
-    
+
         let off = state.rand_mut().below(size as u64) as usize;
-    
+
         let meta = state.metadata().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
         let mut len = token.len();
         if off + len > size {
             len = size - off;
         }
-    
+
         buffer_copy(input.bytes_mut(), token, 0, off, len);
-    
+
         Ok(MutationResult::Mutated)
     }
 }
@@ -253,7 +263,7 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    fn name(&self) -> &str{
+    fn name(&self) -> &str {
         "TokenReplace"
     }
 }
@@ -264,13 +274,12 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    pub fn new() -> Self{
-        Self{
+    pub fn new() -> Self {
+        Self {
             phantom: PhantomData,
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

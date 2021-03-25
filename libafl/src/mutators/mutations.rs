@@ -1778,10 +1778,10 @@ mod tests {
     use super::*;
     use crate::{
         bolts::tuples::tuple_list,
+        bolts::tuples::HasLen,
         corpus::{Corpus, InMemoryCorpus},
         inputs::BytesInput,
         mutators::MutatorsTuple,
-        bolts::tuples::HasLen,
         state::{HasMetadata, State},
         utils::StdRand,
     };
@@ -1848,7 +1848,10 @@ mod tests {
             for idx in 0..(mutations.len()) {
                 for input in inputs.iter() {
                     let mut mutant = input.clone();
-                    match mutations.get_and_mutate(idx, &mut state, &mut mutant, 0).unwrap() {
+                    match mutations
+                        .get_and_mutate(idx, &mut state, &mut mutant, 0)
+                        .unwrap()
+                    {
                         MutationResult::Mutated => new_testcases.push(mutant),
                         MutationResult::Skipped => (),
                     };

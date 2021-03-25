@@ -16,7 +16,10 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::Input,
-    mutators::{scheduled::{havoc_mutations,StdScheduledMutator}, token_mutations::Tokens},
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
@@ -167,12 +170,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut executor,
-                &mut restarting_mgr,
-                &scheduler,
-                &corpus_dirs,
-            )
+            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
