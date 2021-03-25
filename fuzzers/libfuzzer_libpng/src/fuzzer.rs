@@ -16,7 +16,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::Input,
-    mutators::{scheduled::HavocBytesMutator, token_mutations::Tokens},
+    mutators::{scheduled::{havoc_mutations,StdScheduledMutator}, token_mutations::Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
@@ -136,7 +136,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     }
 
     // Setup a basic mutator with a mutational stage
-    let mutator = HavocBytesMutator::default();
+    let mutator = StdScheduledMutator::new(havoc_mutations());
     let stage = StdMutationalStage::new(mutator);
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
