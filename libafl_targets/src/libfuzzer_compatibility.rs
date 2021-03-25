@@ -8,9 +8,14 @@ extern "C" {
 }
 
 pub fn libfuzzer_initialize(args: &[String]) -> i32 {
-	let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
-	let argc = argv.len() as i32;
-    unsafe { libafl_targets_libfuzzer_init(&argc as *const i32, &argv.as_ptr() as *const *const *const u8) }
+    let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
+    let argc = argv.len() as i32;
+    unsafe {
+        libafl_targets_libfuzzer_init(
+            &argc as *const i32,
+            &argv.as_ptr() as *const *const *const u8,
+        )
+    }
 }
 
 pub fn libfuzzer_test_one_input(buf: &[u8]) -> i32 {
