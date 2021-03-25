@@ -120,7 +120,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     let scheduler = RandCorpusScheduler::new();
     // A fuzzer with just one stage and a random policy to get testcasess from the corpus
-    let fuzzer = StdFuzzer::new(tuple_list!(stage));
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
