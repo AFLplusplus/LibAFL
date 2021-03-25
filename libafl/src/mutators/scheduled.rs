@@ -273,7 +273,7 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        self.scheduled.mutate(state, input, stage_idx)
+        self.scheduled_mutate(state, input, stage_idx)
     }
 
     fn post_exec(
