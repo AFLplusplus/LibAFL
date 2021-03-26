@@ -7,6 +7,7 @@ use core::{
     cell::UnsafeCell,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
+    ptr,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
@@ -17,6 +18,17 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 //const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+
+// From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
+pub const SIGINT: i32 = 2;
+pub const SIGILL: i32 = 4;
+pub const SIGABRT_COMPAT: i32 = 6;
+pub const SIGFPE: i32 = 8;
+pub const SIGSEGV: i32 = 11;
+pub const SIGTERM: i32 = 15;
+pub const SIGBREAK: i32 = 21;
+pub const SIGABRT: i32 = 22;
+pub const SIGABRT2: i32 = 22;
 
 // From https://github.com/wine-mirror/wine/blob/master/include/winnt.h#L611
 pub const STATUS_WAIT_0: u32 = 0x00000000;
@@ -274,6 +286,24 @@ static mut EXCEPTION_HANDLERS: [Option<HandlerHolder>; 64] = [
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
 ];
 
+unsafe fn internal_handle_exception(
+    exception_code: ExceptionCode,
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> i32 {
+    let index = EXCEPTION_CODES_MAPPING
+        .iter()
+        .position(|x| *x == exception_code)
+        .unwrap();
+    match &EXCEPTION_HANDLERS[index] {
+        Some(handler_holder) => {
+            let handler = &mut **handler_holder.handler.get();
+            handler.handle(exception_code, exception_pointers);
+            EXCEPTION_EXECUTE_HANDLER
+        }
+        None => EXCEPTION_EXECUTE_HANDLER,
+    }
+}
+
 type NativeHandlerType = extern "system" fn(*mut EXCEPTION_POINTERS) -> c_long;
 static mut PREVIOUS_HANDLER: Option<NativeHandlerType> = None;
 
@@ -287,18 +317,8 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
         .unwrap()
         .exception_code;
     let exception_code = ExceptionCode::try_from(code).unwrap();
-    let index = EXCEPTION_CODES_MAPPING
-        .iter()
-        .position(|x| *x == exception_code)
-        .unwrap();
-    let ret = match &EXCEPTION_HANDLERS[index] {
-        Some(handler_holder) => {
-            let handler = &mut **handler_holder.handler.get();
-            handler.handle(exception_code, exception_pointers);
-            EXCEPTION_EXECUTE_HANDLER
-        }
-        None => EXCEPTION_EXECUTE_HANDLER,
-    };
+    // println!("Received {}", exception_code);
+    let ret = internal_handle_exception(exception_code, exception_pointers);
     if let Some(prev_handler) = PREVIOUS_HANDLER {
         prev_handler(exception_pointers)
     } else {
@@ -306,12 +326,26 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
     }
 }
 
+type NativeSignalHandlerType = unsafe extern "C" fn(i32);
+extern "C" {
+    fn signal(signum: i32, func: NativeSignalHandlerType) -> *const c_void;
+}
+
+unsafe extern "C" fn handle_signal(_signum: i32) {
+    // println!("Received signal {}", _signum);
+    internal_handle_exception(ExceptionCode::AssertionFailure, ptr::null_mut());
+}
+
 /// Setup Win32 exception handlers in a somewhat rusty way.
 /// # Safety
 /// Exception handlers are usually ugly, handle with care!
 pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
     let exceptions = handler.exceptions();
+    let mut catch_assertions = false;
     for exception_code in exceptions {
+        if exception_code == ExceptionCode::AssertionFailure {
+            catch_assertions = true;
+        }
         let index = EXCEPTION_CODES_MAPPING
             .iter()
             .position(|x| *x == exception_code)
@@ -324,7 +358,9 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
         );
     }
     compiler_fence(Ordering::SeqCst);
-
+    if catch_assertions {
+        signal(SIGABRT, handle_signal);
+    }
     if let Some(prev) = SetUnhandledExceptionFilter(Some(core::mem::transmute(
         handle_exception as *const c_void,
     ))) {

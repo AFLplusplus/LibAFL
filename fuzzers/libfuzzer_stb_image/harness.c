@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <assert.h>
 
 #define STBI_ASSERT(x)
 #define STBI_NO_SIMD
@@ -20,6 +21,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     unsigned char *img = stbi_load_from_memory(data, size, &x, &y, &channels, 4);
 
     free(img);
+	
+	// if (x > 10000) free(img); // free crash
 
     return 0;
 }
