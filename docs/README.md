@@ -1,6 +1,6 @@
-# LibAFL Documentation
+# LibAFL Documentation Book
 
-This project contains the out-of-source LibAFL documentation.
+This project contains the out-of-source LibAFL documentation as a book.
 
 Here you can find tutorials, examples and detailed explanations.
 

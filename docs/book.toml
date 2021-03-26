@@ -1,6 +1,6 @@
 [book]
-authors = ["Andrea Fioraldi"]
+authors = ["Andrea Fioraldi", "Dominik Maier"]
 language = "en"
 multilingual = false
 src = "src"
-title = "LibAFL Documentation"
+title = "The LibAFL Fuzzing Library"
