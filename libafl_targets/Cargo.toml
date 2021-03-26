@@ -9,6 +9,7 @@ default = []
 pcguard_edges = []
 pcguard_hitcounts = []
 libfuzzer = []
+value_profile = []
 pcguard = ["pcguard_hitcounts"]
 
 [build-dependencies]

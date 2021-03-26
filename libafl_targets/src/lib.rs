@@ -3,6 +3,11 @@ pub mod pcguard;
 #[cfg(any(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]
 pub use pcguard::*;
 
+#[cfg(feature = "value_profile")]
+pub mod value_profile;
+#[cfg(feature = "value_profile")]
+pub use value_profile::*;
+
 #[cfg(feature = "libfuzzer")]
 pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]
