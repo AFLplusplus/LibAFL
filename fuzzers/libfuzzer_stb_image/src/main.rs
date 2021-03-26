@@ -15,7 +15,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -63,9 +63,9 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         };
 
     // Create an observation channel using the coverage map
-    let edges_observer = HitcountsMapObserver::new(unsafe {
-        StdMapObserver::new("edges", &mut EDGES_MAP, MAX_EDGES_NUM)
-    });
+    // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
+    let edges_observer =
+        StdMapObserver::new("edges", unsafe { &mut EDGES_MAP }, unsafe { MAX_EDGES_NUM });
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
