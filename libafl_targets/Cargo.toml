@@ -6,8 +6,10 @@ edition = "2018"
 
 [features]
 default = []
-sancov = []
-libfuzzer_compatibility = []
+pcguard_edges = []
+pcguard_hitcounts = []
+libfuzzer = []
+pcguard = ["pcguard_hitcounts"]
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

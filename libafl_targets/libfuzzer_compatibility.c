@@ -13,6 +13,8 @@
 #define LIBFUZZER_MSVC 0
 #endif  // _MSC_VER
 
+#define EXPORT_FN __declspec(dllexport)
+
 // From Libfuzzer
 // Intermediate macro to ensure the parameter is expanded before stringified.
 #define STRINGIFY_(A) #A
@@ -32,7 +34,7 @@
   __pragma(comment(linker, "/alternatename:" WIN_SYM_PREFIX STRINGIFY( \
                                Name) "=" WIN_SYM_PREFIX STRINGIFY(Default)))
 
-#define CHECK_WEAK_FN(Name) (Name != &Name##Def)
+#define CHECK_WEAK_FN(Name) ((void*)Name != (void*)&Name##Def)
 #else
 // Declare external functions as weak to allow them to default to a specified
 // function if not defined explicitly. We must use weak symbols because clang's
@@ -48,6 +50,8 @@
   RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
   EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
 #else
+
+#define EXPORT_FN
 
 // Declare these symbols as weak to allow them to be optionally defined.
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                            \
@@ -68,11 +72,11 @@ EXT_FUNC(LLVMFuzzerCustomCrossOver, size_t,
 
 #undef EXT_FUNC
 
-int libafl_targets_has_libfuzzer_init() {
+EXPORT_FN int libafl_targets_has_libfuzzer_init() {
   return CHECK_WEAK_FN(LLVMFuzzerInitialize);
 }
 
-int libafl_targets_libfuzzer_init(int *argc, char ***argv) {
+EXPORT_FN int libafl_targets_libfuzzer_init(int *argc, char ***argv) {
   if (libafl_targets_has_libfuzzer_init()) {
     return LLVMFuzzerInitialize(argc, argv);
   } else {

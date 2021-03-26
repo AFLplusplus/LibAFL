@@ -107,8 +107,10 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let stage = StdMutationalStage::new(mutator);
 
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+
+    // A minimization+queue policy to get testcasess from the corpus
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |buf: &[u8]| {
@@ -119,7 +121,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
-            "in-process(edges)",
+            "in-process(edges,time)",
             &mut harness,
             tuple_list!(edges_observer, TimeObserver::new("time")),
             &mut state,

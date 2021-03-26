@@ -12,7 +12,6 @@ members = [
     "libafl_targets",
 
     #example fuzzers
-    #"fuzzers/libfuzzer_libpng",
     "fuzzers/frida_libpng",
     "fuzzers/libfuzzer_libmozjpeg",
     "fuzzers/libfuzzer_libpng_cmpalloc",
@@ -20,4 +19,5 @@ members = [
 ]
 exclude = [
     "fuzzers/libfuzzer_libpng",
+	"fuzzers/libfuzzer_stb_image",
 ]

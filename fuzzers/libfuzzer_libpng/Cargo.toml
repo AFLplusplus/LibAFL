@@ -18,7 +18,7 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["sancov", "libfuzzer_compatibility"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 

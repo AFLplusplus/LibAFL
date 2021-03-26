@@ -219,13 +219,13 @@ int load_stbi(const uint8_t *data, int size)
 
 extern "C"
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-  //return target_func(Data, Size);
+  return target_func(Data, Size);
 
   if(Size > 0x4000) return 0;
 
   int size = Size;
   const unsigned char * data = Data;
-  //return load_stbi(data, size);  
-  return parse_pe(data, size);
+  return load_stbi(data, size);  
+  //return parse_pe(data, size);
 }
 
