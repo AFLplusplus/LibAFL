@@ -14,6 +14,11 @@ Clone the LibAFL repository with
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
+To get the latest and greatest features,
+```
+git checkout dev
+```
+
 Build the library using
 
 ```
