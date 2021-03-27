@@ -5,7 +5,8 @@
 [Introduction](./introduction.md)
 
 - [Getting Started](./getting_started/getting_started.md)
-  - [Installation](./getting_started/installation.md)
+  - [Setup](./getting_started/setup.md)
+  - [Build](./getting_started/build.md)
   - [Crates](./getting_started/crates.md)
 
 - [Baby Fuzzer](./baby_fuzzer.md)
