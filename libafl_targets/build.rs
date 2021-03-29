@@ -20,7 +20,7 @@ fn main() {
             .file(_src_dir.join("libfuzzer_compatibility.c"))
             .compile("libfuzzer_compatibility");
     }
-    
+
     #[cfg(feature = "value_profile")]
     {
         println!("cargo:rerun-if-changed=src/value_profile.c");
