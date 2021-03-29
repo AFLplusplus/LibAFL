@@ -11,10 +11,12 @@ fn main() {
         cc.is_cpp()
             .from_args(&args)
             .unwrap()
-            .add_arg("-fsanitize-coverage=trace-pc-guard".into())
+            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
+            .unwrap()
+            .add_arg("-fPIC".into())
             .unwrap()
             .add_link_arg(
-                dir.join(format!("{}libfuzzer_libpng.{}", LIB_PREFIX, LIB_EXT))
+                dir.join(format!("{}libfuzzer_libmozjpeg.{}", LIB_PREFIX, LIB_EXT))
                     .display()
                     .to_string(),
             )

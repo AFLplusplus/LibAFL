@@ -3,6 +3,8 @@
 This folder contains an example fuzzer for libmozjpeg, using LLMP for fast multi-process fuzzing and crash detection.
 It has been tested on Linux.
 
+https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz
+
 ## Build
 
 To build this example, run `cargo build --example libfuzzer_libmozjpeg --release`.

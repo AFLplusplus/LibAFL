@@ -1,120 +1,21 @@
 // build.rs
 
-use std::{
-    env,
-    path::Path,
-    process::{exit, Command},
-};
-
-const LIBMOZJPEG_URL: &str = "https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz";
+use std::env;
 
 fn main() {
-    if cfg!(windows) {
-        println!("cargo:warning=Skipping libmozjpeg example on Windows");
-        exit(0);
-    }
-
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
-    let out_dir_path = Path::new(&out_dir);
 
-    println!("cargo:rerun-if-changed=./runtime/rt.c",);
-    println!("cargo:rerun-if-changed=harness.cc");
-
-    let libmozjpeg = format!("{}/mozjpeg-4.0.3", &out_dir);
-    let libmozjpeg_path = Path::new(&libmozjpeg);
-    let libmozjpeg_tar = format!("{}/v4.0.3.tar.gz", &out_dir);
-
-    // Enforce clang for its -fsanitize-coverage support.
-    std::env::set_var("CC", "clang");
-    std::env::set_var("CXX", "clang++");
-
-    if !libmozjpeg_path.is_dir() {
-        if !Path::new(&libmozjpeg_tar).is_file() {
-            println!("cargo:warning=Libmozjpeg not found, downloading...");
-            // Download libmozjpeg
-            Command::new("wget")
-                .arg("-c")
-                .arg(LIBMOZJPEG_URL)
-                .arg("-O")
-                .arg(&libmozjpeg_tar)
-                .status()
-                .unwrap();
-        }
-        Command::new("tar")
-            .current_dir(&out_dir_path)
-            .arg("-xvf")
-            .arg(&libmozjpeg_tar)
-            .status()
-            .unwrap();
-        //println!("cargo:warning=Running cmake on {}", &libmozjpeg);
-
-        Command::new("cmake")
-            .current_dir(&libmozjpeg_path)
-            .args(&["-G", "Unix Makefiles", "--disable-shared"])
-            .arg(&libmozjpeg)
-            .env("OPT_LEVEL", "3")
-            .env("CC", "clang")
-            .env("CXX", "clang++")
-            .env(
-                "CFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            )
-            .env(
-                "CXXFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            )
-            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
-            .status()
-            .unwrap();
-
-        Command::new("make")
-            .current_dir(&libmozjpeg_path)
-            //.arg(&format!("-j{}", num_cpus::get()))
-            .args(&[
-                "CC=clang",
-                "CXX=clang++",
-                "OPT_LEVEL=3",
-                "CFLAGS=-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-                "LDFLAGS=-g -fPIE -fsanitize-coverage=trace-pc-guard",
-                "CXXFLAGS=-D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            ])
-            .env("CC", "clang")
-            .env("CXX", "clang++")
-            .env(
-                "CFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            )
-            .env(
-                "CXXFLAGS",
-                "-O3 -g -D_DEFAULT_SOURCE -fPIE -fsanitize-coverage=trace-pc-guard",
-            )
-            .env("LDFLAGS", "-g -fPIE -fsanitize-coverage=trace-pc-guard")
-            .status()
-            .unwrap();
-    }
+    println!("cargo:rerun-if-changed=harness.c");
 
     cc::Build::new()
-        .file("../libfuzzer_runtime/rt.c")
-        .compile("libfuzzer-sys");
-
-    cc::Build::new()
-        .include(&libmozjpeg_path)
-        .flag("-fsanitize-coverage=trace-pc-guard")
-        .file("./harness.cc")
-        .compile("libfuzzer-harness");
+        // Use sanitizer coverage to track the edges in the PUT
+        // Take advantage of LTO (needs lld-link set in your cargo config)
+        //.flag("-flto=thin")
+        .file("./hook_allocs.c")
+        .compile("hook_allocs");
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
-    println!("cargo:rustc-link-search=native={}/", &libmozjpeg);
-    println!("cargo:rustc-link-lib=static=jpeg");
-
-    //Deps for libmozjpeg: -pthread -lz -lm
-    println!("cargo:rustc-link-lib=dylib=m");
-    println!("cargo:rustc-link-lib=dylib=z");
-
-    //For the C++ harness
-    println!("cargo:rustc-link-lib=static=stdc++");
 
     println!("cargo:rerun-if-changed=build.rs");
 }
