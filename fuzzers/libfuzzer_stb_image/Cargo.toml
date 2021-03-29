@@ -17,7 +17,7 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_edges", "value_profile", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_edges", "libfuzzer"] }
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
