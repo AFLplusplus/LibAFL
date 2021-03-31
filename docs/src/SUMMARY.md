@@ -12,5 +12,8 @@
 - [Baby Fuzzer](./baby_fuzzer.md)
 
 - [Core Concepts](./core_concepts/core_concepts.md)
-  - [Executor](./core_concepts/executor.md)
   - [Observer](./core_concepts/observer.md)
+  - [Executor](./core_concepts/executor.md)
+  - [Feedback](./core_concepts/feedback.md)
+  - [Input](./core_concepts/input.md)
+  - [Corpus](./core_concepts/corpus.md)
