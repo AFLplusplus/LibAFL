@@ -77,69 +77,66 @@ pub fn get_module_size(module_name: &str) -> usize {
 /// every time we need a copy that is within a direct branch of the start of the transformed basic
 /// block.
 #[cfg(target_arch = "x86_64")]
-const MAYBE_LOG_CODE: [u8; 69] = [
-    0x9c, // pushfq
-    0x50, // push rax
-    0x51, // push rcx
-    0x52, // push rdx
-    0x56, // push rsi
-    0x89, 0xf8, // mov eax, edi
-    0xc1, 0xe0, 0x08, // shl eax, 8
-    0xc1, 0xef, 0x04, // shr edi, 4
-    0x31, 0xc7, // xor edi, eax
-    0x0f, 0xb7, 0xc7, // movzx eax, di
-    0x48, 0x8d, 0x0d, 0x34, 0x00, 0x00, 0x00, // lea rcx, sym._afl_area_ptr_ptr
-    0x48, 0x8b, 0x09, // mov rcx, qword [rcx]
-    0x48, 0x8d, 0x15, 0x22, 0x00, 0x00, 0x00, // lea rdx, sym._afl_prev_loc_ptr
-    0x48, 0x8b, 0x32, // mov rsi, qword [rdx]
-    0x48, 0x8b, 0x36, // mov rsi, qword [rsi]
-    0x48, 0x31, 0xc6, // xor rsi, rax
-    0x48, 0x81, 0xe6, 0xff, 0x1f, 0x00,
-    0x00, // and rsi, 0x1fff (8 * 1024 - 1) TODO: make this variable
-    0xfe, 0x04, 0x31, // inc byte [rcx + rsi]
-    0x48, 0xd1, 0xe8, // shr rax, 1
-    0x48, 0x8b, 0x0a, // mov rcx, qword [rdx]
-    0x48, 0x89, 0x01, // mov qword [rcx], rax
-    0x5e, // pop rsi
-    0x5a, // pop rdx
-    0x59, // pop rcx
-    0x58, // pop rax
-    0x9d, // popfq
-    0xc3, // ret
-          // Read-only data goes here:
-          // uint64_t* afl_prev_loc_ptr
-          // uint8_t** afl_area_ptr_ptr
-          // unsigned int afl_instr_rms
+const MAYBE_LOG_CODE: [u8; 47] = [
+    0x9c,                                                         /* pushfq */
+    0x50,                                                       /* push rax */
+    0x51,                                                       /* push rcx */
+    0x52,                                                       /* push rdx */
+
+    0x48, 0x8d, 0x05, 0x24,
+    0x00, 0x00, 0x00,                     /* lea rax, sym._afl_area_ptr_ptr */
+    0x48, 0x8b, 0x00,                               /* mov rax, qword [rax] */
+    0x48, 0x8d, 0x0d, 0x22,
+    0x00, 0x00, 0x00,                       /* lea rcx, sym.previous_pc     */
+    0x48, 0x8b, 0x11,                               /* mov rdx, qword [rcx] */
+    0x48, 0x8b, 0x12,                               /* mov rdx, qword [rdx] */
+    0x48, 0x31, 0xfa,                                       /* xor rdx, rdi */
+    0xfe, 0x04, 0x10,                               /* inc byte [rax + rdx] */
+    0x48, 0xd1, 0xef,                                         /* shr rdi, 1 */
+    0x48, 0x8b, 0x01,                               /* mov rax, qword [rcx] */
+    0x48, 0x89, 0x38,                               /* mov qword [rax], rdi */
+
+    0x5a,                                                        /* pop rdx */
+    0x59,                                                        /* pop rcx */
+    0x58,                                                        /* pop rax */
+    0x9d,                                                          /* popfq */
+
+    0xc3,                                                            /* ret */
+
+    /* Read-only data goes here: */
+    /* uint8_t* afl_area_ptr */
+    /* uint64_t* afl_prev_loc_ptr */
 ];
 
 #[cfg(target_arch = "aarch64")]
-const MAYBE_LOG_CODE: [u8; 104] = [
-    0xE1, 0x0B, 0xBF, 0xA9, // stp x1, x2, [sp, -0x10]!
-    0xE3, 0x13, 0xBF, 0xA9, // stp x3, x4, [sp, -0x10]!
-    0xE1, 0x03, 0x00, 0xAA, // mov x1, x0
-    0x00, 0xDC, 0x78, 0xD3, // lsl x0, x0, #8
-    0x21, 0xFC, 0x44, 0xD3, // lsr x1, x1, #4
-    0x00, 0x00, 0x01, 0xCA, // eor x0, x0, x1
-    0x00, 0x3C, 0x00, 0x53, // uxth w0, w0
-    0xa1, 0x02, 0x00, 0x58, // ldr x1, =area_ptr
-    0x42, 0x02, 0x00, 0x58, // ldr x2, =pc_ptr
-    0x43, 0x00, 0x40, 0xF9, // ldr x3, [x2]
-    0x63, 0x00, 0x00, 0xCA, // eor x3, x3, x0
-    0x63, 0x40, 0x40, 0x92, // and x3, x3, #0x1ffff
-    0x21, 0x00, 0x03, 0x8B, // add x1, x1, x3
-    0x24, 0x00, 0x40, 0x39, // ldrb w4, [x1, #0
-    0x84, 0x04, 0x00, 0x91, // add x4, x4, #1
-    0x24, 0x00, 0x00, 0x39, // strb w4, [x1, #0]
-    0x00, 0xFC, 0x41, 0xD3, // lsr x0, x0, #1
-    0x40, 0x00, 0x00, 0xF9, // str x0, [x2]
-    0xE3, 0x13, 0xc1, 0xA8, // ldp x3, x4, [sp], #0x10
-    0xE1, 0x0B, 0xc1, 0xA8, // ldp x1, x2, [sp], #0x10
-    0xC0, 0x03, 0x5F, 0xD6, // ret
-    0x1f, 0x20, 0x03, 0xD5, // nop
-    0x1f, 0x20, 0x03, 0xD5, // nop
-    0x1f, 0x20, 0x03, 0xD5, // nop
-    0x1f, 0x20, 0x03, 0xD5, // nop
-    0x1f, 0x20, 0x03, 0xD5, // nop
+const MAYBE_LOG_CODE: [u8; 56] = [
+    // __afl_area_ptr[current_pc ^ previous_pc]++;
+    // previous_pc = current_pc >> 1;
+    0xE1, 0x0B, 0xBF, 0xA9,  // stp x1, x2, [sp, -0x10]!
+    0xE3, 0x13, 0xBF, 0xA9,  // stp x3, x4, [sp, -0x10]!
+
+    // x0 = current_pc
+    0x81, 0x01, 0x00, 0x58,  // ldr x1, #0x30, =__afl_area_ptr
+
+    0xa2, 0x01, 0x00, 0x58,  // ldr x2, #0x38, =&previous_pc
+    0x44, 0x00, 0x40, 0xf9,  // ldr x4, [x2] (=previous_pc)
+
+    // __afl_area_ptr[current_pc ^ previous_pc]++;
+    0x84, 0x00, 0x00, 0xca,  // eor x4, x4, x0
+    0x23, 0x68, 0x64, 0xf8,  // ldr x3, [x1, x4]
+    0x63, 0x04, 0x00, 0x91,  // add x3, x3, #1
+    0x23, 0x68, 0x24, 0xf8,  // str x3, [x1, x2]
+
+    // previous_pc = current_pc >> 1;
+    0xe0, 0x07, 0x40, 0x8b,  // add x0, xzr, x0, LSR #1
+    0x40, 0x00, 0x00, 0xf9,  // str x0, [x2]
+
+    0xE3, 0x13, 0xc1, 0xA8,  // ldp x3, x4, [sp], #0x10
+    0xE1, 0x0B, 0xc1, 0xA8,  // ldp x1, x2, [sp], #0x10
+    0xC0, 0x03, 0x5F, 0xD6,  // ret
+
+    // &afl_area_ptr
+    // &afl_prev_loc_ptr
 ];
 
 /// The implementation of the FridaEdgeCoverageHelper
@@ -198,7 +195,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                                 -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
                             );
                             writer.put_push_reg(X86Register::Rdi);
-                            writer.put_mov_reg_address(X86Register::Rdi, address);
+                            writer.put_mov_reg_address(X86Register::Rdi, ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64);
                             writer.put_call_address(helper.current_log_impl);
                             writer.put_pop_reg(X86Register::Rdi);
                             writer.put_lea_reg_reg_offset(
@@ -216,7 +213,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                                 -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
                                 IndexMode::PreAdjust,
                             );
-                            writer.put_ldr_reg_u64(Aarch64Register::X0, address);
+                            writer.put_ldr_reg_u64(Aarch64Register::X0, ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64);
                             writer.put_bl_imm(helper.current_log_impl);
                             writer.put_ldp_reg_reg_reg_offset(
                                 Aarch64Register::Lr,

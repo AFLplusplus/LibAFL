@@ -1438,6 +1438,7 @@ where
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
         let broadcast_map_description = postcard::to_allocvec(&client_out_map_mem.description())?;
+        let client_out_map_mem_fd: i32 = client_out_map_mem.shm_str().parse().unwrap();
 
         let mut incoming_map_description_serialized = vec![0u8; broadcast_map_description.len()];
 
@@ -1504,17 +1505,7 @@ where
                     ListenerStream::Unix(stream, addr) => unsafe {
                         dbg!("New connection", addr);
 
-                        let broadcast_fd_initial: i32 =
-                            CStr::from_ptr(broadcast_map_description.as_ptr() as *const c_char)
-                                .to_string_lossy()
-                                .into_owned()
-                                .parse()
-                                .unwrap_or_else(|_| {
-                                    panic!(
-                                        "ShmId is not a valid int file descriptor: {:?}",
-                                        broadcast_map_description
-                                    )
-                                });
+                        let broadcast_fd_initial: i32 = client_out_map_mem_fd;
 
                         match sendmsg(
                             stream.as_raw_fd(),

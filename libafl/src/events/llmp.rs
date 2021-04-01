@@ -516,7 +516,7 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SH: ShMem, // Todo: HasFd is only needed for Android
+    SH: ShMem + HasFd, // Todo: HasFd is only needed for Android
     ST: Stats,
 {
     let mut mgr;

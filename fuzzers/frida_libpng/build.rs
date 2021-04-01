@@ -29,8 +29,13 @@ fn main() {
     let libpng_tar = format!("{}/libpng-1.6.37.tar.xz", &cwd);
 
     // Enforce clang for its -fsanitize-coverage support.
-    std::env::set_var("CC", "clang");
-    std::env::set_var("CXX", "clang++");
+    let clang = match env::var("CLANG_PATH") {
+        Ok(path) => path,
+        Err(_) => "clang".to_string(),
+    };
+    let clangpp = format!("{}++", &clang);
+    std::env::set_var("CC", &clang);
+    std::env::set_var("CXX", &clangpp);
     let ldflags = match env::var("LDFLAGS") {
         Ok(val) => val,
         Err(_) => "".to_string(),
@@ -61,8 +66,8 @@ fn main() {
                 "--disable-shared",
                 &format!("--host={}", env::var("TARGET").unwrap())[..],
             ])
-            .env("CC", "clang")
-            .env("CXX", "clang++")
+            .env("CC", &clang)
+            .env("CXX", &clangpp)
             .env(
                 "CFLAGS",
                 "-O3 -g -D_DEFAULT_SOURCE -fPIC -fno-omit-frame-pointer",
