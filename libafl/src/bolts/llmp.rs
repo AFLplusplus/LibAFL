@@ -80,12 +80,10 @@ use nix::{
 };
 
 #[cfg(all(feature = "std", unix))]
-use std::{
-    os::unix::{
-        self,
-        net::{UnixListener, UnixStream},
-        {io::AsRawFd, prelude::RawFd},
-    },
+use std::os::unix::{
+    self,
+    net::{UnixListener, UnixStream},
+    {io::AsRawFd, prelude::RawFd},
 };
 
 #[cfg(all(unix, feature = "std"))]
@@ -1920,7 +1918,9 @@ where
                             .first()
                             .unwrap()
                             .shmem
-                            .shm_str().parse().unwrap()])],
+                            .shm_str()
+                            .parse()
+                            .unwrap()])],
                         MsgFlags::empty(),
                         None,
                     ) {
