@@ -81,16 +81,12 @@ use nix::{
 
 #[cfg(all(feature = "std", unix))]
 use std::{
-    ffi::CStr,
     os::unix::{
         self,
         net::{UnixListener, UnixStream},
         {io::AsRawFd, prelude::RawFd},
     },
 };
-
-#[cfg(all(unix, feature = "std"))]
-use libc::c_char;
 
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
@@ -101,9 +97,6 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription},
     Error,
 };
-
-#[cfg(all(unix, feature = "std"))]
-use super::shmem::HasFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
@@ -454,7 +447,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpConnection<SH>
 where
-    SH: ShMem + HasFd,
+    SH: ShMem,
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
@@ -1884,7 +1877,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpClient<SH>
 where
-    SH: ShMem + HasFd,
+    SH: ShMem,
 {
     #[cfg(all(unix, feature = "std"))]
     /// Create a LlmpClient, getting the ID from a given filename
@@ -1927,7 +1920,7 @@ where
                             .first()
                             .unwrap()
                             .shmem
-                            .shm_id()])],
+                            .shm_str().parse().unwrap()])],
                         MsgFlags::empty(),
                         None,
                     ) {

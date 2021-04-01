@@ -101,13 +101,6 @@ pub trait ShMem: Sized + Debug {
     }
 }
 
-/// shared maps that have an id can use this trait
-//#[cfg(all(unix, feature = "std"))]
-pub trait HasFd {
-    /// Retrieve the id of this shared map
-    fn shm_id(&self) -> i32;
-}
-
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 
@@ -121,7 +114,7 @@ pub mod unix_shmem {
 
     use crate::Error;
 
-    use super::{HasFd, ShMem};
+    use super::ShMem;
 
     #[cfg(unix)]
     extern "C" {
@@ -310,12 +303,6 @@ pub mod unix_shmem {
 
         fn map_mut(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
-        }
-    }
-
-    impl HasFd for UnixShMem {
-        fn shm_id(&self) -> i32 {
-            self.shm_id
         }
     }
 
