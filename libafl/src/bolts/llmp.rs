@@ -80,17 +80,11 @@ use nix::{
 };
 
 #[cfg(all(feature = "std", unix))]
-use std::{
-    ffi::CStr,
-    os::unix::{
-        self,
-        net::{UnixListener, UnixStream},
-        {io::AsRawFd, prelude::RawFd},
-    },
+use std::os::unix::{
+    self,
+    net::{UnixListener, UnixStream},
+    {io::AsRawFd, prelude::RawFd},
 };
-
-#[cfg(all(unix, feature = "std"))]
-use libc::c_char;
 
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
@@ -101,9 +95,6 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription},
     Error,
 };
-
-#[cfg(all(unix, feature = "std"))]
-use super::shmem::HasFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
@@ -454,7 +445,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpConnection<SH>
 where
-    SH: ShMem + HasFd,
+    SH: ShMem,
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
@@ -1438,6 +1429,7 @@ where
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
         let broadcast_map_description = postcard::to_allocvec(&client_out_map_mem.description())?;
+        let client_out_map_mem_fd: i32 = client_out_map_mem.shm_str().parse().unwrap();
 
         let mut incoming_map_description_serialized = vec![0u8; broadcast_map_description.len()];
 
@@ -1504,17 +1496,7 @@ where
                     ListenerStream::Unix(stream, addr) => unsafe {
                         dbg!("New connection", addr);
 
-                        let broadcast_fd_initial: i32 =
-                            CStr::from_ptr(broadcast_map_description.as_ptr() as *const c_char)
-                                .to_string_lossy()
-                                .into_owned()
-                                .parse()
-                                .unwrap_or_else(|_| {
-                                    panic!(
-                                        "ShmId is not a valid int file descriptor: {:?}",
-                                        broadcast_map_description
-                                    )
-                                });
+                        let broadcast_fd_initial: i32 = client_out_map_mem_fd;
 
                         match sendmsg(
                             stream.as_raw_fd(),
@@ -1893,7 +1875,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpClient<SH>
 where
-    SH: ShMem + HasFd,
+    SH: ShMem,
 {
     #[cfg(all(unix, feature = "std"))]
     /// Create a LlmpClient, getting the ID from a given filename
@@ -1936,7 +1918,9 @@ where
                             .first()
                             .unwrap()
                             .shmem
-                            .shm_id()])],
+                            .shm_str()
+                            .parse()
+                            .unwrap()])],
                         MsgFlags::empty(),
                         None,
                     ) {
