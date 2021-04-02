@@ -17,9 +17,6 @@ use crate::utils::{fork, ForkResult};
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMem;
 
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::shmem::HasFd;
-
 use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
@@ -313,7 +310,7 @@ impl<I, S, SH, ST> LlmpEventManager<I, S, SH, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SH: ShMem + HasFd,
+    SH: ShMem,
     ST: Stats,
 {
     #[cfg(all(feature = "std", unix))]
@@ -516,7 +513,7 @@ pub fn setup_restarting_mgr<I, S, SH, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SH: ShMem, // Todo: HasFd is only needed for Android
+    SH: ShMem,
     ST: Stats,
 {
     let mut mgr;
@@ -525,7 +522,6 @@ where
     let (sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
         #[cfg(target_os = "android")]
         {
-            let path = std::env::current_dir()?;
             mgr = LlmpEventManager::<I, S, SH, ST>::new_on_domain_socket(stats, "\x00llmp_socket")?;
         };
         #[cfg(not(target_os = "android"))]
