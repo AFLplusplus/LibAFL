@@ -13,5 +13,5 @@ crate-type=["cdylib"]
 jemallocator = "0.3.2"
 nix = "0.20.0"
 libc = "0.2.92"
-fxhash = "0.2.1"
+hashbrown = "0.11"
 

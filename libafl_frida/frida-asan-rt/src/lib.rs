@@ -1,8 +1,6 @@
-use std::{alloc::Layout, collections::HashMap};
-
 use jemallocator::Jemalloc;
 
-use fxhash::FxHashMap;
+use hashbrown::HashMap;
 use nix::{
     libc::{memcpy, memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -20,7 +18,7 @@ static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 struct Allocator {
     page_size: usize,
     shadow_offset: usize,
-    allocations: FxHashMap<usize, usize>,
+    allocations: HashMap<usize, usize>,
 }
 
 impl Allocator {
@@ -28,7 +26,7 @@ impl Allocator {
         Self {
             page_size: unsafe { sysconf(_SC_PAGESIZE) as usize },
             shadow_offset: 1 << 44,
-            allocations: FxHashMap::default(),
+            allocations: HashMap::new(),
         }
     }
 
