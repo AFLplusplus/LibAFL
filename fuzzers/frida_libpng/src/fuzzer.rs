@@ -27,10 +27,7 @@ use core::cell::RefCell;
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-use frida_gum::{
-    instruction_writer::InstructionWriter,
-    stalker::{NoneEventSink, Stalker, Transformer},
-};
+use frida_gum::{instruction_writer::InstructionWriter, stalker::{NoneEventSink, Stalker, Transformer, StalkerOutput}};
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 use std::{env, ffi::c_void, path::PathBuf};
 
@@ -50,6 +47,7 @@ struct FridaEdgeCoverageHelper<'a> {
     current_log_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
+    capstone: Capstone,
 }
 
 impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
@@ -126,6 +124,17 @@ const MAYBE_LOG_CODE: [u8; 56] = [
           // &afl_prev_loc_ptr
 ];
 
+#[cfg(target_arch = "aarch64")]
+const CHECK_SHADOW_MEM_QWORD: [u8; 0x1c] = [
+    0x21, 0x00, 0x80, 0xD2, // mov x1, #1
+    0xE1, 0x93, 0x01, 0x8B, // add x1, xzr, x1, lsl #36
+    0x20, 0x0C, 0x40, 0x8B, // add x0, x1, x0, lsr #3
+    0x00, 0x00, 0x40, 0x39, // ldrb w0, [x0. #0]
+    0x1F, 0xFC, 0x03, 0x71, // cmp w0, 0xff
+    0x40, 0x00, 0x00, 0x54, // beq done
+    0x20, 0x00, 0x20, 0xD4, // brk #1
+];
+
 /// The implementation of the FridaEdgeCoverageHelper
 impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
@@ -137,86 +146,36 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             size: get_module_size(module_name),
             current_log_impl: 0,
             transformer: None,
+            capstone: Capstone::new()
+                .arm64()
+                .mode(arch::arm64::ArchMode::Arm)
+                .detail(true)
+                .build()
+                .expect("Failed to create Capsone object"),
         };
 
-        let transformer = Transformer::from_callback(gum, |basic_block, _output| {
+        let mut asan_runtime = AsanRuntime::new();
+        asan_runtime.hook_library(module_name);
+
+        let transformer = Transformer::from_callback(gum, |basic_block, output| {
             let mut first = true;
             for instruction in basic_block {
-                if first {
-                    first = false;
-                    let address = unsafe { (*instruction.instr()).address };
-                    if address >= helper.base_address
-                        && address <= helper.base_address + helper.size as u64
-                    {
-                        let writer = _output.writer();
-                        if helper.current_log_impl == 0
-                            || !writer.can_branch_directly_to(helper.current_log_impl)
-                            || !writer.can_branch_directly_between(
-                                writer.pc() + 128,
-                                helper.current_log_impl,
-                            )
-                        {
-                            let after_log_impl = writer.code_offset() + 1;
-
-                            #[cfg(target_arch = "x86_64")]
-                            writer.put_jmp_near_label(after_log_impl);
-                            #[cfg(target_arch = "aarch64")]
-                            writer.put_b_label(after_log_impl);
-
-                            helper.current_log_impl = writer.pc();
-                            writer.put_bytes(&MAYBE_LOG_CODE);
-                            let prev_loc_pointer = helper.previous_pc.as_ptr() as *mut _ as usize;
-                            let map_pointer = helper.map.as_ptr() as usize;
-
-                            writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
-                            writer.put_bytes(&map_pointer.to_ne_bytes());
-
-                            writer.put_label(after_log_impl);
-                        }
-                        #[cfg(target_arch = "x86_64")]
-                        {
-                            println!("here");
-                            writer.put_lea_reg_reg_offset(
-                                X86Register::Rsp,
-                                X86Register::Rsp,
-                                -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
-                            );
-                            writer.put_push_reg(X86Register::Rdi);
-                            writer.put_mov_reg_address(
-                                X86Register::Rdi,
-                                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
-                            );
-                            writer.put_call_address(helper.current_log_impl);
-                            writer.put_pop_reg(X86Register::Rdi);
-                            writer.put_lea_reg_reg_offset(
-                                X86Register::Rsp,
-                                X86Register::Rsp,
-                                frida_gum_sys::GUM_RED_ZONE_SIZE as i32,
-                            );
-                        }
-                        #[cfg(target_arch = "aarch64")]
-                        {
-                            writer.put_stp_reg_reg_reg_offset(
-                                Aarch64Register::Lr,
-                                Aarch64Register::X0,
-                                Aarch64Register::Sp,
-                                -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
-                                IndexMode::PreAdjust,
-                            );
-                            writer.put_ldr_reg_u64(
-                                Aarch64Register::X0,
-                                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
-                            );
-                            writer.put_bl_imm(helper.current_log_impl);
-                            writer.put_ldp_reg_reg_reg_offset(
-                                Aarch64Register::Lr,
-                                Aarch64Register::X0,
-                                Aarch64Register::Sp,
-                                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
-                                IndexMode::PostAdjust,
-                            );
-                        }
+                let instr = instruction.instr();
+                let address = instr.address();
+                if address >= helper.base_address
+                    && address <= helper.base_address + helper.size as u64 {
+                    if first {
+                        first = false;
+                        helper.emit_coverage_mapping(address, &output);
                     }
+
+                    //match helper.is_interesting_instruction(address, instr) {
+                        //Ok((basereg, indexreg, displacement)) => {
+                            ////helper.emit_shadow_check(address, &output, basereg, indexreg, displacement);
+                        //},
+                        //Err(_) => ()
+                    //}
+
                 }
                 instruction.keep()
             }
@@ -224,6 +183,182 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
         helper.transformer = Some(transformer);
         helper
+    }
+
+    #[inline]
+    fn get_writer_register(&self, reg: capstone::RegId) -> Aarch64Register {
+        let regint: u16 = reg.0;
+        Aarch64Register::from_u32(regint as u32).unwrap()
+    }
+
+    #[inline]
+    fn emit_shadow_check(&self, address: u64, output: &StalkerOutput, basereg: capstone::RegId, indexreg: capstone::RegId, displacement: i32) {
+        let mut writer = output.writer();
+
+        let basereg = self.get_writer_register(basereg);
+
+        writer.put_brk_imm(1);
+
+        // Preserve x0, x1:
+        writer.put_stp_reg_reg_reg_offset(
+            Aarch64Register::X0,
+            Aarch64Register::X1,
+            Aarch64Register::Sp,
+            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+            IndexMode::PreAdjust,
+        );
+
+        // Make sure the base register is copied into x0
+        match basereg {
+            Aarch64Register::X0 | Aarch64Register::W0 => {
+            },
+            Aarch64Register::X1 | Aarch64Register::W1 => {
+                writer.put_mov_reg_reg(
+                    Aarch64Register::X0,
+                    Aarch64Register::X1
+                )
+            },
+            _ => {
+                writer.put_mov_reg_reg(
+                    Aarch64Register::X0,
+                    basereg
+                )
+            }
+        }
+
+        if indexreg.0 != 0 {
+            panic!("TODO: deal with indexreg")
+        }
+
+        let displacement = displacement + if basereg == Aarch64Register::Sp {
+            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+        } else {
+            0
+        };
+
+        if displacement < 0 {
+            // Subtract the displacement into x0
+            writer.put_sub_reg_reg_imm(
+                Aarch64Register::X0,
+                Aarch64Register::X0,
+                displacement.abs() as u64
+            );
+        } else {
+            // Add the displacement into x0
+            writer.put_add_reg_reg_imm(
+                Aarch64Register::X0,
+                Aarch64Register::X0,
+                displacement as u64
+            );
+
+        }
+
+        // Insert the check_shadow_mem code blob
+        writer.put_bytes(&CHECK_SHADOW_MEM_QWORD);
+
+        // Restore x0, x1
+        writer.put_ldp_reg_reg_reg_offset(
+            Aarch64Register::X0,
+            Aarch64Register::X1,
+            Aarch64Register::Sp,
+            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+            IndexMode::PostAdjust,
+        );
+    }
+
+    #[inline]
+    fn is_interesting_instruction(&self, _address: u64, instr: &Insn) -> Result<(capstone::RegId, capstone::RegId, i32), ()> {
+        let operands = self.capstone.insn_detail(instr).unwrap().arch_detail().operands();
+        if operands.len() < 2 {
+            return Err(());
+        }
+
+        match operands.get(operands.len() - 1).unwrap() {
+            Arm64Operand(arm64operand) => {
+                match arm64operand.op_type {
+                    Arm64OperandType::Mem(opmem) => {
+                        return Ok((opmem.base(), opmem.index(), opmem.disp()));
+                    },
+                    _ => ()
+                }
+            },
+            _ => ()
+
+        }
+
+        Err(())
+    }
+
+    #[inline]
+    fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
+        let writer = output.writer();
+        if self.current_log_impl == 0
+            || !writer.can_branch_directly_to(self.current_log_impl)
+            || !writer.can_branch_directly_between(
+                writer.pc() + 128,
+                self.current_log_impl,
+            )
+        {
+            let after_log_impl = writer.code_offset() + 1;
+
+            #[cfg(target_arch = "x86_64")]
+            writer.put_jmp_near_label(after_log_impl);
+            #[cfg(target_arch = "aarch64")]
+            writer.put_b_label(after_log_impl);
+
+            self.current_log_impl = writer.pc();
+            writer.put_bytes(&MAYBE_LOG_CODE);
+            let prev_loc_pointer = self.previous_pc.as_ptr() as *mut _ as usize;
+            let map_pointer = self.map.as_ptr() as usize;
+
+            writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
+            writer.put_bytes(&map_pointer.to_ne_bytes());
+
+            writer.put_label(after_log_impl);
+        }
+        #[cfg(target_arch = "x86_64")]
+        {
+            println!("here");
+            writer.put_lea_reg_reg_offset(
+                X86Register::Rsp,
+                X86Register::Rsp,
+                -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
+            );
+            writer.put_push_reg(X86Register::Rdi);
+            writer.put_mov_reg_address(
+                X86Register::Rdi,
+                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
+            );
+            writer.put_call_address(self.current_log_impl);
+            writer.put_pop_reg(X86Register::Rdi);
+            writer.put_lea_reg_reg_offset(
+                X86Register::Rsp,
+                X86Register::Rsp,
+                frida_gum_sys::GUM_RED_ZONE_SIZE as i32,
+            );
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            writer.put_stp_reg_reg_reg_offset(
+                Aarch64Register::Lr,
+                Aarch64Register::X0,
+                Aarch64Register::Sp,
+                -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                IndexMode::PreAdjust,
+            );
+            writer.put_ldr_reg_u64(
+                Aarch64Register::X0,
+                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
+            );
+            writer.put_bl_imm(self.current_log_impl);
+            writer.put_ldp_reg_reg_reg_offset(
+                Aarch64Register::Lr,
+                Aarch64Register::X0,
+                Aarch64Register::Sp,
+                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                IndexMode::PostAdjust,
+            );
+        }
     }
 }
 
@@ -409,6 +544,12 @@ unsafe fn fuzz(
         };
 
     let gum = Gum::obtain();
+
+    let mut rt_path = std::env::current_exe().unwrap();
+    rt_path.pop();
+    rt_path.push("libfrida_asan_rt.so");
+    //println!("Loaded rt-library: {:?}", libloading::Library::new(rt_path).unwrap());
+
     let lib = libloading::Library::new(module_name).unwrap();
     let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
         lib.get(symbol_name.as_bytes()).unwrap();
