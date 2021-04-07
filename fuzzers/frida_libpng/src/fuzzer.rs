@@ -54,7 +54,6 @@ struct FridaEdgeCoverageHelper<'a> {
     transformer: Option<Transformer<'a>>,
     capstone: Capstone,
     asan_runtime: AsanRuntime,
-    memset_addr: *mut c_void,
 }
 
 impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
@@ -169,48 +168,41 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 .build()
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(),
-            memset_addr: std::ptr::null_mut(),
         };
 
         helper.asan_runtime.unpoison_all_existing_memory();
         helper.asan_runtime.hook_library(module_name);
 
-        unsafe {
-            let lib = libloading::Library::new("libc.so").unwrap();
-            let memset_sym: libloading::Symbol<*mut c_void> = lib.get("memset".as_bytes()).unwrap();
-            helper.memset_addr = memset_sym.into_raw().into_raw();
-            println!("memset address: {:?}", helper.memset_addr);
-            let transformer = Transformer::from_callback(gum, |basic_block, output| {
-                let mut first = true;
-                for instruction in basic_block {
-                    let instr = instruction.instr();
-                    let address = instr.address();
-                    if address >= helper.base_address
-                        && address <= helper.base_address + helper.size as u64
-                    {
-                        if first {
-                            first = false;
-                            //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                            helper.emit_coverage_mapping(address, &output);
-                        }
-
-                        if let Ok((basereg, indexreg, displacement)) =
-                            helper.is_interesting_instruction(address, instr)
-                        {
-                            helper.emit_shadow_check(
-                                address,
-                                &output,
-                                basereg,
-                                indexreg,
-                                displacement,
-                            );
-                        }
+        let transformer = Transformer::from_callback(gum, |basic_block, output| {
+            let mut first = true;
+            for instruction in basic_block {
+                let instr = instruction.instr();
+                let address = instr.address();
+                if address >= helper.base_address
+                    && address <= helper.base_address + helper.size as u64
+                {
+                    if first {
+                        first = false;
+                        //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                        helper.emit_coverage_mapping(address, &output);
                     }
-                    instruction.keep()
+
+                    if let Ok((basereg, indexreg, displacement)) =
+                        helper.is_interesting_instruction(address, instr)
+                    {
+                        helper.emit_shadow_check(
+                            address,
+                            &output,
+                            basereg,
+                            indexreg,
+                            displacement,
+                        );
+                    }
                 }
-            });
-            helper.transformer = Some(transformer);
-        }
+                instruction.keep()
+            }
+        });
+        helper.transformer = Some(transformer);
         helper
     }
 
@@ -264,25 +256,24 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
         // Make sure the index register is copied into x1
         if indexreg.is_some() {
-            match indexreg.unwrap() {
-                Aarch64Register::X0 | Aarch64Register::W0 => {
-                    writer.put_ldr_reg_reg_offset(
-                        Aarch64Register::X1,
-                        Aarch64Register::Sp,
-                        (8 + frida_gum_sys::GUM_RED_ZONE_SIZE) as u64,
-                    );
-                    writer.put_brk_imm(0x77);
-                }
-                Aarch64Register::X1 | Aarch64Register::W1 => {}
-                _ => {
-                    if !writer.put_mov_reg_reg(Aarch64Register::X1, indexreg.unwrap()) {
-                        writer.put_mov_reg_reg(Aarch64Register::W1, indexreg.unwrap());
+            if let Some(indexreg) = indexreg {
+                match indexreg {
+                    Aarch64Register::X0 | Aarch64Register::W0 => {
+                        writer.put_ldr_reg_reg_offset(
+                            Aarch64Register::X1,
+                            Aarch64Register::Sp,
+                            (8 + frida_gum_sys::GUM_RED_ZONE_SIZE) as u64,
+                        );
+                        writer.put_brk_imm(0x77);
+                    }
+                    Aarch64Register::X1 | Aarch64Register::W1 => {}
+                    _ => {
+                        if !writer.put_mov_reg_reg(Aarch64Register::X1, indexreg) {
+                            writer.put_mov_reg_reg(Aarch64Register::W1, indexreg);
+                        }
                     }
                 }
             }
-        }
-
-        if indexreg.is_some() {
             writer.put_add_reg_reg_reg(
                 Aarch64Register::X0,
                 Aarch64Register::X0,
@@ -297,6 +288,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 0
             };
 
+        #[allow(clippy::comparison_chain)]
         if displacement < 0 {
             // Subtract the displacement into x0
             writer.put_sub_reg_reg_imm(

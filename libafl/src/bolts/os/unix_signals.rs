@@ -15,7 +15,7 @@ use std::ffi::CString;
 use libc::{
     c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
     SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
-    SIGQUIT, SIGSEGV, SIGTERM, SIGUSR2, SIGTRAP,
+    SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
