@@ -507,7 +507,7 @@ where
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
-#[allow(clippy::clippy::unnecessary_operation)] // for { mgr = LlmpEventManager... }
+#[allow(clippy::clippy::unnecessary_operation, clippy::clippy::type_complexity)] // for { mgr = LlmpEventManager... }
 pub fn setup_restarting_mgr<I, S, SH, ST>(
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
