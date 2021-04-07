@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 use nix::{
     libc::{memmove, memset},
-    sys::mman::{mmap, mprotect, msync, MsFlags, MapFlags, ProtFlags},
+    sys::mman::{mmap, mprotect, msync, MapFlags, MsFlags, ProtFlags},
 };
 
 use libc::{pthread_atfork, sysconf, _SC_PAGESIZE};
@@ -17,7 +17,6 @@ use libloading::Library;
 use regex::Regex;
 
 use rangemap::RangeSet;
-
 
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 
@@ -46,11 +45,15 @@ impl Allocator {
 
             // we need to loop in case there is a race between threads at init time.
             //loop {
-                //if let Ok(allocref) = ALLOCATOR_SINGLETON.as_mut().unwrap().try_borrow_mut() {
-                    //return allocref;
-                //}
+            //if let Ok(allocref) = ALLOCATOR_SINGLETON.as_mut().unwrap().try_borrow_mut() {
+            //return allocref;
             //}
-            ALLOCATOR_SINGLETON.as_mut().unwrap().try_borrow_mut().unwrap()
+            //}
+            ALLOCATOR_SINGLETON
+                .as_mut()
+                .unwrap()
+                .try_borrow_mut()
+                .unwrap()
         }
     }
 
@@ -130,16 +133,16 @@ impl Allocator {
         //println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             //println!("memset: {:?}", start as *mut c_void);
-            memset(
-                start as *mut c_void,
-                0xff,
-                size / 8,
-            );
+            memset(start as *mut c_void, 0xff, size / 8);
 
             let remainder = size % 8;
             if remainder > 0 {
                 //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
-                memset((start + size / 8) as *mut c_void, (0xff << (8 - remainder)) & 0xff, 1);
+                memset(
+                    (start + size / 8) as *mut c_void,
+                    (0xff << (8 - remainder)) & 0xff,
+                    1,
+                );
             }
         }
     }
@@ -167,7 +170,8 @@ impl Allocator {
                     MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
                     -1,
                     0,
-                ).expect("An error occurred while mapping shadow memory");
+                )
+                .expect("An error occurred while mapping shadow memory");
             }
         }
 
@@ -301,7 +305,6 @@ fn mapping_containing(address: *const c_void) -> (usize, usize) {
     result
 }
 
-
 /// Get the start and end address of the mapping containing a particular address
 fn mapping_for_library(libpath: &str) -> (usize, usize) {
     let mut libstart = 0;
@@ -313,7 +316,6 @@ fn mapping_for_library(libpath: &str) -> (usize, usize) {
             }
 
             libend = end;
-
         }
         false
     });
@@ -339,7 +341,7 @@ impl AsanRuntime {
     pub fn unpoison_all_existing_memory(&self) {
         walk_self_maps(&mut |start, end, _permissions, _path| {
             //if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
-                Allocator::get().map_shadow_for_region(start, end, true);
+            Allocator::get().map_shadow_for_region(start, end, true);
             //}
             false
         });
@@ -354,7 +356,10 @@ impl AsanRuntime {
 
         let (tls_start, tls_end) = Self::current_tls();
         allocator.map_shadow_for_region(tls_start, tls_end, true);
-        println!("registering thread with stack {:x}:{:x} and tls {:x}:{:x}", stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize);
+        println!(
+            "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
+            stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
+        );
     }
 
     /// Determine the stack start, end for the currently running thread
@@ -365,14 +370,12 @@ impl AsanRuntime {
         mapping_containing(stack_address)
     }
 
-
     /// Determine the tls start, end for the currently running thread
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { get_tls_ptr() };
 
         mapping_containing(tls_address)
     }
-
 
     /// Locate the target library and hook it's memory allocation functions
     pub fn hook_library(&mut self, path: &str) {
