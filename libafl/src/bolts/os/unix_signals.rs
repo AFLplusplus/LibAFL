@@ -13,7 +13,7 @@ use core::{
 use std::ffi::CString;
 
 use libc::{
-    c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
+    c_int, malloc, mcontext_t, sigaction, sigaltstack, sigemptyset, stack_t, ucontext_t, SA_NODEFER, SA_ONSTACK,
     SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
     SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
@@ -87,7 +87,7 @@ impl Display for Signal {
 
 pub trait Handler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: siginfo_t, _void: *const c_void);
+    fn handle(&mut self, signal: Signal, info: siginfo_t, _context: ucontext_t);
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
@@ -123,7 +123,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *const c_void) {
             None => return,
         }
     };
-    handler.handle(*signal, info, void);
+    handler.handle(*signal, info, *(void as *const ucontext_t));
 }
 
 /// Setup signal handlers in a somewhat rusty way.
