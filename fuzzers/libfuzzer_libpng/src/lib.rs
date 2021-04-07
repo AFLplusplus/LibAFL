@@ -76,6 +76,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
+
             // Feedbacks to rate the interestingness of an input
             tuple_list!(
                 MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
@@ -84,10 +85,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
-            // Feedbacks to recognize an input as solution
+
+            // Objectives to recognize an input as solution
             tuple_list!(CrashFeedback::new(), TimeoutFeedback::new()),
         )
     });
+
 
     println!("We're a client, let's fuzz :)");
 
@@ -150,6 +153,9 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     }
 
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+
+    print!("DONE\n");
+    loop {}
 
     // Never reached
     Ok(())

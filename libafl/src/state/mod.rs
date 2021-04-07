@@ -18,8 +18,11 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     utils::Rand,
+    stats::{ClientPerfStats, PerfFeature},
     Error,
+    start_timer, mark_feature_time
 };
+
 
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
@@ -68,6 +71,16 @@ where
     fn rand(&self) -> &R;
     /// The rand instance (mut)
     fn rand_mut(&mut self) -> &mut R;
+}
+
+/// Trait for offering a [`ClientPerfStats`]
+pub trait HasClientPerfStats
+{
+    /// [`ClientPerfStats`] itself
+    fn perf_stats(&self) -> &ClientPerfStats;
+
+    /// Mutatable ref to [`ClientPerfStats`]
+    fn perf_stats_mut(&mut self) -> &mut ClientPerfStats;
 }
 
 /// Trait for elements offering metadata
@@ -237,6 +250,10 @@ where
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
 
+    /// Performance statistics for this fuzzer
+    #[cfg(feature="perf_stats")]
+    perf_stats: ClientPerfStats,
+
     phantom: PhantomData<I>,
 }
 
@@ -394,6 +411,28 @@ where
     }
 }
 
+/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "perf_stats"
+/// feature is enabled, and only [`HasExecution`] when "perf_stats" is disabled
+#[cfg(feature="perf_stats")]
+pub trait HasFuzzerStats: HasExecutions + HasClientPerfStats {}
+
+/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "perf_stats"
+/// feature is enabled, and only [`HasExecution`] when "perf_stats" is disabled
+#[cfg(not(feature="perf_stats"))]
+pub trait HasFuzzerStats: HasExecutions {}
+
+impl<C, FT, I, OFT, R, SC> HasFuzzerStats for State<C, FT, I, OFT, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbacksTuple<I>,
+    SC: Corpus<I>,
+    OFT: FeedbacksTuple<I>,
+{
+
+}
+
 impl<C, FT, I, OFT, R, SC> HasMaxSize for State<C, FT, I, OFT, R, SC>
 where
     C: Corpus<I>,
@@ -508,13 +547,16 @@ where
         CS: CorpusScheduler<I, Self>,
     {
         let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
+
         let observers = executor.observers();
 
         if is_solution {
             // If the input is a solution, add it to the respective corpus
             self.solutions_mut().add(Testcase::new(input.clone()))?;
         }
+
         let corpus_idx = self.add_if_interesting(&input, fitness, scheduler)?;
+
         if corpus_idx.is_some() {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
@@ -640,24 +682,42 @@ where
         C: Corpus<I>,
         EM: EventManager<I, Self>,
     {
+        start_timer!(self);
         executor.pre_exec_observers()?;
+        mark_feature_time!(self, PerfFeature::PreExecObservers);
 
+        start_timer!(self);
         executor.pre_exec(self, event_mgr, input)?;
+        mark_feature_time!(self, PerfFeature::PreExec);
+
+        start_timer!(self);
         let exit_kind = executor.run_target(input)?;
+        mark_feature_time!(self, PerfFeature::TargetExecution);
+
+        start_timer!(self);
         executor.post_exec(self, event_mgr, input)?;
+        mark_feature_time!(self, PerfFeature::PostExec);
 
         *self.executions_mut() += 1;
-        executor.post_exec_observers()?;
 
+        start_timer!(self);
+        executor.post_exec_observers()?;
+        mark_feature_time!(self, PerfFeature::PostExecObservers);
+
+        start_timer!(self);
         let observers = executor.observers();
         let fitness =
             self.feedbacks_mut()
                 .is_interesting_all(&input, observers, exit_kind.clone())?;
+        mark_feature_time!(self, PerfFeature::GetFeedbackInterestingAll);
 
+        start_timer!(self);
         let is_solution = self
             .objectives_mut()
             .is_interesting_all(&input, observers, exit_kind)?
             > 0;
+        mark_feature_time!(self, PerfFeature::GetObjectivesInterestingAll);
+
         Ok((fitness, is_solution))
     }
 
@@ -708,7 +768,48 @@ where
             solutions,
             objectives,
             max_size: DEFAULT_MAX_SIZE,
+            #[cfg(feature="perf_stats")]
+            perf_stats: ClientPerfStats::new(),
             phantom: PhantomData,
         }
+    }
+
+}
+
+#[cfg(feature = "perf_stats")]
+impl<C, FT, I, OFT, R, SC> HasClientPerfStats for State<C, FT, I, OFT, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbacksTuple<I>,
+    SC: Corpus<I>,
+    OFT: FeedbacksTuple<I>,
+{
+    fn perf_stats(&self) -> &ClientPerfStats {
+        &self.perf_stats
+    }
+
+    fn perf_stats_mut(&mut self) -> &mut ClientPerfStats {
+        &mut self.perf_stats
+    }
+}
+
+#[cfg(not(feature = "perf_stats"))]
+impl<C, FT, I, OFT, R, SC> HasClientPerfStats for State<C, FT, I, OFT, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbacksTuple<I>,
+    SC: Corpus<I>,
+    OFT: FeedbacksTuple<I>,
+{
+    fn perf_stats(&self) -> &ClientPerfStats {
+        unimplemented!()
+    }
+
+    fn perf_stats_mut(&mut self) -> &mut ClientPerfStats {
+        unimplemented!()
     }
 }

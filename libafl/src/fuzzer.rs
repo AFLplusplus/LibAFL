@@ -5,16 +5,17 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     stages::StagesTuple,
-    state::HasExecutions,
+    state::{HasExecutions, HasClientPerfStats},
     utils::current_time,
+    cpu,
     Error,
 };
 
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
-/// Send a stats update all 6 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(6 * 1000);
+/// Send a stats update all 1 (or more) seconds
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(1000);
 
 /// Holds a set of stages
 pub trait HasStages<CS, E, EM, I, S, ST>
@@ -68,7 +69,7 @@ pub trait Fuzzer<E, EM, S, CS> {
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
     }
-
+    
     /// Fuzz for n iterations
     /// Returns the index of the last fuzzed corpus item
     fn fuzz_loop_for(
@@ -95,6 +96,7 @@ pub trait Fuzzer<E, EM, S, CS> {
         }
         Ok(ret)
     }
+
 
     /// Given the last time, if stats_timeout seconds passed, send off an info/stats/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `stats_timeout` time has passed and stats have been sent)
@@ -160,7 +162,7 @@ where
 impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S, CS> for StdFuzzer<CS, ST, E, EM, I, OT, S>
 where
     CS: CorpusScheduler<I, S>,
-    S: HasExecutions,
+    S: HasExecutions + HasClientPerfStats,
     ST: StagesTuple<CS, E, EM, I, S>,
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT>,
@@ -176,7 +178,8 @@ where
     ) -> Result<Duration, Error> {
         let cur = current_time();
         if cur - last > stats_timeout {
-            //println!("Fire {:?} {:?} {:?}", cur, last, stats_timeout);
+            // Default no perf_stats implmentation
+            #[cfg(not(feature = "perf_stats"))]
             manager.fire(
                 state,
                 Event::UpdateStats {
@@ -185,6 +188,25 @@ where
                     phantom: PhantomData,
                 },
             )?;
+
+            // If performance stats are requested, fire the `UpdatePerfStats` event
+            #[cfg(feature = "perf_stats")]
+            {
+                state.perf_stats_mut().set_current_time(cpu::read_time_counter());
+
+                // Send the current stats over to the manager. This `.clone` shouldn't be
+                // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s
+                manager.fire(
+                    state,
+                    Event::UpdatePerfStats {
+                        executions: *state.executions(),
+                        time: cur,
+                        perf_stats: state.perf_stats().clone(),
+                        phantom: PhantomData,
+                    },
+                )?;
+            }
+
             Ok(cur)
         } else {
             if cur.as_millis() % 1000 == 0 {}
@@ -199,12 +221,36 @@ where
         manager: &mut EM,
         scheduler: &CS,
     ) -> Result<usize, Error> {
+        // Init timer for scheduler
+        #[cfg(feature="perf_stats")]
+        state.perf_stats_mut().start_timer();
+
+        // Get the next index from the scheduler
         let idx = scheduler.next(state)?;
 
+        // Mark the elapsed time for the scheduler
+        #[cfg(feature="perf_stats")]
+        state.perf_stats_mut().mark_scheduler_time();
+
+        // Mark the elapsed time for the scheduler
+        #[cfg(feature="perf_stats")]
+        state.perf_stats_mut().reset_stage_index();
+
+        // Execute all stages
         self.stages_mut()
             .perform_all(state, executor, manager, scheduler, idx)?;
 
+        // Init timer for manager
+        #[cfg(feature="perf_stats")]
+        state.perf_stats_mut().start_timer();
+
+        // Execute the manager
         manager.process(state, executor, scheduler)?;
+
+        // Mark the elapsed time for the manager
+        #[cfg(feature="perf_stats")]
+        state.perf_stats_mut().mark_manager_time();
+
         Ok(idx)
     }
 }

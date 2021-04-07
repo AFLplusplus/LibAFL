@@ -15,7 +15,8 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../libafl/" }
+libafl = { path = "../../libafl/", features = ["default", "perf_stats"] }
+# libafl = { path = "../../libafl/", features = ["default"] }
 libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }

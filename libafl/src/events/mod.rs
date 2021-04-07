@@ -17,6 +17,9 @@ use crate::{
     Error,
 };
 
+#[cfg(feature = "perf_stats")] 
+use crate::stats::ClientPerfStats;
+
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum LogSeverity {
@@ -97,6 +100,20 @@ where
         executions: usize,
         phantom: PhantomData<I>,
     },
+    /// New stats with performance stats.
+    #[cfg(feature = "perf_stats")]
+    UpdatePerfStats {
+        /// The time of generation of the event
+        time: Duration,
+
+        /// The executions of this client
+        executions: usize,
+
+        /// Current performance statistics
+        perf_stats: ClientPerfStats,
+
+        phantom: PhantomData<I>,
+    },
     /// A new objective was found
     Objective {
         /// Objective corpus size
@@ -136,6 +153,13 @@ where
                 executions: _,
                 phantom: _,
             } => "Stats",
+            #[cfg(feature = "perf_stats")]
+            Event::UpdatePerfStats {
+                time: _,
+                executions: _,
+                perf_stats: _,
+                phantom: _,
+            } => "PerfStats",
             Event::Objective { objective_size: _ } => "Objective",
             Event::Log {
                 severity_level: _,
