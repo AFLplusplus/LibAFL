@@ -1,4 +1,4 @@
-// build.rs
+//! build.rs for `libafl_targets`
 
 use std::env;
 use std::path::Path;

@@ -49,6 +49,7 @@ impl Tokens {
 
     /// Adds a token to a dictionary, checking it is not a duplicate
     /// Returns `false` if the token was already present and did not get added.
+    #[allow(clippy::clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
         if self.token_vec.contains(token) {
             return false;

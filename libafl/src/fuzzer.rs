@@ -96,7 +96,7 @@ pub trait Fuzzer<E, EM, S, CS> {
         Ok(ret)
     }
 
-    /// Given the last time, if stats_timeout seconds passed, send off an info/stats/heartbeat message to the broker.
+    /// Given the last time, if `stats_timeout` seconds passed, send off an info/stats/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `stats_timeout` time has passed and stats have been sent)
     /// Will return an Error, if the stats could not be sent.
     fn maybe_report_stats(
