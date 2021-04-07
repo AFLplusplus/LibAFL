@@ -97,14 +97,14 @@ pub trait Stats {
     fn corpus_size(&self) -> u64 {
         self.client_stats()
             .iter()
-            .fold(0u64, |acc, x| acc + x.corpus_size)
+            .fold(0_u64, |acc, x| acc + x.corpus_size)
     }
 
     /// Amount of elements in the objectives (combined for all children)
     fn objective_size(&self) -> u64 {
         self.client_stats()
             .iter()
-            .fold(0u64, |acc, x| acc + x.objective_size)
+            .fold(0_u64, |acc, x| acc + x.objective_size)
     }
 
     /// Total executions
@@ -112,7 +112,7 @@ pub trait Stats {
     fn total_execs(&mut self) -> u64 {
         self.client_stats()
             .iter()
-            .fold(0u64, |acc, x| acc + x.executions)
+            .fold(0_u64, |acc, x| acc + x.executions)
     }
 
     /// Executions per second
@@ -121,7 +121,7 @@ pub trait Stats {
         let cur_time = current_time();
         self.client_stats_mut()
             .iter_mut()
-            .fold(0u64, |acc, x| acc + x.execs_per_sec(cur_time))
+            .fold(0_u64, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
     /// The client stats for a specific id, creating new if it doesn't exist

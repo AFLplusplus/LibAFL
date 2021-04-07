@@ -1,3 +1,5 @@
+//! `libafl_targets` contains runtime code, injected in the target itself during compilation.
+
 #[cfg(any(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]
 pub mod pcguard;
 #[cfg(any(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]

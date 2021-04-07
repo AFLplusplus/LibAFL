@@ -21,7 +21,7 @@ use crate::{
 pub enum ExitKind {
     Ok,
     Crash,
-    OOM,
+    Oom,
     Timeout,
 }
 

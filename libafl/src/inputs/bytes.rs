@@ -16,10 +16,11 @@ pub struct BytesInput {
 
 impl Input for BytesInput {}
 
+
 /// Rc Ref-cell from Input
-impl Into<Rc<RefCell<Self>>> for BytesInput {
-    fn into(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
+impl From<BytesInput> for Rc<RefCell<BytesInput>> {
+    fn from(input: BytesInput) -> Self {
+        Rc::new(RefCell::new(input))
     }
 }
 

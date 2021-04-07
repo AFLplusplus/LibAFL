@@ -1064,6 +1064,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         unsafe {
@@ -1824,6 +1825,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         self.receiver.recv_buf()
