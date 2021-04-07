@@ -16,7 +16,6 @@ pub struct BytesInput {
 
 impl Input for BytesInput {}
 
-
 /// Rc Ref-cell from Input
 impl From<BytesInput> for Rc<RefCell<BytesInput>> {
     fn from(input: BytesInput) -> Self {

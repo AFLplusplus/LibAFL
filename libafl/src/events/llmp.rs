@@ -537,7 +537,7 @@ where
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
             mgr.broker_loop()?;
             return Err(Error::ShuttingDown);
-        } 
+        }
 
         // We are the fuzzer respawner in a llmp client
         mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
@@ -574,7 +574,6 @@ where
             }
 
             ctr = ctr.wrapping_add(1);
-
         }
     } else {
         // We are the newly started fuzzing instance, first, connect to our own restore map.

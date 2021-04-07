@@ -453,8 +453,7 @@ where
     where
         OT: ObserversTuple,
     {
-        self
-            .feedbacks_mut()
+        self.feedbacks_mut()
             .is_interesting_all(input, observers, exit_kind)
     }
 
