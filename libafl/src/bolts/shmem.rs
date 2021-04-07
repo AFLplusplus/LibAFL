@@ -356,7 +356,7 @@ pub mod unix_shmem {
     }
 
     /// Deinitialize this shmem instance
-    #[allow(clippy::clippy::clippy::unnecessary_cast)] // for c_ types
+    #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
     unsafe fn unix_shmem_deinit(shm: *mut UnixShMem) {
         if shm.is_null() || (*shm).map.is_null() {
             /* Serialized map id */
@@ -370,7 +370,7 @@ pub mod unix_shmem {
 
     /// Functions to create Shared memory region, for observation channels and
     /// opening inputs and stuff.
-    #[allow(clippy::clippy::clippy::unnecessary_cast)] // for c_ types
+    #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
     unsafe fn unix_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
         (*shm).map_size = map_size;
         (*shm).map = ptr::null_mut();
@@ -390,8 +390,7 @@ pub mod unix_shmem {
             (*shm).shm_id,
         );
         (*shm).shm_str
-            [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_int as c_ulong) as usize] =
-            0u8;
+            [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_ulong) as usize] = 0u8;
         (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
         if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar || (*shm).map.is_null() {
             shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
@@ -403,7 +402,7 @@ pub mod unix_shmem {
     }
 
     /// Uses a shmap id string to open a shared map
-    #[allow(clippy::clippy::unnecessary_cast)] // for c_int and c_long
+    #[allow(clippy::unnecessary_cast)] // for c_int and c_long
     unsafe fn unix_shmem_by_str(
         shm: *mut UnixShMem,
         shm_str: &CStr,

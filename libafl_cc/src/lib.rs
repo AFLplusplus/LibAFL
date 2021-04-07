@@ -67,7 +67,7 @@ pub trait CompilerWrapper {
 }
 
 /// Wrap Clang
-#[allow(clippy::clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ClangWrapper {
     optimize: bool,
     wrapped_cc: String,

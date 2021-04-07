@@ -1223,6 +1223,7 @@ where
     /// Will return IllegalArgument error if msg is not on page.
     /// # Safety
     /// This dereferences msg, make sure to pass a proper pointer to it.
+    #[allow(clippy::cast_sign_loss)]
     pub unsafe fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
         let page = self.page();
         if llmp_msg_in_page(page, msg) {
@@ -1266,19 +1267,17 @@ where
     /// Gets this message from this page, at the indicated offset.
     /// Will return IllegalArgument error if the offset is out of bounds.
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
+        let offset = offset as usize;
         unsafe {
             let page = self.page_mut();
             let page_size = self.shmem.map().len() - size_of::<LlmpPage>();
-            if offset as isize > page_size as isize {
+            if offset > page_size {
                 Err(Error::IllegalArgument(format!(
                     "Msg offset out of bounds (size: {}, requested offset: {})",
                     page_size, offset
                 )))
             } else {
-                Ok(
-                    ((*page).messages.as_mut_ptr() as *mut u8).offset(offset as isize)
-                        as *mut LlmpMsg,
-                )
+                Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg)
             }
         }
     }
@@ -1310,7 +1309,7 @@ pub struct LlmpBrokerSignalHandler {
 
 #[cfg(all(unix))]
 impl Handler for LlmpBrokerSignalHandler {
-    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: c_void) {
+    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: *const c_void) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
     }
 
@@ -1400,6 +1399,7 @@ where
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
     #[inline]
     #[cfg(unix)]
+    #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
         unsafe { ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
     }

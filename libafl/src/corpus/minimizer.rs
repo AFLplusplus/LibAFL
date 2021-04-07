@@ -150,6 +150,8 @@ where
     C: Corpus<I>,
     R: Rand,
 {
+    /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
+    #[allow(clippy::unused_self)]
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
@@ -194,6 +196,8 @@ where
         Ok(())
     }
 
+    /// Cull the `Corpus` using the `MinimizerCorpusScheduler`
+    #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &mut S) -> Result<(), Error> {
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
             return Ok(());

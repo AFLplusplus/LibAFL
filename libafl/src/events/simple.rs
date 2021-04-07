@@ -118,6 +118,7 @@ where
     }
 
     // Handle arriving events in the client
+    #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
     fn handle_in_client(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         Err(Error::Unknown(format!(
             "Received illegal message that message should not have arrived: {:?}.",

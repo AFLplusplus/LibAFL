@@ -56,6 +56,7 @@ where
 /// A well-known example is the AFL-Style coverage map.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
@@ -156,6 +157,7 @@ where
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
@@ -226,11 +228,11 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T], size: &usize) -> Self {
+    pub fn new(name: &'static str, map: &'static mut [T], size: *const usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
-            size: Cptr::Cptr(size as *const _),
+            size: Cptr::Cptr(size),
             name: name.into(),
             initial,
         }

@@ -273,8 +273,8 @@ mod unix_signal_handler {
         pub event_mgr_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
-        pub crash_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
-        pub timeout_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
+        pub crash_handler: unsafe fn(Signal, siginfo_t, *const c_void, data: &mut Self),
+        pub timeout_handler: unsafe fn(Signal, siginfo_t, *const c_void, data: &mut Self),
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
@@ -283,14 +283,14 @@ mod unix_signal_handler {
     unsafe fn nop_handler(
         _signal: Signal,
         _info: siginfo_t,
-        _void: c_void,
+        _void: *const c_void,
         _data: &mut InProcessExecutorHandlerData,
     ) {
     }
 
     #[cfg(unix)]
     impl Handler for InProcessExecutorHandlerData {
-        fn handle(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
+        fn handle(&mut self, signal: Signal, info: siginfo_t, void: *const c_void) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 match signal {
@@ -320,7 +320,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _void: c_void,
+        _void: *const c_void,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
@@ -382,7 +382,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _void: c_void,
+        _void: *const c_void,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
