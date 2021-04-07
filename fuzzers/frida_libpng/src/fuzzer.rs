@@ -136,20 +136,78 @@ const MAYBE_LOG_CODE: [u8; 56] = [
 ];
 
 #[cfg(target_arch = "aarch64")]
-const CHECK_SHADOW_MEM_QWORD: [u8; 0x24] = [
+const CHECK_SHADOW_MEM_BYTE: [u8; 0x28] = [
     0x21, 0x00, 0x80, 0xD2, // mov x1, #1
     0xE1, 0x93, 0x01, 0x8B, // add x1, xzr, x1, lsl #36
     0x21, 0x0C, 0x40, 0x8B, // add x1, x1, x0, lsr #3
     0x21, 0x00, 0x40, 0x39, // ldrb w1, [x1. #0]
-    0x00, 0x42, 0x3b, 0xd5, // mrs x0, nzcv
-    //0x3F, 0xFC, 0x03, 0x71, // cmp w1, 0xff
-    //0x40, 0x00, 0x00, 0x54, // beq done
-    0x3F, 0x00, 0x00, 0x71, // cmp w1, 0x0
-    0x41, 0x00, 0x00, 0x54, // beq done
+    0x00, 0x08, 0x40, 0x92, // and x0, x0, #7
+    0x21, 0x00, 0xc0, 0x5a, // rbit w1, w1
+    0x21, 0xfc, 0x58, 0xd3, // lsr x1, x1, #24
+    0x21, 0x24, 0xc0, 0x9a, // lsr x1, x1, x0
+    0x41, 0x00, 0x00, 0x37, // tbnz x1, #0, done
     0x80, 0x08, 0x20, 0xD4, // brk #1
-    0x00, 0x42, 0x1b, 0xd5, // done: msr nzcv, x0
 ];
 
+#[cfg(target_arch = "aarch64")]
+const CHECK_SHADOW_MEM_HALFWORD: [u8; 0x2c] = [
+    0x21, 0x00, 0x80, 0xD2, // mov x1, #1
+    0xE1, 0x93, 0x01, 0x8B, // add x1, xzr, x1, lsl #36
+    0x21, 0x0C, 0x40, 0x8B, // add x1, x1, x0, lsr #3
+    0x21, 0x00, 0x40, 0x79, // ldrh w1, [x1. #0]
+    0x00, 0x08, 0x40, 0x92, // and x0, x0, #7
+    0x21, 0x04, 0xc0, 0x5a, // rev16 w1, w1
+    0x21, 0x00, 0xc0, 0x5a, // rbit w1, w1
+    0x21, 0xfc, 0x50, 0xd3, // lsr x1, x1, #16
+    0x21, 0x24, 0xc0, 0x9a, // lsr x1, x1, x0
+    0x41, 0x00, 0x08, 0x37, // tbnz x1, #1, done
+    0x80, 0x08, 0x20, 0xD4, // brk #1
+];
+
+#[cfg(target_arch = "aarch64")]
+const CHECK_SHADOW_MEM_DWORD: [u8; 0x2c] = [
+    0x21, 0x00, 0x80, 0xD2, // mov x1, #1
+    0xE1, 0x93, 0x01, 0x8B, // add x1, xzr, x1, lsl #36
+    0x21, 0x0C, 0x40, 0x8B, // add x1, x1, x0, lsr #3
+    0x21, 0x00, 0x40, 0x79, // ldrh w1, [x1. #0]
+    0x00, 0x08, 0x40, 0x92, // and x0, x0, #7
+    0x21, 0x04, 0xc0, 0x5a, // rev16 w1, w1
+    0x21, 0x00, 0xc0, 0x5a, // rbit w1, w1
+    0x21, 0xfc, 0x50, 0xd3, // lsr x1, x1, #16
+    0x21, 0x24, 0xc0, 0x9a, // lsr x1, x1, x0
+    0x41, 0x00, 0x10, 0x37, // tbnz x1, #2, done
+    0x80, 0x08, 0x20, 0xD4, // brk #1
+];
+
+#[cfg(target_arch = "aarch64")]
+const CHECK_SHADOW_MEM_QWORD: [u8; 0x2c] = [
+    0x21, 0x00, 0x80, 0xD2, // mov x1, #1
+    0xE1, 0x93, 0x01, 0x8B, // add x1, xzr, x1, lsl #36
+    0x21, 0x0C, 0x40, 0x8B, // add x1, x1, x0, lsr #3
+    0x21, 0x00, 0x40, 0x79, // ldrh w1, [x1. #0]
+    0x00, 0x08, 0x40, 0x92, // and x0, x0, #7
+    0x21, 0x04, 0xc0, 0x5a, // rev16 w1, w1
+    0x21, 0x00, 0xc0, 0x5a, // rbit w1, w1
+    0x21, 0xfc, 0x50, 0xd3, // lsr x1, x1, #16
+    0x21, 0x24, 0xc0, 0x9a, // lsr x1, x1, x0
+    0x41, 0x00, 0x18, 0x37, // tbnz x1, #3, done
+    0x80, 0x08, 0x20, 0xD4, // brk #1
+];
+
+#[cfg(target_arch = "aarch64")]
+const CHECK_SHADOW_MEM_16BYTES: [u8; 0x2c] = [
+    0x21, 0x00, 0x80, 0xD2, // mov x1, #1
+    0xE1, 0x93, 0x01, 0x8B, // add x1, xzr, x1, lsl #36
+    0x21, 0x0C, 0x40, 0x8B, // add x1, x1, x0, lsr #3
+    0x21, 0x00, 0x40, 0x79, // ldrh w1, [x1. #0]
+    0x00, 0x08, 0x40, 0x92, // and x0, x0, #7
+    0x21, 0x04, 0xc0, 0x5a, // rev16 w1, w1
+    0x21, 0x00, 0xc0, 0x5a, // rbit w1, w1
+    0x21, 0xfc, 0x50, 0xd3, // lsr x1, x1, #16
+    0x21, 0x24, 0xc0, 0x9a, // lsr x1, x1, x0
+    0x41, 0x00, 0x0, 0x37, // tbnz x1, #4, done
+    0x80, 0x08, 0x20, 0xD4, // brk #1
+];
 /// The implementation of the FridaEdgeCoverageHelper
 impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
@@ -187,7 +245,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                         helper.emit_coverage_mapping(address, &output);
                     }
 
-                    if let Ok((basereg, indexreg, displacement)) =
+                    if let Ok((basereg, indexreg, displacement, width)) =
                         helper.is_interesting_instruction(address, instr)
                     {
                         helper.emit_shadow_check(
@@ -196,6 +254,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                             basereg,
                             indexreg,
                             displacement,
+                            width,
                         );
                     }
                 }
@@ -220,6 +279,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         basereg: capstone::RegId,
         indexreg: capstone::RegId,
         displacement: i32,
+        width: u32,
     ) {
         let writer = output.writer();
 
@@ -306,7 +366,14 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         }
 
         // Insert the check_shadow_mem code blob
-        writer.put_bytes(&CHECK_SHADOW_MEM_QWORD);
+        match width {
+            1 => writer.put_bytes(&CHECK_SHADOW_MEM_BYTE),
+            2 => writer.put_bytes(&CHECK_SHADOW_MEM_HALFWORD),
+            4 => writer.put_bytes(&CHECK_SHADOW_MEM_DWORD),
+            8 => writer.put_bytes(&CHECK_SHADOW_MEM_QWORD),
+            16 => writer.put_bytes(&CHECK_SHADOW_MEM_16BYTES),
+            _ => (),
+        }
 
         // Restore x0, x1
         writer.put_ldp_reg_reg_reg_offset(
@@ -319,11 +386,49 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
     }
 
     #[inline]
+    fn get_instruction_width(&self, instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
+        use capstone::arch::arm64::Arm64Insn as I;
+        use capstone::arch::arm64::Arm64Reg as R;
+
+        let num_registers = match instr.id().0.into() {
+            I::ARM64_INS_STP | I::ARM64_INS_STXP | I::ARM64_INS_STNP | I::ARM64_INS_STLXP |
+            I::ARM64_INS_LDP | I::ARM64_INS_LDXP | I::ARM64_INS_LDNP
+            => 2,
+            _ => 1,
+        };
+
+        let mnemonic = instr.mnemonic().unwrap();
+        match mnemonic.as_bytes().last().unwrap() {
+            b'b' => return 1,
+            b'h' => return 2,
+            b'w' => return 4 * num_registers,
+            _ => (),
+        }
+
+        if let Arm64Operand(operand) = operands.first().unwrap() {
+            if let Arm64OperandType::Reg(operand) = operand.op_type {
+                match operand.0 as u32 {
+                    R::ARM64_REG_W0..=R::ARM64_REG_W30 | R::ARM64_REG_WZR | R::ARM64_REG_WSP |
+                    R::ARM64_REG_S0..=R::ARM64_REG_S31
+                        => return 4 * num_registers,
+                    R::ARM64_REG_D0..=R::ARM64_REG_D31
+                        => return 8 * num_registers,
+                    R::ARM64_REG_Q0..=R::ARM64_REG_Q31
+                        => return 16,
+                    _ => (),
+                }
+            };
+        };
+
+        8 * num_registers
+    }
+
+    #[inline]
     fn is_interesting_instruction(
         &self,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(capstone::RegId, capstone::RegId, i32), ()> {
+    ) -> Result<(capstone::RegId, capstone::RegId, i32, u32), ()> {
         let operands = self
             .capstone
             .insn_detail(instr)
@@ -336,7 +441,8 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
         if let Arm64Operand(arm64operand) = operands.last().unwrap() {
             if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                return Ok((opmem.base(), opmem.index(), opmem.disp()));
+                return Ok((opmem.base(), opmem.index(), opmem.disp(),
+                        self.get_instruction_width(instr, &operands)));
             }
         }
 
