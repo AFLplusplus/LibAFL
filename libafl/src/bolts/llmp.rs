@@ -86,7 +86,7 @@ use std::os::unix::{
     {io::AsRawFd, prelude::RawFd},
 };
 
-#[cfg(feature = "llmp_debug")]
+#[cfg(all(feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
 
 #[cfg(all(unix, feature = "std"))]
@@ -788,9 +788,12 @@ where
 
     /// listener about it using a EOP message.
     unsafe fn handle_out_eop(&mut self) -> Result<(), Error> {
-        #[cfg(feature = "llmp_debug")]
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
         {
+            #[cfg(debug_assertions)]
             let bt = Backtrace::new();
+            #[cfg(not(debug_assertions))]
+            let bt = "<n/a (release)>";
             let shm = self.out_maps.last().unwrap();
             println!(
                 "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
@@ -1039,7 +1042,7 @@ where
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
 
-                    #[cfg(feature = "llmp_debug")]
+                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
                         "LLMP_DEBUG: Got a new recv map {} with len {:?}",
                         self.current_recv_map.shmem.shm_str(),
@@ -1154,7 +1157,7 @@ where
 {
     /// Creates a new page, initializing the passed shared mem struct
     pub fn new(sender: u32, mut new_map: SH) -> Self {
-        #[cfg(feature = "llmp_debug")]
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
             "LLMP_DEBUG: Initializing map on {} with size {}",
             new_map.shm_str(),
@@ -1169,9 +1172,12 @@ where
 
     /// Maps and wraps an existing
     pub fn existing(existing_map: SH) -> Self {
-        #[cfg(feature = "llmp_debug")]
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
         {
+            #[cfg(debug_assertions)]
             let bt = Backtrace::new();
+            #[cfg(not(debug_assertions))]
+            let bt = "<n/a (release)>";
             println!(
                 "LLMP_DEBUG: Using existing map {} with size {}, bt: {:?}",
                 existing_map.shm_str(),

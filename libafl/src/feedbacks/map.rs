@@ -259,7 +259,7 @@ where
     R: Reducer<T>,
     O: MapObserver<T> + Observer,
 {
-    /// Create new MapFeedback
+    /// Create new `MapFeedback`
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
@@ -270,7 +270,7 @@ where
         }
     }
 
-    /// Create new MapFeedback for the observer type.
+    /// Create new `MapFeedback` for the observer type.
     pub fn new_with_observer(map_observer: &O) -> Self {
         Self {
             history_map: vec![T::default(); map_observer.map().len()],
@@ -281,7 +281,7 @@ where
         }
     }
 
-    /// Create new MapFeedback specifying if it must track indexes of novelties
+    /// Create new `MapFeedback` specifying if it must track indexes of novelties
     pub fn new_track(
         name: &'static str,
         map_size: usize,
@@ -297,7 +297,7 @@ where
         }
     }
 
-    /// Create new MapFeedback for the observer type if it must track indexes of novelties
+    /// Create new `MapFeedback` for the observer type if it must track indexes of novelties
     pub fn new_with_observer_track(
         map_observer: &O,
         track_indexes: bool,
@@ -319,7 +319,7 @@ where
     R: Reducer<T>,
     O: MapObserver<T>,
 {
-    /// Create new MapFeedback using a map observer, and a map.
+    /// Create new `MapFeedback` using a map observer, and a map.
     /// The map can be shared.
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {

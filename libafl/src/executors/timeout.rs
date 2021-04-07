@@ -1,4 +1,4 @@
-//! A TimeoutExecutor set a timeout before each target run
+//! A `TimeoutExecutor` sets a timeout before each target run
 
 use core::{marker::PhantomData, time::Duration};
 

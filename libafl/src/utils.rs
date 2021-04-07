@@ -402,7 +402,7 @@ impl ChildHandle {
 }
 
 #[cfg(unix)]
-/// The ForkResult
+/// The `ForkResult` (result of a fork)
 pub enum ForkResult {
     Parent(ChildHandle),
     Child,
