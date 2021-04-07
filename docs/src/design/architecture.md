@@ -1,0 +1,3 @@
+# Architecture
+
+The LibAFL architecture
