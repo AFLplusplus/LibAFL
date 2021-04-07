@@ -15,7 +15,7 @@ use std::ffi::CString;
 use libc::{
     c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
     SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
-    SIGQUIT, SIGSEGV, SIGTERM, SIGUSR2,
+    SIGQUIT, SIGSEGV, SIGTERM, SIGUSR2, SIGTRAP,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -40,6 +40,7 @@ pub enum Signal {
     SigQuit = SIGQUIT,
     SigTerm = SIGTERM,
     SigInterrupt = SIGINT,
+    SigTrap = SIGTRAP,
 }
 
 pub static CRASH_SIGNALS: &[Signal] = &[
@@ -77,6 +78,7 @@ impl Display for Signal {
             Signal::SigQuit => write!(f, "SIGQUIT")?,
             Signal::SigTerm => write!(f, "SIGTERM")?,
             Signal::SigInterrupt => write!(f, "SIGINT")?,
+            Signal::SigTrap => write!(f, "SIGTRAP")?,
         };
 
         Ok(())

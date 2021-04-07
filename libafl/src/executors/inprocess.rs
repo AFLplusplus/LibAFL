@@ -312,6 +312,7 @@ mod unix_signal_handler {
                 Signal::SigFloatingPointException,
                 Signal::SigIllegalInstruction,
                 Signal::SigSegmentationFault,
+                Signal::SigTrap,
             ]
         }
     }
