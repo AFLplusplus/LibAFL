@@ -1,3 +1,4 @@
+//! Signal handling for unix
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,

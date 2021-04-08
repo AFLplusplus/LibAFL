@@ -1,3 +1,5 @@
+//! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,

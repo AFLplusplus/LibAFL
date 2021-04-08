@@ -1,3 +1,5 @@
+//! The `Fuzzer` is the main struct for a fuzz campaign.
+
 use crate::{
     corpus::CorpusScheduler,
     events::{Event, EventManager},

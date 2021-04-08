@@ -1,3 +1,5 @@
+//! The `MapObserver` provides access a map, usually injected into the target
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,

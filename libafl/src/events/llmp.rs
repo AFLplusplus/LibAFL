@@ -1,3 +1,5 @@
+//! LLMP-backed event manager for scalable multi-processed fuzzing
+
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};

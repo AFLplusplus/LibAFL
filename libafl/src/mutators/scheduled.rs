@@ -1,3 +1,5 @@
+//! The `ScheduledMutator` schedules multiple mutations internally.
+
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::{
