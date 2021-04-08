@@ -10,14 +10,12 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::io::Read;
+use hashbrown::HashMap;
 
 #[cfg(all(feature = "std", unix))]
 use nix::{
     cmsg_space,
-    sys::{
-        socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
-        uio::IoVec,
-    },
+    poll::{poll, PollFlags, PollFd},
 };
 
 #[cfg(all(feature = "std", unix))]
@@ -27,38 +25,16 @@ use std::os::unix::{
     {io::AsRawFd, prelude::RawFd},
 };
 
+use std::rc::Rc;
+
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
-/// The implementing channel has the ability to send a file descriptor.
-pub trait SendFd {
-    /// Sends a file descriptor
-    fn send_fd(&self, fd: i32) -> Result<(), Error>;
-}
-
-/// Send a file descriptor over a unix stream
-impl SendFd for UnixStream {
-    fn send_fd(&self, fd: i32) -> Result<(), Error> {
-        match sendmsg(
-            self.as_raw_fd(),
-            &[IoVec::from_slice(b"\x00")],
-            &[ControlMessage::ScmRights(&[fd])],
-            MsgFlags::empty(),
-            None,
-        ) {
-            // TODO: Return a more appropriate Error
-            Err(e) => Err(Error::Unknown(format!(
-                "Could not send fd to Unix Socket {} {:?}: {:?}",
-                fd, self, e
-            ))),
-            Ok(_) => Ok(()),
-        }
-    }
-}
-
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 /// The Sharedmem backed by a `ShmemService`a
-pub struct ServedShMem {}
+pub struct ServedShMem {
+
+}
 
 impl ShMem for ServedShMem {
     fn new_map(map_size: usize) -> Result<Self, crate::Error> {
@@ -103,25 +79,25 @@ pub struct AshmemClient {
 
 #[derive(Debug)]
 pub struct AshmemService {
-    maps: Vec<UnixShMem>,
+    maps: HashMap<[u8; 20], UnixShMem>,
 }
 
-pub impl AshmemService {
+impl AshmemService {
     /// Create a new AshMem service
     #[must_use]
     pub fn new() -> Self {
-        AshmemService { maps: vec![] }
+        AshmemService { maps: HashMap::new() }
     }
 
     /// Read and handle the client request, send the answer over unix fd.
-    fn handle_client(&mut self, stream: UnixStream) -> Result<(), Error> {
+    fn handle_client(&mut self, stream: &mut UnixStream) -> Result<(), Error> {
         // Always receive one be u32 of size, then the command.
         let mut size_bytes = [0u8; 4];
         stream.read_exact(&mut size_bytes)?;
         let size = u32::from_be_bytes(size_bytes);
-        let bytes = vec![];
+        let mut bytes = vec![];
         bytes.resize(size as usize, 0u8);
-        stream.read_exact(&mut bytes);
+        stream.read_exact(&mut bytes).expect("Failed to read message body");
         let request: AshmemRequest = postcard::from_bytes(&bytes)?;
 
         // Handle the client request
@@ -134,19 +110,12 @@ pub impl AshmemService {
                 Ok(map) => {
                     let fd = map.shm_id;
 
-                    self.maps.push(map);
+                    self.maps.insert(*map.shm_slice(), map);
                     fd
                 }
             },
             AshmemRequest::ExistingPage(description) => {
-                let map = None;
-                for shmem in self.maps {
-                    if shmem.shm_str() == description.str_bytes {
-                        map = Some(shmem);
-                    }
-                }
-
-                match map {
+                match self.maps.get(&description.str_bytes) {
                     None => {
                         println!("Error finding shared map {:?}", description);
                         -1
@@ -154,7 +123,7 @@ pub impl AshmemService {
                     Some(map) => map.shm_id,
                 }
             }
-            AshmemRequest::Deregister(id) => {
+            AshmemRequest::Deregister(_) => {
                 return Ok(());
             }
         };
@@ -162,28 +131,51 @@ pub impl AshmemService {
         stream.send_fds(&fd.to_be_bytes(), &[fd])?;
         Ok(())
     }
-}
 
-pub fn listen(&self, filename: &str) -> Result<(), Error> {
-    let listener = UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?)?;
 
-    loop {
-        let (stream, addr) = match listener.accept() {
-            Ok(stream_val) => stream_val,
-            Err(e) => {
-                println!("Error accepting client: {:?}", e);
-                continue;
+    pub fn listen(&mut self, filename: &str) -> Result<(), Error> {
+        let listener = UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?)?;
+        let mut clients: HashMap<RawFd, (UnixStream, UnixSocketAddr)> = HashMap::new();
+        let mut poll_fds: HashMap<RawFd, PollFd> = HashMap::new();
+
+        poll_fds.insert(listener.as_raw_fd(), PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN));
+
+        loop {
+            let mut fds_to_poll: Vec<PollFd> = poll_fds.values().map(|p| *p).collect();
+            let fd = match poll(&mut fds_to_poll, -1) {
+                Ok(fd) => fd,
+                Err(e) => {
+                    println!("Error polling for activity: {:?}", e);
+                    continue;
+                }
+            };
+            if fd == listener.as_raw_fd() {
+                let (stream, addr) = match listener.accept_unix_addr() {
+                    Ok(stream_val) => stream_val,
+                    Err(e) => {
+                        println!("Error accepting client: {:?}", e);
+                        continue;
+                    }
+                };
+
+                println!("Recieved connection from {:?}", addr);
+                let pollfd = PollFd::new(stream.as_raw_fd(), PollFlags::POLLIN);
+                poll_fds.insert(stream.as_raw_fd(), pollfd);
+                clients.insert(stream.as_raw_fd(), (stream, addr)).as_ref().unwrap();
+            } else if poll_fds.get(&fd).unwrap().revents().unwrap().contains(PollFlags::POLLHUP) {
+                    poll_fds.remove(&fd);
+                    clients.remove(&fd);
+            } else {
+                let (stream, _addr) = clients.get_mut(&fd).unwrap();
+                match self.handle_client(stream) {
+                    Ok(()) => (),
+                    Err(e) => {
+                        dbg!("Ignoring failed read from client", e);
+                        continue;
+                    }
+                };
             }
-        };
-
-        println!("Recieved connection from {:?}", addr);
-
-        match self.handle_client(stream) {
-            Ok(()) => (),
-            Err(e) => {
-                dbg!("Ignoring failed read from client", e);
-                continue;
-            }
-        };
+        }
     }
 }
+
