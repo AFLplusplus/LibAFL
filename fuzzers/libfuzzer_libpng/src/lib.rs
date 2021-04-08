@@ -20,10 +20,9 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    utils::{current_nanos, StdRand},
+    utils::{current_nanos, StdRand, launcher},
     Error,
 };
-
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
 /// The main fn, no_mangle as it is a C main
@@ -33,26 +32,45 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
+    let args: Vec<String> = env::args().collect();
+    //println!("{:?}", args);
     println!(
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
-    fuzz(
-        vec![PathBuf::from("./corpus")],
-        PathBuf::from("./crashes"),
-        1337,
-    )
-    .expect("An error occurred while fuzzing");
+
+    let broker_args = FnArgs{
+        corpus_dirs : vec![PathBuf::from("./corpus")], 
+        objective_dir : PathBuf::from("./crashes"),
+        broker_port : 1337
+    };
+    let client_args = FnArgs{
+        corpus_dirs : vec![PathBuf::from("./corpus")], 
+        objective_dir : PathBuf::from("./crashes"),
+        broker_port : 1337
+    };
+    #[cfg(unix)]
+    let _ = launcher(&in_client,&in_client, broker_args, client_args, args);
+
+    #[cfg(not(unix))]
+    let _ = in_client( corpus_dirs : vec![PathBuf::from("./corpus")], PathBuf::from("./crashes"), 1337);    
 }
 
-/// The actual fuzzer
-fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
+struct FnArgs{
+    corpus_dirs: Vec<PathBuf>,
+    objective_dir: PathBuf,
+    broker_port: u16,
+}
+
+fn in_client(
+    fn_args:FnArgs
+) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr::<_, _, StdShMem, _>(stats, broker_port) {
+        match setup_restarting_mgr::<_, _, StdShMem, _>(stats, fn_args.broker_port) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
@@ -70,6 +88,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     });
 
     // If not restarting, create a State from scratch
+    let objective_dir = fn_args.objective_dir;
     let mut state = state.unwrap_or_else(|| {
         State::new(
             // RNG
@@ -141,10 +160,10 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
+            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &fn_args.corpus_dirs)
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
-                &corpus_dirs
+                &fn_args.corpus_dirs
             ));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
