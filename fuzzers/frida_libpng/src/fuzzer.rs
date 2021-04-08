@@ -364,14 +364,13 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 displacement as u64,
             );
         }
-
         // Insert the check_shadow_mem code blob
         match width {
-            1 => writer.put_bytes(&CHECK_SHADOW_MEM_BYTE),
-            2 => writer.put_bytes(&CHECK_SHADOW_MEM_HALFWORD),
-            4 => writer.put_bytes(&CHECK_SHADOW_MEM_DWORD),
-            8 => writer.put_bytes(&CHECK_SHADOW_MEM_QWORD),
-            16 => writer.put_bytes(&CHECK_SHADOW_MEM_16BYTES),
+            1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
+            2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
+            4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
+            8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
+            16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
             _ => (),
         }
 

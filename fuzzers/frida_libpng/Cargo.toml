@@ -22,7 +22,7 @@ num_cpus = "1.0"
 which = "4.1"
 
 [target.'cfg(unix)'.dependencies]
-libafl = { path = "../../libafl/" }
+libafl = { path = "../../libafl/", features = [ "llmp_debug", "std"]}
 capstone = { path = "../../../capstone-rs/capstone-rs", version = "0.7.0" }
 capstone-sys = { path = "../../../capstone-rs/capstone-sys", version = "0.11.0" }
 frida-gum = { path = "../../../frida-rust/frida-gum", version = "0.3.4", optional = true, features = [ "event-sink", "invocation-listener"] }

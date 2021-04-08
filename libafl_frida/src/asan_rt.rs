@@ -4,24 +4,22 @@ use nix::{
     sys::mman::{mmap, mprotect, MapFlags, ProtFlags},
 };
 
-use libc::{pthread_atfork, sysconf, _SC_PAGESIZE};
+use libc::{siginfo_t, ucontext_t, pthread_atfork, sysconf, _SC_PAGESIZE};
 use std::{
     cell::RefCell,
     cell::RefMut,
     ffi::c_void,
     fs::File,
     io::{BufRead, BufReader},
+    pin::Pin,
 };
-
-use libloading::Library;
 use regex::Regex;
-
 use rangemap::RangeSet;
-
-use libc::{siginfo_t, ucontext_t};
+use gothook::GotHookLibrary;
 use libafl::bolts::os::unix_signals::{setup_signal_handler, Signal, Handler};
 use backtrace::resolve;
 use frida_gum::Backtracer;
+use dynasmrt::{DynasmApi, DynasmLabelApi, ExecutableBuffer, dynasm};
 
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 
@@ -329,6 +327,11 @@ fn mapping_for_library(libpath: &str) -> (usize, usize) {
 }
 
 pub struct AsanRuntime {
+    blob_check_mem_byte: Option<Vec<u8>>,
+    blob_check_mem_halfword: Option<Vec<u8>>,
+    blob_check_mem_dword: Option<Vec<u8>>,
+    blob_check_mem_qword: Option<Vec<u8>>,
+    blob_check_mem_16bytes: Option<Vec<u8>>,
 }
 
 impl AsanRuntime {
@@ -337,7 +340,14 @@ impl AsanRuntime {
         allocator.init();
 
         let mut res = Self {
+            blob_check_mem_byte: None,
+            blob_check_mem_halfword: None,
+            blob_check_mem_dword: None,
+            blob_check_mem_qword: None,
+            blob_check_mem_16bytes: None,
         };
+
+        res.generate_instrumentation_blobs();
 
         unsafe {
             setup_signal_handler(&mut res).expect("Failed to setup Asan signal handler");
@@ -387,10 +397,10 @@ impl AsanRuntime {
 
     /// Locate the target library and hook it's memory allocation functions
     pub fn hook_library(&mut self, path: &str) {
-        let target_lib = HookerTargetLibrary::new(path, false);
+        let target_lib = GotHookLibrary::new(path, false);
 
         // shadow the library itself, allowing all accesses
-        Allocator::get().map_shadow_for_region(target_lib.start, target_lib.end, true);
+        Allocator::get().map_shadow_for_region(target_lib.start(), target_lib.end(), true);
 
         // Hook all the memory allocator functions
         target_lib.hook_function("malloc", asan_malloc as *const c_void);
@@ -405,6 +415,77 @@ impl AsanRuntime {
             "malloc_usable_size",
             asan_malloc_usable_size as *const c_void,
         );
+    }
+
+    /// Generate the instrumentation blobs for the current arch.
+    fn generate_instrumentation_blobs(&mut self) {
+        macro_rules! shadow_check {
+            ($ops:ident, $bit:expr) => {dynasm!($ops
+                ; .arch aarch64
+                ; mov x1, #1
+                ; add x1, xzr, x1, lsl #36
+                ; add x1, x1, x0, lsr #3
+                ; ldrh w1, [x1, #0]
+                ; and x0, x0, #7
+                ; rev16 w1, w1
+                ; rbit w1, w1
+                ; lsr x1, x1, #16
+                ; lsr x1, x1, x0
+                ; tbnz x1, #$bit, ->done
+                ; brk #$bit
+                ; ->done:
+            );};
+        }
+
+        let mut ops_check_mem_byte = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check!(ops_check_mem_byte, 0);
+        self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap());
+
+        let mut ops_check_mem_halfword = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check!(ops_check_mem_halfword, 1);
+        self.blob_check_mem_halfword = Some(ops_check_mem_halfword.finalize().unwrap());
+
+        let mut ops_check_mem_dword = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check!(ops_check_mem_dword, 2);
+        self.blob_check_mem_dword = Some(ops_check_mem_dword.finalize().unwrap());
+
+        let mut ops_check_mem_qword = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check!(ops_check_mem_qword, 3);
+        self.blob_check_mem_qword = Some(ops_check_mem_qword.finalize().unwrap());
+
+        let mut ops_check_mem_16bytes = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check!(ops_check_mem_16bytes, 4);
+        self.blob_check_mem_16bytes = Some(ops_check_mem_16bytes.finalize().unwrap());
+    }
+
+    /// Get the blob which checks a byte access
+   #[inline]
+    pub fn blob_check_mem_byte(&self) -> Pin<&Vec<u8>> {
+        Pin::new(self.blob_check_mem_byte.as_ref().unwrap())
+    }
+
+    /// Get the blob which checks a halfword access
+   #[inline]
+    pub fn blob_check_mem_halfword(&self) -> Pin<&Vec<u8>> {
+        Pin::new(self.blob_check_mem_halfword.as_ref().unwrap())
+    }
+
+    /// Get the blob which checks a dword access
+   #[inline]
+    pub fn blob_check_mem_dword(&self) -> Pin<&Vec<u8>> {
+        Pin::new(self.blob_check_mem_dword.as_ref().unwrap())
+    }
+
+    /// Get the blob which checks a qword access
+   #[inline]
+    pub fn blob_check_mem_qword(&self) -> Pin<&Vec<u8>> {
+        Pin::new(self.blob_check_mem_qword.as_ref().unwrap())
+    }
+
+    /// Get the blob which checks a 16 byte access
+   #[inline]
+    pub fn blob_check_mem_16bytes(&self) -> Pin<&Vec<u8>> {
+        Pin::new(self.blob_check_mem_16bytes.as_ref().unwrap())
     }
 }
 
@@ -463,163 +544,5 @@ impl Handler for AsanRuntime {
         vec![
             Signal::SigTrap,
         ]
-    }
-}
-struct HookerTargetLibrary<'a> {
-    path: &'a str,
-    start: usize,
-    end: usize,
-    file_in_memory: Box<&'a [u8]>,
-    elf: goblin::elf::Elf<'a>,
-}
-
-impl<'a> HookerTargetLibrary<'a> {
-    /// Create a new library to be hooked from a path. If the load boolean is true, the library will first be
-    /// loaded.
-    pub fn new(path: &'a str, load: bool) -> Self {
-        println!("Path is {:?}", path);
-        let library = if load {
-            Some(unsafe { Library::new(path) })
-        } else {
-            None
-        };
-
-        println!("library: {:?}", library);
-
-        let (start, end) = mapping_for_library(path);
-
-        let file_in_memory = unsafe { std::slice::from_raw_parts(start as *const u8, end - start) };
-        let mut elf = goblin::elf::Elf::lazy_parse(
-            goblin::elf::Elf::parse_header(file_in_memory).expect("Failed to parse elf"),
-        )
-        .expect("Failed to parse elf lazily");
-
-        let ctx = goblin::container::Ctx {
-            le: scroll::Endian::Little,
-            container: goblin::container::Container::Big,
-        };
-        elf.program_headers = goblin::elf::ProgramHeader::parse(
-            &file_in_memory,
-            elf.header.e_phoff as usize,
-            elf.header.e_phnum as usize,
-            ctx,
-        )
-        .expect("parse program headers");
-        // because we're in memory, we need to use teh vaddr. goblin uses offsets, so we'll
-        // just patch the PHDRS so that they have offsets equal to vaddr.
-        for mut program_header in &mut elf.program_headers {
-            program_header.p_offset = program_header.p_vaddr;
-        }
-        elf.dynamic =
-            goblin::elf::dynamic::Dynamic::parse(&file_in_memory, &elf.program_headers, ctx)
-                .expect("parse dynamic section");
-
-        //let mut relandroid_offset = 0;
-        //let mut relandroid_size = 0;
-
-        //for dynentry in elf.dynamic.unwrap().dyns {
-        //match dynentry.d_tag {
-        //goblin::elf64::dynamic::DT_LOOS + 2 | goblin::elf64::dynamic::DT_LOOS + 4 => {
-        //relandroid_offset = dynentry.d_val;
-        //},
-        //goblin::elf64::dynamic::DT_LOOS + 3 | goblin::elf64::dynamic::DT_LOOS + 5 => {
-        //relandroid_size = dynentry.d_val;
-        //},
-        //}
-        //}
-
-        let info = &elf.dynamic.as_ref().unwrap().info;
-
-        // second word of hash
-        let chain_count = unsafe {
-            std::slice::from_raw_parts((start + info.hash.unwrap() as usize + 4) as *mut u32, 1)[0]
-        };
-
-        elf.dynsyms = goblin::elf::sym::Symtab::parse(
-            &file_in_memory,
-            info.symtab,
-            chain_count as usize,
-            ctx,
-        )
-        .expect("parse dynsyms");
-        elf.dynstrtab =
-            goblin::strtab::Strtab::parse(&file_in_memory, info.strtab, info.strsz, b'\x00')
-                .expect("parse dynstrtab");
-        elf.pltrelocs = goblin::elf::RelocSection::parse(
-            &file_in_memory,
-            info.jmprel,
-            info.pltrelsz,
-            info.pltrel == goblin::elf64::dynamic::DT_RELA,
-            ctx,
-        )
-        .expect("parse pltrel");
-        //
-        //let dynsyms = &elf.dynsyms.to_vec();
-        //let gnu_hash_metadata = unsafe { std::slice::from_raw_parts((start + dynamic.info.gnu_hash.unwrap() as usize) as *mut u32, 4)};
-        //let gnu_hash_size = (dynsyms.len() - gnu_hash_metadata[1] as usize) * 4 + gnu_hash_metadata[0] as usize * 4 + gnu_hash_metadata[2] as usize  * 8 + 4 * 4;
-        //let gnu_hash = unsafe { goblin::elf64::gnu_hash::GnuHash::from_raw_table(
-        //std::slice::from_raw_parts((start + dynamic.info.gnu_hash.unwrap() as usize) as *mut u8,  gnu_hash_size as usize),
-        //dynsyms) }.expect("parse gnu_hash");
-
-        Self {
-            path,
-            start,
-            end,
-            file_in_memory: Box::new(file_in_memory),
-            elf,
-        }
-    }
-
-    pub fn hook_function(&self, name: &str, newfunc: *const c_void) -> bool {
-        let mut symindex: isize = -1;
-        for (i, symbol) in self.elf.dynsyms.iter().enumerate() {
-            if name == self.elf.dynstrtab.get(symbol.st_name).unwrap().unwrap() {
-                symindex = i as isize;
-                break;
-            }
-        }
-
-        if symindex == -1 {
-            println!("failed to find function {:?}", name);
-            return false;
-        }
-
-        let mut offset: isize = -1;
-        for reloc in self.elf.pltrelocs.iter() {
-            if reloc.r_sym == symindex as usize {
-                offset = reloc.r_offset as isize;
-                break;
-            }
-        }
-
-        unsafe {
-            let address = self.start + offset as usize;
-            let value = std::ptr::read(address as *const *const c_void);
-            println!(
-                "found {:?} at address {:x}, with value {:x}, replacing...",
-                name, address, value as usize
-            );
-            mprotect(
-                ((address / 0x1000) * 0x1000) as *mut c_void,
-                0x1000,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            )
-            .expect("Failed to mprotect to read/write");
-            std::ptr::replace(address as *mut *const c_void, newfunc);
-            mprotect(
-                ((address / 0x1000) * 0x1000) as *mut c_void,
-                0x1000,
-                ProtFlags::PROT_READ,
-            )
-            .expect("Failed to mprotect back to read-only");
-
-            let value = std::ptr::read(address as *const *const c_void);
-            println!(
-                "verified value set to {:x}, expected {:x}",
-                value as usize, newfunc as usize
-            );
-
-            value == newfunc
-        }
     }
 }
