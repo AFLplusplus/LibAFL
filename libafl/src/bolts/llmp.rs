@@ -1338,7 +1338,7 @@ pub struct LlmpBrokerSignalHandler {
 
 #[cfg(all(unix))]
 impl Handler for LlmpBrokerSignalHandler {
-    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: ucontext_t) {
+    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: &mut ucontext_t) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
     }
 

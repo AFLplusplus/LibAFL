@@ -273,8 +273,8 @@ mod unix_signal_handler {
         pub event_mgr_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
-        pub crash_handler: unsafe fn(Signal, siginfo_t, ucontext_t, data: &mut Self),
-        pub timeout_handler: unsafe fn(Signal, siginfo_t, ucontext_t, data: &mut Self),
+        pub crash_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
+        pub timeout_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
@@ -283,14 +283,14 @@ mod unix_signal_handler {
     unsafe fn nop_handler(
         _signal: Signal,
         _info: siginfo_t,
-        _void: *const c_void,
+        _context: &mut ucontext_t,
         _data: &mut InProcessExecutorHandlerData,
     ) {
     }
 
     #[cfg(unix)]
     impl Handler for InProcessExecutorHandlerData {
-        fn handle(&mut self, signal: Signal, info: siginfo_t, context: ucontext_t) {
+        fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 match signal {
@@ -312,7 +312,6 @@ mod unix_signal_handler {
                 Signal::SigFloatingPointException,
                 Signal::SigIllegalInstruction,
                 Signal::SigSegmentationFault,
-                Signal::SigTrap,
             ]
         }
     }
@@ -321,7 +320,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _context: ucontext_t,
+        _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
@@ -383,7 +382,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _context: ucontext_t,
+        _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
@@ -404,17 +403,6 @@ mod unix_signal_handler {
             println!("Child crashed!");
             #[cfg(feature = "std")]
             let _ = stdout().flush();
-
-            //#[cfg(target_arch = "aarch64")]
-            {
-                for reg in 0..30 {
-                    print!("x{:02}: 0x{:016x} ", reg, _context.uc_mcontext.regs[reg]);
-                    if reg % 4 == 3 {
-                        print!("\n");
-                    }
-                }
-                print!("\n");
-            }
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             // Make sure we don't crash in the crash handler forever.

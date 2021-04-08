@@ -87,7 +87,7 @@ impl Display for Signal {
 
 pub trait Handler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: siginfo_t, _context: ucontext_t);
+    fn handle(&mut self, signal: Signal, info: siginfo_t, _context: &mut ucontext_t);
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
@@ -115,7 +115,7 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 /// # Safety
 /// This should be somewhat safe to call for signals previously registered,
 /// unless the signal handlers registered using [setup_signal_handler] are broken.
-unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *const c_void) {
+unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
         match &SIGNAL_HANDLERS[*signal as usize] {
@@ -123,7 +123,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *const c_void) {
             None => return,
         }
     };
-    handler.handle(*signal, info, *(void as *const ucontext_t));
+    handler.handle(*signal, info, &mut *(void as *mut ucontext_t));
 }
 
 /// Setup signal handlers in a somewhat rusty way.
