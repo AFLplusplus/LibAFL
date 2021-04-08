@@ -4,6 +4,9 @@ use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 use std::{thread};
+use std::io::Error as ioErr;
+use std::fs::OpenOptions;
+use std::os::unix::io::{AsRawFd};
 
 #[cfg(unix)]
 use libc::pid_t;
@@ -526,6 +529,9 @@ pub fn launcher<T1,T2>(broker_fn: &dyn Fn(T1) -> Result<(), Error>, client_fn: &
                         if bind_to_core 
                         {core_affinity::set_for_current(bind_to);}
                         //silence stdout and stderr of clients here
+                        let file = OpenOptions::new().write(true).open("/dev/null").unwrap();
+                        let _ = set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd() );
+                        let _ = set_std_fd(libc::STDERR_FILENO, file.as_raw_fd() );
                        let _ = client_fn(client_args);
                        break;                   
                     }
@@ -548,4 +554,10 @@ pub fn launcher<T1,T2>(broker_fn: &dyn Fn(T1) -> Result<(), Error>, client_fn: &
 }
 fn findinvec(vec1:&Vec<usize> ,num:usize)->bool{
     vec1.into_iter().find(|&&x| x==num).is_some()
+}
+fn set_std_fd(device: i32, fd: i32) -> Result<(),Error> {
+    match unsafe { libc::dup2(fd, device) } {
+        -1 => Err(Error::File(ioErr::last_os_error())),
+        _ => Ok(()),
+    }
 }
