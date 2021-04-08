@@ -1,4 +1,4 @@
-//! The BytesInput is the "normal" input, a map of bytes, that can be sent directly to the client
+//! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
 //! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
 
 use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
