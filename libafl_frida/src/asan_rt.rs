@@ -15,6 +15,7 @@ use libc::{pthread_atfork, siginfo_t, sysconf, ucontext_t, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use regex::Regex;
 use std::{
+    borrow::BorrowMut,
     cell::RefCell,
     cell::RefMut,
     ffi::c_void,
@@ -23,6 +24,7 @@ use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
     pin::Pin,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 use termcolor::{Color, ColorSpec, WriteColor};
 
@@ -331,39 +333,7 @@ fn mapping_for_library(libpath: &str) -> (usize, usize) {
     (libstart, libend)
 }
 
-pub struct Holder<T> {
-    val: *const T,
-    pinned: Pin<Box<T>>,
-}
-
-impl<T> Holder<T> {
-    pub fn new(val: T) -> Self {
-        let mut pinned = Box::pin(val);
-
-        let mut res = Self {
-            val: &*pinned.as_mut() as *const T,
-            pinned,
-        };
-
-        res
-    }
-}
-impl<T> Deref for Holder<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.val.as_ref().unwrap() }
-    }
-}
-
-// NOTE: Apparently this is unsound and might result in the pinned value moving. Needs rework.
-impl<T> DerefMut for Holder<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { (self.val as *mut T).as_mut().unwrap() }
-    }
-}
-pub type PinnedAsanRuntime<'a> = Holder<AsanRuntime<'a>>;
-pub struct AsanRuntime<'a> {
+pub struct AsanRuntime {
     regs: [usize; 32],
     blob_check_mem_byte: Option<Vec<u8>>,
     blob_check_mem_halfword: Option<Vec<u8>>,
@@ -371,15 +341,14 @@ pub struct AsanRuntime<'a> {
     blob_check_mem_qword: Option<Vec<u8>>,
     blob_check_mem_16bytes: Option<Vec<u8>>,
     stalked_addresses: HashMap<usize, usize>,
-    _phantom: PhantomData<&'a u32>,
 }
 
-impl<'a> AsanRuntime<'a> {
-    pub fn new_pinned() -> Box<Holder<Self>> {
+impl AsanRuntime {
+    pub fn new() -> AsanRuntime {
         let allocator = Allocator::get();
         allocator.init();
 
-        let mut inner = Self {
+        Self {
             regs: [0; 32],
             blob_check_mem_byte: None,
             blob_check_mem_halfword: None,
@@ -387,11 +356,15 @@ impl<'a> AsanRuntime<'a> {
             blob_check_mem_qword: None,
             blob_check_mem_16bytes: None,
             stalked_addresses: HashMap::new(),
-            _phantom: PhantomData,
-        };
-
-        inner.generate_instrumentation_blobs();
-        Box::new(Holder::new(inner))
+        }
+    }
+    /// Initialize the runtime so that it is read for action. Take care not to move the runtime
+    /// instance after this function has been called, as the generated blobs would become
+    /// invalid!
+    pub fn init(&mut self, module_name: &str) {
+        self.generate_instrumentation_blobs();
+        self.unpoison_all_existing_memory();
+        self.hook_library(module_name);
     }
 
     /// Add a stalked address to real address mapping.
@@ -401,7 +374,7 @@ impl<'a> AsanRuntime<'a> {
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
-    pub fn unpoison_all_existing_memory(&self) {
+    fn unpoison_all_existing_memory(&self) {
         walk_self_maps(&mut |start, end, _permissions, _path| {
             //if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
             Allocator::get().map_shadow_for_region(start, end, true);
@@ -441,7 +414,7 @@ impl<'a> AsanRuntime<'a> {
     }
 
     /// Locate the target library and hook it's memory allocation functions
-    pub fn hook_library(&mut self, path: &str) {
+    fn hook_library(&mut self, path: &str) {
         let target_lib = GotHookLibrary::new(path, false);
 
         // shadow the library itself, allowing all accesses
@@ -462,7 +435,7 @@ impl<'a> AsanRuntime<'a> {
         );
     }
 
-    extern "C" fn handle_trap(&mut self, sp: *mut usize) {
+    extern "C" fn handle_trap(&mut self) {
         let mut actual_pc = self.regs[31] + 32 + 4;
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
