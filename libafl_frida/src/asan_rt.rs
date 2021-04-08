@@ -4,8 +4,8 @@ use nix::{
     sys::mman::{mmap, mprotect, MapFlags, ProtFlags},
 };
 
-use capstone::{Capstone, arch::BuildsCapstone};
 use backtrace::Backtrace;
+use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi, ExecutableBuffer};
 use frida_gum::Backtracer;
@@ -14,7 +14,16 @@ use libafl::bolts::os::unix_signals::{setup_signal_handler, Handler, Signal};
 use libc::{pthread_atfork, siginfo_t, sysconf, ucontext_t, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use regex::Regex;
-use std::{cell::RefCell, cell::RefMut, ffi::c_void, fs::File, io::{BufRead, BufReader, Write}, marker::PhantomData, ops::{Deref, DerefMut}, pin::Pin};
+use std::{
+    cell::RefCell,
+    cell::RefMut,
+    ffi::c_void,
+    fs::File,
+    io::{BufRead, BufReader, Write},
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+};
 use termcolor::{Color, ColorSpec, WriteColor};
 
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
@@ -322,40 +331,36 @@ fn mapping_for_library(libpath: &str) -> (usize, usize) {
     (libstart, libend)
 }
 
-pub struct Holder<T>{
-   val: *const T,
-   pinned: Pin<Box<T>>,
+pub struct Holder<T> {
+    val: *const T,
+    pinned: Pin<Box<T>>,
 }
 
 impl<T> Holder<T> {
-   pub fn new(val: T) -> Self {
-      let mut pinned = Box::pin(val);
+    pub fn new(val: T) -> Self {
+        let mut pinned = Box::pin(val);
 
-      let mut res = Self {
-         val: &*pinned.as_mut() as *const T,
-         pinned,
-      };
+        let mut res = Self {
+            val: &*pinned.as_mut() as *const T,
+            pinned,
+        };
 
-      res
-   }
+        res
+    }
 }
 impl<T> Deref for Holder<T> {
-   type Target = T;
+    type Target = T;
 
-   fn deref(&self) -> &Self::Target {
-      unsafe {
-         self.val.as_ref().unwrap()
-      }
-   }
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.val.as_ref().unwrap() }
+    }
 }
 
 // NOTE: Apparently this is unsound and might result in the pinned value moving. Needs rework.
-impl <T> DerefMut for Holder<T> {
-   fn deref_mut(&mut self) -> &mut Self::Target {
-      unsafe {
-         (self.val as *mut T).as_mut().unwrap()
-      }
-   }
+impl<T> DerefMut for Holder<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { (self.val as *mut T).as_mut().unwrap() }
+    }
 }
 pub type PinnedAsanRuntime<'a> = Holder<AsanRuntime<'a>>;
 pub struct AsanRuntime<'a> {
@@ -383,8 +388,7 @@ impl<'a> AsanRuntime<'a> {
             blob_check_mem_16bytes: None,
             stalked_addresses: HashMap::new(),
             _phantom: PhantomData,
-         };
-
+        };
 
         inner.generate_instrumentation_blobs();
         Box::new(Holder::new(inner))
@@ -393,7 +397,7 @@ impl<'a> AsanRuntime<'a> {
     /// Add a stalked address to real address mapping.
     //#[inline]
     pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
-       self.stalked_addresses.insert(stalked, real);
+        self.stalked_addresses.insert(stalked, real);
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
@@ -458,18 +462,18 @@ impl<'a> AsanRuntime<'a> {
         );
     }
 
-
     extern "C" fn handle_trap(&mut self, sp: *mut usize) {
         let mut actual_pc = self.regs[31] + 32 + 4;
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
-           Some(addr) => *addr,
-           _ => actual_pc,
+            Some(addr) => *addr,
+            _ => actual_pc,
         };
 
         let mut cs = Capstone::new()
-           .arm64()
-           .mode(capstone::arch::arm64::ArchMode::Arm)
-           .build().unwrap();
+            .arm64()
+            .mode(capstone::arch::arm64::ArchMode::Arm)
+            .build()
+            .unwrap();
         cs.set_skipdata(true).expect("failed to set skipdata");
 
         let mut out_stream = default_output_stream();
@@ -486,17 +490,24 @@ impl<'a> AsanRuntime<'a> {
         writeln!(output, "pc : 0x{:016x} ", actual_pc).unwrap();
 
         let start_pc = actual_pc - 4 * 5;
-        for insn in cs.disasm_count(
-           unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-           start_pc as u64,
-           11).expect("failed to disassemble instructions").iter() {
-           if insn.address() as usize == actual_pc {
-               output.set_color(ColorSpec::new().set_fg(Some(Color::Red))).unwrap();
-               writeln!(output, "\t => {}", insn).unwrap();
-               output.reset().unwrap();
-           } else {
-              writeln!(output, "\t    {}", insn).unwrap();
-           }
+        for insn in cs
+            .disasm_count(
+                unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                start_pc as u64,
+                11,
+            )
+            .expect("failed to disassemble instructions")
+            .iter()
+        {
+            if insn.address() as usize == actual_pc {
+                output
+                    .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                    .unwrap();
+                writeln!(output, "\t => {}", insn).unwrap();
+                output.reset().unwrap();
+            } else {
+                writeln!(output, "\t    {}", insn).unwrap();
+            }
         }
         BacktracePrinter::new()
            .add_frame_filter(Box::new(|frames| {
@@ -559,7 +570,6 @@ impl<'a> AsanRuntime<'a> {
                 ; done:
             );};
         }
-
 
         let mut ops_check_mem_byte =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);

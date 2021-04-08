@@ -1,7 +1,5 @@
 // build.rs
 
 fn main() {
-    cc::Build::new()
-        .file("src/gettls.c")
-        .compile("libgettls.a");
+    cc::Build::new().file("src/gettls.c").compile("libgettls.a");
 }

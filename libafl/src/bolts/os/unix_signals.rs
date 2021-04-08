@@ -13,9 +13,9 @@ use core::{
 use std::ffi::CString;
 
 use libc::{
-    c_int, malloc, mcontext_t, sigaction, sigaltstack, sigemptyset, stack_t, ucontext_t, SA_NODEFER, SA_ONSTACK,
-    SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
-    SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
+    c_int, malloc, mcontext_t, sigaction, sigaltstack, sigemptyset, stack_t, ucontext_t,
+    SA_NODEFER, SA_ONSTACK, SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT,
+    SIGKILL, SIGPIPE, SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 

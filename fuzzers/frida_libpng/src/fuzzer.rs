@@ -184,7 +184,9 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                             width,
                         );
                     }
-                    helper.asan_runtime.add_stalked_address(output.writer().pc() as usize - 4, address as usize);
+                    helper
+                        .asan_runtime
+                        .add_stalked_address(output.writer().pc() as usize - 4, address as usize);
                 }
                 instruction.keep()
             }
@@ -318,9 +320,13 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         use capstone::arch::arm64::Arm64Reg as R;
 
         let num_registers = match instr.id().0.into() {
-            I::ARM64_INS_STP | I::ARM64_INS_STXP | I::ARM64_INS_STNP | I::ARM64_INS_STLXP |
-            I::ARM64_INS_LDP | I::ARM64_INS_LDXP | I::ARM64_INS_LDNP
-            => 2,
+            I::ARM64_INS_STP
+            | I::ARM64_INS_STXP
+            | I::ARM64_INS_STNP
+            | I::ARM64_INS_STLXP
+            | I::ARM64_INS_LDP
+            | I::ARM64_INS_LDXP
+            | I::ARM64_INS_LDNP => 2,
             _ => 1,
         };
 
@@ -335,13 +341,12 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         if let Arm64Operand(operand) = operands.first().unwrap() {
             if let Arm64OperandType::Reg(operand) = operand.op_type {
                 match operand.0 as u32 {
-                    R::ARM64_REG_W0..=R::ARM64_REG_W30 | R::ARM64_REG_WZR | R::ARM64_REG_WSP |
-                    R::ARM64_REG_S0..=R::ARM64_REG_S31
-                        => return 4 * num_registers,
-                    R::ARM64_REG_D0..=R::ARM64_REG_D31
-                        => return 8 * num_registers,
-                    R::ARM64_REG_Q0..=R::ARM64_REG_Q31
-                        => return 16,
+                    R::ARM64_REG_W0..=R::ARM64_REG_W30
+                    | R::ARM64_REG_WZR
+                    | R::ARM64_REG_WSP
+                    | R::ARM64_REG_S0..=R::ARM64_REG_S31 => return 4 * num_registers,
+                    R::ARM64_REG_D0..=R::ARM64_REG_D31 => return 8 * num_registers,
+                    R::ARM64_REG_Q0..=R::ARM64_REG_Q31 => return 16,
                     _ => (),
                 }
             };
@@ -368,8 +373,12 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
         if let Arm64Operand(arm64operand) = operands.last().unwrap() {
             if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                return Ok((opmem.base(), opmem.index(), opmem.disp(),
-                        self.get_instruction_width(instr, &operands)));
+                return Ok((
+                    opmem.base(),
+                    opmem.index(),
+                    opmem.disp(),
+                    self.get_instruction_width(instr, &operands),
+                ));
             }
         }
 

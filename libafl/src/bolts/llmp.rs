@@ -62,6 +62,7 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
+use libc::ucontext_t;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
