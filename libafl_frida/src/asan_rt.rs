@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 use nix::{
     libc::{memmove, memset},
-    sys::mman::{mmap, mprotect, msync, MapFlags, MsFlags, ProtFlags},
+    sys::mman::{mmap, mprotect, MapFlags, ProtFlags},
 };
 
 use libc::{pthread_atfork, sysconf, _SC_PAGESIZE};
@@ -17,6 +17,11 @@ use libloading::Library;
 use regex::Regex;
 
 use rangemap::RangeSet;
+
+use libc::{siginfo_t, ucontext_t};
+use libafl::bolts::os::unix_signals::{setup_signal_handler, Signal, Handler};
+use backtrace::resolve;
+use frida_gum::Backtracer;
 
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 
@@ -324,7 +329,6 @@ fn mapping_for_library(libpath: &str) -> (usize, usize) {
 }
 
 pub struct AsanRuntime {
-    //allocator: Allocator,
 }
 
 impl AsanRuntime {
@@ -332,9 +336,13 @@ impl AsanRuntime {
         let allocator = Allocator::get();
         allocator.init();
 
-        Self {
-            //allocator: *allocator,
+        let mut res = Self {
+        };
+
+        unsafe {
+            setup_signal_handler(&mut res).expect("Failed to setup Asan signal handler");
         }
+        res
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
@@ -397,6 +405,64 @@ impl AsanRuntime {
             "malloc_usable_size",
             asan_malloc_usable_size as *const c_void,
         );
+    }
+}
+
+#[cfg(unix)]
+impl Handler for AsanRuntime {
+    fn handle(&mut self, _signal: Signal, _info: siginfo_t, context: &mut ucontext_t) {
+        //println!("backtrace:\n {:?}", backtrace::Backtrace::new());
+
+        let mut sigcontext = unsafe { *(((context as *mut  _ as *mut c_void as usize) + 128) as *mut ucontext_t) }.uc_mcontext;
+
+        unsafe {
+            sigcontext.regs[0] = (sigcontext.sp as *mut u64).read();
+            sigcontext.regs[1] = ((sigcontext.sp + 8) as *mut u64).read();
+            sigcontext.sp += 144;
+        }
+        for reg in 0..=30 {
+            print!("x{:02}: 0x{:016x} ", reg, sigcontext.regs[reg]);
+            if reg % 4 == 3 {
+                println!("");
+            }
+        }
+        print!("sp : 0x{:016x} ",  sigcontext.sp);
+        println!("");
+        print!("pc : 0x{:016x} ", sigcontext.pc);
+        print!("pstate: 0x{:016x} ", sigcontext.pstate);
+        print!("fault: 0x{:016x} ", sigcontext.fault_address);
+        print!("\nstack:");
+        for i in 0..0x100 {
+            if i % 4 == 0 {
+                print!("\n0x{:016x}: ", sigcontext.sp + i * 8)
+            }
+            unsafe {
+                print!("0x{:016x} ", ((sigcontext.sp  + i * 8) as * mut u64).read());
+            }
+        }
+        println!("\nbacktrace: ");
+
+        for return_address in Backtracer::accurate_with_signal_context(context) {
+            resolve(return_address as *mut c_void, |symbol|{
+                if symbol.name().is_some() {
+                    if symbol.filename().is_some() {
+                        println!("- 0x{:016x}: {} - {:?}:{}", return_address, symbol.name().unwrap(), symbol.filename().unwrap(), symbol.lineno().unwrap());
+                    } else {
+                        println!("- 0x{:016x}: {}", return_address, symbol.name().unwrap());
+                    }
+                } else {
+                    println!("- 0x{:016x}", return_address);
+                }
+            });
+        }
+
+        nix::sys::signal::raise(nix::sys::signal::Signal::SIGSEGV).expect("Failed to suicide");
+    }
+
+    fn signals(&self) -> Vec<Signal> {
+        vec![
+            Signal::SigTrap,
+        ]
     }
 }
 struct HookerTargetLibrary<'a> {

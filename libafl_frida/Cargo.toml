@@ -1,0 +1,29 @@
+[package]
+name = "libafl_frida"
+version = "0.1.0"
+authors = ["s1341 <github@shmarya.net>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+
+[dependencies]
+libafl = { path = "../libafl", version = "0.1.0" }
+nix = "0.20.0"
+libc = "0.2.92"
+hashbrown = "0.11"
+regex = "1.4.5"
+libloading = "0.7.0"
+goblin = "0.3.4"
+scroll = "0.10"
+rangemap = "0.1.10"
+frida-gum = { path =  "../../frida-rust/frida-gum", version = "0.3.4", features = [ "event-sink", "invocation-listener"] }
+frida-gum-sys = { path = "../../frida-rust/frida-gum-sys", version = "0.2.2", features = [ "event-sink", "invocation-listener"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+backtrace = { version = "0.3", default-features = false, features = ["std", "libbacktrace"] }
+unwind = { version = "0.4.0", path = "../../rstack/unwind" }
+unwind-sys = { version = "0.1.2", path = "../../rstack/unwind-sys" }
+
