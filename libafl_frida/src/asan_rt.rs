@@ -4,22 +4,18 @@ use nix::{
     sys::mman::{mmap, mprotect, MapFlags, ProtFlags},
 };
 
-use libc::{siginfo_t, ucontext_t, pthread_atfork, sysconf, _SC_PAGESIZE};
-use std::{
-    cell::RefCell,
-    cell::RefMut,
-    ffi::c_void,
-    fs::File,
-    io::{BufRead, BufReader},
-    pin::Pin,
-};
-use regex::Regex;
-use rangemap::RangeSet;
-use gothook::GotHookLibrary;
-use libafl::bolts::os::unix_signals::{setup_signal_handler, Signal, Handler};
-use backtrace::resolve;
+use capstone::{Capstone, arch::BuildsCapstone};
+use backtrace::Backtrace;
+use color_backtrace::{default_output_stream, BacktracePrinter};
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi, ExecutableBuffer};
 use frida_gum::Backtracer;
-use dynasmrt::{DynasmApi, DynasmLabelApi, ExecutableBuffer, dynasm};
+use gothook::GotHookLibrary;
+use libafl::bolts::os::unix_signals::{setup_signal_handler, Handler, Signal};
+use libc::{pthread_atfork, siginfo_t, sysconf, ucontext_t, _SC_PAGESIZE};
+use rangemap::RangeSet;
+use regex::Regex;
+use std::{cell::RefCell, cell::RefMut, ffi::c_void, fs::File, io::{BufRead, BufReader, Write}, marker::PhantomData, ops::{Deref, DerefMut}, pin::Pin};
+use termcolor::{Color, ColorSpec, WriteColor};
 
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 
@@ -326,33 +322,78 @@ fn mapping_for_library(libpath: &str) -> (usize, usize) {
     (libstart, libend)
 }
 
-pub struct AsanRuntime {
+pub struct Holder<T>{
+   val: *const T,
+   pinned: Pin<Box<T>>,
+}
+
+impl<T> Holder<T> {
+   pub fn new(val: T) -> Self {
+      let mut pinned = Box::pin(val);
+
+      let mut res = Self {
+         val: &*pinned.as_mut() as *const T,
+         pinned,
+      };
+
+      res
+   }
+}
+impl<T> Deref for Holder<T> {
+   type Target = T;
+
+   fn deref(&self) -> &Self::Target {
+      unsafe {
+         self.val.as_ref().unwrap()
+      }
+   }
+}
+
+// NOTE: Apparently this is unsound and might result in the pinned value moving. Needs rework.
+impl <T> DerefMut for Holder<T> {
+   fn deref_mut(&mut self) -> &mut Self::Target {
+      unsafe {
+         (self.val as *mut T).as_mut().unwrap()
+      }
+   }
+}
+pub type PinnedAsanRuntime<'a> = Holder<AsanRuntime<'a>>;
+pub struct AsanRuntime<'a> {
+    regs: [usize; 32],
     blob_check_mem_byte: Option<Vec<u8>>,
     blob_check_mem_halfword: Option<Vec<u8>>,
     blob_check_mem_dword: Option<Vec<u8>>,
     blob_check_mem_qword: Option<Vec<u8>>,
     blob_check_mem_16bytes: Option<Vec<u8>>,
+    stalked_addresses: HashMap<usize, usize>,
+    _phantom: PhantomData<&'a u32>,
 }
 
-impl AsanRuntime {
-    pub fn new() -> Self {
+impl<'a> AsanRuntime<'a> {
+    pub fn new_pinned() -> Box<Holder<Self>> {
         let allocator = Allocator::get();
         allocator.init();
 
-        let mut res = Self {
+        let mut inner = Self {
+            regs: [0; 32],
             blob_check_mem_byte: None,
             blob_check_mem_halfword: None,
             blob_check_mem_dword: None,
             blob_check_mem_qword: None,
             blob_check_mem_16bytes: None,
-        };
+            stalked_addresses: HashMap::new(),
+            _phantom: PhantomData,
+         };
 
-        res.generate_instrumentation_blobs();
 
-        unsafe {
-            setup_signal_handler(&mut res).expect("Failed to setup Asan signal handler");
-        }
-        res
+        inner.generate_instrumentation_blobs();
+        Box::new(Holder::new(inner))
+    }
+
+    /// Add a stalked address to real address mapping.
+    //#[inline]
+    pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
+       self.stalked_addresses.insert(stalked, real);
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
@@ -417,6 +458,56 @@ impl AsanRuntime {
         );
     }
 
+
+    extern "C" fn handle_trap(&mut self, sp: *mut usize) {
+        let mut actual_pc = self.regs[31] + 32 + 4;
+        actual_pc = match self.stalked_addresses.get(&actual_pc) {
+           Some(addr) => *addr,
+           _ => actual_pc,
+        };
+
+        let mut cs = Capstone::new()
+           .arm64()
+           .mode(capstone::arch::arm64::ArchMode::Arm)
+           .build().unwrap();
+        cs.set_skipdata(true).expect("failed to set skipdata");
+
+        let mut out_stream = default_output_stream();
+        let output = out_stream.as_mut();
+
+        writeln!(output, "{:━^80}", " Memory error detected! ").unwrap();
+
+        for reg in 0..=30 {
+            write!(output, "x{:02}: 0x{:016x} ", reg, self.regs[reg]).unwrap();
+            if reg % 4 == 3 {
+                writeln!(output, "").unwrap();
+            }
+        }
+        writeln!(output, "pc : 0x{:016x} ", actual_pc).unwrap();
+
+        let start_pc = actual_pc - 4 * 5;
+        for insn in cs.disasm_count(
+           unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+           start_pc as u64,
+           11).expect("failed to disassemble instructions").iter() {
+           if insn.address() as usize == actual_pc {
+               output.set_color(ColorSpec::new().set_fg(Some(Color::Red))).unwrap();
+               writeln!(output, "\t => {}", insn).unwrap();
+               output.reset().unwrap();
+           } else {
+              writeln!(output, "\t    {}", insn).unwrap();
+           }
+        }
+        BacktracePrinter::new()
+           .add_frame_filter(Box::new(|frames| {
+              frames.retain(|x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::AsanRuntime::handle_trap")))
+           }))
+           .print_trace(&Backtrace::new(), output)
+          .unwrap();
+
+        panic!("Crashing!");
+    }
+
     /// Generate the instrumentation blobs for the current arch.
     fn generate_instrumentation_blobs(&mut self) {
         macro_rules! shadow_check {
@@ -431,118 +522,98 @@ impl AsanRuntime {
                 ; rbit w1, w1
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
-                ; tbnz x1, #$bit, ->done
-                ; brk #$bit
-                ; ->done:
+                ; tbnz x1, #$bit, >done
+                //; brk #$bit
+                ; ldr x0, >self_regs_addr
+                ; stp x2, x3, [x0, #0x10]
+                ; stp x4, x5, [x0, #0x20]
+                ; stp x6, x7, [x0, #0x30]
+                ; stp x8, x9, [x0, #0x40]
+                ; stp x10, x11, [x0, #0x50]
+                ; stp x12, x13, [x0, #0x60]
+                ; stp x14, x15, [x0, #0x70]
+                ; stp x16, x17, [x0, #0x80]
+                ; stp x18, x19, [x0, #0x90]
+                ; stp x20, x21, [x0, #0xa0]
+                ; stp x22, x23, [x0, #0xb0]
+                ; stp x24, x25, [x0, #0xc0]
+                ; stp x26, x27, [x0, #0xd0]
+                ; stp x28, x29, [x0, #0xe0]
+                ; stp x30, xzr, [x0, #0xf0]
+                ; mov x3, x0
+                ; ldp x0, x1, [sp], #144
+                ; stp x0, x1, [x3]
+                ; ldr x0, >self_addr
+                ; ldr x1, >trap_func
+                ; bl >here
+                ; here:
+                ; str x30, [x3, 0xf8]
+                ; ldr x30, [x3, 0xf0]
+                ; br x1
+                ; self_addr:
+                ; .qword self as *mut _  as *mut c_void as i64
+                ; self_regs_addr:
+                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+                ; trap_func:
+                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+                ; done:
             );};
         }
 
-        let mut ops_check_mem_byte = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+
+        let mut ops_check_mem_byte =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_byte, 0);
         self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap());
 
-        let mut ops_check_mem_halfword = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        let mut ops_check_mem_halfword =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_halfword, 1);
         self.blob_check_mem_halfword = Some(ops_check_mem_halfword.finalize().unwrap());
 
-        let mut ops_check_mem_dword = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        let mut ops_check_mem_dword =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_dword, 2);
         self.blob_check_mem_dword = Some(ops_check_mem_dword.finalize().unwrap());
 
-        let mut ops_check_mem_qword = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        let mut ops_check_mem_qword =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_qword, 3);
         self.blob_check_mem_qword = Some(ops_check_mem_qword.finalize().unwrap());
 
-        let mut ops_check_mem_16bytes = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        let mut ops_check_mem_16bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_16bytes, 4);
         self.blob_check_mem_16bytes = Some(ops_check_mem_16bytes.finalize().unwrap());
     }
 
     /// Get the blob which checks a byte access
-   #[inline]
+    #[inline]
     pub fn blob_check_mem_byte(&self) -> Pin<&Vec<u8>> {
         Pin::new(self.blob_check_mem_byte.as_ref().unwrap())
     }
 
     /// Get the blob which checks a halfword access
-   #[inline]
+    #[inline]
     pub fn blob_check_mem_halfword(&self) -> Pin<&Vec<u8>> {
         Pin::new(self.blob_check_mem_halfword.as_ref().unwrap())
     }
 
     /// Get the blob which checks a dword access
-   #[inline]
+    #[inline]
     pub fn blob_check_mem_dword(&self) -> Pin<&Vec<u8>> {
         Pin::new(self.blob_check_mem_dword.as_ref().unwrap())
     }
 
     /// Get the blob which checks a qword access
-   #[inline]
+    #[inline]
     pub fn blob_check_mem_qword(&self) -> Pin<&Vec<u8>> {
         Pin::new(self.blob_check_mem_qword.as_ref().unwrap())
     }
 
     /// Get the blob which checks a 16 byte access
-   #[inline]
+    #[inline]
     pub fn blob_check_mem_16bytes(&self) -> Pin<&Vec<u8>> {
         Pin::new(self.blob_check_mem_16bytes.as_ref().unwrap())
-    }
-}
-
-#[cfg(unix)]
-impl Handler for AsanRuntime {
-    fn handle(&mut self, _signal: Signal, _info: siginfo_t, context: &mut ucontext_t) {
-        //println!("backtrace:\n {:?}", backtrace::Backtrace::new());
-
-        let mut sigcontext = unsafe { *(((context as *mut  _ as *mut c_void as usize) + 128) as *mut ucontext_t) }.uc_mcontext;
-
-        unsafe {
-            sigcontext.regs[0] = (sigcontext.sp as *mut u64).read();
-            sigcontext.regs[1] = ((sigcontext.sp + 8) as *mut u64).read();
-            sigcontext.sp += 144;
-        }
-        for reg in 0..=30 {
-            print!("x{:02}: 0x{:016x} ", reg, sigcontext.regs[reg]);
-            if reg % 4 == 3 {
-                println!("");
-            }
-        }
-        print!("sp : 0x{:016x} ",  sigcontext.sp);
-        println!("");
-        print!("pc : 0x{:016x} ", sigcontext.pc);
-        print!("pstate: 0x{:016x} ", sigcontext.pstate);
-        print!("fault: 0x{:016x} ", sigcontext.fault_address);
-        print!("\nstack:");
-        for i in 0..0x100 {
-            if i % 4 == 0 {
-                print!("\n0x{:016x}: ", sigcontext.sp + i * 8)
-            }
-            unsafe {
-                print!("0x{:016x} ", ((sigcontext.sp  + i * 8) as * mut u64).read());
-            }
-        }
-        println!("\nbacktrace: ");
-
-        for return_address in Backtracer::accurate_with_signal_context(context) {
-            resolve(return_address as *mut c_void, |symbol|{
-                if symbol.name().is_some() {
-                    if symbol.filename().is_some() {
-                        println!("- 0x{:016x}: {} - {:?}:{}", return_address, symbol.name().unwrap(), symbol.filename().unwrap(), symbol.lineno().unwrap());
-                    } else {
-                        println!("- 0x{:016x}: {}", return_address, symbol.name().unwrap());
-                    }
-                } else {
-                    println!("- 0x{:016x}", return_address);
-                }
-            });
-        }
-
-        nix::sys::signal::raise(nix::sys::signal::Signal::SIGSEGV).expect("Failed to suicide");
-    }
-
-    fn signals(&self) -> Vec<Signal> {
-        vec![
-            Signal::SigTrap,
-        ]
     }
 }

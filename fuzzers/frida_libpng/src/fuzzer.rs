@@ -53,7 +53,7 @@ struct FridaEdgeCoverageHelper<'a> {
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
     capstone: Capstone,
-    asan_runtime: AsanRuntime,
+    asan_runtime: Box<PinnedAsanRuntime<'a>>,
 }
 
 impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
@@ -152,7 +152,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
-            asan_runtime: AsanRuntime::new(),
+            asan_runtime: AsanRuntime::new_pinned(),
         };
 
         helper.asan_runtime.unpoison_all_existing_memory();
@@ -184,6 +184,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                             width,
                         );
                     }
+                    helper.asan_runtime.add_stalked_address(output.writer().pc() as usize - 4, address as usize);
                 }
                 instruction.keep()
             }
