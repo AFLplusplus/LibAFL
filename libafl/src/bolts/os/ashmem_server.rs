@@ -30,8 +30,6 @@ use std::{
     thread,
 };
 
-use std::rc::Rc;
-
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
