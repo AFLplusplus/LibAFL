@@ -503,6 +503,7 @@ pub mod unix_shmem {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
+<<<<<<< HEAD
 
         /// Drop implementation for AshmemShMem, which cleans up the mapping
         #[cfg(unix)]
@@ -538,6 +539,7 @@ pub mod unix_shmem {
                 Self::new()
             }
         }
+<<<<<<< HEAD
 <<<<<<< HEAD
 
         /// Implement ShMemProvider for AshmemShMemProvider

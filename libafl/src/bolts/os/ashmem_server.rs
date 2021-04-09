@@ -41,6 +41,7 @@ pub struct ServedShMemProvider {
     inner: AshmemShMemProvider,
 }
 
+<<<<<<< HEAD
 #[derive(Clone, Debug)]
 pub struct ServedShMem {
     inner: AshmemShMem,
@@ -92,6 +93,7 @@ impl ServedShMemProvider {
         (server_fd, fd_buf[0])
     }
 }
+<<<<<<< HEAD
 
 impl Default for ServedShMemProvider {
     fn default() -> Self {
