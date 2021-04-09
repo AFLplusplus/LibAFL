@@ -273,7 +273,7 @@ pub mod unix_shmem {
     pub struct UnixShMem {
         pub shm_str: [u8; 20],
         pub shm_id: c_int,
-        pub map: *mut u8,
+        pub map: usize, // really *mut u8, but that does not Send, Sync
         pub map_size: usize,
     }
 
@@ -298,11 +298,11 @@ pub mod unix_shmem {
         }
 
         fn map(&self) -> &[u8] {
-            unsafe { slice::from_raw_parts(self.map, self.map_size) }
+            unsafe { slice::from_raw_parts(self.map as *mut u8, self.map_size) }
         }
 
         fn map_mut(&mut self) -> &mut [u8] {
-            unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+            unsafe { slice::from_raw_parts_mut(self.map as *mut u8, self.map_size) }
         }
     }
 
@@ -321,7 +321,7 @@ pub mod unix_shmem {
         UnixShMem {
             shm_str: [0; 20],
             shm_id: -1,
-            map: 0 as *mut c_uchar,
+            map: 0,
             map_size: 0,
         }
     }
@@ -358,14 +358,14 @@ pub mod unix_shmem {
     /// Deinitialize this shmem instance
     #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
     unsafe fn unix_shmem_deinit(shm: *mut UnixShMem) {
-        if shm.is_null() || (*shm).map.is_null() {
+        if shm.is_null() || ((*shm).map as *mut u8).is_null() {
             /* Serialized map id */
             // Not set or not initialized;
             return;
         }
         (*shm).shm_str[0_usize] = 0u8;
         shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
-        (*shm).map = ptr::null_mut();
+        (*shm).map = ptr::null_mut() as *mut u8 as usize;
     }
 
     /// Functions to create Shared memory region, for observation channels and
@@ -373,7 +373,7 @@ pub mod unix_shmem {
     #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
     unsafe fn unix_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
         (*shm).map_size = map_size;
-        (*shm).map = ptr::null_mut();
+        (*shm).map = ptr::null_mut() as *mut u8 as usize;
         (*shm).shm_id = shmget(
             0 as c_int,
             map_size as c_ulong,
@@ -391,14 +391,14 @@ pub mod unix_shmem {
         );
         (*shm).shm_str
             [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_ulong) as usize] = 0u8;
-        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
-        if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar || (*shm).map.is_null() {
+        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_char as usize;
+        if (*shm).map == -(1 as c_int) as *mut c_char as usize || ((*shm).map as *mut u8).is_null() {
             shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
             (*shm).shm_id = -(1 as c_int);
             (*shm).shm_str[0] = 0u8;
             return ptr::null_mut();
         }
-        (*shm).map
+        (*shm).map as *mut u8
     }
 
     /// Uses a shmap id string to open a shared map
@@ -411,7 +411,7 @@ pub mod unix_shmem {
         if shm.is_null() || shm_str.to_bytes().is_empty() || map_size == 0 {
             return ptr::null_mut();
         }
-        (*shm).map = ptr::null_mut();
+        (*shm).map = ptr::null_mut() as *mut u8 as usize;
         (*shm).map_size = map_size;
         strncpy(
             (*shm).shm_str.as_mut_ptr() as *mut c_char,
@@ -423,14 +423,14 @@ pub mod unix_shmem {
             .unwrap_or_else(|_| panic!("illegal shm_str {:?}", shm_str))
             .parse::<i32>()
             .unwrap();
-        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
-        if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar {
-            (*shm).map = ptr::null_mut();
+        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_char as usize;
+        if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_char as usize {
+            (*shm).map = ptr::null_mut() as * mut u8 as usize;
             (*shm).map_size = 0;
             (*shm).shm_str[0] = 0u8;
             return ptr::null_mut();
         }
-        (*shm).map
+        (*shm).map as *mut u8
     }
 }
 
