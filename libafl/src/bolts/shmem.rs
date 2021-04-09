@@ -392,7 +392,8 @@ pub mod unix_shmem {
         (*shm).shm_str
             [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_ulong) as usize] = 0u8;
         (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_char as usize;
-        if (*shm).map == -(1 as c_int) as *mut c_char as usize || ((*shm).map as *mut u8).is_null() {
+        if (*shm).map == -(1 as c_int) as *mut c_char as usize || ((*shm).map as *mut u8).is_null()
+        {
             shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
             (*shm).shm_id = -(1 as c_int);
             (*shm).shm_str[0] = 0u8;
@@ -425,7 +426,7 @@ pub mod unix_shmem {
             .unwrap();
         (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_char as usize;
         if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_char as usize {
-            (*shm).map = ptr::null_mut() as * mut u8 as usize;
+            (*shm).map = ptr::null_mut() as *mut u8 as usize;
             (*shm).map_size = 0;
             (*shm).shm_str[0] = 0u8;
             return ptr::null_mut();

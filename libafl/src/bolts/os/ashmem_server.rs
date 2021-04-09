@@ -8,15 +8,15 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription, UnixShMem},
     Error,
 };
+use hashbrown::HashMap;
 use libc::c_char;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
-use hashbrown::HashMap;
 
 #[cfg(all(feature = "std", unix))]
 use nix::{
     cmsg_space,
-    poll::{poll, PollFlags, PollFd},
+    poll::{poll, PollFd, PollFlags},
 };
 
 #[cfg(all(feature = "std", unix))]
@@ -39,7 +39,6 @@ pub struct ServedShMem {
     shmem: Option<UnixShMem>,
     slice: Option<[u8; 20]>,
     fd: Option<RawFd>,
-
 }
 const ASHMEM_SERVER_NAME: &str = "@ashmem_server";
 
@@ -55,17 +54,21 @@ impl ServedShMem {
     }
 
     fn send_receive(&mut self, request: AshmemRequest) -> ([u8; 20], RawFd) {
-        let body  = postcard::to_allocvec(&request).unwrap();
+        let body = postcard::to_allocvec(&request).unwrap();
 
         let header = (body.len() as u32).to_be_bytes();
         let mut message = header.to_vec();
         message.extend(body);
 
-        self.stream.write_all(&message).expect("Failed to send message");
+        self.stream
+            .write_all(&message)
+            .expect("Failed to send message");
 
         let mut shm_slice = [0u8; 20];
         let mut fd_buf = [-1; 1];
-        self.stream.recv_fds(&mut shm_slice, &mut fd_buf).expect("Did not receive a response");
+        self.stream
+            .recv_fds(&mut shm_slice, &mut fd_buf)
+            .expect("Did not receive a response");
         (shm_slice, fd_buf[0])
     }
 }
@@ -74,11 +77,16 @@ impl ShMem for ServedShMem {
         let mut res = Self::connect(ASHMEM_SERVER_NAME);
         let (shm_slice, fd) = res.send_receive(AshmemRequest::NewMap(map_size));
         if fd == -1 {
-            Err(Error::IllegalState("Could not allocate from the ashmem server".to_string()))
+            Err(Error::IllegalState(
+                "Could not allocate from the ashmem server".to_string(),
+            ))
         } else {
             res.slice = Some(shm_slice);
             res.fd = Some(fd);
-            res.shmem = Some(UnixShMem::existing_from_shm_slice(&shm_slice, map_size).expect("Failed to create the UnixShMem"));
+            res.shmem = Some(
+                UnixShMem::existing_from_shm_slice(&shm_slice, map_size)
+                    .expect("Failed to create the UnixShMem"),
+            );
             Ok(res)
         }
     }
@@ -88,13 +96,21 @@ impl ShMem for ServedShMem {
         map_size: usize,
     ) -> Result<Self, crate::Error> {
         let mut res = Self::connect(ASHMEM_SERVER_NAME);
-        let (shm_slice, fd) = res.send_receive(AshmemRequest::ExistingMap(ShMemDescription {size: map_size, str_bytes: *map_str_bytes}));
+        let (shm_slice, fd) = res.send_receive(AshmemRequest::ExistingMap(ShMemDescription {
+            size: map_size,
+            str_bytes: *map_str_bytes,
+        }));
         if fd == -1 {
-            Err(Error::IllegalState("Could not allocate from the ashmem server".to_string()))
+            Err(Error::IllegalState(
+                "Could not allocate from the ashmem server".to_string(),
+            ))
         } else {
             res.slice = Some(shm_slice);
             res.fd = Some(fd);
-            res.shmem = Some(UnixShMem::existing_from_shm_slice(&shm_slice, map_size).expect("Failed to create the UnixShMem"));
+            res.shmem = Some(
+                UnixShMem::existing_from_shm_slice(&shm_slice, map_size)
+                    .expect("Failed to create the UnixShMem"),
+            );
             Ok(res)
         }
     }
@@ -137,7 +153,9 @@ impl AshmemService {
     /// Create a new AshMem service
     #[must_use]
     pub fn new() -> Self {
-        AshmemService { maps: HashMap::new() }
+        AshmemService {
+            maps: HashMap::new(),
+        }
     }
 
     /// Read and handle the client request, send the answer over unix fd.
@@ -148,7 +166,9 @@ impl AshmemService {
         let size = u32::from_be_bytes(size_bytes);
         let mut bytes = vec![];
         bytes.resize(size as usize, 0u8);
-        stream.read_exact(&mut bytes).expect("Failed to read message body");
+        stream
+            .read_exact(&mut bytes)
+            .expect("Failed to read message body");
         let request: AshmemRequest = postcard::from_bytes(&bytes)?;
 
         // Handle the client request
@@ -183,7 +203,7 @@ impl AshmemService {
         Ok(())
     }
 
-    pub fn start(&'static mut self) ->  Result<thread::JoinHandle<()>, Error> {
+    pub fn start(&'static mut self) -> Result<thread::JoinHandle<()>, Error> {
         Ok(thread::spawn(move || {
             self.listen(ASHMEM_SERVER_NAME).unwrap()
         }))
@@ -194,7 +214,10 @@ impl AshmemService {
         let mut clients: HashMap<RawFd, (UnixStream, UnixSocketAddr)> = HashMap::new();
         let mut poll_fds: HashMap<RawFd, PollFd> = HashMap::new();
 
-        poll_fds.insert(listener.as_raw_fd(), PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN));
+        poll_fds.insert(
+            listener.as_raw_fd(),
+            PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN),
+        );
 
         loop {
             let mut fds_to_poll: Vec<PollFd> = poll_fds.values().map(|p| *p).collect();
@@ -217,10 +240,19 @@ impl AshmemService {
                 println!("Recieved connection from {:?}", addr);
                 let pollfd = PollFd::new(stream.as_raw_fd(), PollFlags::POLLIN);
                 poll_fds.insert(stream.as_raw_fd(), pollfd);
-                clients.insert(stream.as_raw_fd(), (stream, addr)).as_ref().unwrap();
-            } else if poll_fds.get(&fd).unwrap().revents().unwrap().contains(PollFlags::POLLHUP) {
-                    poll_fds.remove(&fd);
-                    clients.remove(&fd);
+                clients
+                    .insert(stream.as_raw_fd(), (stream, addr))
+                    .as_ref()
+                    .unwrap();
+            } else if poll_fds
+                .get(&fd)
+                .unwrap()
+                .revents()
+                .unwrap()
+                .contains(PollFlags::POLLHUP)
+            {
+                poll_fds.remove(&fd);
+                clients.remove(&fd);
             } else {
                 let (stream, _addr) = clients.get_mut(&fd).unwrap();
                 match self.handle_client(stream) {
@@ -234,4 +266,3 @@ impl AshmemService {
         }
     }
 }
-
