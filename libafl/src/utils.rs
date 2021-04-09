@@ -3,21 +3,20 @@
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
-use std::{thread};
-use std::io::Error as ioErr;
-use std::fs::OpenOptions;
-use std::os::unix::io::{AsRawFd};
 
 #[cfg(unix)]
 use libc::pid_t;
-#[cfg(all(unix, feature = "std"))]
-use std::ffi::CString;
 #[cfg(feature = "std")]
 use std::{
     env,
+    fs::OpenOptions,
+    io::Error as ioErr,
     process::Command,
+    thread,
     time::{SystemTime, UNIX_EPOCH},
 };
+#[cfg(all(unix, feature = "std"))]
+use std::{ffi::CString, os::unix::io::AsRawFd};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::Error;
@@ -474,7 +473,17 @@ mod tests {
     }
 }
 
-pub fn launcher<T1,T2>(broker_fn: &dyn Fn(T1) -> Result<(), Error>, client_fn: &dyn Fn(T2)-> Result<(), Error>,broker_args: T1,client_args:T2,args:Vec<String>)-> Result<(), Error>{
+#[cfg(unix)]
+pub fn launcher<T1, T2>(
+    broker_fn: fn(T1) -> Result<(), Error>,
+    client_fn: fn(T2) -> Result<(), Error>,
+    broker_args: T1,
+    client_args: T2,
+    args: String,
+) -> Result<(), Error> {
+    let core_ids = core_affinity::get_core_ids().unwrap();
+    let num_cores = core_ids.len();
+    let (bind_to_core, cores) = parse_args(args, num_cores);
 
     let _ = match unsafe { fork() }? {
         ForkResult::Parent(handle) => {
@@ -482,60 +491,32 @@ pub fn launcher<T1,T2>(broker_fn: &dyn Fn(T1) -> Result<(), Error>, client_fn: &
             //wait for broker to finish broker things
             let one_sec = time::Duration::from_millis(1000);
             thread::sleep(one_sec);
-
             //spawn clients
-            let core_ids = core_affinity::get_core_ids().unwrap();
-            let mut num_cores = core_ids.len();
-            let mut bind_to_core = false;
-            let mut vecx:Vec<usize> = [].to_vec();
-
-            if args.len() != 2 {
-                num_cores = 2;
-                vecx.push(1);
-                println!("Launching a single client without binding to any cpu core.");
-            } else {
-                let core_args: Vec<&str> = args[1].split(',').collect();
-                if core_args.len()==1 && core_args[0] == "all"{
-                    for x in 1..num_cores{
-                        vecx.push(x);
-                    }
-                }
-                else{
-                // broker always binds to the 0th core
-                // ./fuzzer 1,2-4,6 -> clients run in cores 1,2,3,4,6
-                // ./fuzzer all -> one client runs in each available core
-                for arg in core_args{
-                    let marg: Vec<&str> = arg.split("-").collect();
-                    if marg.len()==1{
-                        vecx.push(marg[0].parse::<usize>().unwrap());
-                    }else if marg.len()==2{
-                        for x in marg[0].parse::<usize>().unwrap()..(marg[1].parse::<usize>().unwrap()+1){
-                            vecx.push(x);
-                        }
-                    }
-                }}
-                bind_to_core = true;
-            }
-            //println!("the cores are {:?}",vecx);
             for id in 1..num_cores {
+                //0 reserved for the broker
                 let bind_to = core_ids[id];
-                if findinvec(&vecx, id){
-                let _: Result<(), Error> = match unsafe { fork() }? {
-                    ForkResult::Parent(_handle) => {
-                        println!("child spawned {}", id);
-                        Ok(())
-                    }
-                    ForkResult::Child => {
-                        if bind_to_core 
-                        {core_affinity::set_for_current(bind_to);}
-                        //silence stdout and stderr of clients here
-                        let file = OpenOptions::new().write(true).open("/dev/null").unwrap();
-                        let _ = set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd() );
-                        let _ = set_std_fd(libc::STDERR_FILENO, file.as_raw_fd() );
-                       let _ = client_fn(client_args);
-                       break;                   
-                    }
-                };
+                if cores.iter().any(|&x| x == id) {
+                    let _: Result<(), Error> = match unsafe { fork() }? {
+                        ForkResult::Parent(_handle) => {
+                            println!("child spawned and bound to core {}", id);
+                            Ok(())
+                        }
+                        ForkResult::Child => {
+                            if bind_to_core {
+                                core_affinity::set_for_current(bind_to);
+                            }
+                            //silence stdout and stderr for clients
+                            #[cfg(feature = "std")]
+                            {
+                            let file = OpenOptions::new().write(true).open("/dev/null").unwrap();
+                            set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd()).unwrap();
+                            set_std_fd(libc::STDERR_FILENO, file.as_raw_fd()).unwrap();
+                            }
+
+                            let _ = client_fn(client_args);
+                            break;
+                        }
+                    };
                 }
             }
             let sts = handle.status();
@@ -544,20 +525,52 @@ pub fn launcher<T1,T2>(broker_fn: &dyn Fn(T1) -> Result<(), Error>, client_fn: &
         }
         ForkResult::Child => {
             println!("I am broker!!.");
-            let core_ids = core_affinity::get_core_ids().unwrap();
-            core_affinity::set_for_current(core_ids[0]);          
-            let _ = broker_fn(broker_args);
-            Err(Error::ShuttingDown)
+            //broker binds to the 0th core
+            core_affinity::set_for_current(core_ids[0]);
+            broker_fn(broker_args)
         }
     };
-   Ok(())
+    Ok(())
 }
-fn findinvec(vec1:&Vec<usize> ,num:usize)->bool{
-    vec1.into_iter().find(|&&x| x==num).is_some()
-}
-fn set_std_fd(device: i32, fd: i32) -> Result<(),Error> {
+
+#[cfg(all(unix, feature = "std"))]
+fn set_std_fd(device: i32, fd: i32) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
         -1 => Err(Error::File(ioErr::last_os_error())),
         _ => Ok(()),
     }
+}
+
+fn parse_args(args: String, num_cores: usize) -> (bool, Vec<usize>) {
+    let mut bind_to_core = false;
+    let mut cores: Vec<usize> = [].to_vec();
+    if args == "none" {
+        cores.push(1);
+        println!("Launching a single client without binding to any cpu core.");
+    } else {
+        let core_args: Vec<&str> = args.split(',').collect();
+        if core_args.len() == 1 && core_args[0] == "all" {
+            for x in 1..num_cores {
+                cores.push(x);
+            }
+        } else {
+            // broker always binds to the 0th core
+            // ./fuzzer --cores 1,2-4,6 -> clients run in cores 1,2,3,4,6
+            // ./fuzzer --cores all -> one client runs in each available core
+            for csv in core_args {
+                let core_range: Vec<&str> = csv.split('-').collect();
+                if core_range.len() == 1 {
+                    cores.push(core_range[0].parse::<usize>().unwrap());
+                } else if core_range.len() == 2 {
+                    for x in core_range[0].parse::<usize>().unwrap()
+                        ..(core_range[1].parse::<usize>().unwrap() + 1)
+                    {
+                        cores.push(x);
+                    }
+                }
+            }
+        }
+        bind_to_core = true;
+    }
+    (bind_to_core, cores)
 }

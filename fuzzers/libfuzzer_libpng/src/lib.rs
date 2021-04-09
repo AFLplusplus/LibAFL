@@ -20,51 +20,56 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    utils::{current_nanos, StdRand, launcher},
+    utils::{current_nanos, launcher, StdRand},
     Error,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
-
+extern crate clap;
+use clap::{load_yaml, App};
 /// The main fn, no_mangle as it is a C main
 #[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
+    let yaml = load_yaml!("clap-config.yaml");
+    let matches = App::from(yaml).get_matches();
 
-    let args: Vec<String> = env::args().collect();
+    let cores = matches.value_of("cores").unwrap().to_string();
     //println!("{:?}", args);
     println!(
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let broker_args = FnArgs{
-        corpus_dirs : vec![PathBuf::from("./corpus")], 
-        objective_dir : PathBuf::from("./crashes"),
-        broker_port : 1337
+    let broker_args = FnArgs {
+        corpus_dirs: vec![PathBuf::from("./corpus")],
+        objective_dir: PathBuf::from("./crashes"),
+        broker_port: 1337,
     };
-    let client_args = FnArgs{
-        corpus_dirs : vec![PathBuf::from("./corpus")], 
-        objective_dir : PathBuf::from("./crashes"),
-        broker_port : 1337
+    let client_args = FnArgs {
+        corpus_dirs: vec![PathBuf::from("./corpus")],
+        objective_dir: PathBuf::from("./crashes"),
+        broker_port: 1337,
     };
     #[cfg(unix)]
-    let _ = launcher(&in_client,&in_client, broker_args, client_args, args);
+    launcher(in_client, in_client, broker_args, client_args, cores).unwrap();
 
     #[cfg(not(unix))]
-    let _ = in_client( corpus_dirs : vec![PathBuf::from("./corpus")], PathBuf::from("./crashes"), 1337);    
+    in_client(
+        corpus_dirs: vec![PathBuf::from("./corpus")],
+        PathBuf::from("./crashes"),
+        1337,
+    ).unwrap();
 }
 
-struct FnArgs{
+struct FnArgs {
     corpus_dirs: Vec<PathBuf>,
     objective_dir: PathBuf,
     broker_port: u16,
 }
 
-fn in_client(
-    fn_args:FnArgs
-) -> Result<(), Error> {
+fn in_client(fn_args: FnArgs) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
@@ -160,7 +165,12 @@ fn in_client(
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &fn_args.corpus_dirs)
+            .load_initial_inputs(
+                &mut executor,
+                &mut restarting_mgr,
+                &scheduler,
+                &fn_args.corpus_dirs,
+            )
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &fn_args.corpus_dirs

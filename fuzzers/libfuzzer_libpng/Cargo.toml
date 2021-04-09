@@ -19,7 +19,7 @@ libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-core_affinity = "0.5.9"
+clap = { version = "3.0.0-beta.2", features = ["yaml"] }
 
 [lib]
 name = "libfuzzer_libpng"
