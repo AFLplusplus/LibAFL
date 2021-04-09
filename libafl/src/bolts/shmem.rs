@@ -370,6 +370,7 @@ pub mod unix_shmem {
 
         }
 
+<<<<<<< HEAD
         /// An ashmem based impl for linux/android
         #[cfg(unix)]
         #[derive(Clone, Debug)]
@@ -493,6 +494,7 @@ pub mod unix_shmem {
                 self.map_size
             }
 
+<<<<<<< HEAD
             fn map(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
@@ -536,6 +538,7 @@ pub mod unix_shmem {
                 Self::new()
             }
         }
+<<<<<<< HEAD
 
         /// Implement ShMemProvider for AshmemShMemProvider
         #[cfg(unix)]
