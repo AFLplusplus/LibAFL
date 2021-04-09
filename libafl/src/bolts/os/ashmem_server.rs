@@ -201,7 +201,7 @@ impl AshmemService {
             }
         };
 
-        stream.send_fds(&fd.to_be_bytes(), &[fd])?;
+        stream.send_fds(&shmem_slice, &[fd])?;
         Ok(())
     }
 
@@ -225,7 +225,7 @@ impl AshmemService {
         );
 
         loop {
-            let mut fds_to_poll: Vec<PollFd> = poll_fds.values().map(|p| *p).collect();
+            let mut fds_to_poll: Vec<PollFd> = poll_fds.values().copied().collect();
             let fd = match poll(&mut fds_to_poll, -1) {
                 Ok(fd) => fd,
                 Err(e) => {
