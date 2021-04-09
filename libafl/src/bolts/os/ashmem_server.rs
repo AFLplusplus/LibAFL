@@ -8,8 +8,9 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription, UnixShMem},
     Error,
 };
+use libc::c_char;
 use serde::{Deserialize, Serialize};
-use std::io::Read;
+use std::io::{Read, Write};
 use hashbrown::HashMap;
 
 #[cfg(all(feature = "std", unix))]
@@ -19,45 +20,95 @@ use nix::{
 };
 
 #[cfg(all(feature = "std", unix))]
-use std::os::unix::{
-    self,
-    net::{UnixListener, UnixStream},
-    {io::AsRawFd, prelude::RawFd},
+use std::{
+    os::unix::{
+        self,
+        net::{UnixListener, UnixStream},
+        {io::AsRawFd, prelude::RawFd},
+    },
+    thread,
 };
-
-use std::rc::Rc;
 
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 /// The Sharedmem backed by a `ShmemService`a
 pub struct ServedShMem {
+    stream: UnixStream,
+    shmem: Option<UnixShMem>,
+    slice: Option<[u8; 20]>,
+    fd: Option<RawFd>,
 
 }
+const ASHMEM_SERVER_NAME: &str = "@ashmem_server";
 
+impl ServedShMem {
+    pub fn connect(name: &str) -> Self {
+        Self {
+            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::from_abstract(name).unwrap())
+                .expect("Failed to connect to the ashmem server"),
+            shmem: None,
+            slice: None,
+            fd: None,
+        }
+    }
+
+    fn send_receive(&mut self, request: AshmemRequest) -> ([u8; 20], RawFd) {
+        let body  = postcard::to_allocvec(&request).unwrap();
+
+        let header = (body.len() as u32).to_be_bytes();
+        let mut message = header.to_vec();
+        message.extend(body);
+
+        self.stream.write_all(&message).expect("Failed to send message");
+
+        let mut shm_slice = [0u8; 20];
+        let mut fd_buf = [-1; 1];
+        self.stream.recv_fds(&mut shm_slice, &mut fd_buf).expect("Did not receive a response");
+        (shm_slice, fd_buf[0])
+    }
+}
 impl ShMem for ServedShMem {
     fn new_map(map_size: usize) -> Result<Self, crate::Error> {
-        todo!()
+        let mut res = Self::connect(ASHMEM_SERVER_NAME);
+        let (shm_slice, fd) = res.send_receive(AshmemRequest::NewMap(map_size));
+        if fd == -1 {
+            Err(Error::IllegalState("Could not allocate from the ashmem server".to_string()))
+        } else {
+            res.slice = Some(shm_slice);
+            res.fd = Some(fd);
+            res.shmem = Some(UnixShMem::existing_from_shm_slice(&shm_slice, map_size).expect("Failed to create the UnixShMem"));
+            Ok(res)
+        }
     }
 
     fn existing_from_shm_slice(
         map_str_bytes: &[u8; 20],
         map_size: usize,
     ) -> Result<Self, crate::Error> {
-        todo!()
+        let mut res = Self::connect(ASHMEM_SERVER_NAME);
+        let (shm_slice, fd) = res.send_receive(AshmemRequest::ExistingMap(ShMemDescription {size: map_size, str_bytes: *map_str_bytes}));
+        if fd == -1 {
+            Err(Error::IllegalState("Could not allocate from the ashmem server".to_string()))
+        } else {
+            res.slice = Some(shm_slice);
+            res.fd = Some(fd);
+            res.shmem = Some(UnixShMem::existing_from_shm_slice(&shm_slice, map_size).expect("Failed to create the UnixShMem"));
+            Ok(res)
+        }
     }
 
     fn shm_slice(&self) -> &[u8; 20] {
-        todo!()
+        self.slice.as_ref().unwrap()
     }
 
     fn map(&self) -> &[u8] {
-        todo!()
+        self.shmem.as_ref().unwrap().map()
     }
 
     fn map_mut(&mut self) -> &mut [u8] {
-        todo!()
+        self.shmem.as_mut().unwrap().map_mut()
     }
 }
 
@@ -65,10 +116,10 @@ impl ShMem for ServedShMem {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum AshmemRequest {
     /// Register a new map with a given size.
-    NewPage(usize),
-    /// Another client already has a page with this description mapped.
-    ExistingPage(ShMemDescription),
-    /// A client tells us it unregistes the previously allocated map
+    NewMap(usize),
+    /// Another client already has a map with this description mapped.
+    ExistingMap(ShMemDescription),
+    /// A client tells us it unregisters the previously allocated map
     Deregister(u32),
 }
 
@@ -102,7 +153,7 @@ impl AshmemService {
 
         // Handle the client request
         let fd: i32 = match request {
-            AshmemRequest::NewPage(map_size) => match UnixShMem::new(map_size) {
+            AshmemRequest::NewMap(map_size) => match UnixShMem::new(map_size) {
                 Err(e) => {
                     println!("Error allocating shared map {:?}", e);
                     -1
@@ -114,7 +165,7 @@ impl AshmemService {
                     fd
                 }
             },
-            AshmemRequest::ExistingPage(description) => {
+            AshmemRequest::ExistingMap(description) => {
                 match self.maps.get(&description.str_bytes) {
                     None => {
                         println!("Error finding shared map {:?}", description);
@@ -132,8 +183,13 @@ impl AshmemService {
         Ok(())
     }
 
+    pub fn start(&'static mut self) ->  Result<thread::JoinHandle<()>, Error> {
+        Ok(thread::spawn(move || {
+            self.listen(ASHMEM_SERVER_NAME).unwrap()
+        }))
+    }
 
-    pub fn listen(&mut self, filename: &str) -> Result<(), Error> {
+    fn listen(&mut self, filename: &str) -> Result<(), Error> {
         let listener = UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?)?;
         let mut clients: HashMap<RawFd, (UnixStream, UnixSocketAddr)> = HashMap::new();
         let mut poll_fds: HashMap<RawFd, PollFd> = HashMap::new();
