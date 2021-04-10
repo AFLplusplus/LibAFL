@@ -1,5 +1,11 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
+use alloc::vec::Vec;
+use core::marker::PhantomData;
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -7,22 +13,15 @@ use std::{
     path::Path,
 };
 
-#[cfg(feature = "std")]
-use crate::mutators::str_decode;
-
 use crate::{
     inputs::{HasBytesVec, Input},
-    mutators::{buffer_self_copy, mutations, MutationResult, Mutator, Named},
+    mutators::{
+        buffer_self_copy, mutations, mutations::buffer_copy, MutationResult, Mutator, Named,
+    },
     state::{HasMaxSize, HasMetadata, HasRand},
     utils::Rand,
     Error,
 };
-use core::marker::PhantomData;
-
-use alloc::vec::Vec;
-use serde::{Deserialize, Serialize};
-
-use mutations::buffer_copy;
 
 /// A state metadata holding a list of tokens
 #[derive(Serialize, Deserialize)]
