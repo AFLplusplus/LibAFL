@@ -437,7 +437,7 @@ pub unsafe fn fork() -> Result<ForkResult, Error> {
 #[cfg(feature = "std")]
 pub fn startable_self() -> Result<Command, Error> {
     let mut startable = Command::new(env::current_exe()?);
-    startable.current_dir(env::current_dir()?).args(env::args());
+    startable.current_dir(env::current_dir()?).args(env::args().skip(1));
     Ok(startable)
 }
 
@@ -490,57 +490,112 @@ pub fn launcher<T1, T2>(
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
     let (bind_to_core, cores) = parse_args(args, num_cores);
+    let mut handles = vec![];
+    //let ags = std::env::args;
+    //spawn clients
+    for id in 0..num_cores {
+        let bind_to = core_ids[id];
+        if cores.iter().any(|&x| x == id) {
+            let _: Result<(), Error> = match unsafe { fork() }? {
+                ForkResult::Parent(handle) => {
+                    handles.push(handle.pid);
+                    #[cfg(feature = "std")]
+                    println!("child spawned and bound to core {}", id);
+                    Ok(())
+                }
+                ForkResult::Child => {
+                    if bind_to_core {
+                        core_affinity::set_for_current(bind_to);
+                    }
+                    //silence stdout and stderr for clients
+                    #[cfg(feature = "std")]
+                    {
+                        let file = OpenOptions::new().write(true).open("/dev/null").unwrap();
+                        set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd()).unwrap();
+                        set_std_fd(libc::STDERR_FILENO, file.as_raw_fd()).unwrap();
+                    }
+                    //clients keep retrying the connection to broker
+                    client_fn(client_args).unwrap();
+                    break;
+                }
+            };
+        }
+    }
+    #[cfg(feature = "std")]
+    println!("I am broker!!.");
+    //broker binds to the 0th core??
+    //core_affinity::set_for_current(core_ids[0]);
+    let _ = broker_fn(broker_args);
+    //broker exited. kill all clients.
+    for handle in handles.iter() {
+        unsafe {
+            libc::kill(*handle, libc::SIGINT);
+        }
+    }
+    Ok(())
+}
+const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
 
-    let _ = match unsafe { fork() }? {
-        ForkResult::Parent(_handle) => {
-            #[cfg(feature = "std")]
-            println!("forked the broker");
+#[cfg(windows)]
+pub fn launcher<T1, T2>(
+    broker_fn: fn(T1) -> Result<(), Error>,
+    client_fn: fn(T2) -> Result<(), Error>,
+    broker_args: T1,
+    client_args: T2,
+    args: String,
+) -> Result<(), Error> {
 
-            //spawn clients
-            for id in 1..num_cores {
-                //0 reserved for the broker
-                let bind_to = core_ids[id];
+    let core_ids = core_affinity::get_core_ids().unwrap();
+    let num_cores = core_ids.len();
+    let (bind_to_core, cores) = parse_args(args, num_cores);
+
+    let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
+
+    match is_client {
+        Ok(core_conf) => {
+            if core_conf == "bound" || core_conf == "none" {
+                //restarting or client not binding to any cpu. call client_fn
+                return client_fn(client_args);
+            } else {
+                //first instance of a spawned client. bind to the specified core and start fuzzing
+                let core: usize = core_conf.parse().unwrap();
+                let bind_to = core_ids[core];
+                core_affinity::set_for_current(bind_to);
+                std::env::set_var(_AFL_LAUNCHER_CLIENT, "bound");
+                //todo: silence stdout and stderr for clients
+                
+                return client_fn(client_args);
+            }
+        },
+        Err(std::env::VarError::NotPresent) => {
+            // I am a broker
+            // before going to the broker loop, spawn n clients
+            let mut children = vec![];
+            for id in 0..num_cores {
                 if cores.iter().any(|&x| x == id) {
-                    let _: Result<(), Error> = match unsafe { fork() }? {
-                        ForkResult::Parent(_handle) => {
-                            #[cfg(feature = "std")]
-                            println!("child spawned and bound to core {}", id);
-                            Ok(())
-                        }
-                        ForkResult::Child => {
-                            if bind_to_core {
-                                core_affinity::set_for_current(bind_to);
-                            }
-                            //silence stdout and stderr for clients
-                            #[cfg(feature = "std")]
-                            {
-                                let file =
-                                    OpenOptions::new().write(true).open("/dev/null").unwrap();
-                                set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd()).unwrap();
-                                set_std_fd(libc::STDERR_FILENO, file.as_raw_fd()).unwrap();
-                            }
-
-                            let _ = client_fn(client_args);
-                            break;
-                        }
-                    };
+                    if bind_to_core {
+                        std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                    } else {
+                        std::env::set_var(_AFL_LAUNCHER_CLIENT, "none");
+                    }
+                    let child = startable_self().unwrap().spawn().unwrap();
+                    children.push(child);
+                    
                 }
             }
-            #[cfg(feature = "std")]
-            let sts = _handle.status();
-            #[cfg(feature = "std")]
-            println!("Exiting with status of broker {}", sts);
+            //finished spawning clients. start the broker
+            let _ = broker_fn(broker_args);
+
+            //broker exited. kill clients
+            for child in children.iter_mut(){
+                child.kill().unwrap();
+            }
             Ok(())
+        },
+        _ => {
+            return Err(Error::IllegalState("Env var is non unicode".to_string()));
         }
-        ForkResult::Child => {
-            #[cfg(feature = "std")]
-            println!("I am broker!!.");
-            //broker binds to the 0th core
-            core_affinity::set_for_current(core_ids[0]);
-            broker_fn(broker_args)
-        }
-    };
-    Ok(())
+    }
 }
 
 #[cfg(all(unix, feature = "std"))]
@@ -553,7 +608,7 @@ fn set_std_fd(device: i32, fd: i32) -> Result<(), Error> {
 
 fn parse_args(args: String, num_cores: usize) -> (bool, Vec<usize>) {
     let mut bind_to_core = false;
-    let mut cores: Vec<usize> = [].to_vec();
+    let mut cores: Vec<usize> = vec![];
     if args == "none" {
         cores.push(1);
         #[cfg(feature = "std")]
@@ -561,7 +616,7 @@ fn parse_args(args: String, num_cores: usize) -> (bool, Vec<usize>) {
     } else {
         let core_args: Vec<&str> = args.split(',').collect();
         if core_args.len() == 1 && core_args[0] == "all" {
-            for x in 1..num_cores {
+            for x in 0..num_cores {
                 cores.push(x);
             }
         } else {
