@@ -10,10 +10,13 @@ use libafl::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::setup_restarting_mgr,
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    events::{setup_new_llmp_broker, setup_restarting_mgr, setup_restarting_mgr_client},
+    executors::{inprocess::InProcessExecutor, Executor, ExitKind, TimeoutExecutor},
+    feedbacks::{
+        CrashFeedback, MapFeedback, MaxMapFeedback, MaxReducer, TimeFeedback, TimeoutFeedback,
+    },
+    fuzzer::{Fuzzer, HasCorpusScheduler, StdFuzzer},
+    inputs::{BytesInput, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -53,14 +56,15 @@ pub fn main() {
         broker_port: 1337,
     };
     #[cfg(unix)]
-    launcher(in_client, in_client, broker_args, client_args, cores).unwrap();
+    launcher(in_broker, in_client, 1337, client_args, cores).unwrap();
 
     #[cfg(not(unix))]
     in_client(
         corpus_dirs: vec![PathBuf::from("./corpus")],
         PathBuf::from("./crashes"),
         1337,
-    ).unwrap();
+    )
+    .unwrap();
 }
 
 struct FnArgs {
@@ -68,14 +72,32 @@ struct FnArgs {
     objective_dir: PathBuf,
     broker_port: u16,
 }
-
+fn in_broker(broker_port: u16) -> Result<(), Error> {
+    let stats = SimpleStats::new(|s| println!("{}", s));
+    setup_new_llmp_broker::<
+        BytesInput,
+        State<
+            InMemoryCorpus<BytesInput>,
+            (
+                MapFeedback<u8, MaxReducer<u8>, HitcountsMapObserver<StdMapObserver<u8>>>,
+                (TimeFeedback, ()),
+            ),
+            BytesInput,
+            (CrashFeedback, (TimeoutFeedback, ())),
+            StdRand,
+            OnDiskCorpus<BytesInput>,
+        >,
+        StdShMem,
+        _,
+    >(stats, broker_port)
+}
 fn in_client(fn_args: FnArgs) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr::<_, _, StdShMem, _>(stats, fn_args.broker_port) {
+        match setup_restarting_mgr_client::<_, _, StdShMem, _>(stats, fn_args.broker_port) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {

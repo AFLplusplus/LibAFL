@@ -488,9 +488,7 @@ pub fn launcher<T1, T2>(
     let _ = match unsafe { fork() }? {
         ForkResult::Parent(handle) => {
             println!("forked the broker");
-            //wait for broker to finish broker things
-            let one_sec = time::Duration::from_millis(1000);
-            thread::sleep(one_sec);
+            
             //spawn clients
             for id in 1..num_cores {
                 //0 reserved for the broker
@@ -508,9 +506,10 @@ pub fn launcher<T1, T2>(
                             //silence stdout and stderr for clients
                             #[cfg(feature = "std")]
                             {
-                            let file = OpenOptions::new().write(true).open("/dev/null").unwrap();
-                            set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd()).unwrap();
-                            set_std_fd(libc::STDERR_FILENO, file.as_raw_fd()).unwrap();
+                                let file =
+                                    OpenOptions::new().write(true).open("/dev/null").unwrap();
+                                set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd()).unwrap();
+                                set_std_fd(libc::STDERR_FILENO, file.as_raw_fd()).unwrap();
                             }
 
                             let _ = client_fn(client_args);

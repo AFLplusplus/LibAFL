@@ -416,6 +416,23 @@ where
         }
     }
 
+    pub fn broker_on_port(port: u16) -> Result<Self, Error> {
+        match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+            Ok(listener) => {
+                let mut broker = LlmpBroker::new()?;
+                let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
+                Ok(LlmpConnection::IsBroker { broker })
+            }
+            Err(e) => Err(Error::File(e)),
+        }
+    }
+
+    pub fn client_on_port(port: u16) -> Result<Self, Error> {
+        Ok(LlmpConnection::IsClient {
+            client: LlmpClient::create_attach_to_tcp(port)?,
+        })
+    }
+
     /// Describe this in a reproducable fashion, if it's a client
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(match self {
@@ -470,6 +487,27 @@ where
                 }
             }
         }
+    }
+
+    #[cfg(all(feature = "std", unix))]
+    pub fn broker_on_domain_socket(filename: &str) -> Result<Self, Error> {
+        match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename).unwrap()) {
+            Ok(listener) => {
+                dbg!("We're the broker");
+                let mut broker = LlmpBroker::new()?;
+                broker.socket_name = Some(filename.to_string());
+                let _listener_thread = broker.launch_listener(Listener::Unix(listener))?;
+                Ok(LlmpConnection::IsBroker { broker })
+            }
+            Err(e) => Err(Error::File(e)),
+        }
+    }
+
+    pub fn client_on_domain_socket(filename: &str) -> Result<Self, Error> {
+        dbg!("We're the client");
+        Ok(LlmpConnection::IsClient {
+            client: LlmpClient::create_attach_to_unix(filename)?,
+        })
     }
 }
 
@@ -1844,7 +1882,23 @@ where
     #[cfg(feature = "std")]
     /// Create a LlmpClient, getting the ID from a given port
     pub fn create_attach_to_tcp(port: u16) -> Result<Self, Error> {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
+        let mut stream = match TcpStream::connect(format!("127.0.0.1:{}", port)) {
+            Ok(stream) => stream,
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::ConnectionRefused => {
+                        //connection refused. loop till the broker is up
+                        loop {
+                            match TcpStream::connect(format!("127.0.0.1:{}", port)) {
+                                Ok(stream) => break stream,
+                                _ => {dbg!("Connection Refused.. Retrying");}
+                            }
+                        }
+                    }
+                    _ => return Err(Error::IllegalState(e.to_string())),
+                }
+            }
+        };
         println!("Connected to port {}", port);
 
         // First, get the serialized description size by serializing a dummy.
