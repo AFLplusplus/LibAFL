@@ -82,6 +82,8 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
+#[cfg(target_os = "android")]
+use crate::bolts::os::ashmem_server::AshmemService;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
@@ -1508,6 +1510,7 @@ where
         // to read from the initial map id.
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
+        println!("out_maps: {:?}", self.llmp_out.out_maps);
         let broadcast_map_description = postcard::to_allocvec(&client_out_map_mem.description())?;
 
         let mut incoming_map_description_serialized = vec![0u8; broadcast_map_description.len()];

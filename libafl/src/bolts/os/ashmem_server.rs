@@ -41,8 +41,6 @@ pub struct ServedShMemProvider {
     inner: AshmemShMemProvider,
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 #[derive(Clone, Debug)]
 pub struct ServedShMem {
     inner: AshmemShMem,
@@ -131,7 +129,6 @@ impl ShMemProvider for ServedShMemProvider {
         })
     }
 
-<<<<<<< HEAD
     fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
         let parts = id.to_string().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();

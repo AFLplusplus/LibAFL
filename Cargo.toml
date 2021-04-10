@@ -10,6 +10,7 @@ members = [
     "libafl_derive",
     "libafl_cc",
     "libafl_targets",
+    "libafl_frida",
 ]
 exclude = [
     "fuzzers/libfuzzer_libpng",
