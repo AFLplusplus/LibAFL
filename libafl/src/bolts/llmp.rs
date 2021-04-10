@@ -679,7 +679,10 @@ where
         let map = self.out_maps.last_mut().unwrap();
         println!("Allocating on map {:?} (size: {})", map, complete_msg_size);
         let page = map.page_mut();
-        println!("Allocating {} (>={}) bytes on page {:?}", complete_msg_size, buf_len, page);
+        println!(
+            "Allocating {} (>={}) bytes on page {:?}",
+            complete_msg_size, buf_len, page
+        );
         let last_msg = self.last_msg_sent;
         println!("last msg: {:?}", last_msg);
         /* DBG("XXX complete_msg_size %lu (h: %lu)\n", complete_msg_size, sizeof(llmp_message)); */
@@ -704,7 +707,12 @@ where
             /* Still space for the new message plus the additional "we're full" message?
              */
 
-            dbg!((*page).size_used, complete_msg_size, EOP_MSG_SIZE, (*page).size_total);
+            dbg!(
+                (*page).size_used,
+                complete_msg_size,
+                EOP_MSG_SIZE,
+                (*page).size_total
+            );
             if (*page).size_used + complete_msg_size + EOP_MSG_SIZE > (*page).size_total {
                 /* We're full. */
                 return None;
