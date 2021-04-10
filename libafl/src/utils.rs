@@ -437,7 +437,9 @@ pub unsafe fn fork() -> Result<ForkResult, Error> {
 #[cfg(feature = "std")]
 pub fn startable_self() -> Result<Command, Error> {
     let mut startable = Command::new(env::current_exe()?);
-    startable.current_dir(env::current_dir()?).args(env::args().skip(1));
+    startable
+        .current_dir(env::current_dir()?)
+        .args(env::args().skip(1));
     Ok(startable)
 }
 
@@ -544,7 +546,6 @@ pub fn launcher<T1, T2>(
     client_args: T2,
     args: String,
 ) -> Result<(), Error> {
-
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
     let (bind_to_core, cores) = parse_args(args, num_cores);
@@ -563,10 +564,10 @@ pub fn launcher<T1, T2>(
                 core_affinity::set_for_current(bind_to);
                 std::env::set_var(_AFL_LAUNCHER_CLIENT, "bound");
                 //todo: silence stdout and stderr for clients
-                
+
                 return client_fn(client_args);
             }
-        },
+        }
         Err(std::env::VarError::NotPresent) => {
             // I am a broker
             // before going to the broker loop, spawn n clients
@@ -580,18 +581,17 @@ pub fn launcher<T1, T2>(
                     }
                     let child = startable_self().unwrap().spawn().unwrap();
                     children.push(child);
-                    
                 }
             }
             //finished spawning clients. start the broker
             let _ = broker_fn(broker_args);
 
             //broker exited. kill clients
-            for child in children.iter_mut(){
+            for child in children.iter_mut() {
                 child.kill().unwrap();
             }
             Ok(())
-        },
+        }
         _ => {
             return Err(Error::IllegalState("Env var is non unicode".to_string()));
         }
