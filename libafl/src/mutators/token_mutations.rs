@@ -6,20 +6,21 @@ use std::{
     io::{BufRead, BufReader},
     path::Path,
 };
-
-use crate::{
-    inputs::{HasBytesVec, Input},
-    mutators::{buffer_self_copy, mutations, str_decode, MutationResult, Mutator, Named},
-    state::{HasMaxSize, HasMetadata, HasRand},
-    utils::Rand,
-    Error,
-};
 use core::marker::PhantomData;
-
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use mutations::buffer_copy;
+use crate::{
+    inputs::{HasBytesVec, Input},
+    mutators::{buffer_self_copy, mutations, MutationResult, Mutator, Named},
+    state::{HasMaxSize, HasMetadata, HasRand},
+    utils::Rand,
+    Error,
+};
+
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
 
 /// A state metadata holding a list of tokens
 #[derive(Serialize, Deserialize)]

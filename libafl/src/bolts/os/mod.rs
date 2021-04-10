@@ -1,6 +1,6 @@
 //! Operating System specific abstractions
 
-//#[cfg(target_os = "android")]
+#[cfg(all(unix, feature = "std"))]
 pub mod ashmem_server;
 
 #[cfg(unix)]

@@ -732,7 +732,7 @@ where
                     #[cfg(feature = "std")]
                     return None;
                     #[cfg(not(feature = "std"))]
-                    panic!(&format!("Unexpected error allocing new msg {:?}", e));
+                    panic!("Unexpected error allocing new msg {:?}", e);
                 }
             };
             (*ret).message_id = (*last_msg).message_id + 1

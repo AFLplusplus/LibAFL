@@ -9,20 +9,15 @@ use crate::{
     Error,
 };
 use hashbrown::HashMap;
-use libc::c_char;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
 #[cfg(all(feature = "std", unix))]
-use nix::{
-    cmsg_space,
-    poll::{poll, PollFd, PollFlags},
-};
+use nix::poll::{poll, PollFd, PollFlags};
 
 #[cfg(all(feature = "std", unix))]
 use std::{
     os::unix::{
-        self,
         net::{UnixListener, UnixStream},
         {io::AsRawFd, prelude::RawFd},
     },
