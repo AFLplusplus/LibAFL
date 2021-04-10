@@ -7,9 +7,12 @@ use std::{
     path::Path,
 };
 
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
+
 use crate::{
     inputs::{HasBytesVec, Input},
-    mutators::{buffer_self_copy, mutations, str_decode, MutationResult, Mutator, Named},
+    mutators::{buffer_self_copy, mutations, MutationResult, Mutator, Named},
     state::{HasMaxSize, HasMetadata, HasRand},
     utils::Rand,
     Error,

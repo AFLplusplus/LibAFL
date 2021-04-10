@@ -1,9 +1,9 @@
 //! Utility functions for AFL
 
+use alloc::{string::String, vec::Vec};
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
-use std::{thread};
 
 #[cfg(unix)]
 use libc::pid_t;
@@ -13,6 +13,7 @@ use std::ffi::CString;
 use std::{
     env,
     process::Command,
+    thread,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -477,81 +478,98 @@ mod tests {
     }
 }
 
-pub fn launcher<T1,T2>(broker_fn: &dyn Fn(T1) -> Result<(), Error>, client_fn: &dyn Fn(T2)-> Result<(), Error>,broker_args: T1,client_args:T2,args:Vec<String>)-> Result<(), Error>{
-
+#[cfg(unix)]
+pub fn launcher<T1, T2>(
+    broker_fn: &dyn Fn(T1) -> Result<(), Error>,
+    client_fn: &dyn Fn(T2) -> Result<(), Error>,
+    broker_args: T1,
+    client_args: T2,
+    args: Vec<String>,
+) -> Result<(), Error> {
     let _ = match unsafe { fork() }? {
-        ForkResult::Parent(handle) => {
-            println!("forked the broker");
-            //wait for broker to finish broker things
-            let one_sec = time::Duration::from_millis(1000);
-            thread::sleep(one_sec);
+        ForkResult::Parent(_handle) => {
+            #[cfg(feature = "std")]
+            {
+                println!("forked the broker");
+                //wait for broker to finish broker things
+                let one_sec = time::Duration::from_millis(1000);
+                thread::sleep(one_sec);
+            }
 
             //spawn clients
             let core_ids = core_affinity::get_core_ids().unwrap();
             let mut num_cores = core_ids.len();
             let mut bind_to_core = false;
-            let mut vecx:Vec<usize> = [].to_vec();
+            let mut vecx: Vec<usize> = [].to_vec();
 
             if args.len() != 2 {
                 num_cores = 2;
                 vecx.push(1);
+                #[cfg(feature = "std")]
                 println!("Launching a single client without binding to any cpu core.");
             } else {
                 let core_args: Vec<&str> = args[1].split(',').collect();
-                if core_args.len()==1 && core_args[0] == "all"{
-                    for x in 1..num_cores{
+                if core_args.len() == 1 && core_args[0] == "all" {
+                    for x in 1..num_cores {
                         vecx.push(x);
                     }
-                }
-                else{
-                // broker always binds to the 0th core
-                // ./fuzzer 1,2-4,6 -> clients run in cores 1,2,3,4,6
-                // ./fuzzer all -> one client runs in each available core
-                for arg in core_args{
-                    let marg: Vec<&str> = arg.split("-").collect();
-                    if marg.len()==1{
-                        vecx.push(marg[0].parse::<usize>().unwrap());
-                    }else if marg.len()==2{
-                        for x in marg[0].parse::<usize>().unwrap()..(marg[1].parse::<usize>().unwrap()+1){
-                            vecx.push(x);
+                } else {
+                    // broker always binds to the 0th core
+                    // ./fuzzer 1,2-4,6 -> clients run in cores 1,2,3,4,6
+                    // ./fuzzer all -> one client runs in each available core
+                    for arg in core_args {
+                        let marg: Vec<&str> = arg.split("-").collect();
+                        if marg.len() == 1 {
+                            vecx.push(marg[0].parse::<usize>().unwrap());
+                        } else if marg.len() == 2 {
+                            for x in marg[0].parse::<usize>().unwrap()
+                                ..(marg[1].parse::<usize>().unwrap() + 1)
+                            {
+                                vecx.push(x);
+                            }
                         }
                     }
-                }}
+                }
                 bind_to_core = true;
             }
             //println!("the cores are {:?}",vecx);
             for id in 1..num_cores {
                 let bind_to = core_ids[id];
-                if findinvec(&vecx, id){
-                let _: Result<(), Error> = match unsafe { fork() }? {
-                    ForkResult::Parent(_handle) => {
-                        println!("child spawned {}", id);
-                        Ok(())
-                    }
-                    ForkResult::Child => {
-                        if bind_to_core 
-                        {core_affinity::set_for_current(bind_to);}
-                        //silence stdout and stderr of clients here
-                       let _ = client_fn(client_args);
-                       break;                   
-                    }
-                };
+                if findinvec(&vecx, id) {
+                    let _: Result<(), Error> = match unsafe { fork() }? {
+                        ForkResult::Parent(_handle) => {
+                            #[cfg(feature = "std")]
+                            println!("child spawned {}", id);
+                            Ok(())
+                        }
+                        ForkResult::Child => {
+                            if bind_to_core {
+                                core_affinity::set_for_current(bind_to);
+                            }
+                            //silence stdout and stderr of clients here
+                            let _ = client_fn(client_args);
+                            break;
+                        }
+                    };
                 }
             }
-            let sts = handle.status();
+            #[cfg(feature = "std")]
+            let sts = _handle.status();
+            #[cfg(feature = "std")]
             println!("Exiting with status of broker {}", sts);
             Ok(())
         }
         ForkResult::Child => {
+            #[cfg(feature = "std")]
             println!("I am broker!!.");
             let core_ids = core_affinity::get_core_ids().unwrap();
-            core_affinity::set_for_current(core_ids[0]);          
+            core_affinity::set_for_current(core_ids[0]);
             let _ = broker_fn(broker_args);
             Err(Error::ShuttingDown)
         }
     };
-   Ok(())
+    Ok(())
 }
-fn findinvec(vec1:&Vec<usize> ,num:usize)->bool{
-    vec1.into_iter().find(|&&x| x==num).is_some()
+fn findinvec(vec1: &Vec<usize>, num: usize) -> bool {
+    vec1.into_iter().find(|&&x| x == num).is_some()
 }
