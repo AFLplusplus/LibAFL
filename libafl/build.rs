@@ -1,3 +1,5 @@
+//! special handling to build and link libafl
+
 fn main() {
     #[cfg(target_os = "windows")]
     windows::build!(

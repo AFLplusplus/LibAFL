@@ -48,7 +48,7 @@ where
         Ok(BytesInput::new(random_bytes))
     }
 
-    /// Generates up to DUMMY_BYTES_MAX non-random dummy bytes (0)
+    /// Generates up to `DUMMY_BYTES_MAX` non-random dummy bytes (0)
     fn generate_dummy(&self) -> BytesInput {
         let size = min(self.max_size, DUMMY_BYTES_MAX);
         BytesInput::new(vec![0; size])
@@ -90,10 +90,10 @@ where
         Ok(BytesInput::new(random_bytes))
     }
 
-    /// Generates up to DUMMY_BYTES_MAX non-random dummy bytes (0)
+    /// Generates up to `DUMMY_BYTES_MAX` non-random dummy bytes (0)
     fn generate_dummy(&self) -> BytesInput {
         let size = min(self.max_size, DUMMY_BYTES_MAX);
-        BytesInput::new(vec![0u8; size])
+        BytesInput::new(vec![0_u8; size])
     }
 }
 

@@ -137,9 +137,9 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
-        executors::{Executor, ExitKind, InProcessExecutor},
-        inputs::{BytesInput, Input},
-        mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
+        executors::{ExitKind, InProcessExecutor},
+        inputs::BytesInput,
+        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, State},
         stats::SimpleStats,
@@ -149,10 +149,6 @@ mod tests {
 
     #[cfg(feature = "std")]
     use crate::events::SimpleEventManager;
-
-    fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
-        ExitKind::Ok
-    }
 
     #[test]
     fn test_fuzzer() {
@@ -175,9 +171,10 @@ mod tests {
         });
         let mut event_manager = SimpleEventManager::new(stats);
 
+        let mut harness = |_buf: &[u8]| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
             "main",
-            harness,
+            &mut harness,
             tuple_list!(),
             //Box::new(|_, _, _, _, _| ()),
             &mut state,
@@ -185,14 +182,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut mutator = StdScheduledMutator::new();
-        mutator.add_mutation(mutation_bitflip);
+        let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
         let stage = StdMutationalStage::new(mutator);
-        let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
+        let scheduler = RandCorpusScheduler::new();
+        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut state, &mut executor, &mut event_manager)
+                .fuzz_one(&mut state, &mut executor, &mut event_manager, &scheduler)
                 .expect(&format!("Error in iter {}", i));
         }
 

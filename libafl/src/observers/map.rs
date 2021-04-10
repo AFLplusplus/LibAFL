@@ -1,4 +1,9 @@
-use alloc::string::{String, ToString};
+//! The `MapObserver` provides access a map, usually injected into the target
+
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -53,6 +58,7 @@ where
 /// A well-known example is the AFL-Style coverage map.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
@@ -117,10 +123,21 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
+    pub fn new(name: &'static str, map: &'static mut [T], len: usize) -> Self {
+        assert!(map.len() >= len);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
+            map: ArrayMut::Cptr((map.as_mut_ptr(), len)),
+            name: name.to_string(),
+            initial,
+        }
+    }
+
+    /// Creates a new MapObserver with an owned map
+    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: ArrayMut::Owned(map),
             name: name.to_string(),
             initial,
         }
@@ -142,6 +159,7 @@ where
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
@@ -212,11 +230,11 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T], size: &usize) -> Self {
+    pub fn new(name: &'static str, map: &'static mut [T], size: *const usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
-            size: Cptr::Cptr(size as *const _),
+            size: Cptr::Cptr(size),
             name: name.into(),
             initial,
         }

@@ -217,14 +217,15 @@ where
                 self.cached_len = Some(l);
                 l
             }
-            None => match self.cached_len {
-                Some(l) => l,
-                None => {
+            None => {
+                if let Some(l) = self.cached_len {
+                    l
+                } else {
                     let l = self.load_input()?.len();
                     self.cached_len = Some(l);
                     l
                 }
-            },
+            }
         })
     }
 }

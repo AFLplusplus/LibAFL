@@ -1,3 +1,5 @@
+//! Observers give insights about runs of a target, such as coverage, timing, stack depth, and more.
+
 pub mod map;
 pub use map::*;
 
@@ -9,7 +11,7 @@ use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchFirstType, MatchNameAndType, MatchType, Named, TupleList},
+    bolts::tuples::{MatchFirstType, MatchNameAndType, MatchType, Named},
     utils::current_time,
     Error,
 };
@@ -75,7 +77,7 @@ impl ObserversTuple for () {
 impl<Head, Tail> ObserversTuple for (Head, Tail)
 where
     Head: Observer,
-    Tail: ObserversTuple + TupleList,
+    Tail: ObserversTuple,
 {
     fn pre_exec_all(&mut self) -> Result<(), Error> {
         self.0.pre_exec()?;
@@ -145,7 +147,7 @@ mod tests {
     fn test_observer_serde() {
         let obv = tuple_list!(
             TimeObserver::new("time"),
-            StdMapObserver::new("map", unsafe { &mut MAP })
+            StdMapObserver::new("map", unsafe { &mut MAP }, unsafe { MAP.len() })
         );
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{:?}", vec);

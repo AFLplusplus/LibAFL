@@ -4,8 +4,6 @@ pub mod inprocess;
 pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
-#[cfg(feature = "runtime")]
-pub mod runtime;
 
 use core::cmp::PartialEq;
 use core::marker::PhantomData;
@@ -23,7 +21,7 @@ use crate::{
 pub enum ExitKind {
     Ok,
     Crash,
-    OOM,
+    Oom,
     Timeout,
 }
 
@@ -51,7 +49,7 @@ where
 }
 
 /// A simple executor that does nothing.
-/// If intput len is 0, run_target will return Err
+/// If intput len is 0, `run_target` will return Err
 struct NopExecutor<I> {
     phantom: PhantomData<I>,
 }

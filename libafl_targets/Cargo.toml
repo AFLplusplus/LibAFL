@@ -1,0 +1,18 @@
+[package]
+name = "libafl_targets"
+version = "0.1.0"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+edition = "2018"
+
+[features]
+default = []
+pcguard_edges = []
+pcguard_hitcounts = []
+libfuzzer = []
+value_profile = []
+pcguard = ["pcguard_hitcounts"]
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+
+[dependencies]

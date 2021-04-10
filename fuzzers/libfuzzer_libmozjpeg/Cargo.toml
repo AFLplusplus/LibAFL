@@ -1,31 +1,29 @@
 [package]
 name = "libfuzzer_libmozjpeg"
 version = "0.1.0"
-authors = ["Marcin Kozlowski <marcinguy@gmail.com>"]
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
-build = "build.rs"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 default = ["std"]
 std = []
 
-#[profile.release]
-#lto = true
-#codegen-units = 1
-#opt-level = 3
-#debug = true
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../libafl/" }
+libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_edges", "value_profile", "libfuzzer"] }
+# TODO Include it only when building cc
+libafl_cc = { path = "../../libafl_cc/" }
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 num_cpus = "1.0"
 
-[dependencies]
-libafl = { path = "../../libafl/" }
-
-[[example]]
+[lib]
 name = "libfuzzer_libmozjpeg"
-path = "./src/fuzzer.rs"
-test = false
-bench = false
+crate-type = ["staticlib"]

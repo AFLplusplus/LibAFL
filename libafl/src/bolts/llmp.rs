@@ -80,19 +80,16 @@ use nix::{
 };
 
 #[cfg(all(feature = "std", unix))]
-use std::{
-    ffi::CStr,
-    os::unix::{
-        self,
-        net::{UnixListener, UnixStream},
-        {io::AsRawFd, prelude::RawFd},
-    },
+use std::os::unix::{
+    self,
+    net::{UnixListener, UnixStream},
+    {io::AsRawFd, prelude::RawFd},
 };
 
-#[cfg(all(feature = "std", unix))]
-use libc::c_char;
+#[cfg(all(feature = "llmp_debug", feature = "std"))]
+use backtrace::Backtrace;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 #[cfg(unix)]
@@ -101,8 +98,6 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription},
     Error,
 };
-
-use super::shmem::HasFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
@@ -450,13 +445,14 @@ where
     }
 }
 
+#[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpConnection<SH>
 where
-    SH: ShMem + HasFd,
+    SH: ShMem,
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
-        match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename).unwrap()) {
+        match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?) {
             Ok(listener) => {
                 dbg!("We're the broker");
                 let mut broker = LlmpBroker::new()?;
@@ -736,7 +732,7 @@ where
                     #[cfg(feature = "std")]
                     return None;
                     #[cfg(not(feature = "std"))]
-                    panic!(&format!("Unexpected error allocing new msg {:?}", e));
+                    panic!("Unexpected error allocing new msg {:?}", e);
                 }
             };
             (*ret).message_id = (*last_msg).message_id + 1
@@ -792,6 +788,21 @@ where
 
     /// listener about it using a EOP message.
     unsafe fn handle_out_eop(&mut self) -> Result<(), Error> {
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        {
+            #[cfg(debug_assertions)]
+            let bt = Backtrace::new();
+            #[cfg(not(debug_assertions))]
+            let bt = "<n/a (release)>";
+            let shm = self.out_maps.last().unwrap();
+            println!(
+                "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
+                shm.shmem.shm_str(),
+                shm.shmem.map().len(),
+                bt
+            );
+        }
+
         let old_map = self.out_maps.last_mut().unwrap().page_mut();
 
         // Create a new shard page.
@@ -966,7 +977,7 @@ where
     unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         /* DBG("recv %p %p\n", page, last_msg); */
         compiler_fence(Ordering::SeqCst);
-        let page = self.current_recv_map.page_mut();
+        let mut page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
         let current_msg_id = ptr::read_volatile(&(*page).current_msg_id);
 
@@ -1004,7 +1015,7 @@ where
                 }
                 LLMP_TAG_END_OF_PAGE => {
                     #[cfg(feature = "std")]
-                    dbg!("Got end of page, allocing next");
+                    println!("Received end of page, allocating next");
                     // Handle end of page
                     if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
                         panic!(
@@ -1015,23 +1026,28 @@ where
                     }
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
-                    /* We can reuse the map mem space, no need to free and calloc.
-                    However, the pageinfo points to the map we're about to unmap.
-                    Clone the contents first to be safe (probably fine in rust eitner way). */
+                    /* The pageinfo points to the map we're about to unmap.
+                    Copy the contents first to be safe (probably fine in rust either way). */
                     let pageinfo_cpy = *pageinfo;
 
                     // Mark the old page save to unmap, in case we didn't so earlier.
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
+
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_map = LlmpSharedMap::existing(SH::existing_from_shm_slice(
                         &pageinfo_cpy.shm_str,
                         pageinfo_cpy.map_size,
                     )?);
+                    page = self.current_recv_map.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
 
-                    #[cfg(feature = "std")]
-                    dbg!("Got a new recv map", self.current_recv_map.shmem.shm_str());
+                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
+                    println!(
+                        "LLMP_DEBUG: Got a new recv map {} with len {:?}",
+                        self.current_recv_map.shmem.shm_str(),
+                        self.current_recv_map.shmem.map().len()
+                    );
                     // After we mapped the new page, return the next message, if available
                     return self.recv();
                 }
@@ -1070,6 +1086,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         unsafe {
@@ -1140,6 +1157,13 @@ where
 {
     /// Creates a new page, initializing the passed shared mem struct
     pub fn new(sender: u32, mut new_map: SH) -> Self {
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        println!(
+            "LLMP_DEBUG: Initializing map on {} with size {}",
+            new_map.shm_str(),
+            new_map.map().len()
+        );
+
         unsafe {
             _llmp_page_init(&mut new_map, sender, false);
         }
@@ -1148,6 +1172,20 @@ where
 
     /// Maps and wraps an existing
     pub fn existing(existing_map: SH) -> Self {
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        {
+            #[cfg(debug_assertions)]
+            let bt = Backtrace::new();
+            #[cfg(not(debug_assertions))]
+            let bt = "<n/a (release)>";
+            println!(
+                "LLMP_DEBUG: Using existing map {} with size {}, bt: {:?}",
+                existing_map.shm_str(),
+                existing_map.map().len(),
+                bt
+            );
+        }
+
         let ret = Self {
             shmem: existing_map,
         };
@@ -1185,6 +1223,7 @@ where
     /// Will return IllegalArgument error if msg is not on page.
     /// # Safety
     /// This dereferences msg, make sure to pass a proper pointer to it.
+    #[allow(clippy::cast_sign_loss)]
     pub unsafe fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
         let page = self.page();
         if llmp_msg_in_page(page, msg) {
@@ -1228,19 +1267,17 @@ where
     /// Gets this message from this page, at the indicated offset.
     /// Will return IllegalArgument error if the offset is out of bounds.
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
+        let offset = offset as usize;
         unsafe {
             let page = self.page_mut();
             let page_size = self.shmem.map().len() - size_of::<LlmpPage>();
-            if offset as isize > page_size as isize {
+            if offset > page_size {
                 Err(Error::IllegalArgument(format!(
                     "Msg offset out of bounds (size: {}, requested offset: {})",
                     page_size, offset
                 )))
             } else {
-                Ok(
-                    ((*page).messages.as_mut_ptr() as *mut u8).offset(offset as isize)
-                        as *mut LlmpMsg,
-                )
+                Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg)
             }
         }
     }
@@ -1272,7 +1309,7 @@ pub struct LlmpBrokerSignalHandler {
 
 #[cfg(all(unix))]
 impl Handler for LlmpBrokerSignalHandler {
-    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: c_void) {
+    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: *const c_void) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
     }
 
@@ -1362,6 +1399,7 @@ where
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
     #[inline]
     #[cfg(unix)]
+    #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
         unsafe { ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
     }
@@ -1434,7 +1472,10 @@ where
         // to read from the initial map id.
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
-        let broadcast_str_initial = *client_out_map_mem.shm_slice();
+        let broadcast_map_description = postcard::to_allocvec(&client_out_map_mem.description())?;
+        let client_out_map_mem_fd: i32 = client_out_map_mem.shm_str().parse().unwrap();
+
+        let mut incoming_map_description_serialized = vec![0u8; broadcast_map_description.len()];
 
         let llmp_tcp_id = self.llmp_clients.len() as u32;
 
@@ -1462,50 +1503,44 @@ where
                 match listener.accept() {
                     ListenerStream::Tcp(mut stream, addr) => {
                         dbg!("New connection", addr, stream.peer_addr().unwrap());
-                        match stream.write(&broadcast_str_initial) {
+                        match stream.write(&broadcast_map_description) {
                             Ok(_) => {} // fire & forget
                             Err(e) => {
                                 dbg!("Could not send to shmap to client", e);
                                 continue;
                             }
                         };
-                        let mut new_client_map_str: [u8; 20] = Default::default();
-                        match stream.read_exact(&mut new_client_map_str) {
+                        match stream.read_exact(&mut incoming_map_description_serialized) {
                             Ok(()) => (),
                             Err(e) => {
                                 dbg!("Ignoring failed read from client", e);
                                 continue;
                             }
                         };
-                        unsafe {
-                            let msg = new_client_sender
-                                .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
-                                .expect("Could not allocate a new message in shared map.");
-                            (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
-                            let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                            (*pageinfo).shm_str = new_client_map_str;
-                            (*pageinfo).map_size = LLMP_CFG_INITIAL_MAP_SIZE;
-                            match new_client_sender.send(msg) {
-                                Ok(()) => (),
-                                Err(e) => println!("Error forwarding client on map: {:?}", e),
-                            };
+                        if let Ok(incoming_map_description) = postcard::from_bytes::<ShMemDescription>(
+                            &incoming_map_description_serialized,
+                        ) {
+                            unsafe {
+                                let msg = new_client_sender
+                                    .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
+                                    .expect("Could not allocate a new message in shared map.");
+                                (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+                                let pageinfo =
+                                    (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+                                (*pageinfo).shm_str = incoming_map_description.str_bytes;
+                                (*pageinfo).map_size = incoming_map_description.size;
+                                match new_client_sender.send(msg) {
+                                    Ok(()) => (),
+                                    Err(e) => println!("Error forwarding client on map: {:?}", e),
+                                };
+                            }
                         }
                     }
                     #[cfg(unix)]
                     ListenerStream::Unix(stream, addr) => unsafe {
                         dbg!("New connection", addr);
 
-                        let broadcast_fd_initial: i32 =
-                            CStr::from_ptr(broadcast_str_initial.as_ptr() as *const c_char)
-                                .to_string_lossy()
-                                .into_owned()
-                                .parse()
-                                .unwrap_or_else(|_| {
-                                    panic!(
-                                        "ShmId is not a valid int file descriptor: {:?}",
-                                        broadcast_str_initial
-                                    )
-                                });
+                        let broadcast_fd_initial: i32 = client_out_map_mem_fd;
 
                         match sendmsg(
                             stream.as_raw_fd(),
@@ -1833,6 +1868,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         self.receiver.recv_buf()
@@ -1856,15 +1892,24 @@ where
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
         println!("Connected to port {}", port);
 
-        let mut new_broker_map_str: [u8; 20] = Default::default();
+        // First, get the serialized description size by serializing a dummy.
+        let dummy_description = ShMemDescription {
+            size: 0,
+            str_bytes: Default::default(),
+        };
+        let mut new_broker_map_str = postcard::to_allocvec(&dummy_description)?;
+
         stream.read_exact(&mut new_broker_map_str)?;
 
-        let ret = Self::new(LlmpSharedMap::existing(SH::existing_from_shm_slice(
-            &new_broker_map_str,
-            LLMP_CFG_INITIAL_MAP_SIZE,
+        let broker_map_description: ShMemDescription = postcard::from_bytes(&new_broker_map_str)?;
+
+        let ret = Self::new(LlmpSharedMap::existing(SH::existing_from_description(
+            &broker_map_description,
         )?))?;
 
-        stream.write_all(ret.sender.out_maps.first().unwrap().shmem.shm_slice())?;
+        let own_map_description_bytes =
+            postcard::to_allocvec(&ret.sender.out_maps.first().unwrap().shmem.description())?;
+        stream.write_all(&own_map_description_bytes)?;
         Ok(ret)
     }
 }
@@ -1872,9 +1917,10 @@ where
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
 /// and get incoming messages from the shared broker bus
 /// If the Shm has a fd, we can attach to it.
+#[cfg(all(unix, feature = "std"))]
 impl<SH> LlmpClient<SH>
 where
-    SH: ShMem + HasFd,
+    SH: ShMem,
 {
     #[cfg(all(unix, feature = "std"))]
     /// Create a LlmpClient, getting the ID from a given filename
@@ -1917,7 +1963,9 @@ where
                             .first()
                             .unwrap()
                             .shmem
-                            .shm_id()])],
+                            .shm_str()
+                            .parse()
+                            .unwrap()])],
                         MsgFlags::empty(),
                         None,
                     ) {

@@ -7,7 +7,7 @@ pub use map::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{Named, TupleList},
+    bolts::tuples::Named,
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
@@ -24,7 +24,7 @@ pub trait Feedback<I>: Named + serde::Serialize + serde::de::DeserializeOwned + 
 where
     I: Input,
 {
-    /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
+    /// `is_interesting ` should return the "Interestingness" from 0 to 255 (percent times 2.55)
     fn is_interesting<OT: ObserversTuple>(
         &mut self,
         input: &I,
@@ -92,7 +92,7 @@ where
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
 where
     Head: Feedback<I>,
-    Tail: FeedbacksTuple<I> + TupleList,
+    Tail: FeedbacksTuple<I>,
     I: Input,
 {
     fn is_interesting_all<OT: ObserversTuple>(

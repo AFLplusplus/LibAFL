@@ -3,9 +3,13 @@
 
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::UnixShMem;
+#[cfg(all(feature = "std", unix))]
+pub type StdShMem = UnixShMem;
 
 #[cfg(all(windows, feature = "std"))]
-pub use shmem::Win32ShMem;
+pub use win32_shmem::Win32ShMem;
+#[cfg(all(windows, feature = "std"))]
+pub type StdShMem = Win32ShMem;
 
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
@@ -20,9 +24,9 @@ use crate::Error;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct ShMemDescription {
     /// Size of this map
-    size: usize,
+    pub size: usize,
     /// of name of this map, as fixed 20 bytes c-string
-    str_bytes: [u8; 20],
+    pub str_bytes: [u8; 20],
 }
 
 /// A Shared map
@@ -97,12 +101,6 @@ pub trait ShMem: Sized + Debug {
     }
 }
 
-/// shared maps that have an id can use this trait
-pub trait HasFd {
-    /// Retrieve the id of this shared map
-    fn shm_id(&self) -> i32;
-}
-
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 
@@ -116,7 +114,7 @@ pub mod unix_shmem {
 
     use crate::Error;
 
-    use super::{HasFd, ShMem};
+    use super::ShMem;
 
     #[cfg(unix)]
     extern "C" {
@@ -308,12 +306,6 @@ pub mod unix_shmem {
         }
     }
 
-    impl HasFd for UnixShMem {
-        fn shm_id(&self) -> i32 {
-            self.shm_id
-        }
-    }
-
     /// Deinit sharedmaps on drop
     impl Drop for UnixShMem {
         fn drop(&mut self) {
@@ -364,6 +356,7 @@ pub mod unix_shmem {
     }
 
     /// Deinitialize this shmem instance
+    #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
     unsafe fn unix_shmem_deinit(shm: *mut UnixShMem) {
         if shm.is_null() || (*shm).map.is_null() {
             /* Serialized map id */
@@ -377,6 +370,7 @@ pub mod unix_shmem {
 
     /// Functions to create Shared memory region, for observation channels and
     /// opening inputs and stuff.
+    #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
     unsafe fn unix_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
         (*shm).map_size = map_size;
         (*shm).map = ptr::null_mut();
@@ -396,19 +390,19 @@ pub mod unix_shmem {
             (*shm).shm_id,
         );
         (*shm).shm_str
-            [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_int as c_ulong) as usize] =
-            0u8;
+            [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_ulong) as usize] = 0u8;
         (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
         if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar || (*shm).map.is_null() {
             shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
             (*shm).shm_id = -(1 as c_int);
-            (*shm).shm_str[0 as c_int as usize] = 0u8;
+            (*shm).shm_str[0] = 0u8;
             return ptr::null_mut();
         }
         (*shm).map
     }
 
     /// Uses a shmap id string to open a shared map
+    #[allow(clippy::unnecessary_cast)] // for c_int and c_long
     unsafe fn unix_shmem_by_str(
         shm: *mut UnixShMem,
         shm_str: &CStr,
@@ -422,7 +416,7 @@ pub mod unix_shmem {
         strncpy(
             (*shm).shm_str.as_mut_ptr() as *mut c_char,
             shm_str.as_ptr() as *const c_char,
-            (size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_int as c_ulong),
+            (size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_ulong),
         );
         (*shm).shm_id = shm_str
             .to_str()
@@ -441,7 +435,7 @@ pub mod unix_shmem {
 }
 
 #[cfg(all(feature = "std", windows))]
-pub mod shmem {
+pub mod win32_shmem {
 
     use super::ShMem;
     use crate::{
@@ -519,9 +513,8 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
-                if map == ptr::null_mut() {
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
@@ -558,8 +551,7 @@ pub mod shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let map =
-                    MapViewOfFile(handle.clone(), FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map == ptr::null_mut() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
@@ -568,9 +560,9 @@ pub mod shmem {
                 }
                 let mut ret = Self {
                     shm_str: [0; 20],
-                    handle: handle,
-                    map: map,
-                    map_size: map_size,
+                    handle,
+                    map,
+                    map_size,
                 };
                 ret.shm_str.clone_from_slice(&map_str_bytes[0..20]);
                 Ok(ret)
