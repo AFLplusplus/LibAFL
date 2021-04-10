@@ -23,8 +23,7 @@ which = "4.1"
 
 [target.'cfg(unix)'.dependencies]
 libafl = { path = "../../libafl/", features = [ "llmp_debug", "std"]}
-capstone = { path = "../../../capstone-rs/capstone-rs", version = "0.7.0" }
-capstone-sys = { path = "../../../capstone-rs/capstone-sys", version = "0.11.0" }
+capstone = "0.8.0"
 frida-gum = { path = "../../../frida-rust/frida-gum", version = "0.3.4", optional = true, features = [ "event-sink", "invocation-listener"] }
 frida-gum-sys = { path = "../../../frida-rust/frida-gum-sys", version = "0.2.2", optional = true, features = [ "event-sink", "invocation-listener"] }
 libafl_frida = { path = "../../libafl_frida", version = "0.1.0" }

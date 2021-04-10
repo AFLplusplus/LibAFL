@@ -1,30 +1,24 @@
 use hashbrown::HashMap;
 use nix::{
     libc::{memmove, memset},
-    sys::mman::{mmap, mprotect, MapFlags, ProtFlags},
+    sys::mman::{mmap, MapFlags, ProtFlags},
 };
 
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter};
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi, ExecutableBuffer};
-use frida_gum::Backtracer;
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use gothook::GotHookLibrary;
-use libafl::bolts::os::unix_signals::{setup_signal_handler, Handler, Signal};
-use libc::{pthread_atfork, siginfo_t, sysconf, ucontext_t, _SC_PAGESIZE};
+use libc::{pthread_atfork, sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use regex::Regex;
 use std::{
-    borrow::BorrowMut,
     cell::RefCell,
     cell::RefMut,
     ffi::c_void,
     fs::File,
     io::{BufRead, BufReader, Write},
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
     pin::Pin,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 use termcolor::{Color, ColorSpec, WriteColor};
 
@@ -335,11 +329,11 @@ fn mapping_for_library(libpath: &str) -> (usize, usize) {
 
 pub struct AsanRuntime {
     regs: [usize; 32],
-    blob_check_mem_byte: Option<Vec<u8>>,
-    blob_check_mem_halfword: Option<Vec<u8>>,
-    blob_check_mem_dword: Option<Vec<u8>>,
-    blob_check_mem_qword: Option<Vec<u8>>,
-    blob_check_mem_16bytes: Option<Vec<u8>>,
+    blob_check_mem_byte: Option<Box<[u8]>>,
+    blob_check_mem_halfword: Option<Box<[u8]>>,
+    blob_check_mem_dword: Option<Box<[u8]>>,
+    blob_check_mem_qword: Option<Box<[u8]>>,
+    blob_check_mem_16bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
 }
 
@@ -362,6 +356,14 @@ impl AsanRuntime {
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
     pub fn init(&mut self, module_name: &str) {
+        // workaround frida's frida-gum-allocate-near bug:
+        unsafe {
+            for _ in 0..50 {
+                mmap(std::ptr::null_mut(), 128 * 1024, ProtFlags::PROT_NONE, MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE, -1, 0).expect("Failed to map dummy regions for frida workaround");
+            }
+        }
+
+
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
         self.hook_library(module_name);
@@ -547,56 +549,56 @@ impl AsanRuntime {
         let mut ops_check_mem_byte =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_byte, 0);
-        self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap());
+        self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap().into_boxed_slice() );
 
         let mut ops_check_mem_halfword =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_halfword, 1);
-        self.blob_check_mem_halfword = Some(ops_check_mem_halfword.finalize().unwrap());
+        self.blob_check_mem_halfword = Some(ops_check_mem_halfword.finalize().unwrap().into_boxed_slice());
 
         let mut ops_check_mem_dword =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_dword, 2);
-        self.blob_check_mem_dword = Some(ops_check_mem_dword.finalize().unwrap());
+        self.blob_check_mem_dword = Some(ops_check_mem_dword.finalize().unwrap().into_boxed_slice());
 
         let mut ops_check_mem_qword =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_qword, 3);
-        self.blob_check_mem_qword = Some(ops_check_mem_qword.finalize().unwrap());
+        self.blob_check_mem_qword = Some(ops_check_mem_qword.finalize().unwrap().into_boxed_slice());
 
         let mut ops_check_mem_16bytes =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_16bytes, 4);
-        self.blob_check_mem_16bytes = Some(ops_check_mem_16bytes.finalize().unwrap());
+        self.blob_check_mem_16bytes = Some(ops_check_mem_16bytes.finalize().unwrap().into_boxed_slice());
     }
 
     /// Get the blob which checks a byte access
     #[inline]
-    pub fn blob_check_mem_byte(&self) -> Pin<&Vec<u8>> {
-        Pin::new(self.blob_check_mem_byte.as_ref().unwrap())
+    pub fn blob_check_mem_byte(&self) -> &Box<[u8]> {
+        self.blob_check_mem_byte.as_ref().unwrap()
     }
 
     /// Get the blob which checks a halfword access
     #[inline]
-    pub fn blob_check_mem_halfword(&self) -> Pin<&Vec<u8>> {
-        Pin::new(self.blob_check_mem_halfword.as_ref().unwrap())
+    pub fn blob_check_mem_halfword(&self) -> &Box<[u8]> {
+        self.blob_check_mem_halfword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a dword access
     #[inline]
-    pub fn blob_check_mem_dword(&self) -> Pin<&Vec<u8>> {
-        Pin::new(self.blob_check_mem_dword.as_ref().unwrap())
+    pub fn blob_check_mem_dword(&self) -> &Box<[u8]> {
+        self.blob_check_mem_dword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a qword access
     #[inline]
-    pub fn blob_check_mem_qword(&self) -> Pin<&Vec<u8>> {
-        Pin::new(self.blob_check_mem_qword.as_ref().unwrap())
+    pub fn blob_check_mem_qword(&self) -> &Box<[u8]> {
+       self.blob_check_mem_qword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 16 byte access
     #[inline]
-    pub fn blob_check_mem_16bytes(&self) -> Pin<&Vec<u8>> {
-        Pin::new(self.blob_check_mem_16bytes.as_ref().unwrap())
+    pub fn blob_check_mem_16bytes(&self) -> &Box<[u8]> {
+        self.blob_check_mem_16bytes.as_ref().unwrap()
     }
 }

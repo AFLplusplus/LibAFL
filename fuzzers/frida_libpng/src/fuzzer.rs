@@ -46,7 +46,7 @@ const MAP_SIZE: usize = 64 * 1024;
 /// An helper that feeds FridaInProcessExecutor with edge-coverage instrumentation
 struct FridaEdgeCoverageHelper<'a> {
     map: [u8; MAP_SIZE],
-    previous_pc: RefCell<u64>,
+    previous_pc: [u64; 1],
     base_address: u64,
     size: usize,
     current_log_impl: u64,
@@ -110,20 +110,22 @@ const MAYBE_LOG_CODE: [u8; 47] = [
 ];
 
 #[cfg(target_arch = "aarch64")]
-const MAYBE_LOG_CODE: [u8; 56] = [
+const MAYBE_LOG_CODE: [u8; 60] = [
     // __afl_area_ptr[current_pc ^ previous_pc]++;
     // previous_pc = current_pc >> 1;
     0xE1, 0x0B, 0xBF, 0xA9, // stp x1, x2, [sp, -0x10]!
     0xE3, 0x13, 0xBF, 0xA9, // stp x3, x4, [sp, -0x10]!
     // x0 = current_pc
-    0x81, 0x01, 0x00, 0x58, // ldr x1, #0x30, =__afl_area_ptr
-    0xa2, 0x01, 0x00, 0x58, // ldr x2, #0x38, =&previous_pc
+    0xa1, 0x01, 0x00, 0x58, // ldr x1, #0x30, =__afl_area_ptr
+    0x82, 0x01, 0x00, 0x58, // ldr x2, #0x38, =&previous_pc
     0x44, 0x00, 0x40, 0xf9, // ldr x4, [x2] (=previous_pc)
     // __afl_area_ptr[current_pc ^ previous_pc]++;
     0x84, 0x00, 0x00, 0xca, // eor x4, x4, x0
+    0x84, 0x3c, 0x40, 0x92, // and x4, x4, 0xffff (=MAP_SIZE - 1)
+    //0x20, 0x13, 0x20, 0xd4,
     0x23, 0x68, 0x64, 0xf8, // ldr x3, [x1, x4]
     0x63, 0x04, 0x00, 0x91, // add x3, x3, #1
-    0x23, 0x68, 0x24, 0xf8, // str x3, [x1, x2]
+    0x23, 0x68, 0x24, 0xf8, // str x3, [x1, x4]
     // previous_pc = current_pc >> 1;
     0xe0, 0x07, 0x40, 0x8b, // add x0, xzr, x0, LSR #1
     0x40, 0x00, 0x00, 0xf9, // str x0, [x2]
@@ -141,7 +143,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
     pub fn new(gum: &'a Gum, module_name: &str) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
-            previous_pc: RefCell::new(0x0),
+            previous_pc: [0u64; 1],
             base_address: Module::find_base_address(module_name).0 as u64,
             size: get_module_size(module_name),
             current_log_impl: 0,
@@ -299,17 +301,17 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
             8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
             16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
-            _ => (),
-        }
+            _ => false,
+        };
 
         // Restore x0, x1
-        writer.put_ldp_reg_reg_reg_offset(
+        assert!(writer.put_ldp_reg_reg_reg_offset(
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
             16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
             IndexMode::PostAdjust,
-        );
+        ));
     }
 
     #[inline]
@@ -399,11 +401,11 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
             self.current_log_impl = writer.pc();
             writer.put_bytes(&MAYBE_LOG_CODE);
-            let prev_loc_pointer = self.previous_pc.as_ptr() as *mut _ as usize;
+            let prev_loc_pointer = self.previous_pc.as_ptr() as usize;
             let map_pointer = self.map.as_ptr() as usize;
 
-            writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
             writer.put_bytes(&map_pointer.to_ne_bytes());
+            writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
 
             writer.put_label(after_log_impl);
         }
