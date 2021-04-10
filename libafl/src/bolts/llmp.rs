@@ -452,7 +452,7 @@ where
 {
     #[cfg(all(feature = "std", unix))]
     pub fn on_domain_socket(filename: &str) -> Result<Self, Error> {
-        match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename).unwrap()) {
+        match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?) {
             Ok(listener) => {
                 dbg!("We're the broker");
                 let mut broker = LlmpBroker::new()?;
@@ -732,7 +732,7 @@ where
                     #[cfg(feature = "std")]
                     return None;
                     #[cfg(not(feature = "std"))]
-                    panic!(&format!("Unexpected error allocing new msg {:?}", e));
+                    panic!("Unexpected error allocing new msg {:?}", e);
                 }
             };
             (*ret).message_id = (*last_msg).message_id + 1
