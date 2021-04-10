@@ -81,6 +81,7 @@ where
     R: Rand,
 {
     mutator: M,
+    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, CS, E, EM, I, OT, R, S)>,
 }
 

@@ -1,36 +1,46 @@
+//! Compiler Wrapper from `LibAFL`
+
 use std::{process::Command, string::String, vec::Vec};
 
+/// `LibAFL` CC Error Type
 #[derive(Debug)]
 pub enum Error {
+    /// CC Wrapper called with invalid arguments
     InvalidArguments(String),
-    IOError(std::io::Error),
+    /// Io error occurred
+    Io(std::io::Error),
+    /// Something else happened
     Unknown(String),
 }
 
 // TODO macOS
+/// extension for static libraries
 #[cfg(windows)]
-pub const LIB_EXT: &'static str = "lib";
+pub const LIB_EXT: &str = "lib";
+/// extension for static libraries
 #[cfg(not(windows))]
-pub const LIB_EXT: &'static str = "a";
+pub const LIB_EXT: &str = "a";
 
+/// prefix for static libraries
 #[cfg(windows)]
-pub const LIB_PREFIX: &'static str = "";
+pub const LIB_PREFIX: &str = "";
+/// prefix for static libraries
 #[cfg(not(windows))]
-pub const LIB_PREFIX: &'static str = "lib";
+pub const LIB_PREFIX: &str = "lib";
 
 /// Wrap a compiler hijacking its arguments
 pub trait CompilerWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
-    fn from_args<'a>(&'a mut self, args: &[String]) -> Result<&'a mut Self, Error>;
+    fn from_args(&mut self, args: &[String]) -> Result<&'_ mut Self, Error>;
 
     /// Add a compiler argument
-    fn add_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error>;
+    fn add_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
 
     /// Add a compiler argument only when compiling
-    fn add_cc_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error>;
+    fn add_cc_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
 
     /// Add a compiler argument only when linking
-    fn add_link_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error>;
+    fn add_link_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
 
     /// Command to run the compiler
     fn command(&mut self) -> Result<Vec<String>, Error>;
@@ -42,14 +52,14 @@ pub trait CompilerWrapper {
     fn run(&mut self) -> Result<(), Error> {
         let args = self.command()?;
         dbg!(&args);
-        if args.len() < 1 {
+        if args.is_empty() {
             return Err(Error::InvalidArguments(
                 "The number of arguments cannot be 0".into(),
             ));
         }
         let status = match Command::new(&args[0]).args(&args[1..]).status() {
             Ok(s) => s,
-            Err(e) => return Err(Error::IOError(e)),
+            Err(e) => return Err(Error::Io(e)),
         };
         dbg!(status);
         Ok(())
@@ -57,6 +67,7 @@ pub trait CompilerWrapper {
 }
 
 /// Wrap Clang
+#[allow(clippy::struct_excessive_bools)]
 pub struct ClangWrapper {
     optimize: bool,
     wrapped_cc: String,
@@ -73,10 +84,11 @@ pub struct ClangWrapper {
     link_args: Vec<String>,
 }
 
+#[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl CompilerWrapper for ClangWrapper {
     fn from_args<'a>(&'a mut self, args: &[String]) -> Result<&'a mut Self, Error> {
         let mut new_args = vec![];
-        if args.len() < 1 {
+        if args.is_empty() {
             return Err(Error::InvalidArguments(
                 "The number of arguments cannot be 0".into(),
             ));
@@ -122,17 +134,17 @@ impl CompilerWrapper for ClangWrapper {
         Ok(self)
     }
 
-    fn add_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error> {
+    fn add_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error> {
         self.base_args.push(arg);
         Ok(self)
     }
 
-    fn add_cc_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error> {
+    fn add_cc_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error> {
         self.cc_args.push(arg);
         Ok(self)
     }
 
-    fn add_link_arg<'a>(&'a mut self, arg: String) -> Result<&'a mut Self, Error> {
+    fn add_link_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error> {
         self.link_args.push(arg);
         Ok(self)
     }
@@ -165,6 +177,8 @@ impl CompilerWrapper for ClangWrapper {
 }
 
 impl ClangWrapper {
+    /// Create a new Clang Wrapper
+    #[must_use]
     pub fn new(wrapped_cc: &str, wrapped_cxx: &str) -> Self {
         Self {
             optimize: true,
@@ -181,12 +195,14 @@ impl ClangWrapper {
         }
     }
 
-    pub fn dont_optimize<'a>(&'a mut self) -> &'a mut Self {
+    /// Disable optimizations
+    pub fn dont_optimize(&mut self) -> &'_ mut Self {
         self.optimize = false;
         self
     }
 
-    pub fn is_cpp<'a>(&'a mut self) -> &'a mut Self {
+    /// set cpp mode
+    pub fn is_cpp(&mut self) -> &'_ mut Self {
         self.is_cpp = true;
         self
     }

@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     inputs::{HasBytesVec, Input},
-    mutators::*,
+    mutators::{buffer_self_copy, mutations, str_decode, MutationResult, Mutator, Named},
     state::{HasMaxSize, HasMetadata, HasRand},
     utils::Rand,
     Error,
@@ -49,6 +49,7 @@ impl Tokens {
 
     /// Adds a token to a dictionary, checking it is not a duplicate
     /// Returns `false` if the token was already present and did not get added.
+    #[allow(clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
         if self.token_vec.contains(token) {
             return false;
@@ -81,7 +82,7 @@ impl Tokens {
             }
             let pos_quote = match line.find('\"') {
                 Some(x) => x,
-                _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
             };
             if line.chars().nth(line.len() - 1) != Some('"') {
                 return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
@@ -90,7 +91,7 @@ impl Tokens {
             // extract item
             let item = match line.get(pos_quote + 1..line.len() - 1) {
                 Some(x) => x,
-                _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
             };
             if item.is_empty() {
                 continue;

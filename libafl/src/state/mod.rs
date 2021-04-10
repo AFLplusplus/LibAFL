@@ -25,7 +25,7 @@ use crate::{
 use crate::inputs::bytes::BytesInput;
 
 /// The maximum size of a testcase
-pub const DEFAULT_MAX_SIZE: usize = 1048576;
+pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
 /// Trait for elements offering a corpus
 pub trait HasCorpus<C, I>
@@ -453,9 +453,8 @@ where
     where
         OT: ObserversTuple,
     {
-        Ok(self
-            .feedbacks_mut()
-            .is_interesting_all(input, observers, exit_kind)?)
+        self.feedbacks_mut()
+            .is_interesting_all(input, observers, exit_kind)
     }
 
     /// Adds this input to the corpus, if it's intersting, and return the index

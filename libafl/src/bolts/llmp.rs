@@ -86,6 +86,9 @@ use std::os::unix::{
     {io::AsRawFd, prelude::RawFd},
 };
 
+#[cfg(all(feature = "llmp_debug", feature = "std"))]
+use backtrace::Backtrace;
+
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
@@ -785,6 +788,21 @@ where
 
     /// listener about it using a EOP message.
     unsafe fn handle_out_eop(&mut self) -> Result<(), Error> {
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        {
+            #[cfg(debug_assertions)]
+            let bt = Backtrace::new();
+            #[cfg(not(debug_assertions))]
+            let bt = "<n/a (release)>";
+            let shm = self.out_maps.last().unwrap();
+            println!(
+                "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
+                shm.shmem.shm_str(),
+                shm.shmem.map().len(),
+                bt
+            );
+        }
+
         let old_map = self.out_maps.last_mut().unwrap().page_mut();
 
         // Create a new shard page.
@@ -1024,8 +1042,12 @@ where
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
 
-                    #[cfg(feature = "std")]
-                    dbg!("Got a new recv map", self.current_recv_map.shmem.shm_str());
+                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
+                    println!(
+                        "LLMP_DEBUG: Got a new recv map {} with len {:?}",
+                        self.current_recv_map.shmem.shm_str(),
+                        self.current_recv_map.shmem.map().len()
+                    );
                     // After we mapped the new page, return the next message, if available
                     return self.recv();
                 }
@@ -1064,6 +1086,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         unsafe {
@@ -1134,6 +1157,13 @@ where
 {
     /// Creates a new page, initializing the passed shared mem struct
     pub fn new(sender: u32, mut new_map: SH) -> Self {
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        println!(
+            "LLMP_DEBUG: Initializing map on {} with size {}",
+            new_map.shm_str(),
+            new_map.map().len()
+        );
+
         unsafe {
             _llmp_page_init(&mut new_map, sender, false);
         }
@@ -1142,6 +1172,20 @@ where
 
     /// Maps and wraps an existing
     pub fn existing(existing_map: SH) -> Self {
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        {
+            #[cfg(debug_assertions)]
+            let bt = Backtrace::new();
+            #[cfg(not(debug_assertions))]
+            let bt = "<n/a (release)>";
+            println!(
+                "LLMP_DEBUG: Using existing map {} with size {}, bt: {:?}",
+                existing_map.shm_str(),
+                existing_map.map().len(),
+                bt
+            );
+        }
+
         let ret = Self {
             shmem: existing_map,
         };
@@ -1179,6 +1223,7 @@ where
     /// Will return IllegalArgument error if msg is not on page.
     /// # Safety
     /// This dereferences msg, make sure to pass a proper pointer to it.
+    #[allow(clippy::cast_sign_loss)]
     pub unsafe fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
         let page = self.page();
         if llmp_msg_in_page(page, msg) {
@@ -1222,19 +1267,17 @@ where
     /// Gets this message from this page, at the indicated offset.
     /// Will return IllegalArgument error if the offset is out of bounds.
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
+        let offset = offset as usize;
         unsafe {
             let page = self.page_mut();
             let page_size = self.shmem.map().len() - size_of::<LlmpPage>();
-            if offset as isize > page_size as isize {
+            if offset > page_size {
                 Err(Error::IllegalArgument(format!(
                     "Msg offset out of bounds (size: {}, requested offset: {})",
                     page_size, offset
                 )))
             } else {
-                Ok(
-                    ((*page).messages.as_mut_ptr() as *mut u8).offset(offset as isize)
-                        as *mut LlmpMsg,
-                )
+                Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg)
             }
         }
     }
@@ -1266,7 +1309,7 @@ pub struct LlmpBrokerSignalHandler {
 
 #[cfg(all(unix))]
 impl Handler for LlmpBrokerSignalHandler {
-    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: c_void) {
+    fn handle(&mut self, _signal: Signal, _info: siginfo_t, _void: *const c_void) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
     }
 
@@ -1356,6 +1399,7 @@ where
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
     #[inline]
     #[cfg(unix)]
+    #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
         unsafe { ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
     }
@@ -1824,6 +1868,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if avaliable, else None
+    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
         self.receiver.recv_buf()

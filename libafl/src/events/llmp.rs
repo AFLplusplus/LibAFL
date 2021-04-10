@@ -1,3 +1,5 @@
+//! LLMP-backed event manager for scalable multi-processed fuzzing
+
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
@@ -206,6 +208,7 @@ where
     }
 
     /// Handle arriving events in the broker
+    #[allow(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         stats: &mut ST,
         sender_id: u32,
@@ -257,6 +260,7 @@ where
     }
 
     // Handle arriving events in the client
+    #[allow(clippy::unused_self)]
     fn handle_in_client<CS, E, OT>(
         &mut self,
         state: &mut S,
@@ -398,6 +402,7 @@ where
 }
 
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
+#[allow(clippy::type_complexity)]
 pub fn deserialize_state_mgr<I, S, SH, ST>(
     state_corpus_serialized: &[u8],
 ) -> Result<(S, LlmpEventManager<I, S, SH, ST>), Error>
@@ -505,6 +510,11 @@ where
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
+#[allow(
+    clippy::unnecessary_operation,
+    clippy::type_complexity,
+    clippy::similar_names
+)] // for { mgr = LlmpEventManager... }
 pub fn setup_restarting_mgr<I, S, SH, ST>(
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
@@ -534,43 +544,43 @@ where
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
             mgr.broker_loop()?;
             return Err(Error::ShuttingDown);
-        } else {
-            // We are the fuzzer respawner in a llmp client
-            mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+        }
 
-            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-            let sender = LlmpSender::new(0, false)?;
-            let receiver = LlmpReceiver::on_existing_map(
-                SH::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
-                None,
-            )?;
-            // Store the information to a map.
-            sender.to_env(_ENV_FUZZER_SENDER)?;
-            receiver.to_env(_ENV_FUZZER_RECEIVER)?;
+        // We are the fuzzer respawner in a llmp client
+        mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
-            let mut ctr: u64 = 0;
-            // Client->parent loop
-            loop {
-                dbg!("Spawning next client (id {})", ctr);
+        // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
+        let sender = LlmpSender::new(0, false)?;
+        let receiver = LlmpReceiver::on_existing_map(
+            SH::clone_ref(&sender.out_maps.last().unwrap().shmem)?,
+            None,
+        )?;
+        // Store the information to a map.
+        sender.to_env(_ENV_FUZZER_SENDER)?;
+        receiver.to_env(_ENV_FUZZER_RECEIVER)?;
 
-                // On Unix, we fork (todo: measure if that is actually faster.)
-                #[cfg(unix)]
-                let _ = match unsafe { fork() }? {
-                    ForkResult::Parent(handle) => handle.status(),
-                    ForkResult::Child => break (sender, receiver),
-                };
+        let mut ctr: u64 = 0;
+        // Client->parent loop
+        loop {
+            dbg!("Spawning next client (id {})", ctr);
 
-                // On windows, we spawn ourself again
-                #[cfg(windows)]
-                startable_self()?.status()?;
+            // On Unix, we fork (todo: measure if that is actually faster.)
+            #[cfg(unix)]
+            let _ = match unsafe { fork() }? {
+                ForkResult::Parent(handle) => handle.status(),
+                ForkResult::Child => break (sender, receiver),
+            };
 
-                if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
-                    // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client!");
-                }
+            // On windows, we spawn ourself again
+            #[cfg(windows)]
+            startable_self()?.status()?;
 
-                ctr = ctr.wrapping_add(1);
+            if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
+                // Storing state in the last round did not work
+                panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client!");
             }
+
+            ctr = ctr.wrapping_add(1);
         }
     } else {
         // We are the newly started fuzzing instance, first, connect to our own restore map.

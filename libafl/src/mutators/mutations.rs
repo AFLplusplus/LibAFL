@@ -44,7 +44,7 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
 
 /// A simple buffer_set.
 /// The compiler does the heavy lifting.
-/// see https://stackoverflow.com/a/51732799/1345238
+/// see <https://stackoverflow.com/a/51732799/1345238/>
 #[inline]
 fn buffer_set(data: &mut [u8], from: usize, len: usize, val: u8) {
     debug_assert!(from + len <= data.len());
@@ -118,7 +118,7 @@ where
             let bit = state.rand_mut().below((input.bytes().len() << 3) as u64) as usize;
             unsafe {
                 // Moar speed, no bound check
-                *input.bytes_mut().get_unchecked_mut(bit >> 3) ^= (128 >> (bit & 7)) as u8;
+                *input.bytes_mut().get_unchecked_mut(bit >> 3) ^= (128u8 >> (bit & 7)) as u8;
             }
             Ok(MutationResult::Mutated)
         }
@@ -734,6 +734,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    #[allow(clippy::cast_sign_loss)]
     fn mutate(
         &mut self,
         state: &mut S,
@@ -796,6 +797,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    #[allow(clippy::cast_sign_loss)]
     fn mutate(
         &mut self,
         state: &mut S,
@@ -863,6 +865,7 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    #[allow(clippy::cast_sign_loss)]
     fn mutate(
         &mut self,
         state: &mut S,
@@ -1651,6 +1654,7 @@ where
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
 {
+    #[allow(clippy::cast_sign_loss)]
     fn mutate(
         &mut self,
         state: &mut S,
@@ -1670,12 +1674,12 @@ where
             let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
             let other = other_testcase.load_input()?;
 
-            let mut counter = 0;
+            let mut counter: u32 = 0;
             loop {
                 let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
                 if f != l && f >= 0 && l >= 2 {
-                    break (f, l);
+                    break (f as u64, l as u64);
                 }
                 if counter == 3 {
                     return Ok(MutationResult::Skipped);
@@ -1684,9 +1688,7 @@ where
             }
         };
 
-        let split_at = state
-            .rand_mut()
-            .between(first_diff as u64, last_diff as u64) as usize;
+        let split_at = state.rand_mut().between(first_diff, last_diff) as usize;
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;

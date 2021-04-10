@@ -1,3 +1,5 @@
+//! Observers give insights about runs of a target, such as coverage, timing, stack depth, and more.
+
 pub mod map;
 pub use map::*;
 
