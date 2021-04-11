@@ -16,7 +16,15 @@ use gothook::GotHookLibrary;
 use libc::{pthread_atfork, sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use regex::Regex;
-use std::{cell::RefCell, cell::{RefMut, UnsafeCell}, ffi::c_void, fs::File, io::{BufRead, BufReader, Write}, ops::{Deref, DerefMut}, sync::{Arc, RwLock}};
+use std::{
+    cell::RefCell,
+    cell::{RefMut, UnsafeCell},
+    ffi::c_void,
+    fs::File,
+    io::{BufRead, BufReader, Write},
+    ops::{Deref, DerefMut},
+    sync::{Arc, RwLock},
+};
 use termcolor::{Color, ColorSpec, WriteColor};
 
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
@@ -35,7 +43,7 @@ struct AllocationMetadata {
     size: usize,
     allocation_site_backtrace: Option<Backtrace>,
     release_site_backtrace: Option<Backtrace>,
-    freed: bool
+    freed: bool,
 }
 
 impl Allocator {
@@ -122,14 +130,16 @@ impl Allocator {
             None => {
                 if !ptr.is_null() {
                     // TODO: report this as an observer
-                    self.runtime.report_error(&mut AsanError::UnallocatedFree(ptr));
+                    self.runtime
+                        .report_error(&mut AsanError::UnallocatedFree(ptr));
                 }
                 return;
-            },
+            }
         };
 
         if metadata.freed {
-            self.runtime.report_error(&mut AsanError::DoubleFree((ptr, &mut metadata)));
+            self.runtime
+                .report_error(&mut AsanError::DoubleFree((ptr, &mut metadata)));
         }
         let shadow_mapping_start = (ptr as usize >> 3) + self.shadow_offset;
 
@@ -142,13 +152,17 @@ impl Allocator {
         memset(shadow_mapping_start as *mut c_void, 0x00, metadata.size / 8);
         let remainder = metadata.size % 8;
         if remainder > 0 {
-            memset((shadow_mapping_start + metadata.size / 8) as *mut c_void, 0x00, 1);
+            memset(
+                (shadow_mapping_start + metadata.size / 8) as *mut c_void,
+                0x00,
+                1,
+            );
         }
     }
 
     pub fn find_metadata(&mut self, ptr: usize, hint_base: usize) -> &mut AllocationMetadata {
         let mut metadatas: Vec<&mut AllocationMetadata> = self.allocations.values_mut().collect();
-        metadatas.sort_by(|a, b| { a.address.cmp(&b.address) });
+        metadatas.sort_by(|a, b| a.address.cmp(&b.address));
         let mut offset_to_closest = i64::max_value();
         let mut closest = None;
         for metadata in metadatas {
@@ -156,7 +170,10 @@ impl Allocator {
                 closest = Some(metadata);
                 break;
             }
-            let new_offset = std::cmp::min(offset_to_closest, (ptr as i64 - metadata.address as i64).abs());
+            let new_offset = std::cmp::min(
+                offset_to_closest,
+                (ptr as i64 - metadata.address as i64).abs(),
+            );
             if new_offset < offset_to_closest {
                 offset_to_closest = new_offset;
                 closest = Some(metadata);
@@ -169,7 +186,10 @@ impl Allocator {
         match self.allocations.get(&(ptr as usize)) {
             Some(metadata) => metadata.size,
             None => {
-                panic!("Attempted to get_usable_size on a pointer ({:?}) which was not allocated!", ptr);
+                panic!(
+                    "Attempted to get_usable_size on a pointer ({:?}) which was not allocated!",
+                    ptr
+                );
             }
         }
     }
@@ -402,12 +422,40 @@ pub struct AsanRuntime {
 }
 
 enum AsanError<'a> {
-    OobRead((&'a [usize], usize, (u16, u16, usize, usize), &'a mut AllocationMetadata)),
-    OobWrite((&'a [usize], usize, (u16, u16, usize, usize), &'a mut AllocationMetadata)),
+    OobRead(
+        (
+            &'a [usize],
+            usize,
+            (u16, u16, usize, usize),
+            &'a mut AllocationMetadata,
+        ),
+    ),
+    OobWrite(
+        (
+            &'a [usize],
+            usize,
+            (u16, u16, usize, usize),
+            &'a mut AllocationMetadata,
+        ),
+    ),
     DoubleFree((*mut c_void, &'a mut AllocationMetadata)),
     UnallocatedFree(*mut c_void),
-    WriteAfterFree((&'a [usize], usize, (u16, u16, usize, usize), &'a mut AllocationMetadata)),
-    ReadAfterFree((&'a [usize], usize, (u16, u16, usize, usize), &'a mut AllocationMetadata)),
+    WriteAfterFree(
+        (
+            &'a [usize],
+            usize,
+            (u16, u16, usize, usize),
+            &'a mut AllocationMetadata,
+        ),
+    ),
+    ReadAfterFree(
+        (
+            &'a [usize],
+            usize,
+            (u16, u16, usize, usize),
+            &'a mut AllocationMetadata,
+        ),
+    ),
     Leak((*mut c_void, &'a mut AllocationMetadata)),
 }
 
@@ -420,14 +468,13 @@ impl<'a> AsanError<'a> {
             AsanError::UnallocatedFree(_) => "unallocated-free",
             AsanError::WriteAfterFree(_) => "heap use-after-free write",
             AsanError::ReadAfterFree(_) => "heap use-after-free read",
-            AsanError::Leak(_) => "memory-leak"
+            AsanError::Leak(_) => "memory-leak",
         }
     }
 }
 
 impl AsanRuntime {
     pub fn new() -> AsanRuntime {
-
         let mut res = Self {
             regs: [0; 32],
             blob_check_mem_byte: None,
@@ -447,10 +494,17 @@ impl AsanRuntime {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
             for _ in 0..50 {
-                mmap(std::ptr::null_mut(), 128 * 1024, ProtFlags::PROT_NONE, MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE, -1, 0).expect("Failed to map dummy regions for frida workaround");
+                mmap(
+                    std::ptr::null_mut(),
+                    128 * 1024,
+                    ProtFlags::PROT_NONE,
+                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                    -1,
+                    0,
+                )
+                .expect("Failed to map dummy regions for frida workaround");
             }
         }
-
 
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
@@ -539,15 +593,19 @@ impl AsanRuntime {
             .build()
             .unwrap();
 
-         for insn in cs
-             .disasm_count(
-                 unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 8) },
-                 actual_pc as u64,
-                 1)
-             .unwrap().iter() {
-                let detail = cs.insn_detail(&insn).unwrap();
-                let arch_detail = detail.arch_detail();
-                let (mut base_reg, mut index_reg, displacement) = if let Arm64Operand(arm64operand) = arch_detail.operands().last().unwrap() {
+        for insn in cs
+            .disasm_count(
+                unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 8) },
+                actual_pc as u64,
+                1,
+            )
+            .unwrap()
+            .iter()
+        {
+            let detail = cs.insn_detail(&insn).unwrap();
+            let arch_detail = detail.arch_detail();
+            let (mut base_reg, mut index_reg, displacement) =
+                if let Arm64Operand(arm64operand) = arch_detail.operands().last().unwrap() {
                     if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
                         (opmem.base().0, opmem.index().0, opmem.disp())
                     } else {
@@ -557,149 +615,212 @@ impl AsanRuntime {
                     (0, 0, 0)
                 };
 
-                if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= base_reg && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16 {
-                    base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-                } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-                    base_reg = 29u16;
-                } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-                    base_reg = 30u16;
-                } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16 || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16 ||
-                    base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16 || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16 {
-                    base_reg = 31u16;
-                } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= base_reg && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16 {
-                    base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-                } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= base_reg && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16 {
-                    base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
+            if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= base_reg
+                && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
+            {
+                base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
+            } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
+                base_reg = 29u16;
+            } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
+                base_reg = 30u16;
+            } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
+                || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
+                || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
+                || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
+            {
+                base_reg = 31u16;
+            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= base_reg
+                && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
+            {
+                base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
+            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= base_reg
+                && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
+            {
+                base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
+            }
+
+            let mut fault_address = self.regs[base_reg as usize] + displacement as usize;
+
+            if index_reg != 0 {
+                if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
+                    && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
+                {
+                    index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
+                } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
+                    index_reg = 29u16;
+                } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
+                    index_reg = 30u16;
+                } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
+                    || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
+                    || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
+                    || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
+                {
+                    index_reg = 31u16;
+                } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= index_reg
+                    && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
+                {
+                    index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
+                } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= index_reg
+                    && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
+                {
+                    index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
                 }
+                fault_address += self.regs[index_reg as usize] as usize;
+            } else {
+                index_reg = 0xffff
+            }
 
-                let mut fault_address = self.regs[base_reg as usize] + displacement as usize;
+            let mut allocator = Allocator::get();
+            let metadata = allocator.find_metadata(fault_address, self.regs[base_reg as usize]);
 
-                if index_reg != 0 {
-                    if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16 {
-                        index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-                    } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-                        index_reg = 29u16;
-                    } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-                        index_reg = 30u16;
-                    } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16 || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16 ||
-                        index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16 || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16 {
-                        index_reg = 31u16;
-                    } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= index_reg && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16 {
-                        index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-                    } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= index_reg && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16 {
-                        index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
-                    }
-                    fault_address += self.regs[index_reg as usize] as usize;
+            let mut error = if insn.mnemonic().unwrap().starts_with("l") {
+                if metadata.freed {
+                    AsanError::ReadAfterFree((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
                 } else {
-                    index_reg = 0xffff
+                    AsanError::OobRead((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
                 }
-
-                let mut allocator = Allocator::get();
-                let metadata = allocator.find_metadata(fault_address, self.regs[base_reg as usize]);
-
-                let mut error = if insn.mnemonic().unwrap().starts_with("l") {
-                    if metadata.freed {
-                        AsanError::ReadAfterFree((&self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), metadata))
-                    } else {
-                        AsanError::OobRead((&self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), metadata))
-                    }
+            } else {
+                if metadata.freed {
+                    AsanError::WriteAfterFree((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
                 } else {
-                    if metadata.freed {
-                        AsanError::WriteAfterFree((&self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), metadata))
-                    } else {
-                        AsanError::OobWrite((&self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), metadata))
-                    }
-                };
+                    AsanError::OobWrite((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
+                }
+            };
 
-                self.report_error(&mut error);
-                break;
-         }
+            self.report_error(&mut error);
+            break;
+        }
     }
 
     fn report_error(&self, error: &mut AsanError) {
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
-        let backtrace_printer = BacktracePrinter::new()
-           .add_frame_filter(Box::new(|frames| {
-              frames.retain(|x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")))
-           }));
+        let backtrace_printer = BacktracePrinter::new().add_frame_filter(Box::new(|frames| {
+            frames
+                .retain(|x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")))
+        }));
 
         writeln!(output, "{:━^80}", " Memory error detected! ").unwrap();
-        output.set_color(ColorSpec::new().set_fg(Some(Color::Red))).unwrap();
+        output
+            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+            .unwrap();
         write!(output, "{}", error.description());
         match error {
-            AsanError::OobRead((registers, pc, fault, metadata)) |
-                AsanError::OobWrite((registers, pc, fault, metadata)) |
-                AsanError::ReadAfterFree((registers, pc, fault, metadata)) |
-                AsanError::WriteAfterFree((registers, pc, fault, metadata)) => {
-                    let (basereg, indexreg, _displacement, fault_address) = fault;
+            AsanError::OobRead((registers, pc, fault, metadata))
+            | AsanError::OobWrite((registers, pc, fault, metadata))
+            | AsanError::ReadAfterFree((registers, pc, fault, metadata))
+            | AsanError::WriteAfterFree((registers, pc, fault, metadata)) => {
+                let (basereg, indexreg, _displacement, fault_address) = fault;
 
-                    writeln!(output, " at 0x{:x}, faulting address 0x{:x}", pc, fault_address).unwrap();
+                writeln!(
+                    output,
+                    " at 0x{:x}, faulting address 0x{:x}",
+                    pc, fault_address
+                )
+                .unwrap();
+                output.reset().unwrap();
+
+                writeln!(output, "{:━^80}", " REGISTERS ").unwrap();
+                for reg in 0..=30 {
+                    if reg == *basereg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                    } else if reg == *indexreg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
+                            .unwrap();
+                    }
+                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
                     output.reset().unwrap();
+                    if reg % 4 == 3 {
+                        writeln!(output, "").unwrap();
+                    }
+                }
+                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
 
-                    writeln!(output, "{:━^80}", " REGISTERS ").unwrap();
-                    for reg in 0..=30 {
-                        if reg == *basereg {
-                            output.set_color(ColorSpec::new().set_fg(Some(Color::Red))).unwrap();
-                        } else if reg == *indexreg {
-                            output.set_color(ColorSpec::new().set_fg(Some(Color::Yellow))).unwrap();
-                        }
-                        write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
+                writeln!(output, "{:━^80}", " CODE ").unwrap();
+                let mut cs = Capstone::new()
+                    .arm64()
+                    .mode(capstone::arch::arm64::ArchMode::Arm)
+                    .build()
+                    .unwrap();
+                cs.set_skipdata(true).expect("failed to set skipdata");
+
+                let start_pc = *pc - 4 * 5;
+                for insn in cs
+                    .disasm_count(
+                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                        start_pc as u64,
+                        11,
+                    )
+                    .expect("failed to disassemble instructions")
+                    .iter()
+                {
+                    if insn.address() as usize == *pc {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                        writeln!(output, "\t => {}", insn).unwrap();
                         output.reset().unwrap();
-                        if reg % 4 == 3 {
-                            writeln!(output, "").unwrap();
-                        }
+                    } else {
+                        writeln!(output, "\t    {}", insn).unwrap();
                     }
-                    writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+                }
+                backtrace_printer
+                    .print_trace(&Backtrace::new(), output)
+                    .unwrap();
 
-                    writeln!(output, "{:━^80}", " CODE ").unwrap();
-                    let mut cs = Capstone::new()
-                        .arm64()
-                        .mode(capstone::arch::arm64::ArchMode::Arm)
-                        .build()
-                        .unwrap();
-                    cs.set_skipdata(true).expect("failed to set skipdata");
-
-                    let start_pc = *pc - 4 * 5;
-                    for insn in cs
-                        .disasm_count(
-                            unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                            start_pc as u64,
-                            11,
-                        )
-                        .expect("failed to disassemble instructions")
-                        .iter()
-                    {
-                        if insn.address() as usize == *pc {
-                            output
-                                .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                                .unwrap();
-                            writeln!(output, "\t => {}", insn).unwrap();
-                            output.reset().unwrap();
-                        } else {
-                            writeln!(output, "\t    {}", insn).unwrap();
-                        }
-                    }
-                    backtrace_printer.print_trace(&Backtrace::new(), output).unwrap();
-
-                    writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
-                    let offset = *fault_address - metadata.address;
-                    let direction = if offset > 0 { "right" } else { "left" };
-                    writeln!(output, "access is 0x{:x} to the {} of the 0x{:x} byte allocation at 0x{:x}", offset, direction, metadata.size, metadata.address).unwrap();
-                    if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
-                        writeln!(output, "allocation site backtrace:").unwrap();
-                        backtrace.resolve();
-                        backtrace_printer.print_trace(backtrace, output).unwrap();
-                    }
-            },
+                writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
+                let offset = *fault_address - metadata.address;
+                let direction = if offset > 0 { "right" } else { "left" };
+                writeln!(
+                    output,
+                    "access is 0x{:x} to the {} of the 0x{:x} byte allocation at 0x{:x}",
+                    offset, direction, metadata.size, metadata.address
+                )
+                .unwrap();
+                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
+                    writeln!(output, "allocation site backtrace:").unwrap();
+                    backtrace.resolve();
+                    backtrace_printer.print_trace(backtrace, output).unwrap();
+                }
+            }
             AsanError::DoubleFree((ptr, metadata)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
-                backtrace_printer.print_trace(&Backtrace::new(), output).unwrap();
+                backtrace_printer
+                    .print_trace(&Backtrace::new(), output)
+                    .unwrap();
 
                 writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
-                writeln!(output, "allocation at 0x{:x}, with size 0x{:x}", metadata.address, metadata.size).unwrap();
+                writeln!(
+                    output,
+                    "allocation at 0x{:x}, with size 0x{:x}",
+                    metadata.address, metadata.size
+                )
+                .unwrap();
                 if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
@@ -711,18 +832,25 @@ impl AsanRuntime {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
-            },
+            }
             AsanError::UnallocatedFree(ptr) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
-                backtrace_printer.print_trace(&Backtrace::new(), output).unwrap();
-            },
+                backtrace_printer
+                    .print_trace(&Backtrace::new(), output)
+                    .unwrap();
+            }
             AsanError::Leak((ptr, metadata)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
 
                 writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
-                writeln!(output, "allocation at 0x{:x}, with size 0x{:x}", metadata.address, metadata.size).unwrap();
+                writeln!(
+                    output,
+                    "allocation at 0x{:x}, with size 0x{:x}",
+                    metadata.address, metadata.size
+                )
+                .unwrap();
                 if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
@@ -732,14 +860,15 @@ impl AsanRuntime {
         };
 
         match error {
-            AsanError::ReadAfterFree((_, _, _, metadata)) | AsanError::WriteAfterFree((_, _, _, metadata)) => {
+            AsanError::ReadAfterFree((_, _, _, metadata))
+            | AsanError::WriteAfterFree((_, _, _, metadata)) => {
                 writeln!(output, "{:━^80}", " FREE INFO ").unwrap();
                 if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
                     writeln!(output, "free site backtrace:").unwrap();
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
-            },
+            }
             _ => (),
         }
 
@@ -801,27 +930,35 @@ impl AsanRuntime {
         let mut ops_check_mem_byte =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_byte, 0);
-        self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap().into_boxed_slice() );
+        self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap().into_boxed_slice());
 
         let mut ops_check_mem_halfword =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_halfword, 1);
-        self.blob_check_mem_halfword = Some(ops_check_mem_halfword.finalize().unwrap().into_boxed_slice());
+        self.blob_check_mem_halfword = Some(
+            ops_check_mem_halfword
+                .finalize()
+                .unwrap()
+                .into_boxed_slice(),
+        );
 
         let mut ops_check_mem_dword =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_dword, 2);
-        self.blob_check_mem_dword = Some(ops_check_mem_dword.finalize().unwrap().into_boxed_slice());
+        self.blob_check_mem_dword =
+            Some(ops_check_mem_dword.finalize().unwrap().into_boxed_slice());
 
         let mut ops_check_mem_qword =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_qword, 3);
-        self.blob_check_mem_qword = Some(ops_check_mem_qword.finalize().unwrap().into_boxed_slice());
+        self.blob_check_mem_qword =
+            Some(ops_check_mem_qword.finalize().unwrap().into_boxed_slice());
 
         let mut ops_check_mem_16bytes =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_16bytes, 4);
-        self.blob_check_mem_16bytes = Some(ops_check_mem_16bytes.finalize().unwrap().into_boxed_slice());
+        self.blob_check_mem_16bytes =
+            Some(ops_check_mem_16bytes.finalize().unwrap().into_boxed_slice());
     }
 
     /// Get the blob which checks a byte access
@@ -845,7 +982,7 @@ impl AsanRuntime {
     /// Get the blob which checks a qword access
     #[inline]
     pub fn blob_check_mem_qword(&self) -> &Box<[u8]> {
-       self.blob_check_mem_qword.as_ref().unwrap()
+        self.blob_check_mem_qword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 16 byte access

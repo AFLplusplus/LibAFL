@@ -82,8 +82,6 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
-#[cfg(target_os = "android")]
-use crate::bolts::os::ashmem_server::AshmemService;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
