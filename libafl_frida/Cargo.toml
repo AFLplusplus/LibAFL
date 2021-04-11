@@ -16,7 +16,7 @@ libc = "0.2.92"
 hashbrown = "0.11"
 libloading = "0.7.0"
 rangemap = "0.1.10"
-frida-gum = { path =  "../../frida-rust/frida-gum", version = "0.3.4", features = [ "event-sink", "invocation-listener"] }
+frida-gum = { path =  "../../frida-rust/frida-gum", version = "0.3.4", features = [ "backtrace", "event-sink", "invocation-listener"] }
 frida-gum-sys = { path = "../../frida-rust/frida-gum-sys", version = "0.2.2", features = [ "event-sink", "invocation-listener"] }
 gothook = { path = "../../gothook", version = "0.1" }
 regex = "1.4.5"
