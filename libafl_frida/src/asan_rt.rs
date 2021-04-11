@@ -7,7 +7,7 @@ use nix::{
 use backtrace::Backtrace;
 use capstone::{
     arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
-    Capstone,
+    Capstone, Insn,
 };
 use color_backtrace::{default_output_stream, BacktracePrinter};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -586,130 +586,129 @@ impl AsanRuntime {
             _ => actual_pc,
         };
 
-        let mut cs = Capstone::new()
+        let cs = Capstone::new()
             .arm64()
             .mode(capstone::arch::arm64::ArchMode::Arm)
             .detail(true)
             .build()
             .unwrap();
 
-        for insn in cs
+        let instructions = cs
             .disasm_count(
                 unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 8) },
                 actual_pc as u64,
                 1,
             )
-            .unwrap()
-            .iter()
-        {
-            let detail = cs.insn_detail(&insn).unwrap();
-            let arch_detail = detail.arch_detail();
-            let (mut base_reg, mut index_reg, displacement) =
-                if let Arm64Operand(arm64operand) = arch_detail.operands().last().unwrap() {
-                    if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                        (opmem.base().0, opmem.index().0, opmem.disp())
-                    } else {
-                        (0, 0, 0)
-                    }
+            .unwrap();
+        let instructions = instructions.iter().collect::<Vec<Insn>>();
+        let insn = instructions.first().unwrap();
+
+        let detail = cs.insn_detail(&insn).unwrap();
+        let arch_detail = detail.arch_detail();
+        let (mut base_reg, mut index_reg, displacement) =
+            if let Arm64Operand(arm64operand) = arch_detail.operands().last().unwrap() {
+                if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
+                    (opmem.base().0, opmem.index().0, opmem.disp())
                 } else {
                     (0, 0, 0)
-                };
-
-            if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= base_reg
-                && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
-            {
-                base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-            } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-                base_reg = 29u16;
-            } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-                base_reg = 30u16;
-            } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
-                || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
-                || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
-                || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
-            {
-                base_reg = 31u16;
-            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= base_reg
-                && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
-            {
-                base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= base_reg
-                && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
-            {
-                base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
-            }
-
-            let mut fault_address = self.regs[base_reg as usize] + displacement as usize;
-
-            if index_reg != 0 {
-                if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
-                    && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
-                {
-                    index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-                } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-                    index_reg = 29u16;
-                } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-                    index_reg = 30u16;
-                } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
-                    || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
-                    || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
-                    || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
-                {
-                    index_reg = 31u16;
-                } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= index_reg
-                    && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
-                {
-                    index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-                } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= index_reg
-                    && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
-                {
-                    index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
-                }
-                fault_address += self.regs[index_reg as usize] as usize;
-            } else {
-                index_reg = 0xffff
-            }
-
-            let mut allocator = Allocator::get();
-            let metadata = allocator.find_metadata(fault_address, self.regs[base_reg as usize]);
-
-            let mut error = if insn.mnemonic().unwrap().starts_with("l") {
-                if metadata.freed {
-                    AsanError::ReadAfterFree((
-                        &self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
-                    ))
-                } else {
-                    AsanError::OobRead((
-                        &self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
-                    ))
                 }
             } else {
-                if metadata.freed {
-                    AsanError::WriteAfterFree((
-                        &self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
-                    ))
-                } else {
-                    AsanError::OobWrite((
-                        &self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
-                    ))
-                }
+                (0, 0, 0)
             };
 
-            self.report_error(&mut error);
-            break;
+        if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= base_reg
+            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
+        {
+            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
+        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
+            base_reg = 29u16;
+        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
+            base_reg = 30u16;
+        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
+            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
+            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
+            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
+        {
+            base_reg = 31u16;
+        } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= base_reg
+            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
+        {
+            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
+        } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= base_reg
+            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
+        {
+            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
         }
+
+        let mut fault_address = self.regs[base_reg as usize] + displacement as usize;
+
+        if index_reg != 0 {
+            if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
+                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
+            {
+                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
+            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
+                index_reg = 29u16;
+            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
+                index_reg = 30u16;
+            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
+                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
+                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
+                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
+            {
+                index_reg = 31u16;
+            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= index_reg
+                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
+            {
+                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
+            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= index_reg
+                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
+            {
+                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
+            }
+            fault_address += self.regs[index_reg as usize] as usize;
+        } else {
+            index_reg = 0xffff
+        }
+
+        let mut allocator = Allocator::get();
+        let metadata = allocator.find_metadata(fault_address, self.regs[base_reg as usize]);
+
+        let mut error = if insn.mnemonic().unwrap().starts_with("l") {
+            if metadata.freed {
+                AsanError::ReadAfterFree((
+                    &self.regs,
+                    actual_pc,
+                    (base_reg, index_reg, displacement as usize, fault_address),
+                    metadata,
+                ))
+            } else {
+                AsanError::OobRead((
+                    &self.regs,
+                    actual_pc,
+                    (base_reg, index_reg, displacement as usize, fault_address),
+                    metadata,
+                ))
+            }
+        } else {
+            if metadata.freed {
+                AsanError::WriteAfterFree((
+                    &self.regs,
+                    actual_pc,
+                    (base_reg, index_reg, displacement as usize, fault_address),
+                    metadata,
+                ))
+            } else {
+                AsanError::OobWrite((
+                    &self.regs,
+                    actual_pc,
+                    (base_reg, index_reg, displacement as usize, fault_address),
+                    metadata,
+                ))
+            }
+        };
+
+        self.report_error(&mut error);
     }
 
     fn report_error(&self, error: &mut AsanError) {
