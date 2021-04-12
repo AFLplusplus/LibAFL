@@ -29,6 +29,15 @@ fn main() {
             .file(_src_dir.join("value_profile.c"))
             .compile("value_profile");
     }
+    
+    #[cfg(feature = "cmplog")]
+    {
+        println!("cargo:rerun-if-changed=src/cmplog.c");
+
+        cc::Build::new()
+            .file(_src_dir.join("cmplog.c"))
+            .compile("cmplog");
+    }
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
 
