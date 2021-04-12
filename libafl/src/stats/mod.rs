@@ -256,8 +256,20 @@ macro_rules! mark_feature_time {
     }}
 }
 
+#[macro_export]
+macro_rules! mark_feedback_time {
+    ($state:expr) => {{
+        // Mark the elapsed time for the given feature
+        #[cfg(feature="perf_stats")]
+        $state.perf_stats_mut().mark_feedback_time();
+    }}
+}
+
 /// Number of stages in the fuzzer
 const NUM_STAGES: usize = 4;
+
+/// Number of feedback mechanisms to measure for performance
+pub const NUM_FEEDBACKS: usize = 4;
 
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -278,13 +290,18 @@ pub struct ClientPerfStats {
     /// Current stage index to write the next stage benchmark time
     curr_stage: u8,
 
+    /// Current feedback index to write the next feedback benchmark time
+    curr_feedback: u8,
+
     /// Flag to dictate this stage is in use. Used during printing to not print the empty
-    /// stages if they are not in use
+    /// stages if they are not in use.
     stages_used: [bool; NUM_STAGES],
 
-    /// Clock cycles spent in the the various features of each stage. Can currently keep
-    /// track of [`NUM_STAGE_FEATURES`] 
+    /// Clock cycles spent in the the various features of each stage
     stages: [[u64; PerfFeature::Count as usize]; NUM_STAGES],
+
+    /// Clock cycles spent in each feedback mechanism of the fuzzer.
+    feedbacks: [u64; NUM_FEEDBACKS],
 
     /// Current time set by `start_timer`
     timer_start: Option<u64>
@@ -382,14 +399,16 @@ impl ClientPerfStats {
         let start_time = cpu::read_time_counter().try_into().unwrap();
         
         Self {
-            start_time:        start_time,
-            current_time:      start_time,
-            scheduler:         0,
-            manager:           0,
-            curr_stage:        0,
-            stages:            [[0; NUM_PERF_FEATURES]; NUM_STAGES],
-            stages_used:       [false; NUM_STAGES],
-            timer_start:       None
+            start_time:    start_time,
+            current_time:  start_time,
+            scheduler:     0,
+            manager:       0,
+            curr_stage:    0,
+            curr_feedback: 0,
+            stages:        [[0; NUM_PERF_FEATURES]; NUM_STAGES],
+            stages_used:   [false; NUM_STAGES],
+            feedbacks:     [0; NUM_FEEDBACKS],
+            timer_start:   None
         }
     }
 
@@ -409,6 +428,7 @@ impl ClientPerfStats {
         self.update_scheduler(stats.scheduler);
         self.update_manager(stats.manager);
         self.update_stages(stats.stages);
+        self.update_feedbacks(stats.feedbacks);
     }
 
     /// Gets the elapsed time since the internal timer started. Resets the timer when
@@ -462,6 +482,30 @@ impl ClientPerfStats {
         self.update_feature(feature, elapsed);
     }
 
+    /// Update the time spent in the current [`Feedback`] with the elapsed time that we 
+    /// have seen
+    pub fn mark_feedback_time(&mut self) {
+        // Sanity check that these stats have enough room for these benchmarks
+        assert!((self.curr_feedback as usize) < NUM_FEEDBACKS, "Current fuzzer has more 
+                stages than the `ClientPerfStats` supports ({}). Please update the 
+                NUM_FEEDBACKS const value in src/stats/mod.rs and rebuild", 
+                NUM_FEEDBACKS);
+
+        // Get the current elapsed time
+        let elapsed = self.mark_time();
+
+        // Get a `usize` for the index
+        let index: usize = self.curr_feedback.try_into().unwrap();
+
+        // Update the current feedback's time with the given time
+        self.feedbacks[index] = self.feedbacks[index]
+                                    .checked_add(elapsed)
+                                    .expect("mark_feedback_time overflow");
+
+        // Increment the feedback index to the next feedback
+        self.curr_feedback += 1;
+    }
+
     /// Add the given `time` to the `scheduler` stats
     pub fn update_scheduler(&mut self, time: u64) {
         self.scheduler = self.scheduler.checked_add(time)
@@ -486,9 +530,22 @@ impl ClientPerfStats {
         self.curr_stage = 0;
     }
 
+    /// Reset the feedback index counter to zero
+    pub fn reset_feedback_index(&mut self) {
+        self.curr_feedback = 0;
+    }
+
+    /// Update the time spent in the feedbacks
+    pub fn update_feedbacks(&mut self, feedbacks: [u64; NUM_FEEDBACKS]) {
+        for (feedback_index, feedback) in feedbacks.iter().enumerate() {
+            self.feedbacks[feedback_index] = 
+                self.feedbacks[feedback_index].checked_add(*feedback)
+                                              .expect("update_feedback overflow");
+        }
+    }
+
     /// Update the time spent in the stages
-    pub fn update_stages(&mut self, stages: [[u64; NUM_PERF_FEATURES]; NUM_STAGES]) 
-    {
+    pub fn update_stages(&mut self, stages: [[u64; NUM_PERF_FEATURES]; NUM_STAGES]) {
         for (stage_index, features) in stages.iter().enumerate() {
             for (feature_index, feature) in features.iter().enumerate() {
                 self.stages[stage_index][feature_index] = 
@@ -567,6 +624,23 @@ impl core::fmt::Display for ClientPerfStats {
 
                 // Write the percentage for this feature
                 write!(f, "    {:6.4}: {:?}\n", feature_percent, feature)?;
+            }
+
+            for (feedback_index, feedback) in self.feedbacks.iter().enumerate() {
+                // Calculate this current stage's percentage
+                let feedback_percent = *feedback as f64 / elapsed;
+
+                // Ignore this feedback if it isn't used
+                if feedback_percent == 0.0 {
+                    continue;
+                }
+
+                // Update the other percent by removing this current percent
+                other_percent -= feedback_percent;
+
+                // Write the percentage for this feedback
+                write!(f, "    {:6.4}: Feedback index {}\n", feedback_percent, 
+                       feedback_index)?;
             }
         }
 

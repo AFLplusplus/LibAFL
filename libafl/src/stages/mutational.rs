@@ -67,7 +67,9 @@ where
             self.mutator_mut().mutate(state, &mut input_mut, i as i32)?;
             mark_feature_time!(state, PerfFeature::Mutate);
 
-            let (_, corpus_idx) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
+            // Time is measured directly the `evaluate_input` function
+            let (_, corpus_idx) = state.evaluate_input(input_mut, executor, manager, 
+                                                       scheduler)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;

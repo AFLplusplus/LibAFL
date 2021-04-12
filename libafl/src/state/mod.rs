@@ -704,12 +704,29 @@ where
         executor.post_exec_observers()?;
         mark_feature_time!(self, PerfFeature::PostExecObservers);
 
-        start_timer!(self);
         let observers = executor.observers();
-        let fitness =
-            self.feedbacks_mut()
+        #[cfg(not(feature="perf_stats"))]
+        let fitness = self.feedbacks_mut()
                 .is_interesting_all(&input, observers, exit_kind.clone())?;
-        mark_feature_time!(self, PerfFeature::GetFeedbackInterestingAll);
+
+        #[cfg(feature="perf_stats")]
+        let fitness = {
+            // Init temporary feedback stats here. We can't use the typical pattern above
+            // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
+            // new `mut self` to `is_interesting_all_with_perf`. We use this stack
+            // variable to get the stats and then update the feedbacks directly
+            let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
+            let mut feedback_index = 0;
+            let fitness = self.feedbacks_mut()
+                    .is_interesting_all_with_perf(&input, observers, exit_kind.clone(), 
+                                                &mut feedback_stats, feedback_index)?;
+
+            // Update the feedback stats
+            self.perf_stats_mut().update_feedbacks(feedback_stats);
+
+            // Return the total fitness
+            fitness
+        };
 
         start_timer!(self);
         let is_solution = self

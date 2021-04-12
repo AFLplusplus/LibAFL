@@ -13,6 +13,10 @@ use crate::{
     inputs::Input,
     observers::{ObserversTuple, TimeObserver},
     Error,
+    state::HasClientPerfStats,
+    stats::{PerfFeature, NUM_FEEDBACKS},
+    start_timer,
+    mark_feedback_time
 };
 
 use core::time::Duration;
@@ -56,6 +60,20 @@ where
         observers: &OT,
         exit_kind: ExitKind,
     ) -> Result<u32, Error>;
+
+    /// Get the total interestingness value from all feedbacks with performance
+    /// statistics included
+    #[cfg(feature="perf_stats")]
+    fn is_interesting_all_with_perf<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+        exit_kind: ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize
+    ) -> Result<u32, Error> {
+        return Ok(0);
+    }
 
     /// Write metadata for this testcase
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error>;
@@ -103,6 +121,37 @@ where
     ) -> Result<u32, Error> {
         Ok(self.0.is_interesting(input, observers, exit_kind.clone())?
             + self.1.is_interesting_all(input, observers, exit_kind)?)
+    }
+
+    #[cfg(feature="perf_stats")]
+    fn is_interesting_all_with_perf<OT: ObserversTuple>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+        exit_kind: ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize
+    ) -> Result<u32, Error> {
+        let mut res = 0;
+
+        // Start a timer for this feedback
+        let start_time = crate::cpu::read_time_counter();
+
+        // Execute this feedback
+        res += self.0.is_interesting(input, observers, exit_kind.clone())?;
+
+        // Get the elapsed time for checking this feedback
+        let elapsed = crate::cpu::read_time_counter() - start_time;
+
+        // Add this stat to the feedback metrics
+        feedback_stats[feedback_index] = elapsed;
+
+        // Increment the index
+        let next_index = feedback_index + 1;
+
+        // Continue executing the chain
+        Ok(res + self.1.is_interesting_all_with_perf(input, observers, exit_kind, 
+                                                     feedback_stats, next_index)?)
     }
 
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {

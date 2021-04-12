@@ -35,6 +35,7 @@ std = [] # print, sharedmap, ... support
 anymapdbg = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 llmp_small_maps = [] # reduces initial map size for llmp
+perf_stats = [] # Include performance statistics of the fuzzing pipeline
 
 [[example]]
 name = "llmp_test"
