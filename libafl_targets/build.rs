@@ -29,7 +29,7 @@ fn main() {
             .file(_src_dir.join("value_profile.c"))
             .compile("value_profile");
     }
-    
+
     #[cfg(feature = "cmplog")]
     {
         println!("cargo:rerun-if-changed=src/cmplog.c");

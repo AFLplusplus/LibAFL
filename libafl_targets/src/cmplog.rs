@@ -26,7 +26,14 @@ pub struct CmpLogMap {
 }
 
 #[no_mangle]
-pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap { headers: [CmpLogHeader {hits: 0, shape: 0, kind: 0}; CMPLOG_MAP_W], operands: [[CmpLogOperands(0, 0); CMPLOG_MAP_H]; CMPLOG_MAP_W] };
+pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
+    headers: [CmpLogHeader {
+        hits: 0,
+        shape: 0,
+        kind: 0,
+    }; CMPLOG_MAP_W],
+    operands: [[CmpLogOperands(0, 0); CMPLOG_MAP_H]; CMPLOG_MAP_W],
+};
 
 pub use libafl_cmplog_map as CMPLOG_MAP;
 
