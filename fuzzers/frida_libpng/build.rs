@@ -15,7 +15,7 @@ fn build_dep_check(tools: &[&str]) {
     for tool in tools.into_iter() {
         println!("Checking for build tool {}...", tool);
 
-        match which::which(tool) {
+        match which(tool) {
             Ok(path) => println!("Found build tool {}", path.to_str().unwrap()),
             Err(_) => {
                 println!("ERROR: missing build tool {}", tool);
@@ -24,7 +24,6 @@ fn build_dep_check(tools: &[&str]) {
         };
     }
 }
-
 
 fn main() {
     if cfg!(windows) {
@@ -134,5 +133,4 @@ fn main() {
         .status()
         .unwrap();
     assert!(status.success());
-
 }

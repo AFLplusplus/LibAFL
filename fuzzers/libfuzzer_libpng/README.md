@@ -6,13 +6,6 @@ It has been tested on Linux.
 
 ## Build
 
-<<<<<<< HEAD
-You will need `clang` and `clang++` along with basic build dependencies for this example to compile.
-To build this example, run `cargo build --example libfuzzer_libpng --release`.
-This will call [the build.rs](./build.rs), which in turn downloads a libpng archive from the web.
-Then, it will link [the fuzzer](./src/fuzzer.rs) against [the C++ harness](./harness.cc) and the instrumented `libpng`.
-Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng`.
-=======
 To build this example, run `cargo build --release`.
 This will build the library with the fuzzer (src/lib.rs) with the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback.
 In addition, it will build also two C and C++ compiler wrappers (bin/c(c/xx).rs) that you must use to compile the target.
@@ -36,7 +29,6 @@ Now, we have to build the libfuzzer harness and link all togheter to create our 
 ```
 
 Afterwards, the fuzzer will be ready to run simply executing `./fuzzer`.
->>>>>>> dev
 
 ## Run
 
