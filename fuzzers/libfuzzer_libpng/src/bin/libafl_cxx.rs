@@ -28,5 +28,7 @@ fn main() {
             .add_link_arg("-lAdvapi32".into())
             .unwrap();
         cc.run().unwrap();
+    } else {
+        panic!("LibAFL CC: No Arguments given");
     }
 }

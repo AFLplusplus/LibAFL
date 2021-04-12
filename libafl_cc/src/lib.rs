@@ -90,7 +90,13 @@ impl CompilerWrapper for ClangWrapper {
         let mut new_args = vec![];
         if args.is_empty() {
             return Err(Error::InvalidArguments(
-                "The number of arguments cannot be 0".into(),
+                "The number of arguments cannot be 0".to_string(),
+            ));
+        }
+
+        if args.len() == 1 {
+            return Err(Error::InvalidArguments(
+                "LibAFL Compiler wrapper - no commands specified. Use me as compiler.".to_string(),
             ));
         }
 
