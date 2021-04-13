@@ -172,22 +172,19 @@ impl Allocator {
                 }
             };
 
-            let (shadow_mapping_start, _shadow_mapping_size) = self.map_shadow_for_region(
+            self.map_shadow_for_region(
                 mapping,
                 mapping + rounded_up_size + 2 * self.page_size,
                 false,
             );
 
-            let metadata = AllocationMetadata {
+            AllocationMetadata {
                 address: mapping + self.page_size,
                 size,
                 actual_size: rounded_up_size,
                 allocation_site_backtrace: Some(Backtrace::new_unresolved()),
                 ..Default::default()
-            };
-            //
-            //Backtracer::accurate();
-            metadata
+            }
         };
 
         // unpoison the shadow memory for the allocation itself
@@ -704,7 +701,7 @@ impl AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, modules_to_instrument: &Vec<&str>) {
+    pub fn init(&mut self, modules_to_instrument: &[&str]) {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
             for _ in 0..64 {
@@ -739,6 +736,15 @@ impl AsanRuntime {
     /// Reset all allocations so that they can be reused for new allocation requests.
     pub fn reset_allocations(&self) {
         Allocator::get().reset();
+    }
+
+    /// Check if the test leaked any memory and report it if so.
+    pub fn check_for_leaks(&self) {
+        for metadata in Allocator::get().allocations.values_mut() {
+            if !metadata.freed {
+                self.report_error(&mut AsanError::Leak((metadata.address as *mut  c_void, metadata)));
+            }
+        }
     }
 
     /// Make sure the specified memory is unpoisoned

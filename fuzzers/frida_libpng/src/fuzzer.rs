@@ -71,6 +71,7 @@ struct FridaEdgeCoverageHelper<'a> {
     asan_runtime: AsanRuntime,
     ranges: RangeMap<usize, (u16, &'a str)>,
     option_asan_mode: bool,
+    option_asan_detect_leaks: bool,
     option_drcov_mode: bool,
     drcov_basic_blocks: Vec<(usize, usize)>,
 }
@@ -103,6 +104,9 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
         }
 
         if self.option_asan_mode {
+            if self.option_asan_detect_leaks {
+                self.asan_runtime.check_for_leaks();
+            }
             self.asan_runtime.reset_allocations();
         }
     }
@@ -274,6 +278,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             asan_runtime: AsanRuntime::new(),
             ranges: RangeMap::new(),
             option_asan_mode: true,
+            option_asan_detect_leaks: false,
             option_drcov_mode: false,
             drcov_basic_blocks: vec![],
         };
@@ -294,13 +299,16 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 match name {
                     "asan" => {
                         helper.option_asan_mode = value.parse().unwrap();
-                    }
+                    },
+                    "asan-detect-leaks" => {
+                        helper.option_asan_detect_leaks = value.parse().unwrap();
+                    },
                     "drcov" => {
                         helper.option_drcov_mode = value.parse().unwrap();
-                    }
+                    },
                     _ => {
                         panic!("unknown FRIDA option: '{}'", option);
-                    }
+                    },
                 }
             }
         }
