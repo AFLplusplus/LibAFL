@@ -32,13 +32,30 @@ use frida_gum::{
     stalker::{NoneEventSink, Stalker, StalkerOutput, Transformer},
 };
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
-use std::{env, ffi::c_void, path::PathBuf};
+use num_traits::cast::FromPrimitive;
+
+use rangemap::{RangeMap, RangeSet};
+use std::{
+    cell::RefCell,
+    env,
+    ffi::c_void,
+    fs::File,
+    io::{BufWriter, Write},
+    path::PathBuf,
+    sync::{Arc, RwLock},
+};
+
+use libafl_frida::asan_rt::AsanRuntime;
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
-pub trait FridaHelper<'a> {
+pub trait FridaHelper<'a, I: Input + HasTargetBytes> {
     fn transformer(&self) -> &Transformer<'a>;
 
     fn register_thread(&self);
+
+    fn pre_exec(&self, input: &I);
+
+    fn post_exec(&self, input: &I);
 }
 
 const MAP_SIZE: usize = 64 * 1024;
@@ -47,16 +64,18 @@ const MAP_SIZE: usize = 64 * 1024;
 struct FridaEdgeCoverageHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
-    base_address: u64,
-    size: usize,
     current_log_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
     capstone: Capstone,
     asan_runtime: AsanRuntime,
+    ranges: RangeMap<usize, (u16, &'a str)>,
+    option_asan_mode: bool,
+    option_drcov_mode: bool,
+    drcov_basic_blocks: Vec<(usize, usize)>,
 }
 
-impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
+impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelper<'a> {
     fn transformer(&self) -> &Transformer<'a> {
         self.transformer.as_ref().unwrap()
     }
@@ -64,6 +83,102 @@ impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
     /// Register the current thread with the FridaEdgeCoverageHelper
     fn register_thread(&self) {
         self.asan_runtime.register_thread();
+    }
+
+    fn pre_exec(&self, input: &I) {
+        let target_bytes = input.target_bytes();
+        let slice = target_bytes.as_slice();
+        //println!("target_bytes: {:?}", slice);
+        self.asan_runtime
+            .unpoison(slice.as_ptr() as usize, slice.len());
+    }
+
+    fn post_exec(&self, input: &I) {
+        if self.option_drcov_mode {
+            let filename = format!(
+                "./coverage/{:016x}.drcov",
+                seahash::hash(input.target_bytes().as_slice())
+            );
+            DrCovWriter::new(&filename, &self.ranges, &self.drcov_basic_blocks).write();
+        }
+
+        if self.option_asan_mode {
+            self.asan_runtime.reset_allocations();
+        }
+    }
+}
+
+struct DrCovWriter<'a> {
+    writer: BufWriter<File>,
+    module_mapping: &'a RangeMap<usize, (u16, &'a str)>,
+    basic_blocks: &'a Vec<(usize, usize)>,
+}
+
+#[repr(C)]
+struct DrCovBasicBlockEntry {
+    start: u32,
+    size: u16,
+    mod_id: u16,
+}
+
+impl<'a> DrCovWriter<'a> {
+    pub fn new(
+        path: &str,
+        module_mapping: &'a RangeMap<usize, (u16, &str)>,
+        basic_blocks: &'a Vec<(usize, usize)>,
+    ) -> Self {
+        Self {
+            writer: BufWriter::new(
+                File::create(path).expect("unable to create file for coverage data"),
+            ),
+            module_mapping,
+            basic_blocks,
+        }
+    }
+
+    pub fn write(&mut self) {
+        self.writer
+            .write(b"DRCOV VERSION: 2\nDRCOV FLAVOR: libafl-frida\n")
+            .unwrap();
+
+        let modules: Vec<(&std::ops::Range<usize>, &(u16, &str))> =
+            self.module_mapping.iter().collect();
+        self.writer
+            .write(format!("Module Table: version 2, count {}\n", modules.len()).as_bytes())
+            .unwrap();
+        self.writer
+            .write(b"Columns: id, base, end, entry, checksum, timestamp, path\n")
+            .unwrap();
+        for module in modules {
+            let (range, (id, path)) = module;
+            self.writer
+                .write(
+                    format!(
+                        "{:03}, 0x{:x}, 0x{:x}, 0x00000000, 0x00000000, 0x00000000, {}\n",
+                        id, range.start, range.end, path
+                    )
+                    .as_bytes(),
+                )
+                .unwrap();
+        }
+        self.writer
+            .write(format!("BB Table: {} bbs\n", self.basic_blocks.len()).as_bytes())
+            .unwrap();
+        for (start, end) in self.basic_blocks {
+            let (range, (id, _)) = self.module_mapping.get_key_value(&start).unwrap();
+            let basic_block = DrCovBasicBlockEntry {
+                start: (start - range.start) as u32,
+                size: (end - start) as u16,
+                mod_id: *id,
+            };
+            self.writer
+                .write(unsafe {
+                    std::slice::from_raw_parts(&basic_block as *const _ as *const u8, 8)
+                })
+                .unwrap();
+        }
+
+        self.writer.flush().unwrap();
     }
 }
 
@@ -140,12 +255,14 @@ const MAYBE_LOG_CODE: [u8; 60] = [
 /// The implementation of the FridaEdgeCoverageHelper
 impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
-    pub fn new(gum: &'a Gum, module_name: &str) -> Self {
+    pub fn new(
+        gum: &'a Gum,
+        harness_module_name: &str,
+        modules_to_instrument: &'a Vec<&str>,
+    ) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],
-            base_address: Module::find_base_address(module_name).0 as u64,
-            size: get_module_size(module_name),
             current_log_impl: 0,
             transformer: None,
             capstone: Capstone::new()
@@ -155,33 +272,86 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 .build()
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(),
+            ranges: RangeMap::new(),
+            option_asan_mode: true,
+            option_drcov_mode: false,
+            drcov_basic_blocks: vec![],
         };
+
+        for (id, module_name) in modules_to_instrument.iter().enumerate() {
+            let (lib_start, lib_end) = libafl_frida::asan_rt::mapping_for_library(module_name);
+            println!("including range {:x}-{:x}", lib_start, lib_end);
+            helper
+                .ranges
+                .insert(lib_start..lib_end, (id as u16, module_name));
+        }
+
+        if let Ok(options) = std::env::var("LIBAFL_FRIDA_OPTIONS") {
+            for option in options.trim().to_lowercase().split(":") {
+                let (name, mut value) =
+                    option.split_at(option.find("=").expect("Expected a '=' in option string"));
+                value = value.get(1..).unwrap();
+                match name {
+                    "asan" => {
+                        helper.option_asan_mode = value.parse().unwrap();
+                    }
+                    "drcov" => {
+                        helper.option_drcov_mode = value.parse().unwrap();
+                    }
+                    _ => {
+                        panic!("unknown FRIDA option: '{}'", option);
+                    }
+                }
+            }
+        }
+
+        if helper.option_drcov_mode {
+            std::fs::create_dir("./coverage")
+                .expect("failed to create directory for coverage files");
+        }
 
         let transformer = Transformer::from_callback(gum, |basic_block, output| {
             let mut first = true;
             for instruction in basic_block {
                 let instr = instruction.instr();
                 let address = instr.address();
-                if address >= helper.base_address
-                    && address <= helper.base_address + helper.size as u64
-                {
+                //println!("address: {:x} contains: {:?}", address, helper.ranges.contains(&(address as usize)));
+                if helper.ranges.contains_key(&(address as usize)) {
                     if first {
                         first = false;
                         //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
                         helper.emit_coverage_mapping(address, &output);
+                        if helper.option_drcov_mode {
+                            instruction.put_callout(|context| {
+                                let real_address = match helper
+                                    .asan_runtime
+                                    .real_address_for_stalked(context.pc() as usize)
+                                {
+                                    Some(address) => *address,
+                                    _ => context.pc() as usize,
+                                };
+                                //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
+                                //println!("{}:0x{:016x}", name, real_address - range.start);
+                                helper
+                                    .drcov_basic_blocks
+                                    .push((real_address, real_address + 4));
+                            })
+                        }
                     }
 
-                    if let Ok((basereg, indexreg, displacement, width)) =
-                        helper.is_interesting_instruction(address, instr)
-                    {
-                        helper.emit_shadow_check(
-                            address,
-                            &output,
-                            basereg,
-                            indexreg,
-                            displacement,
-                            width,
-                        );
+                    if helper.option_asan_mode {
+                        if let Ok((basereg, indexreg, displacement, width)) =
+                            helper.is_interesting_instruction(address, instr)
+                        {
+                            helper.emit_shadow_check(
+                                address,
+                                &output,
+                                basereg,
+                                indexreg,
+                                displacement,
+                                width,
+                            );
+                        }
                     }
                     helper
                         .asan_runtime
@@ -191,7 +361,9 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             }
         });
         helper.transformer = Some(transformer);
-        helper.asan_runtime.init(module_name);
+        if helper.option_asan_mode {
+            helper.asan_runtime.init(modules_to_instrument);
+        }
         helper
     }
 
@@ -252,9 +424,8 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                         writer.put_ldr_reg_reg_offset(
                             Aarch64Register::X1,
                             Aarch64Register::Sp,
-                            (8 + frida_gum_sys::GUM_RED_ZONE_SIZE) as u64,
+                            0u64,
                         );
-                        writer.put_brk_imm(0x77);
                     }
                     Aarch64Register::X1 | Aarch64Register::W1 => {}
                     _ => {
@@ -298,9 +469,14 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
             2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
+            3 => writer.put_bytes(&self.asan_runtime.blob_check_mem_3bytes()),
             4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
+            6 => writer.put_bytes(&self.asan_runtime.blob_check_mem_6bytes()),
             8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
+            12 => writer.put_bytes(&self.asan_runtime.blob_check_mem_12bytes()),
             16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
+            24 => writer.put_bytes(&self.asan_runtime.blob_check_mem_24bytes()),
+            32 => writer.put_bytes(&self.asan_runtime.blob_check_mem_32bytes()),
             _ => false,
         };
 
@@ -318,6 +494,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
     fn get_instruction_width(&self, instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
         use capstone::arch::arm64::Arm64Insn as I;
         use capstone::arch::arm64::Arm64Reg as R;
+        use capstone::arch::arm64::Arm64Vas as V;
 
         let num_registers = match instr.id().0.into() {
             I::ARM64_INS_STP
@@ -339,7 +516,30 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         }
 
         if let Arm64Operand(operand) = operands.first().unwrap() {
-            if let Arm64OperandType::Reg(operand) = operand.op_type {
+            if operand.vas != V::ARM64_VAS_INVALID {
+                let count_byte: u32 = if mnemonic.starts_with("st") || mnemonic.starts_with("ld") {
+                    mnemonic.chars().nth(2).unwrap().to_digit(10).unwrap()
+                } else {
+                    1
+                };
+
+                return match operand.vas {
+                    V::ARM64_VAS_1B => 1 * count_byte,
+                    V::ARM64_VAS_1H => 2 * count_byte,
+                    V::ARM64_VAS_4B | V::ARM64_VAS_1S | V::ARM64_VAS_1D | V::ARM64_VAS_2H => {
+                        4 * count_byte
+                    }
+                    V::ARM64_VAS_8B
+                    | V::ARM64_VAS_4H
+                    | V::ARM64_VAS_2S
+                    | V::ARM64_VAS_2D
+                    | V::ARM64_VAS_1Q => 8 * count_byte,
+                    V::ARM64_VAS_8H | V::ARM64_VAS_4S | V::ARM64_VAS_16B => 16 * count_byte,
+                    V::ARM64_VAS_INVALID => {
+                        panic!("should not be reached");
+                    }
+                };
+            } else if let Arm64OperandType::Reg(operand) = operand.op_type {
                 match operand.0 as u32 {
                     R::ARM64_REG_W0..=R::ARM64_REG_W30
                     | R::ARM64_REG_WZR
@@ -361,6 +561,15 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         _address: u64,
         instr: &Insn,
     ) -> Result<(capstone::RegId, capstone::RegId, i32, u32), ()> {
+        // We have to ignore these instructions. Simulating them with their side effects is
+        // complex, to say the least.
+        match instr.mnemonic().unwrap() {
+            "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
+            | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
+            | "ldxrh" | "stxrb" | "stxrh" => return Err(()),
+            _ => (),
+        }
+
         let operands = self
             .capstone
             .insn_detail(instr)
@@ -457,7 +666,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
 struct FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'a, I>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -472,7 +681,7 @@ where
 
 impl<'a, FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'a, I>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -492,6 +701,9 @@ where
                 self.base.harness_mut() as *mut _ as *mut c_void
             ))
         }
+
+        self.helper.pre_exec(input);
+
         self.base.pre_exec(state, event_mgr, input)
     }
 
@@ -513,13 +725,14 @@ where
         EM: EventManager<I, S>,
     {
         self.stalker.deactivate();
+        self.helper.post_exec(input);
         self.base.post_exec(state, event_mgr, input)
     }
 }
 
 impl<'a, FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'a, I>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -537,7 +750,7 @@ where
 
 impl<'a, FH, H, I, OT> Named for FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'a, I>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -549,7 +762,7 @@ where
 
 impl<'a, FH, H, I, OT> FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'a, I>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -562,10 +775,10 @@ where
             Module::find_base_address(&env::args().next().unwrap()),
             get_module_size(&env::args().next().unwrap()),
         ));
-        stalker.exclude(&MemoryRange::new(
-            Module::find_base_address("libc.so"),
-            get_module_size("libc.so"),
-        ));
+        //stalker.exclude(&MemoryRange::new(
+        //Module::find_base_address("libc.so"),
+        //get_module_size("libc.so"),
+        //));
 
         Self {
             base,
@@ -590,6 +803,11 @@ pub fn main() {
         fuzz(
             &env::args().nth(1).expect("no module specified"),
             &env::args().nth(2).expect("no symbol specified"),
+            env::args()
+                .nth(3)
+                .expect("no modules to instrument specified")
+                .split(":")
+                .collect(),
             vec![PathBuf::from("./corpus")],
             PathBuf::from("./crashes"),
             1337,
@@ -615,6 +833,7 @@ fn fuzz(
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
+    modules_to_instrument: Vec<&str>,
     corpus_dirs: Vec<PathBuf>,
     objective_dir: PathBuf,
     broker_port: u16,
@@ -646,7 +865,8 @@ unsafe fn fuzz(
     let lib = libloading::Library::new(module_name).unwrap();
     let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
         lib.get(symbol_name.as_bytes()).unwrap();
-    let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, module_name);
+
+    let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, module_name, &modules_to_instrument);
 
     // Create an observation channel using the coverage map
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
@@ -719,10 +939,10 @@ unsafe fn fuzz(
         Module::find_base_address(&env::args().next().unwrap()),
         get_module_size(&env::args().next().unwrap()),
     ));
-    executor.stalker.exclude(&MemoryRange::new(
-        Module::find_base_address("libc.so"),
-        get_module_size("libc.so"),
-    ));
+    //executor.stalker.exclude(&MemoryRange::new(
+    //Module::find_base_address("libc.so"),
+    //get_module_size("libc.so"),
+    //));
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {

@@ -33,14 +33,24 @@ struct Allocator {
     runtime: Dereffer<AsanRuntime>,
     page_size: usize,
     shadow_offset: usize,
+    shadow_bit: usize,
+    pre_allocated_shadow: bool,
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
+    allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
+}
+
+macro_rules! map_to_shadow {
+    ($self:expr, $address:expr) => {
+        (($address >> 3) + $self.shadow_offset) & ((1 << ($self.shadow_bit + 1)) - 1)
+    };
 }
 
 #[derive(Clone, Default)]
 struct AllocationMetadata {
     address: usize,
     size: usize,
+    actual_size: usize,
     allocation_site_backtrace: Option<Backtrace>,
     release_site_backtrace: Option<Backtrace>,
     freed: bool,
@@ -48,12 +58,55 @@ struct AllocationMetadata {
 
 impl Allocator {
     fn new(runtime: Dereffer<AsanRuntime>) {
+        let page_size = unsafe { sysconf(_SC_PAGESIZE) as usize };
+        // probe to find a usable shadow bit:
+        let mut shadow_bit: usize = 0;
+        for try_shadow_bit in &[46usize, 36usize] {
+            let addr: usize = 1 << try_shadow_bit;
+            if unsafe {
+                mmap(
+                    addr as *mut c_void,
+                    page_size,
+                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                    MapFlags::MAP_PRIVATE | MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED,
+                    -1,
+                    0,
+                )
+            }
+            .is_ok()
+            {
+                shadow_bit = *try_shadow_bit;
+                break;
+            }
+        }
+        assert!(shadow_bit != 0);
+
+        // attempt to pre-map the entire shadow-memory space
+        let addr: usize = 1 << shadow_bit;
+        let pre_allocated_shadow = if let Ok(mapped) = unsafe {
+            mmap(
+                addr as *mut c_void,
+                addr + addr,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED,
+                -1,
+                0,
+            )
+        } {
+            true
+        } else {
+            false
+        };
+
         let res = Self {
             runtime,
-            page_size: unsafe { sysconf(_SC_PAGESIZE) as usize },
-            shadow_offset: 1 << 36,
+            page_size,
+            pre_allocated_shadow,
+            shadow_offset: 1 << shadow_bit,
+            shadow_bit,
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
+            allocation_queue: HashMap::new(),
         };
         unsafe {
             ALLOCATOR_SINGLETON = Some(RefCell::new(res));
@@ -85,43 +138,65 @@ impl Allocator {
     }
 
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
+        let size = if size == 0 {
+            println!("zero-sized allocation!");
+            16
+        } else {
+            size
+        };
         let rounded_up_size = self.round_up_to_page(size);
 
-        let mapping = match mmap(
-            std::ptr::null_mut(),
-            rounded_up_size + 2 * self.page_size,
-            ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
-            -1,
-            0,
-        ) {
-            Ok(mapping) => mapping as usize,
-            Err(err) => {
-                println!("An error occurred while mapping memory: {:?}", err);
-                return std::ptr::null_mut();
-            }
-        };
+        let metadata = if let Some(mut metadata) = self
+            .allocation_queue
+            .entry(rounded_up_size)
+            .or_default()
+            .pop()
+        {
+            //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
+            metadata.size = size;
+            metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
+            metadata
+        } else {
+            let mapping = match mmap(
+                std::ptr::null_mut(),
+                rounded_up_size + 2 * self.page_size,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                -1,
+                0,
+            ) {
+                Ok(mapping) => mapping as usize,
+                Err(err) => {
+                    println!("An error occurred while mapping memory: {:?}", err);
+                    return std::ptr::null_mut();
+                }
+            };
 
-        let (shadow_mapping_start, _shadow_mapping_size) = self.map_shadow_for_region(
-            mapping,
-            mapping + rounded_up_size + 2 * self.page_size,
-            false,
-        );
+            let (shadow_mapping_start, _shadow_mapping_size) = self.map_shadow_for_region(
+                mapping,
+                mapping + rounded_up_size + 2 * self.page_size,
+                false,
+            );
+
+            let metadata = AllocationMetadata {
+                address: mapping + self.page_size,
+                size,
+                actual_size: rounded_up_size,
+                allocation_site_backtrace: Some(Backtrace::new_unresolved()),
+                ..Default::default()
+            };
+            //
+            //Backtracer::accurate();
+            metadata
+        };
 
         // unpoison the shadow memory for the allocation itself
-        self.unpoison(shadow_mapping_start + self.page_size / 8, size);
+        Self::unpoison(map_to_shadow!(self, metadata.address), size);
+        let address = metadata.address as *mut c_void;
 
-        let metadata = AllocationMetadata {
-            address: mapping + self.page_size,
-            size,
-            allocation_site_backtrace: Some(Backtrace::new_unresolved()),
-            ..Default::default()
-        };
-
-        //Backtracer::accurate();
-        self.allocations.insert(mapping + self.page_size, metadata);
-
-        (mapping + self.page_size) as *mut c_void
+        self.allocations.insert(metadata.address, metadata);
+        //println!("serving address: {:?}, size: {:x}", address, size);
+        address
     }
 
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
@@ -141,26 +216,21 @@ impl Allocator {
             self.runtime
                 .report_error(&mut AsanError::DoubleFree((ptr, &mut metadata)));
         }
-        let shadow_mapping_start = (ptr as usize >> 3) + self.shadow_offset;
+        let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
         metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
         //Backtracer::accurate();
 
         // poison the shadow memory for the allocation
-        //println!("poisoning {:x} for {:x}", shadow_mapping_start, size / 8 + 1);
-        memset(shadow_mapping_start as *mut c_void, 0x00, metadata.size / 8);
-        let remainder = metadata.size % 8;
-        if remainder > 0 {
-            memset(
-                (shadow_mapping_start + metadata.size / 8) as *mut c_void,
-                0x00,
-                1,
-            );
-        }
+        Self::poison(shadow_mapping_start, metadata.size);
     }
 
-    pub fn find_metadata(&mut self, ptr: usize, hint_base: usize) -> &mut AllocationMetadata {
+    pub fn find_metadata(
+        &mut self,
+        ptr: usize,
+        hint_base: usize,
+    ) -> Option<&mut AllocationMetadata> {
         let mut metadatas: Vec<&mut AllocationMetadata> = self.allocations.values_mut().collect();
         metadatas.sort_by(|a, b| a.address.cmp(&b.address));
         let mut offset_to_closest = i64::max_value();
@@ -179,7 +249,26 @@ impl Allocator {
                 closest = Some(metadata);
             }
         }
-        closest.unwrap()
+        closest
+    }
+
+    pub fn reset(&mut self) {
+        for (address, mut allocation) in self.allocations.drain() {
+            // First poison the memory.
+            Self::poison(map_to_shadow!(self, address), allocation.size);
+
+            // Reset the allocaiton metadata object
+            allocation.size = 0;
+            allocation.freed = false;
+            allocation.allocation_site_backtrace = None;
+            allocation.release_site_backtrace = None;
+
+            // Move the allocation from the allocations to the to-be-allocated queues
+            self.allocation_queue
+                .entry(allocation.actual_size)
+                .or_default()
+                .push(allocation);
+        }
     }
 
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
@@ -194,7 +283,7 @@ impl Allocator {
         }
     }
 
-    fn unpoison(&self, start: usize, size: usize) {
+    fn unpoison(start: usize, size: usize) {
         //println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             //println!("memset: {:?}", start as *mut c_void);
@@ -212,6 +301,20 @@ impl Allocator {
         }
     }
 
+    fn poison(start: usize, size: usize) {
+        //println!("poisoning {:x} for {:x}", start, size / 8 + 1);
+        unsafe {
+            //println!("memset: {:?}", start as *mut c_void);
+            memset(start as *mut c_void, 0x00, size / 8);
+
+            let remainder = size % 8;
+            if remainder > 0 {
+                //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
+                memset((start + size / 8) as *mut c_void, 0x00, 1);
+            }
+        }
+    }
+
     /// Map shadow memory for a region, and optionally unpoison it
     pub fn map_shadow_for_region(
         &mut self,
@@ -221,30 +324,33 @@ impl Allocator {
     ) -> (usize, usize) {
         //println!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
 
-        let shadow_mapping_start = (start >> 3) + self.shadow_offset;
-        let shadow_start = self.round_down_to_page(shadow_mapping_start);
-        let shadow_end = self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
+        let shadow_mapping_start = map_to_shadow!(self, start);
 
-        for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-            //println!("mapping: {:x} - {:x}", mapping_start * self.page_size, (mapping_end + 1) * self.page_size);
-            unsafe {
-                mmap(
-                    range.start as *mut c_void,
-                    range.end - range.start,
-                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
-                    -1,
-                    0,
-                )
-                .expect("An error occurred while mapping shadow memory");
+        if !self.pre_allocated_shadow {
+            let shadow_start = self.round_down_to_page(shadow_mapping_start);
+            let shadow_end =
+                self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
+            for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
+                //println!("range: {:x}-{:x}, pagesize: {}", range.start, range.end, self.page_size);
+                unsafe {
+                    mmap(
+                        range.start as *mut c_void,
+                        range.end - range.start,
+                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                        MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
+                        -1,
+                        0,
+                    )
+                    .expect("An error occurred while mapping shadow memory");
+                }
             }
-        }
 
-        self.shadow_pages.insert(shadow_start..shadow_end);
+            self.shadow_pages.insert(shadow_start..shadow_end);
+        }
 
         //println!("shadow_mapping_start: {:x}, shadow_size: {:x}", shadow_mapping_start, (end - start) / 8);
         if unpoison {
-            self.unpoison(shadow_mapping_start, end - start);
+            Self::unpoison(shadow_mapping_start, end - start);
         }
 
         (shadow_mapping_start, (end - start) / 8)
@@ -254,6 +360,30 @@ impl Allocator {
 /// Hook for malloc.
 pub extern "C" fn asan_malloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
+}
+
+/// Hook for new.
+pub extern "C" fn asan_new(size: usize) -> *mut c_void {
+    unsafe { Allocator::get().alloc(size, 0x8) }
+}
+
+/// Hook for new.
+pub extern "C" fn asan_new_nothrow(size: usize, nothrow: *const c_void) -> *mut c_void {
+    unsafe { Allocator::get().alloc(size, 0x8) }
+}
+
+/// Hook for new with alignment.
+pub extern "C" fn asan_new_aligned(size: usize, alignment: usize) -> *mut c_void {
+    unsafe { Allocator::get().alloc(size, alignment) }
+}
+
+/// Hook for new with alignment.
+pub extern "C" fn asan_new_aligned_nothrow(
+    size: usize,
+    alignment: usize,
+    nothrow: *const c_void,
+) -> *mut c_void {
+    unsafe { Allocator::get().alloc(size, alignment) }
 }
 
 /// Hook for pvalloc
@@ -290,6 +420,74 @@ pub unsafe extern "C" fn asan_realloc(ptr: *mut c_void, size: usize) -> *mut c_v
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
 pub unsafe extern "C" fn asan_free(ptr: *mut c_void) {
+    if ptr != std::ptr::null_mut() {
+        Allocator::get().release(ptr);
+    }
+}
+
+/// Hook for delete
+///
+/// # Safety
+/// This function is inherently unsafe, as it takes a raw pointer
+pub unsafe extern "C" fn asan_delete(ptr: *mut c_void) {
+    if ptr != std::ptr::null_mut() {
+        Allocator::get().release(ptr);
+    }
+}
+
+/// Hook for delete
+///
+/// # Safety
+/// This function is inherently unsafe, as it takes a raw pointer
+pub unsafe extern "C" fn asan_delete_ulong(ptr: *mut c_void, ulong: u64) {
+    if ptr != std::ptr::null_mut() {
+        Allocator::get().release(ptr);
+    }
+}
+
+/// Hook for delete
+///
+/// # Safety
+/// This function is inherently unsafe, as it takes a raw pointer
+pub unsafe extern "C" fn asan_delete_ulong_aligned(
+    ptr: *mut c_void,
+    ulong: u64,
+    nothrow: *const c_void,
+) {
+    if ptr != std::ptr::null_mut() {
+        Allocator::get().release(ptr);
+    }
+}
+
+/// Hook for delete
+///
+/// # Safety
+/// This function is inherently unsafe, as it takes a raw pointer
+pub unsafe extern "C" fn asan_delete_aligned(ptr: *mut c_void, alignment: usize) {
+    if ptr != std::ptr::null_mut() {
+        Allocator::get().release(ptr);
+    }
+}
+
+/// Hook for delete
+///
+/// # Safety
+/// This function is inherently unsafe, as it takes a raw pointer
+pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, nothrow: *const c_void) {
+    if ptr != std::ptr::null_mut() {
+        Allocator::get().release(ptr);
+    }
+}
+
+/// Hook for delete
+///
+/// # Safety
+/// This function is inherently unsafe, as it takes a raw pointer
+pub unsafe extern "C" fn asan_delete_aligned_nothrow(
+    ptr: *mut c_void,
+    alignment: usize,
+    nothrow: *const c_void,
+) {
     if ptr != std::ptr::null_mut() {
         Allocator::get().release(ptr);
     }
@@ -371,7 +569,7 @@ fn mapping_containing(address: *const c_void) -> (usize, usize) {
 }
 
 /// Get the start and end address of the mapping containing a particular address
-fn mapping_for_library(libpath: &str) -> (usize, usize) {
+pub fn mapping_for_library(libpath: &str) -> (usize, usize) {
     let mut libstart = 0;
     let mut libend = 0;
     walk_self_maps(&mut |start, end, _permissions, path| {
@@ -418,6 +616,13 @@ pub struct AsanRuntime {
     blob_check_mem_dword: Option<Box<[u8]>>,
     blob_check_mem_qword: Option<Box<[u8]>>,
     blob_check_mem_16bytes: Option<Box<[u8]>>,
+    blob_check_mem_3bytes: Option<Box<[u8]>>,
+    blob_check_mem_6bytes: Option<Box<[u8]>>,
+    blob_check_mem_12bytes: Option<Box<[u8]>>,
+    blob_check_mem_24bytes: Option<Box<[u8]>>,
+    blob_check_mem_32bytes: Option<Box<[u8]>>,
+    blob_check_mem_48bytes: Option<Box<[u8]>>,
+    blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
 }
 
@@ -456,6 +661,7 @@ enum AsanError<'a> {
             &'a mut AllocationMetadata,
         ),
     ),
+    Unknown((&'a [usize], usize, (u16, u16, usize, usize))),
     Leak((*mut c_void, &'a mut AllocationMetadata)),
 }
 
@@ -468,6 +674,7 @@ impl<'a> AsanError<'a> {
             AsanError::UnallocatedFree(_) => "unallocated-free",
             AsanError::WriteAfterFree(_) => "heap use-after-free write",
             AsanError::ReadAfterFree(_) => "heap use-after-free read",
+            AsanError::Unknown(_) => "heap unknown",
             AsanError::Leak(_) => "memory-leak",
         }
     }
@@ -482,6 +689,13 @@ impl AsanRuntime {
             blob_check_mem_dword: None,
             blob_check_mem_qword: None,
             blob_check_mem_16bytes: None,
+            blob_check_mem_3bytes: None,
+            blob_check_mem_6bytes: None,
+            blob_check_mem_12bytes: None,
+            blob_check_mem_24bytes: None,
+            blob_check_mem_32bytes: None,
+            blob_check_mem_48bytes: None,
+            blob_check_mem_64bytes: None,
             stalked_addresses: HashMap::new(),
         };
         Allocator::init(Dereffer::new(&mut res as *mut Self));
@@ -490,13 +704,22 @@ impl AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, module_name: &str) {
+    pub fn init(&mut self, modules_to_instrument: &Vec<&str>) {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
-            for _ in 0..50 {
+            for _ in 0..64 {
                 mmap(
                     std::ptr::null_mut(),
                     128 * 1024,
+                    ProtFlags::PROT_NONE,
+                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                    -1,
+                    0,
+                )
+                .expect("Failed to map dummy regions for frida workaround");
+                mmap(
+                    std::ptr::null_mut(),
+                    4 * 1024 * 1024,
                     ProtFlags::PROT_NONE,
                     MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
                     -1,
@@ -508,7 +731,19 @@ impl AsanRuntime {
 
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
-        self.hook_library(module_name);
+        for module_name in modules_to_instrument {
+            self.hook_library(module_name);
+        }
+    }
+
+    /// Reset all allocations so that they can be reused for new allocation requests.
+    pub fn reset_allocations(&self) {
+        Allocator::get().reset();
+    }
+
+    /// Make sure the specified memory is unpoisoned
+    pub fn unpoison(&self, address: usize, size: usize) {
+        Allocator::get().map_shadow_for_region(address, address + size, true);
     }
 
     /// Add a stalked address to real address mapping.
@@ -517,11 +752,19 @@ impl AsanRuntime {
         self.stalked_addresses.insert(stalked, real);
     }
 
+    pub fn real_address_for_stalked(&self, stalked: usize) -> Option<&usize> {
+        self.stalked_addresses.get(&stalked)
+    }
+
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     fn unpoison_all_existing_memory(&self) {
+        let mut allocator = Allocator::get();
         walk_self_maps(&mut |start, end, _permissions, _path| {
             //if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
-            Allocator::get().map_shadow_for_region(start, end, true);
+            if allocator.pre_allocated_shadow && start == 1 << allocator.shadow_bit {
+                return false;
+            }
+            allocator.map_shadow_for_region(start, end, true);
             //}
             false
         });
@@ -566,6 +809,53 @@ impl AsanRuntime {
 
         // Hook all the memory allocator functions
         target_lib.hook_function("malloc", asan_malloc as *const c_void);
+        target_lib.hook_function("_Znam", asan_new as *const c_void);
+        target_lib.hook_function("_ZnamRKSt9nothrow_t", asan_new_nothrow as *const c_void);
+        target_lib.hook_function("_ZnamSt11align_val_t", asan_new_aligned as *const c_void);
+        target_lib.hook_function(
+            "_ZnamSt11align_val_tRKSt9nothrow_t",
+            asan_new_aligned_nothrow as *const c_void,
+        );
+        target_lib.hook_function("_Znwm", asan_new as *const c_void);
+        target_lib.hook_function("_ZnwmRKSt9nothrow_t", asan_new_nothrow as *const c_void);
+        target_lib.hook_function("_ZnwmSt11align_val_t", asan_new_aligned as *const c_void);
+        target_lib.hook_function(
+            "_ZnwmSt11align_val_tRKSt9nothrow_t",
+            asan_new_aligned_nothrow as *const c_void,
+        );
+
+        target_lib.hook_function("_ZdaPv", asan_delete as *const c_void);
+        target_lib.hook_function("_ZdaPvm", asan_delete_ulong as *const c_void);
+        target_lib.hook_function(
+            "_ZdaPvmSt11align_val_t",
+            asan_delete_ulong_aligned as *const c_void,
+        );
+        target_lib.hook_function("_ZdaPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
+        target_lib.hook_function(
+            "_ZdaPvSt11align_val_t",
+            asan_delete_aligned as *const c_void,
+        );
+        target_lib.hook_function(
+            "_ZdaPvSt11align_val_tRKSt9nothrow_t",
+            asan_delete_aligned_nothrow as *const c_void,
+        );
+
+        target_lib.hook_function("_ZdlPv", asan_delete as *const c_void);
+        target_lib.hook_function("_ZdlPvm", asan_delete_ulong as *const c_void);
+        target_lib.hook_function(
+            "_ZdlPvmSt11align_val_t",
+            asan_delete_ulong_aligned as *const c_void,
+        );
+        target_lib.hook_function("_ZdlPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
+        target_lib.hook_function(
+            "_ZdlPvSt11align_val_t",
+            asan_delete_aligned as *const c_void,
+        );
+        target_lib.hook_function(
+            "_ZdlPvSt11align_val_tRKSt9nothrow_t",
+            asan_delete_aligned_nothrow as *const c_void,
+        );
+
         target_lib.hook_function("calloc", asan_calloc as *const c_void);
         target_lib.hook_function("pvalloc", asan_pvalloc as *const c_void);
         target_lib.hook_function("valloc", asan_valloc as *const c_void);
@@ -595,13 +885,17 @@ impl AsanRuntime {
 
         let instructions = cs
             .disasm_count(
-                unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 8) },
+                unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 24) },
                 actual_pc as u64,
-                1,
+                3,
             )
             .unwrap();
         let instructions = instructions.iter().collect::<Vec<Insn>>();
-        let insn = instructions.first().unwrap();
+        let mut insn = instructions.first().unwrap();
+        if insn.mnemonic().unwrap() == "msr" && insn.op_str().unwrap() == "nzcv, x0" {
+            insn = instructions.get(2).unwrap();
+            actual_pc = insn.address() as usize;
+        }
 
         let detail = cs.insn_detail(&insn).unwrap();
         let arch_detail = detail.arch_detail();
@@ -672,43 +966,49 @@ impl AsanRuntime {
         }
 
         let mut allocator = Allocator::get();
-        let metadata = allocator.find_metadata(fault_address, self.regs[base_reg as usize]);
-
-        let mut error = if insn.mnemonic().unwrap().starts_with("l") {
-            if metadata.freed {
-                AsanError::ReadAfterFree((
-                    &self.regs,
-                    actual_pc,
-                    (base_reg, index_reg, displacement as usize, fault_address),
-                    metadata,
-                ))
+        if let Some(metadata) = allocator.find_metadata(fault_address, self.regs[base_reg as usize])
+        {
+            let mut error = if insn.mnemonic().unwrap().starts_with("l") {
+                if metadata.freed {
+                    AsanError::ReadAfterFree((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
+                } else {
+                    AsanError::OobRead((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
+                }
             } else {
-                AsanError::OobRead((
-                    &self.regs,
-                    actual_pc,
-                    (base_reg, index_reg, displacement as usize, fault_address),
-                    metadata,
-                ))
-            }
-        } else {
-            if metadata.freed {
-                AsanError::WriteAfterFree((
-                    &self.regs,
-                    actual_pc,
-                    (base_reg, index_reg, displacement as usize, fault_address),
-                    metadata,
-                ))
-            } else {
-                AsanError::OobWrite((
-                    &self.regs,
-                    actual_pc,
-                    (base_reg, index_reg, displacement as usize, fault_address),
-                    metadata,
-                ))
-            }
+                if metadata.freed {
+                    AsanError::WriteAfterFree((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
+                } else {
+                    AsanError::OobWrite((
+                        &self.regs,
+                        actual_pc,
+                        (base_reg, index_reg, displacement as usize, fault_address),
+                        metadata,
+                    ))
+                }
+            };
+            self.report_error(&mut error);
         };
 
-        self.report_error(&mut error);
+        self.report_error(&mut AsanError::Unknown((
+            &self.regs,
+            actual_pc,
+            (base_reg, index_reg, displacement as usize, fault_address),
+        )));
     }
 
     fn report_error(&self, error: &mut AsanError) {
@@ -792,7 +1092,7 @@ impl AsanRuntime {
                     .unwrap();
 
                 writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
-                let offset = *fault_address - metadata.address;
+                let offset: i64 = *fault_address as i64 - metadata.address as i64;
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
@@ -805,6 +1105,68 @@ impl AsanRuntime {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
+            }
+            &mut AsanError::Unknown((registers, pc, fault)) => {
+                let (basereg, indexreg, _displacement, fault_address) = fault;
+
+                writeln!(
+                    output,
+                    " at 0x{:x}, faulting address 0x{:x}",
+                    pc, fault_address
+                )
+                .unwrap();
+                output.reset().unwrap();
+
+                writeln!(output, "{:━^80}", " REGISTERS ").unwrap();
+                for reg in 0..=30 {
+                    if reg == basereg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                    } else if reg == indexreg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
+                            .unwrap();
+                    }
+                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
+                    output.reset().unwrap();
+                    if reg % 4 == 3 {
+                        writeln!(output, "").unwrap();
+                    }
+                }
+                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+
+                writeln!(output, "{:━^80}", " CODE ").unwrap();
+                let mut cs = Capstone::new()
+                    .arm64()
+                    .mode(capstone::arch::arm64::ArchMode::Arm)
+                    .build()
+                    .unwrap();
+                cs.set_skipdata(true).expect("failed to set skipdata");
+
+                let start_pc = pc - 4 * 5;
+                for insn in cs
+                    .disasm_count(
+                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                        start_pc as u64,
+                        11,
+                    )
+                    .expect("failed to disassemble instructions")
+                    .iter()
+                {
+                    if insn.address() as usize == pc {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                        writeln!(output, "\t => {}", insn).unwrap();
+                        output.reset().unwrap();
+                    } else {
+                        writeln!(output, "\t    {}", insn).unwrap();
+                    }
+                }
+                backtrace_printer
+                    .print_trace(&Backtrace::new(), output)
+                    .unwrap();
             }
             AsanError::DoubleFree((ptr, metadata)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
@@ -876,12 +1238,15 @@ impl AsanRuntime {
 
     /// Generate the instrumentation blobs for the current arch.
     fn generate_instrumentation_blobs(&mut self) {
+        let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check {
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch aarch64
+                //; brk #5
                 ; mov x1, #1
-                ; add x1, xzr, x1, lsl #36
+                ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
@@ -926,6 +1291,62 @@ impl AsanRuntime {
             );};
         }
 
+        macro_rules! shadow_check_exact {
+            ($ops:ident, $val:expr) => {dynasm!($ops
+                ; .arch aarch64
+                //; brk #0x42
+                ; mov x1, #1
+                ; add x1, xzr, x1, lsl #shadow_bit
+                ; add x1, x1, x0, lsr #3
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
+                ; ldrh w1, [x1, #0]
+                ; and x0, x0, #7
+                ; rev16 w1, w1
+                ; rbit w1, w1
+                ; lsr x1, x1, #16
+                ; lsr x1, x1, x0
+                ; .dword -717536768 // 0xd53b4200 //mrs x0, NZCV
+                ; and x1, x1, #$val
+                ; cmp x1, #$val
+                ; b.eq >done
+                //; brk #$bit
+                ; ldr x0, >self_regs_addr
+                ; stp x2, x3, [x0, #0x10]
+                ; stp x4, x5, [x0, #0x20]
+                ; stp x6, x7, [x0, #0x30]
+                ; stp x8, x9, [x0, #0x40]
+                ; stp x10, x11, [x0, #0x50]
+                ; stp x12, x13, [x0, #0x60]
+                ; stp x14, x15, [x0, #0x70]
+                ; stp x16, x17, [x0, #0x80]
+                ; stp x18, x19, [x0, #0x90]
+                ; stp x20, x21, [x0, #0xa0]
+                ; stp x22, x23, [x0, #0xb0]
+                ; stp x24, x25, [x0, #0xc0]
+                ; stp x26, x27, [x0, #0xd0]
+                ; stp x28, x29, [x0, #0xe0]
+                ; stp x30, xzr, [x0, #0xf0]
+                ; mov x3, x0
+                ; ldp x0, x1, [sp], #144
+                ; stp x0, x1, [x3]
+                ; ldr x0, >self_addr
+                ; ldr x1, >trap_func
+                ; bl >here
+                ; here:
+                ; str x30, [x3, 0xf8]
+                ; ldr x30, [x3, 0xf0]
+                ; br x1
+                ; self_addr:
+                ; .qword self as *mut _  as *mut c_void as i64
+                ; self_regs_addr:
+                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+                ; trap_func:
+                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+                ; done:
+                ; .dword -719633920 //0xd51b4200 // msr nvcz, x0
+            );};
+        }
+
         let mut ops_check_mem_byte =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops_check_mem_byte, 0);
@@ -958,35 +1379,119 @@ impl AsanRuntime {
         shadow_check!(ops_check_mem_16bytes, 4);
         self.blob_check_mem_16bytes =
             Some(ops_check_mem_16bytes.finalize().unwrap().into_boxed_slice());
+
+        let mut ops_check_mem_3bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops_check_mem_3bytes, 3);
+        self.blob_check_mem_3bytes =
+            Some(ops_check_mem_3bytes.finalize().unwrap().into_boxed_slice());
+
+        let mut ops_check_mem_6bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops_check_mem_6bytes, 6);
+        self.blob_check_mem_6bytes =
+            Some(ops_check_mem_6bytes.finalize().unwrap().into_boxed_slice());
+
+        let mut ops_check_mem_12bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops_check_mem_12bytes, 12);
+        self.blob_check_mem_12bytes =
+            Some(ops_check_mem_12bytes.finalize().unwrap().into_boxed_slice());
+
+        let mut ops_check_mem_24bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops_check_mem_24bytes, 24);
+        self.blob_check_mem_24bytes =
+            Some(ops_check_mem_24bytes.finalize().unwrap().into_boxed_slice());
+
+        let mut ops_check_mem_32bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops_check_mem_32bytes, 32);
+        self.blob_check_mem_32bytes =
+            Some(ops_check_mem_32bytes.finalize().unwrap().into_boxed_slice());
+
+        let mut ops_check_mem_48bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops_check_mem_48bytes, 48);
+        self.blob_check_mem_48bytes =
+            Some(ops_check_mem_48bytes.finalize().unwrap().into_boxed_slice());
+
+        let mut ops_check_mem_64bytes =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops_check_mem_64bytes, 64);
+        self.blob_check_mem_64bytes =
+            Some(ops_check_mem_64bytes.finalize().unwrap().into_boxed_slice());
     }
 
     /// Get the blob which checks a byte access
     #[inline]
-    pub fn blob_check_mem_byte(&self) -> &Box<[u8]> {
+    pub fn blob_check_mem_byte(&self) -> &[u8] {
         self.blob_check_mem_byte.as_ref().unwrap()
     }
 
     /// Get the blob which checks a halfword access
     #[inline]
-    pub fn blob_check_mem_halfword(&self) -> &Box<[u8]> {
+    pub fn blob_check_mem_halfword(&self) -> &[u8] {
         self.blob_check_mem_halfword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a dword access
     #[inline]
-    pub fn blob_check_mem_dword(&self) -> &Box<[u8]> {
+    pub fn blob_check_mem_dword(&self) -> &[u8] {
         self.blob_check_mem_dword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a qword access
     #[inline]
-    pub fn blob_check_mem_qword(&self) -> &Box<[u8]> {
+    pub fn blob_check_mem_qword(&self) -> &[u8] {
         self.blob_check_mem_qword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 16 byte access
     #[inline]
-    pub fn blob_check_mem_16bytes(&self) -> &Box<[u8]> {
+    pub fn blob_check_mem_16bytes(&self) -> &[u8] {
         self.blob_check_mem_16bytes.as_ref().unwrap()
+    }
+
+    /// Get the blob which checks a 3 byte access
+    #[inline]
+    pub fn blob_check_mem_3bytes(&self) -> &[u8] {
+        self.blob_check_mem_3bytes.as_ref().unwrap()
+    }
+
+    /// Get the blob which checks a 6 byte access
+    #[inline]
+    pub fn blob_check_mem_6bytes(&self) -> &[u8] {
+        self.blob_check_mem_6bytes.as_ref().unwrap()
+    }
+
+    /// Get the blob which checks a 12 byte access
+    #[inline]
+    pub fn blob_check_mem_12bytes(&self) -> &[u8] {
+        self.blob_check_mem_12bytes.as_ref().unwrap()
+    }
+
+    /// Get the blob which checks a 24 byte access
+    #[inline]
+    pub fn blob_check_mem_24bytes(&self) -> &[u8] {
+        self.blob_check_mem_24bytes.as_ref().unwrap()
+    }
+
+    /// Get the blob which checks a 32 byte access
+    #[inline]
+    pub fn blob_check_mem_32bytes(&self) -> &[u8] {
+        self.blob_check_mem_32bytes.as_ref().unwrap()
+    }
+
+    /// Get the blob which checks a 48 byte access
+    #[inline]
+    pub fn blob_check_mem_48bytes(&self) -> &[u8] {
+        self.blob_check_mem_48bytes.as_ref().unwrap()
+    }
+
+    /// Get the blob which checks a 64 byte access
+    #[inline]
+    pub fn blob_check_mem_64bytes(&self) -> &[u8] {
+        self.blob_check_mem_64bytes.as_ref().unwrap()
     }
 }
