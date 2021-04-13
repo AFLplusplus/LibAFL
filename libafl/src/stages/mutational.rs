@@ -39,6 +39,7 @@ where
     fn iterations(&self, state: &mut S) -> usize;
 
     /// Runs this (mutational) stage for the given testcase
+    #[allow(clippy::clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
         state: &mut S,

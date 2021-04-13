@@ -237,7 +237,7 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
 fn new_map_size(max_alloc: usize) -> usize {
     max(
         max_alloc * 2 + EOP_MSG_SIZE + LLMP_PAGE_HEADER_LEN,
-        LLMP_CFG_INITIAL_MAP_SIZE,
+        LLMP_CFG_INITIAL_MAP_SIZE - 1,
     )
     .next_power_of_two()
 }
@@ -588,7 +588,7 @@ where
             last_msg_sent: ptr::null_mut(),
             out_maps: vec![LlmpSharedMap::new(
                 0,
-                SH::new_map(new_map_size(LLMP_CFG_INITIAL_MAP_SIZE))?,
+                SH::new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
             )],
             // drop pages to the broker if it already read them
             keep_pages_forever,
@@ -701,7 +701,10 @@ where
         if (*ret).tag == LLMP_TAG_UNINITIALIZED {
             panic!("Did not call send() on last message!");
         }
-        (*ret).buf_len_padded = size_of::<LlmpPayloadSharedMapInfo>() as u64;
+        (*ret).buf_len = size_of::<LlmpPayloadSharedMapInfo>() as u64;
+
+        // We don't need to pad the EOP message: it'll always be the last in this page.
+        (*ret).buf_len_padded = (*ret).buf_len;
         (*ret).message_id = if !last_msg.is_null() {
             (*last_msg).message_id + 1
         } else {
@@ -721,6 +724,11 @@ where
         let map = self.out_maps.last_mut().unwrap();
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        println!(
+            "Allocating {} (>={}) bytes on page {:?} / map {:?} (last msg: {:?})",
+            complete_msg_size, buf_len, page, map, last_msg
+        );
         /* DBG("XXX complete_msg_size %lu (h: %lu)\n", complete_msg_size, sizeof(llmp_message)); */
         /* In case we don't have enough space, make sure the next page will be large
          * enough */
@@ -739,19 +747,26 @@ where
             buf_len_padded =
                 llmp_align(base_addr + complete_msg_size) - base_addr - size_of::<LlmpMsg>();
             complete_msg_size = buf_len_padded + size_of::<LlmpMsg>();
-            /* DBG("XXX complete_msg_size NEW %lu\n", complete_msg_size); */
             /* Still space for the new message plus the additional "we're full" message?
              */
+
+            #[cfg(all(feature = "llmp_debug", feature = "std"))]
+            dbg!(
+                (*page).size_used,
+                complete_msg_size,
+                EOP_MSG_SIZE,
+                (*page).size_total
+            );
             if (*page).size_used + complete_msg_size + EOP_MSG_SIZE > (*page).size_total {
                 /* We're full. */
                 return None;
             }
             /* We need to start with 1 for ids, as current message id is initialized
              * with 0... */
-            (*ret).message_id = if !last_msg.is_null() {
-                (*last_msg).message_id + 1
-            } else {
+            (*ret).message_id = if last_msg.is_null() {
                 1
+            } else {
+                (*last_msg).message_id + 1
             }
         } else if (*page).current_msg_id != (*last_msg).message_id {
             /* Oops, wrong usage! */
@@ -807,6 +822,8 @@ where
     /// It will be read by the consuming threads (broker->clients or client->broker)
     #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
     unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
+        // dbg!("Sending msg {:?}", msg);
+
         if self.last_msg_sent == msg {
             panic!("Message sent twice!");
         }
@@ -847,6 +864,9 @@ where
 
         let old_map = self.out_maps.last_mut().unwrap().page_mut();
 
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        println!("New Map Size {}", new_map_size((*old_map).max_alloc_size));
+
         // Create a new shard page.
         let mut new_map_shmem = LlmpSharedMap::new(
             (*old_map).sender,
@@ -854,7 +874,14 @@ where
         );
         let mut new_map = new_map_shmem.page_mut();
 
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        println!("got new map at: {:?}", new_map);
+
         ptr::write_volatile(&mut (*new_map).current_msg_id, (*old_map).current_msg_id);
+
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        println!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
+
         (*new_map).max_alloc_size = (*old_map).max_alloc_size;
         /* On the old map, place a last message linking to the new map for the clients
          * to consume */
@@ -865,17 +892,20 @@ where
         (*end_of_page_msg).map_size = new_map_shmem.shmem.map().len();
         (*end_of_page_msg).shm_str = *new_map_shmem.shmem.shm_slice();
 
-        // We never sent a msg on the new buf */
-        self.last_msg_sent = ptr::null_mut();
-
         /* Send the last msg on the old buf */
         self.send(out)?;
 
+        // Set the new page as current page.
+        self.out_maps.push(new_map_shmem);
+        // We never sent a msg on the new buf */
+        self.last_msg_sent = ptr::null_mut();
+
+        // If we want to get red if old pages, (client to broker), do that now
         if !self.keep_pages_forever {
+            #[cfg(all(feature = "llmp_debug", feature = "std"))]
+            println!("pruning");
             self.prune_old_pages();
         }
-
-        self.out_maps.push(new_map_shmem);
 
         Ok(())
     }
@@ -890,6 +920,9 @@ where
         unsafe {
             self.handle_out_eop()?;
         }
+
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        println!("Handled out eop");
 
         match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
@@ -1061,7 +1094,8 @@ where
                     // Handle end of page
                     if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
                         panic!(
-                            "Illegal message length for EOP (is {}, expected {})",
+                            "Illegal message length for EOP (is {}/{}, expected {})",
+                            (*msg).buf_len,
                             (*msg).buf_len_padded,
                             size_of::<LlmpPayloadSharedMapInfo>()
                         );
@@ -1071,6 +1105,9 @@ where
                     /* The pageinfo points to the map we're about to unmap.
                     Copy the contents first to be safe (probably fine in rust either way). */
                     let pageinfo_cpy = *pageinfo;
+
+                    // Set last msg we received to null (as the map may no longer exist)
+                    self.last_msg_recvd = ptr::null();
 
                     // Mark the old page save to unmap, in case we didn't so earlier.
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
@@ -1215,18 +1252,18 @@ where
     /// Maps and wraps an existing
     pub fn existing(existing_map: SH) -> Self {
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        {
-            #[cfg(debug_assertions)]
-            let bt = Backtrace::new();
-            #[cfg(not(debug_assertions))]
-            let bt = "<n/a (release)>";
-            println!(
-                "LLMP_DEBUG: Using existing map {} with size {}, bt: {:?}",
-                existing_map.shm_str(),
-                existing_map.map().len(),
-                bt
-            );
-        }
+        //{
+        //#[cfg(debug_assertions)]
+        //let bt = Backtrace::new();
+        //#[cfg(not(debug_assertions))]
+        //let bt = "<n/a (release)>";
+        dbg!(
+            "LLMP_DEBUG: Using existing map {} with size {}",
+            existing_map.shm_str(),
+            existing_map.map().len(),
+            //bt
+        );
+        //}
 
         let ret = Self {
             shmem: existing_map,
@@ -1412,7 +1449,8 @@ where
         If we should need zero copy, we could instead post a link to the
         original msg with the map_id and offset. */
         let actual_size = (*out).buf_len_padded;
-        msg.copy_to_nonoverlapping(out, size_of::<LlmpMsg>() + (*msg).buf_len_padded as usize);
+        let complete_size = actual_size as usize + size_of::<LlmpMsg>();
+        (msg as *const u8).copy_to_nonoverlapping(out as *mut u8, complete_size);
         (*out).buf_len_padded = actual_size;
         /* We need to replace the message ID with our own */
         if let Err(e) = self.llmp_out.send(out) {
@@ -1522,10 +1560,7 @@ where
         let llmp_tcp_id = self.llmp_clients.len() as u32;
 
         // Tcp out map sends messages from background thread tcp server to foreground client
-        let tcp_out_map = LlmpSharedMap::new(
-            llmp_tcp_id,
-            SH::new_map(new_map_size(LLMP_CFG_INITIAL_MAP_SIZE))?,
-        );
+        let tcp_out_map = LlmpSharedMap::new(llmp_tcp_id, SH::new_map(LLMP_CFG_INITIAL_MAP_SIZE)?);
         let tcp_out_map_str = tcp_out_map.shmem.shm_str();
         let tcp_out_map_size = tcp_out_map.shmem.map().len();
         self.register_client(tcp_out_map);
@@ -1837,7 +1872,7 @@ where
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::new(
                     0,
-                    SH::new_map(new_map_size(LLMP_CFG_INITIAL_MAP_SIZE))?,
+                    SH::new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
                 )],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,

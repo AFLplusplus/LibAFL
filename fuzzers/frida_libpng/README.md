@@ -7,7 +7,7 @@ It has been tested on Linux.
 ## Build
 
 To build this example, run `cargo build --example libfuzzer_libpng --release`.
-This will call (the build.rs)[./builld.rs], which in turn downloads a libpng archive from the web.
+This will call (the build.rs)[./build.rs], which in turn downloads a libpng archive from the web.
 Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the C++ harness)[./harness.cc] and the instrumented `libpng`.
 Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng`.
 

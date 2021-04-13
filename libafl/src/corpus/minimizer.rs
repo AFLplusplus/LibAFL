@@ -199,15 +199,15 @@ where
     /// Cull the `Corpus` using the `MinimizerCorpusScheduler`
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &mut S) -> Result<(), Error> {
-        if state.metadata().get::<TopRatedsMetadata>().is_none() {
-            return Ok(());
-        }
-        let mut acc = HashSet::new();
-        let top_rated = state.metadata().get::<TopRatedsMetadata>().unwrap();
+        let top_rated = match state.metadata().get::<TopRatedsMetadata>() {
+            None => return Ok(()),
+            Some(val) => val,
+        };
 
-        for key in top_rated.map.keys() {
+        let mut acc = HashSet::new();
+
+        for (key, idx) in &top_rated.map {
             if !acc.contains(key) {
-                let idx = top_rated.map.get(key).unwrap();
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
                 let meta = entry.metadata().get::<M>().ok_or_else(|| {
                     Error::KeyNotFound(format!(

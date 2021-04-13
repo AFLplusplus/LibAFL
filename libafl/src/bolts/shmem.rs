@@ -344,13 +344,13 @@ pub mod unix_shmem {
         pub fn new(map_size: usize) -> Result<Self, Error> {
             let mut ret = unix_shmem_unitialized();
             let map = unsafe { unix_shmem_init(&mut ret, map_size) };
-            if !map.is_null() {
-                Ok(ret)
-            } else {
+            if map.is_null() {
                 Err(Error::Unknown(format!(
-                    "Could not allocate map of size {}",
+                    "Could not allocate map of size {} - check OS limits, (i.e. shmall, shmmax)!",
                     map_size
                 )))
+            } else {
+                Ok(ret)
             }
         }
     }

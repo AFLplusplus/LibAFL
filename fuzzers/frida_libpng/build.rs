@@ -6,8 +6,24 @@ use std::{
     process::{exit, Command},
 };
 
+use which::which;
+
 const LIBPNG_URL: &str =
     "https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz";
+
+fn build_dep_check(tools: &[&str]) {
+    for tool in tools.into_iter() {
+        println!("Checking for build tool {}...", tool);
+
+        match which(tool) {
+            Ok(path) => println!("Found build tool {}", path.to_str().unwrap()),
+            Err(_) => {
+                println!("ERROR: missing build tool {}", tool);
+                exit(1);
+            }
+        };
+    }
+}
 
 fn main() {
     if cfg!(windows) {
@@ -21,8 +37,11 @@ fn main() {
     let out_dir_path = Path::new(&out_dir);
     std::fs::create_dir_all(&out_dir).expect(&format!("Failed to create {}", &out_dir));
 
+    println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
     println!("cargo:rerun-if-changed=harness.cc");
+
+    build_dep_check(&["clang", "clang++", "wget", "tar", "make"]);
 
     let libpng = format!("{}/libpng-1.6.37", &out_dir);
     let libpng_path = Path::new(&libpng);
@@ -114,6 +133,4 @@ fn main() {
         .status()
         .unwrap();
     assert!(status.success());
-
-    println!("cargo:rerun-if-changed=build.rs");
 }

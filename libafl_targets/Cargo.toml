@@ -10,6 +10,7 @@ pcguard_edges = []
 pcguard_hitcounts = []
 libfuzzer = []
 value_profile = []
+cmplog = []
 pcguard = ["pcguard_hitcounts"]
 
 [build-dependencies]
