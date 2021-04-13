@@ -487,12 +487,12 @@ pub fn launcher<T1, T2>(
     client_fn: fn(T2) -> Result<(), Error>,
     broker_args: T1,
     client_args: T2,
-    args: String,
+    cores: &[usize],
 ) -> Result<(), Error> {
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
-    let (bind_to_core, cores) = parse_args(args, num_cores);
     let mut handles = vec![];
+
     //let ags = std::env::args;
     //spawn clients
     for id in 0..num_cores {
@@ -506,15 +506,16 @@ pub fn launcher<T1, T2>(
                     Ok(())
                 }
                 ForkResult::Child => {
-                    if bind_to_core {
-                        core_affinity::set_for_current(bind_to);
-                    }
+                    //if bind {
+                    core_affinity::set_for_current(bind_to);
+                    //}
                     //silence stdout and stderr for clients
                     #[cfg(feature = "std")]
                     {
-                        let file = OpenOptions::new().write(true).open("/dev/null").unwrap();
-                        set_std_fd(libc::STDOUT_FILENO, file.as_raw_fd()).unwrap();
-                        set_std_fd(libc::STDERR_FILENO, file.as_raw_fd()).unwrap();
+                        let stdout_file = OpenOptions::new().write(true).open("/dev/null").unwrap();
+                        dup2(stdout_file.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
+                        dup2(stdout_file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
+                        // todo: does the file fd get Dropped early?
                     }
                     //clients keep retrying the connection to broker
                     client_fn(client_args).unwrap();
@@ -544,11 +545,10 @@ pub fn launcher<T1, T2>(
     client_fn: fn(T2) -> Result<(), Error>,
     broker_args: T1,
     client_args: T2,
-    args: String,
+    cores: &[usize],
 ) -> Result<(), Error> {
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
-    let (bind_to_core, cores) = parse_args(args, num_cores);
 
     let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 
@@ -574,11 +574,11 @@ pub fn launcher<T1, T2>(
             let mut children = vec![];
             for id in 0..num_cores {
                 if cores.iter().any(|&x| x == id) {
-                    if bind_to_core {
-                        std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                    } else {
-                        std::env::set_var(_AFL_LAUNCHER_CLIENT, "none");
-                    }
+                    //if bind_to_core {
+                    std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                    //} else {
+                    //std::env::set_var(_AFL_LAUNCHER_CLIENT, "none");
+                    //}
                     let child = startable_self().unwrap().spawn().unwrap();
                     children.push(child);
                 }
@@ -598,15 +598,21 @@ pub fn launcher<T1, T2>(
     }
 }
 
+/// "Safe" wrapper around dup2
 #[cfg(all(unix, feature = "std"))]
-fn set_std_fd(device: i32, fd: i32) -> Result<(), Error> {
+fn dup2(fd: i32, device: i32) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
         -1 => Err(Error::File(ioErr::last_os_error())),
         _ => Ok(()),
     }
 }
 
-fn parse_args(args: String, num_cores: usize) -> (bool, Vec<usize>) {
+/// Parses core binding args from user input
+/// Returns `None` if no feedback, or a Vec of CPU IDs.
+/// broker always binds to the 0th core
+/// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
+/// ` ./fuzzer --cores all` -> one client runs on each available core
+pub fn parse_core_bind_arg(args: String) -> Option<Vec<usize>> {
     let mut bind_to_core = false;
     let mut cores: Vec<usize> = vec![];
     if args == "none" {
@@ -616,6 +622,7 @@ fn parse_args(args: String, num_cores: usize) -> (bool, Vec<usize>) {
     } else {
         let core_args: Vec<&str> = args.split(',').collect();
         if core_args.len() == 1 && core_args[0] == "all" {
+            let num_cores = core_affinity::get_core_ids().unwrap().len();
             for x in 0..num_cores {
                 cores.push(x);
             }
@@ -638,5 +645,9 @@ fn parse_args(args: String, num_cores: usize) -> (bool, Vec<usize>) {
         }
         bind_to_core = true;
     }
-    (bind_to_core, cores)
+    if bind_to_core {
+        Some(cores)
+    } else {
+        None
+    }
 }

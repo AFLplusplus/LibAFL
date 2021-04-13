@@ -16,14 +16,14 @@ use libafl::{
         CrashFeedback, MapFeedback, MaxMapFeedback, MaxReducer, TimeFeedback, TimeoutFeedback,
     },
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput},
+    inputs::BytesInput,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    utils::{current_nanos, launcher, StdRand},
+    utils::{current_nanos, launcher, parse_core_bind_arg, StdRand},
     Error,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
@@ -38,7 +38,8 @@ pub fn main() {
     let yaml = load_yaml!("clap-config.yaml");
     let matches = App::from(yaml).get_matches();
 
-    let cores = matches.value_of("cores").unwrap().to_string();
+    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap().to_string())
+        .expect("No valid core count given!");
     //println!("{:?}", args);
     println!(
         "Workdir: {:?}",
@@ -50,7 +51,7 @@ pub fn main() {
         objective_dir: PathBuf::from("./crashes"),
         broker_port: 1337,
     };
-    launcher(in_broker, in_client, 1337, client_args, cores).unwrap();
+    launcher(in_broker, in_client, 1337, client_args, &cores).unwrap();
 }
 
 struct FnArgs {
@@ -78,7 +79,6 @@ fn in_broker(broker_port: u16) -> Result<(), Error> {
     >(stats, broker_port)
 }
 fn in_client(fn_args: FnArgs) -> Result<(), Error> {
-
     let stats = SimpleStats::new(|s| println!("{}", s));
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
