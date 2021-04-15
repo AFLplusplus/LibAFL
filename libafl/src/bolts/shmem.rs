@@ -18,7 +18,7 @@ pub type StdShMem = Win32ShMem;
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::{env, num::ParseIntError};
+use std::env;
 
 use crate::Error;
 
@@ -56,13 +56,7 @@ impl ShMemId {
 
     /// Create a new id from an int
     pub fn from_int(val: i32) -> Self {
-        let mut slice: [u8; 20] = [0; 20];
-        let bytes = val.to_be_bytes();
-        let start_pos = bytes.iter().position(|&c| c != 0).unwrap();
-        for (i, val) in bytes[start_pos..].iter().enumerate() {
-            slice[i] = *val;
-        }
-        Self { id: slice }
+        Self::from_string(&val.to_string())
     }
 
     /// Create a new id from a string
@@ -86,8 +80,9 @@ impl ShMemId {
     }
 
     /// Get an integer representation of this id
-    pub fn to_int(&self) -> Result<i32, ParseIntError> {
-        self.to_string().parse()
+    pub fn to_int(&self) -> i32 {
+        let id: i32 = self.to_string().parse().unwrap();
+        id
     }
 }
 
@@ -258,7 +253,7 @@ pub mod unix_shmem {
             /// Get a UnixShMem of the existing shared memory mapping identified by id
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let map = shmat(id.to_int().unwrap(), ptr::null(), 0) as *mut c_uchar;
+                    let map = shmat(id.to_int(), ptr::null(), 0) as *mut c_uchar;
 
                     if map == usize::MAX as *mut c_void as *mut c_uchar || map.is_null() {
                         return Err(Error::Unknown("Failed to map the shared mapping".to_string()));
@@ -293,7 +288,7 @@ pub mod unix_shmem {
         impl Drop for DefaultUnixShMem {
             fn drop(&mut self) {
                 unsafe {
-                    shmctl(self.id.to_int().unwrap(), 0, ptr::null_mut());
+                    shmctl(self.id.to_int(), 0, ptr::null_mut());
                 }
             }
         }
@@ -478,17 +473,6 @@ pub mod unix_shmem {
                     })
                 }
             }
-
-            ///// Get the file descriptor from an AshmemShMem's id
-            //pub fn fd_from_id(id: ShMemId) -> Result<c_int, Error> {
-            //let result = if let Some(fd_str) = id.to_string().split(":").collect::<Vec<&str>>().get(1) {
-            //println!("id: {}, fd_str: {}", id.to_string(), fd_str);
-            //Ok(fd_str.parse().expect("Could not parse the file descriptor"))
-            //} else {
-            //Err(Error::Unknown("Invalid id for ashmem".to_string()))
-            //};
-            //result
-            //}
         }
 
         #[cfg(unix)]
