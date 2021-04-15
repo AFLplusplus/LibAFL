@@ -78,7 +78,7 @@ use backtrace::Backtrace;
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
-    bolts::shmem::{ShMemDescription, ShMemId, ShMemMapping, ShMem},
+    bolts::shmem::{ShMemDescription, ShMemId, ShMemMapping, ShMemProvider},
     Error,
 };
 
@@ -362,7 +362,7 @@ impl LlmpMsg {
 #[derive(Debug)]
 pub enum LlmpConnection<'a, SHP>
 where
-    SHP: ShMem + 'static,
+    SHP: ShMemProvider + 'static,
 {
     /// A broker and a thread using this tcp background thread
     IsBroker { broker: LlmpBroker<'a, SHP> },
@@ -372,7 +372,7 @@ where
 
 impl<'a, SHP> LlmpConnection<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
@@ -483,7 +483,7 @@ struct LlmpPayloadSharedMapInfo {
 #[derive(Debug)]
 pub struct LlmpSender<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     /// ID of this sender. Only used in the broker.
     pub id: u32,
@@ -504,7 +504,7 @@ where
 /// An actor on the sending part of the shared map
 impl<'a, SHP> LlmpSender<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     pub fn new(
         shmem_provider: Arc<Mutex<SHP>>,
@@ -952,7 +952,7 @@ where
 #[derive(Debug)]
 pub struct LlmpReceiver<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     pub id: u32,
     /// Pointer to the last meg this received
@@ -967,7 +967,7 @@ where
 /// Receiving end of an llmp channel
 impl<'a, SHP> LlmpReceiver<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     /// Reattach to a vacant recv_map, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
@@ -1344,7 +1344,7 @@ where
 #[derive(Debug)]
 pub struct LlmpBroker<'a, SHP>
 where
-    SHP: ShMem + 'static,
+    SHP: ShMemProvider + 'static,
 {
     /// Broadcast map from broker to all clients
     pub llmp_out: LlmpSender<'a, SHP>,
@@ -1357,7 +1357,7 @@ where
     /// This flag is used to indicate that shutdown has been requested by the SIGINT and SIGTERM
     /// handlers
     shutting_down: bool,
-    /// The ShMem to use
+    /// The ShMemProvider to use
     shmem_provider: Arc<Mutex<SHP>>,
 }
 
@@ -1381,7 +1381,7 @@ impl Handler for LlmpBrokerSignalHandler {
 /// It may intercept messages passing through.
 impl<'a, SHP> LlmpBroker<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     /// Create and initialize a new llmp_broker
     pub fn new(shmem_provider: Arc<Mutex<SHP>>) -> Result<Self, Error> {
@@ -1726,7 +1726,7 @@ pub struct LlmpClientDescription {
 #[derive(Debug)]
 pub struct LlmpClient<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     shmem_provider: Arc<Mutex<SHP>>,
     /// Outgoing channel to the broker
@@ -1739,7 +1739,7 @@ where
 /// and get incoming messages from the shared broker bus
 impl<'a, SHP> LlmpClient<'a, SHP>
 where
-    SHP: ShMem,
+    SHP: ShMemProvider,
 {
     /// Reattach to a vacant client map.
     /// It is essential, that the broker (or someone else) kept a pointer to the out_map
@@ -1994,18 +1994,19 @@ mod tests {
         Tag,
     };
 
+    use parking_lot::Mutex;
 
-    use crate::bolts::shmem::StdShMem;
+    use crate::bolts::shmem::StdShMemProvider;
 
-    //#[test]
+    #[test]
     pub fn llmp_connection() {
-        let mut broker = match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMem::new())), 1337).unwrap() {
+        let mut broker = match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMemProvider::new())), 1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
             IsBroker { broker } => broker,
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMem::new())), 1337).unwrap() {
+        let mut client = match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMemProvider::new())), 1337).unwrap() {
             IsBroker { broker: _ } => panic!("Second connect should be a client!"),
             IsClient { client } => client,
         };
@@ -2029,7 +2030,7 @@ mod tests {
         }
 
         /* recreate the client from env, check if it still works */
-        client = LlmpClient::on_existing_from_env(Arc::new(Mutex::new(StdShMem::new())), "_ENV_TEST").unwrap();
+        client = LlmpClient::on_existing_from_env(Arc::new(Mutex::new(StdShMemProvider::new())), "_ENV_TEST").unwrap();
 
         client.send_buf(tag, &arr).unwrap();
 

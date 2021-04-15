@@ -17,7 +17,7 @@ use crate::utils::startable_self;
 use crate::utils::{fork, ForkResult};
 
 #[cfg(all(feature = "std", unix))]
-use crate::bolts::shmem::UnixShMem;
+use crate::bolts::shmem::UnixShMemProvider;
 
 #[cfg(feature = "std")]
 use std::sync::{Arc, Mutex};
@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex};
 use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
-        shmem::ShMem,
+        shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
@@ -54,7 +54,7 @@ pub struct LlmpEventManager<'a, I, S, SHP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SHP: ShMem + 'static,
+    SHP: ShMemProvider + 'static,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
@@ -65,7 +65,7 @@ where
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-impl<'a, I, S, ST> LlmpEventManager<'a, I, S, UnixShMem, ST>
+impl<'a, I, S, ST> LlmpEventManager<'a, I, S, UnixShMemProvider, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -76,7 +76,7 @@ where
     /// Else, it will act as client.
     #[cfg(feature = "std")]
     pub fn new_on_port_std(
-        shmem_provider: UnixShMem,
+        shmem_provider: UnixShMemProvider,
         stats: ST,
         port: u16,
     ) -> Result<Self, Error> {
@@ -94,7 +94,7 @@ where
     /// Std uses UnixShMem.
     #[cfg(feature = "std")]
     pub fn existing_client_from_env_std(
-        shmem_provider: UnixShMem,
+        shmem_provider: UnixShMemProvider,
         env_name: &str,
     ) -> Result<Self, Error> {
         Self::existing_client_from_env(
@@ -108,7 +108,7 @@ impl<'a, I, S, SHP, ST> Drop for LlmpEventManager<'a, I, S, SHP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
@@ -121,7 +121,7 @@ impl<'a, I, S, SHP, ST> LlmpEventManager<'a, I, S, SHP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats,
 {
     /// Create llmp on a port
@@ -331,7 +331,7 @@ impl<'a, I, S, SHP, ST> EventManager<I, S> for LlmpEventManager<'a, I, S, SHP, S
 where
     I: Input,
     S: IfInteresting<I>,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats, //CE: CustomEvent<I>,
 {
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
@@ -395,7 +395,7 @@ pub fn serialize_state_mgr<'a, I, S, SHP, ST>(
 where
     I: Input,
     S: Serialize + IfInteresting<I>,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats,
 {
     Ok(postcard::to_allocvec(&(&state, &mgr.describe()?))?)
@@ -410,7 +410,7 @@ pub fn deserialize_state_mgr<'a, I, S, SHP, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats,
 {
     let tuple: (S, _) = postcard::from_bytes(&state_corpus_serialized)?;
@@ -426,7 +426,7 @@ pub struct LlmpRestartingEventManager<'a, I, S, SHP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SHP: ShMem + 'static,
+    SHP: ShMemProvider + 'static,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
@@ -440,7 +440,7 @@ impl<'a, I, S, SHP, ST> EventManager<I, S> for LlmpRestartingEventManager<'a, I,
 where
     I: Input,
     S: IfInteresting<I> + Serialize,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats, //CE: CustomEvent<I>,
 {
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
@@ -489,7 +489,7 @@ impl<'a, I, S, SHP, ST> LlmpRestartingEventManager<'a, I, S, SHP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats, //CE: CustomEvent<I>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
@@ -525,7 +525,7 @@ pub fn setup_restarting_mgr<'a, I, S, SHP, ST>(
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
-    SHP: ShMem,
+    SHP: ShMemProvider,
     ST: Stats,
 {
     let shmem_provider = Arc::new(Mutex::new(shmem_provider));
