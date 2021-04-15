@@ -687,16 +687,13 @@ pub mod win32_shmem {
     #[derive(Debug)]
     pub struct Win32ShMemProvider {}
 
-    /// Implementation for Win32ShMemProvider
-    impl Win32ShMemProvider {
-        pub fn new() -> Self {
-            Self {}
-        }
-    }
-
     /// Implement ShMemProvider for Win32ShMemProvider
     impl ShMemProvider for Win32ShMemProvider {
         type Mapping = Win32ShMem;
+
+        fn new() -> Self {
+            Self {}
+        }
 
         fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
             Win32ShMem::new_map(map_size)
