@@ -1981,7 +1981,7 @@ mod tests {
         Tag,
     };
 
-    use crate::bolts::shmem::StdShMemProvider;
+    use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
 
     #[test]
     pub fn llmp_connection() {

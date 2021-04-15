@@ -11,7 +11,7 @@ use std::{thread, time};
 use libafl::bolts::llmp::Tag;
 #[cfg(all(unix, feature = "std"))]
 use libafl::{
-    bolts::{llmp, shmem::StdShMemProvider},
+    bolts::{llmp, shmem::{ShMemProvider, StdShMemProvider}},
     Error,
 };
 

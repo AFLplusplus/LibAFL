@@ -5,7 +5,7 @@ use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{shmem::StdShMemProvider, tuples::tuple_list},
+    bolts::{shmem::{ShMemProvider, StdShMemProvider}, tuples::tuple_list},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
