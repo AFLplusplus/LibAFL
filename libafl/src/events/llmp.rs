@@ -1,6 +1,6 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::{cell::RefCell, marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -73,7 +73,7 @@ where
     /// Else, it will act as client.
     #[cfg(feature = "std")]
     pub fn new_on_port_std(
-        shmem_provider: &'a RefCell<UnixShMemProvider>,
+        shmem_provider: Rc<RefCell<UnixShMemProvider>>,
         stats: ST,
         port: u16,
     ) -> Result<Self, Error> {
@@ -88,7 +88,7 @@ where
     /// Std uses UnixShMem.
     #[cfg(feature = "std")]
     pub fn existing_client_from_env_std(
-        shmem_provider: &'a RefCell<UnixShMemProvider>,
+        shmem_provider: Rc<RefCell<UnixShMemProvider>>,
         env_name: &str,
     ) -> Result<Self, Error> {
         Self::existing_client_from_env(shmem_provider, env_name)
@@ -120,7 +120,7 @@ where
     /// Else, it will act as client.
     #[cfg(feature = "std")]
     pub fn new_on_port(
-        shmem_provider: &'a RefCell<SHP>,
+        shmem_provider: Rc<RefCell<SHP>>,
         stats: ST,
         port: u16,
     ) -> Result<Self, Error> {
@@ -134,7 +134,7 @@ where
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
     pub fn existing_client_from_env(
-        shmem_provider: &'a RefCell<SHP>,
+        shmem_provider: Rc<RefCell<SHP>>,
         env_name: &str,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -155,7 +155,7 @@ where
 
     /// Create an existing client from description
     pub fn existing_client_from_description(
-        shmem_provider: &'a RefCell<SHP>,
+        shmem_provider: Rc<RefCell<SHP>>,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -395,7 +395,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 #[allow(clippy::type_complexity)]
 pub fn deserialize_state_mgr<'a, I, S, SHP, ST>(
-    shmem_provider: &'a RefCell<SHP>,
+    shmem_provider: Rc<RefCell<SHP>>,
     state_corpus_serialized: &[u8],
 ) -> Result<(S, LlmpEventManager<'a, I, S, SHP, ST>), Error>
 where
@@ -485,7 +485,7 @@ where
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
     pub fn new(llmp_mgr: LlmpEventManager<'a, I, S, SHP, ST>, sender: LlmpSender<'a, SHP>) -> Self {
-        Self { llmp_mgr, sender, }
+        Self { llmp_mgr, sender }
     }
 
     /// Get the sender
@@ -508,21 +508,21 @@ where
     clippy::similar_names
 )] // for { mgr = LlmpEventManager... }
 pub fn setup_restarting_mgr<'a, I, S, SHP, ST: 'a>(
-    shmem_provider: &'a RefCell<SHP>,
+    shmem_provider: SHP,
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     _broker_port: u16,
-) -> Result<(Option<RefCell<SHP>>, Option<S>, LlmpRestartingEventManager<'a, I, S, SHP, ST>), Error>
+) -> Result<(Option<S>, LlmpRestartingEventManager<'a, I, S, SHP, ST>), Error>
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
     SHP: ShMemProvider,
     ST: Stats,
 {
+    let shmem_provider = Rc::new(RefCell::new(shmem_provider));
 
-    let mut new_shmem_provider = None;
     let mut mgr = LlmpEventManager::<'a, I, S, SHP, ST>::new_on_port(
-        shmem_provider,
+        shmem_provider.clone(),
         stats,
         _broker_port,
     )?;
@@ -540,18 +540,14 @@ where
         mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
         // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-        let sender = {
-            LlmpSender::new(shmem_provider, 0, false)?
-        };
+        let sender = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
 
         let map = {
-            shmem_provider.borrow_mut().clone_ref(&sender.out_maps.last().unwrap().shmem)?
+            shmem_provider
+                .borrow_mut()
+                .clone_ref(&sender.out_maps.last().unwrap().shmem)?
         };
-        let receiver = LlmpReceiver::on_existing_map(
-            shmem_provider,
-            map,
-            None,
-        )?;
+        let receiver = LlmpReceiver::on_existing_map(shmem_provider.clone(), map, None)?;
         // Store the information to a map.
         sender.to_env(_ENV_FUZZER_SENDER)?;
         receiver.to_env(_ENV_FUZZER_RECEIVER)?;
@@ -584,12 +580,14 @@ where
         // A sender and a receiver for single communication
         // Clone so we get a new connection to the AshmemServer if we are using
         // ServedShMemProvider
-        new_shmem_provider = Some(RefCell::new(shmem_provider.borrow_mut().clone()));
+        let shmem_provider = Rc::new(RefCell::new(shmem_provider.borrow_mut().clone()));
         (
-            LlmpSender::on_existing_from_env(shmem_provider, _ENV_FUZZER_SENDER)?,
-            LlmpReceiver::on_existing_from_env(shmem_provider, _ENV_FUZZER_RECEIVER)?,
+            LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
+            LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
         )
     };
+
+    let shmem_provider = Rc::new(RefCell::new(shmem_provider.borrow_mut().clone()));
 
     println!("We're a client, let's fuzz :)");
 
@@ -603,7 +601,7 @@ where
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
             let client_mgr = LlmpEventManager::<I, S, SHP, ST>::existing_client_from_env(
-                &shmem_provider,
+                shmem_provider.clone(),
                 _ENV_FUZZER_BROKER_CLIENT_INITIAL,
             )?;
 
@@ -613,7 +611,7 @@ where
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
             let (state, mgr): (S, LlmpEventManager<I, S, SHP, ST>) =
-                deserialize_state_mgr(&shmem_provider, &msg)?;
+                deserialize_state_mgr(shmem_provider, &msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }
@@ -626,5 +624,5 @@ where
     sender.send_buf(_LLMP_TAG_NO_RESTART, []);
     */
 
-    Ok((new_shmem_provider, state, mgr))
+    Ok((state, mgr))
 }
