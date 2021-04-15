@@ -19,8 +19,8 @@ use crate::utils::{fork, ForkResult};
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMemProvider;
 
-#[cfg(feature = "std")]
-use std::sync::{Arc, Mutex};
+use spin::Mutex;
+use alloc::sync::Arc;
 
 use crate::{
     bolts::{
@@ -554,7 +554,6 @@ where
             shmem_provider.clone(),
             shmem_provider
                 .lock()
-                .unwrap()
                 .clone_ref(&sender.out_maps.last().unwrap().shmem)?,
             None,
         )?;

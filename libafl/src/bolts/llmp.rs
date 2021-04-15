@@ -62,13 +62,14 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
-use core::marker::PhantomData;
+use core::{marker::PhantomData};
+use alloc::sync::Arc;
+use spin::Mutex;
 #[cfg(feature = "std")]
 use std::{
     env,
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    sync::{Arc, Mutex},
     thread,
 };
 
@@ -518,8 +519,6 @@ where
                 0,
                 shmem_provider
                     .lock()
-                    .unwrap()
-
                     .new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
             )],
             // drop pages to the broker if it already read them
@@ -548,7 +547,7 @@ where
         let msg_sent_offset = msg_offset_from_env(env_name)?;
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.lock().unwrap().existing_from_env(env_name)?,
+            shmem_provider.lock().existing_from_env(env_name)?,
             msg_sent_offset,
         )
     }
@@ -818,8 +817,6 @@ where
             (*old_map).sender,
             self.shmem_provider
                 .lock()
-                .unwrap()
-
                 .new_map(new_map_size((*old_map).max_alloc_size))?,
         );
         let mut new_map = new_map_shmem.page_mut();
@@ -940,8 +937,6 @@ where
             shmem_provider.clone(),
             shmem_provider
                 .lock()
-                .unwrap()
-
                 .from_description(description.shmem)?,
             description.last_message_offset,
         )
@@ -977,7 +972,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.lock().unwrap().existing_from_env(env_name)?,
+            shmem_provider.lock().existing_from_env(env_name)?,
             msg_offset_from_env(env_name)?,
         )
     }
@@ -1082,7 +1077,7 @@ where
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_map = LlmpSharedMap::existing(
-                        self.shmem_provider.lock().unwrap().from_id_and_size(
+                        self.shmem_provider.lock().from_id_and_size(
                             ShMemId::from_slice(&pageinfo_cpy.shm_str),
                             pageinfo_cpy.map_size,
                         )?,
@@ -1186,8 +1181,6 @@ where
             shmem_provider.clone(),
             shmem_provider
                 .lock()
-                .unwrap()
-
                 .from_description(description.shmem)?,
             description.last_message_offset,
         )
@@ -1393,8 +1386,6 @@ where
                     0,
                     shmem_provider
                         .lock()
-                        .unwrap()
-
                         .new_map(new_map_size(0))?,
                 )],
                 // Broker never cleans up the pages so that new
@@ -1556,8 +1547,6 @@ where
             llmp_tcp_id,
             self.shmem_provider
                 .lock()
-                .unwrap()
-
                 .new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
         );
         let shmem_id = tcp_out_map.shmem.id();
@@ -1574,8 +1563,6 @@ where
                 out_maps: vec![LlmpSharedMap::existing(
                     shmem_provider
                         .lock()
-                        .unwrap()
-
                         .from_id_and_size(ShMemId::from_slice(&tcp_out_map_str), tcp_out_map_size)
                         .unwrap(),
                 )],
@@ -1668,7 +1655,7 @@ where
                 } else {
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
-                    match self.shmem_provider.lock().unwrap().from_id_and_size(
+                    match self.shmem_provider.lock().from_id_and_size(
                         ShMemId::from_slice(&(*pageinfo).shm_str),
                         (*pageinfo).map_size,
                     ) {
@@ -1844,8 +1831,6 @@ where
                 out_maps: vec![LlmpSharedMap::new(0, {
                     shmem_provider
                         .lock()
-                        .unwrap()
-
                         .new_map(LLMP_CFG_INITIAL_MAP_SIZE)?
                 })],
                 // drop pages to the broker if it already read them
@@ -1942,7 +1927,7 @@ where
         env_var: &str,
     ) -> Result<Self, Error> {
         let map = {
-            let mut lock = shmem_provider.lock().unwrap();
+            let mut lock = shmem_provider.lock();
             LlmpSharedMap::existing(lock.existing_from_env(env_var)?)
         };
         Self::new(shmem_provider, map)
@@ -1969,7 +1954,7 @@ where
         let broker_map_description: ShMemDescription = postcard::from_bytes(&new_broker_map_str)?;
 
         let map = {
-            let mut lock = shmem_provider.lock().unwrap();
+            let mut lock = shmem_provider.lock();
             LlmpSharedMap::existing(lock.from_description(broker_map_description)?)
         };
         let ret = Self::new(shmem_provider, map)?;
