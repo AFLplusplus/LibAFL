@@ -7,8 +7,7 @@ and forwards them over unix domain sockets.
 use crate::{
     bolts::shmem::{
         unix_shmem::ashmem::{AshmemShMem, AshmemShMemProvider},
-        ShMemDescription, ShMemId, ShMem,
-        ShMemProvider,
+        ShMem, ShMemDescription, ShMemId, ShMemProvider,
     },
     Error,
 };
@@ -25,7 +24,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 #[cfg(all(feature = "std", unix))]
 use std::{
     os::unix::{
-        io::{RawFd, AsRawFd},
+        io::{AsRawFd, RawFd},
         net::{UnixListener, UnixStream},
     },
     thread,
@@ -105,7 +104,6 @@ impl Clone for ServedShMemProvider {
     }
 }
 
-
 impl ShMemProvider for ServedShMemProvider {
     type Mapping = ServedShMem;
 
@@ -114,7 +112,8 @@ impl ShMemProvider for ServedShMemProvider {
         Self {
             stream: UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap(),
-            ).expect("Unable to open connection to ashmem service"),
+            )
+            .expect("Unable to open connection to ashmem service"),
             inner: AshmemShMemProvider::new(),
         }
     }
@@ -132,7 +131,7 @@ impl ShMemProvider for ServedShMemProvider {
     fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error> {
         let parts = id.to_string().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();
-        let (server_fd, client_fd) =  self.send_receive(AshmemRequest::ExistingMap(
+        let (server_fd, client_fd) = self.send_receive(AshmemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
         ));
         Ok(ServedShMem {

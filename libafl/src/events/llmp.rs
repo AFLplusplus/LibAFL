@@ -19,8 +19,8 @@ use crate::utils::{fork, ForkResult};
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMemProvider;
 
-use spin::Mutex;
 use alloc::sync::Arc;
+use spin::Mutex;
 
 use crate::{
     bolts::{
@@ -82,10 +82,7 @@ where
     ) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
-            llmp: llmp::LlmpConnection::on_port(
-                Arc::new(Mutex::new(shmem_provider)),
-                port,
-            )?,
+            llmp: llmp::LlmpConnection::on_port(Arc::new(Mutex::new(shmem_provider)), port)?,
             phantom: PhantomData,
         })
     }
@@ -97,10 +94,7 @@ where
         shmem_provider: UnixShMemProvider,
         env_name: &str,
     ) -> Result<Self, Error> {
-        Self::existing_client_from_env(
-            Arc::new(Mutex::new(shmem_provider)),
-            env_name,
-        )
+        Self::existing_client_from_env(Arc::new(Mutex::new(shmem_provider)), env_name)
     }
 }
 
@@ -589,9 +583,7 @@ where
         // A sender and a receiver for single communication
         // Clone so we get a new connection to the AshmemServer if we are using
         // ServedShMemProvider
-        let shmem_provider = {
-            Arc::new(Mutex::new(shmem_provider.lock().clone()))
-        };
+        let shmem_provider = { Arc::new(Mutex::new(shmem_provider.lock().clone())) };
         (
             shmem_provider.clone(),
             LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,

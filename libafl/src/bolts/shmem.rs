@@ -177,7 +177,7 @@ pub mod unix_shmem {
 
         use crate::Error;
 
-        use super::super::{ShMemId, ShMem, ShMemProvider};
+        use super::super::{ShMem, ShMemId, ShMemProvider};
 
         #[cfg(unix)]
         #[derive(Copy, Clone)]
@@ -230,21 +230,19 @@ pub mod unix_shmem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let os_id = shmget(
-                        0,
-                        map_size as c_ulong,
-                        0o1000 | 0o2000 | 0o600,
-                    );
+                    let os_id = shmget(0, map_size as c_ulong, 0o1000 | 0o2000 | 0o600);
 
                     if os_id < 0_i32 {
-                        return Err(Error::Unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)))
+                        return Err(Error::Unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
                     }
 
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map == usize::MAX as c_int as *mut c_void as *mut c_uchar || map.is_null() {
                         shmctl(os_id, 0, ptr::null_mut());
-                        return Err(Error::Unknown("Failed to map the shared mapping".to_string()));
+                        return Err(Error::Unknown(
+                            "Failed to map the shared mapping".to_string(),
+                        ));
                     }
 
                     Ok(Self {
@@ -261,7 +259,9 @@ pub mod unix_shmem {
                     let map = shmat(id.to_int(), ptr::null(), 0) as *mut c_uchar;
 
                     if map == usize::MAX as *mut c_void as *mut c_uchar || map.is_null() {
-                        return Err(Error::Unknown("Failed to map the shared mapping".to_string()));
+                        return Err(Error::Unknown(
+                            "Failed to map the shared mapping".to_string(),
+                        ));
                     }
 
                     Ok(Self { id, map, map_size })
@@ -345,7 +345,7 @@ pub mod unix_shmem {
 
         use crate::Error;
 
-        use super::super::{ShMemId, ShMem, ShMemProvider};
+        use super::super::{ShMem, ShMemId, ShMemProvider};
 
         extern "C" {
             fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
@@ -557,7 +557,7 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
-    use super::{ShMemId, ShMem, ShMemProvider};
+    use super::{ShMem, ShMemId, ShMemProvider};
     use crate::{
         bolts::bindings::{
             windows::win32::system_services::{
@@ -570,8 +570,8 @@ pub mod win32_shmem {
     };
 
     use core::{ffi::c_void, ptr, slice};
-    use uuid::Uuid;
     use std::convert::TryInto;
+    use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: isize = -1;
     const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
@@ -705,11 +705,7 @@ pub mod win32_shmem {
             Win32ShMem::new_map(map_size)
         }
 
-        fn from_id_and_size(
-            &mut self,
-            id: ShMemId,
-            size: usize,
-        ) -> Result<Self::Mapping, Error> {
+        fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error> {
             Win32ShMem::from_id_and_size(id, size)
         }
     }

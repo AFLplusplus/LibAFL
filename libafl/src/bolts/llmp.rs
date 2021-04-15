@@ -52,7 +52,9 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 
 */
 
+use alloc::sync::Arc;
 use alloc::{string::String, vec::Vec};
+use core::marker::PhantomData;
 use core::{
     cmp::max,
     fmt::Debug,
@@ -62,8 +64,6 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
-use core::{marker::PhantomData};
-use alloc::sync::Arc;
 use spin::Mutex;
 #[cfg(feature = "std")]
 use std::{
@@ -79,7 +79,7 @@ use backtrace::Backtrace;
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
-    bolts::shmem::{ShMemDescription, ShMemId, ShMem, ShMemProvider},
+    bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
 
@@ -319,10 +319,7 @@ impl LlmpMsg {
 
     /// Gets the buffer from this message as slice, with the corrent length.
     #[inline]
-    pub fn as_slice<SHM: ShMem>(
-        &self,
-        map: &mut LlmpSharedMap<SHM>,
-    ) -> Result<&[u8], Error> {
+    pub fn as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
         unsafe {
             if self.in_map(map) {
                 Ok(self.as_slice_unsafe())
@@ -370,10 +367,7 @@ where
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
-    pub fn on_port(
-        shmem_provider: Arc<Mutex<SHP>>,
-        port: u16,
-    ) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: Arc<Mutex<SHP>>, port: u16) -> Result<Self, Error> {
         match TcpListener::bind(format!("127.0.0.1:{}", port)) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
@@ -418,10 +412,7 @@ where
         description: &LlmpClientDescription,
     ) -> Result<LlmpConnection<'a, SHP>, Error> {
         Ok(LlmpConnection::IsClient {
-            client: LlmpClient::existing_client_from_description(
-                shmem_provider,
-                description,
-            )?,
+            client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
         })
     }
 
@@ -510,9 +501,7 @@ where
             last_msg_sent: ptr::null_mut(),
             out_maps: vec![LlmpSharedMap::new(
                 0,
-                shmem_provider
-                    .lock()
-                    .new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
+                shmem_provider.lock().new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
             )],
             // drop pages to the broker if it already read them
             keep_pages_forever,
@@ -928,9 +917,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider
-                .lock()
-                .from_description(description.shmem)?,
+            shmem_provider.lock().from_description(description.shmem)?,
             description.last_message_offset,
         )
     }
@@ -1069,12 +1056,11 @@ where
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
 
                     // Map the new page. The old one should be unmapped by Drop
-                    self.current_recv_map = LlmpSharedMap::existing(
-                        self.shmem_provider.lock().from_id_and_size(
+                    self.current_recv_map =
+                        LlmpSharedMap::existing(self.shmem_provider.lock().from_id_and_size(
                             ShMemId::from_slice(&pageinfo_cpy.shm_str),
                             pageinfo_cpy.map_size,
-                        )?,
-                    );
+                        )?);
                     page = self.current_recv_map.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
                     ptr::write_volatile(&mut (*page).save_to_unmap, 1);
@@ -1172,9 +1158,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider
-                .lock()
-                .from_description(description.shmem)?,
+            shmem_provider.lock().from_description(description.shmem)?,
             description.last_message_offset,
         )
     }
@@ -1377,9 +1361,7 @@ where
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::new(
                     0,
-                    shmem_provider
-                        .lock()
-                        .new_map(new_map_size(0))?,
+                    shmem_provider.lock().new_map(new_map_size(0))?,
                 )],
                 // Broker never cleans up the pages so that new
                 // clients may join at any time
@@ -1552,9 +1534,7 @@ where
         Ok(thread::spawn(move || {
             // Clone so we get a new connection to the AshmemServer if we are using
             // ServedShMemProvider
-            let shmem_provider = {
-                Arc::new(Mutex::new(shmem_provider.lock().clone()))
-            };
+            let shmem_provider = { Arc::new(Mutex::new(shmem_provider.lock().clone())) };
 
             let mut new_client_sender = LlmpSender {
                 id: 0,
@@ -1828,9 +1808,7 @@ where
                 id: 0,
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::new(0, {
-                    shmem_provider
-                        .lock()
-                        .new_map(LLMP_CFG_INITIAL_MAP_SIZE)?
+                    shmem_provider.lock().new_map(LLMP_CFG_INITIAL_MAP_SIZE)?
                 })],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
@@ -1921,10 +1899,7 @@ where
 
     #[cfg(feature = "std")]
     /// Creates a new LlmpClient, reading the map id and len from env
-    pub fn create_using_env(
-        shmem_provider: Arc<Mutex<SHP>>,
-        env_var: &str,
-    ) -> Result<Self, Error> {
+    pub fn create_using_env(shmem_provider: Arc<Mutex<SHP>>, env_var: &str) -> Result<Self, Error> {
         let map = {
             let mut lock = shmem_provider.lock();
             LlmpSharedMap::existing(lock.existing_from_env(env_var)?)
@@ -1934,10 +1909,7 @@ where
 
     #[cfg(feature = "std")]
     /// Create a LlmpClient, getting the ID from a given port
-    pub fn create_attach_to_tcp(
-        shmem_provider: Arc<Mutex<SHP>>,
-        port: u16,
-    ) -> Result<Self, Error> {
+    pub fn create_attach_to_tcp(shmem_provider: Arc<Mutex<SHP>>, port: u16) -> Result<Self, Error> {
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
         println!("Connected to port {}", port);
 
@@ -1969,9 +1941,9 @@ where
 #[cfg(all(unix, feature = "std"))]
 mod tests {
 
-    use std::{thread::sleep, time::Duration};
     use alloc::sync::Arc;
     use spin::Mutex;
+    use std::{thread::sleep, time::Duration};
 
     use super::{
         LlmpClient,
@@ -1984,16 +1956,22 @@ mod tests {
 
     #[test]
     pub fn llmp_connection() {
-        let mut broker = match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMemProvider::new())), 1337).unwrap() {
-            IsClient { client: _ } => panic!("Could not bind to port as broker"),
-            IsBroker { broker } => broker,
-        };
+        let mut broker =
+            match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMemProvider::new())), 1337)
+                .unwrap()
+            {
+                IsClient { client: _ } => panic!("Could not bind to port as broker"),
+                IsBroker { broker } => broker,
+            };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMemProvider::new())), 1337).unwrap() {
-            IsBroker { broker: _ } => panic!("Second connect should be a client!"),
-            IsClient { client } => client,
-        };
+        let mut client =
+            match LlmpConnection::on_port(Arc::new(Mutex::new(StdShMemProvider::new())), 1337)
+                .unwrap()
+            {
+                IsBroker { broker: _ } => panic!("Second connect should be a client!"),
+                IsClient { client } => client,
+            };
 
         // Give the (background) tcp thread a few millis to post the message
         sleep(Duration::from_millis(100));
@@ -2014,7 +1992,11 @@ mod tests {
         }
 
         /* recreate the client from env, check if it still works */
-        client = LlmpClient::on_existing_from_env(Arc::new(Mutex::new(StdShMemProvider::new())), "_ENV_TEST").unwrap();
+        client = LlmpClient::on_existing_from_env(
+            Arc::new(Mutex::new(StdShMemProvider::new())),
+            "_ENV_TEST",
+        )
+        .unwrap();
 
         client.send_buf(tag, &arr).unwrap();
 
