@@ -687,7 +687,6 @@ pub mod win32_shmem {
     #[derive(Clone, Debug)]
     pub struct Win32ShMemProvider {}
 
-    #[cfg(unix)]
     impl Default for Win32ShMemProvider {
         fn default() -> Self {
             Self::new()
