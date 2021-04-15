@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 
+use alloc::string::ToString;
+
 use crate::Error;
 
 /// Description of a shared map.
@@ -125,6 +127,9 @@ pub trait ShMem: Sized + Debug + Clone {
 
 pub trait ShMemProvider: Send {
     type Mapping: ShMem;
+
+    /// Create a new instance of the provider
+    fn new() -> Self;
 
     /// Create a new shared memory mapping
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error>;
@@ -300,14 +305,6 @@ pub mod unix_shmem {
 
         unsafe impl Send for DefaultUnixShMemProvider {}
 
-        /// Implementation for UnixShMemProvider
-        #[cfg(unix)]
-        impl DefaultUnixShMemProvider {
-            pub fn new() -> Self {
-                Self {}
-            }
-        }
-
         #[cfg(unix)]
         impl Default for DefaultUnixShMemProvider {
             fn default() -> Self {
@@ -320,6 +317,9 @@ pub mod unix_shmem {
         impl ShMemProvider for DefaultUnixShMemProvider {
             type Mapping = DefaultUnixShMem;
 
+            fn new() -> Self {
+                Self {}
+            }
             fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
                 DefaultUnixShMem::new(map_size)
             }
@@ -520,14 +520,6 @@ pub mod unix_shmem {
         #[derive(Debug)]
         pub struct AshmemShMemProvider {}
 
-        /// Implementation for AshmemShMemProvider
-        #[cfg(unix)]
-        impl AshmemShMemProvider {
-            pub fn new() -> Self {
-                Self {}
-            }
-        }
-
         unsafe impl Send for AshmemShMemProvider {}
 
         #[cfg(unix)]
@@ -541,6 +533,10 @@ pub mod unix_shmem {
         #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
             type Mapping = AshmemShMem;
+
+            fn new() -> Self {
+                Self {}
+            }
 
             fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
                 let mapping = AshmemShMem::new(map_size)?;

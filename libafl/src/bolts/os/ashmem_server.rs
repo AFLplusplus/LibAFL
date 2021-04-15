@@ -68,16 +68,6 @@ impl ShMem for ServedShMem {
 }
 
 impl ServedShMemProvider {
-    /// Connect to the server and return a new ServedShMemProvider
-    pub fn new() -> Result<Self, Error> {
-        Ok(Self {
-            stream: UnixStream::connect_to_unix_addr(
-                &UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap(),
-            )?,
-            inner: AshmemShMemProvider::new(),
-        })
-    }
-
     /// Send a request to the server, and wait for a response
     fn send_receive(&mut self, request: AshmemRequest) -> (i32, i32) {
         let body = postcard::to_allocvec(&request).unwrap();
@@ -105,6 +95,16 @@ impl ServedShMemProvider {
 
 impl ShMemProvider for ServedShMemProvider {
     type Mapping = ServedShMem;
+
+    /// Connect to the server and return a new ServedShMemProvider
+    fn new() -> Self {
+        Self {
+            stream: UnixStream::connect_to_unix_addr(
+                &UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap(),
+            ).expect("Unable to open connection to ashmem service"),
+            inner: AshmemShMemProvider::new(),
+        }
+    }
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, crate::Error> {
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size));
 
