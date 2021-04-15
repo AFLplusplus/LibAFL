@@ -27,7 +27,21 @@ use parking_lot::ReentrantMutex;
 #[cfg(all(unix, feature = "std"))]
 use std::cell::RefCell;
 
-use crate::{Error, bolts::{llmp::{self, LlmpClient, LlmpClientDescription, LlmpConnection, LlmpSender, Tag}, shmem::ShMemProvider}, corpus::CorpusScheduler, events::{BrokerEventResult, Event, EventManager}, executors::ExitKind, executors::{Executor, HasObservers}, inputs::Input, observers::ObserversTuple, state::IfInteresting, stats::Stats};
+use crate::{
+    bolts::{
+        llmp::{self, LlmpClient, LlmpClientDescription, LlmpConnection, LlmpSender, Tag},
+        shmem::ShMemProvider,
+    },
+    corpus::CorpusScheduler,
+    events::{BrokerEventResult, Event, EventManager},
+    executors::ExitKind,
+    executors::{Executor, HasObservers},
+    inputs::Input,
+    observers::ObserversTuple,
+    state::IfInteresting,
+    stats::Stats,
+    Error,
+};
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
@@ -66,10 +80,17 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port_std(shmem_provider: UnixShMemProvider, stats: ST, port: u16) -> Result<Self, Error> {
+    pub fn new_on_port_std(
+        shmem_provider: UnixShMemProvider,
+        stats: ST,
+        port: u16,
+    ) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
-            llmp: llmp::LlmpConnection::on_port(Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider))), port)?,
+            llmp: llmp::LlmpConnection::on_port(
+                Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider))),
+                port,
+            )?,
             phantom: PhantomData,
         })
     }
@@ -77,8 +98,14 @@ where
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     /// Std uses UnixShMem.
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env_std(shmem_provider: UnixShMemProvider, env_name: &str) -> Result<Self, Error> {
-        Self::existing_client_from_env(Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider))), env_name)
+    pub fn existing_client_from_env_std(
+        shmem_provider: UnixShMemProvider,
+        env_name: &str,
+    ) -> Result<Self, Error> {
+        Self::existing_client_from_env(
+            Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider))),
+            env_name,
+        )
     }
 }
 
@@ -106,7 +133,11 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port(shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>, stats: ST, port: u16) -> Result<Self, Error> {
+    pub fn new_on_port(
+        shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>,
+        stats: ST,
+        port: u16,
+    ) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
@@ -116,7 +147,10 @@ where
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env(shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>, env_name: &str) -> Result<Self, Error> {
+    pub fn existing_client_from_env(
+        shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>,
+        env_name: &str,
+    ) -> Result<Self, Error> {
         Ok(Self {
             stats: None,
             llmp: llmp::LlmpConnection::IsClient {
@@ -135,12 +169,15 @@ where
 
     /// Create an existing client from description
     pub fn existing_client_from_description(
-        shmem_provider:  Arc<ReentrantMutex<RefCell<SHP>>>,
+        shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
         Ok(Self {
             stats: None,
-            llmp: llmp::LlmpConnection::existing_client_from_description(shmem_provider.clone(), description)?,
+            llmp: llmp::LlmpConnection::existing_client_from_description(
+                shmem_provider.clone(),
+                description,
+            )?,
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -498,11 +535,14 @@ where
 {
     let shmem_provider = Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider)));
 
-    let mut mgr = LlmpEventManager::<'a, I, S, SHP, ST>::new_on_port(shmem_provider.clone(), stats, _broker_port)?;
+    let mut mgr = LlmpEventManager::<'a, I, S, SHP, ST>::new_on_port(
+        shmem_provider.clone(),
+        stats,
+        _broker_port,
+    )?;
 
     // We start ourself as child process to actually fuzz
     let (shmem_provider, sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
@@ -517,7 +557,10 @@ where
         let sender = LlmpSender::new(shmem_provider.clone(), 0, false)?;
         let receiver = LlmpReceiver::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.lock().borrow_mut().clone_ref(&sender.out_maps.last().unwrap().shmem)?,
+            shmem_provider
+                .lock()
+                .borrow_mut()
+                .clone_ref(&sender.out_maps.last().unwrap().shmem)?,
             None,
         )?;
         // Store the information to a map.
@@ -578,7 +621,8 @@ where
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (state, mgr): (S, LlmpEventManager<I, S, SHP, ST>) = deserialize_state_mgr(shmem_provider.clone(), &msg)?;
+            let (state, mgr): (S, LlmpEventManager<I, S, SHP, ST>) =
+                deserialize_state_mgr(shmem_provider.clone(), &msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }

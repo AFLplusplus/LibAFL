@@ -52,9 +52,7 @@ pub struct ShMemId {
 impl ShMemId {
     /// Create a new id from a fixed-size string
     pub fn from_slice(slice: &[u8; 20]) -> Self {
-        Self {
-            id: *slice,
-        }
+        Self { id: *slice }
     }
 
     /// Create a new id from an int
@@ -63,9 +61,7 @@ impl ShMemId {
         for (i, val) in val.to_be_bytes().iter().enumerate() {
             slice[i] = *val;
         }
-        Self {
-            id: slice,
-        }
+        Self { id: slice }
     }
 
     /// Create a new id from a string
@@ -74,9 +70,7 @@ impl ShMemId {
         for (i, val) in val.as_bytes().iter().enumerate() {
             slice[i] = *val;
         }
-        Self {
-            id: slice,
-        }
+        Self { id: slice }
     }
 
     /// Get the id as a fixed-length slice
@@ -91,7 +85,7 @@ impl ShMemId {
     }
 }
 
-pub trait ShMemMapping: Sized + Debug + Send  + Clone {
+pub trait ShMemMapping: Sized + Debug + Send + Clone {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -146,9 +140,11 @@ pub trait ShMemProvider: Send {
     fn from_env(&mut self, env_name: &str) -> Result<Self::Mapping, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
-        self.from_description(ShMemDescription::from_string_and_size(&map_shm_str, map_size))
+        self.from_description(ShMemDescription::from_string_and_size(
+            &map_shm_str,
+            map_size,
+        ))
     }
-
 }
 
 #[cfg(all(unix, feature = "std"))]
@@ -171,7 +167,7 @@ pub mod unix_shmem {
 
         use crate::Error;
 
-        use super::super::{ShMemProvider, ShMemMapping, ShMemId};
+        use super::super::{ShMemId, ShMemMapping, ShMemProvider};
 
         #[cfg(unix)]
         #[derive(Copy, Clone)]
@@ -260,12 +256,7 @@ pub mod unix_shmem {
                         return Err(Error::Unknown("Failed to map the shared mapping"));
                     }
 
-                    Ok(Self {
-                        id,
-                        map,
-                        map_size,
-                    })
-
+                    Ok(Self { id, map, map_size })
                 }
             }
         }
@@ -323,7 +314,11 @@ pub mod unix_shmem {
                 DefaultUnixShMemMapping::new(map_size)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error> {
+            fn from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::Mapping, Error> {
                 DefaultUnixShMemMapping::from_id_and_size(id, size)
             }
         }
@@ -332,12 +327,15 @@ pub mod unix_shmem {
     #[cfg(all(unix, feature = "std"))]
     pub mod ashmem {
         use core::slice;
-        use libc::{c_char, c_int, c_long, c_uint, c_void, off_t, size_t, MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
+        use libc::{
+            c_char, c_int, c_long, c_uint, c_void, off_t, size_t, MAP_SHARED, O_RDWR, PROT_READ,
+            PROT_WRITE,
+        };
         use std::ffi::CString;
 
         use crate::Error;
 
-        use super::super::{ShMemProvider, ShMemMapping, ShMemId};
+        use super::super::{ShMemId, ShMemMapping, ShMemProvider};
 
         extern "C" {
             fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
@@ -383,26 +381,34 @@ pub mod unix_shmem {
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let device_path = CString::new(
-                        if let Ok(boot_id) = std::fs::read_to_string("/proc/sys/kernel/random/boot_id") {
+                        if let Ok(boot_id) =
+                            std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+                        {
                             format!("{}{}", "/dev/ashmem", boot_id).trim().to_string()
                         } else {
                             "/dev/ashmem".to_string()
-                        }
-                    ).unwrap();
+                        },
+                    )
+                    .unwrap();
 
                     let fd = open(device_path.as_ptr(), O_RDWR);
                     if fd == -(1 as c_int) {
-                        return Err(Error::Unknown(format!("Failed to open the ashmem device at {:?}", device_path)));
+                        return Err(Error::Unknown(format!(
+                            "Failed to open the ashmem device at {:?}",
+                            device_path
+                        )));
                     }
 
                     //if ioctl(fd, ASHMEM_SET_NAME, name) != 0 {
-                        //close(fd);
-                        //return Err(Error::Unknown("Failed to set the ashmem mapping's name".to_string()));
+                    //close(fd);
+                    //return Err(Error::Unknown("Failed to set the ashmem mapping's name".to_string()));
                     //};
 
                     if ioctl(fd, ASHMEM_SET_SIZE, map_size) != 0 {
                         close(fd);
-                        return Err(Error::Unknown("Failed to set the ashmem mapping's size".to_string()));
+                        return Err(Error::Unknown(
+                            "Failed to set the ashmem mapping's size".to_string(),
+                        ));
                     };
 
                     let map = mmap(
@@ -415,7 +421,9 @@ pub mod unix_shmem {
                     );
                     if map == usize::MAX as *mut c_void {
                         close(fd);
-                        return Err(Error::Unknown("Failed to map the ashmem mapping".to_string()));
+                        return Err(Error::Unknown(
+                            "Failed to map the ashmem mapping".to_string(),
+                        ));
                     }
 
                     Ok(Self {
@@ -431,7 +439,9 @@ pub mod unix_shmem {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
                     if ioctl(fd, ASHMEM_GET_SIZE) != map_size as i32 {
-                        return Err(Error::Unknown("The mapping's size differs from the requested size".to_string()));
+                        return Err(Error::Unknown(
+                            "The mapping's size differs from the requested size".to_string(),
+                        ));
                     };
 
                     let map = mmap(
@@ -444,7 +454,9 @@ pub mod unix_shmem {
                     );
                     if map == usize::MAX as *mut c_void {
                         close(fd);
-                        return Err(Error::Unknown("Failed to map the ashmem mapping".to_string()));
+                        return Err(Error::Unknown(
+                            "Failed to map the ashmem mapping".to_string(),
+                        ));
                     }
 
                     Ok(Self {
@@ -457,13 +469,13 @@ pub mod unix_shmem {
 
             ///// Get the file descriptor from an AshmemShMemMapping's id
             //pub fn fd_from_id(id: ShMemId) -> Result<c_int, Error> {
-                //let result = if let Some(fd_str) = id.to_string().split(":").collect::<Vec<&str>>().get(1) {
-                    //println!("id: {}, fd_str: {}", id.to_string(), fd_str);
-                    //Ok(fd_str.parse().expect("Could not parse the file descriptor"))
-                //} else {
-                    //Err(Error::Unknown("Invalid id for ashmem".to_string()))
-                //};
-                //result
+            //let result = if let Some(fd_str) = id.to_string().split(":").collect::<Vec<&str>>().get(1) {
+            //println!("id: {}, fd_str: {}", id.to_string(), fd_str);
+            //Ok(fd_str.parse().expect("Could not parse the file descriptor"))
+            //} else {
+            //Err(Error::Unknown("Invalid id for ashmem".to_string()))
+            //};
+            //result
             //}
         }
 
@@ -532,7 +544,11 @@ pub mod unix_shmem {
                 Ok(mapping)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error> {
+            fn from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::Mapping, Error> {
                 AshmemShMemMapping::from_id_and_size(id, size)
             }
         }
@@ -684,7 +700,11 @@ pub mod win32_shmem {
             Win32ShMemMapping::new(map_size)
         }
 
-        fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<&mut Self::Mapping, Error> {
+        fn from_id_and_size(
+            &mut self,
+            id: ShMemId,
+            size: usize,
+        ) -> Result<&mut Self::Mapping, Error> {
             Win32ShMemMapping::from_id_and_size(id, size)
         }
     }
