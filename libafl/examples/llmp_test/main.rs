@@ -5,7 +5,6 @@ extern crate alloc;
 
 #[cfg(all(unix, feature = "std"))]
 use core::{convert::TryInto, time::Duration};
-use std::sync::{Arc, Mutex};
 #[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 
@@ -15,6 +14,9 @@ use libafl::{
     bolts::{llmp, shmem::StdShMemProvider},
     Error,
 };
+
+use alloc::sync::Arc;
+use spin::Mutex;
 
 const _TAG_SIMPLE_U32_V1: Tag = 0x51300321;
 const _TAG_MATH_RESULT_V1: Tag = 0x77474331;

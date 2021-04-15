@@ -1970,7 +1970,9 @@ where
 #[cfg(all(unix, feature = "std"))]
 mod tests {
 
-    use std::{thread::sleep, time::Duration, sync::{Arc, Mutex}};
+    use std::{thread::sleep, time::Duration};
+    use alloc::sync::Arc;
+    use spin::Mutex;
 
     use super::{
         LlmpClient,
