@@ -93,6 +93,19 @@ impl ServedShMemProvider {
     }
 }
 
+impl Default for ServedShMemProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Clone for ServedShMemProvider {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
+
 impl ShMemProvider for ServedShMemProvider {
     type Mapping = ServedShMem;
 

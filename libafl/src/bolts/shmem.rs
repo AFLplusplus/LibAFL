@@ -125,7 +125,7 @@ pub trait ShMem: Sized + Debug + Clone {
     }
 }
 
-pub trait ShMemProvider: Send {
+pub trait ShMemProvider: Send + Clone + Default {
     type Mapping: ShMem;
 
     /// Create a new instance of the provider
@@ -300,7 +300,7 @@ pub mod unix_shmem {
 
         /// A ShMemProvider which uses shmget/shmat/shmctl to provide shared memory mappings.
         #[cfg(unix)]
-        #[derive(Debug)]
+        #[derive(Clone, Debug)]
         pub struct DefaultUnixShMemProvider {}
 
         unsafe impl Send for DefaultUnixShMemProvider {}
@@ -515,9 +515,9 @@ pub mod unix_shmem {
             }
         }
 
-        /// A ShMemProvider which uses shmget/shmat/shmctl to provide shared memory mappings.
+        /// A ShMemProvider which uses ashmem to provide shared memory mappings.
         #[cfg(unix)]
-        #[derive(Debug)]
+        #[derive(Clone, Debug)]
         pub struct AshmemShMemProvider {}
 
         unsafe impl Send for AshmemShMemProvider {}
@@ -684,8 +684,15 @@ pub mod win32_shmem {
     }
 
     /// A ShMemProvider which uses win32 functions to provide shared memory mappings.
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub struct Win32ShMemProvider {}
+
+    #[cfg(unix)]
+    impl Default for Win32ShMemProvider {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 
     /// Implement ShMemProvider for Win32ShMemProvider
     impl ShMemProvider for Win32ShMemProvider {
@@ -694,7 +701,6 @@ pub mod win32_shmem {
         fn new() -> Self {
             Self {}
         }
-
         fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
             Win32ShMem::new_map(map_size)
         }

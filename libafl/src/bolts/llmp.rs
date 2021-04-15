@@ -1550,6 +1550,12 @@ where
         let shmem_provider = self.shmem_provider.clone();
 
         Ok(thread::spawn(move || {
+            // Clone so we get a new connection to the AshmemServer if we are using
+            // ServedShMemProvider
+            let shmem_provider = {
+                Arc::new(Mutex::new(shmem_provider.lock().clone()))
+            };
+
             let mut new_client_sender = LlmpSender {
                 id: 0,
                 last_msg_sent: ptr::null_mut(),

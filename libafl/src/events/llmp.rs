@@ -587,6 +587,11 @@ where
     } else {
         // We are the newly started fuzzing instance, first, connect to our own restore map.
         // A sender and a receiver for single communication
+        // Clone so we get a new connection to the AshmemServer if we are using
+        // ServedShMemProvider
+        let shmem_provider = {
+            Arc::new(Mutex::new(shmem_provider.lock().clone()))
+        };
         (
             shmem_provider.clone(),
             LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
