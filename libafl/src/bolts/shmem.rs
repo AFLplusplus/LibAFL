@@ -634,7 +634,7 @@ pub mod win32_shmem {
                 }
 
                 Ok(Self {
-                    id: ShMemId::from_string(&map_str_bytes[0..20]),
+                    id: ShMemId::from_slice(&map_str_bytes[0..20]),
                     handle,
                     map,
                     map_size,
@@ -649,19 +649,19 @@ pub mod win32_shmem {
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS,
                     BOOL(0),
-                    PSTR(map_str_bytes as *const u8 as *mut u8),
+                    PSTR(&map_str_bytes as *const u8 as *mut u8),
                 );
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
                         "Cannot open shared memory {}",
-                        String::from_utf8_lossy(map_str_bytes)
+                        String::from_utf8_lossy(&map_str_bytes)
                     )));
                 }
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
-                        String::from_utf8_lossy(map_str_bytes)
+                        String::from_utf8_lossy(&map_str_bytes)
                     )));
                 }
                 Ok(Self {
@@ -715,8 +715,10 @@ pub mod win32_shmem {
 
     /// Implement ShMemProvider for Win32ShMemProvider
     impl ShMemProvider for Win32ShMemProvider {
+        type Mapping = Win32ShMemMapping;
+
         fn new_map(&mut self, map_size: usize) -> Result<&mut Self::Mapping, Error> {
-            Win32ShMemMapping::new(map_size)
+            Win32ShMemMapping::new_map(map_size)
         }
 
         fn from_id_and_size(
