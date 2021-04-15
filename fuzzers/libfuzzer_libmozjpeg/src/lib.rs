@@ -4,7 +4,7 @@
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{shmem::UnixShMem, tuples::tuple_list},
+    bolts::{shmem::StdShMemProvider, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::setup_restarting_mgr,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -53,7 +53,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, UnixShMem, _>(stats, broker_port)
+        setup_restarting_mgr(StdShMemProvider::new(), stats, broker_port)
             .expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
