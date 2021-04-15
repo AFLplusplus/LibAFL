@@ -591,6 +591,7 @@ pub mod win32_shmem {
 
     use core::{ffi::c_void, ptr, slice};
     use uuid::Uuid;
+    use std::convert::TryInto;
 
     const INVALID_HANDLE_VALUE: isize = -1;
     const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
