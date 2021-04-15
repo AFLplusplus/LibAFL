@@ -62,7 +62,7 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -552,7 +552,7 @@ where
         let msg_sent_offset = msg_offset_from_env(env_name)?;
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.lock().borrow_mut().from_env(env_name)?,
+            shmem_provider.lock().borrow_mut().existing_from_env(env_name)?,
             msg_sent_offset,
         )
     }
@@ -979,7 +979,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.lock().borrow_mut().from_env(env_name)?,
+            shmem_provider.lock().borrow_mut().existing_from_env(env_name)?,
             msg_offset_from_env(env_name)?,
         )
     }
@@ -1942,7 +1942,7 @@ where
             let lock = shmem_provider.lock();
             let res = {
                 let mut borrow = lock.borrow_mut();
-                LlmpSharedMap::existing(borrow.from_env(env_var)?)
+                LlmpSharedMap::existing(borrow.existing_from_env(env_var)?)
             };
             unsafe {
                 shmem_provider.force_unlock();

@@ -91,7 +91,7 @@ impl ShMemId {
     }
 }
 
-pub trait ShMemMapping: Sized + Debug + Send + Clone {
+pub trait ShMemMapping: Sized + Debug + Clone {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -148,7 +148,7 @@ pub trait ShMemProvider: Send {
 
     /// Reads an existing map config from env vars, then maps it
     #[cfg(feature = "std")]
-    fn from_env(&mut self, env_name: &str) -> Result<Self::Mapping, Error> {
+    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::Mapping, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
         self.from_description(ShMemDescription::from_string_and_size(
@@ -225,8 +225,6 @@ pub mod unix_shmem {
             map: *mut u8,
             map_size: usize,
         }
-
-        unsafe impl Send for DefaultUnixShMemMapping {}
 
         impl DefaultUnixShMemMapping {
             /// Create a new shared memory mapping, using shmget/shmat
@@ -377,8 +375,6 @@ pub mod unix_shmem {
             map: *mut u8,
             map_size: usize,
         }
-
-        unsafe impl Send for AshmemShMemMapping {}
 
         #[derive(Copy, Clone)]
         #[repr(C)]
@@ -540,8 +536,6 @@ pub mod unix_shmem {
         #[derive(Debug)]
         pub struct AshmemShMemProvider {}
 
-        unsafe impl Send for AshmemShMemProvider {}
-
         /// Implementation for AshmemShMemProvider
         #[cfg(unix)]
         impl AshmemShMemProvider {
@@ -549,6 +543,8 @@ pub mod unix_shmem {
                 Self {}
             }
         }
+
+        unsafe impl Send for AshmemShMemProvider {}
 
         #[cfg(unix)]
         impl Default for AshmemShMemProvider {
