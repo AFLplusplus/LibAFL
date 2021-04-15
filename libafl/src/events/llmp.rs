@@ -20,7 +20,7 @@ use crate::utils::{fork, ForkResult};
 use crate::bolts::shmem::UnixShMemProvider;
 
 #[cfg(feature = "std")]
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[cfg(all(unix, feature = "std"))]
 use parking_lot::ReentrantMutex;
@@ -29,7 +29,7 @@ use std::cell::RefCell;
 
 use crate::{
     bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, LlmpConnection, LlmpSender, Tag},
+        llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -175,7 +175,7 @@ where
         Ok(Self {
             stats: None,
             llmp: llmp::LlmpConnection::existing_client_from_description(
-                shmem_provider.clone(),
+                shmem_provider,
                 description,
             )?,
             // Inserting a nop-stats element here so rust won't complain.
@@ -421,7 +421,7 @@ where
     let tuple: (S, _) = postcard::from_bytes(&state_corpus_serialized)?;
     Ok((
         tuple.0,
-        LlmpEventManager::existing_client_from_description(shmem_provider.clone(), &tuple.1)?,
+        LlmpEventManager::existing_client_from_description(shmem_provider, &tuple.1)?,
     ))
 }
 
@@ -596,7 +596,7 @@ where
         (
             shmem_provider.clone(),
             LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
-            LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
+            LlmpReceiver::on_existing_from_env(shmem_provider, _ENV_FUZZER_RECEIVER)?,
         )
     };
 
@@ -612,7 +612,7 @@ where
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
             let client_mgr = LlmpEventManager::<I, S, SHP, ST>::existing_client_from_env(
-                shmem_provider.clone(),
+                shmem_provider,
                 _ENV_FUZZER_BROKER_CLIENT_INITIAL,
             )?;
 
@@ -622,7 +622,7 @@ where
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
             let (state, mgr): (S, LlmpEventManager<I, S, SHP, ST>) =
-                deserialize_state_mgr(shmem_provider.clone(), &msg)?;
+                deserialize_state_mgr(shmem_provider, &msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }

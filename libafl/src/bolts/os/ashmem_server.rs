@@ -6,7 +6,7 @@ and forwards them over unix domain sockets.
 
 use crate::{
     bolts::shmem::{
-        unix_shmem::ashmem::AshmemShMemMapping, ShMemDescription, ShMemId, ShMemMapping,
+        ShMemDescription, ShMemId, ShMemMapping,
         ShMemProvider, UnixShMemMapping, UnixShMemProvider,
     },
     Error,
@@ -14,9 +14,7 @@ use crate::{
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
-    ffi::CStr,
     io::{Read, Write},
-    os::unix::io::RawFd,
     sync::{Arc, Condvar, Mutex},
 };
 
@@ -26,7 +24,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 #[cfg(all(feature = "std", unix))]
 use std::{
     os::unix::{
-        io::AsRawFd,
+        io::{RawFd, AsRawFd},
         net::{UnixListener, UnixStream},
     },
     thread,
@@ -80,7 +78,7 @@ impl ServedShMemProvider {
     }
 
     /// Send a request to the server, and wait for a response
-    fn send_receive(&mut self, request: AshmemRequest) -> Result<(i32, i32), crate::Error> {
+    fn send_receive(&mut self, request: AshmemRequest) -> (i32, i32) {
         let body = postcard::to_allocvec(&request).unwrap();
 
         let header = (body.len() as u32).to_be_bytes();
@@ -100,38 +98,35 @@ impl ServedShMemProvider {
         let server_id = ShMemId::from_slice(&shm_slice);
         let server_id_str = server_id.to_string();
         let server_fd: i32 = server_id_str.parse().unwrap();
-        Ok((server_fd, fd_buf[0]))
+        (server_fd, fd_buf[0])
     }
 }
 
 impl ShMemProvider for ServedShMemProvider {
     type Mapping = ServedShMemMapping;
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, crate::Error> {
-        match self.send_receive(AshmemRequest::NewMap(map_size)) {
-            Ok((server_fd, client_fd)) => Ok(ServedShMemMapping {
-                inner: self
-                    .inner
-                    .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), map_size)?,
-                server_fd,
-            }),
-            Err(e) => Err(e),
-        }
+        let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size));
+
+        Ok(ServedShMemMapping {
+            inner: self
+                .inner
+                .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), map_size)?,
+            server_fd,
+        })
     }
 
     fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error> {
-        let parts = id.to_string().split(":").collect::<Vec<&str>>();
+        let parts = id.to_string().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();
-        match self.send_receive(AshmemRequest::ExistingMap(
+        let (server_fd, client_fd) =  self.send_receive(AshmemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
-        )) {
-            Ok((server_fd, client_fd)) => Ok(ServedShMemMapping {
-                inner: self
-                    .inner
-                    .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
-                server_fd,
-            }),
-            Err(e) => Err(e),
-        }
+        ));
+        Ok(ServedShMemMapping {
+            inner: self
+                .inner
+                .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
+            server_fd,
+        })
     }
 }
 
@@ -209,6 +204,7 @@ impl AshmemService {
 
     /// Create a new AshmemService, then listen and service incoming connections in a new thread.
     pub fn start() -> Result<thread::JoinHandle<Result<(), Error>>, Error> {
+        #[allow(clippy::mutex_atomic)]
         let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle =

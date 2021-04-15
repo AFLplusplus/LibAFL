@@ -15,7 +15,6 @@ pub type StdShMemProvider = Win32ShMemProvider;
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemMapping = Win32ShMemMapping;
 
-use alloc::string::{String, ToString};
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -91,6 +90,11 @@ pub trait ShMemMapping: Sized + Debug + Send + Clone {
 
     /// Get the size of this mapping
     fn len(&self) -> usize;
+
+    /// Check if the mapping is empty
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     /// Get the description of the shared memory mapping
     fn description(&self) -> ShMemDescription {
@@ -338,7 +342,6 @@ pub mod unix_shmem {
         use super::super::{ShMemId, ShMemMapping, ShMemProvider};
 
         extern "C" {
-            fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
             fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
             fn open(path: *const c_char, oflag: c_int, ...) -> c_int;
             fn close(fd: c_int) -> c_int;
@@ -373,7 +376,7 @@ pub mod unix_shmem {
 
         const ASHMEM_GET_SIZE: c_long = 0x00007704;
         const ASHMEM_UNPIN: c_long = 0x40087708;
-        const ASHMEM_SET_NAME: c_long = 0x41007701;
+        //const ASHMEM_SET_NAME: c_long = 0x41007701;
         const ASHMEM_SET_SIZE: c_long = 0x40087703;
 
         impl AshmemShMemMapping {
@@ -392,7 +395,7 @@ pub mod unix_shmem {
                     .unwrap();
 
                     let fd = open(device_path.as_ptr(), O_RDWR);
-                    if fd == -(1 as c_int) {
+                    if fd == -1 {
                         return Err(Error::Unknown(format!(
                             "Failed to open the ashmem device at {:?}",
                             device_path
@@ -412,7 +415,7 @@ pub mod unix_shmem {
                     };
 
                     let map = mmap(
-                        0 as *mut c_void,
+                        std::ptr::null_mut(),
                         map_size,
                         PROT_READ | PROT_WRITE,
                         MAP_SHARED,
@@ -445,7 +448,7 @@ pub mod unix_shmem {
                     };
 
                     let map = mmap(
-                        0 as *mut c_void,
+                        std::ptr::null_mut(),
                         map_size,
                         PROT_READ | PROT_WRITE,
                         MAP_SHARED,
@@ -513,7 +516,7 @@ pub mod unix_shmem {
                         len: length as u32,
                     };
 
-                    let ret = ioctl(fd, ASHMEM_UNPIN, &ap);
+                    ioctl(fd, ASHMEM_UNPIN, &ap);
                     close(fd);
                 }
             }
@@ -531,6 +534,13 @@ pub mod unix_shmem {
         impl AshmemShMemProvider {
             pub fn new() -> Self {
                 Self {}
+            }
+        }
+
+        #[cfg(unix)]
+        impl Default for AshmemShMemProvider {
+            fn default() -> Self {
+                Self::new()
             }
         }
 

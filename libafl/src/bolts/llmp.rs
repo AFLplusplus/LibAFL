@@ -61,33 +61,15 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
-#[cfg(unix)]
-use libc::ucontext_t;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::{
-    env, fs,
+    env,
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::Arc,
     thread,
-};
-
-#[cfg(all(feature = "std", unix))]
-use nix::{
-    cmsg_space,
-    sys::{
-        socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
-        uio::IoVec,
-    },
-};
-
-#[cfg(all(feature = "std", unix))]
-use std::os::unix::{
-    self,
-    net::{UnixListener, UnixStream},
-    {io::AsRawFd, prelude::RawFd},
 };
 
 #[cfg(all(feature = "llmp_debug", feature = "std"))]
@@ -448,7 +430,7 @@ where
     ) -> Result<LlmpConnection<'a, SHP>, Error> {
         Ok(LlmpConnection::IsClient {
             client: LlmpClient::existing_client_from_description(
-                shmem_provider.clone(),
+                shmem_provider,
                 description,
             )?,
         })
@@ -624,7 +606,7 @@ where
             out_maps: vec![out_map],
             // drop pages to the broker if it already read them
             keep_pages_forever: false,
-            shmem_provider: shmem_provider.clone(),
+            shmem_provider,
             _phantom: PhantomData,
         })
     }
@@ -1762,8 +1744,8 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail
     pub fn on_existing_map(
         shmem_provider: SHP,
-        current_out_map: SHP::Mapping,
-        last_msg_sent_offset: Option<u64>,
+        _current_out_map: SHP::Mapping,
+        _last_msg_sent_offset: Option<u64>,
         current_broker_map: SHP::Mapping,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
@@ -1776,7 +1758,7 @@ where
                 last_msg_recvd_offset,
             )?,
             sender: LlmpSender::on_existing_map(
-                shmem_provider.clone(),
+                shmem_provider,
                 current_broker_map,
                 last_msg_recvd_offset,
             )?,
@@ -1796,7 +1778,7 @@ where
                 &format!("{}_SENDER", env_name),
             )?,
             receiver: LlmpReceiver::on_existing_from_env(
-                shmem_provider.clone(),
+                shmem_provider,
                 &format!("{}_RECEIVER", env_name),
             )?,
         })
@@ -1830,7 +1812,7 @@ where
                 &description.sender,
             )?,
             receiver: LlmpReceiver::on_existing_from_description(
-                shmem_provider.clone(),
+                shmem_provider,
                 &description.receiver,
             )?,
         })
@@ -2011,7 +1993,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 mod tests {
 
-    use std::{thread::sleep, time::Duration};
+    use std::{thread::sleep, time::Duration, sync::Arc, cell::RefCell};
 
     use super::{
         LlmpClient,
@@ -2020,17 +2002,19 @@ mod tests {
         Tag,
     };
 
-    use crate::bolts::shmem::{ShMemProvider, UnixShMemProvider};
+    use parking_lot::ReentrantMutex;
+
+    use crate::bolts::shmem::StdShMemProvider;
 
     #[test]
     pub fn llmp_connection() {
-        let mut broker = match LlmpConnection::on_port(1337).unwrap() {
+        let mut broker = match LlmpConnection::on_port(Arc::new(ReentrantMutex::new(RefCell::new(StdShMemProvider::new()))), 1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
             IsBroker { broker } => broker,
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::on_port(1337).unwrap() {
+        let mut client = match LlmpConnection::on_port(Arc::new(ReentrantMutex::new(RefCell::new(StdShMemProvider::new()))), 1337).unwrap() {
             IsBroker { broker: _ } => panic!("Second connect should be a client!"),
             IsClient { client } => client,
         };
@@ -2054,7 +2038,7 @@ mod tests {
         }
 
         /* recreate the client from env, check if it still works */
-        client = LlmpClient::on_existing_from_env(UnixShMemProvider::new(), "_ENV_TEST").unwrap();
+        client = LlmpClient::on_existing_from_env(Arc::new(ReentrantMutex::new(RefCell::new(StdShMemProvider::new()))), "_ENV_TEST").unwrap();
 
         client.send_buf(tag, &arr).unwrap();
 
