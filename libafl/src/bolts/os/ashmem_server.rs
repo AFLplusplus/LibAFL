@@ -63,19 +63,6 @@ impl ShMemMapping for ServedShMemMapping {
         self.inner.map_mut()
     }
 }
-const ASHMEM_SERVER_NAME: &str = "@ashmem_server";
-
-impl ServedShMem {
-    /// Create a new ServedShMem and connect to the ashmem server.
-    pub fn connect(name: &str) -> Self {
-        Self {
-            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::from_abstract(name).unwrap())
-                .expect("Failed to connect to the ashmem server"),
-            shmem: None,
-            slice: None,
-            fd: None,
-        }
-    }
 
 impl ServedShMemProvider {
     /// Connect to the server and return a new ServedShMemProvider
@@ -253,15 +240,14 @@ impl AshmemService {
             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
         )];
 
-        poll_fds.insert(
-            listener.as_raw_fd(),
-            PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN),
-        );
+        let (lock, cvar) = &*syncpair;
+        *lock.lock().unwrap() = true;
+        cvar.notify_one();
 
         loop {
-            let mut fds_to_poll: Vec<PollFd> = poll_fds.values().copied().collect();
-            let fd = match poll(&mut fds_to_poll, -1) {
-                Ok(fd) => fd,
+            match poll(&mut poll_fds, -1) {
+                Ok(num_fds) if num_fds > 0 => (),
+                Ok(_) => continue,
                 Err(e) => {
                     println!("Error polling for activity: {:?}", e);
                     continue;
