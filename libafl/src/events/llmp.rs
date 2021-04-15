@@ -20,12 +20,7 @@ use crate::utils::{fork, ForkResult};
 use crate::bolts::shmem::UnixShMemProvider;
 
 #[cfg(feature = "std")]
-use std::sync::Arc;
-
-#[cfg(all(unix, feature = "std"))]
-use parking_lot::ReentrantMutex;
-#[cfg(all(unix, feature = "std"))]
-use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
 use crate::{
     bolts::{
@@ -88,7 +83,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(
-                Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider))),
+                Arc::new(Mutex::new(shmem_provider)),
                 port,
             )?,
             phantom: PhantomData,
@@ -103,7 +98,7 @@ where
         env_name: &str,
     ) -> Result<Self, Error> {
         Self::existing_client_from_env(
-            Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider))),
+            Arc::new(Mutex::new(shmem_provider)),
             env_name,
         )
     }
@@ -134,7 +129,7 @@ where
     /// Else, it will act as client.
     #[cfg(feature = "std")]
     pub fn new_on_port(
-        shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>,
+        shmem_provider: Arc<Mutex<SHP>>,
         stats: ST,
         port: u16,
     ) -> Result<Self, Error> {
@@ -148,7 +143,7 @@ where
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
     pub fn existing_client_from_env(
-        shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>,
+        shmem_provider: Arc<Mutex<SHP>>,
         env_name: &str,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -169,7 +164,7 @@ where
 
     /// Create an existing client from description
     pub fn existing_client_from_description(
-        shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>,
+        shmem_provider: Arc<Mutex<SHP>>,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -409,7 +404,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 #[allow(clippy::type_complexity)]
 pub fn deserialize_state_mgr<'a, I, S, SHP, ST>(
-    shmem_provider: Arc<ReentrantMutex<RefCell<SHP>>>,
+    shmem_provider: Arc<Mutex<SHP>>,
     state_corpus_serialized: &[u8],
 ) -> Result<(S, LlmpEventManager<'a, I, S, SHP, ST>), Error>
 where
@@ -533,7 +528,7 @@ where
     SHP: ShMemProvider,
     ST: Stats,
 {
-    let shmem_provider = Arc::new(ReentrantMutex::new(RefCell::new(shmem_provider)));
+    let shmem_provider = Arc::new(Mutex::new(shmem_provider));
 
     let mut mgr = LlmpEventManager::<'a, I, S, SHP, ST>::new_on_port(
         shmem_provider.clone(),
@@ -559,7 +554,7 @@ where
             shmem_provider.clone(),
             shmem_provider
                 .lock()
-                .borrow_mut()
+                .unwrap()
                 .clone_ref(&sender.out_maps.last().unwrap().shmem)?,
             None,
         )?;
