@@ -6,8 +6,9 @@ and forwards them over unix domain sockets.
 
 use crate::{
     bolts::shmem::{
+        unix_shmem::ashmem::{AshmemShMemMapping, AshmemShMemProvider},
         ShMemDescription, ShMemId, ShMemMapping,
-        ShMemProvider, UnixShMemMapping, UnixShMemProvider,
+        ShMemProvider,
     },
     Error,
 };
@@ -38,12 +39,12 @@ const ASHMEM_SERVER_NAME: &str = "@ashmem_server";
 #[derive(Debug)]
 pub struct ServedShMemProvider {
     stream: UnixStream,
-    inner: UnixShMemProvider,
+    inner: AshmemShMemProvider,
 }
 
 #[derive(Clone, Debug)]
 pub struct ServedShMemMapping {
-    inner: UnixShMemMapping,
+    inner: AshmemShMemMapping,
     server_fd: i32,
 }
 
@@ -73,7 +74,7 @@ impl ServedShMemProvider {
             stream: UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap(),
             )?,
-            inner: UnixShMemProvider::new(),
+            inner: AshmemShMemProvider::new(),
         })
     }
 
@@ -154,8 +155,8 @@ impl AshmemClient {
 
 #[derive(Debug)]
 pub struct AshmemService {
-    provider: UnixShMemProvider,
-    maps: Vec<UnixShMemMapping>,
+    provider: AshmemShMemProvider,
+    maps: Vec<AshmemShMemMapping>,
 }
 
 impl AshmemService {
@@ -163,7 +164,7 @@ impl AshmemService {
     #[must_use]
     fn new() -> Self {
         AshmemService {
-            provider: UnixShMemProvider::new(),
+            provider: AshmemShMemProvider::new(),
             maps: Vec::new(),
         }
     }

@@ -18,7 +18,7 @@ pub type StdShMemMapping = Win32ShMemMapping;
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::env;
+use std::{env, num::ParseIntError};
 
 use crate::Error;
 
@@ -55,9 +55,11 @@ impl ShMemId {
     }
 
     /// Create a new id from an int
-    pub fn from_int(val: usize) -> Self {
+    pub fn from_int(val: i32) -> Self {
         let mut slice: [u8; 20] = [0; 20];
-        for (i, val) in val.to_be_bytes().iter().enumerate() {
+        let bytes = val.to_be_bytes();
+        let start_pos = bytes.iter().position(|&c| c != 0).unwrap();
+        for (i, val) in bytes[start_pos..].iter().enumerate() {
             slice[i] = *val;
         }
         Self { id: slice }
@@ -81,6 +83,11 @@ impl ShMemId {
     pub fn to_string(&self) -> &str {
         let eof_pos = self.id.iter().position(|&c| c == 0).unwrap();
         alloc::str::from_utf8(&self.id[..eof_pos]).unwrap()
+    }
+
+    /// Get an integer representation of this id
+    pub fn to_int(&self) -> Result<i32, ParseIntError> {
+        self.to_string().parse()
     }
 }
 
@@ -165,9 +172,8 @@ pub mod unix_shmem {
 
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
-        use core::{mem::size_of, ptr, slice};
-        use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
-        use std::ffi::CStr;
+        use core::{ptr, slice};
+        use libc::{c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
 
         use crate::Error;
 
@@ -227,20 +233,20 @@ pub mod unix_shmem {
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let os_id = shmget(
-                        0 as c_int,
+                        0,
                         map_size as c_ulong,
-                        0o1000 as c_int | 0o2000 as c_int | 0o600 as c_int,
+                        0o1000 | 0o2000 | 0o600,
                     );
 
-                    if os_id < 0 as c_int {
-                        return Err(Error::Unknown("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size));
+                    if os_id < 0_i32 {
+                        return Err(Error::Unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)))
                     }
 
-                    let map = shmat(os_id, ptr::null(), 0 as c_int) as *mut c_uchar;
+                    let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
-                    if map == -(1 as c_int) as *mut c_void as *mut c_uchar || map.is_null() {
-                        shmctl(os_id, 0 as c_int, ptr::null_mut());
-                        return Err(Error::Unknown("Failed to map the shared mapping"));
+                    if map == usize::MAX as c_int as *mut c_void as *mut c_uchar || map.is_null() {
+                        shmctl(os_id, 0, ptr::null_mut());
+                        return Err(Error::Unknown("Failed to map the shared mapping".to_string()));
                     }
 
                     Ok(Self {
@@ -254,10 +260,10 @@ pub mod unix_shmem {
             /// Get a UnixShMemMapping of the existing shared memory mapping identified by id
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let map = shmat(id.id, ptr::null(), 0 as c_int) as *mut c_uchar;
+                    let map = shmat(id.to_int().unwrap(), ptr::null(), 0) as *mut c_uchar;
 
-                    if map == -(1 as c_int) as *mut c_void as *mut c_uchar || map.is_null() {
-                        return Err(Error::Unknown("Failed to map the shared mapping"));
+                    if map == usize::MAX as *mut c_void as *mut c_uchar || map.is_null() {
+                        return Err(Error::Unknown("Failed to map the shared mapping".to_string()));
                     }
 
                     Ok(Self { id, map, map_size })
@@ -289,7 +295,7 @@ pub mod unix_shmem {
         impl Drop for DefaultUnixShMemMapping {
             fn drop(&mut self) {
                 unsafe {
-                    shmctl(self.id, 0 as c_int, ptr::null_mut());
+                    shmctl(self.id.to_int().unwrap(), 0, ptr::null_mut());
                 }
             }
         }
@@ -306,6 +312,13 @@ pub mod unix_shmem {
         impl DefaultUnixShMemProvider {
             pub fn new() -> Self {
                 Self {}
+            }
+        }
+
+        #[cfg(unix)]
+        impl Default for DefaultUnixShMemProvider {
+            fn default() -> Self {
+                Self::new()
             }
         }
 
