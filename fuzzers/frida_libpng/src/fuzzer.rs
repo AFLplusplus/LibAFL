@@ -403,7 +403,7 @@ unsafe fn fuzz(
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr(ServedShMemProvider::new()?, stats, broker_port) {
+        match setup_restarting_mgr(ServedShMemProvider::new(), stats, broker_port) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
