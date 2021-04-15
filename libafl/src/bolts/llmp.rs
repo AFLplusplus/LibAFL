@@ -78,7 +78,7 @@ use backtrace::Backtrace;
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
-    bolts::shmem::{ShMemDescription, ShMemId, ShMemMapping, ShMemProvider},
+    bolts::shmem::{ShMemDescription, ShMemId, ShMem, ShMemProvider},
     Error,
 };
 
@@ -154,13 +154,13 @@ impl Listener {
 
 /// Get sharedmem from a page
 #[inline]
-unsafe fn shmem2page_mut<SHM: ShMemMapping>(afl_shmem: &mut SHM) -> *mut LlmpPage {
+unsafe fn shmem2page_mut<SHM: ShMem>(afl_shmem: &mut SHM) -> *mut LlmpPage {
     afl_shmem.map_mut().as_mut_ptr() as *mut LlmpPage
 }
 
 /// Get sharedmem from a page
 #[inline]
-unsafe fn shmem2page<SHM: ShMemMapping>(afl_shmem: &SHM) -> *const LlmpPage {
+unsafe fn shmem2page<SHM: ShMem>(afl_shmem: &SHM) -> *const LlmpPage {
     afl_shmem.map().as_ptr() as *const LlmpPage
 }
 
@@ -215,7 +215,7 @@ fn new_map_size(max_alloc: usize) -> usize {
 
 /// Initialize a new llmp_page. size should be relative to
 /// llmp_page->messages
-unsafe fn _llmp_page_init<SHM: ShMemMapping>(shmem: &mut SHM, sender: u32, allow_reinit: bool) {
+unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit: bool) {
     let map_size = shmem.map().len();
     let page = shmem2page_mut(shmem);
     println!(
@@ -246,7 +246,7 @@ unsafe fn _llmp_page_init<SHM: ShMemMapping>(shmem: &mut SHM, sender: u32, allow
 
 /// Get the next pointer and make sure it's in the current page, and has enough space.
 #[inline]
-unsafe fn llmp_next_msg_ptr_checked<SHM: ShMemMapping>(
+unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     map: &mut LlmpSharedMap<SHM>,
     last_msg: *const LlmpMsg,
     alloc_size: usize,
@@ -325,7 +325,7 @@ impl LlmpMsg {
 
     /// Gets the buffer from this message as slice, with the corrent length.
     #[inline]
-    pub fn as_slice<SHM: ShMemMapping>(
+    pub fn as_slice<SHM: ShMem>(
         &self,
         map: &mut LlmpSharedMap<SHM>,
     ) -> Result<&[u8], Error> {
@@ -340,7 +340,7 @@ impl LlmpMsg {
 
     /// Returns true, if the pointer is, indeed, in the page of this shared map.
     #[inline]
-    pub fn in_map<SHM: ShMemMapping>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
+    pub fn in_map<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
         unsafe {
             let map_size = map.shmem.map().len();
             let buf_ptr = self.buf.as_ptr();
@@ -1198,7 +1198,7 @@ where
 #[derive(Clone, Debug)]
 pub struct LlmpSharedMap<SHM>
 where
-    SHM: ShMemMapping,
+    SHM: ShMem,
 {
     /// Shmem containg the actual (unsafe) page,
     /// shared between one LlmpSender and one LlmpReceiver
@@ -1210,7 +1210,7 @@ where
 /// A thin wrapper around a ShMem implementation, with special Llmp funcs
 impl<SHM> LlmpSharedMap<SHM>
 where
-    SHM: ShMemMapping,
+    SHM: ShMem,
 {
     /// Creates a new page, initializing the passed shared mem struct
     pub fn new(sender: u32, mut new_map: SHM) -> Self {
@@ -1993,8 +1993,6 @@ mod tests {
         LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
-
-    use parking_lot::Mutex;
 
     use crate::bolts::shmem::StdShMemProvider;
 

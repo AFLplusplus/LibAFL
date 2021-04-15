@@ -6,8 +6,8 @@ and forwards them over unix domain sockets.
 
 use crate::{
     bolts::shmem::{
-        unix_shmem::ashmem::{AshmemShMemMapping, AshmemShMemProvider},
-        ShMemDescription, ShMemId, ShMemMapping,
+        unix_shmem::ashmem::{AshmemShMem, AshmemShMemProvider},
+        ShMemDescription, ShMemId, ShMem,
         ShMemProvider,
     },
     Error,
@@ -43,12 +43,12 @@ pub struct ServedShMemProvider {
 }
 
 #[derive(Clone, Debug)]
-pub struct ServedShMemMapping {
-    inner: AshmemShMemMapping,
+pub struct ServedShMem {
+    inner: AshmemShMem,
     server_fd: i32,
 }
 
-impl ShMemMapping for ServedShMemMapping {
+impl ShMem for ServedShMem {
     fn id(&self) -> ShMemId {
         let client_id = self.inner.id();
         ShMemId::from_string(&format!("{}:{}", self.server_fd, client_id.to_string()))
@@ -104,11 +104,11 @@ impl ServedShMemProvider {
 }
 
 impl ShMemProvider for ServedShMemProvider {
-    type Mapping = ServedShMemMapping;
+    type Mapping = ServedShMem;
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, crate::Error> {
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size));
 
-        Ok(ServedShMemMapping {
+        Ok(ServedShMem {
             inner: self
                 .inner
                 .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), map_size)?,
@@ -122,7 +122,7 @@ impl ShMemProvider for ServedShMemProvider {
         let (server_fd, client_fd) =  self.send_receive(AshmemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
         ));
-        Ok(ServedShMemMapping {
+        Ok(ServedShMem {
             inner: self
                 .inner
                 .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
@@ -156,7 +156,7 @@ impl AshmemClient {
 #[derive(Debug)]
 pub struct AshmemService {
     provider: AshmemShMemProvider,
-    maps: Vec<AshmemShMemMapping>,
+    maps: Vec<AshmemShMem>,
 }
 
 impl AshmemService {

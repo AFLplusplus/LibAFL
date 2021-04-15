@@ -2,18 +2,18 @@
 // too.)
 
 #[cfg(all(feature = "std", unix))]
-pub use unix_shmem::{UnixShMemMapping, UnixShMemProvider};
+pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 #[cfg(all(feature = "std", unix))]
 pub type StdShMemProvider = UnixShMemProvider;
 #[cfg(all(feature = "std", unix))]
-pub type StdShMemMapping = UnixShMemMapping;
+pub type StdShMem = UnixShMem;
 
 #[cfg(all(windows, feature = "std"))]
-pub use win32_shmem::{Win32ShMemMapping, Win32ShMemProvider};
+pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemProvider = Win32ShMemProvider;
 #[cfg(all(windows, feature = "std"))]
-pub type StdShMemMapping = Win32ShMemMapping;
+pub type StdShMem = Win32ShMem;
 
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ impl ShMemDescription {
     }
 }
 
-/// An id associated with a given shared memory mapping (ShMemMapping), which can be used to
+/// An id associated with a given shared memory mapping (ShMem), which can be used to
 /// establish shared-mappings between proccesses.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct ShMemId {
@@ -91,7 +91,7 @@ impl ShMemId {
     }
 }
 
-pub trait ShMemMapping: Sized + Debug + Clone {
+pub trait ShMem: Sized + Debug + Clone {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -129,7 +129,7 @@ pub trait ShMemMapping: Sized + Debug + Clone {
 }
 
 pub trait ShMemProvider: Send {
-    type Mapping: ShMemMapping;
+    type Mapping: ShMem;
 
     /// Create a new shared memory mapping
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error>;
@@ -164,11 +164,11 @@ pub mod unix_shmem {
     #[cfg(target_os = "android")]
     pub type UnixShMemProvider = ashmem::AshmemShMemProvider;
     #[cfg(target_os = "android")]
-    pub type UnixShMemMapping = ashmem::AshmemShMemMapping;
+    pub type UnixShMem = ashmem::AshmemShMem;
     #[cfg(not(target_os = "android"))]
     pub type UnixShMemProvider = default::DefaultUnixShMemProvider;
     #[cfg(not(target_os = "android"))]
-    pub type UnixShMemMapping = ashmem::AshmemShMemMapping;
+    pub type UnixShMem = ashmem::AshmemShMem;
 
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
@@ -177,7 +177,7 @@ pub mod unix_shmem {
 
         use crate::Error;
 
-        use super::super::{ShMemId, ShMemMapping, ShMemProvider};
+        use super::super::{ShMemId, ShMem, ShMemProvider};
 
         #[cfg(unix)]
         #[derive(Copy, Clone)]
@@ -220,13 +220,13 @@ pub mod unix_shmem {
 
         /// The default sharedmap impl for unix using shmctl & shmget
         #[derive(Clone, Debug)]
-        pub struct DefaultUnixShMemMapping {
+        pub struct DefaultUnixShMem {
             id: ShMemId,
             map: *mut u8,
             map_size: usize,
         }
 
-        impl DefaultUnixShMemMapping {
+        impl DefaultUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
@@ -255,7 +255,7 @@ pub mod unix_shmem {
                 }
             }
 
-            /// Get a UnixShMemMapping of the existing shared memory mapping identified by id
+            /// Get a UnixShMem of the existing shared memory mapping identified by id
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let map = shmat(id.to_int().unwrap(), ptr::null(), 0) as *mut c_uchar;
@@ -270,7 +270,7 @@ pub mod unix_shmem {
         }
 
         #[cfg(unix)]
-        impl ShMemMapping for DefaultUnixShMemMapping {
+        impl ShMem for DefaultUnixShMem {
             fn id(&self) -> ShMemId {
                 self.id
             }
@@ -288,9 +288,9 @@ pub mod unix_shmem {
             }
         }
 
-        /// Drop implementation for UnixShMemMapping, which cleans up the mapping
+        /// Drop implementation for UnixShMem, which cleans up the mapping
         #[cfg(unix)]
-        impl Drop for DefaultUnixShMemMapping {
+        impl Drop for DefaultUnixShMem {
             fn drop(&mut self) {
                 unsafe {
                     shmctl(self.id.to_int().unwrap(), 0, ptr::null_mut());
@@ -323,10 +323,10 @@ pub mod unix_shmem {
         /// Implement ShMemProvider for UnixShMemProvider
         #[cfg(unix)]
         impl ShMemProvider for DefaultUnixShMemProvider {
-            type Mapping = DefaultUnixShMemMapping;
+            type Mapping = DefaultUnixShMem;
 
             fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
-                DefaultUnixShMemMapping::new(map_size)
+                DefaultUnixShMem::new(map_size)
             }
 
             fn from_id_and_size(
@@ -334,7 +334,7 @@ pub mod unix_shmem {
                 id: ShMemId,
                 size: usize,
             ) -> Result<Self::Mapping, Error> {
-                DefaultUnixShMemMapping::from_id_and_size(id, size)
+                DefaultUnixShMem::from_id_and_size(id, size)
             }
         }
     }
@@ -350,7 +350,7 @@ pub mod unix_shmem {
 
         use crate::Error;
 
-        use super::super::{ShMemId, ShMemMapping, ShMemProvider};
+        use super::super::{ShMemId, ShMem, ShMemProvider};
 
         extern "C" {
             fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
@@ -370,7 +370,7 @@ pub mod unix_shmem {
         /// An ashmem based impl for linux/android
         #[cfg(unix)]
         #[derive(Clone, Debug)]
-        pub struct AshmemShMemMapping {
+        pub struct AshmemShMem {
             id: ShMemId,
             map: *mut u8,
             map_size: usize,
@@ -388,7 +388,7 @@ pub mod unix_shmem {
         //const ASHMEM_SET_NAME: c_long = 0x41007701;
         const ASHMEM_SET_SIZE: c_long = 0x40087703;
 
-        impl AshmemShMemMapping {
+        impl AshmemShMem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
@@ -446,7 +446,7 @@ pub mod unix_shmem {
                 }
             }
 
-            /// Get a UnixShMemMapping of the existing shared memory mapping identified by id
+            /// Get a UnixShMem of the existing shared memory mapping identified by id
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
@@ -479,7 +479,7 @@ pub mod unix_shmem {
                 }
             }
 
-            ///// Get the file descriptor from an AshmemShMemMapping's id
+            ///// Get the file descriptor from an AshmemShMem's id
             //pub fn fd_from_id(id: ShMemId) -> Result<c_int, Error> {
             //let result = if let Some(fd_str) = id.to_string().split(":").collect::<Vec<&str>>().get(1) {
             //println!("id: {}, fd_str: {}", id.to_string(), fd_str);
@@ -492,7 +492,7 @@ pub mod unix_shmem {
         }
 
         #[cfg(unix)]
-        impl ShMemMapping for AshmemShMemMapping {
+        impl ShMem for AshmemShMem {
             fn id(&self) -> ShMemId {
                 self.id
             }
@@ -510,9 +510,9 @@ pub mod unix_shmem {
             }
         }
 
-        /// Drop implementation for AshmemShMemMapping, which cleans up the mapping
+        /// Drop implementation for AshmemShMem, which cleans up the mapping
         #[cfg(unix)]
-        impl Drop for AshmemShMemMapping {
+        impl Drop for AshmemShMem {
             fn drop(&mut self) {
                 unsafe {
                     //let fd = Self::fd_from_id(self.id).unwrap();
@@ -556,10 +556,10 @@ pub mod unix_shmem {
         /// Implement ShMemProvider for AshmemShMemProvider
         #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
-            type Mapping = AshmemShMemMapping;
+            type Mapping = AshmemShMem;
 
             fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
-                let mapping = AshmemShMemMapping::new(map_size)?;
+                let mapping = AshmemShMem::new(map_size)?;
                 Ok(mapping)
             }
 
@@ -568,7 +568,7 @@ pub mod unix_shmem {
                 id: ShMemId,
                 size: usize,
             ) -> Result<Self::Mapping, Error> {
-                AshmemShMemMapping::from_id_and_size(id, size)
+                AshmemShMem::from_id_and_size(id, size)
             }
         }
     }
@@ -577,7 +577,7 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
-    use super::{ShMemId, ShMemMapping, ShMemProvider};
+    use super::{ShMemId, ShMem, ShMemProvider};
     use crate::{
         bolts::bindings::{
             windows::win32::system_services::{
@@ -597,14 +597,14 @@ pub mod win32_shmem {
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
-    pub struct Win32ShMemMapping {
+    pub struct Win32ShMem {
         id: ShMemId,
         handle: HANDLE,
         map: *mut u8,
         map_size: usize,
     }
 
-    impl Win32ShMemMapping {
+    impl Win32ShMem {
         fn new_map(map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let uuid = Uuid::new_v4();
@@ -634,7 +634,7 @@ pub mod win32_shmem {
                 }
 
                 Ok(Self {
-                    id: ShMemId::from_slice(&map_str_bytes[0..20]),
+                    id: ShMemId::from_string(&map_str_bytes[0..20].try_into().unwrap()),
                     handle,
                     map,
                     map_size,
@@ -674,7 +674,7 @@ pub mod win32_shmem {
         }
     }
 
-    impl ShMemMapping for Win32ShMemMapping {
+    impl ShMem for Win32ShMem {
         fn id(&self) -> ShMemId {
             self.id
         }
@@ -693,7 +693,7 @@ pub mod win32_shmem {
     }
 
     /// Deinit sharedmaps on drop
-    impl Drop for Win32ShMemMapping {
+    impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
                 UnmapViewOfFile(self.map as *mut c_void);
@@ -715,10 +715,10 @@ pub mod win32_shmem {
 
     /// Implement ShMemProvider for Win32ShMemProvider
     impl ShMemProvider for Win32ShMemProvider {
-        type Mapping = Win32ShMemMapping;
+        type Mapping = Win32ShMem;
 
         fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
-            Win32ShMemMapping::new_map(map_size)
+            Win32ShMem::new_map(map_size)
         }
 
         fn from_id_and_size(
@@ -726,7 +726,7 @@ pub mod win32_shmem {
             id: ShMemId,
             size: usize,
         ) -> Result<Self::Mapping, Error> {
-            Win32ShMemMapping::from_id_and_size(id, size)
+            Win32ShMem::from_id_and_size(id, size)
         }
     }
 }
