@@ -367,12 +367,12 @@ where
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
-    pub fn on_port(shmem_provider: Rc<RefCell<SHP>>, port: u16) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: &Rc<RefCell<SHP>>, port: u16) -> Result<Self, Error> {
         match TcpListener::bind(format!("127.0.0.1:{}", port)) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
                 dbg!("We're the broker");
-                let mut broker = LlmpBroker::new(shmem_provider.clone())?;
+                let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
@@ -408,7 +408,7 @@ where
 
     /// Recreate an existing client from the stored description
     pub fn existing_client_from_description(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         description: &LlmpClientDescription,
     ) -> Result<LlmpConnection<'a, SHP>, Error> {
         Ok(LlmpConnection::IsClient {
@@ -492,7 +492,7 @@ where
     SHP: ShMemProvider,
 {
     pub fn new(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         id: u32,
         keep_pages_forever: bool,
     ) -> Result<Self, Error> {
@@ -525,7 +525,7 @@ where
     /// Reattach to a vacant out_map, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         env_name: &str,
     ) -> Result<Self, Error> {
         let msg_sent_offset = msg_offset_from_env(env_name)?;
@@ -914,7 +914,7 @@ where
 
     // Create this client on an existing map from the given description. acquired with `self.describe`
     pub fn on_existing_from_description(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         description: &LlmpDescription,
     ) -> Result<Self, Error> {
         Self::on_existing_map(
@@ -951,7 +951,7 @@ where
     /// Reattach to a vacant recv_map, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         env_name: &str,
     ) -> Result<Self, Error> {
         Self::on_existing_map(
@@ -1158,7 +1158,7 @@ where
 
     // Create this client on an existing map from the given description. acquired with `self.describe`
     pub fn on_existing_from_description(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         description: &LlmpDescription,
     ) -> Result<Self, Error> {
         Self::on_existing_map(
@@ -1361,7 +1361,7 @@ where
     SHP: ShMemProvider,
 {
     /// Create and initialize a new llmp_broker
-    pub fn new(shmem_provider: Rc<RefCell<SHP>>) -> Result<Self, Error> {
+    pub fn new(shmem_provider: &Rc<RefCell<SHP>>) -> Result<Self, Error> {
         Ok(LlmpBroker {
             llmp_out: LlmpSender {
                 id: 0,
@@ -1731,23 +1731,23 @@ where
                 current_broker_map,
                 last_msg_recvd_offset,
             )?,
-            shmem_provider: shmem_provider.clone(),
+            shmem_provider,
         })
     }
 
     /// Recreate this client from a previous client.to_env
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         env_name: &str,
     ) -> Result<Self, Error> {
         Ok(Self {
             sender: LlmpSender::on_existing_from_env(
-                shmem_provider.clone(),
+                shmem_provider,
                 &format!("{}_SENDER", env_name),
             )?,
             receiver: LlmpReceiver::on_existing_from_env(
-                shmem_provider.clone(),
+                shmem_provider,
                 &format!("{}_RECEIVER", env_name),
             )?,
             shmem_provider: shmem_provider.clone(),
@@ -1772,16 +1772,13 @@ where
 
     /// Create an existing client from description
     fn existing_client_from_description(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
         Ok(Self {
-            sender: LlmpSender::on_existing_from_description(
-                shmem_provider.clone(),
-                &description.sender,
-            )?,
+            sender: LlmpSender::on_existing_from_description(shmem_provider, &description.sender)?,
             receiver: LlmpReceiver::on_existing_from_description(
-                shmem_provider.clone(),
+                shmem_provider,
                 &description.receiver,
             )?,
             shmem_provider: shmem_provider.clone(),
@@ -1801,7 +1798,7 @@ where
 
     /// Creates a new LlmpClient
     pub fn new(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         initial_broker_map: LlmpSharedMap<SHP::Mapping>,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -1904,7 +1901,7 @@ where
     #[cfg(feature = "std")]
     /// Creates a new LlmpClient, reading the map id and len from env
     pub fn create_using_env(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         env_var: &str,
     ) -> Result<Self, Error> {
         let map = LlmpSharedMap::existing(shmem_provider.borrow_mut().existing_from_env(env_var)?);
@@ -1914,7 +1911,7 @@ where
     #[cfg(feature = "std")]
     /// Create a LlmpClient, getting the ID from a given port
     pub fn create_attach_to_tcp(
-        shmem_provider: Rc<RefCell<SHP>>,
+        shmem_provider: &Rc<RefCell<SHP>>,
         port: u16,
     ) -> Result<Self, Error> {
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
@@ -1923,7 +1920,7 @@ where
         // First, get the serialized description size by serializing a dummy.
         let dummy_description = ShMemDescription {
             size: 0,
-            id: Default::default(),
+            id: ShMemId::default(),
         };
         let mut new_broker_map_str = postcard::to_allocvec(&dummy_description)?;
 
@@ -1936,7 +1933,7 @@ where
                 .borrow_mut()
                 .from_description(broker_map_description)?,
         );
-        let ret = Self::new(shmem_provider.clone(), map)?;
+        let ret = Self::new(shmem_provider, map)?;
 
         let own_map_description_bytes =
             postcard::to_allocvec(&ret.sender.out_maps.first().unwrap().shmem.description())?;
@@ -1966,13 +1963,13 @@ mod tests {
     #[test]
     pub fn llmp_connection() {
         let shmem_provider = Rc::new(RefCell::new(StdShMemProvider::new()));
-        let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
+        let mut broker = match LlmpConnection::on_port(&shmem_provider, 1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
             IsBroker { broker } => broker,
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
+        let mut client = match LlmpConnection::on_port(&shmem_provider, 1337).unwrap() {
             IsBroker { broker: _ } => panic!("Second connect should be a client!"),
             IsClient { client } => client,
         };
@@ -1996,7 +1993,7 @@ mod tests {
         }
 
         /* recreate the client from env, check if it still works */
-        client = LlmpClient::on_existing_from_env(shmem_provider.clone(), "_ENV_TEST").unwrap();
+        client = LlmpClient::on_existing_from_env(&shmem_provider, "_ENV_TEST").unwrap();
 
         client.send_buf(tag, &arr).unwrap();
 

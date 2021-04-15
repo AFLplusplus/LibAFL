@@ -3,8 +3,8 @@
 
 use libafl::{
     bolts::{
-        os::ashmem_server::{AshmemService, ServedShMemProvider},
-        shmem::{ShMemProvider, UnixShMemProvider},
+        os::ashmem_server::ServedShMemProvider,
+        shmem::ShMemProvider,
         tuples::{tuple_list, Named},
     },
     corpus::{
@@ -36,14 +36,7 @@ use frida_gum::{
     stalker::{NoneEventSink, Stalker, Transformer},
 };
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
-use std::{
-    env,
-    ffi::c_void,
-    fs::File,
-    io::{BufWriter, Write},
-    path::PathBuf,
-    sync::{Arc, RwLock},
-};
+use std::{env, ffi::c_void, path::PathBuf};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a> {
