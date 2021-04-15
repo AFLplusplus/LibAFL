@@ -619,7 +619,7 @@ pub mod win32_shmem {
                 }
 
                 Ok(Self {
-                    id: ShMemId::from_string(&map_str_bytes[0..20].try_into().unwrap()),
+                    id: ShMemId::from_slice(&map_str_bytes[0..20].try_into().unwrap()),
                     handle,
                     map,
                     map_size,
