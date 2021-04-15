@@ -6,9 +6,9 @@ and forwards them over unix domain sockets.
 
 use crate::{
     bolts::shmem::{
-        unix_shmem::ashmem::{AshmemShMemMapping, AshmemShMemProvider},
+        unix_shmem::ashmem::{AshmemShMemMapping, AshmemShMem},
         ShMemDescription, ShMemId, ShMemMapping,
-        ShMemProvider,
+        ShMem,
     },
     Error,
 };
@@ -37,9 +37,9 @@ use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 const ASHMEM_SERVER_NAME: &str = "@ashmem_server";
 
 #[derive(Debug)]
-pub struct ServedShMemProvider {
+pub struct ServedShMem {
     stream: UnixStream,
-    inner: AshmemShMemProvider,
+    inner: AshmemShMem,
 }
 
 #[derive(Clone, Debug)]
@@ -67,14 +67,14 @@ impl ShMemMapping for ServedShMemMapping {
     }
 }
 
-impl ServedShMemProvider {
-    /// Connect to the server and return a new ServedShMemProvider
+impl ServedShMem {
+    /// Connect to the server and return a new ServedShMem
     pub fn new() -> Result<Self, Error> {
         Ok(Self {
             stream: UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap(),
             )?,
-            inner: AshmemShMemProvider::new(),
+            inner: AshmemShMem::new(),
         })
     }
 
@@ -103,7 +103,7 @@ impl ServedShMemProvider {
     }
 }
 
-impl ShMemProvider for ServedShMemProvider {
+impl ShMem for ServedShMem {
     type Mapping = ServedShMemMapping;
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, crate::Error> {
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size));
@@ -155,7 +155,7 @@ impl AshmemClient {
 
 #[derive(Debug)]
 pub struct AshmemService {
-    provider: AshmemShMemProvider,
+    provider: AshmemShMem,
     maps: Vec<AshmemShMemMapping>,
 }
 
@@ -164,7 +164,7 @@ impl AshmemService {
     #[must_use]
     fn new() -> Self {
         AshmemService {
-            provider: AshmemShMemProvider::new(),
+            provider: AshmemShMem::new(),
             maps: Vec::new(),
         }
     }
