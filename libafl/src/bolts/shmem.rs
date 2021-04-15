@@ -717,7 +717,7 @@ pub mod win32_shmem {
     impl ShMemProvider for Win32ShMemProvider {
         type Mapping = Win32ShMemMapping;
 
-        fn new_map(&mut self, map_size: usize) -> Result<&mut Self::Mapping, Error> {
+        fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
             Win32ShMemMapping::new_map(map_size)
         }
 
@@ -725,7 +725,7 @@ pub mod win32_shmem {
             &mut self,
             id: ShMemId,
             size: usize,
-        ) -> Result<&mut Self::Mapping, Error> {
+        ) -> Result<Self::Mapping, Error> {
             Win32ShMemMapping::from_id_and_size(id, size)
         }
     }

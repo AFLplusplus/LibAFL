@@ -5,13 +5,14 @@ extern crate alloc;
 
 #[cfg(all(unix, feature = "std"))]
 use core::{convert::TryInto, time::Duration};
+use std::sync::{Arc, Mutex};
 #[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 
 use libafl::bolts::llmp::Tag;
 #[cfg(all(unix, feature = "std"))]
 use libafl::{
-    bolts::{llmp, shmem::UnixShMem},
+    bolts::{llmp, shmem::StdShMemProvider},
     Error,
 };
 
@@ -21,7 +22,7 @@ const _TAG_1MEG_V1: Tag = 0xB1111161;
 
 #[cfg(all(unix, feature = "std"))]
 fn adder_loop(port: u16) -> ! {
-    let mut client = llmp::LlmpClient::<UnixShMem>::create_attach_to_tcp(port).unwrap();
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(Arc::new(Mutex::new(StdShMemProvider::new())), port).unwrap();
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
@@ -63,7 +64,7 @@ fn adder_loop(port: u16) -> ! {
 
 #[cfg(all(unix, feature = "std"))]
 fn large_msg_loop(port: u16) -> ! {
-    let mut client = llmp::LlmpClient::<UnixShMem>::create_attach_to_tcp(port).unwrap();
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(Arc::new(Mutex::new(StdShMemProvider::new())), port).unwrap();
 
     let meg_buf = [1u8; 1 << 20];
 
@@ -124,7 +125,7 @@ fn main() {
 
     match mode.as_str() {
         "broker" => {
-            let mut broker = llmp::LlmpBroker::<UnixShMem>::new().unwrap();
+            let mut broker = llmp::LlmpBroker::new(Arc::new(Mutex::new(StdShMemProvider::new()))).unwrap();
             broker
                 .launch_listener(llmp::Listener::Tcp(
                     std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap(),
@@ -133,7 +134,7 @@ fn main() {
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
         }
         "ctr" => {
-            let mut client = llmp::LlmpClient::<UnixShMem>::create_attach_to_tcp(port).unwrap();
+            let mut client = llmp::LlmpClient::create_attach_to_tcp(Arc::new(Mutex::new(StdShMemProvider::new())), port).unwrap();
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
