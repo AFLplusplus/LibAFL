@@ -219,13 +219,6 @@ fn new_map_size(max_alloc: usize) -> usize {
 unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit: bool) {
     let map_size = shmem.map().len();
     let page = shmem2page_mut(shmem);
-    dbg!(
-        "page: {:?}: {:?}, magic: {}, allow_reinit: {}",
-        page,
-        *page,
-        (*page).magic,
-        allow_reinit
-    );
     if (*page).magic == PAGE_INITIALIZED_MAGIC && !allow_reinit {
         panic!(
             "Tried to initialize page {:?} twice (for shmem {:?})",
