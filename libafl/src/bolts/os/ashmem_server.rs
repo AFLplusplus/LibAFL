@@ -141,67 +141,6 @@ impl ShMemProvider for ServedShMemProvider {
                 .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
             server_fd,
         })
-=======
-    fn existing_from_shm_slice(
-        map_str_bytes: &[u8; 20],
-        map_size: usize,
-    ) -> Result<Self, crate::Error> {
-        match Self::new(ASHMEM_SERVER_NAME).unwrap() {
-            ServedShMem::Client(mut client) => {
-                let (shm_slice, fd) = client
-                    .send_receive(AshmemRequest::ExistingMap(ShMemDescription {
-                        size: map_size,
-                        str_bytes: *map_str_bytes,
-                    }))
-                    .expect("Could not allocate from the ashmem server");
-
-                let mut ourkey: [u8; 20] = [0; 20];
-                unsafe {
-                    snprintf(
-                        ourkey.as_mut_ptr() as *mut u8,
-                        20,
-                        b"%d\x00" as *const u8,
-                        fd,
-                    );
-                }
-                client.slice = Some(shm_slice);
-                client.fd = Some(fd);
-                client.shmem = Some(
-                    UnixShMem::existing_from_shm_slice(&ourkey, map_size)
-                        .expect("Failed to create the UnixShMem"),
-                );
-                Ok(ServedShMem::Client(client))
-            }
-            ServedShMem::Server(mut server) => {
-                server.shmem = Some(
-                    UnixShMem::existing_from_shm_slice(map_str_bytes, map_size)
-                        .expect("Failed to create the UnixShMem"),
-                );
-                Ok(ServedShMem::Server(server))
-            }
-        }
-    }
-
-    fn shm_slice(&self) -> &[u8; 20] {
-        match self {
-            ServedShMem::Client(client) => client.slice.as_ref().unwrap(),
-            ServedShMem::Server(server) => server.shmem.as_ref().unwrap().shm_slice(),
-        }
-    }
-
-    fn map(&self) -> &[u8] {
-        match self {
-            ServedShMem::Client(client) => client.shmem.as_ref().unwrap().map(),
-            ServedShMem::Server(server) => server.shmem.as_ref().unwrap().map(),
-        }
-    }
-
-    fn map_mut(&mut self) -> &mut [u8] {
-        match self {
-            ServedShMem::Client(client) => client.shmem.as_mut().unwrap().map_mut(),
-            ServedShMem::Server(server) => server.shmem.as_mut().unwrap().map_mut(),
-        }
->>>>>>> 012d25a (fmt)
     }
 }
 
