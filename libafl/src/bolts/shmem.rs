@@ -138,29 +138,29 @@ pub trait ShMem: Sized + Debug + Clone {
 }
 
 pub trait ShMemProvider: Send + Clone + Default {
-    type Mapping: ShMem;
+    type Mem: ShMem;
 
     /// Create a new instance of the provider
     fn new() -> Self;
 
     /// Create a new shared memory mapping
-    fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error>;
+    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error>;
 
     /// Get a mapping given its id and size
-    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error>;
+    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error>;
 
     /// Get a mapping given a description
-    fn from_description(&mut self, description: ShMemDescription) -> Result<Self::Mapping, Error> {
+    fn from_description(&mut self, description: ShMemDescription) -> Result<Self::Mem, Error> {
         self.from_id_and_size(description.id, description.size)
     }
 
-    fn clone_ref(&mut self, mapping: &Self::Mapping) -> Result<Self::Mapping, Error> {
+    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
         self.from_id_and_size(mapping.id(), mapping.len())
     }
 
     /// Reads an existing map config from env vars, then maps it
     #[cfg(feature = "std")]
-    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::Mapping, Error> {
+    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::Mem, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
         self.from_description(ShMemDescription::from_string_and_size(
@@ -327,12 +327,12 @@ pub mod unix_shmem {
         /// Implement ShMemProvider for UnixShMemProvider
         #[cfg(unix)]
         impl ShMemProvider for DefaultUnixShMemProvider {
-            type Mapping = DefaultUnixShMem;
+            type Mem = DefaultUnixShMem;
 
             fn new() -> Self {
                 Self {}
             }
-            fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
+            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
                 DefaultUnixShMem::new(map_size)
             }
 
@@ -340,7 +340,7 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<Self::Mapping, Error> {
+            ) -> Result<Self::Mem, Error> {
                 DefaultUnixShMem::from_id_and_size(id, size)
             }
         }
@@ -544,13 +544,13 @@ pub mod unix_shmem {
         /// Implement ShMemProvider for AshmemShMemProvider
         #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
-            type Mapping = AshmemShMem;
+            type Mem = AshmemShMem;
 
             fn new() -> Self {
                 Self {}
             }
 
-            fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
+            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
                 let mapping = AshmemShMem::new(map_size)?;
                 Ok(mapping)
             }
@@ -559,7 +559,7 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<Self::Mapping, Error> {
+            ) -> Result<Self::Mem, Error> {
                 AshmemShMem::from_id_and_size(id, size)
             }
         }
@@ -573,7 +573,7 @@ pub mod win32_shmem {
     use crate::{
         bolts::bindings::{
             windows::win32::system_services::{
-                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+                CreateFileMemA, MapViewOfFile, OpenFileMemA, UnmapViewOfFile,
             },
             windows::win32::system_services::{BOOL, HANDLE, PAGE_TYPE, PSTR},
             windows::win32::windows_programming::CloseHandle,
@@ -604,7 +604,7 @@ pub mod win32_shmem {
                 let mut map_str = format!("libafl_{}", uuid.to_simple());
                 let map_str_bytes = map_str.as_mut_vec();
                 map_str_bytes[19] = 0; // Trucate to size 20
-                let handle = CreateFileMappingA(
+                let handle = CreateFileMemA(
                     HANDLE(INVALID_HANDLE_VALUE),
                     ptr::null_mut(),
                     PAGE_TYPE::PAGE_READWRITE,
@@ -639,7 +639,7 @@ pub mod win32_shmem {
             unsafe {
                 let map_str_bytes = id.id;
 
-                let handle = OpenFileMappingA(
+                let handle = OpenFileMemA(
                     FILE_MAP_ALL_ACCESS,
                     BOOL(0),
                     PSTR(&map_str_bytes as *const u8 as *mut u8),
@@ -707,16 +707,16 @@ pub mod win32_shmem {
 
     /// Implement ShMemProvider for Win32ShMemProvider
     impl ShMemProvider for Win32ShMemProvider {
-        type Mapping = Win32ShMem;
+        type Mem = Win32ShMem;
 
         fn new() -> Self {
             Self {}
         }
-        fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, Error> {
+        fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
             Win32ShMem::new_map(map_size)
         }
 
-        fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error> {
+        fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
             Win32ShMem::from_id_and_size(id, size)
         }
     }

@@ -474,7 +474,7 @@ where
     /// If null, a new page (just) started.
     pub last_msg_sent: *const LlmpMsg,
     /// A vec of page wrappers, each containing an intialized AfShmem
-    pub out_maps: Vec<LlmpSharedMap<SP::Mapping>>,
+    pub out_maps: Vec<LlmpSharedMap<SP::Mem>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
     /// By keeping the message history around,
@@ -566,7 +566,7 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_map(
         shmem_provider: Rc<RefCell<SP>>,
-        current_out_map: SP::Mapping,
+        current_out_map: SP::Mem,
         last_msg_sent_offset: Option<u64>,
     ) -> Result<Self, Error> {
         let mut out_map = LlmpSharedMap::existing(current_out_map);
@@ -934,7 +934,7 @@ where
     /// The shmem provider
     pub shmem_provider: Rc<RefCell<SP>>,
     /// current page. After EOP, this gets replaced with the new one
-    pub current_recv_map: LlmpSharedMap<SP::Mapping>,
+    pub current_recv_map: LlmpSharedMap<SP::Mem>,
 }
 
 /// Receiving end of an llmp channel
@@ -969,7 +969,7 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_map(
         shmem_provider: Rc<RefCell<SP>>,
-        current_sender_map: SP::Mapping,
+        current_sender_map: SP::Mem,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
         let mut current_recv_map = LlmpSharedMap::existing(current_sender_map);
@@ -1382,7 +1382,7 @@ where
 
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in broker.client_map
-    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::Mapping>) {
+    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::Mem>) {
         // Tell the client it may unmap this page now.
         client_page.mark_save_to_unmap();
 
@@ -1704,9 +1704,9 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail
     pub fn on_existing_map(
         shmem_provider: Rc<RefCell<SP>>,
-        _current_out_map: SP::Mapping,
+        _current_out_map: SP::Mem,
         _last_msg_sent_offset: Option<u64>,
-        current_broker_map: SP::Mapping,
+        current_broker_map: SP::Mem,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -1788,7 +1788,7 @@ where
     /// Creates a new LlmpClient
     pub fn new(
         shmem_provider: &Rc<RefCell<SP>>,
-        initial_broker_map: LlmpSharedMap<SP::Mapping>,
+        initial_broker_map: LlmpSharedMap<SP::Mem>,
     ) -> Result<Self, Error> {
         Ok(Self {
             sender: LlmpSender {

@@ -106,7 +106,7 @@ impl Clone for ServedShMemProvider {
 }
 
 impl ShMemProvider for ServedShMemProvider {
-    type Mapping = ServedShMem;
+    type Mem = ServedShMem;
 
     /// Connect to the server and return a new ServedShMemProvider
     fn new() -> Self {
@@ -118,7 +118,7 @@ impl ShMemProvider for ServedShMemProvider {
             inner: AshmemShMemProvider::new(),
         }
     }
-    fn new_map(&mut self, map_size: usize) -> Result<Self::Mapping, crate::Error> {
+    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, crate::Error> {
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size));
 
         Ok(ServedShMem {
@@ -129,7 +129,7 @@ impl ShMemProvider for ServedShMemProvider {
         })
     }
 
-    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mapping, Error> {
+    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
         let parts = id.to_string().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::ExistingMap(
