@@ -22,8 +22,7 @@ use crate::bolts::shmem::UnixShMemProvider;
 use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
-        os::ashmem_server::{AshmemService, ServedShMemProvider},
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
@@ -35,6 +34,10 @@ use crate::{
     stats::Stats,
     Error,
 };
+#[cfg(target_os = "android")]
+use crate::bolts::os::ashmem_server::{AshmemService, ServedShMemProvider};
+#[cfg(not(target_os = "android"))]
+use crate::bolts::shmem::StdShMemProvider;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
@@ -539,7 +542,7 @@ where
     S: DeserializeOwned + IfInteresting<I>,
     ST: Stats,
 {
-    AshmemService::start();
+    AshmemService::start().expect("Error starting Ashmem Service");
 
     setup_restarting_mgr(ServedShMemProvider::new(), stats, broker_port)
 }
