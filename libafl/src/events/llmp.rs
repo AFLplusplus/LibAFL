@@ -570,7 +570,7 @@ where
         LlmpEventManager::<'a, I, S, SP, ST>::new_on_port(&shmem_provider, stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
-    let (sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+    let (sender, mut receiver, shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
@@ -603,7 +603,7 @@ where
             #[cfg(unix)]
             let _ = match unsafe { fork() }? {
                 ForkResult::Parent(handle) => handle.status(),
-                ForkResult::Child => break (sender, receiver),
+                ForkResult::Child => break (sender, receiver, shmem_provider),
             };
 
             // On windows, we spawn ourself again
@@ -626,10 +626,9 @@ where
         (
             LlmpSender::on_existing_from_env(&shmem_provider, _ENV_FUZZER_SENDER)?,
             LlmpReceiver::on_existing_from_env(&shmem_provider, _ENV_FUZZER_RECEIVER)?,
+            shmem_provider,
         )
     };
-
-    let shmem_provider = Rc::new(RefCell::new(shmem_provider.borrow_mut().clone()));
 
     println!("We're a client, let's fuzz :)");
 
