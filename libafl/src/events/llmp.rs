@@ -34,9 +34,9 @@ use crate::{
     stats::Stats,
     Error,
 };
-#[cfg(target_os = "android")]
+#[cfg(all(feature = "std", target_os = "android"))]
 use crate::bolts::os::ashmem_server::{AshmemService, ServedShMemProvider};
-#[cfg(not(target_os = "android"))]
+#[cfg(all(feature = "std", not(target_os = "android")))]
 use crate::bolts::shmem::StdShMemProvider;
 
 /// Forward this to the client
