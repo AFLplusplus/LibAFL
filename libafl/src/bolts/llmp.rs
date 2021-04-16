@@ -64,7 +64,7 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
+use alloc::rc::Rc;
 #[cfg(feature = "std")]
 use std::{
     env,
