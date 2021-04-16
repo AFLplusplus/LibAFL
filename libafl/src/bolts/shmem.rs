@@ -565,7 +565,7 @@ pub mod win32_shmem {
     use crate::{
         bolts::bindings::{
             windows::win32::system_services::{
-                CreateFileMemA, MapViewOfFile, OpenFileMemA, UnmapViewOfFile,
+                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             },
             windows::win32::system_services::{BOOL, HANDLE, PAGE_TYPE, PSTR},
             windows::win32::windows_programming::CloseHandle,
@@ -596,7 +596,7 @@ pub mod win32_shmem {
                 let mut map_str = format!("libafl_{}", uuid.to_simple());
                 let map_str_bytes = map_str.as_mut_vec();
                 map_str_bytes[19] = 0; // Trucate to size 20
-                let handle = CreateFileMemA(
+                let handle = CreateFileMappingA(
                     HANDLE(INVALID_HANDLE_VALUE),
                     ptr::null_mut(),
                     PAGE_TYPE::PAGE_READWRITE,
@@ -631,7 +631,7 @@ pub mod win32_shmem {
             unsafe {
                 let map_str_bytes = id.id;
 
-                let handle = OpenFileMemA(
+                let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS,
                     BOOL(0),
                     PSTR(&map_str_bytes as *const u8 as *mut u8),
