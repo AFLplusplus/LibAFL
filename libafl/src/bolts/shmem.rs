@@ -178,7 +178,7 @@ pub mod unix_shmem {
     #[cfg(target_os = "android")]
     pub type UnixShMem = ashmem::AshmemShMem;
     #[cfg(not(target_os = "android"))]
-    pub type UnixShMemProvider = default::DefaultUnixShMemProvider;
+    pub type UnixShMemProvider = default::CommonUnixShMemProvider;
     #[cfg(not(target_os = "android"))]
     pub type UnixShMem = ashmem::AshmemShMem;
 
@@ -232,13 +232,13 @@ pub mod unix_shmem {
 
         /// The default sharedmap impl for unix using shmctl & shmget
         #[derive(Clone, Debug)]
-        pub struct DefaultUnixShMem {
+        pub struct CommonUnixShMem {
             id: ShMemId,
             map: *mut u8,
             map_size: usize,
         }
 
-        impl DefaultUnixShMem {
+        impl CommonUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
@@ -282,7 +282,7 @@ pub mod unix_shmem {
         }
 
         #[cfg(unix)]
-        impl ShMem for DefaultUnixShMem {
+        impl ShMem for CommonUnixShMem {
             fn id(&self) -> ShMemId {
                 self.id
             }
@@ -302,7 +302,7 @@ pub mod unix_shmem {
 
         /// Drop implementation for UnixShMem, which cleans up the mapping
         #[cfg(unix)]
-        impl Drop for DefaultUnixShMem {
+        impl Drop for CommonUnixShMem {
             fn drop(&mut self) {
                 unsafe {
                     shmctl(self.id.to_int(), 0, ptr::null_mut());
@@ -313,12 +313,12 @@ pub mod unix_shmem {
         /// A ShMemProvider which uses shmget/shmat/shmctl to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
-        pub struct DefaultUnixShMemProvider {}
+        pub struct CommonUnixShMemProvider {}
 
-        unsafe impl Send for DefaultUnixShMemProvider {}
+        unsafe impl Send for CommonUnixShMemProvider {}
 
         #[cfg(unix)]
-        impl Default for DefaultUnixShMemProvider {
+        impl Default for CommonUnixShMemProvider {
             fn default() -> Self {
                 Self::new()
             }
@@ -326,18 +326,18 @@ pub mod unix_shmem {
 
         /// Implement ShMemProvider for UnixShMemProvider
         #[cfg(unix)]
-        impl ShMemProvider for DefaultUnixShMemProvider {
-            type Mem = DefaultUnixShMem;
+        impl ShMemProvider for CommonUnixShMemProvider {
+            type Mem = CommonUnixShMem;
 
             fn new() -> Self {
                 Self {}
             }
             fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
-                DefaultUnixShMem::new(map_size)
+                CommonUnixShMem::new(map_size)
             }
 
             fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-                DefaultUnixShMem::from_id_and_size(id, size)
+                CommonUnixShMem::from_id_and_size(id, size)
             }
         }
     }
