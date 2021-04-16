@@ -20,8 +20,8 @@ use crate::utils::{fork, ForkResult};
 use crate::bolts::shmem::UnixShMemProvider;
 
 #[cfg(all(feature = "std", target_os = "android"))]
-use crate::bolts::os::ashmem_server::{AshmemService, ServedShMemProvider};
-#[cfg(all(feature = "std", not(target_os = "android")))]
+use crate::bolts::os::ashmem_server::AshmemService;
+#[cfg(feature = "std")]
 use crate::bolts::shmem::StdShMemProvider;
 use crate::{
     bolts::{
@@ -503,7 +503,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", not(target_os = "android")))]
+#[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
 pub fn setup_restarting_mgr_std<'a, I, S, ST: 'a>(
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
@@ -521,31 +521,12 @@ where
     S: DeserializeOwned + IfInteresting<I>,
     ST: Stats,
 {
+    #[cfg(target_os = "android")]
+    AshmemService::start().expect("Error starting Ashmem Service");
+
     setup_restarting_mgr(StdShMemProvider::new(), stats, broker_port)
 }
 
-#[cfg(all(feature = "std", target_os = "android"))]
-#[allow(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<'a, I, S, ST: 'a>(
-    //mgr: &mut LlmpEventManager<I, S, SH, ST>,
-    stats: ST,
-    broker_port: u16,
-) -> Result<
-    (
-        Option<S>,
-        LlmpRestartingEventManager<'a, I, S, ServedShMemProvider, ST>,
-    ),
-    Error,
->
-where
-    I: Input,
-    S: DeserializeOwned + IfInteresting<I>,
-    ST: Stats,
-{
-    AshmemService::start().expect("Error starting Ashmem Service");
-
-    setup_restarting_mgr(ServedShMemProvider::new(), stats, broker_port)
-}
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.

@@ -4,16 +4,28 @@
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 #[cfg(all(feature = "std", unix))]
-pub type StdShMemProvider = UnixShMemProvider;
+pub type OsShMemProvider = UnixShMemProvider;
 #[cfg(all(feature = "std", unix))]
-pub type StdShMem = UnixShMem;
+pub type OsShMem = UnixShMem;
 
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 #[cfg(all(windows, feature = "std"))]
-pub type StdShMemProvider = Win32ShMemProvider;
+pub type OsShMemProvider = Win32ShMemProvider;
 #[cfg(all(windows, feature = "std"))]
-pub type StdShMem = Win32ShMem;
+pub type OsShMem = Win32ShMem;
+
+#[cfg(target_os = "android")]
+use crate::bolts::os::ashmem_server::{ServedShMem, ServedShMemProvider};
+#[cfg(target_os = "android")]
+pub type StdShMemProvider = ServedShMemProvider;
+#[cfg(target_os = "android")]
+pub type StdShMem = ServedShMem;
+
+#[cfg(all(feature = "std", not(target_os = "android")))]
+pub type StdShMemProvider = OsShMemProvider;
+#[cfg(all(feature = "std", not(target_os = "android")))]
+pub type StdShMem = OsShMem;
 
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
