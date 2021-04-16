@@ -68,6 +68,7 @@ impl ShMem for ServedShMem {
 
 impl ServedShMemProvider {
     /// Send a request to the server, and wait for a response
+    #[allow(clippy::similar_names)] // id and fd
     fn send_receive(&mut self, request: AshmemRequest) -> (i32, i32) {
         let body = postcard::to_allocvec(&request).unwrap();
 
