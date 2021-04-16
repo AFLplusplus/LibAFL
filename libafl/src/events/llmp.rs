@@ -19,6 +19,10 @@ use crate::utils::{fork, ForkResult};
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::UnixShMemProvider;
 
+#[cfg(all(feature = "std", target_os = "android"))]
+use crate::bolts::os::ashmem_server::{AshmemService, ServedShMemProvider};
+#[cfg(all(feature = "std", not(target_os = "android")))]
+use crate::bolts::shmem::StdShMemProvider;
 use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
@@ -34,10 +38,6 @@ use crate::{
     stats::Stats,
     Error,
 };
-#[cfg(all(feature = "std", target_os = "android"))]
-use crate::bolts::os::ashmem_server::{AshmemService, ServedShMemProvider};
-#[cfg(all(feature = "std", not(target_os = "android")))]
-use crate::bolts::shmem::StdShMemProvider;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
