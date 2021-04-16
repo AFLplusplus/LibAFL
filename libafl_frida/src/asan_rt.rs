@@ -593,10 +593,6 @@ impl<T> Dereffer<T> {
             internal: UnsafeCell::new(internal),
         }
     }
-
-    pub fn as_mut(&self) -> &mut T {
-        unsafe { &mut **self.internal.get() }
-    }
 }
 
 impl<T> Deref for Dereffer<T> {
@@ -742,7 +738,10 @@ impl AsanRuntime {
     pub fn check_for_leaks(&self) {
         for metadata in Allocator::get().allocations.values_mut() {
             if !metadata.freed {
-                self.report_error(&mut AsanError::Leak((metadata.address as *mut  c_void, metadata)));
+                self.report_error(&mut AsanError::Leak((
+                    metadata.address as *mut c_void,
+                    metadata,
+                )));
             }
         }
     }
@@ -813,66 +812,68 @@ impl AsanRuntime {
         // shadow the library itself, allowing all accesses
         Allocator::get().map_shadow_for_region(target_lib.start(), target_lib.end(), true);
 
-        // Hook all the memory allocator functions
-        target_lib.hook_function("malloc", asan_malloc as *const c_void);
-        target_lib.hook_function("_Znam", asan_new as *const c_void);
-        target_lib.hook_function("_ZnamRKSt9nothrow_t", asan_new_nothrow as *const c_void);
-        target_lib.hook_function("_ZnamSt11align_val_t", asan_new_aligned as *const c_void);
-        target_lib.hook_function(
-            "_ZnamSt11align_val_tRKSt9nothrow_t",
-            asan_new_aligned_nothrow as *const c_void,
-        );
-        target_lib.hook_function("_Znwm", asan_new as *const c_void);
-        target_lib.hook_function("_ZnwmRKSt9nothrow_t", asan_new_nothrow as *const c_void);
-        target_lib.hook_function("_ZnwmSt11align_val_t", asan_new_aligned as *const c_void);
-        target_lib.hook_function(
-            "_ZnwmSt11align_val_tRKSt9nothrow_t",
-            asan_new_aligned_nothrow as *const c_void,
-        );
+        unsafe {
+            // Hook all the memory allocator functions
+            target_lib.hook_function("malloc", asan_malloc as *const c_void);
+            target_lib.hook_function("_Znam", asan_new as *const c_void);
+            target_lib.hook_function("_ZnamRKSt9nothrow_t", asan_new_nothrow as *const c_void);
+            target_lib.hook_function("_ZnamSt11align_val_t", asan_new_aligned as *const c_void);
+            target_lib.hook_function(
+                "_ZnamSt11align_val_tRKSt9nothrow_t",
+                asan_new_aligned_nothrow as *const c_void,
+            );
+            target_lib.hook_function("_Znwm", asan_new as *const c_void);
+            target_lib.hook_function("_ZnwmRKSt9nothrow_t", asan_new_nothrow as *const c_void);
+            target_lib.hook_function("_ZnwmSt11align_val_t", asan_new_aligned as *const c_void);
+            target_lib.hook_function(
+                "_ZnwmSt11align_val_tRKSt9nothrow_t",
+                asan_new_aligned_nothrow as *const c_void,
+            );
 
-        target_lib.hook_function("_ZdaPv", asan_delete as *const c_void);
-        target_lib.hook_function("_ZdaPvm", asan_delete_ulong as *const c_void);
-        target_lib.hook_function(
-            "_ZdaPvmSt11align_val_t",
-            asan_delete_ulong_aligned as *const c_void,
-        );
-        target_lib.hook_function("_ZdaPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
-        target_lib.hook_function(
-            "_ZdaPvSt11align_val_t",
-            asan_delete_aligned as *const c_void,
-        );
-        target_lib.hook_function(
-            "_ZdaPvSt11align_val_tRKSt9nothrow_t",
-            asan_delete_aligned_nothrow as *const c_void,
-        );
+            target_lib.hook_function("_ZdaPv", asan_delete as *const c_void);
+            target_lib.hook_function("_ZdaPvm", asan_delete_ulong as *const c_void);
+            target_lib.hook_function(
+                "_ZdaPvmSt11align_val_t",
+                asan_delete_ulong_aligned as *const c_void,
+            );
+            target_lib.hook_function("_ZdaPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
+            target_lib.hook_function(
+                "_ZdaPvSt11align_val_t",
+                asan_delete_aligned as *const c_void,
+            );
+            target_lib.hook_function(
+                "_ZdaPvSt11align_val_tRKSt9nothrow_t",
+                asan_delete_aligned_nothrow as *const c_void,
+            );
 
-        target_lib.hook_function("_ZdlPv", asan_delete as *const c_void);
-        target_lib.hook_function("_ZdlPvm", asan_delete_ulong as *const c_void);
-        target_lib.hook_function(
-            "_ZdlPvmSt11align_val_t",
-            asan_delete_ulong_aligned as *const c_void,
-        );
-        target_lib.hook_function("_ZdlPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
-        target_lib.hook_function(
-            "_ZdlPvSt11align_val_t",
-            asan_delete_aligned as *const c_void,
-        );
-        target_lib.hook_function(
-            "_ZdlPvSt11align_val_tRKSt9nothrow_t",
-            asan_delete_aligned_nothrow as *const c_void,
-        );
+            target_lib.hook_function("_ZdlPv", asan_delete as *const c_void);
+            target_lib.hook_function("_ZdlPvm", asan_delete_ulong as *const c_void);
+            target_lib.hook_function(
+                "_ZdlPvmSt11align_val_t",
+                asan_delete_ulong_aligned as *const c_void,
+            );
+            target_lib.hook_function("_ZdlPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
+            target_lib.hook_function(
+                "_ZdlPvSt11align_val_t",
+                asan_delete_aligned as *const c_void,
+            );
+            target_lib.hook_function(
+                "_ZdlPvSt11align_val_tRKSt9nothrow_t",
+                asan_delete_aligned_nothrow as *const c_void,
+            );
 
-        target_lib.hook_function("calloc", asan_calloc as *const c_void);
-        target_lib.hook_function("pvalloc", asan_pvalloc as *const c_void);
-        target_lib.hook_function("valloc", asan_valloc as *const c_void);
-        target_lib.hook_function("realloc", asan_realloc as *const c_void);
-        target_lib.hook_function("free", asan_free as *const c_void);
-        target_lib.hook_function("memalign", asan_memalign as *const c_void);
-        target_lib.hook_function("posix_memalign", asan_posix_memalign as *const c_void);
-        target_lib.hook_function(
-            "malloc_usable_size",
-            asan_malloc_usable_size as *const c_void,
-        );
+            target_lib.hook_function("calloc", asan_calloc as *const c_void);
+            target_lib.hook_function("pvalloc", asan_pvalloc as *const c_void);
+            target_lib.hook_function("valloc", asan_valloc as *const c_void);
+            target_lib.hook_function("realloc", asan_realloc as *const c_void);
+            target_lib.hook_function("free", asan_free as *const c_void);
+            target_lib.hook_function("memalign", asan_memalign as *const c_void);
+            target_lib.hook_function("posix_memalign", asan_posix_memalign as *const c_void);
+            target_lib.hook_function(
+                "malloc_usable_size",
+                asan_malloc_usable_size as *const c_void,
+            );
+        }
     }
 
     extern "C" fn handle_trap(&mut self) {

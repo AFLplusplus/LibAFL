@@ -621,6 +621,8 @@ where
         )
     };
 
+    let shmem_provider = Rc::new(RefCell::new(shmem_provider.borrow_mut().clone()));
+
     println!("We're a client, let's fuzz :)");
 
     for (var, val) in std::env::vars() {

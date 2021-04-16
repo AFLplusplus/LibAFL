@@ -22,6 +22,10 @@ use libafl::{
     Error,
 };
 
+use capstone::{
+    arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
+    Capstone, Insn,
+};
 use core::cell::RefCell;
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
@@ -36,7 +40,6 @@ use num_traits::cast::FromPrimitive;
 
 use rangemap::{RangeMap, RangeSet};
 use std::{
-    cell::RefCell,
     env,
     ffi::c_void,
     fs::File,
@@ -142,21 +145,21 @@ impl<'a> DrCovWriter<'a> {
 
     pub fn write(&mut self) {
         self.writer
-            .write(b"DRCOV VERSION: 2\nDRCOV FLAVOR: libafl-frida\n")
+            .write_all(b"DRCOV VERSION: 2\nDRCOV FLAVOR: libafl-frida\n")
             .unwrap();
 
         let modules: Vec<(&std::ops::Range<usize>, &(u16, &str))> =
             self.module_mapping.iter().collect();
         self.writer
-            .write(format!("Module Table: version 2, count {}\n", modules.len()).as_bytes())
+            .write_all(format!("Module Table: version 2, count {}\n", modules.len()).as_bytes())
             .unwrap();
         self.writer
-            .write(b"Columns: id, base, end, entry, checksum, timestamp, path\n")
+            .write_all(b"Columns: id, base, end, entry, checksum, timestamp, path\n")
             .unwrap();
         for module in modules {
             let (range, (id, path)) = module;
             self.writer
-                .write(
+                .write_all(
                     format!(
                         "{:03}, 0x{:x}, 0x{:x}, 0x00000000, 0x00000000, 0x00000000, {}\n",
                         id, range.start, range.end, path
@@ -166,7 +169,7 @@ impl<'a> DrCovWriter<'a> {
                 .unwrap();
         }
         self.writer
-            .write(format!("BB Table: {} bbs\n", self.basic_blocks.len()).as_bytes())
+            .write_all(format!("BB Table: {} bbs\n", self.basic_blocks.len()).as_bytes())
             .unwrap();
         for (start, end) in self.basic_blocks {
             let (range, (id, _)) = self.module_mapping.get_key_value(&start).unwrap();
@@ -176,7 +179,7 @@ impl<'a> DrCovWriter<'a> {
                 mod_id: *id,
             };
             self.writer
-                .write(unsafe {
+                .write_all(unsafe {
                     std::slice::from_raw_parts(&basic_block as *const _ as *const u8, 8)
                 })
                 .unwrap();
@@ -299,16 +302,16 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 match name {
                     "asan" => {
                         helper.option_asan_mode = value.parse().unwrap();
-                    },
+                    }
                     "asan-detect-leaks" => {
                         helper.option_asan_detect_leaks = value.parse().unwrap();
-                    },
+                    }
                     "drcov" => {
                         helper.option_drcov_mode = value.parse().unwrap();
-                    },
+                    }
                     _ => {
                         panic!("unknown FRIDA option: '{}'", option);
-                    },
+                    }
                 }
             }
         }
@@ -850,18 +853,17 @@ unsafe fn fuzz(
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-    let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port) {
-            Ok(res) => res,
-            Err(err) => match err {
-                Error::ShuttingDown => {
-                    return Ok(());
-                }
-                _ => {
-                    panic!("Failed to setup the restarter: {}", err);
-                }
-            },
-        };
+    let (state, mut restarting_mgr) = match setup_restarting_mgr_std(stats, broker_port) {
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {}", err);
+            }
+        },
+    };
 
     let gum = Gum::obtain();
 

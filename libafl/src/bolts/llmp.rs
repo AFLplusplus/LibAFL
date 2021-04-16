@@ -62,7 +62,6 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
-#[cfg(unix)]
 use libc::ucontext_t;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -77,7 +76,7 @@ use std::{
 use backtrace::Backtrace;
 
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{setup_signal_handler, siginfo_t, Handler, Signal};
+use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
@@ -1338,7 +1337,7 @@ pub struct LlmpBrokerSignalHandler {
     shutting_down: bool,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix))]
 impl Handler for LlmpBrokerSignalHandler {
     fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: &mut ucontext_t) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
@@ -1508,7 +1507,6 @@ where
         // to read from the initial map id.
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
-        println!("out_maps: {:?}", self.llmp_out.out_maps);
         let broadcast_map_description = postcard::to_allocvec(&client_out_map_mem.description())?;
 
         let mut incoming_map_description_serialized = vec![0u8; broadcast_map_description.len()];
