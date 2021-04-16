@@ -527,7 +527,6 @@ where
     setup_restarting_mgr(StdShMemProvider::new(), stats, broker_port)
 }
 
-
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]

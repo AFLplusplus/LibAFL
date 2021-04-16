@@ -336,11 +336,7 @@ pub mod unix_shmem {
                 DefaultUnixShMem::new(map_size)
             }
 
-            fn from_id_and_size(
-                &mut self,
-                id: ShMemId,
-                size: usize,
-            ) -> Result<Self::Mem, Error> {
+            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
                 DefaultUnixShMem::from_id_and_size(id, size)
             }
         }
@@ -555,11 +551,7 @@ pub mod unix_shmem {
                 Ok(mapping)
             }
 
-            fn from_id_and_size(
-                &mut self,
-                id: ShMemId,
-                size: usize,
-            ) -> Result<Self::Mem, Error> {
+            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
                 AshmemShMem::from_id_and_size(id, size)
             }
         }
