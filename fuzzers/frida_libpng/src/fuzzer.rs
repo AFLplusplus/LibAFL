@@ -2,16 +2,12 @@
 //! The example harness is built for libpng.
 
 use libafl::{
-    bolts::{
-        os::ashmem_server::ServedShMemProvider,
-        shmem::ShMemProvider,
-        tuples::{tuple_list, Named},
-    },
+    bolts::tuples::{tuple_list, Named},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::{setup_restarting_mgr, EventManager},
+    events::{setup_restarting_mgr_std, EventManager},
     executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -398,12 +394,9 @@ unsafe fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("error starting ");
-
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr(ServedShMemProvider::new(), stats, broker_port) {
+        match setup_restarting_mgr_std(stats, broker_port) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {

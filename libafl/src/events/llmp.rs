@@ -22,7 +22,8 @@ use crate::bolts::shmem::UnixShMemProvider;
 use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
-        shmem::ShMemProvider,
+        os::ashmem_server::{AshmemService, ServedShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider},
     },
     corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
@@ -499,6 +500,50 @@ where
     }
 }
 
+#[cfg(all(feature = "std", not(target_os = "android")))]
+#[allow(clippy::type_complexity)]
+pub fn setup_restarting_mgr_std<'a, I, S, ST: 'a>(
+    //mgr: &mut LlmpEventManager<I, S, SH, ST>,
+    stats: ST,
+    broker_port: u16,
+) -> Result<
+    (
+        Option<S>,
+        LlmpRestartingEventManager<'a, I, S, StdShMemProvider, ST>,
+    ),
+    Error,
+>
+where
+    I: Input,
+    S: DeserializeOwned + IfInteresting<I>,
+    ST: Stats,
+{
+    setup_restarting_mgr(StdShMemProvider::new(), stats, broker_port)
+}
+
+#[cfg(all(feature = "std", target_os = "android"))]
+#[allow(clippy::type_complexity)]
+pub fn setup_restarting_mgr_std<'a, I, S, ST: 'a>(
+    //mgr: &mut LlmpEventManager<I, S, SH, ST>,
+    stats: ST,
+    broker_port: u16,
+) -> Result<
+    (
+        Option<S>,
+        LlmpRestartingEventManager<'a, I, S, ServedShMemProvider, ST>,
+    ),
+    Error,
+>
+where
+    I: Input,
+    S: DeserializeOwned + IfInteresting<I>,
+    ST: Stats,
+{
+    AshmemService::start();
+
+    setup_restarting_mgr(ServedShMemProvider::new(), stats, broker_port)
+}
+
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
@@ -511,7 +556,7 @@ pub fn setup_restarting_mgr<'a, I, S, SP, ST: 'a>(
     shmem_provider: SP,
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
-    _broker_port: u16,
+    broker_port: u16,
 ) -> Result<(Option<S>, LlmpRestartingEventManager<'a, I, S, SP, ST>), Error>
 where
     I: Input,
@@ -522,7 +567,7 @@ where
     let shmem_provider = Rc::new(RefCell::new(shmem_provider));
 
     let mut mgr =
-        LlmpEventManager::<'a, I, S, SP, ST>::new_on_port(&shmem_provider, stats, _broker_port)?;
+        LlmpEventManager::<'a, I, S, SP, ST>::new_on_port(&shmem_provider, stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
     let (sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
