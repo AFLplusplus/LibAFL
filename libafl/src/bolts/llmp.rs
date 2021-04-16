@@ -53,7 +53,6 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 */
 
 use alloc::{rc::Rc, string::String, vec::Vec};
-use core::marker::PhantomData;
 use core::{
     cell::RefCell,
     cmp::max,
@@ -350,17 +349,17 @@ impl LlmpMsg {
 
 /// An Llmp instance
 #[derive(Debug)]
-pub enum LlmpConnection<'a, SP>
+pub enum LlmpConnection<SP>
 where
     SP: ShMemProvider + 'static,
 {
     /// A broker and a thread using this tcp background thread
-    IsBroker { broker: LlmpBroker<'a, SP> },
+    IsBroker { broker: LlmpBroker<SP> },
     /// A client, connected to the port
-    IsClient { client: LlmpClient<'a, SP> },
+    IsClient { client: LlmpClient<SP> },
 }
 
-impl<'a, SP> LlmpConnection<'a, SP>
+impl<SP> LlmpConnection<SP>
 where
     SP: ShMemProvider,
 {
@@ -409,7 +408,7 @@ where
     pub fn existing_client_from_description(
         shmem_provider: &Rc<RefCell<SP>>,
         description: &LlmpClientDescription,
-    ) -> Result<LlmpConnection<'a, SP>, Error> {
+    ) -> Result<LlmpConnection<SP>, Error> {
         Ok(LlmpConnection::IsClient {
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
         })
@@ -465,7 +464,7 @@ struct LlmpPayloadSharedMapInfo {
 
 /// Sending end on a (unidirectional) sharedmap channel
 #[derive(Debug)]
-pub struct LlmpSender<'a, SP>
+pub struct LlmpSender<SP>
 where
     SP: ShMemProvider,
 {
@@ -482,11 +481,10 @@ where
     /// new clients may join at any time in the future.
     pub keep_pages_forever: bool,
     shmem_provider: Rc<RefCell<SP>>,
-    _phantom: PhantomData<&'a u8>,
 }
 
 /// An actor on the sending part of the shared map
-impl<'a, SP> LlmpSender<'a, SP>
+impl<SP> LlmpSender<SP>
 where
     SP: ShMemProvider,
 {
@@ -507,7 +505,6 @@ where
             // drop pages to the broker if it already read them
             keep_pages_forever,
             shmem_provider: shmem_provider.clone(),
-            _phantom: PhantomData,
         })
     }
 
@@ -585,7 +582,6 @@ where
             // drop pages to the broker if it already read them
             keep_pages_forever: false,
             shmem_provider,
-            _phantom: PhantomData,
         })
     }
 
@@ -928,7 +924,7 @@ where
 
 /// Receiving end on a (unidirectional) sharedmap channel
 #[derive(Debug)]
-pub struct LlmpReceiver<'a, SP>
+pub struct LlmpReceiver<SP>
 where
     SP: ShMemProvider,
 {
@@ -939,11 +935,10 @@ where
     pub shmem_provider: Rc<RefCell<SP>>,
     /// current page. After EOP, this gets replaced with the new one
     pub current_recv_map: LlmpSharedMap<SP::Mapping>,
-    _phantom: PhantomData<&'a u8>,
 }
 
 /// Receiving end of an llmp channel
-impl<'a, SP> LlmpReceiver<'a, SP>
+impl<SP> LlmpReceiver<SP>
 where
     SP: ShMemProvider,
 {
@@ -988,7 +983,6 @@ where
             current_recv_map,
             last_msg_recvd,
             shmem_provider,
-            _phantom: PhantomData,
         })
     }
 
@@ -1318,16 +1312,16 @@ where
 
 /// The broker (node 0)
 #[derive(Debug)]
-pub struct LlmpBroker<'a, SP>
+pub struct LlmpBroker<SP>
 where
     SP: ShMemProvider + 'static,
 {
     /// Broadcast map from broker to all clients
-    pub llmp_out: LlmpSender<'a, SP>,
+    pub llmp_out: LlmpSender<SP>,
     /// Users of Llmp can add message handlers in the broker.
     /// This allows us to intercept messages right in the broker
     /// This keeps the out map clean.
-    pub llmp_clients: Vec<LlmpReceiver<'a, SP>>,
+    pub llmp_clients: Vec<LlmpReceiver<SP>>,
     /// This is the socket name, when unix domain sockets are used.
     socket_name: Option<String>,
     /// This flag is used to indicate that shutdown has been requested by the SIGINT and SIGTERM
@@ -1355,7 +1349,7 @@ impl Handler for LlmpBrokerSignalHandler {
 
 /// The broker forwards all messages to its own bus-like broadcast map.
 /// It may intercept messages passing through.
-impl<'a, SP> LlmpBroker<'a, SP>
+impl<SP> LlmpBroker<SP>
 where
     SP: ShMemProvider,
 {
@@ -1373,7 +1367,6 @@ where
                 // clients may join at any time
                 keep_pages_forever: true,
                 shmem_provider: shmem_provider.clone(),
-                _phantom: PhantomData,
             },
             llmp_clients: vec![],
             socket_name: None,
@@ -1399,7 +1392,6 @@ where
             current_recv_map: client_page,
             last_msg_recvd: ptr::null_mut(),
             shmem_provider: self.shmem_provider.clone(),
-            _phantom: PhantomData,
         });
     }
 
@@ -1550,7 +1542,6 @@ where
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
                 shmem_provider: shmem_provider.clone(),
-                _phantom: PhantomData,
             };
 
             loop {
@@ -1650,7 +1641,6 @@ where
                                 current_recv_map: new_page,
                                 last_msg_recvd: ptr::null_mut(),
                                 shmem_provider: self.shmem_provider.clone(),
-                                _phantom: PhantomData,
                             });
                         }
                         Err(e) => {
@@ -1692,20 +1682,20 @@ pub struct LlmpClientDescription {
 
 /// Client side of LLMP
 #[derive(Debug)]
-pub struct LlmpClient<'a, SP>
+pub struct LlmpClient<SP>
 where
     SP: ShMemProvider,
 {
     shmem_provider: Rc<RefCell<SP>>,
     /// Outgoing channel to the broker
-    pub sender: LlmpSender<'a, SP>,
+    pub sender: LlmpSender<SP>,
     /// Incoming (broker) broadcast map
-    pub receiver: LlmpReceiver<'a, SP>,
+    pub receiver: LlmpReceiver<SP>,
 }
 
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
 /// and get incoming messages from the shared broker bus
-impl<'a, SP> LlmpClient<'a, SP>
+impl<SP> LlmpClient<SP>
 where
     SP: ShMemProvider,
 {
@@ -1812,7 +1802,6 @@ where
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
                 shmem_provider: shmem_provider.clone(),
-                _phantom: PhantomData,
             },
 
             receiver: LlmpReceiver {
@@ -1820,7 +1809,6 @@ where
                 current_recv_map: initial_broker_map,
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider: shmem_provider.clone(),
-                _phantom: PhantomData,
             },
             shmem_provider: shmem_provider.clone(),
         })

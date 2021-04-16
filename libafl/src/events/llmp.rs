@@ -51,7 +51,7 @@ const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
 #[derive(Debug)]
-pub struct LlmpEventManager<'a, I, S, SP, ST>
+pub struct LlmpEventManager<I, S, SP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -60,13 +60,13 @@ where
     //CE: CustomEvent<I>,
 {
     stats: Option<ST>,
-    llmp: llmp::LlmpConnection<'a, SP>,
-    phantom: PhantomData<&'a (I, S)>,
+    llmp: llmp::LlmpConnection<SP>,
+    phantom: PhantomData<(I, S)>,
 }
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
-impl<'a, I, S, ST> LlmpEventManager<'a, I, S, UnixShMemProvider, ST>
+impl<I, S, ST> LlmpEventManager<I, S, UnixShMemProvider, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -99,7 +99,7 @@ where
     }
 }
 
-impl<'a, I, S, SP, ST> Drop for LlmpEventManager<'a, I, S, SP, ST>
+impl<I, S, SP, ST> Drop for LlmpEventManager<I, S, SP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -112,7 +112,7 @@ where
     }
 }
 
-impl<'a, I, S, SP, ST> LlmpEventManager<'a, I, S, SP, ST>
+impl<I, S, SP, ST> LlmpEventManager<I, S, SP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -322,7 +322,7 @@ where
     }
 }
 
-impl<'a, I, S, SP, ST> EventManager<I, S> for LlmpEventManager<'a, I, S, SP, ST>
+impl<I, S, SP, ST> EventManager<I, S> for LlmpEventManager<I, S, SP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -383,9 +383,9 @@ where
 /// Serialize the current state and corpus during an executiont to bytes.
 /// On top, add the current llmp event manager instance to be restored
 /// This method is needed when the fuzzer run crashes and has to restart.
-pub fn serialize_state_mgr<'a, I, S, SP, ST>(
+pub fn serialize_state_mgr<I, S, SP, ST>(
     state: &S,
-    mgr: &LlmpEventManager<'a, I, S, SP, ST>,
+    mgr: &LlmpEventManager<I, S, SP, ST>,
 ) -> Result<Vec<u8>, Error>
 where
     I: Input,
@@ -398,10 +398,10 @@ where
 
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 #[allow(clippy::type_complexity)]
-pub fn deserialize_state_mgr<'a, I, S, SP, ST>(
+pub fn deserialize_state_mgr<I, S, SP, ST>(
     shmem_provider: &Rc<RefCell<SP>>,
     state_corpus_serialized: &[u8],
-) -> Result<(S, LlmpEventManager<'a, I, S, SP, ST>), Error>
+) -> Result<(S, LlmpEventManager<I, S, SP, ST>), Error>
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
@@ -417,7 +417,7 @@ where
 
 /// A manager that can restart on the fly, storing states in-between (in `on_resatrt`)
 #[derive(Debug)]
-pub struct LlmpRestartingEventManager<'a, I, S, SP, ST>
+pub struct LlmpRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -426,12 +426,12 @@ where
     //CE: CustomEvent<I>,
 {
     /// The embedded llmp event manager
-    llmp_mgr: LlmpEventManager<'a, I, S, SP, ST>,
+    llmp_mgr: LlmpEventManager<I, S, SP, ST>,
     /// The sender to serialize the state for the next runner
-    sender: LlmpSender<'a, SP>,
+    sender: LlmpSender<SP>,
 }
 
-impl<'a, I, S, SP, ST> EventManager<I, S> for LlmpRestartingEventManager<'a, I, S, SP, ST>
+impl<I, S, SP, ST> EventManager<I, S> for LlmpRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
     S: IfInteresting<I> + Serialize,
@@ -480,7 +480,7 @@ const _ENV_FUZZER_RECEIVER: &str = &"_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
 
-impl<'a, I, S, SP, ST> LlmpRestartingEventManager<'a, I, S, SP, ST>
+impl<I, S, SP, ST> LlmpRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
     S: IfInteresting<I>,
@@ -488,31 +488,31 @@ where
     ST: Stats, //CE: CustomEvent<I>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
-    pub fn new(llmp_mgr: LlmpEventManager<'a, I, S, SP, ST>, sender: LlmpSender<'a, SP>) -> Self {
+    pub fn new(llmp_mgr: LlmpEventManager<I, S, SP, ST>, sender: LlmpSender<SP>) -> Self {
         Self { llmp_mgr, sender }
     }
 
     /// Get the sender
-    pub fn sender(&self) -> &LlmpSender<'a, SP> {
+    pub fn sender(&self) -> &LlmpSender<SP> {
         &self.sender
     }
 
     /// Get the sender (mut)
-    pub fn sender_mut(&mut self) -> &mut LlmpSender<'a, SP> {
+    pub fn sender_mut(&mut self) -> &mut LlmpSender<SP> {
         &mut self.sender
     }
 }
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<'a, I, S, ST: 'a>(
+pub fn setup_restarting_mgr_std<I, S, ST>(
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     broker_port: u16,
 ) -> Result<
     (
         Option<S>,
-        LlmpRestartingEventManager<'a, I, S, StdShMemProvider, ST>,
+        LlmpRestartingEventManager<I, S, StdShMemProvider, ST>,
     ),
     Error,
 >
@@ -536,12 +536,12 @@ where
     clippy::type_complexity,
     clippy::similar_names
 )] // for { mgr = LlmpEventManager... }
-pub fn setup_restarting_mgr<'a, I, S, SP, ST: 'a>(
+pub fn setup_restarting_mgr<I, S, SP, ST>(
     shmem_provider: SP,
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     broker_port: u16,
-) -> Result<(Option<S>, LlmpRestartingEventManager<'a, I, S, SP, ST>), Error>
+) -> Result<(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>), Error>
 where
     I: Input,
     S: DeserializeOwned + IfInteresting<I>,
@@ -551,7 +551,7 @@ where
     let shmem_provider = Rc::new(RefCell::new(shmem_provider));
 
     let mut mgr =
-        LlmpEventManager::<'a, I, S, SP, ST>::new_on_port(&shmem_provider, stats, broker_port)?;
+        LlmpEventManager::<I, S, SP, ST>::new_on_port(&shmem_provider, stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
     let (sender, mut receiver, shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
