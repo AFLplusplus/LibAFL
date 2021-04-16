@@ -27,6 +27,8 @@ use std::{
 };
 use termcolor::{Color, ColorSpec, WriteColor};
 
+use crate::FridaOptions;
+
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 
 struct Allocator {
@@ -617,6 +619,7 @@ pub struct AsanRuntime {
     blob_check_mem_48bytes: Option<Box<[u8]>>,
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
+    options: FridaOptions,
 }
 
 enum AsanError<'a> {
@@ -674,7 +677,7 @@ impl<'a> AsanError<'a> {
 }
 
 impl AsanRuntime {
-    pub fn new() -> AsanRuntime {
+    pub fn new(options: FridaOptions) -> AsanRuntime {
         let mut res = Self {
             regs: [0; 32],
             blob_check_mem_byte: None,
@@ -690,6 +693,7 @@ impl AsanRuntime {
             blob_check_mem_48bytes: None,
             blob_check_mem_64bytes: None,
             stalked_addresses: HashMap::new(),
+            options,
         };
         Allocator::init(Dereffer::new(&mut res as *mut Self));
         res

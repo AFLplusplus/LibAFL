@@ -48,7 +48,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use libafl_frida::asan_rt::AsanRuntime;
+use libafl_frida::{asan_rt::AsanRuntime, FridaOptions};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a, I: Input + HasTargetBytes> {
@@ -73,9 +73,7 @@ struct FridaEdgeCoverageHelper<'a> {
     capstone: Capstone,
     asan_runtime: AsanRuntime,
     ranges: RangeMap<usize, (u16, &'a str)>,
-    option_asan_mode: bool,
-    option_asan_detect_leaks: bool,
-    option_drcov_mode: bool,
+    options: FridaOptions,
     drcov_basic_blocks: Vec<(usize, usize)>,
 }
 
@@ -98,7 +96,7 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
     }
 
     fn post_exec(&self, input: &I) {
-        if self.option_drcov_mode {
+        if self.options.drcov_enabled() {
             let filename = format!(
                 "./coverage/{:016x}.drcov",
                 seahash::hash(input.target_bytes().as_slice())
@@ -106,8 +104,8 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
             DrCovWriter::new(&filename, &self.ranges, &self.drcov_basic_blocks).write();
         }
 
-        if self.option_asan_mode {
-            if self.option_asan_detect_leaks {
+        if self.options.asan_enabled() {
+            if self.options.asan_detect_leaks() {
                 self.asan_runtime.check_for_leaks();
             }
             self.asan_runtime.reset_allocations();
@@ -264,6 +262,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
     pub fn new(
         gum: &'a Gum,
+        options: FridaOptions,
         harness_module_name: &str,
         modules_to_instrument: &'a Vec<&str>,
     ) -> Self {
@@ -278,11 +277,9 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
-            asan_runtime: AsanRuntime::new(),
+            asan_runtime: AsanRuntime::new(options),
             ranges: RangeMap::new(),
-            option_asan_mode: true,
-            option_asan_detect_leaks: false,
-            option_drcov_mode: false,
+            options,
             drcov_basic_blocks: vec![],
         };
 
@@ -294,29 +291,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                 .insert(lib_start..lib_end, (id as u16, module_name));
         }
 
-        if let Ok(options) = std::env::var("LIBAFL_FRIDA_OPTIONS") {
-            for option in options.trim().to_lowercase().split(":") {
-                let (name, mut value) =
-                    option.split_at(option.find("=").expect("Expected a '=' in option string"));
-                value = value.get(1..).unwrap();
-                match name {
-                    "asan" => {
-                        helper.option_asan_mode = value.parse().unwrap();
-                    }
-                    "asan-detect-leaks" => {
-                        helper.option_asan_detect_leaks = value.parse().unwrap();
-                    }
-                    "drcov" => {
-                        helper.option_drcov_mode = value.parse().unwrap();
-                    }
-                    _ => {
-                        panic!("unknown FRIDA option: '{}'", option);
-                    }
-                }
-            }
-        }
-
-        if helper.option_drcov_mode {
+        if helper.options.drcov_enabled() {
             std::fs::create_dir("./coverage")
                 .expect("failed to create directory for coverage files");
         }
@@ -331,8 +306,10 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                     if first {
                         first = false;
                         //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                        helper.emit_coverage_mapping(address, &output);
-                        if helper.option_drcov_mode {
+                        if helper.options.coverage_enabled() {
+                            helper.emit_coverage_mapping(address, &output);
+                        }
+                        if helper.options.drcov_enabled() {
                             instruction.put_callout(|context| {
                                 let real_address = match helper
                                     .asan_runtime
@@ -350,7 +327,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                         }
                     }
 
-                    if helper.option_asan_mode {
+                    if helper.options.asan_enabled() {
                         if let Ok((basereg, indexreg, displacement, width)) =
                             helper.is_interesting_instruction(address, instr)
                         {
@@ -364,15 +341,17 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                             );
                         }
                     }
-                    helper
-                        .asan_runtime
-                        .add_stalked_address(output.writer().pc() as usize - 4, address as usize);
+                    if helper.options.asan_enabled() || helper.options.drcov_enabled() {
+                        helper
+                            .asan_runtime
+                            .add_stalked_address(output.writer().pc() as usize - 4, address as usize);
+                    }
                 }
                 instruction.keep()
             }
         });
         helper.transformer = Some(transformer);
-        if helper.option_asan_mode {
+        if helper.options.asan_enabled() || helper.options.asan_enabled() {
             helper.asan_runtime.init(modules_to_instrument);
         }
         helper
@@ -867,16 +846,11 @@ unsafe fn fuzz(
 
     let gum = Gum::obtain();
 
-    let mut rt_path = std::env::current_exe().unwrap();
-    rt_path.pop();
-    rt_path.push("libfrida_asan_rt.so");
-    //println!("Loaded rt-library: {:?}", libloading::Library::new(rt_path).unwrap());
-
     let lib = libloading::Library::new(module_name).unwrap();
     let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
         lib.get(symbol_name.as_bytes()).unwrap();
 
-    let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, module_name, &modules_to_instrument);
+    let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, FridaOptions::parse_env_options(), module_name, &modules_to_instrument);
 
     // Create an observation channel using the coverage map
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
