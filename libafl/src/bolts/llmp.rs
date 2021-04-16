@@ -52,7 +52,7 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 
 */
 
-use alloc::{string::String, vec::Vec};
+use alloc::{rc::Rc, string::String, vec::Vec};
 use core::marker::PhantomData;
 use core::{
     cell::RefCell,
@@ -64,7 +64,6 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
-use alloc::rc::Rc;
 #[cfg(feature = "std")]
 use std::{
     env,
