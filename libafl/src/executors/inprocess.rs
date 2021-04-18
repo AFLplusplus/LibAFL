@@ -504,7 +504,7 @@ mod windows_exception_handler {
         },
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
-        executors::ExitKind,
+        executors::{Executor, ExitKind, HasObservers},
         feedbacks::FeedbacksTuple,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
