@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::tuples::Named,
     corpus::Testcase,
-    executors::ExitKind,
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
     observers::{MapObserver, Observer, ObserversTuple},
@@ -150,14 +150,15 @@ where
     O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         _input: &I,
-        observers: &OT,
+        executor: &mut E,
         _exit_kind: ExitKind,
     ) -> Result<u32, Error> {
         let mut interesting = 0;
         // TODO optimize
+        let observers = executor.observers();
         let observer = observers.match_name_type::<O>(&self.name).unwrap();
         let size = observer.usable_count();
         let initial = observer.initial();

@@ -165,13 +165,14 @@ where
     I: Input,
 {
     /// Evaluate if a set of observation channels has an interesting state
-    fn is_interesting<OT>(
+    fn is_interesting<E, OT>(
         &mut self,
         input: &I,
-        observers: &OT,
+        executor: &mut E,
         exit_kind: ExitKind,
     ) -> Result<u32, Error>
     where
+        E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple;
 
     /// Adds this input to the corpus, if it's intersting, and return the index
@@ -444,17 +445,18 @@ where
     OFT: FeedbacksTuple<I>,
 {
     /// Evaluate if a set of observation channels has an interesting state
-    fn is_interesting<OT>(
+    fn is_interesting<E, OT>(
         &mut self,
         input: &I,
-        observers: &OT,
+        executor: &mut E,
         exit_kind: ExitKind,
     ) -> Result<u32, Error>
     where
+        E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
     {
         self.feedbacks_mut()
-            .is_interesting_all(input, observers, exit_kind)
+            .is_interesting_all(input, executor, exit_kind)
     }
 
     /// Adds this input to the corpus, if it's intersting, and return the index
@@ -648,14 +650,13 @@ where
         *self.executions_mut() += 1;
         executor.post_exec_observers()?;
 
-        let observers = executor.observers();
         let fitness =
             self.feedbacks_mut()
-                .is_interesting_all(&input, observers, exit_kind.clone())?;
+                .is_interesting_all(&input, executor, exit_kind.clone())?;
 
         let is_solution = self
             .objectives_mut()
-            .is_interesting_all(&input, observers, exit_kind)?
+            .is_interesting_all(&input, executor, exit_kind)?
             > 0;
         Ok((fitness, is_solution))
     }

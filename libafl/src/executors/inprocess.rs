@@ -65,6 +65,10 @@ where
                 &mut data.observers_ptr,
                 &self.observers as *const _ as *const c_void,
             );
+            write_volatile(
+                &mut data.executor_ptr,
+                self as *mut _ as *mut c_void,
+            );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
@@ -81,6 +85,10 @@ where
             write_volatile(
                 &mut data.observers_ptr,
                 &self.observers as *const _ as *const c_void,
+            );
+            write_volatile(
+                &mut data.executor_ptr,
+                self as *mut _ as *mut c_void,
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
@@ -184,11 +192,11 @@ where
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+                unix_signal_handler::inproc_crash_handler::<EM, Self, I, OC, OFT, OT, S>,
             );
             write_volatile(
                 &mut data.timeout_handler,
-                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+                unix_signal_handler::inproc_timeout_handler::<EM, Self, I, OC, OFT, OT, S>,
             );
 
             setup_signal_handler(data)?;
@@ -243,7 +251,7 @@ mod unix_signal_handler {
         bolts::os::unix_signals::{Handler, Signal},
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
-        executors::ExitKind,
+        executors::{Executor, ExitKind, HasObservers},
         feedbacks::FeedbacksTuple,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
@@ -260,6 +268,8 @@ mod unix_signal_handler {
         event_mgr_ptr: ptr::null_mut(),
         /// The observers ptr for signal handling
         observers_ptr: ptr::null(),
+        /// The executor ptr for signal handling
+        executor_ptr: ptr::null_mut(),
         /// The current input for signal handling
         current_input_ptr: ptr::null(),
         /// The crash handler fn
@@ -272,6 +282,7 @@ mod unix_signal_handler {
         pub state_ptr: *mut c_void,
         pub event_mgr_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
+        pub executor_ptr: *mut c_void,
         pub current_input_ptr: *const c_void,
         pub crash_handler: unsafe fn(Signal, siginfo_t, *const c_void, data: &mut Self),
         pub timeout_handler: unsafe fn(Signal, siginfo_t, *const c_void, data: &mut Self),
@@ -317,7 +328,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_timeout_handler<EM, E, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _void: *const c_void,
@@ -328,11 +339,13 @@ mod unix_signal_handler {
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        E: Executor<I> + HasObservers<OT>,
         I: Input + HasTargetBytes,
     {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
         let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+        let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
 
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
@@ -348,7 +361,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Timeout)
+                .is_interesting_all(&input, executor, ExitKind::Timeout)
                 .expect("In timeout handler objectives failure.");
             if obj_fitness > 0 {
                 state
@@ -379,7 +392,7 @@ mod unix_signal_handler {
         }
     }
 
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, E, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _void: *const c_void,
@@ -390,6 +403,7 @@ mod unix_signal_handler {
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        E: Executor<I> + HasObservers<OT>,
         I: Input + HasTargetBytes,
     {
         #[cfg(feature = "std")]
@@ -398,6 +412,7 @@ mod unix_signal_handler {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
 
             #[cfg(feature = "std")]
             println!("Child crashed!");
@@ -410,7 +425,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, executor, ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();
@@ -504,6 +519,8 @@ mod windows_exception_handler {
         event_mgr_ptr: ptr::null_mut(),
         /// The observers ptr for signal handling
         observers_ptr: ptr::null(),
+        /// The executor ptr for signal handling
+        executor_ptr: ptr::null_mut(),
         /// The current input for signal handling
         current_input_ptr: ptr::null(),
         /// The crash handler fn
@@ -516,6 +533,7 @@ mod windows_exception_handler {
         pub state_ptr: *mut c_void,
         pub event_mgr_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
+        pub executor_ptr: *mut c_void,
         pub current_input_ptr: *const c_void,
         pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
         //pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
@@ -554,6 +572,7 @@ mod windows_exception_handler {
         OC: Corpus<I>,
         OFT: FeedbacksTuple<I>,
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        E: Executor<I> + HasObservers<OT>,
         I: Input + HasTargetBytes,
     {
         #[cfg(feature = "std")]
@@ -562,6 +581,7 @@ mod windows_exception_handler {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
 
             #[cfg(feature = "std")]
             println!("Child crashed!");
@@ -574,7 +594,7 @@ mod windows_exception_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, executor, ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();

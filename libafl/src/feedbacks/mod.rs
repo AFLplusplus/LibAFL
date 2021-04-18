@@ -6,14 +6,7 @@ pub use map::*;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    bolts::tuples::Named,
-    corpus::Testcase,
-    executors::ExitKind,
-    inputs::Input,
-    observers::{ObserversTuple, TimeObserver},
-    Error,
-};
+use crate::{Error, bolts::tuples::Named, corpus::Testcase, executors::{Executor, ExitKind, HasObservers}, inputs::Input, observers::{ObserversTuple, TimeObserver}};
 
 use core::time::Duration;
 
@@ -25,10 +18,10 @@ where
     I: Input,
 {
     /// `is_interesting ` should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         input: &I,
-        observers: &OT,
+        executor: &mut E,
         exit_kind: ExitKind,
     ) -> Result<u32, Error>;
 
@@ -50,10 +43,10 @@ where
     I: Input,
 {
     /// Get the total interestingness value from all feedbacks
-    fn is_interesting_all<OT: ObserversTuple>(
+    fn is_interesting_all<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         input: &I,
-        observers: &OT,
+        executor: &mut E,
         exit_kind: ExitKind,
     ) -> Result<u32, Error>;
 
@@ -69,10 +62,10 @@ where
     I: Input,
 {
     #[inline]
-    fn is_interesting_all<OT: ObserversTuple>(
+    fn is_interesting_all<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         _: &I,
-        _: &OT,
+        _: &mut E,
         _: ExitKind,
     ) -> Result<u32, Error> {
         Ok(0)
@@ -95,14 +88,14 @@ where
     Tail: FeedbacksTuple<I>,
     I: Input,
 {
-    fn is_interesting_all<OT: ObserversTuple>(
+    fn is_interesting_all<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         input: &I,
-        observers: &OT,
+        executor: &mut E,
         exit_kind: ExitKind,
     ) -> Result<u32, Error> {
-        Ok(self.0.is_interesting(input, observers, exit_kind.clone())?
-            + self.1.is_interesting_all(input, observers, exit_kind)?)
+        Ok(self.0.is_interesting(input, executor, exit_kind.clone())?
+            + self.1.is_interesting_all(input, executor, exit_kind)?)
     }
 
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
@@ -124,10 +117,10 @@ impl<I> Feedback<I> for CrashFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         _input: &I,
-        _observers: &OT,
+        _executor: &mut E,
         exit_kind: ExitKind,
     ) -> Result<u32, Error> {
         if exit_kind == ExitKind::Crash {
@@ -164,10 +157,10 @@ impl<I> Feedback<I> for TimeoutFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         _input: &I,
-        _observers: &OT,
+        _executor: &mut E,
         exit_kind: ExitKind,
     ) -> Result<u32, Error> {
         if exit_kind == ExitKind::Timeout {
@@ -207,12 +200,13 @@ impl<I> Feedback<I> for TimeFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<E: Executor<I> + HasObservers<OT>, OT: ObserversTuple>(
         &mut self,
         _input: &I,
-        observers: &OT,
+        executor: &mut E,
         _exit_kind: ExitKind,
     ) -> Result<u32, Error> {
+        let observers = executor.observers();
         let observer = observers.match_first_type::<TimeObserver>().unwrap();
         self.exec_time = *observer.last_runtime();
         Ok(0)

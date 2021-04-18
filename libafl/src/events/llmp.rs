@@ -27,6 +27,7 @@ use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
+        tuples::Named,
     },
     corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
@@ -302,8 +303,13 @@ where
                 println!("Received new Testcase from {}", _sender_id);
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
+
+                let mut dummy_executor = DummyExecutor {
+                    observers,
+                    _phantom: PhantomData,
+                };
                 // TODO include ExitKind in NewTestcase
-                let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
+                let fitness = state.is_interesting(&input, &mut dummy_executor, ExitKind::Ok)?;
                 if fitness > 0
                     && state
                         .add_if_interesting(&input, fitness, scheduler)?
@@ -319,6 +325,58 @@ where
                 event.name()
             ))),
         }
+    }
+}
+
+struct DummyExecutor<I: Input, OT: ObserversTuple> {
+    observers: OT,
+    _phantom: PhantomData<I>,
+}
+
+impl<I, OT> Named for DummyExecutor<I, OT>
+where
+    I: Input,
+    OT: ObserversTuple,
+{
+
+    fn name(&self) -> &str {
+        "DummyExecutor"
+    }
+}
+impl<I, OT> Executor<I> for DummyExecutor<I, OT>
+where
+    I: Input,
+    OT: ObserversTuple,
+{
+    fn pre_exec<EM, S>(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
+    where
+            EM: EventManager<I, S>, {
+        Ok(())
+    }
+
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+
+    }
+
+    fn post_exec<EM, S>(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>
+    where
+            EM: EventManager<I, S>, {
+        Ok(())
+
+    }
+}
+
+impl<I, OT> HasObservers<OT> for DummyExecutor<I, OT>
+where
+    I: Input,
+    OT: ObserversTuple,
+{
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
     }
 }
 
