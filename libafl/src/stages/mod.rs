@@ -5,9 +5,8 @@ pub use mutational::{MutationalStage, StdMutationalStage};
 //pub use power::PowerMutationalStage;
 
 use crate::{
-    bolts::tuples::TupleList, events::EventManager, executors::Executor, inputs::Input, 
-    state::HasClientPerfStats,
-    Error
+    bolts::tuples::TupleList, events::EventManager, executors::Executor, inputs::Input,
+    state::HasClientPerfStats, Error,
 };
 
 /// A stage is one step in the fuzzing process.
@@ -70,7 +69,7 @@ where
     EM: EventManager<I, S>,
     E: Executor<I>,
     I: Input,
-    S: HasClientPerfStats
+    S: HasClientPerfStats,
 {
     fn perform_all(
         &mut self,

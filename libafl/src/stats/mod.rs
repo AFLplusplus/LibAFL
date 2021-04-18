@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 use alloc::{string::String, vec::Vec};
 use core::{time, time::Duration};
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 use std::convert::TryInto;
 
-#[cfg(not(feature="std"))]
+#[cfg(not(feature = "std"))]
 use core::convert::TryInto;
 
-use crate::utils::current_time;
 use crate::cpu;
+use crate::utils::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
@@ -35,7 +35,7 @@ pub struct ClientStats {
 
     /// Client performance statistics
     #[cfg(feature = "perf_stats")]
-    pub perf_stats: ClientPerfStats
+    pub perf_stats: ClientPerfStats,
 }
 
 impl ClientStats {
@@ -112,7 +112,6 @@ pub trait Stats {
 
     /// show the stats to the user
     fn display(&mut self, event_msg: String);
-
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
@@ -200,7 +199,6 @@ where
         );
         (self.print_fn)(fmt);
 
-
         // Only print perf stats if the feature is enabled
         #[cfg(feature = "perf_stats")]
         {
@@ -243,27 +241,27 @@ where
 macro_rules! start_timer {
     ($state:expr) => {{
         // Start the timer
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         $state.perf_stats_mut().start_timer();
-    }}
+    }};
 }
 
 #[macro_export]
 macro_rules! mark_feature_time {
     ($state:expr, $feature:expr) => {{
         // Mark the elapsed time for the given feature
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         $state.perf_stats_mut().mark_feature_time($feature);
-    }}
+    }};
 }
 
 #[macro_export]
 macro_rules! mark_feedback_time {
     ($state:expr) => {{
         // Mark the elapsed time for the given feature
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         $state.perf_stats_mut().mark_feedback_time();
-    }}
+    }};
 }
 
 /// Number of stages in the fuzzer
@@ -278,7 +276,7 @@ pub struct ClientPerfStats {
     /// Starting counter (in clock cycles from [`crate::cpu::read_time_counter`])
     start_time: u64,
 
-    /// Current counter in the fuzzer (in clock cycles from 
+    /// Current counter in the fuzzer (in clock cycles from
     /// [`crate::cpu::read_time_counter`]
     current_time: u64,
 
@@ -305,7 +303,7 @@ pub struct ClientPerfStats {
     feedbacks: [u64; NUM_FEEDBACKS],
 
     /// Current time set by `start_timer`
-    timer_start: Option<u64>
+    timer_start: Option<u64>,
 }
 
 /// Various features that are measured for performance
@@ -344,9 +342,8 @@ pub enum PerfFeature {
 
     /// Used as a counter to know how many elements are in [`PerfFeature`]. Must be the
     /// last value in the enum.
-    Count
-    // !! No more values here since Count is last! !!
-    // !! No more values here since Count is last! !!
+    Count, // !! No more values here since Count is last! !!
+           // !! No more values here since Count is last! !!
 }
 
 // TryFromPrimitive requires `std` so these are implemented manually
@@ -354,18 +351,20 @@ impl From<PerfFeature> for usize {
     fn from(val: PerfFeature) -> usize {
         match val {
             PerfFeature::GetInputFromCorpus => PerfFeature::GetInputFromCorpus as usize,
-            PerfFeature::Mutate             => PerfFeature::Mutate as usize,
-            PerfFeature::MutatePostExec     => PerfFeature::MutatePostExec as usize,
-            PerfFeature::TargetExecution    => PerfFeature::TargetExecution as usize,
-            PerfFeature::PreExec            => PerfFeature::PreExec as usize,
-            PerfFeature::PostExec           => PerfFeature::PostExec as usize,
-            PerfFeature::PreExecObservers   => PerfFeature::PreExecObservers as usize,
-            PerfFeature::PostExecObservers  => PerfFeature::PostExecObservers as usize,
-            PerfFeature::GetFeedbackInterestingAll  
-                => PerfFeature::GetFeedbackInterestingAll as usize,
-            PerfFeature::GetObjectivesInterestingAll  
-                => PerfFeature::GetObjectivesInterestingAll as usize,
-            PerfFeature::Count              => PerfFeature::Count as usize
+            PerfFeature::Mutate => PerfFeature::Mutate as usize,
+            PerfFeature::MutatePostExec => PerfFeature::MutatePostExec as usize,
+            PerfFeature::TargetExecution => PerfFeature::TargetExecution as usize,
+            PerfFeature::PreExec => PerfFeature::PreExec as usize,
+            PerfFeature::PostExec => PerfFeature::PostExec as usize,
+            PerfFeature::PreExecObservers => PerfFeature::PreExecObservers as usize,
+            PerfFeature::PostExecObservers => PerfFeature::PostExecObservers as usize,
+            PerfFeature::GetFeedbackInterestingAll => {
+                PerfFeature::GetFeedbackInterestingAll as usize
+            }
+            PerfFeature::GetObjectivesInterestingAll => {
+                PerfFeature::GetObjectivesInterestingAll as usize
+            }
+            PerfFeature::Count => PerfFeature::Count as usize,
         }
     }
 }
@@ -384,7 +383,7 @@ impl From<usize> for PerfFeature {
             7 => PerfFeature::PostExecObservers,
             8 => PerfFeature::GetFeedbackInterestingAll,
             9 => PerfFeature::GetObjectivesInterestingAll,
-            _ => panic!("Unknown PerfFeature: {}", val)
+            _ => panic!("Unknown PerfFeature: {}", val),
         }
     }
 }
@@ -398,22 +397,22 @@ impl ClientPerfStats {
     /// the current clock counter
     pub fn new() -> Self {
         let start_time = cpu::read_time_counter().try_into().unwrap();
-        
+
         Self {
-            start_time:    start_time,
-            current_time:  start_time,
-            scheduler:     0,
-            manager:       0,
-            curr_stage:    0,
+            start_time: start_time,
+            current_time: start_time,
+            scheduler: 0,
+            manager: 0,
+            curr_stage: 0,
             curr_feedback: 0,
-            stages:        [[0; NUM_PERF_FEATURES]; NUM_STAGES],
-            stages_used:   [false; NUM_STAGES],
-            feedbacks:     [0; NUM_FEEDBACKS],
-            timer_start:   None
+            stages: [[0; NUM_PERF_FEATURES]; NUM_STAGES],
+            stages_used: [false; NUM_STAGES],
+            feedbacks: [0; NUM_FEEDBACKS],
+            timer_start: None,
         }
     }
 
-    /// Set the current time with the given time 
+    /// Set the current time with the given time
     pub fn set_current_time(&mut self, time: u64) {
         self.current_time = time;
     }
@@ -422,7 +421,7 @@ impl ClientPerfStats {
     pub fn start_timer(&mut self) {
         self.timer_start = Some(cpu::read_time_counter());
     }
-    
+
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     pub fn update(&mut self, stats: ClientPerfStats) {
         self.set_current_time(stats.current_time);
@@ -483,14 +482,17 @@ impl ClientPerfStats {
         self.update_feature(feature, elapsed);
     }
 
-    /// Update the time spent in the current [`Feedback`] with the elapsed time that we 
+    /// Update the time spent in the current [`Feedback`] with the elapsed time that we
     /// have seen
     pub fn mark_feedback_time(&mut self) {
         // Sanity check that these stats have enough room for these benchmarks
-        assert!((self.curr_feedback as usize) < NUM_FEEDBACKS, "Current fuzzer has more 
+        assert!(
+            (self.curr_feedback as usize) < NUM_FEEDBACKS,
+            "Current fuzzer has more 
                 stages than the `ClientPerfStats` supports ({}). Please update the 
-                NUM_FEEDBACKS const value in src/stats/mod.rs and rebuild", 
-                NUM_FEEDBACKS);
+                NUM_FEEDBACKS const value in src/stats/mod.rs and rebuild",
+            NUM_FEEDBACKS
+        );
 
         // Get the current elapsed time
         let elapsed = self.mark_time();
@@ -500,8 +502,8 @@ impl ClientPerfStats {
 
         // Update the current feedback's time with the given time
         self.feedbacks[index] = self.feedbacks[index]
-                                    .checked_add(elapsed)
-                                    .expect("mark_feedback_time overflow");
+            .checked_add(elapsed)
+            .expect("mark_feedback_time overflow");
 
         // Increment the feedback index to the next feedback
         self.curr_feedback += 1;
@@ -509,14 +511,18 @@ impl ClientPerfStats {
 
     /// Add the given `time` to the `scheduler` stats
     pub fn update_scheduler(&mut self, time: u64) {
-        self.scheduler = self.scheduler.checked_add(time)
-                                       .expect("update_scheduler overflow");
+        self.scheduler = self
+            .scheduler
+            .checked_add(time)
+            .expect("update_scheduler overflow");
     }
 
     /// Add the given `time` to the `manager` stats
     pub fn update_manager(&mut self, time: u64) {
-        self.manager = self.manager.checked_add(time)
-                                   .expect("update_manager overflow");
+        self.manager = self
+            .manager
+            .checked_add(time)
+            .expect("update_manager overflow");
     }
 
     /// Update the total stage counter and increment the stage counter for the next stage
@@ -539,9 +545,9 @@ impl ClientPerfStats {
     /// Update the time spent in the feedbacks
     pub fn update_feedbacks(&mut self, feedbacks: [u64; NUM_FEEDBACKS]) {
         for (feedback_index, feedback) in feedbacks.iter().enumerate() {
-            self.feedbacks[feedback_index] = 
-                self.feedbacks[feedback_index].checked_add(*feedback)
-                                              .expect("update_feedback overflow");
+            self.feedbacks[feedback_index] = self.feedbacks[feedback_index]
+                .checked_add(*feedback)
+                .expect("update_feedback overflow");
         }
     }
 
@@ -549,9 +555,9 @@ impl ClientPerfStats {
     pub fn update_stages(&mut self, stages: [[u64; NUM_PERF_FEATURES]; NUM_STAGES]) {
         for (stage_index, features) in stages.iter().enumerate() {
             for (feature_index, feature) in features.iter().enumerate() {
-                self.stages[stage_index][feature_index] = 
-                    self.stages[stage_index][feature_index].checked_add(*feature)
-                                                           .expect("Stage overflow");
+                self.stages[stage_index][feature_index] = self.stages[stage_index][feature_index]
+                    .checked_add(*feature)
+                    .expect("Stage overflow");
             }
         }
     }
@@ -559,9 +565,13 @@ impl ClientPerfStats {
     /// Update the given [`PerfFeature`] with the given `time`
     pub fn update_feature(&mut self, feature: PerfFeature, time: u64) {
         // Sanity check that these stats have enough room for these benchmarks
-        assert!((self.curr_stage as usize) < NUM_STAGES, "Current fuzzer has more stages 
+        assert!(
+            (self.curr_stage as usize) < NUM_STAGES,
+            "Current fuzzer has more stages 
                 than the `ClientPerfStats` supports ({}). Please update the NUM_STAGES
-                const value in src/stats/mod.rs and rebuild", NUM_STAGES);
+                const value in src/stats/mod.rs and rebuild",
+            NUM_STAGES
+        );
 
         // Get the current stage index as `usize`
         let stage_index: usize = self.curr_stage.try_into().unwrap();
@@ -571,8 +581,8 @@ impl ClientPerfStats {
 
         // Update the given feature
         self.stages[stage_index][feature_index] = self.stages[stage_index][feature_index]
-                                                      .checked_add(time)
-                                                      .expect("Stage overflow");
+            .checked_add(time)
+            .expect("Stage overflow");
 
         // Set that the current stage is being used
         self.stages_used[stage_index] = true;
@@ -587,7 +597,7 @@ impl core::fmt::Display for ClientPerfStats {
 
         // Calculate the percentages for each benchmark
         let scheduler_percent = self.scheduler as f64 / elapsed;
-        let manager_percent   = self.manager as f64 / elapsed;
+        let manager_percent = self.manager as f64 / elapsed;
 
         // Calculate the remaining percentage that has not been benchmarked
         let mut other_percent = 1.0;
@@ -595,8 +605,11 @@ impl core::fmt::Display for ClientPerfStats {
         other_percent -= manager_percent;
 
         // Create the formatted string
-        write!(f, "Scheduler: {:4.2} | Manager: {:4.2} | Stages:\n", scheduler_percent, 
-               manager_percent)?;
+        write!(
+            f,
+            "Scheduler: {:4.2} | Manager: {:4.2} | Stages:\n",
+            scheduler_percent, manager_percent
+        )?;
 
         // Calculate each stage
         for (stage_index, features) in self.stages.iter().enumerate() {
@@ -640,8 +653,11 @@ impl core::fmt::Display for ClientPerfStats {
                 other_percent -= feedback_percent;
 
                 // Write the percentage for this feedback
-                write!(f, "    {:6.4}: Feedback index {}\n", feedback_percent, 
-                       feedback_index)?;
+                write!(
+                    f,
+                    "    {:6.4}: Feedback index {}\n",
+                    feedback_percent, feedback_index
+                )?;
             }
         }
 

@@ -11,12 +11,12 @@ use crate::{
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
+    mark_feedback_time,
     observers::{ObserversTuple, TimeObserver},
-    Error,
+    start_timer,
     state::HasClientPerfStats,
     stats::{PerfFeature, NUM_FEEDBACKS},
-    start_timer,
-    mark_feedback_time
+    Error,
 };
 
 use core::time::Duration;
@@ -63,14 +63,14 @@ where
 
     /// Get the total interestingness value from all feedbacks with performance
     /// statistics included
-    #[cfg(feature="perf_stats")]
+    #[cfg(feature = "perf_stats")]
     fn is_interesting_all_with_perf<OT: ObserversTuple>(
         &mut self,
         input: &I,
         observers: &OT,
         exit_kind: ExitKind,
         feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize
+        feedback_index: usize,
     ) -> Result<u32, Error> {
         return Ok(0);
     }
@@ -123,14 +123,14 @@ where
             + self.1.is_interesting_all(input, observers, exit_kind)?)
     }
 
-    #[cfg(feature="perf_stats")]
+    #[cfg(feature = "perf_stats")]
     fn is_interesting_all_with_perf<OT: ObserversTuple>(
         &mut self,
         input: &I,
         observers: &OT,
         exit_kind: ExitKind,
         feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize
+        feedback_index: usize,
     ) -> Result<u32, Error> {
         let mut res = 0;
 
@@ -150,8 +150,14 @@ where
         let next_index = feedback_index + 1;
 
         // Continue executing the chain
-        Ok(res + self.1.is_interesting_all_with_perf(input, observers, exit_kind, 
-                                                     feedback_stats, next_index)?)
+        Ok(res
+            + self.1.is_interesting_all_with_perf(
+                input,
+                observers,
+                exit_kind,
+                feedback_stats,
+                next_index,
+            )?)
     }
 
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {

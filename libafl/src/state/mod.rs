@@ -16,13 +16,13 @@ use crate::{
     feedbacks::FeedbacksTuple,
     generators::Generator,
     inputs::Input,
+    mark_feature_time,
     observers::ObserversTuple,
-    utils::Rand,
+    start_timer,
     stats::{ClientPerfStats, PerfFeature},
+    utils::Rand,
     Error,
-    start_timer, mark_feature_time
 };
-
 
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
@@ -74,8 +74,7 @@ where
 }
 
 /// Trait for offering a [`ClientPerfStats`]
-pub trait HasClientPerfStats
-{
+pub trait HasClientPerfStats {
     /// [`ClientPerfStats`] itself
     fn perf_stats(&self) -> &ClientPerfStats;
 
@@ -251,7 +250,7 @@ where
     max_size: usize,
 
     /// Performance statistics for this fuzzer
-    #[cfg(feature="perf_stats")]
+    #[cfg(feature = "perf_stats")]
     perf_stats: ClientPerfStats,
 
     phantom: PhantomData<I>,
@@ -413,12 +412,12 @@ where
 
 /// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "perf_stats"
 /// feature is enabled, and only [`HasExecution`] when "perf_stats" is disabled
-#[cfg(feature="perf_stats")]
+#[cfg(feature = "perf_stats")]
 pub trait HasFuzzerStats: HasExecutions + HasClientPerfStats {}
 
 /// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "perf_stats"
 /// feature is enabled, and only [`HasExecution`] when "perf_stats" is disabled
-#[cfg(not(feature="perf_stats"))]
+#[cfg(not(feature = "perf_stats"))]
 pub trait HasFuzzerStats: HasExecutions {}
 
 impl<C, FT, I, OFT, R, SC> HasFuzzerStats for State<C, FT, I, OFT, R, SC>
@@ -430,7 +429,6 @@ where
     SC: Corpus<I>,
     OFT: FeedbacksTuple<I>,
 {
-
 }
 
 impl<C, FT, I, OFT, R, SC> HasMaxSize for State<C, FT, I, OFT, R, SC>
@@ -704,11 +702,12 @@ where
         mark_feature_time!(self, PerfFeature::PostExecObservers);
 
         let observers = executor.observers();
-        #[cfg(not(feature="perf_stats"))]
-        let fitness = self.feedbacks_mut()
+        #[cfg(not(feature = "perf_stats"))]
+        let fitness =
+            self.feedbacks_mut()
                 .is_interesting_all(&input, observers, exit_kind.clone())?;
 
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         let fitness = {
             // Init temporary feedback stats here. We can't use the typical pattern above
             // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
@@ -716,9 +715,13 @@ where
             // variable to get the stats and then update the feedbacks directly
             let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
             let mut feedback_index = 0;
-            let fitness = self.feedbacks_mut()
-                    .is_interesting_all_with_perf(&input, observers, exit_kind.clone(), 
-                                                &mut feedback_stats, feedback_index)?;
+            let fitness = self.feedbacks_mut().is_interesting_all_with_perf(
+                &input,
+                observers,
+                exit_kind.clone(),
+                &mut feedback_stats,
+                feedback_index,
+            )?;
 
             // Update the feedback stats
             self.perf_stats_mut().update_feedbacks(feedback_stats);
@@ -784,12 +787,11 @@ where
             solutions,
             objectives,
             max_size: DEFAULT_MAX_SIZE,
-            #[cfg(feature="perf_stats")]
+            #[cfg(feature = "perf_stats")]
             perf_stats: ClientPerfStats::new(),
             phantom: PhantomData,
         }
     }
-
 }
 
 #[cfg(feature = "perf_stats")]

@@ -17,7 +17,7 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "perf_stats")] 
+#[cfg(feature = "perf_stats")]
 use crate::stats::ClientPerfStats;
 
 /// The log event severity

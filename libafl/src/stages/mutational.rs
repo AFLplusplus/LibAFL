@@ -5,14 +5,15 @@ use crate::{
     events::EventManager,
     executors::{Executor, HasObservers},
     inputs::Input,
+    mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
     stages::Stage,
-    state::{Evaluator, HasCorpus, HasRand, HasClientPerfStats},
+    start_timer,
+    state::{Evaluator, HasClientPerfStats, HasCorpus, HasRand},
     stats::PerfFeature,
     utils::Rand,
     Error,
-    start_timer, mark_feature_time
 };
 
 // TODO multi mutators stage
@@ -67,8 +68,7 @@ where
             mark_feature_time!(state, PerfFeature::Mutate);
 
             // Time is measured directly the `evaluate_input` function
-            let (_, corpus_idx) = state.evaluate_input(input_mut, executor, manager, 
-                                                       scheduler)?;
+            let (_, corpus_idx) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;

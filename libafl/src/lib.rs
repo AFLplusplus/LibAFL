@@ -23,6 +23,7 @@ pub use libafl_derive::*;
 
 pub mod bolts;
 pub mod corpus;
+pub mod cpu;
 pub mod events;
 pub mod executors;
 pub mod feedbacks;
@@ -34,7 +35,6 @@ pub mod stages;
 pub mod state;
 pub mod stats;
 pub mod utils;
-pub mod cpu;
 
 pub mod fuzzer;
 pub use fuzzer::*;
