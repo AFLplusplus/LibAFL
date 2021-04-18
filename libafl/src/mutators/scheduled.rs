@@ -1,3 +1,5 @@
+//! The `ScheduledMutator` schedules multiple mutations internally.
+
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::{
@@ -179,7 +181,7 @@ where
     /// Create a new StdScheduledMutator instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
-            mutations: mutations,
+            mutations,
             phantom: PhantomData,
         }
     }
@@ -377,7 +379,7 @@ where
     /// Create a new StdScheduledMutator instance without mutations and corpus
     pub fn new(scheduled: SM) -> Self {
         Self {
-            scheduled: scheduled,
+            scheduled,
             mutation_log: vec![],
             phantom: PhantomData,
         }

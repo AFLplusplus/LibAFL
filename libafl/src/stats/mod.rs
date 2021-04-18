@@ -63,6 +63,7 @@ impl ClientStats {
     }
 
     /// Get the calculated executions per second for this client
+    #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
     pub fn execs_per_sec(&mut self, cur_time: time::Duration) -> u64 {
         if self.executions == 0 {
             return 0;
@@ -117,14 +118,14 @@ pub trait Stats {
     fn corpus_size(&self) -> u64 {
         self.client_stats()
             .iter()
-            .fold(0u64, |acc, x| acc + x.corpus_size)
+            .fold(0_u64, |acc, x| acc + x.corpus_size)
     }
 
     /// Amount of elements in the objectives (combined for all children)
     fn objective_size(&self) -> u64 {
         self.client_stats()
             .iter()
-            .fold(0u64, |acc, x| acc + x.objective_size)
+            .fold(0_u64, |acc, x| acc + x.objective_size)
     }
 
     /// Total executions
@@ -132,7 +133,7 @@ pub trait Stats {
     fn total_execs(&mut self) -> u64 {
         self.client_stats()
             .iter()
-            .fold(0u64, |acc, x| acc + x.executions)
+            .fold(0_u64, |acc, x| acc + x.executions)
     }
 
     /// Executions per second
@@ -141,7 +142,7 @@ pub trait Stats {
         let cur_time = current_time();
         self.client_stats_mut()
             .iter_mut()
-            .fold(0u64, |acc, x| acc + x.execs_per_sec(cur_time))
+            .fold(0_u64, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
     /// The client stats for a specific id, creating new if it doesn't exist
@@ -150,7 +151,7 @@ pub trait Stats {
         for _ in client_stat_count..(client_id + 1) as usize {
             self.client_stats_mut().push(ClientStats {
                 last_window_time: current_time(),
-                ..Default::default()
+                ..ClientStats::default()
             })
         }
         &mut self.client_stats_mut()[client_id as usize]

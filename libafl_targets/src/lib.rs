@@ -1,3 +1,5 @@
+//! `libafl_targets` contains runtime code, injected in the target itself during compilation.
+
 #[cfg(any(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]
 pub mod pcguard;
 #[cfg(any(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]
@@ -12,3 +14,8 @@ pub use value_profile::*;
 pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]
 pub use libfuzzer::*;
+
+#[cfg(feature = "cmplog")]
+pub mod cmplog;
+#[cfg(feature = "cmplog")]
+pub use cmplog::*;

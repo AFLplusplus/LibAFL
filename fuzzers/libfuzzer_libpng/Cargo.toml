@@ -8,11 +8,16 @@ edition = "2018"
 default = ["std"]
 std = []
 
-[profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
-debug = true
+#[profile.release]
+#lto = true
+#codegen-units = 1
+#opt-level = 3
+#debug = true
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+which = { version = "4.0.2" }
+num_cpus = "1.0"
 
 [dependencies]
 libafl = { path = "../../libafl/", features = ["default", "perf_stats"] }

@@ -1,13 +1,15 @@
+//! The `Fuzzer` is the main struct for a fuzz campaign.
+
 use crate::{
     corpus::CorpusScheduler,
+    cpu,
     events::{Event, EventManager},
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
     stages::StagesTuple,
-    state::{HasExecutions, HasClientPerfStats},
+    state::{HasClientPerfStats, HasExecutions},
     utils::current_time,
-    cpu,
     Error,
 };
 
@@ -69,7 +71,7 @@ pub trait Fuzzer<E, EM, S, CS> {
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
     }
-    
+
     /// Fuzz for n iterations
     /// Returns the index of the last fuzzed corpus item
     fn fuzz_loop_for(
@@ -96,7 +98,6 @@ pub trait Fuzzer<E, EM, S, CS> {
         }
         Ok(ret)
     }
-
 
     /// Given the last time, if stats_timeout seconds passed, send off an info/stats/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `stats_timeout` time has passed and stats have been sent)
@@ -192,7 +193,9 @@ where
             // If performance stats are requested, fire the `UpdatePerfStats` event
             #[cfg(feature = "perf_stats")]
             {
-                state.perf_stats_mut().set_current_time(cpu::read_time_counter());
+                state
+                    .perf_stats_mut()
+                    .set_current_time(cpu::read_time_counter());
 
                 // Send the current stats over to the manager. This `.clone` shouldn't be
                 // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s
@@ -222,18 +225,18 @@ where
         scheduler: &CS,
     ) -> Result<usize, Error> {
         // Init timer for scheduler
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         state.perf_stats_mut().start_timer();
 
         // Get the next index from the scheduler
         let idx = scheduler.next(state)?;
 
         // Mark the elapsed time for the scheduler
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         state.perf_stats_mut().mark_scheduler_time();
 
         // Mark the elapsed time for the scheduler
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         state.perf_stats_mut().reset_stage_index();
 
         // Execute all stages
@@ -241,14 +244,14 @@ where
             .perform_all(state, executor, manager, scheduler, idx)?;
 
         // Init timer for manager
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         state.perf_stats_mut().start_timer();
 
         // Execute the manager
         manager.process(state, executor, scheduler)?;
 
         // Mark the elapsed time for the manager
-        #[cfg(feature="perf_stats")]
+        #[cfg(feature = "perf_stats")]
         state.perf_stats_mut().mark_manager_time();
 
         Ok(idx)

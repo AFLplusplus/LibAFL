@@ -1,3 +1,4 @@
+//! Signal handling for unix
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
@@ -24,6 +25,7 @@ pub use libc::{c_void, siginfo_t};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
+#[allow(clippy::clippy::pub_enum_variant_names)]
 pub enum Signal {
     SigAbort = SIGABRT,
     SigBus = SIGBUS,
@@ -83,7 +85,7 @@ impl Display for Signal {
 
 pub trait Handler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: siginfo_t, _void: c_void);
+    fn handle(&mut self, signal: Signal, info: siginfo_t, _void: *const c_void);
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
@@ -111,7 +113,7 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 /// # Safety
 /// This should be somewhat safe to call for signals previously registered,
 /// unless the signal handlers registered using [setup_signal_handler] are broken.
-unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: c_void) {
+unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *const c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
         match &SIGNAL_HANDLERS[*signal as usize] {

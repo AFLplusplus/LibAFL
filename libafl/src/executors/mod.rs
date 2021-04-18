@@ -21,7 +21,7 @@ use crate::{
 pub enum ExitKind {
     Ok,
     Crash,
-    OOM,
+    Oom,
     Timeout,
 }
 
@@ -49,7 +49,7 @@ where
 }
 
 /// A simple executor that does nothing.
-/// If intput len is 0, run_target will return Err
+/// If intput len is 0, `run_target` will return Err
 struct NopExecutor<I> {
     phantom: PhantomData<I>,
 }

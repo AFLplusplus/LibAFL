@@ -277,7 +277,7 @@ macro_rules! create_serde_registry_for_trait {
                         None => None,
                         Some(h) => h
                             .get(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
-                            .map(|x| x.as_ref()),
+                            .map(AsRef::as_ref),
                     }
                 }
 
@@ -304,7 +304,7 @@ macro_rules! create_serde_registry_for_trait {
                         None => None,
                         Some(h) => h
                             .get_mut(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
-                            .map(|x| x.as_mut()),
+                            .map(AsMut::as_mut),
                     }
                 }
 

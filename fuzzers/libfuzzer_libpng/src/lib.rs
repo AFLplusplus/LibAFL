@@ -5,12 +5,12 @@ use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{shmem::StdShMem, tuples::tuple_list},
+    bolts::tuples::tuple_list,
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::setup_restarting_mgr,
+    events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -52,7 +52,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr::<_, _, StdShMem, _>(stats, broker_port) {
+        match setup_restarting_mgr_std(stats, broker_port) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {

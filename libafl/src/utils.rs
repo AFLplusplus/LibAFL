@@ -179,6 +179,7 @@ pub struct Xoshiro256StarRand {
 }
 
 impl Rand for Xoshiro256StarRand {
+    #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
         self.rand_seed[0] = xxh3_64_with_seed(&HASH_CONST.to_le_bytes(), seed);
         self.rand_seed[1] = self.rand_seed[0] ^ 0x1234567890abcdef;
@@ -223,6 +224,7 @@ pub struct XorShift64Rand {
 }
 
 impl Rand for XorShift64Rand {
+    #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
         self.rand_seed = seed ^ 0x1234567890abcdef;
     }
@@ -254,11 +256,13 @@ pub struct Lehmer64Rand {
 }
 
 impl Rand for Lehmer64Rand {
+    #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
-        self.rand_seed = (seed as u128) ^ 0x1234567890abcdef;
+        self.rand_seed = u128::from(seed) ^ 0x1234567890abcdef;
     }
 
     #[inline]
+    #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         self.rand_seed *= 0xda942042e4dd58b5;
         (self.rand_seed >> 64) as u64
@@ -303,6 +307,7 @@ impl Rand for RomuTrioRand {
     }
 
     #[inline]
+    #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         let xp = self.x_state;
         let yp = self.y_state;
@@ -339,6 +344,7 @@ impl Rand for RomuDuoJrRand {
     }
 
     #[inline]
+    #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         let xp = self.x_state;
         self.x_state = 15241094284759029579u64.wrapping_mul(self.y_state);
@@ -396,7 +402,7 @@ impl ChildHandle {
 }
 
 #[cfg(unix)]
-/// The ForkResult
+/// The `ForkResult` (result of a fork)
 pub enum ForkResult {
     Parent(ChildHandle),
     Child,

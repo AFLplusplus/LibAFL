@@ -1,5 +1,8 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
+use alloc::vec::Vec;
+use core::marker::PhantomData;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -9,17 +12,15 @@ use std::{
 
 use crate::{
     inputs::{HasBytesVec, Input},
-    mutators::*,
+    mutators::{buffer_self_copy, mutations, MutationResult, Mutator, Named},
     state::{HasMaxSize, HasMetadata, HasRand},
     utils::Rand,
     Error,
 };
-use core::marker::PhantomData;
-
-use alloc::vec::Vec;
-use serde::{Deserialize, Serialize};
-
 use mutations::buffer_copy;
+
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
 
 /// A state metadata holding a list of tokens
 #[derive(Serialize, Deserialize)]
@@ -49,6 +50,7 @@ impl Tokens {
 
     /// Adds a token to a dictionary, checking it is not a duplicate
     /// Returns `false` if the token was already present and did not get added.
+    #[allow(clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
         if self.token_vec.contains(token) {
             return false;
@@ -81,7 +83,7 @@ impl Tokens {
             }
             let pos_quote = match line.find('\"') {
                 Some(x) => x,
-                _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
             };
             if line.chars().nth(line.len() - 1) != Some('"') {
                 return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
@@ -90,7 +92,7 @@ impl Tokens {
             // extract item
             let item = match line.get(pos_quote + 1..line.len() - 1) {
                 Some(x) => x,
-                _ => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
             };
             if item.is_empty() {
                 continue;
