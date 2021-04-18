@@ -207,7 +207,7 @@ where
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+                windows_exception_handler::inproc_crash_handler::<EM, Self, I, OC, OFT, OT, S>,
             );
             //write_volatile(
             //    &mut data.timeout_handler,
@@ -562,7 +562,7 @@ mod windows_exception_handler {
         }
     }
 
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, E, I, OC, OFT, OT, S>(
         code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
