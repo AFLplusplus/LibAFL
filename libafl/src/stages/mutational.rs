@@ -50,8 +50,6 @@ where
         scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        print!("Perform mutational\n");
-
         let num = self.iterations(state);
 
         for i in 0..num {
