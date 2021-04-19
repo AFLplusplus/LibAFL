@@ -154,9 +154,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
-    print!("DONE\n");
-    loop {}
-
     // Never reached
     Ok(())
 }
