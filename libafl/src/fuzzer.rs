@@ -15,8 +15,8 @@ use crate::{
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
-/// Send a stats update all 1 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(1000);
+/// Send a stats update all 3 (or more) seconds
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(3 * 1000);
 
 /// Holds a set of stages
 pub trait HasStages<CS, E, EM, I, S, ST>
