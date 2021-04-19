@@ -11,7 +11,6 @@ use std::convert::TryInto;
 #[cfg(not(feature = "std"))]
 use core::convert::TryInto;
 
-use crate::cpu;
 use crate::utils::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
@@ -273,11 +272,10 @@ pub const NUM_FEEDBACKS: usize = 4;
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct ClientPerfStats {
-    /// Starting counter (in clock cycles from [`crate::cpu::read_time_counter`])
+    /// Starting counter (in clock cycles from [`cpu::read_time_counter`])
     start_time: u64,
 
-    /// Current counter in the fuzzer (in clock cycles from
-    /// [`crate::cpu::read_time_counter`]
+    /// Current counter in the fuzzer (in clock cycles from [`cpu::read_time_counter`]
     current_time: u64,
 
     /// Clock cycles spent in the scheduler
@@ -396,7 +394,7 @@ impl ClientPerfStats {
     /// Create a blank [`ClientPerfStats`] with the `start_time` and `current_time` with
     /// the current clock counter
     pub fn new() -> Self {
-        let start_time = cpu::read_time_counter().try_into().unwrap();
+        let start_time = crate::cpu::read_time_counter().try_into().unwrap();
 
         Self {
             start_time: start_time,
@@ -419,7 +417,7 @@ impl ClientPerfStats {
 
     /// Start a timer with the current time counter
     pub fn start_timer(&mut self) {
-        self.timer_start = Some(cpu::read_time_counter());
+        self.timer_start = Some(crate::cpu::read_time_counter());
     }
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
@@ -444,7 +442,7 @@ impl ClientPerfStats {
             }
             Some(timer_start) => {
                 // Calculate the elapsed time
-                let elapsed = cpu::read_time_counter() - timer_start;
+                let elapsed = crate::cpu::read_time_counter() - timer_start;
 
                 // Reset the timer
                 self.timer_start = None;

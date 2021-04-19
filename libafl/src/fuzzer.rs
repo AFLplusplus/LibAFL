@@ -2,7 +2,6 @@
 
 use crate::{
     corpus::CorpusScheduler,
-    cpu,
     events::{Event, EventManager},
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -195,7 +194,7 @@ where
             {
                 state
                     .perf_stats_mut()
-                    .set_current_time(cpu::read_time_counter());
+                    .set_current_time(crate::cpu::read_time_counter());
 
                 // Send the current stats over to the manager. This `.clone` shouldn't be
                 // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s
