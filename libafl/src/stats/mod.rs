@@ -411,11 +411,13 @@ impl ClientPerfStats {
     }
 
     /// Set the current time with the given time
+    #[inline]
     pub fn set_current_time(&mut self, time: u64) {
         self.current_time = time;
     }
 
     /// Start a timer with the current time counter
+    #[inline]
     pub fn start_timer(&mut self) {
         self.timer_start = Some(crate::cpu::read_time_counter());
     }
@@ -431,6 +433,7 @@ impl ClientPerfStats {
 
     /// Gets the elapsed time since the internal timer started. Resets the timer when
     /// finished execution.
+    #[inline]
     fn mark_time(&mut self) -> u64 {
         match self.timer_start {
             None => {
@@ -454,6 +457,7 @@ impl ClientPerfStats {
     }
 
     /// Update the time spent in the scheduler with the elapsed time that we have seen
+    #[inline]
     pub fn mark_scheduler_time(&mut self) {
         // Get the current elapsed time
         let elapsed = self.mark_time();
@@ -463,6 +467,7 @@ impl ClientPerfStats {
     }
 
     /// Update the time spent in the scheduler with the elapsed time that we have seen
+    #[inline]
     pub fn mark_manager_time(&mut self) {
         // Get the current elapsed time
         let elapsed = self.mark_time();
@@ -472,6 +477,7 @@ impl ClientPerfStats {
     }
 
     /// Update the time spent in the given [`PerfFeature`] with the elapsed time that we have seen
+    #[inline]
     pub fn mark_feature_time(&mut self, feature: PerfFeature) {
         // Get the current elapsed time
         let elapsed = self.mark_time();
@@ -508,6 +514,7 @@ impl ClientPerfStats {
     }
 
     /// Add the given `time` to the `scheduler` stats
+    #[inline]
     pub fn update_scheduler(&mut self, time: u64) {
         self.scheduler = self
             .scheduler
@@ -516,6 +523,7 @@ impl ClientPerfStats {
     }
 
     /// Add the given `time` to the `manager` stats
+    #[inline]
     pub fn update_manager(&mut self, time: u64) {
         self.manager = self
             .manager
@@ -524,6 +532,7 @@ impl ClientPerfStats {
     }
 
     /// Update the total stage counter and increment the stage counter for the next stage
+    #[inline]
     pub fn finish_stage(&mut self) {
         // Increment the stage to the next index. The check is only done if this were to
         // be used past the length of the `self.stages` buffer
@@ -531,11 +540,13 @@ impl ClientPerfStats {
     }
 
     /// Reset the stage index counter to zero
+    #[inline]
     pub fn reset_stage_index(&mut self) {
         self.curr_stage = 0;
     }
 
     /// Reset the feedback index counter to zero
+    #[inline]
     pub fn reset_feedback_index(&mut self) {
         self.curr_feedback = 0;
     }
