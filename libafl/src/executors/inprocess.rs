@@ -348,7 +348,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Timeout)
+                .is_interesting_all(&input, observers, &ExitKind::Timeout)
                 .expect("In timeout handler objectives failure.");
             if obj_fitness > 0 {
                 state
@@ -410,7 +410,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, &ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();
@@ -574,7 +574,7 @@ mod windows_exception_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, &ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();

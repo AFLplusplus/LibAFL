@@ -5,24 +5,21 @@ pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
 
-use core::cmp::PartialEq;
 use core::marker::PhantomData;
 
-use crate::{
-    bolts::tuples::Named,
-    events::EventManager,
-    inputs::{HasTargetBytes, Input},
-    observers::ObserversTuple,
-    Error,
-};
+use crate::{Error, bolts::{serdeany::SerdeAny, tuples::Named}, events::EventManager, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::ObserversTuple};
+
+pub trait CustomExitKind: std::fmt::Debug + SerdeAny + 'static {
+}
 
 /// How an execution finished.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum ExitKind {
     Ok,
     Crash,
     Oom,
     Timeout,
+    Custom(Box<dyn CustomExitKind>)
 }
 
 pub trait HasObservers<OT>
@@ -128,3 +125,4 @@ mod test {
         assert!(executor.run_target(&nonempty_input).is_ok());
     }
 }
+

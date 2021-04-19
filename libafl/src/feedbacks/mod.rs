@@ -29,7 +29,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
@@ -54,7 +54,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>;
 
     /// Write metadata for this testcase
@@ -73,7 +73,7 @@ where
         &mut self,
         _: &I,
         _: &OT,
-        _: ExitKind,
+        _: &ExitKind,
     ) -> Result<u32, Error> {
         Ok(0)
     }
@@ -99,9 +99,9 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        Ok(self.0.is_interesting(input, observers, exit_kind.clone())?
+        Ok(self.0.is_interesting(input, observers, exit_kind)?
             + self.1.is_interesting_all(input, observers, exit_kind)?)
     }
 
@@ -128,9 +128,9 @@ where
         &mut self,
         _input: &I,
         _observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        if exit_kind == ExitKind::Crash {
+        if let ExitKind::Crash = exit_kind {
             Ok(1)
         } else {
             Ok(0)
@@ -168,9 +168,9 @@ where
         &mut self,
         _input: &I,
         _observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        if exit_kind == ExitKind::Timeout {
+        if let ExitKind::Timeout = exit_kind {
             Ok(1)
         } else {
             Ok(0)
@@ -211,7 +211,7 @@ where
         &mut self,
         _input: &I,
         observers: &OT,
-        _exit_kind: ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
         let observer = observers.match_first_type::<TimeObserver>().unwrap();
         self.exec_time = *observer.last_runtime();

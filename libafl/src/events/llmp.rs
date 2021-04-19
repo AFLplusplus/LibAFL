@@ -304,7 +304,7 @@ where
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
-                let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
+                let fitness = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
                 if fitness > 0
                     && state
                         .add_if_interesting(&input, fitness, scheduler)?
