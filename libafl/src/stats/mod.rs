@@ -264,10 +264,10 @@ macro_rules! mark_feedback_time {
 }
 
 /// Number of stages in the fuzzer
-const NUM_STAGES: usize = 4;
+pub(crate) const NUM_STAGES: usize = 4;
 
 /// Number of feedback mechanisms to measure for performance
-pub const NUM_FEEDBACKS: usize = 4;
+pub(crate) const NUM_FEEDBACKS: usize = 4;
 
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
