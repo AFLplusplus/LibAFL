@@ -3,6 +3,7 @@ Welcome to libAFL
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(feature = "perf_stats", feature(link_llvm_intrinsics))]
 
 #[macro_use]
 extern crate alloc;
