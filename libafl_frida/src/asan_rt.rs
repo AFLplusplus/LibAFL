@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+use libafl::{Error, bolts::{serdeany::SerdeAny, tuples::Named}, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::Input, observers::ObserversTuple};
 use nix::{
     libc::{memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -16,23 +17,21 @@ use gothook::GotHookLibrary;
 use libc::{pthread_atfork, sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use regex::Regex;
-use std::{
-    cell::RefCell,
-    cell::{RefMut, UnsafeCell},
-    ffi::c_void,
-    fs::File,
-    io::{BufRead, BufReader, Write},
-    ops::{Deref, DerefMut},
-    sync::{Arc, RwLock},
-};
+use std::{cell::RefCell, cell::{RefMut, UnsafeCell}, ffi::c_void, fs::File, io::{BufRead, BufReader, Write}, ops::{Deref, DerefMut}, rc::Rc, sync::{Arc, RwLock}};
+use serde::{Serialize, Deserialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 
 use crate::FridaOptions;
 
+
+extern "C" {
+    fn __register_frame(begin: *mut c_void);
+}
+
 static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 
 struct Allocator {
-    runtime: Dereffer<AsanRuntime>,
+    runtime: Rc<RefCell<AsanRuntime>>,
     page_size: usize,
     shadow_offset: usize,
     shadow_bit: usize,
@@ -48,7 +47,7 @@ macro_rules! map_to_shadow {
     };
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct AllocationMetadata {
     address: usize,
     size: usize,
@@ -59,7 +58,7 @@ struct AllocationMetadata {
 }
 
 impl Allocator {
-    fn new(runtime: Dereffer<AsanRuntime>) {
+    fn new(runtime: Rc<RefCell<AsanRuntime>>) {
         let page_size = unsafe { sysconf(_SC_PAGESIZE) as usize };
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
@@ -125,7 +124,7 @@ impl Allocator {
         }
     }
 
-    pub fn init(runtime: Dereffer<AsanRuntime>) {
+    pub fn init(runtime: Rc<RefCell<AsanRuntime>>) {
         Self::new(runtime);
     }
 
@@ -205,7 +204,8 @@ impl Allocator {
                 if !ptr.is_null() {
                     // TODO: report this as an observer
                     self.runtime
-                        .report_error(&mut AsanError::UnallocatedFree(ptr));
+                        .borrow_mut()
+                        .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
                 }
                 return;
             }
@@ -213,7 +213,8 @@ impl Allocator {
 
         if metadata.freed {
             self.runtime
-                .report_error(&mut AsanError::DoubleFree((ptr, &mut metadata)));
+                .borrow_mut()
+                .report_error(AsanError::DoubleFree((ptr as usize, metadata.clone(), Backtrace::new())));
         }
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
@@ -620,48 +621,56 @@ pub struct AsanRuntime {
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
     options: FridaOptions,
+    errors: AsanErrors,
 }
 
-enum AsanError<'a> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum AsanError {
     OobRead(
         (
-            &'a [usize],
+            [usize; 32],
             usize,
             (u16, u16, usize, usize),
-            &'a mut AllocationMetadata,
+            AllocationMetadata,
+            Backtrace,
         ),
     ),
     OobWrite(
         (
-            &'a [usize],
+            [usize; 32],
             usize,
             (u16, u16, usize, usize),
-            &'a mut AllocationMetadata,
+            AllocationMetadata,
+            Backtrace,
         ),
     ),
-    DoubleFree((*mut c_void, &'a mut AllocationMetadata)),
-    UnallocatedFree(*mut c_void),
+    DoubleFree((usize, AllocationMetadata, Backtrace)),
+    UnallocatedFree((usize, Backtrace)),
     WriteAfterFree(
         (
-            &'a [usize],
+            [usize; 32],
             usize,
             (u16, u16, usize, usize),
-            &'a mut AllocationMetadata,
+            AllocationMetadata,
+            Backtrace,
         ),
     ),
     ReadAfterFree(
         (
-            &'a [usize],
+            [usize; 32],
             usize,
             (u16, u16, usize, usize),
-            &'a mut AllocationMetadata,
+            AllocationMetadata,
+            Backtrace,
         ),
     ),
-    Unknown((&'a [usize], usize, (u16, u16, usize, usize))),
-    Leak((*mut c_void, &'a mut AllocationMetadata)),
+    Unknown(([usize; 32], usize, (u16, u16, usize, usize),
+            Backtrace,
+            )),
+    Leak((usize, AllocationMetadata)),
 }
 
-impl<'a> AsanError<'a> {
+impl AsanError {
     fn description(&self) -> &str {
         match self {
             AsanError::OobRead(_) => "heap out-of-bounds read",
@@ -676,9 +685,33 @@ impl<'a> AsanError<'a> {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AsanErrors {
+    errors: Vec<AsanError>,
+}
+
+impl AsanErrors {
+    fn new() -> Self {
+        Self {
+            errors: Vec::new(),
+        }
+    }
+}
+impl SerdeAny for AsanErrors {
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+        self
+    }
+}
+impl CustomExitKind for AsanErrors {}
+
+
 impl AsanRuntime {
-    pub fn new(options: FridaOptions) -> AsanRuntime {
-        let mut res = Self {
+    pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
+        let mut res = Rc::new(RefCell::new(Self {
             regs: [0; 32],
             blob_check_mem_byte: None,
             blob_check_mem_halfword: None,
@@ -694,8 +727,9 @@ impl AsanRuntime {
             blob_check_mem_64bytes: None,
             stalked_addresses: HashMap::new(),
             options,
-        };
-        Allocator::init(Dereffer::new(&mut res as *mut Self));
+            errors: AsanErrors::new(),
+        }));
+        Allocator::init(res.clone());
         res
     }
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
@@ -704,7 +738,7 @@ impl AsanRuntime {
     pub fn init(&mut self, modules_to_instrument: &[&str]) {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
-            for _ in 0..64 {
+            for _ in 0..512 {
                 mmap(
                     std::ptr::null_mut(),
                     128 * 1024,
@@ -739,15 +773,25 @@ impl AsanRuntime {
     }
 
     /// Check if the test leaked any memory and report it if so.
-    pub fn check_for_leaks(&self) {
+    pub fn check_for_leaks(&mut self) {
         for metadata in Allocator::get().allocations.values_mut() {
             if !metadata.freed {
-                self.report_error(&mut AsanError::Leak((
-                    metadata.address as *mut c_void,
-                    metadata,
+                self.report_error(AsanError::Leak((
+                    metadata.address,
+                    metadata.clone(),
                 )));
             }
         }
+    }
+
+    pub fn have_errors(&self) -> bool {
+        !self.errors.errors.is_empty()
+    }
+
+    pub fn errors(&mut self) -> ExitKind {
+        let res = ExitKind::Custom(Box::new(self.errors.clone()));
+        self.errors.errors.clear();
+        res
     }
 
     /// Make sure the specified memory is unpoisoned
@@ -881,7 +925,7 @@ impl AsanRuntime {
     }
 
     extern "C" fn handle_trap(&mut self) {
-        let mut actual_pc = self.regs[31] + 32 + 4;
+        let mut actual_pc = self.regs[31] + 66 * 4 + 4;
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
             _ => actual_pc,
@@ -945,7 +989,7 @@ impl AsanRuntime {
             base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
         }
 
-        let mut fault_address = self.regs[base_reg as usize] + displacement as usize;
+        let mut fault_address = (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
         if index_reg != 0 {
             if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
@@ -976,53 +1020,62 @@ impl AsanRuntime {
             index_reg = 0xffff
         }
 
+        let backtrace = Backtrace::new();
         let mut allocator = Allocator::get();
         if let Some(metadata) = allocator.find_metadata(fault_address, self.regs[base_reg as usize])
         {
             let mut error = if insn.mnemonic().unwrap().starts_with("l") {
                 if metadata.freed {
                     AsanError::ReadAfterFree((
-                        &self.regs,
+                        self.regs,
                         actual_pc,
                         (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
+                        metadata.clone(),
+                        backtrace,
                     ))
                 } else {
                     AsanError::OobRead((
-                        &self.regs,
+                        self.regs,
                         actual_pc,
                         (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
+                        metadata.clone(),
+                        backtrace,
                     ))
                 }
             } else {
                 if metadata.freed {
                     AsanError::WriteAfterFree((
-                        &self.regs,
+                        self.regs,
                         actual_pc,
                         (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
+                        metadata.clone(),
+                        backtrace,
                     ))
                 } else {
                     AsanError::OobWrite((
-                        &self.regs,
+                        self.regs,
                         actual_pc,
                         (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata,
+                        metadata.clone(),
+                        backtrace,
                     ))
                 }
             };
-            self.report_error(&mut error);
-        };
+            self.report_error(error);
+        } else {
+            self.report_error(AsanError::Unknown((
+                self.regs,
+                actual_pc,
+                (base_reg, index_reg, displacement as usize, fault_address),
+                backtrace,
+            )));
+        }
 
-        self.report_error(&mut AsanError::Unknown((
-            &self.regs,
-            actual_pc,
-            (base_reg, index_reg, displacement as usize, fault_address),
-        )));
     }
 
-    fn report_error(&self, error: &mut AsanError) {
+    fn report_error(&mut self, error: AsanError) {
+        self.errors.errors.push(error.clone());
+
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
@@ -1037,87 +1090,10 @@ impl AsanRuntime {
             .unwrap();
         write!(output, "{}", error.description());
         match error {
-            AsanError::OobRead((registers, pc, fault, metadata))
-            | AsanError::OobWrite((registers, pc, fault, metadata))
-            | AsanError::ReadAfterFree((registers, pc, fault, metadata))
-            | AsanError::WriteAfterFree((registers, pc, fault, metadata)) => {
-                let (basereg, indexreg, _displacement, fault_address) = fault;
-
-                writeln!(
-                    output,
-                    " at 0x{:x}, faulting address 0x{:x}",
-                    pc, fault_address
-                )
-                .unwrap();
-                output.reset().unwrap();
-
-                writeln!(output, "{:━^80}", " REGISTERS ").unwrap();
-                for reg in 0..=30 {
-                    if reg == *basereg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                    } else if reg == *indexreg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
-                            .unwrap();
-                    }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
-                    output.reset().unwrap();
-                    if reg % 4 == 3 {
-                        writeln!(output, "").unwrap();
-                    }
-                }
-                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
-
-                writeln!(output, "{:━^80}", " CODE ").unwrap();
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
-                cs.set_skipdata(true).expect("failed to set skipdata");
-
-                let start_pc = *pc - 4 * 5;
-                for insn in cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                    .iter()
-                {
-                    if insn.address() as usize == *pc {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
-                        output.reset().unwrap();
-                    } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
-                    }
-                }
-                backtrace_printer
-                    .print_trace(&Backtrace::new(), output)
-                    .unwrap();
-
-                writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
-                let offset: i64 = *fault_address as i64 - metadata.address as i64;
-                let direction = if offset > 0 { "right" } else { "left" };
-                writeln!(
-                    output,
-                    "access is 0x{:x} to the {} of the 0x{:x} byte allocation at 0x{:x}",
-                    offset, direction, metadata.size, metadata.address
-                )
-                .unwrap();
-                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
-                    writeln!(output, "allocation site backtrace:").unwrap();
-                    backtrace.resolve();
-                    backtrace_printer.print_trace(backtrace, output).unwrap();
-                }
-            }
-            &mut AsanError::Unknown((registers, pc, fault)) => {
+            AsanError::OobRead((registers, pc, fault, mut metadata, backtrace))
+            | AsanError::OobWrite((registers, pc, fault, mut metadata, backtrace))
+            | AsanError::ReadAfterFree((registers, pc, fault, mut metadata, backtrace))
+            | AsanError::WriteAfterFree((registers, pc, fault, mut metadata, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
                 writeln!(
@@ -1176,14 +1152,127 @@ impl AsanRuntime {
                     }
                 }
                 backtrace_printer
-                    .print_trace(&Backtrace::new(), output)
+                    .print_trace(&backtrace, output)
+                    .unwrap();
+
+
+                //use unwind::{Cursor, RegNum, get_context};
+
+                //get_context!(context);
+                //let mut cursor = Cursor::local(context).unwrap();
+
+                //loop {
+                    //let ip = cursor.register(RegNum::IP).unwrap();
+
+                    //match (cursor.procedure_info(), cursor.procedure_name()) {
+                        //(Ok(ref info), Ok(ref name)) if ip == info.start_ip() + name.offset() => {
+                            //println!(
+                                //"{:#016x} - {} ({:#016x}) + {:#x}",
+                                //ip,
+                                //name.name(),
+                                //info.start_ip(),
+                                //name.offset()
+                            //);
+                        //}
+                        //_ => println!("{:#016x} - ????", ip),
+                    //}
+
+                    //if !cursor.step().unwrap() {
+                        //break;
+                    //}
+                //}
+
+                writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
+                let offset: i64 = fault_address as i64 - metadata.address as i64;
+                let direction = if offset > 0 { "right" } else { "left" };
+                writeln!(
+                    output,
+                    "access is 0x{:x} to the {} of the 0x{:x} byte allocation at 0x{:x}",
+                    offset, direction, metadata.size, metadata.address
+                )
+                .unwrap();
+                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
+                    writeln!(output, "allocation site backtrace:").unwrap();
+                    backtrace.resolve();
+                    backtrace_printer.print_trace(backtrace, output).unwrap();
+                }
+
+                if metadata.freed {
+                    writeln!(output, "{:━^80}", " FREE INFO ").unwrap();
+                    if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
+                        writeln!(output, "free site backtrace:").unwrap();
+                        backtrace.resolve();
+                        backtrace_printer.print_trace(backtrace, output).unwrap();
+                    }
+                }
+            }
+            AsanError::Unknown((registers, pc, fault, backtrace)) => {
+                let (basereg, indexreg, _displacement, fault_address) = fault;
+
+                writeln!(
+                    output,
+                    " at 0x{:x}, faulting address 0x{:x}",
+                    pc, fault_address
+                )
+                .unwrap();
+                output.reset().unwrap();
+
+                writeln!(output, "{:━^80}", " REGISTERS ").unwrap();
+                for reg in 0..=30 {
+                    if reg == basereg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                    } else if reg == indexreg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
+                            .unwrap();
+                    }
+                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
+                    output.reset().unwrap();
+                    if reg % 4 == 3 {
+                        writeln!(output, "").unwrap();
+                    }
+                }
+                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+
+                writeln!(output, "{:━^80}", " CODE ").unwrap();
+                let mut cs = Capstone::new()
+                    .arm64()
+                    .mode(capstone::arch::arm64::ArchMode::Arm)
+                    .build()
+                    .unwrap();
+                cs.set_skipdata(true).expect("failed to set skipdata");
+
+                let start_pc = pc - 4 * 5;
+                for insn in cs
+                    .disasm_count(
+                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                        start_pc as u64,
+                        11,
+                    )
+                    .expect("failed to disassemble instructions")
+                    .iter()
+                {
+                    if insn.address() as usize == pc {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                        writeln!(output, "\t => {}", insn).unwrap();
+                        output.reset().unwrap();
+                    } else {
+                        writeln!(output, "\t    {}", insn).unwrap();
+                    }
+                }
+                backtrace_printer
+                    .print_trace(&backtrace, output)
                     .unwrap();
             }
-            AsanError::DoubleFree((ptr, metadata)) => {
+            AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
                 backtrace_printer
-                    .print_trace(&Backtrace::new(), output)
+                    .print_trace(&backtrace, output)
                     .unwrap();
 
                 writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
@@ -1212,7 +1301,7 @@ impl AsanRuntime {
                     .print_trace(&Backtrace::new(), output)
                     .unwrap();
             }
-            AsanError::Leak((ptr, metadata)) => {
+            AsanError::Leak((ptr, mut metadata)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
 
@@ -1230,21 +1319,6 @@ impl AsanRuntime {
                 }
             }
         };
-
-        match error {
-            AsanError::ReadAfterFree((_, _, _, metadata))
-            | AsanError::WriteAfterFree((_, _, _, metadata)) => {
-                writeln!(output, "{:━^80}", " FREE INFO ").unwrap();
-                if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
-                    writeln!(output, "free site backtrace:").unwrap();
-                    backtrace.resolve();
-                    backtrace_printer.print_trace(backtrace, output).unwrap();
-                }
-            }
-            _ => (),
-        }
-
-        panic!("Crashing!");
     }
 
     /// Generate the instrumentation blobs for the current arch.
@@ -1254,18 +1328,12 @@ impl AsanRuntime {
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch aarch64
                 //; brk #5
-                ; mov x1, #1
-                ; add x1, xzr, x1, lsl #shadow_bit
-                ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 1)
-                ; ldrh w1, [x1, #0]
-                ; and x0, x0, #7
-                ; rev16 w1, w1
-                ; rbit w1, w1
-                ; lsr x1, x1, #16
-                ; lsr x1, x1, x0
-                ; tbnz x1, #$bit, >done
-                //; brk #$bit
+                ; b >skip_report
+
+                ; report:
+                ; stp x29, x30, [sp, #-0x10]!
+                ; mov x29, sp
+
                 ; ldr x0, >self_regs_addr
                 ; stp x2, x3, [x0, #0x10]
                 ; stp x4, x5, [x0, #0x20]
@@ -1282,22 +1350,94 @@ impl AsanRuntime {
                 ; stp x26, x27, [x0, #0xd0]
                 ; stp x28, x29, [x0, #0xe0]
                 ; stp x30, xzr, [x0, #0xf0]
-                ; mov x3, x0
-                ; ldp x0, x1, [sp], #144
-                ; stp x0, x1, [x3]
+                ; mov x28, x0
+                //; ldp x0, x1, [sp], #144
+                ; ldp x0, x1, [sp, #144]
+                ; stp x0, x1, [x28]
+
+                ; adr x25, >here
+                ; here:
+                ; str x25, [x28, 0xf8]
+                ; adr x0, >eh_frame_fde
+                ; adr x27, >fde_address
+                ; ldr w26, [x27]
+                ; cmp w26, #0x0
+                ; b.ne >skip_register
+                ; sub x25, x25, #(0x4 * 22)
+                ; sub x25, x25, x27
+                ; str w25, [x27]
+                ; ldr x1, >register_frame_func
+                //; brk #11
+                ; blr x1
+                ; skip_register:
                 ; ldr x0, >self_addr
                 ; ldr x1, >trap_func
-                ; bl >here
-                ; here:
-                ; str x30, [x3, 0xf8]
-                ; ldr x30, [x3, 0xf0]
-                ; br x1
+                ; blr x1
+
+                ; ldr x0, >self_regs_addr
+                ; ldp x2, x3, [x0, #0x10]
+                ; ldp x4, x5, [x0, #0x20]
+                ; ldp x6, x7, [x0, #0x30]
+                ; ldp x8, x9, [x0, #0x40]
+                ; ldp x10, x11, [x0, #0x50]
+                ; ldp x12, x13, [x0, #0x60]
+                ; ldp x14, x15, [x0, #0x70]
+                ; ldp x16, x17, [x0, #0x80]
+                ; ldp x18, x19, [x0, #0x90]
+                ; ldp x20, x21, [x0, #0xa0]
+                ; ldp x22, x23, [x0, #0xb0]
+                ; ldp x24, x25, [x0, #0xc0]
+                ; ldp x26, x27, [x0, #0xd0]
+                ; ldp x28, x29, [x0, #0xe0]
+                ; ldp x30, xzr, [x0, #0xf0]
+
+                ; ldp x29, x30, [sp], #0x10
+                ; b >done
                 ; self_addr:
                 ; .qword self as *mut _  as *mut c_void as i64
                 ; self_regs_addr:
                 ; .qword &mut self.regs as *mut _ as *mut c_void as i64
                 ; trap_func:
                 ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+                ; register_frame_func:
+                ; .qword __register_frame as *mut c_void as i64
+                ; eh_frame_cie:
+                ; .dword 0x14
+                ; .dword 0x00
+                ; .dword 0x00527a01
+                ; .dword 0x011e7c01
+                ; .dword 0x001f0c1b
+                ; eh_frame_fde:
+                ; .dword 0x14
+                ; .dword 0x18
+                ; fde_address:
+                ; .dword 0x0 // <-- address offset goes here
+                ; .dword 0x104
+                    //advance_loc 12
+                    //def_cfa r29 (x29) at offset 16
+                    //offset r30 (x30) at cfa-8
+                    //offset r29 (x29) at cfa-16
+                ; .dword 0x1d0c4c00
+                ; .dword (0x9d029e10 as u32 as i32)
+                ; .dword 0x04
+                // empty next FDE:
+                ; .dword 0x0
+                ; .dword 0x0
+
+                ; skip_report:
+                ; mov x1, #1
+                ; add x1, xzr, x1, lsl #shadow_bit
+                ; add x1, x1, x0, lsr #3
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
+                ; ldrh w1, [x1, #0]
+                ; and x0, x0, #7
+                ; rev16 w1, w1
+                ; rbit w1, w1
+                ; lsr x1, x1, #16
+                ; lsr x1, x1, x0
+                ; tbnz x1, #$bit, >done
+                ; b <report
+
                 ; done:
             );};
         }
@@ -1305,7 +1445,104 @@ impl AsanRuntime {
         macro_rules! shadow_check_exact {
             ($ops:ident, $val:expr) => {dynasm!($ops
                 ; .arch aarch64
-                //; brk #0x42
+                ; b >skip_report
+
+                ; report:
+                ; stp x29, x30, [sp, #-0x10]!
+                ; mov x29, sp
+
+                ; ldr x0, >self_regs_addr
+                ; stp x2, x3, [x0, #0x10]
+                ; stp x4, x5, [x0, #0x20]
+                ; stp x6, x7, [x0, #0x30]
+                ; stp x8, x9, [x0, #0x40]
+                ; stp x10, x11, [x0, #0x50]
+                ; stp x12, x13, [x0, #0x60]
+                ; stp x14, x15, [x0, #0x70]
+                ; stp x16, x17, [x0, #0x80]
+                ; stp x18, x19, [x0, #0x90]
+                ; stp x20, x21, [x0, #0xa0]
+                ; stp x22, x23, [x0, #0xb0]
+                ; stp x24, x25, [x0, #0xc0]
+                ; stp x26, x27, [x0, #0xd0]
+                ; stp x28, x29, [x0, #0xe0]
+                ; stp x30, xzr, [x0, #0xf0]
+                ; mov x28, x0
+                //; ldp x0, x1, [sp], #144
+                ; ldp x0, x1, [sp, #144]
+                ; stp x0, x1, [x28]
+
+                ; adr x25, >here
+                ; here:
+                ; str x25, [x28, 0xf8]
+                ; adr x0, >eh_frame_fde
+                ; adr x27, >fde_address
+                ; ldr w26, [x27]
+                ; cmp w26, #0x0
+                ; b.ne >skip_register
+                ; sub x25, x25, #(0x4 * 22)
+                ; sub x25, x25, x27
+                ; str w25, [x27]
+                ; ldr x1, >register_frame_func
+                //; brk #11
+                ; blr x1
+                ; skip_register:
+                ; ldr x0, >self_addr
+                ; ldr x1, >trap_func
+                ; blr x1
+
+                ; ldr x0, >self_regs_addr
+                ; ldp x2, x3, [x0, #0x10]
+                ; ldp x4, x5, [x0, #0x20]
+                ; ldp x6, x7, [x0, #0x30]
+                ; ldp x8, x9, [x0, #0x40]
+                ; ldp x10, x11, [x0, #0x50]
+                ; ldp x12, x13, [x0, #0x60]
+                ; ldp x14, x15, [x0, #0x70]
+                ; ldp x16, x17, [x0, #0x80]
+                ; ldp x18, x19, [x0, #0x90]
+                ; ldp x20, x21, [x0, #0xa0]
+                ; ldp x22, x23, [x0, #0xb0]
+                ; ldp x24, x25, [x0, #0xc0]
+                ; ldp x26, x27, [x0, #0xd0]
+                ; ldp x28, x29, [x0, #0xe0]
+                ; ldp x30, xzr, [x0, #0xf0]
+
+                ; ldp x29, x30, [sp], #0x10
+                ; b >done
+                ; self_addr:
+                ; .qword self as *mut _  as *mut c_void as i64
+                ; self_regs_addr:
+                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+                ; trap_func:
+                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+                ; register_frame_func:
+                ; .qword __register_frame as *mut c_void as i64
+                ; eh_frame_cie:
+                ; .dword 0x14
+                ; .dword 0x00
+                ; .dword 0x00527a01
+                ; .dword 0x011e7c01
+                ; .dword 0x001f0c1b
+                ; eh_frame_fde:
+                ; .dword 0x14
+                ; .dword 0x18
+                ; fde_address:
+                ; .dword 0x0 // <-- address offset goes here
+                ; .dword 0x104
+                    //advance_loc 12
+                    //def_cfa r29 (x29) at offset 16
+                    //offset r30 (x30) at cfa-8
+                    //offset r29 (x29) at cfa-16
+                ; .dword 0x1d0c4c00
+                ; .dword (0x9d029e10 as u32 as i32)
+                ; .dword 0x04
+                // empty next FDE:
+                ; .dword 0x0
+                ; .dword 0x0
+
+
+                ; skip_report:
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
@@ -1320,39 +1557,8 @@ impl AsanRuntime {
                 ; and x1, x1, #$val
                 ; cmp x1, #$val
                 ; b.eq >done
-                //; brk #$bit
-                ; ldr x0, >self_regs_addr
-                ; stp x2, x3, [x0, #0x10]
-                ; stp x4, x5, [x0, #0x20]
-                ; stp x6, x7, [x0, #0x30]
-                ; stp x8, x9, [x0, #0x40]
-                ; stp x10, x11, [x0, #0x50]
-                ; stp x12, x13, [x0, #0x60]
-                ; stp x14, x15, [x0, #0x70]
-                ; stp x16, x17, [x0, #0x80]
-                ; stp x18, x19, [x0, #0x90]
-                ; stp x20, x21, [x0, #0xa0]
-                ; stp x22, x23, [x0, #0xb0]
-                ; stp x24, x25, [x0, #0xc0]
-                ; stp x26, x27, [x0, #0xd0]
-                ; stp x28, x29, [x0, #0xe0]
-                ; stp x30, xzr, [x0, #0xf0]
-                ; mov x3, x0
-                ; ldp x0, x1, [sp], #144
-                ; stp x0, x1, [x3]
-                ; ldr x0, >self_addr
-                ; ldr x1, >trap_func
-                ; bl >here
-                ; here:
-                ; str x30, [x3, 0xf8]
-                ; ldr x30, [x3, 0xf0]
-                ; br x1
-                ; self_addr:
-                ; .qword self as *mut _  as *mut c_void as i64
-                ; self_regs_addr:
-                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
-                ; trap_func:
-                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+                ; b <report
+
                 ; done:
                 ; .dword -719633920 //0xd51b4200 // msr nvcz, x0
             );};
@@ -1506,3 +1712,34 @@ impl AsanRuntime {
         self.blob_check_mem_64bytes.as_ref().unwrap()
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AsanErrorsFeedback {}
+
+impl AsanErrorsFeedback {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Named for AsanErrorsFeedback {
+    fn name(&self) -> &str {
+        "FridaAsanErrorsFeedback"
+    }
+}
+
+
+impl<I> Feedback<I> for AsanErrorsFeedback
+where
+    I: Input,
+{
+    fn is_interesting<OT: ObserversTuple>(&mut self, _input: &I, _observers: &OT, exit_kind: &ExitKind) -> Result<u32, Error> {
+        if let ExitKind::Custom(_custom_exit_kind) = exit_kind {
+            Ok(1u32)
+        } else {
+            Ok(0u32)
+        }
+    }
+
+}
+

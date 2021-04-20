@@ -83,7 +83,25 @@ extern "C" int afl_libfuzzer_init() {
   return 0;
 }
 
-static int * allocation = NULL;
+static char * allocation = NULL;
+__attribute__((noinline))
+void func3( char * alloc) {
+  printf("func3\n");
+  if (random() % 5 == 0) {
+    alloc[0xff] = 0xde;
+  }
+}
+__attribute__((noinline))
+void func2() {
+  allocation = (char*)malloc(0xff);
+  printf("func2\n");
+  func3(allocation);
+}
+__attribute__((noinline))
+void func1() {
+  printf("func1\n");
+  func2();
+}
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
@@ -92,9 +110,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
 
-  allocation = (int*)malloc(0x100);
 
-  //allocation[0x200] = 0xdeadbeef;
+  func1();
 
   std::vector<unsigned char> v(data, data + size);
   if (png_sig_cmp(v.data(), 0, kPngHeaderSize)) {

@@ -24,8 +24,8 @@ which = "4.1"
 [target.'cfg(unix)'.dependencies]
 libafl = { path = "../../libafl/", features = [ "std" ] } #,  "llmp_small_maps", "llmp_debug"]}
 capstone = "0.8.0"
-frida-gum = { path = "../../../frida-rust/frida-gum", version = "0.3.4", optional = true, features = [ "event-sink", "invocation-listener"] }
-frida-gum-sys = { path = "../../../frida-rust/frida-gum-sys", version = "0.2.2", optional = true, features = [ "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.4", optional = true, features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum-sys = { version = "0.2.4", optional = true, features = [ "auto-download", "event-sink", "invocation-listener"] }
 libafl_frida = { path = "../../libafl_frida", version = "0.1.0" }
 lazy_static = "1.4.0"
 libc = "0.2"
