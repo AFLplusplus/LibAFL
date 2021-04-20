@@ -11,7 +11,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
@@ -39,16 +39,9 @@ use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 use num_traits::cast::FromPrimitive;
 
 use rangemap::{RangeMap, RangeSet};
-use std::{
-    env,
-    ffi::c_void,
-    fs::File,
-    io::{BufWriter, Write},
-    path::PathBuf,
-    sync::{Arc, RwLock},
-};
+use std::{env, ffi::c_void, fs::File, io::{BufWriter, Write}, path::PathBuf, rc::Rc, sync::{Arc, RwLock}};
 
-use libafl_frida::{asan_rt::AsanRuntime, FridaOptions};
+use libafl_frida::{FridaOptions, asan_rt::{ASAN_ERRORS, AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime}};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a, I: Input + HasTargetBytes> {
@@ -71,7 +64,7 @@ struct FridaEdgeCoverageHelper<'a> {
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
     capstone: Capstone,
-    asan_runtime: AsanRuntime,
+    asan_runtime: Rc<RefCell<AsanRuntime>>,
     ranges: RangeMap<usize, (u16, &'a str)>,
     options: FridaOptions,
     drcov_basic_blocks: Vec<(usize, usize)>,
@@ -84,14 +77,19 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
 
     /// Register the current thread with the FridaEdgeCoverageHelper
     fn register_thread(&self) {
-        self.asan_runtime.register_thread();
+        self.asan_runtime.borrow().register_thread();
     }
 
     fn pre_exec(&self, input: &I) {
+        unsafe {
+            ASAN_ERRORS.as_mut().unwrap().clear();
+        }
+
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
-        //println!("target_bytes: {:?}", slice);
+        //println!("target_bytes: {:02x?}", slice);
         self.asan_runtime
+            .borrow()
             .unpoison(slice.as_ptr() as usize, slice.len());
     }
 
@@ -106,9 +104,9 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
 
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
-                self.asan_runtime.check_for_leaks();
+                self.asan_runtime.borrow_mut().check_for_leaks();
             }
-            self.asan_runtime.reset_allocations();
+            self.asan_runtime.borrow_mut().reset_allocations();
         }
     }
 }
@@ -313,6 +311,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                             instruction.put_callout(|context| {
                                 let real_address = match helper
                                     .asan_runtime
+                                    .borrow()
                                     .real_address_for_stalked(context.pc() as usize)
                                 {
                                     Some(address) => *address,
@@ -344,6 +343,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                     if helper.options.asan_enabled() || helper.options.drcov_enabled() {
                         helper
                             .asan_runtime
+                            .borrow_mut()
                             .add_stalked_address(output.writer().pc() as usize - 4, address as usize);
                     }
                 }
@@ -352,7 +352,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         });
         helper.transformer = Some(transformer);
         if helper.options.asan_enabled() || helper.options.asan_enabled() {
-            helper.asan_runtime.init(modules_to_instrument);
+            helper.asan_runtime.borrow_mut().init(modules_to_instrument);
         }
         helper
     }
@@ -457,16 +457,16 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         }
         // Insert the check_shadow_mem code blob
         match width {
-            1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
-            2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
-            3 => writer.put_bytes(&self.asan_runtime.blob_check_mem_3bytes()),
-            4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
-            6 => writer.put_bytes(&self.asan_runtime.blob_check_mem_6bytes()),
-            8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
-            12 => writer.put_bytes(&self.asan_runtime.blob_check_mem_12bytes()),
-            16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
-            24 => writer.put_bytes(&self.asan_runtime.blob_check_mem_24bytes()),
-            32 => writer.put_bytes(&self.asan_runtime.blob_check_mem_32bytes()),
+            1 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_byte()),
+            2 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_halfword()),
+            3 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_3bytes()),
+            4 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_dword()),
+            6 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_6bytes()),
+            8 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_qword()),
+            12 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_12bytes()),
+            16 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_16bytes()),
+            24 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_24bytes()),
+            32 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_32bytes()),
             _ => false,
         };
 
@@ -881,7 +881,7 @@ unsafe fn fuzz(
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new()),
+            tuple_list!(CrashFeedback::new(), AsanErrorsFeedback::new()),
         )
     });
 
@@ -912,7 +912,7 @@ unsafe fn fuzz(
         InProcessExecutor::new(
             "in-process(edges)",
             &mut frida_harness,
-            tuple_list!(edges_observer),
+            tuple_list!(edges_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
             &mut state,
             &mut restarting_mgr,
         )?,

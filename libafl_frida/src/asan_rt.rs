@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use libafl::{Error, bolts::{serdeany::SerdeAny, tuples::Named}, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::Input, observers::ObserversTuple};
+use libafl::{Error, bolts::{ownedref::Cptr, serdeany::SerdeAny, tuples::Named}, corpus::Testcase, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}};
 use nix::{
     libc::{memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -55,6 +55,7 @@ struct AllocationMetadata {
     allocation_site_backtrace: Option<Backtrace>,
     release_site_backtrace: Option<Backtrace>,
     freed: bool,
+    is_malloc_zero: bool,
 }
 
 impl Allocator {
@@ -139,12 +140,17 @@ impl Allocator {
     }
 
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
+        let mut is_malloc_zero = false;
         let size = if size == 0 {
             println!("zero-sized allocation!");
+            is_malloc_zero = true;
             16
         } else {
             size
         };
+        if size > (1 << 30) {
+            panic!("Allocation is too large: 0x{:x}", size);
+        }
         let rounded_up_size = self.round_up_to_page(size);
 
         let metadata = if let Some(mut metadata) = self
@@ -154,6 +160,7 @@ impl Allocator {
             .pop()
         {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
+            metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
             metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             metadata
@@ -621,7 +628,6 @@ pub struct AsanRuntime {
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
     options: FridaOptions,
-    errors: AsanErrors,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -686,7 +692,7 @@ impl AsanError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct AsanErrors {
+pub struct AsanErrors {
     errors: Vec<AsanError>,
 }
 
@@ -695,6 +701,10 @@ impl AsanErrors {
         Self {
             errors: Vec::new(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.errors.clear()
     }
 }
 impl SerdeAny for AsanErrors {
@@ -727,7 +737,6 @@ impl AsanRuntime {
             blob_check_mem_64bytes: None,
             stalked_addresses: HashMap::new(),
             options,
-            errors: AsanErrors::new(),
         }));
         Allocator::init(res.clone());
         res
@@ -760,6 +769,10 @@ impl AsanRuntime {
             }
         }
 
+        unsafe {
+            ASAN_ERRORS = Some(AsanErrors::new());
+        }
+
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
@@ -784,14 +797,10 @@ impl AsanRuntime {
         }
     }
 
-    pub fn have_errors(&self) -> bool {
-        !self.errors.errors.is_empty()
-    }
-
-    pub fn errors(&mut self) -> ExitKind {
-        let res = ExitKind::Custom(Box::new(self.errors.clone()));
-        self.errors.errors.clear();
-        res
+    pub fn errors(&mut self) -> &Option<AsanErrors> {
+        unsafe {
+            &ASAN_ERRORS
+        }
     }
 
     /// Make sure the specified memory is unpoisoned
@@ -925,7 +934,7 @@ impl AsanRuntime {
     }
 
     extern "C" fn handle_trap(&mut self) {
-        let mut actual_pc = self.regs[31] + 66 * 4 + 4;
+        let mut actual_pc = self.regs[31] + 65 * 4 + 4;
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
             _ => actual_pc,
@@ -1074,7 +1083,9 @@ impl AsanRuntime {
     }
 
     fn report_error(&mut self, error: AsanError) {
-        self.errors.errors.push(error.clone());
+        unsafe {
+            ASAN_ERRORS.as_mut().unwrap().errors.push(error.clone());
+        }
 
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
@@ -1155,33 +1166,6 @@ impl AsanRuntime {
                     .print_trace(&backtrace, output)
                     .unwrap();
 
-
-                //use unwind::{Cursor, RegNum, get_context};
-
-                //get_context!(context);
-                //let mut cursor = Cursor::local(context).unwrap();
-
-                //loop {
-                    //let ip = cursor.register(RegNum::IP).unwrap();
-
-                    //match (cursor.procedure_info(), cursor.procedure_name()) {
-                        //(Ok(ref info), Ok(ref name)) if ip == info.start_ip() + name.offset() => {
-                            //println!(
-                                //"{:#016x} - {} ({:#016x}) + {:#x}",
-                                //ip,
-                                //name.name(),
-                                //info.start_ip(),
-                                //name.offset()
-                            //);
-                        //}
-                        //_ => println!("{:#016x} - ????", ip),
-                    //}
-
-                    //if !cursor.step().unwrap() {
-                        //break;
-                    //}
-                //}
-
                 writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
                 let offset: i64 = fault_address as i64 - metadata.address as i64;
                 let direction = if offset > 0 { "right" } else { "left" };
@@ -1191,6 +1175,11 @@ impl AsanRuntime {
                     offset, direction, metadata.size, metadata.address
                 )
                 .unwrap();
+
+                if metadata.is_malloc_zero {
+                    writeln!(output, "allocation was zero-sized").unwrap();
+                }
+
                 if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
@@ -1282,6 +1271,10 @@ impl AsanRuntime {
                     metadata.address, metadata.size
                 )
                 .unwrap();
+                if metadata.is_malloc_zero {
+                    writeln!(output, "allocation was zero-sized").unwrap();
+                }
+
                 if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
@@ -1294,11 +1287,11 @@ impl AsanRuntime {
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
             }
-            AsanError::UnallocatedFree(ptr) => {
+            AsanError::UnallocatedFree((ptr, backtrace)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
                 backtrace_printer
-                    .print_trace(&Backtrace::new(), output)
+                    .print_trace(&backtrace, output)
                     .unwrap();
             }
             AsanError::Leak((ptr, mut metadata)) => {
@@ -1312,6 +1305,10 @@ impl AsanRuntime {
                     metadata.address, metadata.size
                 )
                 .unwrap();
+                if metadata.is_malloc_zero {
+                    writeln!(output, "allocation was zero-sized").unwrap();
+                }
+
                 if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
@@ -1319,6 +1316,10 @@ impl AsanRuntime {
                 }
             }
         };
+
+        if !self.options.asan_continue_after_error() {
+            panic!("Crashing target!");
+        }
     }
 
     /// Generate the instrumentation blobs for the current arch.
@@ -1713,33 +1714,117 @@ impl AsanRuntime {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AsanErrorsFeedback {}
+pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
-impl AsanErrorsFeedback {
-    pub fn new() -> Self {
-        Self {}
+#[derive(Serialize, Deserialize)]
+pub struct AsanErrorsObserver
+{
+    errors: Cptr<Option<AsanErrors>>,
+}
+
+impl Observer for AsanErrorsObserver
+{
+    fn pre_exec(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl Named for AsanErrorsObserver
+{
+    #[inline]
+    fn name(&self) -> &str {
+        "AsanErrorsObserver"
+    }
+}
+
+impl AsanErrorsObserver {
+    pub fn new(errors: &'static Option<AsanErrors>) -> Self {
+        Self {
+            errors: Cptr::Cptr(errors as *const Option<AsanErrors>)
+        }
+    }
+
+    pub fn new_owned(errors: Option<AsanErrors>) -> Self {
+        Self {
+            errors: Cptr::Owned(Box::new(errors))
+        }
+    }
+
+    pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
+        Self {
+            errors: Cptr::Cptr(errors)
+        }
+    }
+
+    pub fn errors(&self) -> Option<&AsanErrors> {
+        match &self.errors {
+            Cptr::Cptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
+            Cptr::Owned(b) => b.as_ref().as_ref()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AsanErrorsFeedback {
+    errors: Option<AsanErrors>
+}
+
+impl<I> Feedback<I> for AsanErrorsFeedback
+where
+    I: Input + HasTargetBytes,
+{
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<u32, Error> {
+        let observer = observers.match_first_type::<AsanErrorsObserver>().expect("An AsanErrorsFeedback needs an AsanErrorsObserver".into());
+        match observer.errors() {
+            None => Ok(0),
+            Some(errors) => {
+                if !errors.errors.is_empty() {
+                    self.errors = Some(errors.clone());
+                    Ok(1)
+                } else {
+                    Ok(0)
+                }
+            }
+        }
+    }
+
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        panic!("APPEND_METADATA");
+        if let Some(errors) = self.errors.take() {
+            // TODO here add the errors as metadata to testcase
+            //println!("testcase: {:?}", testcase.input().as_ref().unwrap().target_bytes().as_slice());
+        }
+        Ok(())
+    }
+
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+        self.errors = None;
+        Ok(())
     }
 }
 
 impl Named for AsanErrorsFeedback {
+    #[inline]
     fn name(&self) -> &str {
-        "FridaAsanErrorsFeedback"
+        "AsanErrorsFeedback"
     }
 }
 
-
-impl<I> Feedback<I> for AsanErrorsFeedback
-where
-    I: Input,
-{
-    fn is_interesting<OT: ObserversTuple>(&mut self, _input: &I, _observers: &OT, exit_kind: &ExitKind) -> Result<u32, Error> {
-        if let ExitKind::Custom(_custom_exit_kind) = exit_kind {
-            Ok(1u32)
-        } else {
-            Ok(0u32)
+impl AsanErrorsFeedback {
+    pub fn new() -> Self {
+        Self {
+            errors: None
         }
     }
-
 }
 
+impl Default for AsanErrorsFeedback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
