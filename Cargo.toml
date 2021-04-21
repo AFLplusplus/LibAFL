@@ -16,5 +16,5 @@ exclude = [
     "fuzzers/libfuzzer_stb_image",
     "fuzzers/libfuzzer_libmozjpeg",
     "fuzzers/frida_libpng",
-    "fuzzers/qemu_user",
+    "fuzzers/baby_fuzzer",
 ]
