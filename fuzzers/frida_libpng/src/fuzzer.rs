@@ -81,10 +81,6 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
     }
 
     fn pre_exec(&self, input: &I) {
-        unsafe {
-            ASAN_ERRORS.as_mut().unwrap().clear();
-        }
-
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:02x?}", slice);
@@ -441,19 +437,41 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
         #[allow(clippy::comparison_chain)]
         if displacement < 0 {
-            // Subtract the displacement into x0
-            writer.put_sub_reg_reg_imm(
-                Aarch64Register::X0,
-                Aarch64Register::X0,
-                displacement.abs() as u64,
-            );
+            if displacement > -4096 {
+                // Subtract the displacement into x0
+                writer.put_sub_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement.abs() as u64,
+                );
+            } else {
+                let displacement_hi = displacement.abs() / 4096;
+                let displacement_lo = displacement.abs() % 4096;
+                writer.put_bytes(&(0xd1400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                writer.put_sub_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement_lo as u64,
+                );
+            }
         } else if displacement > 0 {
-            // Add the displacement into x0
-            writer.put_add_reg_reg_imm(
-                Aarch64Register::X0,
-                Aarch64Register::X0,
-                displacement as u64,
-            );
+            if displacement < 4096 {
+                // Add the displacement into x0
+                writer.put_add_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement as u64,
+                );
+            } else {
+                let displacement_hi = displacement / 4096;
+                let displacement_lo = displacement % 4096;
+                writer.put_bytes(&(0x91400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                writer.put_add_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement_lo as u64,
+                );
+            }
         }
         // Insert the check_shadow_mem code blob
         match width {
