@@ -18,21 +18,22 @@ pub type OsShMem = Win32ShMem;
 #[cfg(target_os = "android")]
 use crate::bolts::os::ashmem_server::{ServedShMem, ServedShMemProvider};
 #[cfg(target_os = "android")]
-pub type StdShMemProvider = ServedShMemProvider;
+pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider>;
 #[cfg(target_os = "android")]
-pub type StdShMem = ServedShMem;
+pub type StdShMem = RcShMem<ServedShMemProvider>;
 
 #[cfg(all(feature = "std", not(target_os = "android")))]
-pub type StdShMemProvider = OsShMemProvider;
+pub type StdShMemProvider = RcShMemProvider<OsShMemProvider>;
 #[cfg(all(feature = "std", not(target_os = "android")))]
-pub type StdShMem = OsShMem;
+pub type StdShMem = RcShMem<OsShMemProvider>;
 
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 
-use alloc::string::ToString;
+use alloc::{rc::Rc, string::ToString};
+use core::cell::RefCell;
 
 use crate::Error;
 
@@ -137,7 +138,7 @@ pub trait ShMem: Sized + Debug + Clone {
     }
 }
 
-pub trait ShMemProvider: Send + Clone + Default {
+pub trait ShMemProvider: Send + Clone + Default + Debug {
     type Mem: ShMem;
 
     /// Create a new instance of the provider
@@ -168,6 +169,110 @@ pub trait ShMemProvider: Send + Clone + Default {
             map_size,
         ))
     }
+
+    /// This method should be called after a fork or thread creation event, allowing the ShMem to
+    /// reset thread specific info.
+    fn post_fork(&mut self) {
+        // do nothing
+    }
+
+    /// Release the resources associated with the given ShMem
+    fn release_map(&mut self, map: &mut Self::Mem) {
+        // do nothing
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RcShMem<T: ShMemProvider> {
+    internal: T::Mem,
+    provider: Rc<RefCell<T>>,
+}
+
+impl<T> ShMem for RcShMem<T>
+where
+    T: ShMemProvider + alloc::fmt::Debug
+{
+    fn id(&self) -> ShMemId {
+        self.internal.id()
+    }
+
+    fn len(&self) -> usize {
+        self.internal.len()
+    }
+
+    fn map(&self) -> &[u8] {
+        self.internal.map()
+    }
+
+    fn map_mut(&mut self) -> &mut [u8] {
+        self.internal.map_mut()
+    }
+}
+
+impl<T: ShMemProvider> Drop for RcShMem<T>
+{
+    fn drop(&mut self) {
+        println!("In RcShMem drop");
+        self.provider.borrow_mut().release_map(&mut self.internal)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RcShMemProvider<T: ShMemProvider> {
+
+    internal: Rc<RefCell<T>>,
+}
+
+unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
+
+impl<T> ShMemProvider for RcShMemProvider<T>
+where
+    T: ShMemProvider + alloc::fmt::Debug
+{
+    type Mem = RcShMem<T>;
+
+    fn new() -> Self {
+        return Self {
+            internal: Rc::new(RefCell::new(T::new())),
+        }
+    }
+
+    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+        Ok(Self::Mem {
+            internal: self.internal.borrow_mut().new_map(map_size)?,
+            provider: self.internal.clone(),
+        })
+    }
+
+    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+        Ok(Self::Mem {
+            internal: self.internal.borrow_mut().from_id_and_size(id, size)?,
+            provider: self.internal.clone(),
+        })
+    }
+    fn release_map(&mut self, map: &mut Self::Mem) {
+        self.internal.borrow_mut().release_map(&mut map.internal)
+    }
+
+    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
+        Ok(Self::Mem {
+            internal: self.internal.borrow_mut().clone_ref(&mapping.internal)?,
+            provider: self.internal.clone(),
+        })
+    }
+
+    fn post_fork(&mut self) {
+        self.internal.borrow_mut().post_fork()
+    }
+}
+
+impl<T> Default for RcShMemProvider<T>
+where
+    T: ShMemProvider + alloc::fmt::Debug
+{
+     fn default() -> Self {
+         Self::new()
+     }
 }
 
 #[cfg(all(unix, feature = "std"))]
@@ -507,7 +612,6 @@ pub mod unix_shmem {
         impl Drop for AshmemShMem {
             fn drop(&mut self) {
                 unsafe {
-                    //let fd = Self::fd_from_id(self.id).unwrap();
                     let fd: i32 = self.id.to_string().parse().unwrap();
 
                     let length = ioctl(fd, ASHMEM_GET_SIZE);
