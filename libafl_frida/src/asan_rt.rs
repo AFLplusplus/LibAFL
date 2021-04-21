@@ -1725,6 +1725,12 @@ pub struct AsanErrorsObserver
 impl Observer for AsanErrorsObserver
 {
     fn pre_exec(&mut self) -> Result<(), Error> {
+        unsafe {
+            if ASAN_ERRORS.is_some() {
+                ASAN_ERRORS.as_mut().unwrap().clear();
+            }
+        }
+
         Ok(())
     }
 }
