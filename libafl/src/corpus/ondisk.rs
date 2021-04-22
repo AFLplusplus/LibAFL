@@ -5,9 +5,9 @@ use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use std::{fs, path::PathBuf};
+use std::{fs, fs::File, io::Write, path::PathBuf};
 
-use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
+use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, state::HasMetadata, Error};
 
 /// A corpus able to store testcases to disk, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
@@ -20,6 +20,7 @@ where
     entries: Vec<RefCell<Testcase<I>>>,
     current: Option<usize>,
     dir_path: PathBuf,
+    save_meta: bool,
 }
 
 impl<I> Corpus<I> for OnDiskCorpus<I>
@@ -41,6 +42,13 @@ where
             let filename_str = filename.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into());
         };
+        if self.save_meta {
+            let filename = testcase.filename().as_ref().unwrap().to_owned() + ".metadata";
+            let mut file = File::create(filename)?;
+            // TODO maybe use JSON
+            let serialized = postcard::to_allocvec(testcase.metadata())?;
+            file.write_all(&serialized)?;
+        }
         testcase
             .store_input()
             .expect("Could not save testcase to disk");
@@ -99,6 +107,19 @@ where
             entries: vec![],
             current: None,
             dir_path,
+            save_meta: false,
+        })
+    }
+
+    /// Creates the OnDiskCorpus specifying if metatada must be saved to disk.
+    /// Will error, if `std::fs::create_dir_all` failed for `dir_path`.
+    pub fn new_save_meta(dir_path: PathBuf, save_meta: bool) -> Result<Self, Error> {
+        fs::create_dir_all(&dir_path)?;
+        Ok(Self {
+            entries: vec![],
+            current: None,
+            dir_path,
+            save_meta,
         })
     }
 }
