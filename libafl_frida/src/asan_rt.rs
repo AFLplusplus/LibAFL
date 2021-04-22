@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use libafl::{Error, bolts::{ownedref::Cptr, serdeany::SerdeAny, tuples::Named}, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}};
+use libafl::{Error, bolts::{ownedref::Cptr, serdeany::SerdeAny, tuples::Named}, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}, utils::{find_mapping_for_address, walk_self_maps}};
 use nix::{
     libc::{memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -15,8 +15,7 @@ use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use gothook::GotHookLibrary;
 use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
-use regex::Regex;
-use std::{cell::{RefCell, RefMut}, ffi::c_void, fs::File, io::{BufRead, BufReader, Write}, rc::Rc};
+use std::{cell::{RefCell, RefMut}, ffi::c_void, io::Write, rc::Rc};
 use serde::{Serialize, Deserialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 
@@ -538,66 +537,9 @@ pub extern "C" fn asan_mallinfo() -> *mut c_void {
     std::ptr::null_mut()
 }
 
-/// Allows one to walk the mappings in /proc/self/maps, caling a callback function for each
-/// mapping.
-/// If the callback returns true, we stop the walk.
-fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
-    let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
-        .unwrap();
-
-    let mapsfile = File::open("/proc/self/maps").expect("Unable to open /proc/self/maps");
-
-    for line in BufReader::new(mapsfile).lines() {
-        let line = line.unwrap();
-        if let Some(caps) = re.captures(&line) {
-            if visitor(
-                usize::from_str_radix(caps.name("start").unwrap().as_str(), 16).unwrap(),
-                usize::from_str_radix(caps.name("end").unwrap().as_str(), 16).unwrap(),
-                caps.name("perm").unwrap().as_str().to_string(),
-                caps.name("path").unwrap().as_str().to_string(),
-            ) {
-                break;
-            };
-        }
-    }
-}
-
 /// Get the current thread's TLS address
 extern "C" {
     fn get_tls_ptr() -> *const c_void;
-}
-
-/// Get the start and end address of the mapping containing a particular address
-fn mapping_containing(address: *const c_void) -> (usize, usize) {
-    let mut result = (0, 0);
-    walk_self_maps(&mut |start, end, _permissions, _path| {
-        if start <= (address as usize) && (address as usize) < end {
-            result = (start, end);
-            true
-        } else {
-            false
-        }
-    });
-
-    result
-}
-
-/// Get the start and end address of the mapping containing a particular address
-pub fn mapping_for_library(libpath: &str) -> (usize, usize) {
-    let mut libstart = 0;
-    let mut libend = 0;
-    walk_self_maps(&mut |start, end, _permissions, path| {
-        if libpath == path {
-            if libstart == 0 {
-                libstart = start;
-            }
-
-            libend = end;
-        }
-        false
-    });
-
-    (libstart, libend)
 }
 
 pub struct AsanRuntime {
@@ -815,16 +757,18 @@ impl AsanRuntime {
     /// Determine the stack start, end for the currently running thread
     fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;
-        let stack_address = &stack_var as *const _ as *const c_void;
+        let stack_address = &stack_var as *const _ as *const c_void as usize;
 
-        mapping_containing(stack_address)
+        let (start, end, _, _) = find_mapping_for_address(stack_address).unwrap();
+        (start, end)
     }
 
     /// Determine the tls start, end for the currently running thread
     fn current_tls() -> (usize, usize) {
-        let tls_address = unsafe { get_tls_ptr() };
+        let tls_address = unsafe { get_tls_ptr() } as usize;
 
-        mapping_containing(tls_address)
+        let (start, end, _, _) = find_mapping_for_address(tls_address).unwrap();
+        (start, end)
     }
 
     /// Locate the target library and hook it's memory allocation functions
@@ -1043,7 +987,7 @@ impl AsanRuntime {
                 .retain(|x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")))
         }));
 
-        writeln!(output, "{:━^80}", " Memory error detected! ").unwrap();
+        writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
             .unwrap();
@@ -1055,15 +999,24 @@ impl AsanRuntime {
             | AsanError::WriteAfterFree(mut error) => {
                 let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
-                writeln!(
-                    output,
-                    " at 0x{:x}, faulting address 0x{:x}",
-                    error.pc, fault_address
-                )
-                .unwrap();
+                if let Ok((start, _, _, path)) = find_mapping_for_address(error.pc) {
+                    writeln!(
+                        output,
+                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
+                        error.pc, path, error.pc - start, fault_address
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(
+                        output,
+                        " at 0x{:x}, faulting address 0x{:x}",
+                        error.pc, fault_address
+                    )
+                    .unwrap();
+                }
                 output.reset().unwrap();
 
-                writeln!(output, "{:━^80}", " REGISTERS ").unwrap();
+                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
                         output
@@ -1082,7 +1035,7 @@ impl AsanRuntime {
                 }
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
 
-                writeln!(output, "{:━^80}", " CODE ").unwrap();
+                writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
                     .mode(capstone::arch::arm64::ArchMode::Arm)
@@ -1114,7 +1067,7 @@ impl AsanRuntime {
                     .print_trace(&error.backtrace, output)
                     .unwrap();
 
-                writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
+                writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let offset: i64 = fault_address as i64 - error.metadata.address as i64;
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
@@ -1135,7 +1088,7 @@ impl AsanRuntime {
                 }
 
                 if error.metadata.freed {
-                    writeln!(output, "{:━^80}", " FREE INFO ").unwrap();
+                    writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                     if let Some(backtrace) = error.metadata.release_site_backtrace.as_mut() {
                         writeln!(output, "free site backtrace:").unwrap();
                         backtrace.resolve();
@@ -1146,15 +1099,24 @@ impl AsanRuntime {
             AsanError::Unknown((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
-                writeln!(
-                    output,
-                    " at 0x{:x}, faulting address 0x{:x}",
-                    pc, fault_address
-                )
-                .unwrap();
+                if let Ok((start, _, _, path)) = find_mapping_for_address(pc) {
+                    writeln!(
+                        output,
+                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
+                        pc, path, pc - start, fault_address
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(
+                        output,
+                        " at 0x{:x}, faulting address 0x{:x}",
+                        pc, fault_address
+                    )
+                    .unwrap();
+                }
                 output.reset().unwrap();
 
-                writeln!(output, "{:━^80}", " REGISTERS ").unwrap();
+                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
                         output
@@ -1173,7 +1135,7 @@ impl AsanRuntime {
                 }
                 writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
 
-                writeln!(output, "{:━^80}", " CODE ").unwrap();
+                writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
                     .mode(capstone::arch::arm64::ArchMode::Arm)
@@ -1212,7 +1174,7 @@ impl AsanRuntime {
                     .print_trace(&backtrace, output)
                     .unwrap();
 
-                writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
+                writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
@@ -1228,7 +1190,7 @@ impl AsanRuntime {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
-                writeln!(output, "{:━^80}", " FREE INFO ").unwrap();
+                writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                 if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
                     writeln!(output, "previous free site backtrace:").unwrap();
                     backtrace.resolve();
@@ -1246,7 +1208,7 @@ impl AsanRuntime {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
 
-                writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
+                writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",

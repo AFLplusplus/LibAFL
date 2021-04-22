@@ -53,33 +53,46 @@ impl FridaOptions {
     }
 
     /// Is ASAN enabled?
+    #[inline]
     pub fn asan_enabled(&self) -> bool {
         self.enable_asan
     }
 
     /// Is coverage enabled?
+    #[inline]
     pub fn coverage_enabled(&self) -> bool {
         self.enable_coverage
     }
 
     /// Is DrCov enabled?
+    #[inline]
     pub fn drcov_enabled(&self) -> bool {
         self.enable_drcov
     }
 
     /// Should ASAN detect leaks
+    #[inline]
     pub fn asan_detect_leaks(&self) -> bool {
         self.enable_asan_leak_detection
     }
 
     /// Should ASAN continue after a memory error is detected
+    #[inline]
     pub fn asan_continue_after_error(&self) -> bool {
         self.enable_asan_continue_after_error
     }
 
     /// Should ASAN gather (and report) allocation-/free-site backtraces
+    #[inline]
     pub fn asan_allocation_backtraces(&self) -> bool {
         self.enable_asan_allocation_backtraces
+    }
+
+    /// Whether stalker should be enabled. I.e. whether at least one stalker requiring option is
+    /// enabled.
+    #[inline]
+    pub fn stalker_enabled(&self) -> bool {
+        self.enable_asan || self.enable_coverage || self.enable_drcov
     }
 }
 

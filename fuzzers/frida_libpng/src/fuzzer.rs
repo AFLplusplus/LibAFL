@@ -22,6 +22,9 @@ use libafl::{
     Error,
 };
 
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+use libafl::utils::find_mapping_for_path;
+
 use capstone::{
     arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
@@ -52,6 +55,8 @@ pub trait FridaHelper<'a, I: Input + HasTargetBytes> {
     fn pre_exec(&self, input: &I);
 
     fn post_exec(&self, input: &I);
+
+    fn stalker_enabled(&self) -> bool;
 }
 
 const MAP_SIZE: usize = 64 * 1024;
@@ -104,6 +109,10 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
             }
             self.asan_runtime.borrow_mut().reset_allocations();
         }
+    }
+
+    fn stalker_enabled(&self) -> bool {
+        self.options.stalker_enabled()
     }
 }
 
@@ -277,78 +286,80 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             drcov_basic_blocks: vec![],
         };
 
-        for (id, module_name) in modules_to_instrument.iter().enumerate() {
-            let (lib_start, lib_end) = libafl_frida::asan_rt::mapping_for_library(module_name);
-            println!("including range {:x}-{:x}", lib_start, lib_end);
-            helper
-                .ranges
-                .insert(lib_start..lib_end, (id as u16, module_name));
-        }
-
-        if helper.options.drcov_enabled() {
-            std::fs::create_dir("./coverage")
-                .expect("failed to create directory for coverage files");
-        }
-
-        let transformer = Transformer::from_callback(gum, |basic_block, output| {
-            let mut first = true;
-            for instruction in basic_block {
-                let instr = instruction.instr();
-                let address = instr.address();
-                //println!("address: {:x} contains: {:?}", address, helper.ranges.contains(&(address as usize)));
-                if helper.ranges.contains_key(&(address as usize)) {
-                    if first {
-                        first = false;
-                        //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                        if helper.options.coverage_enabled() {
-                            helper.emit_coverage_mapping(address, &output);
-                        }
-                        if helper.options.drcov_enabled() {
-                            instruction.put_callout(|context| {
-                                let real_address = match helper
-                                    .asan_runtime
-                                    .borrow()
-                                    .real_address_for_stalked(context.pc() as usize)
-                                {
-                                    Some(address) => *address,
-                                    _ => context.pc() as usize,
-                                };
-                                //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
-                                //println!("{}:0x{:016x}", name, real_address - range.start);
-                                helper
-                                    .drcov_basic_blocks
-                                    .push((real_address, real_address + 4));
-                            })
-                        }
-                    }
-
-                    if helper.options.asan_enabled() {
-                        if let Ok((basereg, indexreg, displacement, width)) =
-                            helper.is_interesting_instruction(address, instr)
-                        {
-                            helper.emit_shadow_check(
-                                address,
-                                &output,
-                                basereg,
-                                indexreg,
-                                displacement,
-                                width,
-                            );
-                        }
-                    }
-                    if helper.options.asan_enabled() || helper.options.drcov_enabled() {
-                        helper
-                            .asan_runtime
-                            .borrow_mut()
-                            .add_stalked_address(output.writer().pc() as usize - 4, address as usize);
-                    }
-                }
-                instruction.keep()
+        if options.stalker_enabled() {
+            for (id, module_name) in modules_to_instrument.iter().enumerate() {
+                let (lib_start, lib_end) = find_mapping_for_path(module_name);
+                println!("including range {:x}-{:x}", lib_start, lib_end);
+                helper
+                    .ranges
+                    .insert(lib_start..lib_end, (id as u16, module_name));
             }
-        });
-        helper.transformer = Some(transformer);
-        if helper.options.asan_enabled() || helper.options.asan_enabled() {
-            helper.asan_runtime.borrow_mut().init(modules_to_instrument);
+
+            if helper.options.drcov_enabled() {
+                std::fs::create_dir("./coverage")
+                    .expect("failed to create directory for coverage files");
+            }
+
+            let transformer = Transformer::from_callback(gum, |basic_block, output| {
+                let mut first = true;
+                for instruction in basic_block {
+                    let instr = instruction.instr();
+                    let address = instr.address();
+                    //println!("address: {:x} contains: {:?}", address, helper.ranges.contains(&(address as usize)));
+                    if helper.ranges.contains_key(&(address as usize)) {
+                        if first {
+                            first = false;
+                            //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                            if helper.options.coverage_enabled() {
+                                helper.emit_coverage_mapping(address, &output);
+                            }
+                            if helper.options.drcov_enabled() {
+                                instruction.put_callout(|context| {
+                                    let real_address = match helper
+                                        .asan_runtime
+                                        .borrow()
+                                        .real_address_for_stalked(context.pc() as usize)
+                                    {
+                                        Some(address) => *address,
+                                        _ => context.pc() as usize,
+                                    };
+                                    //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
+                                    //println!("{}:0x{:016x}", name, real_address - range.start);
+                                    helper
+                                        .drcov_basic_blocks
+                                        .push((real_address, real_address + 4));
+                                })
+                            }
+                        }
+
+                        if helper.options.asan_enabled() {
+                            if let Ok((basereg, indexreg, displacement, width)) =
+                                helper.is_interesting_instruction(address, instr)
+                            {
+                                helper.emit_shadow_check(
+                                    address,
+                                    &output,
+                                    basereg,
+                                    indexreg,
+                                    displacement,
+                                    width,
+                                );
+                            }
+                        }
+                        if helper.options.asan_enabled() || helper.options.drcov_enabled() {
+                            helper
+                                .asan_runtime
+                                .borrow_mut()
+                                .add_stalked_address(output.writer().pc() as usize - 4, address as usize);
+                        }
+                    }
+                    instruction.keep()
+                }
+            });
+            helper.transformer = Some(transformer);
+            if helper.options.asan_enabled() || helper.options.drcov_enabled() {
+                helper.asan_runtime.borrow_mut().init(modules_to_instrument);
+            }
         }
         helper
     }
@@ -700,14 +711,16 @@ where
     where
         EM: EventManager<I, S>,
     {
-        if !self.followed {
-            self.followed = true;
-            self.stalker
-                .follow_me::<NoneEventSink>(self.helper.transformer(), None);
-        } else {
-            self.stalker.activate(NativePointer(
-                self.base.inner().harness_mut() as *mut _ as *mut c_void
-            ))
+        if self.helper.stalker_enabled() {
+            if !self.followed {
+                self.followed = true;
+                self.stalker
+                    .follow_me::<NoneEventSink>(self.helper.transformer(), None);
+            } else {
+                self.stalker.activate(NativePointer(
+                    self.base.inner().harness_mut() as *mut _ as *mut c_void
+                ))
+            }
         }
 
         self.helper.pre_exec(input);
@@ -732,7 +745,9 @@ where
     where
         EM: EventManager<I, S>,
     {
-        self.stalker.deactivate();
+        if self.helper.stalker_enabled() {
+            self.stalker.deactivate();
+        }
         self.helper.post_exec(input);
         self.base.post_exec(state, event_mgr, input)
     }
