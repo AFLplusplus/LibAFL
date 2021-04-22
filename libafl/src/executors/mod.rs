@@ -7,7 +7,7 @@ pub use timeout::TimeoutExecutor;
 
 use core::marker::PhantomData;
 
-use crate::{Error, bolts::{serdeany::SerdeAny, tuples::Named}, events::EventManager, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::ObserversTuple};
+use crate::{Error, bolts::{serdeany::SerdeAny, tuples::Named}, events::EventManager, inputs::{HasTargetBytes, Input}, observers::ObserversTuple};
 
 pub trait CustomExitKind: std::fmt::Debug + SerdeAny + 'static {
 }

@@ -52,9 +52,8 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 
 */
 
-use alloc::{rc::Rc, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 use core::{
-    cell::RefCell,
     cmp::max,
     fmt::Debug,
     mem::size_of,
@@ -76,9 +75,9 @@ use std::{
 use backtrace::Backtrace;
 
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{c_void, setup_signal_handler, siginfo_t, Handler, Signal};
+use crate::bolts::os::unix_signals::{setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
-    bolts::shmem::{RcShMemProvider, ShMem, ShMemDescription, ShMemId, ShMemProvider},
+    bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
 
@@ -229,7 +228,6 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
         );
     };
     (*page).magic = PAGE_INITIALIZED_MAGIC;
-    (*page).shmem_id = *shmem.id().as_slice();
     (*page).sender = sender;
     ptr::write_volatile(&mut (*page).current_msg_id, 0);
     (*page).max_alloc_size = 0;
@@ -372,7 +370,7 @@ where
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
-    pub fn on_port(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         match TcpListener::bind(format!("127.0.0.1:{}", port)) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
@@ -407,7 +405,7 @@ where
 
     /// Recreate an existing client from the stored description
     pub fn existing_client_from_description(
-        mut shmem_provider: SP,
+        shmem_provider: SP,
         description: &LlmpClientDescription,
     ) -> Result<LlmpConnection<SP>, Error> {
         Ok(LlmpConnection::IsClient {
@@ -430,7 +428,6 @@ where
 pub struct LlmpPage {
     /// to check if this page got initialized properly
     pub magic: u64,
-    pub shmem_id: [u8; 20],
     /// The id of the sender
     pub sender: u32,
     /// Set to != 1 by the receiver, once it got mapped
@@ -505,7 +502,7 @@ where
             )],
             // drop pages to the broker if it already read them
             keep_pages_forever,
-            shmem_provider: shmem_provider.clone(),
+            shmem_provider,
         })
     }
 
@@ -566,7 +563,7 @@ where
     /// It is essential, that the receiver (or someone else) keeps a pointer to this map
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_map(
-        mut shmem_provider: SP,
+        shmem_provider: SP,
         current_out_map: SP::Mem,
         last_msg_sent_offset: Option<u64>,
     ) -> Result<Self, Error> {
@@ -648,7 +645,7 @@ where
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        dbg!(
+        println!(
             "Allocating {} (>={}) bytes on page {:?} / map {:?} (last msg: {:?})",
             complete_msg_size, buf_len, page, &map, last_msg
         );
@@ -967,7 +964,7 @@ where
     /// It is essential, that the sender (or someone else) keeps a pointer to the sender_map
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_map(
-        mut shmem_provider: SP,
+        shmem_provider: SP,
         current_sender_map: SP::Mem,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
@@ -1183,7 +1180,7 @@ where
     /// Creates a new page, initializing the passed shared mem struct
     pub fn new(sender: u32, mut new_map: SHM) -> Self {
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        dbg!(
+        println!(
             "LLMP_DEBUG: Initializing map on {} with size {}",
             new_map.id().to_string(),
             new_map.len()
@@ -1371,7 +1368,7 @@ where
             llmp_clients: vec![],
             socket_name: None,
             shutting_down: false,
-            shmem_provider: shmem_provider.clone(),
+            shmem_provider,
         })
     }
 
@@ -1701,7 +1698,7 @@ where
     /// It is essential, that the broker (or someone else) kept a pointer to the out_map
     /// else reattach will get a new, empty page, from the OS, or fail
     pub fn on_existing_map(
-        mut shmem_provider: SP,
+        shmem_provider: SP,
         _current_out_map: SP::Mem,
         _last_msg_sent_offset: Option<u64>,
         current_broker_map: SP::Mem,
@@ -1725,7 +1722,7 @@ where
     /// Recreate this client from a previous client.to_env
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(
-        mut shmem_provider: SP,
+        shmem_provider: SP,
         env_name: &str,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -1737,7 +1734,7 @@ where
                 shmem_provider.clone(),
                 &format!("{}_RECEIVER", env_name),
             )?,
-            shmem_provider: shmem_provider.clone(),
+            shmem_provider,
         })
     }
 
@@ -1759,7 +1756,7 @@ where
 
     /// Create an existing client from description
     fn existing_client_from_description(
-        mut shmem_provider: SP,
+        shmem_provider: SP,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -1768,7 +1765,7 @@ where
                 shmem_provider.clone(),
                 &description.receiver,
             )?,
-            shmem_provider: shmem_provider.clone(),
+            shmem_provider,
         })
     }
 
@@ -1807,7 +1804,7 @@ where
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider: shmem_provider.clone(),
             },
-            shmem_provider: shmem_provider.clone(),
+            shmem_provider,
         })
     }
 
@@ -1929,7 +1926,6 @@ where
 #[cfg(all(unix, feature = "std"))]
 mod tests {
 
-    use alloc::rc::Rc;
     use std::{thread::sleep, time::Duration};
 
     use super::{
@@ -1941,18 +1937,17 @@ mod tests {
 
     use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
 
-    use core::cell::RefCell;
 
     #[test]
     pub fn llmp_connection() {
-        let shmem_provider = StdShMemProvider::new();
-        let mut broker = match LlmpConnection::on_port(&shmem_provider, 1337).unwrap() {
+        let shmem_provider = StdShMemProvider::new().unwrap();
+        let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
             IsBroker { broker } => broker,
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::on_port(&shmem_provider, 1337).unwrap() {
+        let mut client = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
             IsBroker { broker: _ } => panic!("Second connect should be a client!"),
             IsClient { client } => client,
         };
@@ -1977,7 +1972,7 @@ mod tests {
         }
 
         /* recreate the client from env, check if it still works */
-        client = LlmpClient::on_existing_from_env(&shmem_provider, "_ENV_TEST").unwrap();
+        client = LlmpClient::on_existing_from_env(shmem_provider, "_ENV_TEST").unwrap();
 
         client.send_buf(tag, &arr).unwrap();
 

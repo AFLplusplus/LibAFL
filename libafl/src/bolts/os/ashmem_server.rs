@@ -94,13 +94,13 @@ impl ServedShMemProvider {
 
 impl Default for ServedShMemProvider {
     fn default() -> Self {
-        Self::new()
+        Self::new().unwrap()
     }
 }
 
 impl Clone for ServedShMemProvider {
     fn clone(&self) -> Self {
-        Self::new()
+        Self::new().unwrap()
     }
 }
 
@@ -108,18 +108,17 @@ impl ShMemProvider for ServedShMemProvider {
     type Mem = ServedShMem;
 
     /// Connect to the server and return a new ServedShMemProvider
-    fn new() -> Self {
+    fn new() -> Result<Self, Error> {
         let mut res = Self {
             stream: UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap(),
-            )
-            .expect("Unable to open connection to ashmem service"),
-            inner: AshmemShMemProvider::new(),
+            )?,
+            inner: AshmemShMemProvider::new()?,
             id: -1,
         };
         let (id, _) = res.send_receive(AshmemRequest::Hello(None));
         res.id = id;
-        res
+        Ok(res)
     }
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, crate::Error> {
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size));
@@ -209,11 +208,11 @@ enum AshmemResponse {
 impl AshmemService {
     /// Create a new AshMem service
     #[must_use]
-    fn new() -> Self {
-        AshmemService {
-            provider: AshmemShMemProvider::new(),
+    fn new() -> Result<Self, Error> {
+        Ok(AshmemService {
+            provider: AshmemShMemProvider::new()?,
             clients: HashMap::new(),
-        }
+        })
     }
 
     /// Read and handle the client request, send the answer over unix fd.
@@ -312,7 +311,7 @@ impl AshmemService {
         let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle =
-            thread::spawn(move || Self::new().listen(ASHMEM_SERVER_NAME, childsyncpair));
+            thread::spawn(move || Self::new()?.listen(ASHMEM_SERVER_NAME, childsyncpair));
 
         let (lock, cvar) = &*syncpair;
         let mut started = lock.lock().unwrap();
@@ -392,7 +391,7 @@ impl AshmemService {
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
                         );
                         poll_fds.push(pollfd);
-                        let mut client = AshmemClient::new(stream);
+                        let client = AshmemClient::new(stream);
                         let client_id = client.stream.as_raw_fd();
                         self.clients.insert(client_id, client);
                         match self.handle_client(client_id) {

@@ -16,16 +16,16 @@ pub type OsShMemProvider = Win32ShMemProvider;
 pub type OsShMem = Win32ShMem;
 
 #[cfg(target_os = "android")]
-use crate::bolts::os::ashmem_server::{ServedShMem, ServedShMemProvider};
+use crate::bolts::os::ashmem_server::ServedShMemProvider;
 #[cfg(target_os = "android")]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider>;
 #[cfg(target_os = "android")]
 pub type StdShMem = RcShMem<ServedShMemProvider>;
 
 #[cfg(all(feature = "std", not(target_os = "android")))]
-pub type StdShMemProvider = RcShMemProvider<OsShMemProvider>;
+pub type StdShMemProvider = OsShMemProvider;
 #[cfg(all(feature = "std", not(target_os = "android")))]
-pub type StdShMem = RcShMem<OsShMemProvider>;
+pub type StdShMem = OsShMem;
 
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
@@ -142,7 +142,7 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
     type Mem: ShMem;
 
     /// Create a new instance of the provider
-    fn new() -> Self;
+    fn new() -> Result<Self, Error>;
 
     /// Create a new shared memory mapping
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error>;
@@ -177,7 +177,7 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
     }
 
     /// Release the resources associated with the given ShMem
-    fn release_map(&mut self, map: &mut Self::Mem) {
+    fn release_map(&mut self, _map: &mut Self::Mem) {
         // do nothing
     }
 }
@@ -231,10 +231,10 @@ where
 {
     type Mem = RcShMem<T>;
 
-    fn new() -> Self {
-        return Self {
-            internal: Rc::new(RefCell::new(T::new())),
-        }
+    fn new() -> Result<Self, Error> {
+        return Ok(Self {
+            internal: Rc::new(RefCell::new(T::new()?)),
+        })
     }
 
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
@@ -271,7 +271,7 @@ where
     T: ShMemProvider + alloc::fmt::Debug
 {
      fn default() -> Self {
-         Self::new()
+         Self::new().unwrap()
      }
 }
 
@@ -425,7 +425,7 @@ pub mod unix_shmem {
         #[cfg(unix)]
         impl Default for CommonUnixShMemProvider {
             fn default() -> Self {
-                Self::new()
+                Self::new().unwrap()
             }
         }
 
@@ -434,8 +434,8 @@ pub mod unix_shmem {
         impl ShMemProvider for CommonUnixShMemProvider {
             type Mem = CommonUnixShMem;
 
-            fn new() -> Self {
-                Self {}
+            fn new() -> Result<Self, Error> {
+                Ok(Self {})
             }
             fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
                 CommonUnixShMem::new(map_size)
@@ -637,7 +637,7 @@ pub mod unix_shmem {
         #[cfg(unix)]
         impl Default for AshmemShMemProvider {
             fn default() -> Self {
-                Self::new()
+                Self::new().unwrap()
             }
         }
 
@@ -646,8 +646,8 @@ pub mod unix_shmem {
         impl ShMemProvider for AshmemShMemProvider {
             type Mem = AshmemShMem;
 
-            fn new() -> Self {
-                Self {}
+            fn new() -> Result<Self, Error> {
+                Ok(Self {})
             }
 
             fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
@@ -797,7 +797,7 @@ pub mod win32_shmem {
 
     impl Default for Win32ShMemProvider {
         fn default() -> Self {
-            Self::new()
+            Self::new().unwrap()
         }
     }
 
@@ -805,8 +805,8 @@ pub mod win32_shmem {
     impl ShMemProvider for Win32ShMemProvider {
         type Mem = Win32ShMem;
 
-        fn new() -> Self {
-            Self {}
+        fn new() -> Result<Self, Erro> {
+            Ok(Self {})
         }
         fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
             Win32ShMem::new_map(map_size)

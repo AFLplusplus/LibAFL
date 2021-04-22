@@ -11,7 +11,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, Input},
+    inputs::{HasTargetBytes, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
@@ -38,8 +38,8 @@ use frida_gum::{
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 use num_traits::cast::FromPrimitive;
 
-use rangemap::{RangeMap, RangeSet};
-use std::{env, ffi::c_void, fs::File, io::{BufWriter, Write}, path::PathBuf, rc::Rc, sync::{Arc, RwLock}};
+use rangemap::RangeMap;
+use std::{env, ffi::c_void, fs::File, io::{BufWriter, Write}, path::PathBuf, rc::Rc};
 
 use libafl_frida::{FridaOptions, asan_rt::{ASAN_ERRORS, AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime}};
 
@@ -257,7 +257,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
     pub fn new(
         gum: &'a Gum,
         options: FridaOptions,
-        harness_module_name: &str,
+        _harness_module_name: &str,
         modules_to_instrument: &'a Vec<&str>,
     ) -> Self {
         let mut helper = Self {

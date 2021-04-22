@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use libafl::{Error, bolts::{ownedref::Cptr, serdeany::SerdeAny, tuples::Named}, corpus::Testcase, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}};
+use libafl::{Error, bolts::{ownedref::Cptr, serdeany::SerdeAny, tuples::Named}, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}};
 use nix::{
     libc::{memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -12,12 +12,11 @@ use capstone::{
 };
 use color_backtrace::{default_output_stream, BacktracePrinter};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use frida_gum::Backtracer;
 use gothook::GotHookLibrary;
-use libc::{pthread_atfork, sysconf, _SC_PAGESIZE};
+use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use regex::Regex;
-use std::{cell::RefCell, cell::{RefMut, UnsafeCell}, ffi::c_void, fs::File, io::{BufRead, BufReader, Write}, ops::{Deref, DerefMut}, rc::Rc, sync::{Arc, RwLock}};
+use std::{cell::{RefCell, RefMut}, ffi::c_void, fs::File, io::{BufRead, BufReader, Write}, rc::Rc};
 use serde::{Serialize, Deserialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 
@@ -85,7 +84,7 @@ impl Allocator {
 
         // attempt to pre-map the entire shadow-memory space
         let addr: usize = 1 << shadow_bit;
-        let pre_allocated_shadow = if let Ok(mapped) = unsafe {
+        let pre_allocated_shadow = if let Ok(_) = unsafe {
             mmap(
                 addr as *mut c_void,
                 addr + addr,
@@ -375,7 +374,7 @@ pub extern "C" fn asan_new(size: usize) -> *mut c_void {
 }
 
 /// Hook for new.
-pub extern "C" fn asan_new_nothrow(size: usize, nothrow: *const c_void) -> *mut c_void {
+pub extern "C" fn asan_new_nothrow(size: usize, _nothrow: *const c_void) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
@@ -388,7 +387,7 @@ pub extern "C" fn asan_new_aligned(size: usize, alignment: usize) -> *mut c_void
 pub extern "C" fn asan_new_aligned_nothrow(
     size: usize,
     alignment: usize,
-    nothrow: *const c_void,
+    _nothrow: *const c_void,
 ) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
@@ -446,7 +445,7 @@ pub unsafe extern "C" fn asan_delete(ptr: *mut c_void) {
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_ulong(ptr: *mut c_void, ulong: u64) {
+pub unsafe extern "C" fn asan_delete_ulong(ptr: *mut c_void, _ulong: u64) {
     if ptr != std::ptr::null_mut() {
         Allocator::get().release(ptr);
     }
@@ -458,8 +457,8 @@ pub unsafe extern "C" fn asan_delete_ulong(ptr: *mut c_void, ulong: u64) {
 /// This function is inherently unsafe, as it takes a raw pointer
 pub unsafe extern "C" fn asan_delete_ulong_aligned(
     ptr: *mut c_void,
-    ulong: u64,
-    nothrow: *const c_void,
+    _ulong: u64,
+    _nothrow: *const c_void,
 ) {
     if ptr != std::ptr::null_mut() {
         Allocator::get().release(ptr);
@@ -470,7 +469,7 @@ pub unsafe extern "C" fn asan_delete_ulong_aligned(
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_aligned(ptr: *mut c_void, alignment: usize) {
+pub unsafe extern "C" fn asan_delete_aligned(ptr: *mut c_void, _alignment: usize) {
     if ptr != std::ptr::null_mut() {
         Allocator::get().release(ptr);
     }
@@ -480,7 +479,7 @@ pub unsafe extern "C" fn asan_delete_aligned(ptr: *mut c_void, alignment: usize)
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, nothrow: *const c_void) {
+pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, _nothrow: *const c_void) {
     if ptr != std::ptr::null_mut() {
         Allocator::get().release(ptr);
     }
@@ -492,8 +491,8 @@ pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, nothrow: *const c
 /// This function is inherently unsafe, as it takes a raw pointer
 pub unsafe extern "C" fn asan_delete_aligned_nothrow(
     ptr: *mut c_void,
-    alignment: usize,
-    nothrow: *const c_void,
+    _alignment: usize,
+    _nothrow: *const c_void,
 ) {
     if ptr != std::ptr::null_mut() {
         Allocator::get().release(ptr);
@@ -593,25 +592,6 @@ pub fn mapping_for_library(libpath: &str) -> (usize, usize) {
     (libstart, libend)
 }
 
-pub struct Dereffer<T> {
-    internal: UnsafeCell<*mut T>,
-}
-
-impl<T> Dereffer<T> {
-    pub fn new(internal: *mut T) -> Self {
-        Self {
-            internal: UnsafeCell::new(internal),
-        }
-    }
-}
-
-impl<T> Deref for Dereffer<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        unsafe { &**self.internal.get() }
-    }
-}
-
 pub struct AsanRuntime {
     regs: [usize; 32],
     blob_check_mem_byte: Option<Box<[u8]>>,
@@ -631,45 +611,22 @@ pub struct AsanRuntime {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct AsanReadWriteError {
+    registers: [usize; 32],
+    pc: usize,
+    fault: (u16, u16, usize, usize),
+    metadata: AllocationMetadata,
+    backtrace: Backtrace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 enum AsanError {
-    OobRead(
-        (
-            [usize; 32],
-            usize,
-            (u16, u16, usize, usize),
-            AllocationMetadata,
-            Backtrace,
-        ),
-    ),
-    OobWrite(
-        (
-            [usize; 32],
-            usize,
-            (u16, u16, usize, usize),
-            AllocationMetadata,
-            Backtrace,
-        ),
-    ),
+    OobRead(AsanReadWriteError),
+    OobWrite(AsanReadWriteError),
+    ReadAfterFree(AsanReadWriteError),
+    WriteAfterFree(AsanReadWriteError),
     DoubleFree((usize, AllocationMetadata, Backtrace)),
     UnallocatedFree((usize, Backtrace)),
-    WriteAfterFree(
-        (
-            [usize; 32],
-            usize,
-            (u16, u16, usize, usize),
-            AllocationMetadata,
-            Backtrace,
-        ),
-    ),
-    ReadAfterFree(
-        (
-            [usize; 32],
-            usize,
-            (u16, u16, usize, usize),
-            AllocationMetadata,
-            Backtrace,
-        ),
-    ),
     Unknown(([usize; 32], usize, (u16, u16, usize, usize),
             Backtrace,
             )),
@@ -721,7 +678,7 @@ impl CustomExitKind for AsanErrors {}
 
 impl AsanRuntime {
     pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
-        let mut res = Rc::new(RefCell::new(Self {
+        let res = Rc::new(RefCell::new(Self {
             regs: [0; 32],
             blob_check_mem_byte: None,
             blob_check_mem_halfword: None,
@@ -1033,41 +990,24 @@ impl AsanRuntime {
         let mut allocator = Allocator::get();
         if let Some(metadata) = allocator.find_metadata(fault_address, self.regs[base_reg as usize])
         {
-            let mut error = if insn.mnemonic().unwrap().starts_with("l") {
+            let asan_readwrite_error = AsanReadWriteError {
+                registers: self.regs,
+                pc: actual_pc,
+                fault: (base_reg, index_reg, displacement as usize, fault_address),
+                metadata: metadata.clone(),
+                backtrace,
+            };
+            let error = if insn.mnemonic().unwrap().starts_with("l") {
                 if metadata.freed {
-                    AsanError::ReadAfterFree((
-                        self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata.clone(),
-                        backtrace,
-                    ))
+                    AsanError::ReadAfterFree(asan_readwrite_error)
                 } else {
-                    AsanError::OobRead((
-                        self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata.clone(),
-                        backtrace,
-                    ))
+                    AsanError::OobRead(asan_readwrite_error)
                 }
             } else {
                 if metadata.freed {
-                    AsanError::WriteAfterFree((
-                        self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata.clone(),
-                        backtrace,
-                    ))
+                    AsanError::WriteAfterFree(asan_readwrite_error)
                 } else {
-                    AsanError::OobWrite((
-                        self.regs,
-                        actual_pc,
-                        (base_reg, index_reg, displacement as usize, fault_address),
-                        metadata.clone(),
-                        backtrace,
-                    ))
+                    AsanError::OobWrite(asan_readwrite_error)
                 }
             };
             self.report_error(error);
@@ -1099,18 +1039,18 @@ impl AsanRuntime {
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
             .unwrap();
-        write!(output, "{}", error.description());
+        write!(output, "{}", error.description()).unwrap();
         match error {
-            AsanError::OobRead((registers, pc, fault, mut metadata, backtrace))
-            | AsanError::OobWrite((registers, pc, fault, mut metadata, backtrace))
-            | AsanError::ReadAfterFree((registers, pc, fault, mut metadata, backtrace))
-            | AsanError::WriteAfterFree((registers, pc, fault, mut metadata, backtrace)) => {
-                let (basereg, indexreg, _displacement, fault_address) = fault;
+            AsanError::OobRead(mut error)
+            | AsanError::OobWrite(mut error)
+            | AsanError::ReadAfterFree(mut error)
+            | AsanError::WriteAfterFree(mut error) => {
+                let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
                 writeln!(
                     output,
                     " at 0x{:x}, faulting address 0x{:x}",
-                    pc, fault_address
+                    error.pc, fault_address
                 )
                 .unwrap();
                 output.reset().unwrap();
@@ -1126,13 +1066,13 @@ impl AsanRuntime {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, error.registers[reg as usize]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output, "").unwrap();
                     }
                 }
-                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+                writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
 
                 writeln!(output, "{:━^80}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
@@ -1142,7 +1082,7 @@ impl AsanRuntime {
                     .unwrap();
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
-                let start_pc = pc - 4 * 5;
+                let start_pc = error.pc - 4 * 5;
                 for insn in cs
                     .disasm_count(
                         unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
@@ -1152,7 +1092,7 @@ impl AsanRuntime {
                     .expect("failed to disassemble instructions")
                     .iter()
                 {
-                    if insn.address() as usize == pc {
+                    if insn.address() as usize == error.pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -1163,32 +1103,32 @@ impl AsanRuntime {
                     }
                 }
                 backtrace_printer
-                    .print_trace(&backtrace, output)
+                    .print_trace(&error.backtrace, output)
                     .unwrap();
 
                 writeln!(output, "{:━^80}", " ALLOCATION INFO ").unwrap();
-                let offset: i64 = fault_address as i64 - metadata.address as i64;
+                let offset: i64 = fault_address as i64 - error.metadata.address as i64;
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
                     "access is 0x{:x} to the {} of the 0x{:x} byte allocation at 0x{:x}",
-                    offset, direction, metadata.size, metadata.address
+                    offset, direction, error.metadata.size, error.metadata.address
                 )
                 .unwrap();
 
-                if metadata.is_malloc_zero {
+                if error.metadata.is_malloc_zero {
                     writeln!(output, "allocation was zero-sized").unwrap();
                 }
 
-                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
+                if let Some(backtrace) = error.metadata.allocation_site_backtrace.as_mut() {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
 
-                if metadata.freed {
+                if error.metadata.freed {
                     writeln!(output, "{:━^80}", " FREE INFO ").unwrap();
-                    if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
+                    if let Some(backtrace) = error.metadata.release_site_backtrace.as_mut() {
                         writeln!(output, "free site backtrace:").unwrap();
                         backtrace.resolve();
                         backtrace_printer.print_trace(backtrace, output).unwrap();
@@ -1797,15 +1737,6 @@ where
                 }
             }
         }
-    }
-
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        panic!("APPEND_METADATA");
-        if let Some(errors) = self.errors.take() {
-            // TODO here add the errors as metadata to testcase
-            //println!("testcase: {:?}", testcase.input().as_ref().unwrap().target_bytes().as_slice());
-        }
-        Ok(())
     }
 
     fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {

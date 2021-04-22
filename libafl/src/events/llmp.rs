@@ -1,7 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{rc::Rc, string::ToString, vec::Vec};
-use core::{cell::RefCell, marker::PhantomData, time::Duration};
+use alloc::{string::ToString, vec::Vec};
+use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
@@ -12,6 +12,9 @@ use crate::bolts::{
     llmp::{LlmpClient, LlmpReceiver},
     shmem::StdShMemProvider,
 };
+
+#[cfg(all(feature = "std", target_os = "android"))]
+use crate::bolts::os::ashmem_server::AshmemService;
 use crate::{
     bolts::{
         llmp::{self, LlmpClientDescription, LlmpSender, Tag},
@@ -490,7 +493,7 @@ where
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Error starting Ashmem Service");
 
-    setup_restarting_mgr(StdShMemProvider::new(), stats, broker_port)
+    setup_restarting_mgr(StdShMemProvider::new()?, stats, broker_port)
 }
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
