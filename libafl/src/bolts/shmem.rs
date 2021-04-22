@@ -212,7 +212,6 @@ where
 impl<T: ShMemProvider> Drop for RcShMem<T>
 {
     fn drop(&mut self) {
-        println!("In RcShMem drop");
         self.provider.borrow_mut().release_map(&mut self.internal)
     }
 }

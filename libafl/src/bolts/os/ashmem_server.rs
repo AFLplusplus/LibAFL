@@ -249,7 +249,6 @@ impl AshmemService {
             AshmemRequest::Deregister(map_id) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 let map = client.maps.entry(map_id).or_default().pop().unwrap();
-                println!("deregistering map_id: {}, with refcount: {}, for client_id: {}", map_id, Rc::strong_count(&map), client_id);
                 Ok(AshmemResponse::RefCount(Rc::strong_count(&map) as u32))
             }
         };
