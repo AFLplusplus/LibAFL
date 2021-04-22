@@ -438,6 +438,74 @@ pub fn startable_self() -> Result<Command, Error> {
     Ok(startable)
 }
 
+/// Allows one to walk the mappings in /proc/self/maps, caling a callback function for each
+/// mapping.
+/// If the callback returns true, we stop the walk.
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+pub fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
+    use std::{io::{BufReader, BufRead}, fs::File};
+    use regex::Regex;
+    let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
+        .unwrap();
+
+    let mapsfile = File::open("/proc/self/maps").expect("Unable to open /proc/self/maps");
+
+    for line in BufReader::new(mapsfile).lines() {
+        let line = line.unwrap();
+        if let Some(caps) = re.captures(&line) {
+            if visitor(
+                usize::from_str_radix(caps.name("start").unwrap().as_str(), 16).unwrap(),
+                usize::from_str_radix(caps.name("end").unwrap().as_str(), 16).unwrap(),
+                caps.name("perm").unwrap().as_str().to_string(),
+                caps.name("path").unwrap().as_str().to_string(),
+            ) {
+                break;
+            };
+        }
+    }
+}
+
+/// Get the start and end address, permissions and path of the mapping containing a particular address
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+pub fn find_mapping_for_address(address: usize) -> Result<(usize, usize, String, String), Error> {
+    let mut result = (0, 0, "".to_string(), "".to_string());
+    walk_self_maps(&mut |start, end, permissions, path| {
+        if start <= address && address < end {
+            result = (start, end, permissions, path);
+            true
+        } else {
+            false
+        }
+    });
+
+    if result.0 != 0 {
+        Ok(result)
+    } else {
+        Err(Error::Unknown("Couldn't find a mapping for this address".to_string()))
+    }
+}
+
+/// Get the start and end address of the mapping containing with a particular path
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
+    let mut libstart = 0;
+    let mut libend = 0;
+    walk_self_maps(&mut |start, end, _permissions, path| {
+        if libpath == path {
+            if libstart == 0 {
+                libstart = start;
+            }
+
+            libend = end;
+        }
+        false
+    });
+
+    (libstart, libend)
+}
+
+
+
 #[cfg(test)]
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;

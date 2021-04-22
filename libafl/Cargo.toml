@@ -69,6 +69,7 @@ libc = "0.2" # For (*nix) libc
 nix = "0.20.0"
 uds = "0.2.3"
 lock_api = "0.4.3"
+regex = "1.4.5"
 
 [target.'cfg(windows)'.dependencies]
 windows = "0.4.0"
