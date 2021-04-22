@@ -161,7 +161,9 @@ impl Allocator {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
-            metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
+            if self.runtime.borrow().options.enable_asan_allocation_backtraces {
+                metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
+            }
             metadata
         } else {
             let mapping = match mmap(
@@ -185,13 +187,18 @@ impl Allocator {
                 false,
             );
 
-            AllocationMetadata {
+            let mut metadata = AllocationMetadata {
                 address: mapping + self.page_size,
                 size,
                 actual_size: rounded_up_size,
-                allocation_site_backtrace: Some(Backtrace::new_unresolved()),
                 ..Default::default()
+            };
+
+            if self.runtime.borrow().options.enable_asan_allocation_backtraces {
+                metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
+
+            metadata
         };
 
         // unpoison the shadow memory for the allocation itself
@@ -225,8 +232,9 @@ impl Allocator {
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
-        metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
-        //Backtracer::accurate();
+        if self.runtime.borrow().options.enable_asan_allocation_backtraces {
+            metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
+        }
 
         // poison the shadow memory for the allocation
         Self::poison(shadow_mapping_start, metadata.size);

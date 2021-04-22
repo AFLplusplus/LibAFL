@@ -6,6 +6,7 @@ pub struct FridaOptions {
     enable_asan: bool,
     enable_asan_leak_detection: bool,
     enable_asan_continue_after_error: bool,
+    enable_asan_allocation_backtraces: bool,
     enable_coverage: bool,
     enable_drcov: bool,
 }
@@ -31,6 +32,9 @@ impl FridaOptions {
                     }
                     "asan-continue-after-error" => {
                         options.enable_asan_continue_after_error = value.parse().unwrap();
+                    },
+                    "asan-allocation-backtraces" => {
+                        options.enable_asan_allocation_backtraces = value.parse().unwrap();
                     }
                     "coverage" => {
                         options.enable_coverage = value.parse().unwrap();
@@ -72,6 +76,11 @@ impl FridaOptions {
     pub fn asan_continue_after_error(&self) -> bool {
         self.enable_asan_continue_after_error
     }
+
+    /// Should ASAN gather (and report) allocation-/free-site backtraces
+    pub fn asan_allocation_backtraces(&self) -> bool {
+        self.enable_asan_allocation_backtraces
+    }
 }
 
 impl Default for FridaOptions {
@@ -80,6 +89,7 @@ impl Default for FridaOptions {
             enable_asan: false,
             enable_asan_leak_detection: false,
             enable_asan_continue_after_error: false,
+            enable_asan_allocation_backtraces: true,
             enable_coverage: true,
             enable_drcov: false,
         }
