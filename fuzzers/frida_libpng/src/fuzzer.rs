@@ -912,7 +912,7 @@ unsafe fn fuzz(
             )),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new(objective_dir).unwrap(),
+            OnDiskCorpus::new_save_meta(objective_dir, true).unwrap(),
             // Feedbacks to recognize an input as solution
             tuple_list!(CrashFeedback::new(), TimeoutFeedback::new(), AsanErrorsFeedback::new()),
         )

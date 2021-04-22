@@ -10,7 +10,7 @@ edition = "2018"
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.1.0" }
+libafl = { path = "../libafl", version = "0.1.0", features = ["std", "libafl_derive"] }
 nix = "0.20.0"
 libc = "0.2.92"
 hashbrown = "0.11"

@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use libafl::{Error, bolts::{ownedref::Cptr, serdeany::SerdeAny, tuples::Named}, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}, utils::{find_mapping_for_address, walk_self_maps}};
+use libafl::{Error, SerdeAny, bolts::{ownedref::Cptr, tuples::Named}, corpus::Testcase, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}, state::HasMetadata, utils::{find_mapping_for_address, walk_self_maps}};
 use nix::{
     libc::{memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -569,7 +569,7 @@ struct AsanReadWriteError {
     backtrace: Backtrace,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 enum AsanError {
     OobRead(AsanReadWriteError),
     OobWrite(AsanReadWriteError),
@@ -598,7 +598,8 @@ impl AsanError {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     errors: Vec<AsanError>,
 }
@@ -612,15 +613,6 @@ impl AsanErrors {
 
     pub fn clear(&mut self) {
         self.errors.clear()
-    }
-}
-impl SerdeAny for AsanErrors {
-    fn as_any(&self) -> &dyn core::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
-        self
     }
 }
 impl CustomExitKind for AsanErrors {}
@@ -1707,6 +1699,14 @@ where
                 }
             }
         }
+    }
+
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        if let Some(errors) = &self.errors {
+            testcase.add_metadata(errors.clone());
+        }
+
+        Ok(())
     }
 
     fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
