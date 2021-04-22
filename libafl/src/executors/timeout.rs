@@ -91,6 +91,10 @@ where
             phantom: PhantomData,
         }
     }
+
+    pub fn inner(&mut self) -> &mut E {
+        &mut self.executor
+    }
 }
 
 impl<E, I, OT> Executor<I> for TimeoutExecutor<E, I, OT>

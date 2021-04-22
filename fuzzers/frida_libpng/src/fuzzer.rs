@@ -8,8 +8,8 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventManager},
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    executors::{inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
@@ -26,7 +26,7 @@ use capstone::{
     arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
-use core::cell::RefCell;
+use core::{cell::RefCell, time::Duration};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
@@ -679,7 +679,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    base: InProcessExecutor<'a, H, I, OT>,
+    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT>, I, OT>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -706,7 +706,7 @@ where
                 .follow_me::<NoneEventSink>(self.helper.transformer(), None);
         } else {
             self.stalker.activate(NativePointer(
-                self.base.harness_mut() as *mut _ as *mut c_void
+                self.base.inner().harness_mut() as *mut _ as *mut c_void
             ))
         }
 
@@ -775,7 +775,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH) -> Self {
+    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH, timeout: Duration) -> Self {
         let mut stalker = Stalker::new(gum);
 
         // Let's exclude the main module and libc.so at least:
@@ -789,7 +789,7 @@ where
         //));
 
         Self {
-            base,
+            base: TimeoutExecutor::new(base, timeout),
             stalker,
             helper,
             followed: false,
@@ -899,7 +899,7 @@ unsafe fn fuzz(
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new(), AsanErrorsFeedback::new()),
+            tuple_list!(CrashFeedback::new(), TimeoutFeedback::new(), AsanErrorsFeedback::new()),
         )
     });
 
@@ -935,6 +935,7 @@ unsafe fn fuzz(
             &mut restarting_mgr,
         )?,
         &frida_helper,
+        Duration::new(5, 0),
     );
     // Let's exclude the main module and libc.so at least:
     executor.stalker.exclude(&MemoryRange::new(
