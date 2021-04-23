@@ -496,6 +496,7 @@ macro_rules! create_serde_registry_for_trait {
 create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::SerdeAny);
 pub use serdeany_registry::*;
 
+#[cfg(feature = "std")]
 #[macro_export]
 macro_rules! impl_serdeany {
     ($struct_name:ident) => {
@@ -514,6 +515,22 @@ macro_rules! impl_serdeany {
         #[ctor]
         fn $struct_name() {
             $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
+        }
+    };
+}
+
+#[cfg(not(feature = "std"))]
+#[macro_export]
+macro_rules! impl_serdeany {
+    ($struct_name:ident) => {
+        impl $crate::bolts::serdeany::SerdeAny for $struct_name {
+            fn as_any(&self) -> &dyn core::any::Any {
+                self
+            }
+
+            fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+                self
+            }
         }
     };
 }
