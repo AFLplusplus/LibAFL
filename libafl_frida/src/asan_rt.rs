@@ -10,7 +10,7 @@ use capstone::{
     arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
-use color_backtrace::{default_output_stream, BacktracePrinter};
+use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use gothook::GotHookLibrary;
 use libc::{sysconf, _SC_PAGESIZE};
@@ -249,14 +249,15 @@ impl Allocator {
         let mut offset_to_closest = i64::max_value();
         let mut closest = None;
         for metadata in metadatas {
-            if hint_base == metadata.address {
-                closest = Some(metadata);
-                break;
-            }
-            let new_offset = std::cmp::min(
-                offset_to_closest,
-                (ptr as i64 - metadata.address as i64).abs(),
-            );
+            println!("{:#x}", metadata.address);
+            let new_offset = if hint_base == metadata.address {
+                (ptr as i64 - metadata.address as i64).abs()
+            } else {
+                std::cmp::min(
+                    offset_to_closest,
+                    (ptr as i64 - metadata.address as i64).abs(),
+                )
+            };
             if new_offset < offset_to_closest {
                 offset_to_closest = new_offset;
                 closest = Some(metadata);
@@ -581,6 +582,8 @@ enum AsanError {
             Backtrace,
             )),
     Leak((usize, AllocationMetadata)),
+    StackOobRead(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
+    StackOobWrite(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
 }
 
 impl AsanError {
@@ -594,6 +597,8 @@ impl AsanError {
             AsanError::ReadAfterFree(_) => "heap use-after-free read",
             AsanError::Unknown(_) => "heap unknown",
             AsanError::Leak(_) => "memory-leak",
+            AsanError::StackOobRead(_) => "stack out-of-bounds read",
+            AsanError::StackOobWrite(_) => "stack out-of-bounds write",
         }
     }
 }
@@ -613,6 +618,14 @@ impl AsanErrors {
 
     pub fn clear(&mut self) {
         self.errors.clear()
+    }
+
+    pub fn len(&self) -> usize {
+        self.errors.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
     }
 }
 impl CustomExitKind for AsanErrors {}
@@ -747,7 +760,7 @@ impl AsanRuntime {
     }
 
     /// Determine the stack start, end for the currently running thread
-    fn current_stack() -> (usize, usize) {
+    pub fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;
         let stack_address = &stack_var as *const _ as *const c_void as usize;
 
@@ -835,7 +848,7 @@ impl AsanRuntime {
     }
 
     extern "C" fn handle_trap(&mut self) {
-        let mut actual_pc = self.regs[31] + 65 * 4 + 4;
+        let mut actual_pc = self.regs[31] + 66 * 4 + 4;
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
             _ => actual_pc,
@@ -931,39 +944,48 @@ impl AsanRuntime {
         }
 
         let backtrace = Backtrace::new();
-        let mut allocator = Allocator::get();
-        if let Some(metadata) = allocator.find_metadata(fault_address, self.regs[base_reg as usize])
-        {
-            let asan_readwrite_error = AsanReadWriteError {
-                registers: self.regs,
-                pc: actual_pc,
-                fault: (base_reg, index_reg, displacement as usize, fault_address),
-                metadata: metadata.clone(),
-                backtrace,
-            };
-            let error = if insn.mnemonic().unwrap().starts_with("l") {
-                if metadata.freed {
-                    AsanError::ReadAfterFree(asan_readwrite_error)
+
+        let (stack_start, stack_end) = Self::current_stack();
+        let error = if fault_address >= stack_start && fault_address < stack_end {
+            if insn.mnemonic().unwrap().starts_with('l') {
+                AsanError::StackOobRead((self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), backtrace))
+            } else {
+                AsanError::StackOobWrite((self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), backtrace))
+            }
+        } else {
+            let mut allocator = Allocator::get();
+            if let Some(metadata) = allocator.find_metadata(fault_address, self.regs[base_reg as usize])
+            {
+                let asan_readwrite_error = AsanReadWriteError {
+                    registers: self.regs,
+                    pc: actual_pc,
+                    fault: (base_reg, index_reg, displacement as usize, fault_address),
+                    metadata: metadata.clone(),
+                    backtrace,
+                };
+                if insn.mnemonic().unwrap().starts_with('l') {
+                    if metadata.freed {
+                        AsanError::ReadAfterFree(asan_readwrite_error)
+                    } else {
+                        AsanError::OobRead(asan_readwrite_error)
+                    }
                 } else {
-                    AsanError::OobRead(asan_readwrite_error)
+                    if metadata.freed {
+                        AsanError::WriteAfterFree(asan_readwrite_error)
+                    } else {
+                        AsanError::OobWrite(asan_readwrite_error)
+                    }
                 }
             } else {
-                if metadata.freed {
-                    AsanError::WriteAfterFree(asan_readwrite_error)
-                } else {
-                    AsanError::OobWrite(asan_readwrite_error)
-                }
-            };
-            self.report_error(error);
-        } else {
-            self.report_error(AsanError::Unknown((
-                self.regs,
-                actual_pc,
-                (base_reg, index_reg, displacement as usize, fault_address),
-                backtrace,
-            )));
-        }
-
+                AsanError::Unknown((
+                    self.regs,
+                    actual_pc,
+                    (base_reg, index_reg, displacement as usize, fault_address),
+                    backtrace,
+                ))
+            }
+        };
+        self.report_error(error);
     }
 
     fn report_error(&mut self, error: AsanError) {
@@ -974,7 +996,10 @@ impl AsanRuntime {
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
-        let backtrace_printer = BacktracePrinter::new().add_frame_filter(Box::new(|frames| {
+        let backtrace_printer = BacktracePrinter::new()
+            .print_addresses(true)
+            .verbosity(Verbosity::Full)
+            .add_frame_filter(Box::new(|frames| {
             frames
                 .retain(|x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")))
         }));
@@ -1022,7 +1047,7 @@ impl AsanRuntime {
                     write!(output, "x{:02}: 0x{:016x} ", reg, error.registers[reg as usize]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
-                        writeln!(output, "").unwrap();
+                        write!(output, "\n").unwrap();
                     }
                 }
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
@@ -1064,7 +1089,7 @@ impl AsanRuntime {
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
-                    "access is 0x{:x} to the {} of the 0x{:x} byte allocation at 0x{:x}",
+                    "access is {} to the {} of the 0x{:x} byte allocation at 0x{:x}",
                     offset, direction, error.metadata.size, error.metadata.address
                 )
                 .unwrap();
@@ -1122,7 +1147,7 @@ impl AsanRuntime {
                     write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
-                        writeln!(output, "").unwrap();
+                        writeln!(output).unwrap();
                     }
                 }
                 writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
@@ -1217,6 +1242,79 @@ impl AsanRuntime {
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
             }
+            AsanError::StackOobRead((registers, pc, fault, backtrace)) |
+                AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
+                let (basereg, indexreg, _displacement, fault_address) = fault;
+
+                if let Ok((start, _, _, path)) = find_mapping_for_address(pc) {
+                    writeln!(
+                        output,
+                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
+                        pc, path, pc - start, fault_address
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(
+                        output,
+                        " at 0x{:x}, faulting address 0x{:x}",
+                        pc, fault_address
+                    )
+                    .unwrap();
+                }
+                output.reset().unwrap();
+
+                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
+                for reg in 0..=30 {
+                    if reg == basereg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                    } else if reg == indexreg {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
+                            .unwrap();
+                    }
+                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
+                    output.reset().unwrap();
+                    if reg % 4 == 3 {
+                        writeln!(output).unwrap();
+                    }
+                }
+                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+
+                writeln!(output, "{:━^100}", " CODE ").unwrap();
+                let mut cs = Capstone::new()
+                    .arm64()
+                    .mode(capstone::arch::arm64::ArchMode::Arm)
+                    .build()
+                    .unwrap();
+                cs.set_skipdata(true).expect("failed to set skipdata");
+
+                let start_pc = pc - 4 * 5;
+                for insn in cs
+                    .disasm_count(
+                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                        start_pc as u64,
+                        11,
+                    )
+                    .expect("failed to disassemble instructions")
+                    .iter()
+                {
+                    if insn.address() as usize == pc {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                        writeln!(output, "\t => {}", insn).unwrap();
+                        output.reset().unwrap();
+                    } else {
+                        writeln!(output, "\t    {}", insn).unwrap();
+                    }
+                }
+                backtrace_printer
+                    .print_trace(&backtrace, output)
+                    .unwrap();
+            }
+
         };
 
         if !self.options.asan_continue_after_error() {
@@ -1254,6 +1352,7 @@ impl AsanRuntime {
                 ; stp x28, x29, [x0, #0xe0]
                 ; stp x30, xzr, [x0, #0xf0]
                 ; mov x28, x0
+                ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
                 //; ldp x0, x1, [sp], #144
                 ; ldp x0, x1, [sp, #144]
                 ; stp x0, x1, [x28]
@@ -1277,6 +1376,7 @@ impl AsanRuntime {
                 ; ldr x1, >trap_func
                 ; blr x1
 
+                ; .dword (0xd51b4218u32 as i32) // msr nzcv, x24
                 ; ldr x0, >self_regs_addr
                 ; ldp x2, x3, [x0, #0x10]
                 ; ldp x4, x5, [x0, #0x20]
@@ -1371,12 +1471,14 @@ impl AsanRuntime {
                 ; stp x28, x29, [x0, #0xe0]
                 ; stp x30, xzr, [x0, #0xf0]
                 ; mov x28, x0
+                ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
                 //; ldp x0, x1, [sp], #144
                 ; ldp x0, x1, [sp, #144]
                 ; stp x0, x1, [x28]
 
                 ; adr x25, >here
                 ; here:
+                ; add x25, x25, #(3 * 4) // we need to add for this instruction and the nzcv instructions
                 ; str x25, [x28, 0xf8]
                 ; adr x0, >eh_frame_fde
                 ; adr x27, >fde_address
@@ -1394,6 +1496,7 @@ impl AsanRuntime {
                 ; ldr x1, >trap_func
                 ; blr x1
 
+                ; .dword (0xd51b4218u32 as i32) // msr nzcv, x24
                 ; ldr x0, >self_regs_addr
                 ; ldp x2, x3, [x0, #0x10]
                 ; ldp x4, x5, [x0, #0x20]

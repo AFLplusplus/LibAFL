@@ -4,7 +4,7 @@
 use libafl::{
     bolts::tuples::{tuple_list, Named},
     corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
+        ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventManager},
@@ -47,14 +47,14 @@ use std::{env, ffi::c_void, fs::File, io::{BufWriter, Write}, path::PathBuf, rc:
 use libafl_frida::{FridaOptions, asan_rt::{ASAN_ERRORS, AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime}};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
-pub trait FridaHelper<'a, I: Input + HasTargetBytes> {
+pub trait FridaHelper<'a> {
     fn transformer(&self) -> &Transformer<'a>;
 
     fn register_thread(&self);
 
-    fn pre_exec(&self, input: &I);
+    fn pre_exec<I: Input + HasTargetBytes>(&self, input: &I);
 
-    fn post_exec(&self, input: &I);
+    fn post_exec<I: Input + HasTargetBytes>(&self, input: &I);
 
     fn stalker_enabled(&self) -> bool;
 }
@@ -75,7 +75,7 @@ struct FridaEdgeCoverageHelper<'a> {
     drcov_basic_blocks: Vec<(usize, usize)>,
 }
 
-impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelper<'a> {
+impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
     fn transformer(&self) -> &Transformer<'a> {
         self.transformer.as_ref().unwrap()
     }
@@ -85,7 +85,7 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
         self.asan_runtime.borrow().register_thread();
     }
 
-    fn pre_exec(&self, input: &I) {
+    fn pre_exec<I: Input + HasTargetBytes>(&self, input: &I) {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:02x?}", slice);
@@ -94,7 +94,7 @@ impl<'a, I: Input + HasTargetBytes> FridaHelper<'a, I> for FridaEdgeCoverageHelp
             .unpoison(slice.as_ptr() as usize, slice.len());
     }
 
-    fn post_exec(&self, input: &I) {
+    fn post_exec<I: Input + HasTargetBytes>(&self, input: &I) {
         if self.options.drcov_enabled() {
             let filename = format!(
                 "./coverage/{:016x}.drcov",
@@ -685,7 +685,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
 
 struct FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a, I>,
+    FH: FridaHelper<'a>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -700,7 +700,7 @@ where
 
 impl<'a, FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a, I>,
+    FH: FridaHelper<'a>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -731,7 +731,14 @@ where
     /// Instruct the target about the input and run
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        self.base.run_target(input)
+        let res = self.base.run_target(input);
+        if !unsafe { ASAN_ERRORS.as_ref().unwrap() }.is_empty() {
+            println!("Crashing target as it had ASAN errors");
+            unsafe {
+                libc::raise(libc::SIGABRT);
+            }
+        }
+        res
     }
 
     /// Called right after execution finished.
@@ -755,7 +762,7 @@ where
 
 impl<'a, FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a, I>,
+    FH: FridaHelper<'a>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -773,7 +780,7 @@ where
 
 impl<'a, FH, H, I, OT> Named for FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a, I>,
+    FH: FridaHelper<'a>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -785,7 +792,7 @@ where
 
 impl<'a, FH, H, I, OT> FridaInProcessExecutor<'a, FH, H, I, OT>
 where
-    FH: FridaHelper<'a, I>,
+    FH: FridaHelper<'a>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -912,7 +919,8 @@ unsafe fn fuzz(
             )),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new_save_meta(objective_dir, true).unwrap(),
+            OnDiskCorpus::new_save_meta(objective_dir,
+                Some(OnDiskMetadataFormat::JsonPretty)).unwrap(),
             // Feedbacks to recognize an input as solution
             tuple_list!(CrashFeedback::new(), TimeoutFeedback::new(), AsanErrorsFeedback::new()),
         )
@@ -973,6 +981,7 @@ unsafe fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
+    frida_helper.register_thread();
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached
