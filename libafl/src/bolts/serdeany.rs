@@ -496,8 +496,6 @@ macro_rules! create_serde_registry_for_trait {
 create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::SerdeAny);
 pub use serdeany_registry::*;
 
-
-
 #[macro_export]
 macro_rules! impl_serdeany {
     ($struct_name:ident) => {
