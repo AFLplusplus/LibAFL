@@ -419,13 +419,13 @@ mod unix_signal_handler {
                 for reg in 0..31 {
                         print!("x{:02}: 0x{:016x} ", reg, _context.uc_mcontext.regs[reg as usize]);
                         if reg % 4 == 3 {
-                            print!("\n");
+                            println!();
                         }
                 }
                 println!("pc : 0x{:016x} ", _context.uc_mcontext.pc);
 
-                println!("{:━^100}", " BACKTRACE ");
-                println!("{:?}", backtrace::Backtrace::new())
+                //println!("{:━^100}", " BACKTRACE ");
+                //println!("{:?}", backtrace::Backtrace::new())
             }
 
 
