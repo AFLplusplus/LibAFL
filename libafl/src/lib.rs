@@ -100,6 +100,13 @@ impl From<postcard::Error> for Error {
     }
 }
 
+/// Stringify the json serializer error
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Serialize(format!("{:?}", err))
+    }
+}
+
 /// Create an AFL Error from io Error
 #[cfg(feature = "std")]
 impl From<io::Error> for Error {
