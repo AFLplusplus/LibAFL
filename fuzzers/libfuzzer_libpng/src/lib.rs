@@ -46,19 +46,24 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let client_args = FnArgs {
-        corpus_dirs: vec![PathBuf::from("./corpus")],
-        objective_dir: PathBuf::from("./crashes"),
-        broker_port: 1337,
-    };
-    launcher(in_broker, in_client, 1337, client_args, &cores).unwrap();
+    //let corpus_dirs = ;
+    //let objective_dir = ;
+    let broker_port = 1337;
+
+    launcher(
+        || in_broker(1337),
+        || {
+            in_client(
+                vec![PathBuf::from("./corpus")],
+                PathBuf::from("./crashes"),
+                broker_port,
+            )
+        },
+        &cores,
+    )
+    .unwrap();
 }
 
-struct FnArgs {
-    corpus_dirs: Vec<PathBuf>,
-    objective_dir: PathBuf,
-    broker_port: u16,
-}
 fn in_broker(broker_port: u16) -> Result<(), Error> {
     let stats = SimpleStats::new(|s| println!("{}", s));
     setup_new_llmp_broker::<
@@ -78,11 +83,15 @@ fn in_broker(broker_port: u16) -> Result<(), Error> {
         _,
     >(stats, broker_port)
 }
-fn in_client(fn_args: FnArgs) -> Result<(), Error> {
+fn in_client(
+    corpus_dirs: Vec<PathBuf>,
+    objective_dir: PathBuf,
+    broker_port: u16,
+) -> Result<(), Error> {
     let stats = SimpleStats::new(|s| println!("{}", s));
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_client::<_, _, StdShMem, _>(stats, fn_args.broker_port) {
+        match setup_restarting_mgr_client::<_, _, StdShMem, _>(stats, broker_port) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
@@ -100,7 +109,7 @@ fn in_client(fn_args: FnArgs) -> Result<(), Error> {
     });
 
     // If not restarting, create a State from scratch
-    let objective_dir = fn_args.objective_dir;
+    let objective_dir = objective_dir;
     let mut state = state.unwrap_or_else(|| {
         State::new(
             // RNG
@@ -172,15 +181,10 @@ fn in_client(fn_args: FnArgs) -> Result<(), Error> {
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut executor,
-                &mut restarting_mgr,
-                &scheduler,
-                &fn_args.corpus_dirs,
-            )
+            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
-                &fn_args.corpus_dirs
+                &corpus_dirs
             ));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }

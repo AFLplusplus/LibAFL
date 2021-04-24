@@ -481,34 +481,31 @@ mod tests {
     }
 }
 
+/// utility function which spawns a broker and n clients and binds each client to a cpu core
 #[cfg(unix)]
-pub fn launcher<T1, T2>(
-    broker_fn: fn(T1) -> Result<(), Error>,
-    client_fn: fn(T2) -> Result<(), Error>,
-    broker_args: T1,
-    client_args: T2,
-    cores: &[usize],
-) -> Result<(), Error> {
+pub fn launcher<F, F1>(broker_fn: F, client_fn: F1, cores: &[usize]) -> Result<(), Error>
+where
+    // no two closures, even if identical, have the same type
+    F: Fn() -> Result<(), Error>,
+    F1: Fn() -> Result<(), Error>,
+{
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
     let mut handles = vec![];
 
-    //let ags = std::env::args;
     //spawn clients
     for id in 0..num_cores {
         let bind_to = core_ids[id];
         if cores.iter().any(|&x| x == id) {
-            let _: Result<(), Error> = match unsafe { fork() }? {
+             match unsafe { fork() }? {
                 ForkResult::Parent(handle) => {
                     handles.push(handle.pid);
                     #[cfg(feature = "std")]
                     println!("child spawned and bound to core {}", id);
-                    Ok(())
                 }
                 ForkResult::Child => {
-                    //if bind {
                     core_affinity::set_for_current(bind_to);
-                    //}
+
                     //silence stdout and stderr for clients
                     #[cfg(feature = "std")]
                     {
@@ -517,8 +514,8 @@ pub fn launcher<T1, T2>(
                         dup2(stdout_file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
                         // todo: does the file fd get Dropped early?
                     }
-                    //clients keep retrying the connection to broker
-                    client_fn(client_args).unwrap();
+                    //clients keep retrying the connection to broker till the broker starts
+                    client_fn().unwrap();
                     break;
                 }
             };
@@ -526,9 +523,11 @@ pub fn launcher<T1, T2>(
     }
     #[cfg(feature = "std")]
     println!("I am broker!!.");
-    //broker binds to the 0th core??
-    //core_affinity::set_for_current(core_ids[0]);
-    let _ = broker_fn(broker_args);
+
+    //start the broker
+    //broker seem to underutilise core 0. so broker not binding to any core
+    let _ = broker_fn();
+
     //broker exited. kill all clients.
     for handle in handles.iter() {
         unsafe {
@@ -540,13 +539,12 @@ pub fn launcher<T1, T2>(
 const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
 
 #[cfg(windows)]
-pub fn launcher<T1, T2>(
-    broker_fn: fn(T1) -> Result<(), Error>,
-    client_fn: fn(T2) -> Result<(), Error>,
-    broker_args: T1,
-    client_args: T2,
-    cores: &[usize],
-) -> Result<(), Error> {
+pub fn launcher<F, F1>(broker_fn: F, client_fn: F1, cores: &[usize]) -> Result<(), Error>
+where
+    // no two closures, even if identical, have the same type
+    F: Fn() -> Result<(), Error>,
+    F1: Fn() -> Result<(), Error>,
+{
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
 
@@ -554,9 +552,9 @@ pub fn launcher<T1, T2>(
 
     match is_client {
         Ok(core_conf) => {
-            if core_conf == "bound" || core_conf == "none" {
-                //restarting or client not binding to any cpu. call client_fn
-                return client_fn(client_args);
+            if core_conf == "bound" {
+                //restarting client call client_fn
+                return client_fn();
             } else {
                 //first instance of a spawned client. bind to the specified core and start fuzzing
                 let core: usize = core_conf.parse().unwrap();
@@ -565,7 +563,7 @@ pub fn launcher<T1, T2>(
                 std::env::set_var(_AFL_LAUNCHER_CLIENT, "bound");
                 //todo: silence stdout and stderr for clients
 
-                return client_fn(client_args);
+                return client_fn();
             }
         }
         Err(std::env::VarError::NotPresent) => {
@@ -574,17 +572,13 @@ pub fn launcher<T1, T2>(
             let mut children = vec![];
             for id in 0..num_cores {
                 if cores.iter().any(|&x| x == id) {
-                    //if bind_to_core {
                     std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                    //} else {
-                    //std::env::set_var(_AFL_LAUNCHER_CLIENT, "none");
-                    //}
                     let child = startable_self().unwrap().spawn().unwrap();
                     children.push(child);
                 }
             }
             //finished spawning clients. start the broker
-            let _ = broker_fn(broker_args);
+            let _ = broker_fn();
 
             //broker exited. kill clients
             for child in children.iter_mut() {
@@ -608,46 +602,34 @@ fn dup2(fd: i32, device: i32) -> Result<(), Error> {
 }
 
 /// Parses core binding args from user input
-/// Returns `None` if no feedback, or a Vec of CPU IDs.
-/// broker always binds to the 0th core
+/// Returns a Vec of CPU IDs.
 /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
 /// ` ./fuzzer --cores all` -> one client runs on each available core
 pub fn parse_core_bind_arg(args: String) -> Option<Vec<usize>> {
-    let mut bind_to_core = false;
     let mut cores: Vec<usize> = vec![];
-    if args == "none" {
-        cores.push(1);
-        #[cfg(feature = "std")]
-        println!("Launching a single client without binding to any cpu core.");
+    if args == "all" {
+        let num_cores = core_affinity::get_core_ids().unwrap().len();
+        for x in 0..num_cores {
+            cores.push(x);
+        }
     } else {
         let core_args: Vec<&str> = args.split(',').collect();
-        if core_args.len() == 1 && core_args[0] == "all" {
-            let num_cores = core_affinity::get_core_ids().unwrap().len();
-            for x in 0..num_cores {
-                cores.push(x);
-            }
-        } else {
-            // broker always binds to the 0th core
-            // ./fuzzer --cores 1,2-4,6 -> clients run in cores 1,2,3,4,6
-            // ./fuzzer --cores all -> one client runs in each available core
-            for csv in core_args {
-                let core_range: Vec<&str> = csv.split('-').collect();
-                if core_range.len() == 1 {
-                    cores.push(core_range[0].parse::<usize>().unwrap());
-                } else if core_range.len() == 2 {
-                    for x in core_range[0].parse::<usize>().unwrap()
-                        ..(core_range[1].parse::<usize>().unwrap() + 1)
-                    {
-                        cores.push(x);
-                    }
+
+        // ./fuzzer --cores 1,2-4,6 -> clients run in cores 1,2,3,4,6
+        // ./fuzzer --cores all -> one client runs in each available core
+        for csv in core_args {
+            let core_range: Vec<&str> = csv.split('-').collect();
+            if core_range.len() == 1 {
+                cores.push(core_range[0].parse::<usize>().unwrap());
+            } else if core_range.len() == 2 {
+                for x in core_range[0].parse::<usize>().unwrap()
+                    ..(core_range[1].parse::<usize>().unwrap() + 1)
+                {
+                    cores.push(x);
                 }
             }
         }
-        bind_to_core = true;
     }
-    if bind_to_core {
-        Some(cores)
-    } else {
-        None
-    }
+
+    Some(cores)
 }
