@@ -17,7 +17,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-
 #include <vector>
 
 #define PNG_INTERNAL
