@@ -1431,7 +1431,6 @@ where
         if let Err(e) = self.llmp_out.send(out) {
             panic!("Error sending msg: {:?}", e)
         };
-        println!("are we here?");
         self.llmp_out.last_msg_sent = out;
         Ok(())
     }
@@ -1684,26 +1683,18 @@ where
 
                 if (*msg).tag == LLMP_TAG_EVENT_TO_BOTH {
                     let buf = (*msg).as_slice(map).unwrap().iter().cloned();
-                    let decomp_buf = buf
-                        .decode(&mut GZipDecoder::new())
-                        .collect::<Result<Vec<_>, _>>()
-                        .unwrap();
-                    //println!("after compression {:#?}", decomp_buf.as_slice());
-                    if let LlmpMsgHookResult::Handled =
-                        (on_new_msg)(client_id, (*msg).tag, decomp_buf.as_slice())?
-                    {
+                    let decomp_buf = buf.decode(&mut GZipDecoder::new()).collect::<Result<Vec<_>, _>>().unwrap();
+                    if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, decomp_buf.as_slice())? {
                         should_forward_msg = false
                     };
-                } else {
+                }
+                else{
                     let msg_buf = (*msg).as_slice(map)?;
-                    if let LlmpMsgHookResult::Handled =
-                        (on_new_msg)(client_id, (*msg).tag, msg_buf)?
-                    {
+                    if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
                         should_forward_msg = false
                     };
                 }
                 if should_forward_msg {
-                    println!("???");
                     self.forward_msg(msg)?;
                 }
             }

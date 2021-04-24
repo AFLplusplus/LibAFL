@@ -3,6 +3,7 @@
 use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::{cell::RefCell, marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
+use compression::prelude::*;
 
 #[cfg(feature = "std")]
 use core::ptr::read_volatile;
@@ -357,8 +358,20 @@ where
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
-                    let event: Event<I> = postcard::from_bytes(msg)?;
-                    events.push((sender_id, event));
+                    
+                    if tag == LLMP_TAG_EVENT_TO_BOTH {
+                        let buf = msg.into_iter().cloned();
+                        let decomp_buf : Vec<u8>= buf
+                            .decode(&mut GZipDecoder::new())
+                            .collect::<Result<Vec<_>, _>>()
+                            .unwrap();
+                        let event: Event<I> = postcard::from_bytes(&decomp_buf)?;
+                        events.push((sender_id, event));
+                    }
+                    else{
+                        let event: Event<I> = postcard::from_bytes(msg)?;
+                        events.push((sender_id, event));
+                    }
                 }
             }
             _ => {
