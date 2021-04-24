@@ -46,12 +46,10 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    //let corpus_dirs = ;
-    //let objective_dir = ;
     let broker_port = 1337;
 
     launcher(
-        || in_broker(1337),
+        || in_broker(broker_port),
         || {
             in_client(
                 vec![PathBuf::from("./corpus")],
