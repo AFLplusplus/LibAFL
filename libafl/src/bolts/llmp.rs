@@ -105,7 +105,6 @@ const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
 const LLMP_TAG_EXITING: Tag = 0x13C5171;
 /// Message is compressed
 const LLMP_TAG_COMPRESS: Tag = 0x636f6d70;
-const LLMP_TAG_EVENT_TO_BOTH: Tag = 0x2B0741;
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
 
@@ -889,7 +888,7 @@ where
 
         unsafe {
             match tag {
-                LLMP_TAG_EVENT_TO_BOTH => {
+                LLMP_TAG_COMPRESS => {
                     //println!("before compression: {:#?}", buf.to_vec());
                     let comp_buf = buf
                         .into_iter()
@@ -1681,7 +1680,7 @@ where
 
                 let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
 
-                if (*msg).tag == LLMP_TAG_EVENT_TO_BOTH {
+                if (*msg).tag == LLMP_TAG_COMPRESS {
                     let buf = (*msg).as_slice(map).unwrap().iter().cloned();
                     let decomp_buf = buf.decode(&mut GZipDecoder::new()).collect::<Result<Vec<_>, _>>().unwrap();
                     if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, decomp_buf.as_slice())? {

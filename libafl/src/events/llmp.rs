@@ -47,7 +47,7 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 ///
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-
+const LLMP_TAG_COMPRESS: Tag = 0x636f6d70;
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
@@ -359,7 +359,7 @@ where
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
                     
-                    if tag == LLMP_TAG_EVENT_TO_BOTH {
+                    if tag == LLMP_TAG_COMPRESS {
                         let buf = msg.into_iter().cloned();
                         let decomp_buf : Vec<u8>= buf
                             .decode(&mut GZipDecoder::new())
