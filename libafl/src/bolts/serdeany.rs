@@ -511,7 +511,7 @@ macro_rules! impl_serdeany {
         }
 
         #[allow(non_snake_case)]
-        #[ctor]
+        #[$crate::ctor]
         fn $struct_name() {
             $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
         }
