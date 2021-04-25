@@ -848,7 +848,7 @@ impl AsanRuntime {
     }
 
     extern "C" fn handle_trap(&mut self) {
-        let mut actual_pc = self.regs[31] + 66 * 4 + 4;
+        let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
             _ => actual_pc,
@@ -997,6 +997,7 @@ impl AsanRuntime {
         let output = out_stream.as_mut();
 
         let backtrace_printer = BacktracePrinter::new()
+            .clear_frame_filters()
             .print_addresses(true)
             .verbosity(Verbosity::Full)
             .add_frame_filter(Box::new(|frames| {
@@ -1354,18 +1355,18 @@ impl AsanRuntime {
                 ; mov x28, x0
                 ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
                 //; ldp x0, x1, [sp], #144
-                ; ldp x0, x1, [sp, #144]
+                ; ldp x0, x1, [sp, 0x10]
                 ; stp x0, x1, [x28]
 
-                ; adr x25, >here
-                ; here:
+                ; adr x25, >done
                 ; str x25, [x28, 0xf8]
+
+                ; adr x25, <report
                 ; adr x0, >eh_frame_fde
                 ; adr x27, >fde_address
                 ; ldr w26, [x27]
                 ; cmp w26, #0x0
                 ; b.ne >skip_register
-                ; sub x25, x25, #(0x4 * 22)
                 ; sub x25, x25, x27
                 ; str w25, [x27]
                 ; ldr x1, >register_frame_func
@@ -1472,20 +1473,19 @@ impl AsanRuntime {
                 ; stp x30, xzr, [x0, #0xf0]
                 ; mov x28, x0
                 ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
-                //; ldp x0, x1, [sp], #144
-                ; ldp x0, x1, [sp, #144]
+                ; ldp x0, x1, [sp, 0x10]
                 ; stp x0, x1, [x28]
 
-                ; adr x25, >here
-                ; here:
-                ; add x25, x25, #(3 * 4) // we need to add for this instruction and the nzcv instructions
+                ; adr x25, >done
+                ; add x25, x25, 4
                 ; str x25, [x28, 0xf8]
+
+                ; adr x25, <report
                 ; adr x0, >eh_frame_fde
                 ; adr x27, >fde_address
                 ; ldr w26, [x27]
                 ; cmp w26, #0x0
                 ; b.ne >skip_register
-                ; sub x25, x25, #(0x4 * 22)
                 ; sub x25, x25, x27
                 ; str w25, [x27]
                 ; ldr x1, >register_frame_func
