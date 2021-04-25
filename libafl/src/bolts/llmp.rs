@@ -104,6 +104,7 @@ const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
 /// The sender on this map is exiting (if broker exits, clients should exit gracefully);
 const LLMP_TAG_EXITING: Tag = 0x13C5171;
 /// Message is compressed
+const LLMP_TAG_EVENT_TO_BOTH: Tag = 0x2B0741;
 const LLMP_TAG_COMPRESS: Tag = 0x636f6d70;
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -887,32 +888,14 @@ where
         }
 
         unsafe {
-            match tag {
-                LLMP_TAG_COMPRESS => {
-                    //println!("before compression: {:#?}", buf.to_vec());
-                    let comp_buf = buf
-                        .into_iter()
-                        .cloned()
-                        .encode(&mut GZipEncoder::new(), Action::Finish)
-                        .collect::<Result<Vec<_>, _>>()
-                        .unwrap();
-                    let msg = self.alloc_next(comp_buf.len())?;
-                    (*msg).tag = tag;
-                    comp_buf
-                        .as_ptr()
-                        .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), comp_buf.len());
-                    self.send(msg)
-                }
-                _ => {
-                    let msg = self.alloc_next(buf.len())?;
-                    (*msg).tag = tag;
-                    buf.as_ptr()
-                        .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
-                    self.send(msg)
-                }
-            }
+            let msg = self.alloc_next(buf.len())?;
+            (*msg).tag = tag;
+            buf.as_ptr()
+                .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
+            self.send(msg)
         }
     }
+
     // Describe this cient in a way, that it can be restored later with `Self::on_existing_from_description`
     pub fn describe(&self) -> Result<LlmpDescription, Error> {
         let map = self.out_maps.last().unwrap();
@@ -1679,20 +1662,10 @@ where
                 let mut should_forward_msg = true;
 
                 let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
-
-                if (*msg).tag == LLMP_TAG_COMPRESS {
-                    let buf = (*msg).as_slice(map).unwrap().iter().cloned();
-                    let decomp_buf = buf.decode(&mut GZipDecoder::new()).collect::<Result<Vec<_>, _>>().unwrap();
-                    if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, decomp_buf.as_slice())? {
-                        should_forward_msg = false
-                    };
-                }
-                else{
-                    let msg_buf = (*msg).as_slice(map)?;
-                    if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
-                        should_forward_msg = false
-                    };
-                }
+                let msg_buf = (*msg).as_slice(map)?;
+                if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
+                    should_forward_msg = false
+                };
                 if should_forward_msg {
                     self.forward_msg(msg)?;
                 }

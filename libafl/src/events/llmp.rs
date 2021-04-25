@@ -1,9 +1,9 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{rc::Rc, string::ToString, vec::Vec};
+use compression::prelude::*;
 use core::{cell::RefCell, marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
-use compression::prelude::*;
 
 #[cfg(feature = "std")]
 use core::ptr::read_volatile;
@@ -199,7 +199,12 @@ where
                 broker.loop_forever(
                     &mut |sender_id: u32, tag: Tag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
-                            let event: Event<I> = postcard::from_bytes(msg)?;
+                            let buf = msg.into_iter().cloned();
+                            let decomp_buf: Vec<u8> = buf
+                                .decode(&mut GZipDecoder::new())
+                                .collect::<Result<Vec<_>, _>>()
+                                .unwrap();
+                            let event: Event<I> = postcard::from_bytes(&decomp_buf)?;
                             match Self::handle_in_broker(stats, sender_id, &event)? {
                                 BrokerEventResult::Forward => {
                                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
@@ -358,17 +363,15 @@ where
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
-                    
-                    if tag == LLMP_TAG_COMPRESS {
+                    if tag == LLMP_TAG_EVENT_TO_BOTH {
                         let buf = msg.into_iter().cloned();
-                        let decomp_buf : Vec<u8>= buf
+                        let decomp_buf: Vec<u8> = buf
                             .decode(&mut GZipDecoder::new())
                             .collect::<Result<Vec<_>, _>>()
                             .unwrap();
                         let event: Event<I> = postcard::from_bytes(&decomp_buf)?;
                         events.push((sender_id, event));
-                    }
-                    else{
+                    } else {
                         let event: Event<I> = postcard::from_bytes(msg)?;
                         events.push((sender_id, event));
                     }
@@ -388,7 +391,15 @@ where
 
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+        let buf = &serialized;
+        let comp_buf = buf
+            .into_iter()
+            .cloned()
+            .encode(&mut GZipEncoder::new(), Action::Finish)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &comp_buf)?;
         Ok(())
     }
 }
