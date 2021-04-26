@@ -85,7 +85,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
-            compressor: GzipCompressor::new(1048576),
+            compressor: GzipCompressor::new(1024),
             phantom: PhantomData,
         })
     }
@@ -133,7 +133,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
-            compressor: GzipCompressor::new(1048576),
+            compressor: GzipCompressor::new(1024),
             phantom: PhantomData,
         })
     }
@@ -149,7 +149,7 @@ where
             llmp: llmp::LlmpConnection::IsClient {
                 client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             },
-            compressor: GzipCompressor::new(1048576),
+            compressor: GzipCompressor::new(1024),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -172,7 +172,7 @@ where
                 shmem_provider,
                 description,
             )?,
-            compressor: GzipCompressor::new(1048576),
+            compressor: GzipCompressor::new(1024),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
