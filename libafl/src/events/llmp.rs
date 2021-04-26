@@ -25,6 +25,7 @@ use crate::bolts::os::ashmem_server::AshmemService;
 use crate::bolts::shmem::StdShMemProvider;
 use crate::{
     bolts::{
+        compress::GzipCompressor,
         llmp::{
             self, Flag, LlmpClient, LlmpClientDescription, LlmpSender, Tag, LLMP_FLAG_COMPRESSED,
             LLMP_FLAG_INITIALIZED,
@@ -32,7 +33,7 @@ use crate::{
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
-    events::{BrokerEventResult, Event, EventManager, GzipCompressor},
+    events::{BrokerEventResult, Event, EventManager},
     executors::ExitKind,
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -364,7 +365,7 @@ where
         let mut events = vec![];
         match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {
-                while let Some((sender_id, tag, flag, msg)) = client.recv_buf()? {
+                while let Some((sender_id, tag, flag, msg)) = client.recv_buf_with_flag()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
@@ -667,7 +668,7 @@ where
             (None, LlmpRestartingEventManager::new(client_mgr, sender))
         }
         // Restoring from a previous run, deserialize state and corpus.
-        Some((_sender, _tag, _flag, msg)) => {
+        Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
             let (state, mgr): (S, LlmpEventManager<I, S, SP, ST>) =
                 deserialize_state_mgr(&shmem_provider, &msg)?;

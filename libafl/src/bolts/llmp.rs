@@ -1116,7 +1116,21 @@ where
     /// Returns the next message, tag, buf, if avaliable, else None
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, &[u8])>, Error> {
+        unsafe {
+            Ok(match self.recv()? {
+                Some(msg) => Some((
+                    (*msg).sender,
+                    (*msg).tag,
+                    (*msg).as_slice(&mut self.current_recv_map)?,
+                )),
+                None => None,
+            })
+        }
+    }
+
+    #[inline]
+    pub fn recv_buf_with_flag(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
         unsafe {
             Ok(match self.recv()? {
                 Some(msg) => Some((
@@ -1132,13 +1146,12 @@ where
 
     /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, Flag, &[u8]), Error> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, &[u8]), Error> {
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
                 (*msg).sender,
                 (*msg).tag,
-                (*msg).flag,
                 (*msg).as_slice(&mut self.current_recv_map)?,
             ))
         }
@@ -1886,14 +1899,18 @@ where
     /// Returns the next message, tag, buf, if avaliable, else None
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, &[u8])>, Error> {
         self.receiver.recv_buf()
     }
 
     /// Receives a buf from the broker, looping until a messages becomes avaliable
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, Flag, &[u8]), Error> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, &[u8]), Error> {
         self.receiver.recv_buf_blocking()
+    }
+
+    pub fn recv_buf_with_flag(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
+        self.receiver.recv_buf_with_flag()
     }
 
     #[cfg(feature = "std")]
@@ -1999,7 +2016,7 @@ mod tests {
         broker
             .once(&mut |_sender_id, _tag, _flag, _msg| Ok(ForwardToClients))
             .unwrap();
-        let (_sender_id, tag2, _flag, arr2) = client.recv_buf_blocking().unwrap();
+        let (_sender_id, tag2, arr2) = client.recv_buf_blocking().unwrap();
         assert_eq!(tag, tag2);
         assert_eq!(arr[0], arr2[0]);
 

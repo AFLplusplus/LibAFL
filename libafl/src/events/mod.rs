@@ -4,8 +4,6 @@ pub mod simple;
 pub use simple::*;
 pub mod llmp;
 pub use llmp::*;
-pub mod compress;
-pub use compress::*;
 
 use alloc::{string::String, vec::Vec};
 use core::{fmt, marker::PhantomData, time::Duration};
