@@ -42,7 +42,7 @@ use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
-use std::{env, ffi::c_void, fs::File, io::{BufWriter, Write}, path::PathBuf, rc::Rc};
+use std::{env, ffi::c_void, fs::File, io::{BufWriter, Write}, marker::PhantomData, path::PathBuf, rc::Rc};
 
 use libafl_frida::{FridaOptions, asan_rt::{ASAN_ERRORS, AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime}};
 
@@ -52,9 +52,9 @@ pub trait FridaHelper<'a> {
 
     fn register_thread(&self);
 
-    fn pre_exec<I: Input + HasTargetBytes>(&self, input: &I);
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
 
-    fn post_exec<I: Input + HasTargetBytes>(&self, input: &I);
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
 
     fn stalker_enabled(&self) -> bool;
 }
@@ -85,7 +85,7 @@ impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
         self.asan_runtime.borrow().register_thread();
     }
 
-    fn pre_exec<I: Input + HasTargetBytes>(&self, input: &I) {
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:02x?}", slice);
@@ -94,13 +94,13 @@ impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
             .unpoison(slice.as_ptr() as usize, slice.len());
     }
 
-    fn post_exec<I: Input + HasTargetBytes>(&self, input: &I) {
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
         if self.options.drcov_enabled() {
             let filename = format!(
                 "./coverage/{:016x}.drcov",
                 seahash::hash(input.target_bytes().as_slice())
             );
-            DrCovWriter::new(&filename, &self.ranges, &self.drcov_basic_blocks).write();
+            DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
         if self.options.asan_enabled() {
@@ -119,7 +119,7 @@ impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
 struct DrCovWriter<'a> {
     writer: BufWriter<File>,
     module_mapping: &'a RangeMap<usize, (u16, &'a str)>,
-    basic_blocks: &'a Vec<(usize, usize)>,
+    basic_blocks: &'a mut Vec<(usize, usize)>,
 }
 
 #[repr(C)]
@@ -133,7 +133,7 @@ impl<'a> DrCovWriter<'a> {
     pub fn new(
         path: &str,
         module_mapping: &'a RangeMap<usize, (u16, &str)>,
-        basic_blocks: &'a Vec<(usize, usize)>,
+        basic_blocks: &'a mut Vec<(usize, usize)>,
     ) -> Self {
         Self {
             writer: BufWriter::new(
@@ -172,7 +172,7 @@ impl<'a> DrCovWriter<'a> {
         self.writer
             .write_all(format!("BB Table: {} bbs\n", self.basic_blocks.len()).as_bytes())
             .unwrap();
-        for (start, end) in self.basic_blocks {
+        for (start, end) in self.basic_blocks.drain(0..) {
             let (range, (id, _)) = self.module_mapping.get_key_value(&start).unwrap();
             let basic_block = DrCovBasicBlockEntry {
                 start: (start - range.start) as u32,
@@ -296,7 +296,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
             }
 
             if helper.options.drcov_enabled() {
-                std::fs::create_dir("./coverage")
+                std::fs::create_dir_all("./coverage")
                     .expect("failed to create directory for coverage files");
             }
 
@@ -683,9 +683,9 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
     }
 }
 
-struct FridaInProcessExecutor<'a, FH, H, I, OT>
+struct FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -694,13 +694,14 @@ where
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
-    helper: &'a FH,
+    helper: &'c mut FH,
     followed: bool,
+    _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c,  FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -760,9 +761,9 @@ where
     }
 }
 
-impl<'a, FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c,  FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -778,9 +779,9 @@ where
     }
 }
 
-impl<'a, FH, H, I, OT> Named for FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c,  FH, H, I, OT> Named for FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -790,14 +791,14 @@ where
     }
 }
 
-impl<'a, FH, H, I, OT> FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c,  FH, H, I, OT> FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH, timeout: Duration) -> Self {
+    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'c mut FH, timeout: Duration) -> Self {
         let mut stalker = Stalker::new(gum);
 
         // Let's exclude the main module and libc.so at least:
@@ -815,6 +816,7 @@ where
             stalker,
             helper,
             followed: false,
+            _phantom: PhantomData,
         }
     }
 }
@@ -890,6 +892,11 @@ unsafe fn fuzz(
     let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
         lib.get(symbol_name.as_bytes()).unwrap();
 
+    let mut frida_harness = move |buf: &[u8]| {
+        (target_func)(buf.as_ptr(), buf.len());
+        ExitKind::Ok
+    };
+
     let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, FridaOptions::parse_env_options(), module_name, &modules_to_instrument);
 
     // Create an observation channel using the coverage map
@@ -898,11 +905,6 @@ unsafe fn fuzz(
         frida_helper.map.as_mut_ptr(),
         MAP_SIZE,
     ));
-
-    let mut frida_harness = move |buf: &[u8]| {
-        (target_func)(buf.as_ptr(), buf.len());
-        ExitKind::Ok
-    };
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -947,6 +949,7 @@ unsafe fn fuzz(
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
+
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = FridaInProcessExecutor::new(
         &gum,
@@ -957,8 +960,8 @@ unsafe fn fuzz(
             &mut state,
             &mut restarting_mgr,
         )?,
-        &frida_helper,
-        Duration::new(5, 0),
+        &mut frida_helper,
+        Duration::new(10, 0),
     );
     // Let's exclude the main module and libc.so at least:
     executor.stalker.exclude(&MemoryRange::new(
@@ -981,7 +984,7 @@ unsafe fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    frida_helper.register_thread();
+    //executor.helper.register_thread();
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached
