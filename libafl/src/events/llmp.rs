@@ -217,10 +217,10 @@ where
                 #[cfg(feature = "llmp_compress")]
                 let compressor = &self.compressor;
                 broker.loop_forever(
-                    &mut |sender_id: u32, tag: Tag, flag: Flag, msg: &[u8]| {
+                    &mut |sender_id: u32, tag: Tag, _flag: Flag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
                             #[cfg(feature = "llmp_compress")]
-                            let event: Event<I> = match compressor.decompress(tag, flag, msg) {
+                            let event: Event<I> = match compressor.decompress(tag, _flag, msg) {
                                 Some(decompressed) => postcard::from_bytes(&decompressed)?,
                                 _ => postcard::from_bytes(msg)?,
                             };
