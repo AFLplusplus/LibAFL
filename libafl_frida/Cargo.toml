@@ -22,7 +22,7 @@ gothook = { version = "0.1" }
 regex = "1.4"
 dynasmrt = "1.0.1"
 capstone = "0.8.0"
-color-backtrace ={ version = "0.5.0", path = "../../color-backtrace", features = ["print-addresses"]}
+color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
 termcolor = "1.1.2"
 serde = "1.0"
 backtrace = { version = "0.3", default-features = false, features = ["std", "serde",  "libbacktrace"] }
