@@ -1,5 +1,4 @@
 use crate::bolts::llmp::{Flag, Tag, LLMP_FLAG_COMPRESSED};
-use crate::Error;
 use alloc::vec::Vec;
 use compression::prelude::*;
 use core::fmt::Debug;
@@ -18,10 +17,6 @@ impl GzipCompressor {
 }
 
 impl GzipCompressor {
-    fn pre_exec(&self) -> Result<(), Error> {
-        Ok(())
-    }
-
     pub fn compress(&self, buf: &[u8]) -> Option<Vec<u8>> {
         if buf.len() > self.threshold {
             let t1 = crate::utils::current_time();
@@ -74,9 +69,5 @@ impl GzipCompressor {
             );
             None
         }
-    }
-
-    fn post_exec(&self) -> Result<(), Error> {
-        Ok(())
     }
 }

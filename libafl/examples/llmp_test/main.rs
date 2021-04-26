@@ -14,6 +14,7 @@ use libafl::bolts::llmp::Tag;
 use libafl::{
     bolts::{
         llmp,
+        llmp::LLMP_FLAG_INITIALIZED,
         shmem::{ShMemProvider, StdShMemProvider},
     },
     Error,
@@ -32,7 +33,7 @@ fn adder_loop(port: u16) -> ! {
     loop {
         let mut msg_counter = 0;
         loop {
-            let (_sender, tag, buf) = match client.recv_buf().unwrap() {
+            let (_sender, tag, _flag, buf) = match client.recv_buf().unwrap() {
                 None => break,
                 Some(msg) => msg,
             };
@@ -57,7 +58,11 @@ fn adder_loop(port: u16) -> ! {
             );
 
             client
-                .send_buf(_TAG_MATH_RESULT_V1, &current_result.to_le_bytes())
+                .send_buf(
+                    _TAG_MATH_RESULT_V1,
+                    &current_result.to_le_bytes(),
+                    LLMP_FLAG_INITIALIZED,
+                )
                 .unwrap();
             last_result = current_result;
         }
@@ -77,7 +82,9 @@ fn large_msg_loop(port: u16) -> ! {
     let meg_buf = [1u8; 1 << 20];
 
     loop {
-        client.send_buf(_TAG_1MEG_V1, &meg_buf).unwrap();
+        client
+            .send_buf(_TAG_1MEG_V1, &meg_buf, LLMP_FLAG_INITIALIZED)
+            .unwrap();
         println!("Sending the next megabyte");
         thread::sleep(time::Duration::from_millis(100))
     }
@@ -87,6 +94,7 @@ fn large_msg_loop(port: u16) -> ! {
 fn broker_message_hook(
     client_id: u32,
     tag: llmp::Tag,
+    _flag: llmp::Flag,
     message: &[u8],
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
     match tag {
@@ -152,7 +160,11 @@ fn main() {
             loop {
                 counter = counter.wrapping_add(1);
                 client
-                    .send_buf(_TAG_SIMPLE_U32_V1, &counter.to_le_bytes())
+                    .send_buf(
+                        _TAG_SIMPLE_U32_V1,
+                        &counter.to_le_bytes(),
+                        LLMP_FLAG_INITIALIZED,
+                    )
                     .unwrap();
                 println!("CTR Client writing {}", counter);
                 thread::sleep(Duration::from_secs(1))

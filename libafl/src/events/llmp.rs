@@ -49,9 +49,6 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 ///
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-const LLMP_TAG_COMPRESS: Tag = 0x636f6d70;
-//const LLMP_FLAG_INITIALIZED : Flag = 0x0;
-//const LLMP_FLAG_COMPRESSED : Flag = 0x1;
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
