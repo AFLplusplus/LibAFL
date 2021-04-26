@@ -84,8 +84,12 @@ where
                 time,
                 executions,
             } => {
-                stats.client_stats_mut()[0].update_corpus_size(*corpus_size as u64);
-                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
+                stats
+                    .client_stats_mut_for(0)
+                    .update_corpus_size(*corpus_size as u64);
+                stats
+                    .client_stats_mut_for(0)
+                    .update_executions(*executions as u64, *time);
                 stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
@@ -95,7 +99,9 @@ where
                 phantom: _,
             } => {
                 // TODO: The stats buffer should be added on client add.
-                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
+                stats
+                    .client_stats_mut_for(0)
+                    .update_executions(*executions as u64, *time);
                 stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
@@ -113,7 +119,9 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
-                stats.client_stats_mut()[0].update_objective_size(*objective_size as u64);
+                stats
+                    .client_stats_mut_for(0)
+                    .update_objective_size(*objective_size as u64);
                 stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }

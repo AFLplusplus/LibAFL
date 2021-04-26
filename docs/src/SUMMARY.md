@@ -14,7 +14,6 @@
 - [Design](./design/design.md)
   - [Core Concepts](./design/core_concepts.md)
   - [Architecture](./design/architecture.md)
-  - [The State](./design/state.md)
 
 - [Understanding Metadata](./medatata/metadata.md)
   - [Definition](./medatata/definition.md)

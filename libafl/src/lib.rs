@@ -10,8 +10,9 @@ extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
 #[cfg(feature = "std")]
-#[macro_use]
 extern crate ctor;
+#[cfg(feature = "std")]
+pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "libafl_derive")]
@@ -98,6 +99,14 @@ impl fmt::Display for Error {
 /// Stringify the postcard serializer error
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
+        Self::Serialize(format!("{:?}", err))
+    }
+}
+
+/// Stringify the json serializer error
+#[cfg(feature = "std")]
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
         Self::Serialize(format!("{:?}", err))
     }
 }

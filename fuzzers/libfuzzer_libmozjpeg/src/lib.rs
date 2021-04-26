@@ -55,8 +55,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr_std(stats, broker_port)
-            .expect("Failed to setup the restarter".into());
+        setup_restarting_mgr_std(stats, broker_port).expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
     let edges_observer =
@@ -77,7 +76,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(MaxMapFeedback::new_with_observer(&edges_observer)),
+            tuple_list!(
+                MaxMapFeedback::new_with_observer(&edges_observer),
+                MaxMapFeedback::new_with_observer(&cmps_observer),
+                MaxMapFeedback::new_with_observer(&allocs_observer)
+            ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),

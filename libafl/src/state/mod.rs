@@ -549,7 +549,11 @@ where
 
         if is_solution {
             // If the input is a solution, add it to the respective corpus
-            self.solutions_mut().add(Testcase::new(input.clone()))?;
+            let mut testcase = Testcase::new(input.clone());
+            self.objectives_mut().append_metadata_all(&mut testcase)?;
+            self.solutions_mut().add(testcase)?;
+        } else {
+            self.objectives_mut().discard_metadata_all(&input)?;
         }
 
         let corpus_idx = self.add_if_interesting(&input, fitness, scheduler)?;
