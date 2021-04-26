@@ -155,7 +155,7 @@ impl ShMemProvider for ServedShMemProvider {
 
     fn release_map(&mut self, map: &mut Self::Mem) {
         let (refcount, _) = self.send_receive(AshmemRequest::Deregister(map.server_fd));
-        if refcount == 1 {
+        if refcount == 0 {
             unsafe {
                 ManuallyDrop::drop(&mut map.inner);
             }
@@ -196,6 +196,7 @@ impl AshmemClient {
 pub struct AshmemService {
     provider: AshmemShMemProvider,
     clients: HashMap<RawFd, AshmemClient>,
+    all_maps: HashMap<i32, Rc<RefCell<AshmemShMem>>>,
 }
 
 #[derive(Debug)]
@@ -212,6 +213,7 @@ impl AshmemService {
         Ok(AshmemService {
             provider: AshmemShMemProvider::new()?,
             clients: HashMap::new(),
+            all_maps: HashMap::new(),
         })
     }
 
@@ -242,8 +244,12 @@ impl AshmemService {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 if client.maps.contains_key(&description.id.to_int()) {
                     Ok(AshmemResponse::Mapping(client.maps.get_mut(&description.id.to_int()).as_mut().unwrap().first().as_mut().unwrap().clone()))
+                } else if self.all_maps.contains_key(&description.id.to_int()) {
+                    Ok(AshmemResponse::Mapping(self.all_maps.get_mut(&description.id.to_int()).unwrap().clone()))
                 } else {
-                    Ok(AshmemResponse::Mapping(Rc::new(RefCell::new(self.provider.from_description(description)?))))
+                    let new_rc = Rc::new(RefCell::new(self.provider.from_description(description)?));
+                    self.all_maps.insert(description.id.to_int(), new_rc.clone());
+                    Ok(AshmemResponse::Mapping(new_rc))
                 }
             }
             AshmemRequest::Deregister(map_id) => {
@@ -252,7 +258,7 @@ impl AshmemService {
                 Ok(AshmemResponse::RefCount(Rc::strong_count(&map) as u32))
             }
         };
-        //println!("send ashmem client: {}, respoonse: {:?}", client_id, &response);
+        //println!("send ashmem client: {}, response: {:?}", client_id, &response);
 
         response
     }
@@ -286,7 +292,7 @@ impl AshmemService {
                 client
                     .stream
                     .send_fds(&id.to_string().as_bytes(), &[server_fd])?;
-                client.maps.entry(server_fd).or_default().push(mapping);
+                client.maps.entry(server_fd).or_default().push(mapping.clone());
             },
             AshmemResponse::Id(id) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
