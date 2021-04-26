@@ -4,7 +4,13 @@ Advanced Fuzzing Library - Slot your own fuzzers together and extend their featu
 
 LibAFL is written and maintained by Andrea Fioraldi <andreafioraldi@gmail.com> and Dominik Maier <mail@dmnk.co>.
 
-It is released as Open Source Software under the [Apache v2](LICENSE-APACHE) or [MIT](LICENSE-MIT) licenses.
+## What
+
+LibAFL is a collection of reusable pieces of fuzzers, written in Rust.
+
+It offers a main crate that provide building blocks for custom fuzzers, [libafl](./libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./libafl_cc).
+
+LibAFL is fast, multi-platform, no_std compatible, and scales over cores (and machines in the near future!).
 
 ## Getting started
 
@@ -20,29 +26,50 @@ Build the library using
 cargo build --release
 ```
 
-Build the documentation with
+Build the API documentation with
 
 ```
 cargo doc
 ```
 
-We collect example fuzzers in `./fuzzers`. They can be build using `cargo build --example [fuzzer_name] --release`.
+Browse the LibAFL book with (requires [mdbook](https://github.com/rust-lang/mdBook))
 
-The best-tested fuzzer is `./fuzzers/libfuzzer_libpng`, a clone of libfuzzer using libafl for a libpng harness.
-See its readme [here](./fuzzers/libfuzzer_libpng/README.md).
+```
+cd docs && mdbook serve
+```
 
-## The Core Concepts
+We collect example fuzzers in [`./fuzzers`](./fuzzers/).
 
-The entire library is based on some core concepts that we think can generalize Fuzz Testing.
+The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
 
-We're still working on extending the documentation.
+## Resources
 
-In the meantime, you can watch the Video from last year's RC3, here:
++ [Installation guide](./docs/src/getting_started/setup.md)
 
-[![Video explaining libAFL's core concepts](http://img.youtube.com/vi/3RWkT1Q5IV0/3.jpg)](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO")
++ Our RC3 [talk](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO") explaining the core concepts
+
++ [Online API documentation](https://docs.rs/libafl/)
+
++ The LibAFL book [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
 
 ## Contributing
 
 Check the [TODO.md](./TODO.md) file for features that we plan to support.
 
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
+
+#### License
+
+<sup>
+Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
+2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
+</sup>
+
+<br>
+
+<sub>
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.
+</sub>
+
