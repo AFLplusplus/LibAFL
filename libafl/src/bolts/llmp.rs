@@ -103,8 +103,8 @@ const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
 /// The sender on this map is exiting (if broker exits, clients should exit gracefully);
 const LLMP_TAG_EXITING: Tag = 0x13C5171;
 
-pub const LLMP_FLAG_INITIALIZED : Flag = 0x0;
-pub const LLMP_FLAG_COMPRESSED : Flag = 0x1;
+pub const LLMP_FLAG_INITIALIZED: Flag = 0x0;
+pub const LLMP_FLAG_COMPRESSED: Flag = 0x1;
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -301,7 +301,7 @@ pub struct LlmpMsg {
     /// Sender of this messge
     pub sender: u32,
     /// flag, currently only used for indicating compression
-    pub flag : Flag,
+    pub flag: Flag,
     /// The message ID, unique per page
     pub message_id: u64,
     /// Buffer length as specified by the user
@@ -423,8 +423,8 @@ where
     /// Sends the given buffer over this connection, no matter if client or broker.
     pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
         match self {
-            LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf ,flag),
-            LlmpConnection::IsClient { client } => client.send_buf(tag, buf ,flag),
+            LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf, flag),
+            LlmpConnection::IsClient { client } => client.send_buf(tag, buf, flag),
         }
     }
 }
@@ -877,7 +877,7 @@ where
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag : Flag) -> Result<(), Error> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
         // Make sure we don't reuse already allocated tags
         if tag == LLMP_TAG_NEW_SHM_CLIENT
             || tag == LLMP_TAG_END_OF_PAGE
@@ -1492,7 +1492,7 @@ where
     }
 
     /// Broadcasts the given buf to all lients
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag : Flag) -> Result<(), Error> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
         self.llmp_out.send_buf(tag, buf, flag)
     }
 
@@ -1669,7 +1669,9 @@ where
 
                 let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
                 let msg_buf = (*msg).as_slice(map)?;
-                if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, (*msg).flag, msg_buf)? {
+                if let LlmpMsgHookResult::Handled =
+                    (on_new_msg)(client_id, (*msg).tag, (*msg).flag, msg_buf)?
+                {
                     should_forward_msg = false
                 };
                 if should_forward_msg {
@@ -1831,7 +1833,7 @@ where
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag : Flag) -> Result<(), Error> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
         self.sender.send_buf(tag, buf, flag)
     }
 
@@ -1949,8 +1951,7 @@ mod tests {
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
-        LLMP_FLAG_INITIALIZED,
-        Tag,
+        Tag, LLMP_FLAG_INITIALIZED,
     };
 
     use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
@@ -1996,7 +1997,7 @@ mod tests {
 
         // Forward stuff to clients
         broker
-            .once(&mut |_sender_id, _tag, _flag,  _msg| Ok(ForwardToClients))
+            .once(&mut |_sender_id, _tag, _flag, _msg| Ok(ForwardToClients))
             .unwrap();
         let (_sender_id, tag2, _flag, arr2) = client.recv_buf_blocking().unwrap();
         assert_eq!(tag, tag2);

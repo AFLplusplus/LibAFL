@@ -25,7 +25,10 @@ use crate::bolts::os::ashmem_server::AshmemService;
 use crate::bolts::shmem::StdShMemProvider;
 use crate::{
     bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag, Flag, LLMP_FLAG_INITIALIZED, LLMP_FLAG_COMPRESSED},
+        llmp::{
+            self, Flag, LlmpClient, LlmpClientDescription, LlmpSender, Tag, LLMP_FLAG_COMPRESSED,
+            LLMP_FLAG_INITIALIZED,
+        },
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -46,7 +49,7 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 ///
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-const LLMP_TAG_COMPRESS : Tag = 0x636f6d70;
+const LLMP_TAG_COMPRESS: Tag = 0x636f6d70;
 //const LLMP_FLAG_INITIALIZED : Flag = 0x0;
 //const LLMP_FLAG_COMPRESSED : Flag = 0x1;
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
@@ -206,7 +209,7 @@ where
                 broker.loop_forever(
                     &mut |sender_id: u32, tag: Tag, flag: Flag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
-                            let event: Event<I> = match compressor.decompress(tag, flag, msg){
+                            let event: Event<I> = match compressor.decompress(tag, flag, msg) {
                                 Some(decompressed) => postcard::from_bytes(&decompressed)?,
                                 _ => postcard::from_bytes(msg)?,
                             };
@@ -369,7 +372,7 @@ where
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
                     if tag == LLMP_TAG_EVENT_TO_BOTH {
-                        let event: Event<I> = match self.compressor.decompress(tag, flag, msg){
+                        let event: Event<I> = match self.compressor.decompress(tag, flag, msg) {
                             Some(decompressed) => postcard::from_bytes(&decompressed)?,
                             _ => postcard::from_bytes(msg)?,
                         };
@@ -394,13 +397,18 @@ where
 
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        let flag : Flag = LLMP_FLAG_INITIALIZED;
+        let flag: Flag = LLMP_FLAG_INITIALIZED;
         match self.compressor.compress(&serialized) {
             Some(comp_buf) => {
-                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &comp_buf, flag | LLMP_FLAG_COMPRESSED)?;
+                self.llmp.send_buf(
+                    LLMP_TAG_EVENT_TO_BOTH,
+                    &comp_buf,
+                    flag | LLMP_FLAG_COMPRESSED,
+                )?;
             }
             None => {
-                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized, flag)?;
+                self.llmp
+                    .send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized, flag)?;
             }
         }
         Ok(())
@@ -477,8 +485,11 @@ where
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         unsafe { self.sender.reset() };
         let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
-        self.sender
-            .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized, LLMP_FLAG_INITIALIZED)
+        self.sender.send_buf(
+            _LLMP_TAG_RESTART,
+            &state_corpus_serialized,
+            LLMP_FLAG_INITIALIZED,
+        )
     }
 
     fn process<CS, E, OT>(
