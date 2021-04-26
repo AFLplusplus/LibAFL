@@ -50,7 +50,7 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 
 + [Online API documentation](https://docs.rs/libafl/)
 
-+ The LibAFL book [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
++ The LibAFL book (very WIP) [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
 
 ## Contributing
 
