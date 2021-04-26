@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use libafl::{Error, SerdeAny, bolts::{ownedref::Cptr, tuples::Named}, corpus::Testcase, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}, state::HasMetadata, utils::{find_mapping_for_address, walk_self_maps}};
+use libafl::{Error, SerdeAny, bolts::{ownedref::OwnedPtr, tuples::Named}, corpus::Testcase, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}, state::HasMetadata, utils::{find_mapping_for_address, walk_self_maps}};
 use nix::{
     libc::{memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -1724,7 +1724,7 @@ pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 #[derive(Serialize, Deserialize)]
 pub struct AsanErrorsObserver
 {
-    errors: Cptr<Option<AsanErrors>>,
+    errors: OwnedPtr<Option<AsanErrors>>,
 }
 
 impl Observer for AsanErrorsObserver
@@ -1751,26 +1751,26 @@ impl Named for AsanErrorsObserver
 impl AsanErrorsObserver {
     pub fn new(errors: &'static Option<AsanErrors>) -> Self {
         Self {
-            errors: Cptr::Cptr(errors as *const Option<AsanErrors>)
+            errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>)
         }
     }
 
     pub fn new_owned(errors: Option<AsanErrors>) -> Self {
         Self {
-            errors: Cptr::Owned(Box::new(errors))
+            errors: OwnedPtr::Owned(Box::new(errors))
         }
     }
 
     pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
-            errors: Cptr::Cptr(errors)
+            errors: OwnedPtr::Ptr(errors)
         }
     }
 
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
-            Cptr::Cptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
-            Cptr::Owned(b) => b.as_ref().as_ref()
+            OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
+            OwnedPtr::Owned(b) => b.as_ref().as_ref()
         }
     }
 }
