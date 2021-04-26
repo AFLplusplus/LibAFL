@@ -421,10 +421,17 @@ where
     }
 
     /// Sends the given buffer over this connection, no matter if client or broker.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         match self {
-            LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf, flag),
-            LlmpConnection::IsClient { client } => client.send_buf(tag, buf, flag),
+            LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf),
+            LlmpConnection::IsClient { client } => client.send_buf(tag, buf),
+        }
+    }
+
+    pub fn send_buf_with_flag(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
+        match self {
+            LlmpConnection::IsBroker { broker } => broker.send_buf_with_flag(tag, flag, buf),
+            LlmpConnection::IsClient { client } => client.send_buf_with_flag(tag, flag, buf),
         }
     }
 }
@@ -877,7 +884,30 @@ where
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
+        // Make sure we don't reuse already allocated tags
+        if tag == LLMP_TAG_NEW_SHM_CLIENT
+            || tag == LLMP_TAG_END_OF_PAGE
+            || tag == LLMP_TAG_UNINITIALIZED
+            || tag == LLMP_TAG_UNSET
+        {
+            return Err(Error::Unknown(format!(
+                "Reserved tag supplied to send_buf ({:#X})",
+                tag
+            )));
+        }
+
+        unsafe {
+            let msg = self.alloc_next(buf.len())?;
+            (*msg).tag = tag;
+            (*msg).flag = LLMP_FLAG_INITIALIZED;
+            buf.as_ptr()
+                .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
+            self.send(msg)
+        }
+    }
+
+    pub fn send_buf_with_flag(&mut self, tag: Tag, flag: Flag, buf: &[u8]) -> Result<(), Error> {
         // Make sure we don't reuse already allocated tags
         if tag == LLMP_TAG_NEW_SHM_CLIENT
             || tag == LLMP_TAG_END_OF_PAGE
@@ -1500,13 +1530,17 @@ where
             }
         }
         self.llmp_out
-            .send_buf(LLMP_TAG_EXITING, &[], LLMP_FLAG_INITIALIZED)
+            .send_buf(LLMP_TAG_EXITING, &[])
             .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
     }
 
     /// Broadcasts the given buf to all lients
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
-        self.llmp_out.send_buf(tag, buf, flag)
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
+        self.llmp_out.send_buf(tag, buf)
+    }
+
+    pub fn send_buf_with_flag(&mut self, tag: Tag, flag: Flag, buf: &[u8]) -> Result<(), Error> {
+        self.llmp_out.send_buf_with_flag(tag, flag, buf)
     }
 
     #[cfg(feature = "std")]
@@ -1846,8 +1880,12 @@ where
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
-    pub fn send_buf(&mut self, tag: Tag, buf: &[u8], flag: Flag) -> Result<(), Error> {
-        self.sender.send_buf(tag, buf, flag)
+    pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
+        self.sender.send_buf(tag, buf)
+    }
+
+    pub fn send_buf_with_flag(&mut self, tag: Tag, flag: Flag, buf: &[u8]) -> Result<(), Error> {
+        self.sender.send_buf_with_flag(tag, flag, buf)
     }
 
     /// Informs the broker about a new client in town, with the given map id
@@ -1968,7 +2006,7 @@ mod tests {
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
-        Tag, LLMP_FLAG_INITIALIZED,
+        Tag,
     };
 
     use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
@@ -1998,7 +2036,7 @@ mod tests {
         let tag: Tag = 0x1337;
         let arr: [u8; 1] = [1u8];
         // Send stuff
-        client.send_buf(tag, &arr, LLMP_FLAG_INITIALIZED).unwrap();
+        client.send_buf(tag, &arr).unwrap();
 
         client.to_env("_ENV_TEST").unwrap();
         dbg!(std::env::vars());
@@ -2010,7 +2048,7 @@ mod tests {
         /* recreate the client from env, check if it still works */
         client = LlmpClient::on_existing_from_env(&shmem_provider, "_ENV_TEST").unwrap();
 
-        client.send_buf(tag, &arr, LLMP_FLAG_INITIALIZED).unwrap();
+        client.send_buf(tag, &arr).unwrap();
 
         // Forward stuff to clients
         broker

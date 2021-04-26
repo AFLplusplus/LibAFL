@@ -1,3 +1,4 @@
+#[cfg(feature = "llmp_compress")]
 use crate::bolts::llmp::{Flag, Tag, LLMP_FLAG_COMPRESSED};
 use alloc::vec::Vec;
 use compression::prelude::*;

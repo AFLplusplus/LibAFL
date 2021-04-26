@@ -25,11 +25,7 @@ use crate::bolts::os::ashmem_server::AshmemService;
 use crate::bolts::shmem::StdShMemProvider;
 use crate::{
     bolts::{
-        compress::GzipCompressor,
-        llmp::{
-            self, Flag, LlmpClient, LlmpClientDescription, LlmpSender, Tag, LLMP_FLAG_COMPRESSED,
-            LLMP_FLAG_INITIALIZED,
-        },
+        llmp::{self, Flag, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -41,6 +37,12 @@ use crate::{
     state::IfInteresting,
     stats::Stats,
     Error,
+};
+
+#[cfg(feature = "llmp_compress")]
+use crate::bolts::{
+    compress::GzipCompressor,
+    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 
 /// Forward this to the client
@@ -64,14 +66,14 @@ where
 {
     stats: Option<ST>,
     llmp: llmp::LlmpConnection<SP>,
+    #[cfg(feature = "llmp_compress")]
     compressor: GzipCompressor,
+
     phantom: PhantomData<(I, S)>,
 }
 
-#[cfg(llmp_compress)]
+#[cfg(feature = "llmp_compress")]
 const COMPRESS_THRESHOLD: usize = 1024;
-#[cfg(not(llmp_compress))]
-const COMPRESS_THRESHOLD: usize = usize::MAX;
 
 #[cfg(feature = "std")]
 #[cfg(unix)]
@@ -93,6 +95,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
+            #[cfg(feature = "llmp_compress")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
@@ -141,6 +144,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
+            #[cfg(feature = "llmp_compress")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
@@ -157,6 +161,7 @@ where
             llmp: llmp::LlmpConnection::IsClient {
                 client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             },
+            #[cfg(feature = "llmp_compress")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
@@ -180,6 +185,7 @@ where
                 shmem_provider,
                 description,
             )?,
+            #[cfg(feature = "llmp_compress")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
@@ -208,14 +214,18 @@ where
         match &mut self.llmp {
             llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = self.stats.as_mut().unwrap();
+                #[cfg(feature = "llmp_compress")]
                 let compressor = &self.compressor;
                 broker.loop_forever(
                     &mut |sender_id: u32, tag: Tag, flag: Flag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
+                            #[cfg(feature = "llmp_compress")]
                             let event: Event<I> = match compressor.decompress(tag, flag, msg) {
                                 Some(decompressed) => postcard::from_bytes(&decompressed)?,
                                 _ => postcard::from_bytes(msg)?,
                             };
+                            #[cfg(not(feature = "llmp_compress"))]
+                            let event: Event<I> = postcard::from_bytes(msg)?;
                             match Self::handle_in_broker(stats, sender_id, &event)? {
                                 BrokerEventResult::Forward => {
                                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
@@ -370,20 +380,18 @@ where
         let mut events = vec![];
         match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {
-                while let Some((sender_id, tag, flag, msg)) = client.recv_buf_with_flag()? {
+                while let Some((sender_id, tag, _flag, msg)) = client.recv_buf_with_flag()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
-                    if tag == LLMP_TAG_EVENT_TO_BOTH {
-                        let event: Event<I> = match self.compressor.decompress(tag, flag, msg) {
-                            Some(decompressed) => postcard::from_bytes(&decompressed)?,
-                            _ => postcard::from_bytes(msg)?,
-                        };
-                        events.push((sender_id, event));
-                    } else {
-                        let event: Event<I> = postcard::from_bytes(msg)?;
-                        events.push((sender_id, event));
-                    }
+                    #[cfg(feature = "llmp_compress")]
+                    let event: Event<I> = match self.compressor.decompress(tag, _flag, msg) {
+                        Some(decompressed) => postcard::from_bytes(&decompressed)?,
+                        _ => postcard::from_bytes(msg)?,
+                    };
+                    #[cfg(not(feature = "llmp_compress"))]
+                    let event: Event<I> = postcard::from_bytes(msg)?;
+                    events.push((sender_id, event));
                 }
             }
             _ => {
@@ -398,22 +406,30 @@ where
         Ok(count)
     }
 
+    #[cfg(feature = "llmp_compress")]
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         let flag: Flag = LLMP_FLAG_INITIALIZED;
+
         match self.compressor.compress(&serialized) {
             Some(comp_buf) => {
-                self.llmp.send_buf(
+                self.llmp.send_buf_with_flag(
                     LLMP_TAG_EVENT_TO_BOTH,
                     &comp_buf,
                     flag | LLMP_FLAG_COMPRESSED,
                 )?;
             }
             None => {
-                self.llmp
-                    .send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized, flag)?;
+                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
             }
         }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "llmp_compress"))]
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+        let serialized = postcard::to_allocvec(&event)?;
+        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
     }
 }
@@ -488,11 +504,8 @@ where
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         unsafe { self.sender.reset() };
         let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
-        self.sender.send_buf(
-            _LLMP_TAG_RESTART,
-            &state_corpus_serialized,
-            LLMP_FLAG_INITIALIZED,
-        )
+        self.sender
+            .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
     }
 
     fn process<CS, E, OT>(
