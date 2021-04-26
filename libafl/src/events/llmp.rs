@@ -8,24 +8,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use core::ptr::read_volatile;
 
 #[cfg(feature = "std")]
-use crate::bolts::llmp::LlmpReceiver;
-
-#[cfg(all(feature = "std", windows))]
-use crate::utils::startable_self;
-
-#[cfg(all(feature = "std", unix))]
-use crate::utils::{fork, ForkResult};
-
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::shmem::UnixShMemProvider;
-
-#[cfg(all(feature = "std", target_os = "android"))]
-use crate::bolts::os::ashmem_server::AshmemService;
-#[cfg(feature = "std")]
-use crate::bolts::shmem::StdShMemProvider;
+use crate::bolts::{
+    llmp::{LlmpClient, LlmpReceiver},
+    shmem::StdShMemProvider,
+};
 use crate::{
     bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
+        llmp::{self, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -38,6 +27,18 @@ use crate::{
     stats::Stats,
     Error,
 };
+
+#[cfg(all(feature = "std", windows))]
+use crate::utils::startable_self;
+
+#[cfg(all(feature = "std", unix))]
+use crate::{
+    bolts::shmem::UnixShMemProvider,
+    utils::{fork, ForkResult},
+};
+
+#[cfg(all(feature = "std", target_os = "android"))]
+use crate::bolts::os::ashmem_server::AshmemService;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;

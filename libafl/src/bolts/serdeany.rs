@@ -5,9 +5,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 
-#[cfg(feature = "anymap_debug")]
-use serde_json;
-
 // yolo
 
 pub fn pack_type_id(id: u64) -> TypeId {
@@ -181,15 +178,15 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
-            #[cfg(fature = "anymapdbg")]
+            #[cfg(feature = "anymap_debug")]
             impl fmt::Debug for SerdeAnyMap {
                 fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                     let json = serde_json::to_string(&self);
-                    write!(f, "SerdeAnyMap: [{}]", json)
+                    write!(f, "SerdeAnyMap: [{:?}]", json)
                 }
             }
 
-            #[cfg(not(fature = "anymapdbg"))]
+            #[cfg(not(feature = "anymap_debug"))]
             impl fmt::Debug for SerdeAnyMap {
                 fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                     write!(f, "SerdeAnymap with {} elements", self.len())
