@@ -25,7 +25,7 @@ use crate::bolts::os::ashmem_server::AshmemService;
 use crate::bolts::shmem::StdShMemProvider;
 use crate::{
     bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
+        llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag, Flag, LLMP_FLAG_INITIALIZED, LLMP_FLAG_COMPRESSED},
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -47,6 +47,8 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 ///
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 const LLMP_TAG_COMPRESS : Tag = 0x636f6d70;
+//const LLMP_FLAG_INITIALIZED : Flag = 0x0;
+//const LLMP_FLAG_COMPRESSED : Flag = 0x1;
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
@@ -202,20 +204,12 @@ where
                 let stats = self.stats.as_mut().unwrap();
                 let compressor = &self.compressor;
                 broker.loop_forever(
-                    &mut |sender_id: u32, tag: Tag, msg: &[u8]| {
-                        if tag == LLMP_TAG_EVENT_TO_BOTH || tag == LLMP_TAG_COMPRESS {
-                            let event: Event<I> = match compressor.decompress(tag, msg){
+                    &mut |sender_id: u32, tag: Tag, flag: Flag, msg: &[u8]| {
+                        if tag == LLMP_TAG_EVENT_TO_BOTH {
+                            let event: Event<I> = match compressor.decompress(tag, flag, msg){
                                 Some(decompressed) => postcard::from_bytes(&decompressed)?,
                                 _ => postcard::from_bytes(msg)?,
                             };
-                            /*
-                            let buf = msg.into_iter().cloned();
-                            let decomp_buf: Vec<u8> = buf
-                                .decode(&mut GZipDecoder::new())
-                                .collect::<Result<Vec<_>, _>>()
-                                .unwrap();
-                            */
-                            //let event: Event<I> = postcard::from_bytes(&buf)?;
                             match Self::handle_in_broker(stats, sender_id, &event)? {
                                 BrokerEventResult::Forward => {
                                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
@@ -370,23 +364,15 @@ where
         let mut events = vec![];
         match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {
-                while let Some((sender_id, tag, msg)) = client.recv_buf()? {
+                while let Some((sender_id, tag, flag, msg)) = client.recv_buf()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
-                    if tag == LLMP_TAG_EVENT_TO_BOTH || tag == LLMP_TAG_COMPRESS {
-                        let event: Event<I> = match self.compressor.decompress(tag, msg){
+                    if tag == LLMP_TAG_EVENT_TO_BOTH {
+                        let event: Event<I> = match self.compressor.decompress(tag, flag, msg){
                             Some(decompressed) => postcard::from_bytes(&decompressed)?,
                             _ => postcard::from_bytes(msg)?,
                         };
-                        /*
-                        let buf = msg.into_iter().cloned();
-                        let decomp_buf: Vec<u8> = buf
-                            .decode(&mut GZipDecoder::new())
-                            .collect::<Result<Vec<_>, _>>()
-                            .unwrap();
-                        */
-                        //let event: Event<I> = postcard::from_bytes(&buf)?;
                         events.push((sender_id, event));
                     } else {
                         let event: Event<I> = postcard::from_bytes(msg)?;
@@ -408,25 +394,15 @@ where
 
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
+        let flag : Flag = LLMP_FLAG_INITIALIZED;
         match self.compressor.compress(&serialized) {
             Some(comp_buf) => {
-                self.llmp.send_buf(LLMP_TAG_COMPRESS, &comp_buf)?;
+                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &comp_buf, flag | LLMP_FLAG_COMPRESSED)?;
             }
             None => {
-                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized, flag)?;
             }
         }
-        /*
-        let buf = &serialized;
-        let comp_buf = buf
-            .into_iter()
-            .cloned()
-            .encode(&mut GZipEncoder::new(), Action::Finish)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        
-        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &comp_buf)?;
-        */
         Ok(())
     }
 }
@@ -502,7 +478,7 @@ where
         unsafe { self.sender.reset() };
         let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
         self.sender
-            .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
+            .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized, LLMP_FLAG_INITIALIZED)
     }
 
     fn process<CS, E, OT>(
@@ -683,7 +659,7 @@ where
             (None, LlmpRestartingEventManager::new(client_mgr, sender))
         }
         // Restoring from a previous run, deserialize state and corpus.
-        Some((_sender, _tag, msg)) => {
+        Some((_sender, _tag, _flag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
             let (state, mgr): (S, LlmpEventManager<I, S, SP, ST>) =
                 deserialize_state_mgr(&shmem_provider, &msg)?;

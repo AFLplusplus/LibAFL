@@ -1,10 +1,9 @@
 use compression::prelude::*;
 use alloc::vec::Vec;
 use crate::Error;
-use crate::bolts::llmp::Tag;
+use crate::bolts::llmp::{Tag, Flag, LLMP_FLAG_COMPRESSED};
 use core::fmt::Debug;
 
-const LLMP_TAG_COMPRESS : Tag = 0x636f6d70;
 #[derive(Debug)]
 pub struct GzipCompressor{
     threshold : usize,
@@ -48,8 +47,8 @@ impl GzipCompressor
         }
     }
 
-    pub fn decompress(&self, tag : Tag, buf : &[u8]) -> Option<Vec<u8>> {
-        if tag == LLMP_TAG_COMPRESS{
+    pub fn decompress(&self, _tag : Tag, flag : Flag, buf : &[u8]) -> Option<Vec<u8>> {
+        if flag & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED{
             let t1 = crate::utils::current_time();
                 let decompressed: Vec<u8> = buf.into_iter().cloned()
                 .decode(&mut GZipDecoder::new())
