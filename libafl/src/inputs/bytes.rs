@@ -12,7 +12,8 @@ use std::{
 };
 
 use crate::{
-    inputs::{HasBytesVec, HasLen, HasTargetBytes, Input, TargetBytes},
+    bolts::ownedref::OwnedSlice,
+    inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
     Error,
 };
 
@@ -69,8 +70,8 @@ impl HasBytesVec for BytesInput {
 
 impl HasTargetBytes for BytesInput {
     #[inline]
-    fn target_bytes(&self) -> TargetBytes {
-        TargetBytes::Ref(&self.bytes)
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::Ref(&self.bytes)
     }
 }
 
