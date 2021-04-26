@@ -1,7 +1,6 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{rc::Rc, string::ToString, vec::Vec};
-use compression::prelude::*;
 use core::{cell::RefCell, marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -30,7 +29,7 @@ use crate::{
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
-    events::{BrokerEventResult, Event, EventManager},
+    events::{BrokerEventResult, Event, EventManager, GzipCompressor},
     executors::ExitKind,
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -47,7 +46,7 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 ///
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-const LLMP_TAG_COMPRESS: Tag = 0x636f6d70;
+const LLMP_TAG_COMPRESS : Tag = 0x636f6d70;
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
@@ -62,6 +61,7 @@ where
 {
     stats: Option<ST>,
     llmp: llmp::LlmpConnection<SP>,
+    compressor: GzipCompressor,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -85,6 +85,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
+            compressor: GzipCompressor::new(1048576),
             phantom: PhantomData,
         })
     }
@@ -132,6 +133,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
+            compressor: GzipCompressor::new(1048576),
             phantom: PhantomData,
         })
     }
@@ -147,6 +149,7 @@ where
             llmp: llmp::LlmpConnection::IsClient {
                 client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             },
+            compressor: GzipCompressor::new(1048576),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -169,6 +172,7 @@ where
                 shmem_provider,
                 description,
             )?,
+            compressor: GzipCompressor::new(1048576),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -196,15 +200,22 @@ where
         match &mut self.llmp {
             llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = self.stats.as_mut().unwrap();
+                let compressor = &self.compressor;
                 broker.loop_forever(
                     &mut |sender_id: u32, tag: Tag, msg: &[u8]| {
-                        if tag == LLMP_TAG_EVENT_TO_BOTH {
+                        if tag == LLMP_TAG_EVENT_TO_BOTH || tag == LLMP_TAG_COMPRESS {
+                            let event: Event<I> = match compressor.decompress(tag, msg){
+                                Some(decompressed) => postcard::from_bytes(&decompressed)?,
+                                _ => postcard::from_bytes(msg)?,
+                            };
+                            /*
                             let buf = msg.into_iter().cloned();
                             let decomp_buf: Vec<u8> = buf
                                 .decode(&mut GZipDecoder::new())
                                 .collect::<Result<Vec<_>, _>>()
                                 .unwrap();
-                            let event: Event<I> = postcard::from_bytes(&decomp_buf)?;
+                            */
+                            //let event: Event<I> = postcard::from_bytes(&buf)?;
                             match Self::handle_in_broker(stats, sender_id, &event)? {
                                 BrokerEventResult::Forward => {
                                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
@@ -363,13 +374,19 @@ where
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
-                    if tag == LLMP_TAG_EVENT_TO_BOTH {
+                    if tag == LLMP_TAG_EVENT_TO_BOTH || tag == LLMP_TAG_COMPRESS {
+                        let event: Event<I> = match self.compressor.decompress(tag, msg){
+                            Some(decompressed) => postcard::from_bytes(&decompressed)?,
+                            _ => postcard::from_bytes(msg)?,
+                        };
+                        /*
                         let buf = msg.into_iter().cloned();
                         let decomp_buf: Vec<u8> = buf
                             .decode(&mut GZipDecoder::new())
                             .collect::<Result<Vec<_>, _>>()
                             .unwrap();
-                        let event: Event<I> = postcard::from_bytes(&decomp_buf)?;
+                        */
+                        //let event: Event<I> = postcard::from_bytes(&buf)?;
                         events.push((sender_id, event));
                     } else {
                         let event: Event<I> = postcard::from_bytes(msg)?;
@@ -391,6 +408,15 @@ where
 
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
+        match self.compressor.compress(&serialized) {
+            Some(comp_buf) => {
+                self.llmp.send_buf(LLMP_TAG_COMPRESS, &comp_buf)?;
+            }
+            None => {
+                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+            }
+        }
+        /*
         let buf = &serialized;
         let comp_buf = buf
             .into_iter()
@@ -398,8 +424,9 @@ where
             .encode(&mut GZipEncoder::new(), Action::Finish)
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-
+        
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &comp_buf)?;
+        */
         Ok(())
     }
 }

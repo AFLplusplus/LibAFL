@@ -1,38 +1,32 @@
 use compression::prelude::*;
 use alloc::vec::Vec;
+use crate::Error;
+use crate::bolts::llmp::Tag;
+use core::fmt::Debug;
 
-pub trait Compressor
-{
-    fn pre_exec(&mut self) -> Result<(), Error>
-
-    fn compress(&mut self, buf : &[u8]) -> Vec<u8>
-
-    fn decompress(&mut self, buf : &[u8]) -> Vec<u8>
-
-    fn post_exec(&mut self) -> Result<(), Error>
-}
-
+const LLMP_TAG_COMPRESS : Tag = 0x636f6d70;
+#[derive(Debug)]
 pub struct GzipCompressor{
     threshold : usize,
 }
 
 impl GzipCompressor{
     pub fn new(threshold : usize) -> Self{
-        Self{
+        GzipCompressor {
             threshold : threshold,
         }
     }
 }
 
 
-impl GzipCompressor for Compressor
+impl GzipCompressor
 {
-    fn pre_exec(&mut self) -> Result<(), Error>{
+    fn pre_exec(&self) -> Result<(), Error>{
         Ok(())
     }
 
-    fn compress(&mut self, buf : &[u8]) -> Vec<u8>{
-        if buf.len() > threshold{
+    pub fn compress(&self, buf : &[u8]) -> Option<Vec<u8>>{
+        if buf.len() > self.threshold {
             //compress if the buffer is large enough
             let compressed = buf
             .into_iter()
@@ -40,22 +34,28 @@ impl GzipCompressor for Compressor
             .encode(&mut GZipEncoder::new(), Action::Finish)
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-            compressed
+            Some(compressed)
         }
         else{
-            buf
+            None
         }
     }
 
-    fn decompress(&mut self, buf : &[u8]) -> Vec<u8>{
-        let decompressed: Vec<u8> = buf.into_iter().cloned()
-            .decode(&mut GZipDecoder::new())
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        decompressed
+    pub fn decompress(&self, tag : Tag, buf : &[u8]) -> Option<Vec<u8>> {
+        if tag == LLMP_TAG_COMPRESS{
+                let decompressed: Vec<u8> = buf.into_iter().cloned()
+                .decode(&mut GZipDecoder::new())
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            Some(decompressed)
+        }
+        else{
+            None
+        }
+
     }
 
-    fn post_exec(&mut self) -> Result<(), Error>{
+    fn post_exec(&self) -> Result<(), Error>{
         Ok(())
     }
 }

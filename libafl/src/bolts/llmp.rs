@@ -53,7 +53,6 @@ Then register some clientloops using llmp_broker_register_threaded_clientloop
 */
 
 use alloc::{rc::Rc, string::String, vec::Vec};
-use compression::prelude::*;
 use core::{
     cell::RefCell,
     cmp::max,
@@ -103,9 +102,7 @@ const LLMP_TAG_END_OF_PAGE: Tag = 0xAF1E0F1;
 const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
 /// The sender on this map is exiting (if broker exits, clients should exit gracefully);
 const LLMP_TAG_EXITING: Tag = 0x13C5171;
-/// Message is compressed
-const LLMP_TAG_EVENT_TO_BOTH: Tag = 0x2B0741;
-const LLMP_TAG_COMPRESS: Tag = 0x636f6d70;
+
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
 
