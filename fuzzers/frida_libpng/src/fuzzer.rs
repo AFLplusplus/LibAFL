@@ -732,7 +732,7 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let res = self.base.run_target(input);
-        if !unsafe { ASAN_ERRORS.as_ref().unwrap() }.is_empty() {
+        if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
             println!("Crashing target as it had ASAN errors");
             unsafe {
                 libc::raise(libc::SIGABRT);
