@@ -16,16 +16,21 @@ use libafl::{
     utils::{current_nanos, StdRand},
 };
 
+// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
+
+fn signals_set(idx: usize) {
+    unsafe { SIGNALS[idx] = 1 };
+}
 
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |buf: &[u8]| {
-        unsafe { SIGNALS[0] = 1 };
+        signals_set(0);
         if buf.len() > 0 && buf[0] == 'a' as u8 {
-            unsafe { SIGNALS[1] = 1 };
+            signals_set(1);
             if buf.len() > 1 && buf[1] == 'b' as u8 {
-                unsafe { SIGNALS[2] = 1 };
+                signals_set(2);
                 if buf.len() > 2 && buf[2] == 'c' as u8 {
                     panic!("=)");
                 }
@@ -52,7 +57,7 @@ pub fn main() {
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
         // Feedbacks to rate the interestingness of an input
-        tuple_list!(MaxMapFeedback::new(&observer)),
+        tuple_list!(MaxMapFeedback::new_with_observer(&observer)),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
