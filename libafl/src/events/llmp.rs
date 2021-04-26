@@ -68,6 +68,11 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
+#[cfg(llmp_compress)]
+const COMPRESS_THRESHOLD: usize = 1024;
+#[cfg(not(llmp_compress))]
+const COMPRESS_THRESHOLD: usize = usize::MAX;
+
 #[cfg(feature = "std")]
 #[cfg(unix)]
 impl<I, S, ST> LlmpEventManager<I, S, UnixShMemProvider, ST>
@@ -88,7 +93,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
-            compressor: GzipCompressor::new(1024),
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -136,7 +141,7 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
-            compressor: GzipCompressor::new(1024),
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -152,7 +157,7 @@ where
             llmp: llmp::LlmpConnection::IsClient {
                 client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             },
-            compressor: GzipCompressor::new(1024),
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -175,7 +180,7 @@ where
                 shmem_provider,
                 description,
             )?,
-            compressor: GzipCompressor::new(1024),
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,

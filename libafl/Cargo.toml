@@ -36,6 +36,7 @@ anymapdbg = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable 
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 llmp_small_maps = [] # reduces initial map size for llmp
 llmp_debug = [] # Enables debug output for LLMP
+llmp_compress = []
 
 [[example]]
 name = "llmp_test"
