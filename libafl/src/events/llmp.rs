@@ -585,18 +585,25 @@ where
 
             // On Unix, we fork (todo: measure if that is actually faster.)
             #[cfg(unix)]
-            let _ = match unsafe { fork() }? {
+            let child_status = match unsafe { fork() }? {
                 ForkResult::Parent(handle) => handle.status(),
                 ForkResult::Child => break (sender, receiver, shmem_provider),
             };
 
             // On windows, we spawn ourself again
             #[cfg(windows)]
-            startable_self()?.status()?;
+            let child_status = startable_self()?.status()?;
 
             if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
+                #[cfg(unix)]
+                if child_status == 137 {
+                    // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
+                    // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
+                    panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
+                }
+
                 // Storing state in the last round did not work
-                panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client!");
+                panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! (Child exited with: {})", child_status);
             }
 
             ctr = ctr.wrapping_add(1);
