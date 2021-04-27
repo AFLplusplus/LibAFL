@@ -18,7 +18,6 @@ libloading = "0.7.0"
 rangemap = "0.1.10"
 frida-gum = { version = "0.4.0", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
 frida-gum-sys = { version = "0.2.4", features = [ "auto-download", "event-sink", "invocation-listener"] }
-gothook = { version = "0.1" }
 regex = "1.4"
 dynasmrt = "1.0.1"
 capstone = "0.8.0"
@@ -26,3 +25,6 @@ color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
 termcolor = "1.1.2"
 serde = "1.0"
 backtrace = { version = "0.3", default-features = false, features = ["std", "serde",  "libbacktrace"] }
+
+[target.'cfg(unix)'.dependencies]
+gothook = { version = "0.1" }

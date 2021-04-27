@@ -22,6 +22,7 @@ use capstone::{
 };
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+#[cfg(unix)]
 use gothook::GotHookLibrary;
 use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
@@ -715,6 +716,7 @@ impl AsanRuntime {
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
+            #[cfg(unix)]
             self.hook_library(module_name);
         }
     }
@@ -799,6 +801,7 @@ impl AsanRuntime {
     }
 
     /// Locate the target library and hook it's memory allocation functions
+    #[cfg(unix)]
     fn hook_library(&mut self, path: &str) {
         let target_lib = GotHookLibrary::new(path, false);
 
