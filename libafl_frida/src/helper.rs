@@ -1,25 +1,4 @@
-use libafl::{
-    bolts::tuples::{tuple_list, Named},
-    corpus::{
-        ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
-        IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
-    },
-    events::{setup_restarting_mgr_std, EventManager},
-    executors::{
-        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
-    },
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{HasTargetBytes, Input},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
-    observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
-    stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, State},
-    stats::SimpleStats,
-    utils::{current_nanos, StdRand},
-    Error,
-};
+use libafl::inputs::{HasTargetBytes, Input};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use libafl::utils::find_mapping_for_path;
@@ -31,32 +10,28 @@ use capstone::{
     Capstone, Insn,
 };
 
-use core::{cell::RefCell, time::Duration};
+use core::cell::RefCell;
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter,
-    stalker::{NoneEventSink, Stalker, StalkerOutput, Transformer},
+    stalker::{StalkerOutput, Transformer},
     CpuContext,
 };
-use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
+use frida_gum::{Gum, Module, PageProtection};
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
 use std::{
-    env,
-    ffi::c_void,
     fs::File,
     io::{BufWriter, Write},
-    marker::PhantomData,
-    path::PathBuf,
     rc::Rc,
 };
 
 use crate::{
-    asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime, ASAN_ERRORS},
+    asan_rt::AsanRuntime,
     FridaOptions,
 };
 

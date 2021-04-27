@@ -24,39 +24,22 @@ use libafl::{
     Error,
 };
 
-#[cfg(target_arch = "aarch64")]
-use capstone::arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand};
-use capstone::{
-    arch::{self, BuildsCapstone},
-    Capstone, Insn,
-};
-
-use core::{cell::RefCell, time::Duration};
-#[cfg(target_arch = "x86_64")]
-use frida_gum::instruction_writer::X86Register;
-#[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter,
-    stalker::{NoneEventSink, Stalker, StalkerOutput, Transformer},
-    CpuContext,
+    stalker::{NoneEventSink, Stalker},
+    Gum,
+    NativePointer,
 };
-use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
-use num_traits::cast::FromPrimitive;
 
-use rangemap::RangeMap;
 use std::{
     env,
     ffi::c_void,
-    fs::File,
-    io::{BufWriter, Write},
     marker::PhantomData,
     path::PathBuf,
-    rc::Rc,
+    time::Duration,
 };
 
 use libafl_frida::{
-    asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime, ASAN_ERRORS},
+    asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
     helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     FridaOptions,
 };
@@ -182,7 +165,7 @@ where
         helper: &'c mut FH,
         timeout: Duration,
     ) -> Self {
-        let mut stalker = Stalker::new(gum);
+        let stalker = Stalker::new(gum);
 
         // Let's exclude the main module and libc.so at least:
         //stalker.exclude(&MemoryRange::new(
