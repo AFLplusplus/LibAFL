@@ -654,9 +654,9 @@ where
         executor.post_exec_observers()?;
 
         let observers = executor.observers();
-        let fitness =
-            self.feedbacks_mut()
-                .is_interesting_all(&input, observers, &exit_kind)?;
+        let fitness = self
+            .feedbacks_mut()
+            .is_interesting_all(&input, observers, &exit_kind)?;
 
         let is_solution = self
             .objectives_mut()

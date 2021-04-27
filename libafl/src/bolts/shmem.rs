@@ -191,7 +191,7 @@ pub struct RcShMem<T: ShMemProvider> {
 
 impl<T> ShMem for RcShMem<T>
 where
-    T: ShMemProvider + alloc::fmt::Debug
+    T: ShMemProvider + alloc::fmt::Debug,
 {
     fn id(&self) -> ShMemId {
         self.internal.id()
@@ -210,8 +210,7 @@ where
     }
 }
 
-impl<T: ShMemProvider> Drop for RcShMem<T>
-{
+impl<T: ShMemProvider> Drop for RcShMem<T> {
     fn drop(&mut self) {
         self.provider.borrow_mut().release_map(&mut self.internal)
     }
@@ -219,7 +218,6 @@ impl<T: ShMemProvider> Drop for RcShMem<T>
 
 #[derive(Debug, Clone)]
 pub struct RcShMemProvider<T: ShMemProvider> {
-
     internal: Rc<RefCell<T>>,
 }
 
@@ -227,14 +225,14 @@ unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
 
 impl<T> ShMemProvider for RcShMemProvider<T>
 where
-    T: ShMemProvider + alloc::fmt::Debug
+    T: ShMemProvider + alloc::fmt::Debug,
 {
     type Mem = RcShMem<T>;
 
     fn new() -> Result<Self, Error> {
         return Ok(Self {
             internal: Rc::new(RefCell::new(T::new()?)),
-        })
+        });
     }
 
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
@@ -269,11 +267,11 @@ where
 
 impl<T> Default for RcShMemProvider<T>
 where
-    T: ShMemProvider + alloc::fmt::Debug
+    T: ShMemProvider + alloc::fmt::Debug,
 {
-     fn default() -> Self {
-         Self::new().unwrap()
-     }
+    fn default() -> Self {
+        Self::new().unwrap()
+    }
 }
 
 #[cfg(all(unix, feature = "std"))]

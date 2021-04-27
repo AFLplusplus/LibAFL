@@ -394,7 +394,8 @@ mod unix_signal_handler {
         I: Input + HasTargetBytes,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-        let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void as *mut ucontext_t);
+        let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void
+            as *mut ucontext_t);
 
         #[cfg(feature = "std")]
         println!("Crashed with {}", _signal);
@@ -406,29 +407,43 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             println!("Child crashed!");
 
-            #[cfg(all(feature = "std", any(target_os = "linux", target_os = "android"), target_arch = "aarch64"))]
+            #[cfg(all(
+                feature = "std",
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            ))]
             {
                 use crate::utils::find_mapping_for_address;
                 println!("{:━^100}", " CRASH ");
-                println!("Received signal {} at 0x{:016x}, fault address: 0x{:016x}", _signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address);
-                if let Ok((start, _, _, path)) = find_mapping_for_address(_context.uc_mcontext.pc as usize) {
-                    println!("pc is at offset 0x{:08x} in  {}", _context.uc_mcontext.pc as usize - start, path);
+                println!(
+                    "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
+                    _signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
+                );
+                if let Ok((start, _, _, path)) =
+                    find_mapping_for_address(_context.uc_mcontext.pc as usize)
+                {
+                    println!(
+                        "pc is at offset 0x{:08x} in  {}",
+                        _context.uc_mcontext.pc as usize - start,
+                        path
+                    );
                 }
 
                 println!("{:━^100}", " REGISTERS ");
                 for reg in 0..31 {
-                        print!("x{:02}: 0x{:016x} ", reg, _context.uc_mcontext.regs[reg as usize]);
-                        if reg % 4 == 3 {
-                            println!();
-                        }
+                    print!(
+                        "x{:02}: 0x{:016x} ",
+                        reg, _context.uc_mcontext.regs[reg as usize]
+                    );
+                    if reg % 4 == 3 {
+                        println!();
+                    }
                 }
                 println!("pc : 0x{:016x} ", _context.uc_mcontext.pc);
 
                 //println!("{:━^100}", " BACKTRACE ");
                 //println!("{:?}", backtrace::Backtrace::new())
             }
-
-
 
             #[cfg(feature = "std")]
             let _ = stdout().flush();

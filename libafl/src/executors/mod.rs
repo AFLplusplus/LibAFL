@@ -7,10 +7,15 @@ pub use timeout::TimeoutExecutor;
 
 use core::marker::PhantomData;
 
-use crate::{Error, bolts::{serdeany::SerdeAny, tuples::Named}, events::EventManager, inputs::{HasTargetBytes, Input}, observers::ObserversTuple};
+use crate::{
+    bolts::{serdeany::SerdeAny, tuples::Named},
+    events::EventManager,
+    inputs::{HasTargetBytes, Input},
+    observers::ObserversTuple,
+    Error,
+};
 
-pub trait CustomExitKind: std::fmt::Debug + SerdeAny + 'static {
-}
+pub trait CustomExitKind: std::fmt::Debug + SerdeAny + 'static {}
 
 /// How an execution finished.
 #[derive(Debug)]
@@ -19,7 +24,7 @@ pub enum ExitKind {
     Crash,
     Oom,
     Timeout,
-    Custom(Box<dyn CustomExitKind>)
+    Custom(Box<dyn CustomExitKind>),
 }
 
 pub trait HasObservers<OT>
@@ -125,4 +130,3 @@ mod test {
         assert!(executor.run_target(&nonempty_input).is_ok());
     }
 }
-

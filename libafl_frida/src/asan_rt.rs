@@ -1,5 +1,15 @@
 use hashbrown::HashMap;
-use libafl::{Error, SerdeAny, bolts::{ownedref::OwnedPtr, tuples::Named}, corpus::Testcase, executors::{CustomExitKind, ExitKind}, feedbacks::Feedback, inputs::{HasTargetBytes, Input}, observers::{Observer, ObserversTuple}, state::HasMetadata, utils::{find_mapping_for_address, walk_self_maps}};
+use libafl::{
+    bolts::{ownedref::OwnedPtr, tuples::Named},
+    corpus::Testcase,
+    executors::{CustomExitKind, ExitKind},
+    feedbacks::Feedback,
+    inputs::{HasTargetBytes, Input},
+    observers::{Observer, ObserversTuple},
+    state::HasMetadata,
+    utils::{find_mapping_for_address, walk_self_maps},
+    Error, SerdeAny,
+};
 use nix::{
     libc::{memmove, memset},
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -15,12 +25,16 @@ use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use gothook::GotHookLibrary;
 use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
-use std::{cell::{RefCell, RefMut}, ffi::c_void, io::Write, rc::Rc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{
+    cell::{RefCell, RefMut},
+    ffi::c_void,
+    io::Write,
+    rc::Rc,
+};
 use termcolor::{Color, ColorSpec, WriteColor};
 
 use crate::FridaOptions;
-
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -160,7 +174,12 @@ impl Allocator {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
-            if self.runtime.borrow().options.enable_asan_allocation_backtraces {
+            if self
+                .runtime
+                .borrow()
+                .options
+                .enable_asan_allocation_backtraces
+            {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
             metadata
@@ -193,7 +212,12 @@ impl Allocator {
                 ..Default::default()
             };
 
-            if self.runtime.borrow().options.enable_asan_allocation_backtraces {
+            if self
+                .runtime
+                .borrow()
+                .options
+                .enable_asan_allocation_backtraces
+            {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
 
@@ -226,12 +250,21 @@ impl Allocator {
         if metadata.freed {
             self.runtime
                 .borrow_mut()
-                .report_error(AsanError::DoubleFree((ptr as usize, metadata.clone(), Backtrace::new())));
+                .report_error(AsanError::DoubleFree((
+                    ptr as usize,
+                    metadata.clone(),
+                    Backtrace::new(),
+                )));
         }
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
-        if self.runtime.borrow().options.enable_asan_allocation_backtraces {
+        if self
+            .runtime
+            .borrow()
+            .options
+            .enable_asan_allocation_backtraces
+        {
             metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
         }
 
@@ -578,9 +611,7 @@ enum AsanError {
     WriteAfterFree(AsanReadWriteError),
     DoubleFree((usize, AllocationMetadata, Backtrace)),
     UnallocatedFree((usize, Backtrace)),
-    Unknown(([usize; 32], usize, (u16, u16, usize, usize),
-            Backtrace,
-            )),
+    Unknown(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
     Leak((usize, AllocationMetadata)),
     StackOobRead(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
     StackOobWrite(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
@@ -603,7 +634,6 @@ impl AsanError {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     errors: Vec<AsanError>,
@@ -611,9 +641,7 @@ pub struct AsanErrors {
 
 impl AsanErrors {
     fn new() -> Self {
-        Self {
-            errors: Vec::new(),
-        }
+        Self { errors: Vec::new() }
     }
 
     pub fn clear(&mut self) {
@@ -629,7 +657,6 @@ impl AsanErrors {
     }
 }
 impl CustomExitKind for AsanErrors {}
-
 
 impl AsanRuntime {
     pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
@@ -701,18 +728,13 @@ impl AsanRuntime {
     pub fn check_for_leaks(&mut self) {
         for metadata in Allocator::get().allocations.values_mut() {
             if !metadata.freed {
-                self.report_error(AsanError::Leak((
-                    metadata.address,
-                    metadata.clone(),
-                )));
+                self.report_error(AsanError::Leak((metadata.address, metadata.clone())));
             }
         }
     }
 
     pub fn errors(&mut self) -> &Option<AsanErrors> {
-        unsafe {
-            &ASAN_ERRORS
-        }
+        unsafe { &ASAN_ERRORS }
     }
 
     /// Make sure the specified memory is unpoisoned
@@ -912,7 +934,8 @@ impl AsanRuntime {
             base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
         }
 
-        let mut fault_address = (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
+        let mut fault_address =
+            (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
         if index_reg != 0 {
             if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
@@ -948,13 +971,24 @@ impl AsanRuntime {
         let (stack_start, stack_end) = Self::current_stack();
         let error = if fault_address >= stack_start && fault_address < stack_end {
             if insn.mnemonic().unwrap().starts_with('l') {
-                AsanError::StackOobRead((self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), backtrace))
+                AsanError::StackOobRead((
+                    self.regs,
+                    actual_pc,
+                    (base_reg, index_reg, displacement as usize, fault_address),
+                    backtrace,
+                ))
             } else {
-                AsanError::StackOobWrite((self.regs, actual_pc, (base_reg, index_reg, displacement as usize, fault_address), backtrace))
+                AsanError::StackOobWrite((
+                    self.regs,
+                    actual_pc,
+                    (base_reg, index_reg, displacement as usize, fault_address),
+                    backtrace,
+                ))
             }
         } else {
             let mut allocator = Allocator::get();
-            if let Some(metadata) = allocator.find_metadata(fault_address, self.regs[base_reg as usize])
+            if let Some(metadata) =
+                allocator.find_metadata(fault_address, self.regs[base_reg as usize])
             {
                 let asan_readwrite_error = AsanReadWriteError {
                     registers: self.regs,
@@ -1001,9 +1035,10 @@ impl AsanRuntime {
             .print_addresses(true)
             .verbosity(Verbosity::Full)
             .add_frame_filter(Box::new(|frames| {
-            frames
-                .retain(|x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")))
-        }));
+                frames.retain(
+                    |x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")),
+                )
+            }));
 
         writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
@@ -1021,7 +1056,10 @@ impl AsanRuntime {
                     writeln!(
                         output,
                         " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
-                        error.pc, path, error.pc - start, fault_address
+                        error.pc,
+                        path,
+                        error.pc - start,
+                        fault_address
                     )
                     .unwrap();
                 } else {
@@ -1045,7 +1083,12 @@ impl AsanRuntime {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, error.registers[reg as usize]).unwrap();
+                    write!(
+                        output,
+                        "x{:02}: 0x{:016x} ",
+                        reg, error.registers[reg as usize]
+                    )
+                    .unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         write!(output, "\n").unwrap();
@@ -1121,7 +1164,10 @@ impl AsanRuntime {
                     writeln!(
                         output,
                         " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
-                        pc, path, pc - start, fault_address
+                        pc,
+                        path,
+                        pc - start,
+                        fault_address
                     )
                     .unwrap();
                 } else {
@@ -1181,16 +1227,12 @@ impl AsanRuntime {
                         writeln!(output, "\t    {}", insn).unwrap();
                     }
                 }
-                backtrace_printer
-                    .print_trace(&backtrace, output)
-                    .unwrap();
+                backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
-                backtrace_printer
-                    .print_trace(&backtrace, output)
-                    .unwrap();
+                backtrace_printer.print_trace(&backtrace, output).unwrap();
 
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
@@ -1218,9 +1260,7 @@ impl AsanRuntime {
             AsanError::UnallocatedFree((ptr, backtrace)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
-                backtrace_printer
-                    .print_trace(&backtrace, output)
-                    .unwrap();
+                backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::Leak((ptr, mut metadata)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
@@ -1243,15 +1283,18 @@ impl AsanRuntime {
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
             }
-            AsanError::StackOobRead((registers, pc, fault, backtrace)) |
-                AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
+            AsanError::StackOobRead((registers, pc, fault, backtrace))
+            | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
                 if let Ok((start, _, _, path)) = find_mapping_for_address(pc) {
                     writeln!(
                         output,
                         " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
-                        pc, path, pc - start, fault_address
+                        pc,
+                        path,
+                        pc - start,
+                        fault_address
                     )
                     .unwrap();
                 } else {
@@ -1311,11 +1354,8 @@ impl AsanRuntime {
                         writeln!(output, "\t    {}", insn).unwrap();
                     }
                 }
-                backtrace_printer
-                    .print_trace(&backtrace, output)
-                    .unwrap();
+                backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
-
         };
 
         if !self.options.asan_continue_after_error() {
@@ -1722,13 +1762,11 @@ impl AsanRuntime {
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
 #[derive(Serialize, Deserialize)]
-pub struct AsanErrorsObserver
-{
+pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl Observer for AsanErrorsObserver
-{
+impl Observer for AsanErrorsObserver {
     fn pre_exec(&mut self) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
@@ -1740,8 +1778,7 @@ impl Observer for AsanErrorsObserver
     }
 }
 
-impl Named for AsanErrorsObserver
-{
+impl Named for AsanErrorsObserver {
     #[inline]
     fn name(&self) -> &str {
         "AsanErrorsObserver"
@@ -1751,33 +1788,33 @@ impl Named for AsanErrorsObserver
 impl AsanErrorsObserver {
     pub fn new(errors: &'static Option<AsanErrors>) -> Self {
         Self {
-            errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>)
+            errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>),
         }
     }
 
     pub fn new_owned(errors: Option<AsanErrors>) -> Self {
         Self {
-            errors: OwnedPtr::Owned(Box::new(errors))
+            errors: OwnedPtr::Owned(Box::new(errors)),
         }
     }
 
     pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
-            errors: OwnedPtr::Ptr(errors)
+            errors: OwnedPtr::Ptr(errors),
         }
     }
 
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
-            OwnedPtr::Owned(b) => b.as_ref().as_ref()
+            OwnedPtr::Owned(b) => b.as_ref().as_ref(),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback {
-    errors: Option<AsanErrors>
+    errors: Option<AsanErrors>,
 }
 
 impl<I> Feedback<I> for AsanErrorsFeedback
@@ -1790,7 +1827,9 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        let observer = observers.match_first_type::<AsanErrorsObserver>().expect("An AsanErrorsFeedback needs an AsanErrorsObserver".into());
+        let observer = observers
+            .match_first_type::<AsanErrorsObserver>()
+            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver".into());
         match observer.errors() {
             None => Ok(0),
             Some(errors) => {
@@ -1827,9 +1866,7 @@ impl Named for AsanErrorsFeedback {
 
 impl AsanErrorsFeedback {
     pub fn new() -> Self {
-        Self {
-            errors: None
-        }
+        Self { errors: None }
     }
 }
 

@@ -443,8 +443,11 @@ pub fn startable_self() -> Result<Command, Error> {
 /// If the callback returns true, we stop the walk.
 #[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
 pub fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
-    use std::{io::{BufReader, BufRead}, fs::File};
     use regex::Regex;
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+    };
     let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
         .unwrap();
 
@@ -481,7 +484,9 @@ pub fn find_mapping_for_address(address: usize) -> Result<(usize, usize, String,
     if result.0 != 0 {
         Ok(result)
     } else {
-        Err(Error::Unknown("Couldn't find a mapping for this address".to_string()))
+        Err(Error::Unknown(
+            "Couldn't find a mapping for this address".to_string(),
+        ))
     }
 }
 
@@ -503,8 +508,6 @@ pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
 
     (libstart, libend)
 }
-
-
 
 #[cfg(test)]
 mod tests {

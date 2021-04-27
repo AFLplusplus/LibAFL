@@ -4,11 +4,13 @@
 use libafl::{
     bolts::tuples::{tuple_list, Named},
     corpus::{
-        ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
+        ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
+        IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventManager},
-    executors::{inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers},
+    executors::{
+        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
+    },
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
@@ -25,26 +27,41 @@ use libafl::{
 #[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
 use libafl::utils::find_mapping_for_path;
 
+#[cfg(target_arch = "aarch64")]
+use capstone::arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand};
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone, Insn,
 };
-#[cfg(target_arch = "aarch64")]
-use capstone::arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand};
 
 use core::{cell::RefCell, time::Duration};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-use frida_gum::{CpuContext, instruction_writer::InstructionWriter, stalker::{NoneEventSink, Stalker, StalkerOutput, Transformer}};
+use frida_gum::{
+    instruction_writer::InstructionWriter,
+    stalker::{NoneEventSink, Stalker, StalkerOutput, Transformer},
+    CpuContext,
+};
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
-use std::{env, ffi::c_void, fs::File, io::{BufWriter, Write}, marker::PhantomData, path::PathBuf, rc::Rc};
+use std::{
+    env,
+    ffi::c_void,
+    fs::File,
+    io::{BufWriter, Write},
+    marker::PhantomData,
+    path::PathBuf,
+    rc::Rc,
+};
 
-use libafl_frida::{FridaOptions, asan_rt::{ASAN_ERRORS, AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime}};
+use libafl_frida::{
+    asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, AsanRuntime, ASAN_ERRORS},
+    FridaOptions,
+};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a> {
@@ -360,10 +377,10 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                             }
                         }
                         if helper.options.asan_enabled() || helper.options.drcov_enabled() {
-                            helper
-                                .asan_runtime
-                                .borrow_mut()
-                                .add_stalked_address(output.writer().pc() as usize - 4, address as usize);
+                            helper.asan_runtime.borrow_mut().add_stalked_address(
+                                output.writer().pc() as usize - 4,
+                                address as usize,
+                            );
                         }
                     }
                     instruction.keep()
@@ -700,7 +717,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
     }
 }
 
-struct FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
+struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -716,7 +733,7 @@ where
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c,  FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -778,7 +795,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c,  FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -796,7 +813,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c,  FH, H, I, OT> Named for FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> Named for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -808,14 +825,19 @@ where
     }
 }
 
-impl<'a, 'b, 'c,  FH, H, I, OT> FridaInProcessExecutor<'a, 'b, 'c,  FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'c mut FH, timeout: Duration) -> Self {
+    pub fn new(
+        gum: &'a Gum,
+        base: InProcessExecutor<'a, H, I, OT>,
+        helper: &'c mut FH,
+        timeout: Duration,
+    ) -> Self {
         let mut stalker = Stalker::new(gum);
 
         // Let's exclude the main module and libc.so at least:
@@ -914,7 +936,12 @@ unsafe fn fuzz(
         ExitKind::Ok
     };
 
-    let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, FridaOptions::parse_env_options(), module_name, &modules_to_instrument);
+    let mut frida_helper = FridaEdgeCoverageHelper::new(
+        &gum,
+        FridaOptions::parse_env_options(),
+        module_name,
+        &modules_to_instrument,
+    );
 
     // Create an observation channel using the coverage map
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
@@ -938,10 +965,14 @@ unsafe fn fuzz(
             )),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new_save_meta(objective_dir,
-                Some(OnDiskMetadataFormat::JsonPretty)).unwrap(),
+            OnDiskCorpus::new_save_meta(objective_dir, Some(OnDiskMetadataFormat::JsonPretty))
+                .unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new(), TimeoutFeedback::new(), AsanErrorsFeedback::new()),
+            tuple_list!(
+                CrashFeedback::new(),
+                TimeoutFeedback::new(),
+                AsanErrorsFeedback::new()
+            ),
         )
     });
 
@@ -965,7 +996,6 @@ unsafe fn fuzz(
     // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
-
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = FridaInProcessExecutor::new(

@@ -92,11 +92,7 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port(
-        shmem_provider: SP,
-        stats: ST,
-        port: u16,
-    ) -> Result<Self, Error> {
+    pub fn new_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
@@ -106,10 +102,7 @@ where
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env(
-        shmem_provider: SP,
-        env_name: &str,
-    ) -> Result<Self, Error> {
+    pub fn existing_client_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
             stats: None,
             llmp: llmp::LlmpConnection::IsClient {
@@ -520,7 +513,9 @@ where
         LlmpEventManager::<I, S, SP, ST>::new_on_port(shmem_provider.clone(), stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
-    let (sender, mut receiver, mut new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+    let (sender, mut receiver, mut new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER)
+        .is_err()
+    {
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
@@ -534,10 +529,7 @@ where
         // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
         let sender = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
 
-        let map = {
-            shmem_provider
-                .clone_ref(&sender.out_maps.last().unwrap().shmem)?
-        };
+        let map = { shmem_provider.clone_ref(&sender.out_maps.last().unwrap().shmem)? };
         let receiver = LlmpReceiver::on_existing_map(shmem_provider.clone(), map, None)?;
         // Store the information to a map.
         sender.to_env(_ENV_FUZZER_SENDER)?;

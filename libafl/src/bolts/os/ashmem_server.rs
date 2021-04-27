@@ -11,10 +11,15 @@ use crate::{
     },
     Error,
 };
+use core::mem::ManuallyDrop;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
-use std::{rc::Rc, cell::RefCell, io::{Read, Write}, sync::{Arc, Condvar, Mutex}};
-use core::mem::ManuallyDrop;
+use std::{
+    cell::RefCell,
+    io::{Read, Write},
+    rc::Rc,
+    sync::{Arc, Condvar, Mutex},
+};
 
 #[cfg(all(feature = "std", unix))]
 use nix::poll::{poll, PollFd, PollFlags};
@@ -125,9 +130,9 @@ impl ShMemProvider for ServedShMemProvider {
 
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
-                self
-                .inner
-                .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), map_size)?),
+                self.inner
+                    .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), map_size)?,
+            ),
             server_fd,
         })
     }
@@ -140,15 +145,17 @@ impl ShMemProvider for ServedShMemProvider {
         ));
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
-                self
-                .inner
-                .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?),
+                self.inner
+                    .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
+            ),
             server_fd,
         })
     }
 
     fn post_fork(&mut self) {
-        self.stream = UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap()).expect("Unable to reconnect to the ashmem service");
+        self.stream =
+            UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap())
+                .expect("Unable to reconnect to the ashmem service");
         let (id, _) = self.send_receive(AshmemRequest::Hello(Some(self.id)));
         self.id = id;
     }
@@ -238,17 +245,35 @@ impl AshmemService {
                 };
                 Ok(AshmemResponse::Id(client_id))
             }
-            AshmemRequest::NewMap(map_size) =>
-                Ok(AshmemResponse::Mapping(Rc::new(RefCell::new(self.provider.new_map(map_size)?)))),
+            AshmemRequest::NewMap(map_size) => Ok(AshmemResponse::Mapping(Rc::new(RefCell::new(
+                self.provider.new_map(map_size)?,
+            )))),
             AshmemRequest::ExistingMap(description) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 if client.maps.contains_key(&description.id.to_int()) {
-                    Ok(AshmemResponse::Mapping(client.maps.get_mut(&description.id.to_int()).as_mut().unwrap().first().as_mut().unwrap().clone()))
+                    Ok(AshmemResponse::Mapping(
+                        client
+                            .maps
+                            .get_mut(&description.id.to_int())
+                            .as_mut()
+                            .unwrap()
+                            .first()
+                            .as_mut()
+                            .unwrap()
+                            .clone(),
+                    ))
                 } else if self.all_maps.contains_key(&description.id.to_int()) {
-                    Ok(AshmemResponse::Mapping(self.all_maps.get_mut(&description.id.to_int()).unwrap().clone()))
+                    Ok(AshmemResponse::Mapping(
+                        self.all_maps
+                            .get_mut(&description.id.to_int())
+                            .unwrap()
+                            .clone(),
+                    ))
                 } else {
-                    let new_rc = Rc::new(RefCell::new(self.provider.from_description(description)?));
-                    self.all_maps.insert(description.id.to_int(), new_rc.clone());
+                    let new_rc =
+                        Rc::new(RefCell::new(self.provider.from_description(description)?));
+                    self.all_maps
+                        .insert(description.id.to_int(), new_rc.clone());
                     Ok(AshmemResponse::Mapping(new_rc))
                 }
             }
@@ -279,7 +304,6 @@ impl AshmemService {
         let request: AshmemRequest = postcard::from_bytes(&bytes)?;
 
         Ok(request)
-
     }
     fn handle_client(&mut self, client_id: RawFd) -> Result<(), Error> {
         let response = self.handle_request(client_id)?;
@@ -292,14 +316,16 @@ impl AshmemService {
                 client
                     .stream
                     .send_fds(&id.to_string().as_bytes(), &[server_fd])?;
-                client.maps.entry(server_fd).or_default().push(mapping.clone());
-            },
+                client
+                    .maps
+                    .entry(server_fd)
+                    .or_default()
+                    .push(mapping.clone());
+            }
             AshmemResponse::Id(id) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                client
-                    .stream
-                    .send_fds(&id.to_string().as_bytes(), &[])?;
-            },
+                client.stream.send_fds(&id.to_string().as_bytes(), &[])?;
+            }
             AshmemResponse::RefCount(refcount) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 client

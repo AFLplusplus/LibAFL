@@ -25,7 +25,7 @@ impl FridaOptions {
                 value = value.get(1..).unwrap();
                 match name {
                     "asan" => {
-                        #[cfg(not(target_arch ="aarch64"))]
+                        #[cfg(not(target_arch = "aarch64"))]
                         panic!("ASAN is not currently supported on targets other than aarch64");
                         options.enable_asan = value.parse().unwrap();
                     }
@@ -34,7 +34,7 @@ impl FridaOptions {
                     }
                     "asan-continue-after-error" => {
                         options.enable_asan_continue_after_error = value.parse().unwrap();
-                    },
+                    }
                     "asan-allocation-backtraces" => {
                         options.enable_asan_allocation_backtraces = value.parse().unwrap();
                     }
