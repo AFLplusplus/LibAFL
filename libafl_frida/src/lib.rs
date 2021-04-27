@@ -48,7 +48,9 @@ impl FridaOptions {
                         options.enable_drcov = value.parse().unwrap();
                         #[cfg(not(target_arch = "aarch64"))]
                         if options.enable_drcov {
-                            panic!("DrCov is not currently supported on targets other than aarch64");
+                            panic!(
+                                "DrCov is not currently supported on targets other than aarch64"
+                            );
                         }
                     }
                     _ => {
