@@ -9,8 +9,9 @@ extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
 #[cfg(feature = "std")]
-#[macro_use]
 extern crate ctor;
+#[cfg(feature = "std")]
+pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "libafl_derive")]

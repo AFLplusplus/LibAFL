@@ -11,9 +11,11 @@ use std::{
     path::Path,
 };
 
+#[cfg(feature = "std")]
+use crate::Error;
 use crate::{
-    inputs::{HasBytesVec, HasLen, HasTargetBytes, Input, TargetBytes},
-    Error,
+    bolts::ownedref::OwnedSlice,
+    inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
 };
 
 /// A bytes input is the basic input
@@ -69,8 +71,8 @@ impl HasBytesVec for BytesInput {
 
 impl HasTargetBytes for BytesInput {
     #[inline]
-    fn target_bytes(&self) -> TargetBytes {
-        TargetBytes::Ref(&self.bytes)
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::Ref(&self.bytes)
     }
 }
 

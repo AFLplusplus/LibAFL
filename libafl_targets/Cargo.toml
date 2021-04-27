@@ -2,6 +2,11 @@
 name = "libafl_targets"
 version = "0.1.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+description = "Common code for target instrumentation that can be used combined with LibAFL"
+documentation = "https://docs.rs/libafl_targets"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "testing"]
 edition = "2018"
 
 [features]

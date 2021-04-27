@@ -8,6 +8,6 @@ The LibAFL code reuse meachanism is so based on components rather than sub-class
 
 Thinking about similar fuzzers, you can observe that most of the times the data structures that are modified are the ones related to testcases and the fuzzer global state.
 
-Beside the entities described previously, we then introduce the Testcase and State entities. The Testcase is a container for an Input stored in the Corpus and its metadata (so, in the implementation, the Corpus stores Testcases) and the State contains all the metadata that are evolved while running the fuzzer, Corpus included.
+Beside the entities described previously, we introduce the Testcase and State entities. The Testcase is a container for an Input stored in the Corpus and its metadata (so, in the implementation, the Corpus stores Testcases) and the State contains all the metadata that are evolved while running the fuzzer, Corpus included.
 
 
