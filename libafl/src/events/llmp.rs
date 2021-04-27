@@ -33,10 +33,7 @@ use crate::{
 use crate::utils::startable_self;
 
 #[cfg(all(feature = "std", unix))]
-use crate::{
-    bolts::shmem::UnixShMemProvider,
-    utils::{fork, ForkResult},
-};
+use crate::utils::{fork, ForkResult};
 
 #[cfg(all(feature = "std", target_os = "android"))]
 use crate::bolts::os::ashmem_server::AshmemService;

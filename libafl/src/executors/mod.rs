@@ -15,7 +15,9 @@ use crate::{
     Error,
 };
 
-pub trait CustomExitKind: std::fmt::Debug + SerdeAny + 'static {}
+use alloc::boxed::Box;
+
+pub trait CustomExitKind: core::fmt::Debug + SerdeAny + 'static {}
 
 /// How an execution finished.
 #[derive(Debug)]
