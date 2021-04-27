@@ -1,13 +1,19 @@
+use rangemap::RangeMap;
 use std::{
     fs::File,
     io::{BufWriter, Write},
 };
-use rangemap::RangeMap;
+
+#[derive(Clone, Copy)]
+pub struct DrCovBasicBlock {
+    start: usize,
+    end: usize,
+}
 
 pub struct DrCovWriter<'a> {
     writer: BufWriter<File>,
     module_mapping: &'a RangeMap<usize, (u16, &'a str)>,
-    basic_blocks: &'a mut Vec<(usize, usize)>,
+    basic_blocks: &'a mut Vec<DrCovBasicBlock>,
 }
 
 #[repr(C)]
@@ -17,11 +23,16 @@ struct DrCovBasicBlockEntry {
     mod_id: u16,
 }
 
+impl DrCovBasicBlock {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+}
 impl<'a> DrCovWriter<'a> {
     pub fn new(
         path: &str,
         module_mapping: &'a RangeMap<usize, (u16, &str)>,
-        basic_blocks: &'a mut Vec<(usize, usize)>,
+        basic_blocks: &'a mut Vec<DrCovBasicBlock>,
     ) -> Self {
         Self {
             writer: BufWriter::new(
@@ -60,11 +71,11 @@ impl<'a> DrCovWriter<'a> {
         self.writer
             .write_all(format!("BB Table: {} bbs\n", self.basic_blocks.len()).as_bytes())
             .unwrap();
-        for (start, end) in self.basic_blocks.drain(0..) {
-            let (range, (id, _)) = self.module_mapping.get_key_value(&start).unwrap();
+        for block in self.basic_blocks.drain(0..) {
+            let (range, (id, _)) = self.module_mapping.get_key_value(&block.start).unwrap();
             let basic_block = DrCovBasicBlockEntry {
-                start: (start - range.start) as u32,
-                size: (end - start) as u16,
+                start: (block.start - range.start) as u32,
+                size: (block.end - block.start) as u16,
                 mod_id: *id,
             };
             self.writer
@@ -77,4 +88,3 @@ impl<'a> DrCovWriter<'a> {
         self.writer.flush().unwrap();
     }
 }
-

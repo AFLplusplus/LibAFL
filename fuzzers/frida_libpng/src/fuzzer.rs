@@ -26,17 +26,10 @@ use libafl::{
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
-    Gum,
-    NativePointer,
+    Gum, NativePointer,
 };
 
-use std::{
-    env,
-    ffi::c_void,
-    marker::PhantomData,
-    path::PathBuf,
-    time::Duration,
-};
+use std::{env, ffi::c_void, marker::PhantomData, path::PathBuf, time::Duration};
 
 use libafl_frida::{
     asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
@@ -169,8 +162,8 @@ where
 
         // Let's exclude the main module and libc.so at least:
         //stalker.exclude(&MemoryRange::new(
-            //Module::find_base_address(&env::args().next().unwrap()),
-            //get_module_size(&env::args().next().unwrap()),
+        //Module::find_base_address(&env::args().next().unwrap()),
+        //get_module_size(&env::args().next().unwrap()),
         //));
         //stalker.exclude(&MemoryRange::new(
         //Module::find_base_address("libc.so"),
@@ -339,8 +332,8 @@ unsafe fn fuzz(
     );
     // Let's exclude the main module and libc.so at least:
     //executor.stalker.exclude(&MemoryRange::new(
-        //Module::find_base_address(&env::args().next().unwrap()),
-        //get_module_size(&env::args().next().unwrap()),
+    //Module::find_base_address(&env::args().next().unwrap()),
+    //get_module_size(&env::args().next().unwrap()),
     //));
     //executor.stalker.exclude(&MemoryRange::new(
     //Module::find_base_address("libc.so"),

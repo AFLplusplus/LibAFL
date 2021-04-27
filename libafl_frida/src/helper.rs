@@ -3,7 +3,7 @@ use libafl::inputs::{HasTargetBytes, Input};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use libafl::utils::find_mapping_for_path;
 
-use libafl_targets::drcov::DrCovWriter;
+use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
 use capstone::arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand};
@@ -28,10 +28,7 @@ use num_traits::cast::FromPrimitive;
 use rangemap::RangeMap;
 use std::rc::Rc;
 
-use crate::{
-    asan_rt::AsanRuntime,
-    FridaOptions,
-};
+use crate::{asan_rt::AsanRuntime, FridaOptions};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a> {
@@ -61,7 +58,7 @@ pub struct FridaInstrumentationHelper<'a> {
     asan_runtime: Rc<RefCell<AsanRuntime>>,
     ranges: RangeMap<usize, (u16, &'a str)>,
     options: FridaOptions,
-    drcov_basic_blocks: Vec<(usize, usize)>,
+    drcov_basic_blocks: Vec<DrCovBasicBlock>,
 }
 
 impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
@@ -256,7 +253,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
                                     helper
                                         .drcov_basic_blocks
-                                        .push((real_address, real_address + 4));
+                                        .push(DrCovBasicBlock::new(real_address, real_address + 4));
                                 })
                             }
                         }
