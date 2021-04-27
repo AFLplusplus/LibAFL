@@ -543,7 +543,12 @@ where
     }
 }
 
+/// Setup a `LlmpBroker`.
+/// Will not return until the fuzzer exits.
+/// Returns an `Error`, if broker port was already taken,
+/// or a `ShuttingDown` error when shutting down.
 #[cfg(feature = "std")]
+#[allow(clippy::unnecessary_operation)]
 pub fn setup_new_llmp_broker<I, S, SH, ST>(stats: ST, broker_port: u16) -> Result<(), Error>
 where
     I: Input,
@@ -565,15 +570,17 @@ where
         // Yep, broker. Just loop here.
         println!("Doing broker things. Run this tool again to start fuzzing in a client.");
         mgr.broker_loop()?;
-        return Err(Error::ShuttingDown);
+        Err(Error::ShuttingDown)
     } else {
-        return Err(Error::IllegalState("New Broker is a client.".to_string()));
+        Err(Error::IllegalState("New Broker is a client.".to_string()))
     }
 }
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
+#[allow(clippy::unnecessary_operation)]
+#[allow(clippy::clippy::type_complexity)]
 pub fn setup_restarting_mgr_client<I, S, SH, ST>(
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,

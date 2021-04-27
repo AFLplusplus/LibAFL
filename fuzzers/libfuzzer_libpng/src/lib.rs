@@ -47,7 +47,7 @@ pub fn main() {
     let broker_port = 1337;
     let stats = SimpleStats::new(|s| println!("{}", s));
 
-    launcher(stats, &cores, broker_port, || {
+    launcher(stats, broker_port, &cores, || {
         let corpus_dirs = vec![PathBuf::from("./corpus")];
         let objective_dir = PathBuf::from("./crashes");
         let stats = SimpleStats::new(|s| println!("{}", s));
@@ -126,10 +126,7 @@ pub fn main() {
         if state.corpus().count() < 1 {
             state
                 .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
-                .expect(&format!(
-                    "Failed to load initial corpus at {:?}",
-                    &corpus_dirs
-                ));
+                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
         //fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;

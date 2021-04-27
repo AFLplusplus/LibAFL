@@ -190,7 +190,7 @@ mod tests {
         for i in 0..1000 {
             fuzzer
                 .fuzz_one(&mut state, &mut executor, &mut event_manager, &scheduler)
-                .expect(&format!("Error in iter {}", i));
+                .unwrap_or_else(|_| panic!("Error in iter {}", i));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();

@@ -10,6 +10,12 @@ pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 //pub static mut CMP_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 pub static mut MAX_EDGES_NUM: usize = 0;
 
+/// Sanitizer Coverage PC_Guard implementation.
+/// Will trace edges if `pcguard_edges` is set.
+/// Will trace hitcounts, if `pcguard_hitcounts` is set.
+///
+/// # Safety
+/// The function write to the `EDGES_MAP` global map, if guard exceeds this size, access is out of bounds.
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     let pos = *guard as usize;
@@ -24,6 +30,10 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     }
 }
 
+/// Pcguard sancov implementation, used for coverage feedback.
+///
+/// # Safety
+/// Dereferences, and writes to the handed `start` pointer.
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
     if start == stop || *start != 0 {

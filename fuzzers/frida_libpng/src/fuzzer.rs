@@ -497,7 +497,7 @@ unsafe fn fuzz(
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
-            .expect(&format!(
+            .unwrap_or_else(|_| panic!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
             ));

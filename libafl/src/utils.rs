@@ -508,8 +508,7 @@ where
     let mut handles = vec![];
 
     //spawn clients
-    for id in 0..num_cores {
-        let bind_to = core_ids[id];
+    for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
         if cores.iter().any(|&x| x == id) {
             match unsafe { fork() }? {
                 ForkResult::Parent(handle) => {
@@ -518,7 +517,7 @@ where
                     println!("child spawned and bound to core {}", id);
                 }
                 ForkResult::Child => {
-                    core_affinity::set_for_current(bind_to);
+                    core_affinity::set_for_current(*bind_to);
 
                     //silence stdout and stderr for clients
                     #[cfg(feature = "std")]
