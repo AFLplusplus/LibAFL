@@ -39,7 +39,7 @@ std = [] # print, sharedmap, ... support
 anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 llmp_small_maps = [] # reduces initial map size for llmp
-llmp_debug = [] # Enables debug output for LLMP
+llmp_debug = ["backtrace"] # Enables debug output for LLMP
 
 [[example]]
 name = "llmp_test"
@@ -62,7 +62,10 @@ num_enum = "0.5.1"
 spin = "0.9.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
-backtrace = { version = "0.3", default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug
+backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+backtrace = { version = "0.3", optional = true } # for llmp_debug
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
