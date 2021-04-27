@@ -1,9 +1,11 @@
 //! Utility functions for AFL
 
+#[cfg(feature = "std")]
 use crate::{
     bolts::shmem::StdShMem, corpus::Corpus, events::llmp::setup_new_llmp_broker,
     feedbacks::FeedbacksTuple, fuzzer::Fuzzer, inputs::Input, state::State, stats::Stats,
 };
+
 use alloc::{string::String, vec::Vec};
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -485,7 +487,7 @@ mod tests {
 }
 
 /// utility function which spawns a broker and n clients and binds each client to a cpu core
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
     stats: ST,
     broker_port: u16,
