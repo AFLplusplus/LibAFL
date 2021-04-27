@@ -25,6 +25,8 @@ color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
 termcolor = "1.1.2"
 serde = "1.0"
 backtrace = { version = "0.3", default-features = false, features = ["std", "serde",  "libbacktrace"] }
+num-traits = "0.2.14"
+seahash = "4.1.0"
 
 [target.'cfg(unix)'.dependencies]
 gothook = { version = "0.1" }

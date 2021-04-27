@@ -1,4 +1,5 @@
 pub mod asan_rt;
+pub mod helper;
 
 /// A representation of the various Frida options
 #[derive(Clone, Copy, Debug)]
