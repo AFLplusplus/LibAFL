@@ -13,8 +13,6 @@ use crate::bolts::{
     shmem::StdShMemProvider,
 };
 
-#[cfg(all(feature = "std", target_os = "android"))]
-use crate::bolts::os::ashmem_server::AshmemService;
 use crate::{
     bolts::{
         llmp::{self, LlmpClientDescription, LlmpSender, Tag},
