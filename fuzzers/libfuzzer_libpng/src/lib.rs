@@ -1,5 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
+//! In this example, you will see the use of the `launcher` feature.
+//! The `launcher` will spawn new processes for each cpu core.
 
 use core::time::Duration;
 use std::{env, path::PathBuf};
