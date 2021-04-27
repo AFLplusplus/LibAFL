@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InProcessExecutor<'a, H, I, OT>
+pub struct InProcessExecutor<H, I, OT>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
@@ -35,13 +35,13 @@ where
     /// The name of this executor instance, to address it from other components
     name: &'static str,
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a mut H,
+    harness_fn: H,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<I>,
 }
 
-impl<'a, H, I, OT> Executor<I> for InProcessExecutor<'a, H, I, OT>
+impl<H, I, OT> Executor<I> for InProcessExecutor<H, I, OT>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
@@ -125,7 +125,7 @@ where
     }
 }
 
-impl<'a, H, I, OT> Named for InProcessExecutor<'a, H, I, OT>
+impl<H, I, OT> Named for InProcessExecutor<H, I, OT>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
@@ -136,7 +136,7 @@ where
     }
 }
 
-impl<'a, H, I, OT> HasObservers<OT> for InProcessExecutor<'a, H, I, OT>
+impl<H, I, OT> HasObservers<OT> for InProcessExecutor<H, I, OT>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
@@ -153,7 +153,7 @@ where
     }
 }
 
-impl<'a, H, I, OT> InProcessExecutor<'a, H, I, OT>
+impl<H, I, OT> InProcessExecutor<H, I, OT>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
@@ -168,7 +168,7 @@ where
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OC, OFT, S>(
         name: &'static str,
-        harness_fn: &'a mut H,
+        harness_fn: H,
         observers: OT,
         _state: &mut S,
         _event_mgr: &mut EM,
@@ -218,17 +218,17 @@ where
         })
     }
 
-    /// Retrieve the harness function.
-    #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn
-    }
+    // /// Retrieve the harness function.
+    // #[inline]
+    // pub fn harness(&self) -> &H {
+    //     self.harness_fn
+    // }
 
-    /// Retrieve the harness function for a mutable reference.
-    #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
-    }
+    // /// Retrieve the harness function for a mutable reference.
+    // #[inline]
+    // pub fn harness_mut(&mut self) -> &mut H {
+    //     self.harness_fn
+    // }
 }
 
 #[cfg(unix)]

@@ -1,5 +1,9 @@
 //! Utility functions for AFL
 
+use crate::{
+    bolts::shmem::StdShMem, corpus::Corpus, events::llmp::setup_new_llmp_broker,
+    feedbacks::FeedbacksTuple, fuzzer::Fuzzer, inputs::Input, state::State, stats::Stats,
+};
 use alloc::{string::String, vec::Vec};
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -11,7 +15,6 @@ use libc::pid_t;
 use std::{
     env,
     fs::OpenOptions,
-    io::Error as ioErr,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -483,11 +486,22 @@ mod tests {
 
 /// utility function which spawns a broker and n clients and binds each client to a cpu core
 #[cfg(unix)]
-pub fn launcher<F, F1>(broker_fn: F, client_fn: F1, cores: &[usize]) -> Result<(), Error>
+pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
+    client_fn: CF,
+    cores: &[usize],
+    stats: ST,
+    broker_port: u16,
+) -> Result<(), Error>
 where
-    // no two closures, even if identical, have the same type
-    F: Fn() -> Result<(), Error>,
-    F1: Fn() -> Result<(), Error>,
+    ST: Stats,
+    CF: Fn() -> Result<(FZ, EX, EM, State<C, FT, I, OFT, R, SC>, CS), Error>,
+    C: Corpus<I>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    OFT: FeedbacksTuple<I>,
+    R: Rand,
+    SC: Corpus<I>,
+    FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
 {
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
@@ -497,7 +511,7 @@ where
     for id in 0..num_cores {
         let bind_to = core_ids[id];
         if cores.iter().any(|&x| x == id) {
-             match unsafe { fork() }? {
+            match unsafe { fork() }? {
                 ForkResult::Parent(handle) => {
                     handles.push(handle.pid);
                     #[cfg(feature = "std")]
@@ -514,8 +528,10 @@ where
                         dup2(stdout_file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
                         // todo: does the file fd get Dropped early?
                     }
-                    //clients keep retrying the connection to broker till the broker starts
-                    client_fn().unwrap();
+                    //fuzzer client. keeps retrying the connection to broker till the broker starts
+                    let (mut fuzzer, mut executor, mut restarting_mgr, mut state, scheduler) =
+                        client_fn().unwrap();
+                    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
                     break;
                 }
             };
@@ -525,8 +541,8 @@ where
     println!("I am broker!!.");
 
     //start the broker
-    //broker seem to underutilise core 0. so broker not binding to any core
-    let _ = broker_fn();
+    let _ =
+        setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, StdShMem, _>(stats, broker_port);
 
     //broker exited. kill all clients.
     for handle in handles.iter() {
@@ -536,14 +552,26 @@ where
     }
     Ok(())
 }
+
 const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
 
 #[cfg(windows)]
-pub fn launcher<F, F1>(broker_fn: F, client_fn: F1, cores: &[usize]) -> Result<(), Error>
+pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
+    client_fn: CF,
+    cores: &[usize],
+    stats: ST,
+    broker_port: u16,
+) -> Result<(), Error>
 where
-    // no two closures, even if identical, have the same type
-    F: Fn() -> Result<(), Error>,
-    F1: Fn() -> Result<(), Error>,
+    ST: Stats,
+    CF: Fn() -> Result<(FZ, EX, EM, State<C, FT, I, OFT, R, SC>, CS), Error>,
+    C: Corpus<I>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    OFT: FeedbacksTuple<I>,
+    R: Rand,
+    SC: Corpus<I>,
+    FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
 {
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
@@ -553,8 +581,11 @@ where
     match is_client {
         Ok(core_conf) => {
             if core_conf == "bound" {
-                //restarting client call client_fn
-                return client_fn();
+                //restarting client. continue fuzzing
+                let (mut fuzzer, mut executor, mut restarting_mgr, mut state, scheduler) =
+                    client_fn().unwrap();
+                fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+                Ok(())
             } else {
                 //first instance of a spawned client. bind to the specified core and start fuzzing
                 let core: usize = core_conf.parse().unwrap();
@@ -562,8 +593,10 @@ where
                 core_affinity::set_for_current(bind_to);
                 std::env::set_var(_AFL_LAUNCHER_CLIENT, "bound");
                 //todo: silence stdout and stderr for clients
-
-                return client_fn();
+                let (mut fuzzer, mut executor, mut restarting_mgr, mut state, scheduler) =
+                    client_fn().unwrap();
+                fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+                Ok(())
             }
         }
         Err(std::env::VarError::NotPresent) => {
@@ -578,7 +611,10 @@ where
                 }
             }
             //finished spawning clients. start the broker
-            let _ = broker_fn();
+            let _ = setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, StdShMem, _>(
+                stats,
+                broker_port,
+            );
 
             //broker exited. kill clients
             for child in children.iter_mut() {
@@ -596,7 +632,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 fn dup2(fd: i32, device: i32) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
-        -1 => Err(Error::File(ioErr::last_os_error())),
+        -1 => Err(Error::File(std::io::Error::last_os_error())),
         _ => Ok(()),
     }
 }
