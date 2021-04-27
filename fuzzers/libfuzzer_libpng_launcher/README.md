@@ -1,8 +1,10 @@
-# Libfuzzer for libpng
+# Libfuzzer for libpng, with launcher
 
 This folder contains an example fuzzer for libpng, using LLMP for fast multi-process fuzzing and crash detection.
 To show off crash detection, we added a `ud2` instruction to the harness, edit harness.cc if you want a non-crashing example.
 It has been tested on Linux.
+
+In contrast to the normal libfuzzer libpng example, this uses the `launcher` feature, that automatically spawns n child processes, and sets their affinity.
 
 ## Build
 
