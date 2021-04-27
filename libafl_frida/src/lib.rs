@@ -25,6 +25,8 @@ impl FridaOptions {
                 value = value.get(1..).unwrap();
                 match name {
                     "asan" => {
+                        #[cfg(not(target_arch ="aarch64"))]
+                        panic!("ASAN is not currently supported on targets other than aarch64");
                         options.enable_asan = value.parse().unwrap();
                     }
                     "asan-detect-leaks" => {
@@ -40,6 +42,7 @@ impl FridaOptions {
                         options.enable_coverage = value.parse().unwrap();
                     }
                     "drcov" => {
+                        panic!("DrCov is not currently supported on targets other than aarch64");
                         options.enable_drcov = value.parse().unwrap();
                     }
                     _ => {

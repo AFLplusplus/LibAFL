@@ -26,18 +26,18 @@ use libafl::{
 use libafl::utils::find_mapping_for_path;
 
 use capstone::{
-    arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
+    arch::{self, BuildsCapstone},
     Capstone, Insn,
 };
+#[cfg(target_arch = "aarch64")]
+use capstone::arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand};
+
 use core::{cell::RefCell, time::Duration};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-use frida_gum::{
-    instruction_writer::InstructionWriter,
-    stalker::{NoneEventSink, Stalker, StalkerOutput, Transformer},
-};
+use frida_gum::{CpuContext, instruction_writer::InstructionWriter, stalker::{NoneEventSink, Stalker, StalkerOutput, Transformer}};
 use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 use num_traits::cast::FromPrimitive;
 
@@ -260,6 +260,16 @@ const MAYBE_LOG_CODE: [u8; 60] = [
           // &afl_prev_loc_ptr
 ];
 
+#[cfg(target_arch = "aarch64")]
+fn get_pc(context: &CpuContext) -> usize {
+    context.pc() as usize
+}
+
+#[cfg(target_arch = "x86_64")]
+fn get_pc(context: &CpuContext) -> usize {
+    context.rip() as usize
+}
+
 /// The implementation of the FridaEdgeCoverageHelper
 impl<'a> FridaEdgeCoverageHelper<'a> {
     /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
@@ -318,10 +328,10 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                                     let real_address = match helper
                                         .asan_runtime
                                         .borrow()
-                                        .real_address_for_stalked(context.pc() as usize)
+                                        .real_address_for_stalked(get_pc(&context))
                                     {
                                         Some(address) => *address,
-                                        _ => context.pc() as usize,
+                                        _ => get_pc(&context),
                                     };
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
@@ -333,6 +343,9 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
                         }
 
                         if helper.options.asan_enabled() {
+                            #[cfg(not(target_arch = "aarch64"))]
+                            todo!("Implement ASAN for non-aarch64 targets");
+                            #[cfg(target_arch = "aarch64")]
                             if let Ok((basereg, indexreg, displacement, width)) =
                                 helper.is_interesting_instruction(address, instr)
                             {
@@ -364,12 +377,14 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         helper
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn get_writer_register(&self, reg: capstone::RegId) -> Aarch64Register {
         let regint: u16 = reg.0;
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn emit_shadow_check(
         &self,
@@ -509,6 +524,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         ));
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn get_instruction_width(&self, instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
         use capstone::arch::arm64::Arm64Insn as I;
@@ -574,6 +590,7 @@ impl<'a> FridaEdgeCoverageHelper<'a> {
         8 * num_registers
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn is_interesting_instruction(
         &self,
