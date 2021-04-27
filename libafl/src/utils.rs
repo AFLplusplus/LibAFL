@@ -487,10 +487,10 @@ mod tests {
 /// utility function which spawns a broker and n clients and binds each client to a cpu core
 #[cfg(unix)]
 pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
-    client_fn: CF,
-    cores: &[usize],
     stats: ST,
     broker_port: u16,
+    cores: &[usize],
+    client_fn: CF,
 ) -> Result<(), Error>
 where
     ST: Stats,
@@ -557,10 +557,10 @@ const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
 
 #[cfg(windows)]
 pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
-    client_fn: CF,
-    cores: &[usize],
     stats: ST,
     broker_port: u16,
+    cores: &[usize],
+    client_fn: CF,
 ) -> Result<(), Error>
 where
     ST: Stats,
