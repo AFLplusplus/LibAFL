@@ -1,3 +1,6 @@
+//! Compression of events passed between a broker and clients
+//! Currently we use the gzip compression algorithm for its fast decompression performance.
+
 #[cfg(feature = "llmp_compress")]
 use crate::{bolts::llmp::{Flag, Tag, LLMP_FLAG_COMPRESSED}, Error};
 use alloc::vec::Vec;
@@ -17,6 +20,10 @@ impl GzipCompressor {
     }
 }
 
+
+
+/// Compression
+/// The buffer is compressed with gzip algo
 impl GzipCompressor {
     pub fn compress(&self, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if buf.len() > self.threshold {
@@ -41,7 +48,9 @@ impl GzipCompressor {
         }
     }
 
-    pub fn decompress(&self, _tag: Tag, flag: Flag, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    /// Decompression
+    /// The buffer is decompressed, flag is used to indicate if it's compressed or not
+    pub fn decompress(&self, flag: Flag, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if flag & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
             //let t1 = crate::utils::current_time();
             let decompressed: Vec<u8> = buf
