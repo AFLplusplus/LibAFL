@@ -50,8 +50,8 @@ impl GzipCompressor {
 
     /// Decompression
     /// The buffer is decompressed, flag is used to indicate if it's compressed or not
-    pub fn decompress(&self, flag: Flag, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        if flag & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+    pub fn decompress(&self, flags: Flag, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
             //let t1 = crate::utils::current_time();
             let decompressed: Vec<u8> = buf
                 .into_iter()

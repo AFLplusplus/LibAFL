@@ -172,10 +172,10 @@ where
                 #[cfg(feature = "llmp_compress")]
                 let compressor = &self.compressor;
                 broker.loop_forever(
-                    &mut |sender_id: u32, tag: Tag, _flag: Flag, msg: &[u8]| {
+                    &mut |sender_id: u32, tag: Tag, _flags: Flag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
                             #[cfg(feature = "llmp_compress")]
-                            let event: Event<I> = match compressor.decompress(_flag, msg)? {
+                            let event: Event<I> = match compressor.decompress(_flags, msg)? {
                                 Some(decompressed) => postcard::from_bytes(&decompressed)?,
                                 _ => postcard::from_bytes(msg)?,
                             };
@@ -335,12 +335,12 @@ where
         let mut events = vec![];
         match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {
-                while let Some((sender_id, tag, _flag, msg)) = client.recv_buf_with_flag()? {
+                while let Some((sender_id, tag, _flags, msg)) = client.recv_buf_with_flags()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
                     #[cfg(feature = "llmp_compress")]
-                    let event: Event<I> = match self.compressor.decompress(_flag, msg)? {
+                    let event: Event<I> = match self.compressor.decompress(_flags, msg)? {
                         Some(decompressed) => postcard::from_bytes(&decompressed)?,
                         _ => postcard::from_bytes(msg)?,
                     };
@@ -364,14 +364,14 @@ where
     #[cfg(feature = "llmp_compress")]
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        let flag: Flag = LLMP_FLAG_INITIALIZED;
+        let flags: Flag = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.compress(&serialized)? {
             Some(comp_buf) => {
-                self.llmp.send_buf_with_flag(
+                self.llmp.send_buf_with_flags(
                     LLMP_TAG_EVENT_TO_BOTH,
                     &comp_buf,
-                    flag | LLMP_FLAG_COMPRESSED,
+                    flags | LLMP_FLAG_COMPRESSED,
                 )?;
             }
             None => {
