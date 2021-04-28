@@ -44,7 +44,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT>, I, OT>,
+    base: TimeoutExecutor<InProcessExecutor<H, I, OT>, I, OT>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -154,7 +154,7 @@ where
 {
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT>,
+        base: InProcessExecutor<H, I, OT>,
         helper: &'c mut FH,
         timeout: Duration,
     ) -> Self {

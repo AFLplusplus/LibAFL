@@ -218,17 +218,17 @@ where
         })
     }
 
-    // /// Retrieve the harness function.
-    // #[inline]
-    // pub fn harness(&self) -> &H {
-    //     self.harness_fn
-    // }
+     /// Retrieve the harness function.
+     #[inline]
+     pub fn harness(&self) -> &H {
+         &self.harness_fn
+     }
 
-    // /// Retrieve the harness function for a mutable reference.
-    // #[inline]
-    // pub fn harness_mut(&mut self) -> &mut H {
-    //     self.harness_fn
-    // }
+     /// Retrieve the harness function for a mutable reference.
+     #[inline]
+     pub fn harness_mut(&mut self) -> &mut H {
+         &mut self.harness_fn
+     }
 }
 
 #[cfg(unix)]

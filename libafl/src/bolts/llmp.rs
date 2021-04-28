@@ -398,10 +398,10 @@ where
 
     /// Creates a new broker on the given port
     #[cfg(feature = "std")]
-    pub fn broker_on_port(port: u16) -> Result<Self, Error> {
+    pub fn broker_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         match TcpListener::bind(format!("127.0.0.1:{}", port)) {
             Ok(listener) => {
-                let mut broker = LlmpBroker::new()?;
+                let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
@@ -411,9 +411,9 @@ where
 
     /// Creates a new client on the given port
     #[cfg(feature = "std")]
-    pub fn client_on_port(port: u16) -> Result<Self, Error> {
+    pub fn client_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         Ok(LlmpConnection::IsClient {
-            client: LlmpClient::create_attach_to_tcp(port)?,
+            client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
         })
     }
 
@@ -1894,7 +1894,7 @@ where
 
     #[cfg(feature = "std")]
     /// Create a LlmpClient, getting the ID from a given port
-    pub fn create_attach_to_tcp(port: u16) -> Result<Self, Error> {
+    pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
         let mut stream = match TcpStream::connect(format!("127.0.0.1:{}", port)) {
             Ok(stream) => stream,
             Err(e) => {

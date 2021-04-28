@@ -1,8 +1,9 @@
 //! Utility functions for AFL
 
+use crate::bolts::{os::ashmem_server::AshmemService, shmem::StdShMemProvider};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::shmem::StdShMem, corpus::Corpus, events::llmp::setup_new_llmp_broker,
+    bolts::shmem::ShMemProvider, corpus::Corpus, events::llmp::setup_new_llmp_broker,
     feedbacks::FeedbacksTuple, fuzzer::Fuzzer, inputs::Input, state::State, stats::Stats,
 };
 
@@ -559,7 +560,7 @@ mod tests {
 
 /// utility function which spawns a broker and n clients and binds each client to a cpu core
 #[cfg(all(unix, feature = "std"))]
-pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
+pub fn launcher_std<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
     stats: ST,
     broker_port: u16,
     cores: &[usize],
@@ -574,6 +575,33 @@ where
     OFT: FeedbacksTuple<I>,
     R: Rand,
     SC: Corpus<I>,
+    FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
+{
+    #[cfg(target_os = "android")]
+    AshmemService::start().expect("Error starting Ashmem Service");
+
+    Ok(launcher(StdShMemProvider::new()?, stats, broker_port, cores, client_fn)?)
+}
+
+/// utility function which spawns a broker and n clients and binds each client to a cpu core
+#[cfg(all(unix, feature = "std"))]
+pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC, SP>(
+    mut shmem_provider: SP,
+    stats: ST,
+    broker_port: u16,
+    cores: &[usize],
+    client_fn: CF,
+) -> Result<(), Error>
+where
+    ST: Stats,
+    CF: Fn() -> Result<(FZ, EX, EM, State<C, FT, I, OFT, R, SC>, CS), Error>,
+    C: Corpus<I>,
+    FT: FeedbacksTuple<I>,
+    I: Input,
+    OFT: FeedbacksTuple<I>,
+    R: Rand,
+    SC: Corpus<I>,
+    SP: ShMemProvider + 'static,
     FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
 {
     let core_ids = core_affinity::get_core_ids().unwrap();
@@ -592,14 +620,16 @@ where
                 ForkResult::Child => {
                     core_affinity::set_for_current(*bind_to);
 
+                    shmem_provider.post_fork();
+
                     //silence stdout and stderr for clients
                     #[cfg(feature = "std")]
-                    {
-                        let stdout_file = OpenOptions::new().write(true).open("/dev/null").unwrap();
-                        dup2(stdout_file.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
-                        dup2(stdout_file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
-                        // todo: does the file fd get Dropped early?
-                    }
+                    //{
+                        //let stdout_file = OpenOptions::new().write(true).open("/dev/null").unwrap();
+                        //dup2(stdout_file.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
+                        //dup2(stdout_file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
+                        //// todo: does the file fd get Dropped early?
+                    //}
                     //fuzzer client. keeps retrying the connection to broker till the broker starts
                     let (mut fuzzer, mut executor, mut restarting_mgr, mut state, scheduler) =
                         client_fn().unwrap();
@@ -614,7 +644,7 @@ where
 
     //start the broker
     let _ =
-        setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, StdShMem, _>(stats, broker_port);
+        setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, _, _>(shmem_provider, stats, broker_port);
 
     //broker exited. kill all clients.
     for handle in handles.iter() {
@@ -628,7 +658,8 @@ where
 const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
 
 #[cfg(windows)]
-pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
+pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC, SP>(
+    shmem_provider: SP,
     stats: ST,
     broker_port: u16,
     cores: &[usize],
@@ -643,6 +674,7 @@ where
     OFT: FeedbacksTuple<I>,
     R: Rand,
     SC: Corpus<I>,
+    SP: ShMemProvider,
     FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
 {
     let core_ids = core_affinity::get_core_ids().unwrap();
@@ -683,7 +715,8 @@ where
                 }
             }
             //finished spawning clients. start the broker
-            let _ = setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, StdShMem, _>(
+            let _ = setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, _ , _>(
+                shmem_provider,
                 stats,
                 broker_port,
             );
