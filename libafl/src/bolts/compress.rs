@@ -2,7 +2,7 @@
 //! Currently we use the gzip compression algorithm for its fast decompression performance.
 
 #[cfg(feature = "llmp_compress")]
-use crate::{bolts::llmp::{Flag, Tag, LLMP_FLAG_COMPRESSED}, Error};
+use crate::{bolts::llmp::{Flag, LLMP_FLAG_COMPRESSED}, Error};
 use alloc::vec::Vec;
 use compression::prelude::*;
 use core::fmt::Debug;
