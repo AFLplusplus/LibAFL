@@ -12,6 +12,11 @@ It offers a main crate that provide building blocks for custom fuzzers, [libafl]
 
 LibAFL is fast, multi-platform, no_std compatible, and scales over cores (and machines in the near future!).
 
+LibAFL offers integrations with popular instrumemntation frameworks too. At the moment, the supported backends are:
+
++ SanitizerCoverage, in [libafl_targets](./libafl_targets)
++ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net>
+
 ## Getting started
 
 Clone the LibAFL repository with
