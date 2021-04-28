@@ -3,8 +3,8 @@
 use crate::bolts::{os::ashmem_server::AshmemService, shmem::StdShMemProvider};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::shmem::ShMemProvider, corpus::Corpus, events::llmp::setup_new_llmp_broker,
-    feedbacks::FeedbacksTuple, fuzzer::Fuzzer, inputs::Input, state::State, stats::Stats,
+    bolts::shmem::ShMemProvider, corpus::Corpus, events::{EventManager, llmp::{LlmpRestartingEventManager, ManagerKind, setup_restarting_mgr}},
+    feedbacks::FeedbacksTuple, fuzzer::Fuzzer, inputs::Input, state::{IfInteresting, State}, stats::Stats,
 };
 
 use alloc::{string::String, vec::Vec};
@@ -17,7 +17,7 @@ use libc::pid_t;
 #[cfg(feature = "std")]
 use std::{
     env,
-    fs::OpenOptions,
+    fs::File,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -560,54 +560,27 @@ mod tests {
 
 /// utility function which spawns a broker and n clients and binds each client to a cpu core
 #[cfg(all(unix, feature = "std"))]
-pub fn launcher_std<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC>(
-    stats: ST,
-    broker_port: u16,
-    cores: &[usize],
-    client_fn: CF,
-) -> Result<(), Error>
-where
-    ST: Stats,
-    CF: Fn() -> Result<(FZ, EX, EM, State<C, FT, I, OFT, R, SC>, CS), Error>,
-    C: Corpus<I>,
-    FT: FeedbacksTuple<I>,
-    I: Input,
-    OFT: FeedbacksTuple<I>,
-    R: Rand,
-    SC: Corpus<I>,
-    FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
-{
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Error starting Ashmem Service");
-
-    Ok(launcher(StdShMemProvider::new()?, stats, broker_port, cores, client_fn)?)
-}
-
-/// utility function which spawns a broker and n clients and binds each client to a cpu core
-#[cfg(all(unix, feature = "std"))]
-pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC, SP>(
+pub fn launcher<I, S, SP, ST>(
     mut shmem_provider: SP,
     stats: ST,
+    client_init_stats: &mut dyn FnMut() -> Result<ST, Error>,
+    run_client: &mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>) -> Result<(), Error>,
     broker_port: u16,
     cores: &[usize],
-    client_fn: CF,
+    stdout_file: Option<&str>,
 ) -> Result<(), Error>
 where
-    ST: Stats,
-    CF: Fn() -> Result<(FZ, EX, EM, State<C, FT, I, OFT, R, SC>, CS), Error>,
-    C: Corpus<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    OFT: FeedbacksTuple<I>,
-    R: Rand,
-    SC: Corpus<I>,
+    ST: Stats,
     SP: ShMemProvider + 'static,
-    FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
+    S: DeserializeOwned + IfInteresting<I>
+
 {
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
     let mut handles = vec![];
 
+    println!("spawning on cores: {:?}", cores);
     //spawn clients
     for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
         if cores.iter().any(|&x| x == id) {
@@ -618,33 +591,32 @@ where
                     println!("child spawned and bound to core {}", id);
                 }
                 ForkResult::Child => {
-                    core_affinity::set_for_current(*bind_to);
-
                     shmem_provider.post_fork();
 
-                    //silence stdout and stderr for clients
+
                     #[cfg(feature = "std")]
-                    //{
-                        //let stdout_file = OpenOptions::new().write(true).open("/dev/null").unwrap();
-                        //dup2(stdout_file.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
-                        //dup2(stdout_file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
-                        //// todo: does the file fd get Dropped early?
-                    //}
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+
+                    #[cfg(feature = "std")]
+                    if stdout_file.is_some() {
+                        let file = File::create(stdout_file.unwrap()).unwrap();
+                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
+                        dup2(file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
+                    }
                     //fuzzer client. keeps retrying the connection to broker till the broker starts
-                    let (mut fuzzer, mut executor, mut restarting_mgr, mut state, scheduler) =
-                        client_fn().unwrap();
-                    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+                    let stats = client_init_stats()?;
+                    let (state, mgr) = setup_restarting_mgr(shmem_provider.clone(), stats, broker_port, ManagerKind::Client(Some(*bind_to)))?;
+                    run_client(state, mgr)?;
                     break;
                 }
+
             };
         }
     }
     #[cfg(feature = "std")]
     println!("I am broker!!.");
 
-    //start the broker
-    let _ =
-        setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, _, _>(shmem_provider, stats, broker_port);
+    setup_restarting_mgr::<I, S, SP, ST>(shmem_provider, stats, broker_port, ManagerKind::Broker)?;
 
     //broker exited. kill all clients.
     for handle in handles.iter() {

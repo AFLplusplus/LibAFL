@@ -88,8 +88,8 @@ static char * allocation = NULL;
 __attribute__((noinline))
 void func3( char * alloc) {
   printf("func3\n");
-  if (random() % 5 == 0) {
-    alloc[0xff] = 0xde;
+  if (random() == 0) {
+    //alloc[0xff] = 0xde;
   }
 }
 __attribute__((noinline))

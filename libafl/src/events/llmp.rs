@@ -1,6 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{string::ToString, vec::Vec};
+use core_affinity::CoreId;
 use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -478,6 +479,11 @@ where
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ManagerKind {
+    Client(Option<CoreId>),
+    Broker,
+}
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
@@ -485,6 +491,7 @@ pub fn setup_restarting_mgr_std<I, S, ST>(
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     broker_port: u16,
+    kind: ManagerKind,
 ) -> Result<
     (
         Option<S>,
@@ -500,149 +507,9 @@ where
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Error starting Ashmem Service");
 
-    setup_restarting_mgr(StdShMemProvider::new()?, stats, broker_port)
+    setup_restarting_mgr(StdShMemProvider::new()?, stats, broker_port, kind)
 }
 
-/// Setup a `LlmpBroker`.
-/// Will not return until the fuzzer exits.
-/// Returns an `Error`, if broker port was already taken,
-/// or a `ShuttingDown` error when shutting down.
-#[cfg(feature = "std")]
-#[allow(clippy::unnecessary_operation)]
-pub fn setup_new_llmp_broker<I, S, SP, ST>(shmem_provider: SP, stats: ST, broker_port: u16) -> Result<(), Error>
-where
-    I: Input,
-    S: DeserializeOwned + IfInteresting<I>,
-    SP: ShMemProvider + 'static,
-    ST: Stats,
-{
-    let mut mgr = LlmpEventManager::<I, S, SP, ST>::new_broker_on_port(shmem_provider.clone(), stats, broker_port)?;
-
-    if mgr.is_broker() {
-        // Yep, broker. Just loop here.
-        println!("Doing broker things. Run this tool again to start fuzzing in a client.");
-        mgr.broker_loop()?;
-        Err(Error::ShuttingDown)
-    } else {
-        Err(Error::IllegalState("New Broker is a client.".to_string()))
-    }
-}
-
-/// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
-/// The restarter will start a new process each time the child crashes or timeouts.
-#[cfg(feature = "std")]
-#[allow(clippy::unnecessary_operation)]
-#[allow(clippy::clippy::type_complexity)]
-pub fn setup_restarting_mgr_client<I, S, SP, ST>(
-    //mgr: &mut LlmpEventManager<I, S, SH, ST>,
-    mut shmem_provider: SP,
-    stats: ST,
-    broker_port: u16,
-) -> Result<(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>), Error>
-where
-    I: Input,
-    S: DeserializeOwned + IfInteresting<I>,
-    SP: ShMemProvider,
-    ST: Stats,
-{
-    let mgr = LlmpEventManager::<I, S, SP, ST>::new_client_on_port(shmem_provider.clone(), stats, broker_port)?;
-
-    // We start ourself as child process to actually fuzz
-    let (sender, mut receiver, mut new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-
-        if mgr.is_broker() {
-            return Err(Error::IllegalState("New Client is a broker.".to_string()));
-        } else {
-            // We are the fuzzer respawner in a llmp client
-            mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
-
-            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-            let sender = LlmpSender::new(shmem_provider.clone(), 0, false)?;
-            let receiver = LlmpReceiver::on_existing_map(
-                shmem_provider.clone(),
-                shmem_provider.clone_ref(&sender.out_maps.last().unwrap().shmem)?,
-                None,
-            )?;
-            // Store the information to a map.
-            sender.to_env(_ENV_FUZZER_SENDER)?;
-            receiver.to_env(_ENV_FUZZER_RECEIVER)?;
-
-            let mut ctr: u64 = 0;
-            // Client->parent loop
-            loop {
-                dbg!("Spawning next client (id {})", ctr);
-
-                // On Unix, we fork (todo: measure if that is actually faster.)
-                #[cfg(unix)]
-                let child_status = match unsafe { fork() }? {
-                    ForkResult::Parent(handle) => handle.status(),
-                    ForkResult::Child => break (sender, receiver, shmem_provider),
-                };
-
-                // On windows, we spawn ourself again
-                #[cfg(windows)]
-                let child_status = startable_self()?.status()?;
-
-                if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
-                    #[cfg(unix)]
-                    if child_status == 137 {
-                        // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
-                        // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
-                        panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
-                    }
-
-                    // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! (Child exited with: {})", child_status);
-                }
-
-                ctr = ctr.wrapping_add(1);
-            }
-        }
-    } else {
-        // We are the newly started fuzzing instance, first, connect to our own restore map.
-        // A sender and a receiver for single communication
-        shmem_provider.post_fork();
-        (
-            LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
-            LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
-            shmem_provider
-        )
-    };
-
-    new_shmem_provider.post_fork();
-
-    println!("We're a client, let's fuzz :)");
-
-    // If we're restarting, deserialize the old state.
-    let (state, mut mgr) = match receiver.recv_buf()? {
-        None => {
-            println!("First run. Let's set it all up");
-            // Mgr to send and receive msgs from/to all other fuzzer instances
-            let client_mgr = LlmpEventManager::<I, S, SP, ST>::existing_client_from_env(
-                new_shmem_provider,
-                _ENV_FUZZER_BROKER_CLIENT_INITIAL,
-            )?;
-
-            (None, LlmpRestartingEventManager::new(client_mgr, sender))
-        }
-        // Restoring from a previous run, deserialize state and corpus.
-        Some((_sender, _tag, msg)) => {
-            println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (state, mgr): (S, LlmpEventManager<I, S, SP, ST>) = deserialize_state_mgr(new_shmem_provider, &msg)?;
-
-            (Some(state), LlmpRestartingEventManager::new(mgr, sender))
-        }
-    };
-    // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
-    unsafe { mgr.sender_mut().reset() };
-    /* TODO: Not sure if this is needed
-    // We commit an empty NO_RESTART message to this buf, against infinite loops,
-    // in case something crashes in the fuzzer.
-    sender.send_buf(_LLMP_TAG_NO_RESTART, []);
-    */
-
-    Ok((state, mgr))
-}
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
@@ -656,6 +523,7 @@ pub fn setup_restarting_mgr<I, S, SP, ST>(
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     broker_port: u16,
+    kind: ManagerKind,
 ) -> Result<(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>), Error>
 where
     I: Input,
@@ -667,15 +535,30 @@ where
         LlmpEventManager::<I, S, SP, ST>::new_on_port(shmem_provider.clone(), stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
-    let (sender, mut receiver, mut new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER)
+    let (sender, mut receiver, mut new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
         .is_err()
     {
-        if mgr.is_broker() {
-            // Yep, broker. Just loop here.
-            println!("Doing broker things. Run this tool again to start fuzzing in a client.");
-            mgr.broker_loop()?;
-            return Err(Error::ShuttingDown);
-        }
+        let core_id = if mgr.is_broker() {
+            match kind {
+                ManagerKind::Broker => {
+                    // Yep, broker. Just loop here.
+                    println!("Doing broker things. Run this tool again to start fuzzing in a client.");
+                    mgr.broker_loop()?;
+                    return Err(Error::ShuttingDown);
+
+                },
+                ManagerKind::Client(_) => {
+                    return Err(Error::IllegalState("Tried to start a client, but got a broker".to_string()));
+                }
+            }
+        } else {
+            match kind {
+                ManagerKind::Broker => {
+                    return Err(Error::IllegalState("Tried to start a broker, but got a client".to_string()));
+                },
+                ManagerKind::Client(core_id) => core_id,
+            }
+        };
 
         // We are the fuzzer respawner in a llmp client
         mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
@@ -698,7 +581,7 @@ where
             #[cfg(unix)]
             let child_status = match unsafe { fork() }? {
                 ForkResult::Parent(handle) => handle.status(),
-                ForkResult::Child => break (sender, receiver, shmem_provider),
+                ForkResult::Child => break (sender, receiver, shmem_provider, core_id),
             };
 
             // On windows, we spawn ourself again
@@ -722,17 +605,20 @@ where
     } else {
         // We are the newly started fuzzing instance, first, connect to our own restore map.
         // A sender and a receiver for single communication
-        // Clone so we get a new connection to the AshmemServer if we are using
-        // ServedShMemProvider
         shmem_provider.post_fork();
         (
             LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
             LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
             shmem_provider,
+            None,
         )
     };
 
     new_shmem_provider.post_fork();
+
+    if core_id.is_some() {
+        core_affinity::set_for_current(core_id.unwrap());
+    }
 
     println!("We're a client, let's fuzz :)");
 
