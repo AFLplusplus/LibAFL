@@ -130,6 +130,11 @@ where
                 null_mut(),
             );
         }
+        #[cfg(windows)]
+        {
+            // TODO
+            let _ = self.exec_tmout.as_millis();
+        }
         self.executor.pre_exec(_state, _event_mgr, _input)
     }
 
@@ -158,6 +163,10 @@ where
                 },
                 null_mut(),
             );
+        }
+        #[cfg(windows)]
+        {
+            // TODO
         }
         self.executor.post_exec(_state, _event_mgr, _input)
     }

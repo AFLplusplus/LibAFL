@@ -61,7 +61,6 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
-use libc::ucontext_t;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
@@ -80,6 +79,8 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
+#[cfg(unix)]
+use libc::ucontext_t;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
@@ -1319,7 +1320,7 @@ pub struct LlmpBrokerSignalHandler {
     shutting_down: bool,
 }
 
-#[cfg(all(unix))]
+#[cfg(unix)]
 impl Handler for LlmpBrokerSignalHandler {
     fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: &mut ucontext_t) {
         unsafe { ptr::write_volatile(&mut self.shutting_down, true) };

@@ -804,7 +804,7 @@ pub mod win32_shmem {
     impl ShMemProvider for Win32ShMemProvider {
         type Mem = Win32ShMem;
 
-        fn new() -> Result<Self, Erro> {
+        fn new() -> Result<Self, Error> {
             Ok(Self {})
         }
         fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
