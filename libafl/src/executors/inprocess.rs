@@ -235,7 +235,7 @@ where
 mod unix_signal_handler {
     use alloc::vec::Vec;
     use core::ptr;
-    use libc::{c_void, siginfo_t};
+    use libc::{c_void, siginfo_t, ucontext_t};
     #[cfg(feature = "std")]
     use std::io::{stdout, Write};
 
@@ -273,8 +273,8 @@ mod unix_signal_handler {
         pub event_mgr_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
-        pub crash_handler: unsafe fn(Signal, siginfo_t, *const c_void, data: &mut Self),
-        pub timeout_handler: unsafe fn(Signal, siginfo_t, *const c_void, data: &mut Self),
+        pub crash_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
+        pub timeout_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
@@ -283,21 +283,21 @@ mod unix_signal_handler {
     unsafe fn nop_handler(
         _signal: Signal,
         _info: siginfo_t,
-        _void: *const c_void,
+        _context: &mut ucontext_t,
         _data: &mut InProcessExecutorHandlerData,
     ) {
     }
 
     #[cfg(unix)]
     impl Handler for InProcessExecutorHandlerData {
-        fn handle(&mut self, signal: Signal, info: siginfo_t, void: *const c_void) {
+        fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
-                        (data.timeout_handler)(signal, info, void, data)
+                        (data.timeout_handler)(signal, info, context, data)
                     }
-                    _ => (data.crash_handler)(signal, info, void, data),
+                    _ => (data.crash_handler)(signal, info, context, data),
                 }
             }
         }
@@ -312,6 +312,7 @@ mod unix_signal_handler {
                 Signal::SigFloatingPointException,
                 Signal::SigIllegalInstruction,
                 Signal::SigSegmentationFault,
+                Signal::SigTrap,
             ]
         }
     }
@@ -320,7 +321,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _void: *const c_void,
+        _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
@@ -348,7 +349,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Timeout)
+                .is_interesting_all(&input, observers, &ExitKind::Timeout)
                 .expect("In timeout handler objectives failure.");
             if obj_fitness > 0 {
                 state
@@ -382,7 +383,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _void: *const c_void,
+        _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
@@ -392,6 +393,10 @@ mod unix_signal_handler {
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
+        #[cfg(all(target_os = "android", target_arch = "aarch64"))]
+        let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void
+            as *mut ucontext_t);
+
         #[cfg(feature = "std")]
         println!("Crashed with {}", _signal);
         if !data.current_input_ptr.is_null() {
@@ -401,6 +406,45 @@ mod unix_signal_handler {
 
             #[cfg(feature = "std")]
             println!("Child crashed!");
+
+            #[cfg(all(
+                feature = "std",
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            ))]
+            {
+                use crate::utils::find_mapping_for_address;
+                println!("{:━^100}", " CRASH ");
+                println!(
+                    "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
+                    _signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
+                );
+                if let Ok((start, _, _, path)) =
+                    find_mapping_for_address(_context.uc_mcontext.pc as usize)
+                {
+                    println!(
+                        "pc is at offset 0x{:08x} in  {}",
+                        _context.uc_mcontext.pc as usize - start,
+                        path
+                    );
+                }
+
+                println!("{:━^100}", " REGISTERS ");
+                for reg in 0..31 {
+                    print!(
+                        "x{:02}: 0x{:016x} ",
+                        reg, _context.uc_mcontext.regs[reg as usize]
+                    );
+                    if reg % 4 == 3 {
+                        println!();
+                    }
+                }
+                println!("pc : 0x{:016x} ", _context.uc_mcontext.pc);
+
+                //println!("{:━^100}", " BACKTRACE ");
+                //println!("{:?}", backtrace::Backtrace::new())
+            }
+
             #[cfg(feature = "std")]
             let _ = stdout().flush();
 
@@ -410,7 +454,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, &ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();
@@ -574,7 +618,7 @@ mod windows_exception_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, &ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();

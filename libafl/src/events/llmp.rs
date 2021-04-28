@@ -1,7 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{rc::Rc, string::ToString, vec::Vec};
-use core::{cell::RefCell, marker::PhantomData, time::Duration};
+use alloc::{string::ToString, vec::Vec};
+use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
@@ -12,6 +12,7 @@ use crate::bolts::{
     llmp::{LlmpClient, LlmpReceiver},
     shmem::StdShMemProvider,
 };
+
 use crate::{
     bolts::{
         llmp::{self, LlmpClientDescription, LlmpSender, Tag},
@@ -32,10 +33,7 @@ use crate::{
 use crate::utils::startable_self;
 
 #[cfg(all(feature = "std", unix))]
-use crate::{
-    bolts::shmem::UnixShMemProvider,
-    utils::{fork, ForkResult},
-};
+use crate::utils::{fork, ForkResult};
 
 #[cfg(all(feature = "std", target_os = "android"))]
 use crate::bolts::os::ashmem_server::AshmemService;
@@ -65,41 +63,6 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
-impl<I, S, ST> LlmpEventManager<I, S, UnixShMemProvider, ST>
-where
-    I: Input,
-    S: IfInteresting<I>,
-    ST: Stats,
-{
-    /// Create llmp on a port
-    /// If the port is not yet bound, it will act as broker
-    /// Else, it will act as client.
-    #[cfg(feature = "std")]
-    pub fn new_on_port_std(
-        shmem_provider: &Rc<RefCell<UnixShMemProvider>>,
-        stats: ST,
-        port: u16,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            stats: Some(stats),
-            llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
-            phantom: PhantomData,
-        })
-    }
-
-    /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
-    /// Std uses UnixShMem.
-    #[cfg(feature = "std")]
-    pub fn existing_client_from_env_std(
-        shmem_provider: &Rc<RefCell<UnixShMemProvider>>,
-        env_name: &str,
-    ) -> Result<Self, Error> {
-        Self::existing_client_from_env(shmem_provider, env_name)
-    }
-}
-
 impl<I, S, SP, ST> Drop for LlmpEventManager<I, S, SP, ST>
 where
     I: Input,
@@ -124,11 +87,7 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port(
-        shmem_provider: &Rc<RefCell<SP>>,
-        stats: ST,
-        port: u16,
-    ) -> Result<Self, Error> {
+    pub fn new_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
@@ -138,10 +97,7 @@ where
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env(
-        shmem_provider: &Rc<RefCell<SP>>,
-        env_name: &str,
-    ) -> Result<Self, Error> {
+    pub fn existing_client_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
             stats: None,
             llmp: llmp::LlmpConnection::IsClient {
@@ -160,7 +116,7 @@ where
 
     /// Create an existing client from description
     pub fn existing_client_from_description(
-        shmem_provider: &Rc<RefCell<SP>>,
+        shmem_provider: SP,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -304,7 +260,7 @@ where
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
-                let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
+                let fitness = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
                 if fitness > 0
                     && state
                         .add_if_interesting(&input, fitness, scheduler)?
@@ -400,7 +356,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 #[allow(clippy::type_complexity)]
 pub fn deserialize_state_mgr<I, S, SP, ST>(
-    shmem_provider: &Rc<RefCell<SP>>,
+    shmem_provider: SP,
     state_corpus_serialized: &[u8],
 ) -> Result<(S, LlmpEventManager<I, S, SP, ST>), Error>
 where
@@ -525,7 +481,7 @@ where
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Error starting Ashmem Service");
 
-    setup_restarting_mgr(StdShMemProvider::new(), stats, broker_port)
+    setup_restarting_mgr(StdShMemProvider::new()?, stats, broker_port)
 }
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
@@ -537,7 +493,7 @@ where
     clippy::similar_names
 )] // for { mgr = LlmpEventManager... }
 pub fn setup_restarting_mgr<I, S, SP, ST>(
-    shmem_provider: SP,
+    mut shmem_provider: SP,
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     broker_port: u16,
@@ -548,13 +504,13 @@ where
     SP: ShMemProvider,
     ST: Stats,
 {
-    let shmem_provider = Rc::new(RefCell::new(shmem_provider));
-
     let mut mgr =
-        LlmpEventManager::<I, S, SP, ST>::new_on_port(&shmem_provider, stats, broker_port)?;
+        LlmpEventManager::<I, S, SP, ST>::new_on_port(shmem_provider.clone(), stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
-    let (sender, mut receiver, shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+    let (sender, mut receiver, mut new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER)
+        .is_err()
+    {
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
@@ -566,13 +522,9 @@ where
         mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
         // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-        let sender = { LlmpSender::new(&shmem_provider, 0, false)? };
+        let sender = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
 
-        let map = {
-            shmem_provider
-                .borrow_mut()
-                .clone_ref(&sender.out_maps.last().unwrap().shmem)?
-        };
+        let map = { shmem_provider.clone_ref(&sender.out_maps.last().unwrap().shmem)? };
         let receiver = LlmpReceiver::on_existing_map(shmem_provider.clone(), map, None)?;
         // Store the information to a map.
         sender.to_env(_ENV_FUZZER_SENDER)?;
@@ -613,13 +565,15 @@ where
         // A sender and a receiver for single communication
         // Clone so we get a new connection to the AshmemServer if we are using
         // ServedShMemProvider
-        let shmem_provider = Rc::new(RefCell::new(shmem_provider.borrow_mut().clone()));
+        shmem_provider.post_fork();
         (
-            LlmpSender::on_existing_from_env(&shmem_provider, _ENV_FUZZER_SENDER)?,
-            LlmpReceiver::on_existing_from_env(&shmem_provider, _ENV_FUZZER_RECEIVER)?,
+            LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
+            LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
             shmem_provider,
         )
     };
+
+    new_shmem_provider.post_fork();
 
     println!("We're a client, let's fuzz :)");
 
@@ -633,7 +587,7 @@ where
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
             let client_mgr = LlmpEventManager::<I, S, SP, ST>::existing_client_from_env(
-                &shmem_provider,
+                new_shmem_provider,
                 _ENV_FUZZER_BROKER_CLIENT_INITIAL,
             )?;
 
@@ -643,7 +597,7 @@ where
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
             let (state, mgr): (S, LlmpEventManager<I, S, SP, ST>) =
-                deserialize_state_mgr(&shmem_provider, &msg)?;
+                deserialize_state_mgr(new_shmem_provider, &msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }
