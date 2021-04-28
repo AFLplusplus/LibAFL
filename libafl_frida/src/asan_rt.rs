@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     cell::{RefCell, RefMut},
     ffi::c_void,
-    io::Write,
+    io::{self, Write},
     rc::Rc,
 };
 use termcolor::{Color, ColorSpec, WriteColor};
@@ -72,8 +72,13 @@ struct AllocationMetadata {
 }
 
 impl Allocator {
-    fn new(runtime: Rc<RefCell<AsanRuntime>>) {
-        let page_size = unsafe { sysconf(_SC_PAGESIZE) as usize };
+    fn setup(runtime: Rc<RefCell<AsanRuntime>>) {
+        let ret = unsafe { sysconf(_SC_PAGESIZE) };
+        if ret < 0 {
+            panic!("Failed to read pagesize {:?}", io::Error::last_os_error());
+        }
+        #[allow(clippy::cast_sign_loss)]
+        let page_size = ret as usize;
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
         for try_shadow_bit in &[46usize, 36usize] {
@@ -98,7 +103,7 @@ impl Allocator {
 
         // attempt to pre-map the entire shadow-memory space
         let addr: usize = 1 << shadow_bit;
-        let pre_allocated_shadow = if let Ok(_) = unsafe {
+        let pre_allocated_shadow = unsafe {
             mmap(
                 addr as *mut c_void,
                 addr + addr,
@@ -107,13 +112,10 @@ impl Allocator {
                 -1,
                 0,
             )
-        } {
-            true
-        } else {
-            false
-        };
+        }
+        .is_ok();
 
-        let res = Self {
+        let allocator = Self {
             runtime,
             page_size,
             pre_allocated_shadow,
@@ -124,7 +126,7 @@ impl Allocator {
             allocation_queue: HashMap::new(),
         };
         unsafe {
-            ALLOCATOR_SINGLETON = Some(RefCell::new(res));
+            ALLOCATOR_SINGLETON = Some(RefCell::new(allocator));
         }
     }
 
@@ -139,7 +141,7 @@ impl Allocator {
     }
 
     pub fn init(runtime: Rc<RefCell<AsanRuntime>>) {
-        Self::new(runtime);
+        Self::setup(runtime);
     }
 
     #[inline]
@@ -210,7 +212,7 @@ impl Allocator {
                 address: mapping + self.page_size,
                 size,
                 actual_size: rounded_up_size,
-                ..Default::default()
+                ..AllocationMetadata::default()
             };
 
             if self
@@ -235,17 +237,16 @@ impl Allocator {
     }
 
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        let mut metadata = match self.allocations.get_mut(&(ptr as usize)) {
-            Some(metadata) => metadata,
-            None => {
-                if !ptr.is_null() {
-                    // TODO: report this as an observer
-                    self.runtime
-                        .borrow_mut()
-                        .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
-                }
-                return;
+        let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
+            metadata
+        } else {
+            if !ptr.is_null() {
+                // TODO: report this as an observer
+                self.runtime
+                    .borrow_mut()
+                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
             }
+            return;
         };
 
         if metadata.freed {
@@ -876,7 +877,7 @@ impl AsanRuntime {
         let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
-            _ => actual_pc,
+            None => actual_pc,
         };
 
         let cs = Capstone::new()
@@ -1006,12 +1007,10 @@ impl AsanRuntime {
                     } else {
                         AsanError::OobRead(asan_readwrite_error)
                     }
+                } else if metadata.freed {
+                    AsanError::WriteAfterFree(asan_readwrite_error)
                 } else {
-                    if metadata.freed {
-                        AsanError::WriteAfterFree(asan_readwrite_error)
-                    } else {
-                        AsanError::OobWrite(asan_readwrite_error)
-                    }
+                    AsanError::OobWrite(asan_readwrite_error)
                 }
             } else {
                 AsanError::Unknown((
@@ -1043,6 +1042,7 @@ impl AsanRuntime {
                 )
             }));
 
+        #[allow(clippy::non_ascii_literal)]
         writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -1075,6 +1075,7 @@ impl AsanRuntime {
                 }
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
@@ -1094,11 +1095,12 @@ impl AsanRuntime {
                     .unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
-                        write!(output, "\n").unwrap();
+                        writeln!(output).unwrap();
                     }
                 }
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
@@ -1131,6 +1133,7 @@ impl AsanRuntime {
                     .print_trace(&error.backtrace, output)
                     .unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let offset: i64 = fault_address as i64 - error.metadata.address as i64;
                 let direction = if offset > 0 { "right" } else { "left" };
@@ -1152,6 +1155,7 @@ impl AsanRuntime {
                 }
 
                 if error.metadata.freed {
+                    #[allow(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                     if let Some(backtrace) = error.metadata.release_site_backtrace.as_mut() {
                         writeln!(output, "free site backtrace:").unwrap();
@@ -1183,6 +1187,7 @@ impl AsanRuntime {
                 }
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
@@ -1202,6 +1207,7 @@ impl AsanRuntime {
                 }
                 writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
@@ -1237,6 +1243,7 @@ impl AsanRuntime {
                 output.reset().unwrap();
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -1253,6 +1260,7 @@ impl AsanRuntime {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                 if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
                     writeln!(output, "previous free site backtrace:").unwrap();
@@ -1269,6 +1277,7 @@ impl AsanRuntime {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -1310,6 +1319,7 @@ impl AsanRuntime {
                 }
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
@@ -1329,6 +1339,7 @@ impl AsanRuntime {
                 }
                 writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
@@ -1367,6 +1378,7 @@ impl AsanRuntime {
     }
 
     /// Generate the instrumentation blobs for the current arch.
+    #[allow(clippy::similar_names)] // We allow things like dword and qword
     fn generate_instrumentation_blobs(&mut self) {
         let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check {
@@ -1765,6 +1777,7 @@ impl AsanRuntime {
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
 #[derive(Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
@@ -1832,7 +1845,7 @@ where
     ) -> Result<u32, Error> {
         let observer = observers
             .match_first_type::<AsanErrorsObserver>()
-            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver".into());
+            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         match observer.errors() {
             None => Ok(0),
             Some(errors) => {

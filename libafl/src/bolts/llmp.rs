@@ -1683,6 +1683,7 @@ where
     /// Reattach to a vacant client map.
     /// It is essential, that the broker (or someone else) kept a pointer to the out_map
     /// else reattach will get a new, empty page, from the OS, or fail
+    #[allow(clippy::needless_pass_by_value)]
     pub fn on_existing_map(
         shmem_provider: SP,
         _current_out_map: SP::Mem,
