@@ -7,6 +7,7 @@
 
 extern uint8_t libafl_cmp_map[MAP_SIZE];
 
+#ifdef __GNUC__
 #define MAX(a, b)           \
   ({                        \
                             \
@@ -15,12 +16,20 @@ extern uint8_t libafl_cmp_map[MAP_SIZE];
     _a > _b ? _a : _b;      \
                             \
   })
+#else
+#define MAX(a, b) (((a) > (b)) ? (a) : (b)) 
+#endif
 
 #if defined(__APPLE__)
   #pragma weak __sanitizer_cov_trace_const_cmp1 = __sanitizer_cov_trace_cmp1
   #pragma weak __sanitizer_cov_trace_const_cmp2 = __sanitizer_cov_trace_cmp2
   #pragma weak __sanitizer_cov_trace_const_cmp4 = __sanitizer_cov_trace_cmp4
   #pragma weak __sanitizer_cov_trace_const_cmp8 = __sanitizer_cov_trace_cmp8
+#elif defined(_MSC_VER)
+  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp1=__sanitizer_cov_trace_cmp1")
+  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp2=__sanitizer_cov_trace_cmp2")
+  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp4=__sanitizer_cov_trace_cmp4")
+  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp8=__sanitizer_cov_trace_cmp8")
 #else
 void __sanitizer_cov_trace_const_cmp1(uint8_t arg1, uint8_t arg2) __attribute__((alias("__sanitizer_cov_trace_cmp1")));
 void __sanitizer_cov_trace_const_cmp2(uint16_t arg1, uint16_t arg2)
