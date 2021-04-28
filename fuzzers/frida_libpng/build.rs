@@ -119,6 +119,8 @@ fn main() {
         //.arg("HAS_DUMMY_CRASH=1")
         .arg("-fPIC")
         .arg("-shared")
+        .arg("-O3")
+        //.arg("-fomit-frame-pointer")
         .arg(if env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" {
             "-static-libstdc++"
         } else {

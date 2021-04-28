@@ -106,7 +106,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let stage = StdMutationalStage::new(mutator);
 
-    // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
+    // A fuzzer with just one stage
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     // A minimization+queue policy to get testcasess from the corpus
@@ -118,7 +118,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         ExitKind::Ok
     };
 
-    // Create the executor for an in-process function with just one observer for edge coverage
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
             "in-process(edges,time)",

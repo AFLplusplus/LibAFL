@@ -154,7 +154,7 @@ where
         &mut self,
         _input: &I,
         observers: &OT,
-        _exit_kind: ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
         let mut interesting = 0;
         // TODO optimize

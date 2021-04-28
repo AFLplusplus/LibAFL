@@ -169,7 +169,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple;
@@ -448,7 +448,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple,
@@ -654,13 +654,13 @@ where
         executor.post_exec_observers()?;
 
         let observers = executor.observers();
-        let fitness =
-            self.feedbacks_mut()
-                .is_interesting_all(&input, observers, exit_kind.clone())?;
+        let fitness = self
+            .feedbacks_mut()
+            .is_interesting_all(&input, observers, &exit_kind)?;
 
         let is_solution = self
             .objectives_mut()
-            .is_interesting_all(&input, observers, exit_kind)?
+            .is_interesting_all(&input, observers, &exit_kind)?
             > 0;
         Ok((fitness, is_solution))
     }

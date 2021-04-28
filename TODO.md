@@ -1,5 +1,6 @@
 # TODOs
 
+- [ ] Conditional composition of feedbacks (issue #24)
 - [ ] Other objectives examples (e.g. execution of a given program point)
 - [ ] Objective-Specific Corpuses (named per objective)
 - [ ] Good documentation
@@ -12,11 +13,14 @@
 - [ ] LLMP Cross Machine Link (2 brokers connected via TCP)
 - [ ] "Launcher" example that spawns broker + n clients
 - [ ] Heap for signal handling (bumpallo or llmp directly?)
-- [x] ~~Minset corpus scheduler~~ still doc missing
+- [ ] Frida support for Windows
+- [ ] QEMU based instrumentation
+- [ ] AFL++ LLVM passes in libafl_cc
+- [x] Minset corpus scheduler
 - [x] Win32 shared mem and crash handler to have Windows in-process executor
 - [x] Other feedbacks examples (e.g. maximize allocations to spot OOMs)
 - [x] A macro crate with derive directives (e.g. for SerdeAny impl).
-- [x] Restarting EventMgr could use forks on unix
+- [x] Restarting EventMgr could use forks on Unix
 - [x] Android Ashmem support
 - [x] Errors in the Fuzzer should exit the fuzz run
-- [x] Timeouts for executors
+- [x] Timeouts for executors (WIP on Windows)

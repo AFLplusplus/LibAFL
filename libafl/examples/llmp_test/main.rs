@@ -3,9 +3,8 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
-use alloc::rc::Rc;
 #[cfg(all(unix, feature = "std"))]
-use core::{cell::RefCell, convert::TryInto, time::Duration};
+use core::{convert::TryInto, time::Duration};
 #[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 
@@ -25,8 +24,8 @@ const _TAG_1MEG_V1: Tag = 0xB1111161;
 
 #[cfg(all(unix, feature = "std"))]
 fn adder_loop(port: u16) -> ! {
-    let shmem_provider = Rc::new(RefCell::new(StdShMemProvider::new()));
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(&shmem_provider, port).unwrap();
+    let shmem_provider = StdShMemProvider::new().unwrap();
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port).unwrap();
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
@@ -68,11 +67,8 @@ fn adder_loop(port: u16) -> ! {
 
 #[cfg(all(unix, feature = "std"))]
 fn large_msg_loop(port: u16) -> ! {
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(
-        &Rc::new(RefCell::new(StdShMemProvider::new())),
-        port,
-    )
-    .unwrap();
+    let mut client =
+        llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new().unwrap(), port).unwrap();
 
     let meg_buf = [1u8; 1 << 20];
 
@@ -134,8 +130,7 @@ fn main() {
 
     match mode.as_str() {
         "broker" => {
-            let mut broker =
-                llmp::LlmpBroker::new(&Rc::new(RefCell::new(StdShMemProvider::new()))).unwrap();
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
             broker
                 .launch_listener(llmp::Listener::Tcp(
                     std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap(),
@@ -144,11 +139,9 @@ fn main() {
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
         }
         "ctr" => {
-            let mut client = llmp::LlmpClient::create_attach_to_tcp(
-                &Rc::new(RefCell::new(StdShMemProvider::new())),
-                port,
-            )
-            .unwrap();
+            let mut client =
+                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new().unwrap(), port)
+                    .unwrap();
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
