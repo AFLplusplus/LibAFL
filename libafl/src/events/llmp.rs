@@ -175,7 +175,7 @@ where
                     &mut |sender_id: u32, tag: Tag, _flag: Flag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
                             #[cfg(feature = "llmp_compress")]
-                            let event: Event<I> = match compressor.decompress(tag, _flag, msg) {
+                            let event: Event<I> = match compressor.decompress(tag, _flag, msg)? {
                                 Some(decompressed) => postcard::from_bytes(&decompressed)?,
                                 _ => postcard::from_bytes(msg)?,
                             };
@@ -340,7 +340,7 @@ where
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
                     #[cfg(feature = "llmp_compress")]
-                    let event: Event<I> = match self.compressor.decompress(tag, _flag, msg) {
+                    let event: Event<I> = match self.compressor.decompress(tag, _flag, msg)? {
                         Some(decompressed) => postcard::from_bytes(&decompressed)?,
                         _ => postcard::from_bytes(msg)?,
                     };
@@ -366,7 +366,7 @@ where
         let serialized = postcard::to_allocvec(&event)?;
         let flag: Flag = LLMP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized) {
+        match self.compressor.compress(&serialized)? {
             Some(comp_buf) => {
                 self.llmp.send_buf_with_flag(
                     LLMP_TAG_EVENT_TO_BOTH,

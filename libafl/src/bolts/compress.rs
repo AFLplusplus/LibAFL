@@ -1,5 +1,5 @@
 #[cfg(feature = "llmp_compress")]
-use crate::bolts::llmp::{Flag, Tag, LLMP_FLAG_COMPRESSED};
+use crate::{bolts::llmp::{Flag, Tag, LLMP_FLAG_COMPRESSED}, Error};
 use alloc::vec::Vec;
 use compression::prelude::*;
 use core::fmt::Debug;
@@ -18,7 +18,7 @@ impl GzipCompressor {
 }
 
 impl GzipCompressor {
-    pub fn compress(&self, buf: &[u8]) -> Option<Vec<u8>> {
+    pub fn compress(&self, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if buf.len() > self.threshold {
             //let t1 = crate::utils::current_time();
             //compress if the buffer is large enough
@@ -26,17 +26,8 @@ impl GzipCompressor {
                 .into_iter()
                 .cloned()
                 .encode(&mut GZipEncoder::new(), Action::Finish)
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
-            //let t2 = crate::utils::current_time();
-            /*
-            println!(
-                "fn compress with compression {} nano sec",
-                (t2 - t1).as_nanos()
-            );
-            println!("memory saved {} bytes", buf.len() - compressed.len());
-            */
-            Some(compressed)
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Some(compressed))
         } else {
             /*
             let t1 = crate::utils::current_time();
@@ -46,19 +37,18 @@ impl GzipCompressor {
                 (t2 - t1).as_nanos()
             );
             */
-            None
+            Ok(None)
         }
     }
 
-    pub fn decompress(&self, _tag: Tag, flag: Flag, buf: &[u8]) -> Option<Vec<u8>> {
+    pub fn decompress(&self, _tag: Tag, flag: Flag, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if flag & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
             //let t1 = crate::utils::current_time();
             let decompressed: Vec<u8> = buf
                 .into_iter()
                 .cloned()
                 .decode(&mut GZipDecoder::new())
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+                .collect::<Result<Vec<_>, _>>()?;
             //let t2 = crate::utils::current_time();
             /*
             println!(
@@ -66,7 +56,7 @@ impl GzipCompressor {
                 (t2 - t1).as_nanos()
             );
             */
-            Some(decompressed)
+            Ok(Some(decompressed))
         } else {
             /*
             let t1 = crate::utils::current_time();
@@ -76,7 +66,7 @@ impl GzipCompressor {
                 (t2 - t1).as_nanos()
             );
             */
-            None
+            Ok(None)
         }
     }
 }

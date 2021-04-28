@@ -34,7 +34,7 @@ harness = false
 #debug = true
 
 [features]
-default = ["std", "anymap_debug", "derive"]
+default = ["std", "anymap_debug", "derive", "llmp_compress"]
 std = [] # print, sharedmap, ... support
 anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
