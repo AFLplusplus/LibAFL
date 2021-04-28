@@ -7,6 +7,8 @@ use core::any::TypeId;
 use xxhash_rust::const_xxh3::xxh3_64;
 
 pub trait HasLen {
+    const LEN: usize;
+
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -14,6 +16,8 @@ pub trait HasLen {
 }
 
 impl HasLen for () {
+    const LEN: usize = 0;
+
     fn len(&self) -> usize {
         0
     }
@@ -23,6 +27,8 @@ impl<Head, Tail> HasLen for (Head, Tail)
 where
     Tail: HasLen,
 {
+    const LEN: usize = 1 + Tail::LEN;
+
     fn len(&self) -> usize {
         1 + self.1.len()
     }

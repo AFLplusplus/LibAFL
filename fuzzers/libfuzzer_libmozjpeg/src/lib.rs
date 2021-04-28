@@ -4,9 +4,9 @@
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{shmem::UnixShMem, tuples::tuple_list},
+    bolts::tuples::tuple_list,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
-    events::setup_restarting_mgr,
+    events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -20,9 +20,11 @@ use libafl::{
     Error,
 };
 
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM, CMP_MAP, CMP_MAP_SIZE};
+use libafl_targets::{
+    libfuzzer_initialize, libfuzzer_test_one_input, CMP_MAP, CMP_MAP_SIZE, EDGES_MAP, MAX_EDGES_NUM,
+};
 
-const ALLOC_MAP_SIZE: usize = 16*1024;
+const ALLOC_MAP_SIZE: usize = 16 * 1024;
 extern "C" {
     static mut libafl_alloc_map: [usize; ALLOC_MAP_SIZE];
 }
@@ -53,17 +55,18 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr::<_, _, UnixShMem, _>(stats, broker_port)
-            .expect("Failed to setup the restarter".into());
+        setup_restarting_mgr_std(stats, broker_port).expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
-    let edges_observer = StdMapObserver::new("edges", unsafe { &mut EDGES_MAP }, unsafe { MAX_EDGES_NUM });
+    let edges_observer =
+        StdMapObserver::new("edges", unsafe { &mut EDGES_MAP }, unsafe { MAX_EDGES_NUM });
 
     // Create an observation channel using the cmp map
     let cmps_observer = StdMapObserver::new("cmps", unsafe { &mut CMP_MAP }, CMP_MAP_SIZE);
 
     // Create an observation channel using the allocations map
-    let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map }, ALLOC_MAP_SIZE);
+    let allocs_observer =
+        StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map }, ALLOC_MAP_SIZE);
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -73,7 +76,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(MaxMapFeedback::new_with_observer(&edges_observer)),
+            tuple_list!(
+                MaxMapFeedback::new_with_observer(&edges_observer),
+                MaxMapFeedback::new_with_observer(&cmps_observer),
+                MaxMapFeedback::new_with_observer(&allocs_observer)
+            ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),

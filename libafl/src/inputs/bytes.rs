@@ -4,8 +4,19 @@
 use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
-use crate::inputs::{HasBytesVec, HasLen, HasTargetBytes, Input, TargetBytes};
+#[cfg(feature = "std")]
+use crate::Error;
+use crate::{
+    bolts::ownedref::OwnedSlice,
+    inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
+};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
@@ -14,7 +25,30 @@ pub struct BytesInput {
     bytes: Vec<u8>,
 }
 
-impl Input for BytesInput {}
+impl Input for BytesInput {
+    #[cfg(feature = "std")]
+    /// Write this input to the file
+    fn to_file<P>(&self, path: P) -> Result<(), Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::create(path)?;
+        file.write_all(&self.bytes)?;
+        Ok(())
+    }
+
+    /// Load the contents of this input from a file
+    #[cfg(feature = "std")]
+    fn from_file<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(path)?;
+        let mut bytes: Vec<u8> = vec![];
+        file.read_to_end(&mut bytes)?;
+        Ok(BytesInput::new(bytes))
+    }
+}
 
 /// Rc Ref-cell from Input
 impl From<BytesInput> for Rc<RefCell<BytesInput>> {
@@ -37,8 +71,8 @@ impl HasBytesVec for BytesInput {
 
 impl HasTargetBytes for BytesInput {
     #[inline]
-    fn target_bytes(&self) -> TargetBytes {
-        TargetBytes::Ref(&self.bytes)
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::Ref(&self.bytes)
     }
 }
 

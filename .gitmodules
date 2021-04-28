@@ -1,3 +1,0 @@
-[submodule "fuzzers/qemufuzzer/qemu-fuzz"]
-	path = fuzzers/qemufuzzer/qemu-fuzz
-	url = git@github.com:AFLplusplus/qemu-fuzz.git

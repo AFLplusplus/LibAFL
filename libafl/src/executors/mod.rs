@@ -5,24 +5,28 @@ pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
 
-use core::cmp::PartialEq;
 use core::marker::PhantomData;
 
 use crate::{
-    bolts::tuples::Named,
+    bolts::{serdeany::SerdeAny, tuples::Named},
     events::EventManager,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
 
+use alloc::boxed::Box;
+
+pub trait CustomExitKind: core::fmt::Debug + SerdeAny + 'static {}
+
 /// How an execution finished.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum ExitKind {
     Ok,
     Crash,
     Oom,
     Timeout,
+    Custom(Box<dyn CustomExitKind>),
 }
 
 pub trait HasObservers<OT>

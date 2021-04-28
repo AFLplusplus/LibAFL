@@ -6,19 +6,20 @@ LibAFL, as most of the Rust projects, can be built using `cargo` from the root d
 $ cargo build --release
 ```
 
-Note that the `--release` flag is optional for development, but it is needed for fuzzing at a decent speed,
-otherwise you will experience a slowdown of even more than 10x.
+Note that the `--release` flag is optional for development, but you needed to add it to fuzzing at a decent speed.
+Slowdowns of 10x or more are not uncommon for Debug builds.
 
-The LibAFL repository is composed by multiple crates, and the top-level Cargo.toml is just an orchestrator that groups these crates
-in a workspace. Building from the root directory will build all the crates in the workspace.
+The LibAFL repository is composed of multiple crates.
+The top-level Cargo.toml is the workspace file grouping these crates.
+Calling `cargo build` from the root directory will compile all crates in the workspace.
 
-## Build example fuzzers
+## Build Example Fuzzers
 
-You can notice that in the repository there is a `fuzzers/` folder.
-This folder contains a set of crates that are not part of the workspace, so that are not built issuing `cargo build` from the top-level directory.
+We group example fuzzers in the `./fuzzers` directory of the LibAFL repository.
+The directory contains a set of crates that are not part of the workspace.
 
-These crates are examples of fuzzers using particular features of LibAFL combined sometimes with instrumentation backends (e.g. [SanitizerCoverage](https://clang.llvm.org/docs/SanitizerCoverage.html), [Frida](https://frida.re/), ...).
+Each of these example fuzzers uses particular features of LibAFL, sometimes combined with different instrumentation backends (e.g. [SanitizerCoverage](https://clang.llvm.org/docs/SanitizerCoverage.html), [Frida](https://frida.re/), ...).
 
-The user can use these crates as examples and as skeleton for its custom fuzzer using a similar set of features.
+You can use these crates as examples and as skeletons for custom fuzzers with similar featuresets.
 
-To build an example fuzzer you have to invoke cargo from its folder (`fuzzers/[FUZZER_NAME]).
+To build an example fuzzer you have to invoke cargo from its respective folder (`fuzzers/[FUZZER_NAME]).

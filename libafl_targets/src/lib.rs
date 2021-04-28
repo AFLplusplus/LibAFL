@@ -19,3 +19,5 @@ pub use libfuzzer::*;
 pub mod cmplog;
 #[cfg(feature = "cmplog")]
 pub use cmplog::*;
+
+pub mod drcov;

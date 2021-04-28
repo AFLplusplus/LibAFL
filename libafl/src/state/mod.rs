@@ -169,7 +169,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple;
@@ -448,7 +448,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple,
@@ -511,8 +511,13 @@ where
 
         if is_solution {
             // If the input is a solution, add it to the respective corpus
-            self.solutions_mut().add(Testcase::new(input.clone()))?;
+            let mut testcase = Testcase::new(input.clone());
+            self.objectives_mut().append_metadata_all(&mut testcase)?;
+            self.solutions_mut().add(testcase)?;
+        } else {
+            self.objectives_mut().discard_metadata_all(&input)?;
         }
+
         let corpus_idx = self.add_if_interesting(&input, fitness, scheduler)?;
         if corpus_idx.is_some() {
             let observers_buf = manager.serialize_observers(observers)?;
@@ -649,13 +654,13 @@ where
         executor.post_exec_observers()?;
 
         let observers = executor.observers();
-        let fitness =
-            self.feedbacks_mut()
-                .is_interesting_all(&input, observers, exit_kind.clone())?;
+        let fitness = self
+            .feedbacks_mut()
+            .is_interesting_all(&input, observers, &exit_kind)?;
 
         let is_solution = self
             .objectives_mut()
-            .is_interesting_all(&input, observers, exit_kind)?
+            .is_interesting_all(&input, observers, &exit_kind)?
             > 0;
         Ok((fitness, is_solution))
     }

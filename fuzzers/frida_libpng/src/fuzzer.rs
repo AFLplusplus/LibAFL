@@ -2,17 +2,16 @@
 //! The example harness is built for libpng.
 
 use libafl::{
-    bolts::{
-        shmem::UnixShMem,
-        tuples::{tuple_list, Named},
-    },
+    bolts::tuples::{tuple_list, Named},
     corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
+        ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
+        IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
-    events::{setup_restarting_mgr, EventManager},
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    events::{setup_restarting_mgr_std, EventManager},
+    executors::{
+        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
+    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
@@ -25,229 +24,38 @@ use libafl::{
     Error,
 };
 
-#[cfg(target_arch = "x86_64")]
-use frida_gum::instruction_writer::X86Register;
-#[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter,
-    stalker::{NoneEventSink, Stalker, Transformer},
+    stalker::{NoneEventSink, Stalker},
+    Gum, NativePointer,
 };
-use frida_gum::{Gum, MemoryRange, Module, NativePointer, PageProtection};
 
-use std::{cell::RefCell, env, ffi::c_void, path::PathBuf};
+use std::{env, ffi::c_void, marker::PhantomData, path::PathBuf, time::Duration};
 
-/// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
-pub trait FridaHelper<'a> {
-    fn transformer(&self) -> &Transformer<'a>;
-}
+use libafl_frida::{
+    asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+    helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
+    FridaOptions,
+};
 
-const MAP_SIZE: usize = 64 * 1024;
-
-/// An helper that feeds FridaInProcessExecutor with edge-coverage instrumentation
-struct FridaEdgeCoverageHelper<'a> {
-    map: [u8; MAP_SIZE],
-    previous_pc: RefCell<u64>,
-    base_address: u64,
-    size: usize,
-    current_log_impl: u64,
-    /// Transformer that has to be passed to FridaInProcessExecutor
-    transformer: Option<Transformer<'a>>,
-}
-
-impl<'a> FridaHelper<'a> for FridaEdgeCoverageHelper<'a> {
-    fn transformer(&self) -> &Transformer<'a> {
-        self.transformer.as_ref().unwrap()
-    }
-}
-
-/// Helper function to get the size of a module's CODE section from frida
-pub fn get_module_size(module_name: &str) -> usize {
-    let mut code_size = 0;
-    let code_size_ref = &mut code_size;
-    Module::enumerate_ranges(module_name, PageProtection::ReadExecute, move |details| {
-        *code_size_ref = details.memory_range().size() as usize;
-        true
-    });
-
-    code_size
-}
-
-/// A minimal maybe_log implementation. We insert this into the transformed instruction stream
-/// every time we need a copy that is within a direct branch of the start of the transformed basic
-/// block.
-#[cfg(target_arch = "x86_64")]
-const MAYBE_LOG_CODE: [u8; 47] = [
-    0x9c, /* pushfq */
-    0x50, /* push rax */
-    0x51, /* push rcx */
-    0x52, /* push rdx */
-    0x48, 0x8d, 0x05, 0x24, 0x00, 0x00, 0x00, /* lea rax, sym._afl_area_ptr_ptr */
-    0x48, 0x8b, 0x00, /* mov rax, qword [rax] */
-    0x48, 0x8d, 0x0d, 0x22, 0x00, 0x00, 0x00, /* lea rcx, sym.previous_pc     */
-    0x48, 0x8b, 0x11, /* mov rdx, qword [rcx] */
-    0x48, 0x8b, 0x12, /* mov rdx, qword [rdx] */
-    0x48, 0x31, 0xfa, /* xor rdx, rdi */
-    0xfe, 0x04, 0x10, /* inc byte [rax + rdx] */
-    0x48, 0xd1, 0xef, /* shr rdi, 1 */
-    0x48, 0x8b, 0x01, /* mov rax, qword [rcx] */
-    0x48, 0x89, 0x38, /* mov qword [rax], rdi */
-    0x5a, /* pop rdx */
-    0x59, /* pop rcx */
-    0x58, /* pop rax */
-    0x9d, /* popfq */
-    0xc3, /* ret */
-
-          /* Read-only data goes here: */
-          /* uint8_t* afl_area_ptr */
-          /* uint64_t* afl_prev_loc_ptr */
-];
-
-#[cfg(target_arch = "aarch64")]
-const MAYBE_LOG_CODE: [u8; 56] = [
-    // __afl_area_ptr[current_pc ^ previous_pc]++;
-    // previous_pc = current_pc >> 1;
-    0xE1, 0x0B, 0xBF, 0xA9, // stp x1, x2, [sp, -0x10]!
-    0xE3, 0x13, 0xBF, 0xA9, // stp x3, x4, [sp, -0x10]!
-    // x0 = current_pc
-    0x81, 0x01, 0x00, 0x58, // ldr x1, #0x30, =__afl_area_ptr
-    0xa2, 0x01, 0x00, 0x58, // ldr x2, #0x38, =&previous_pc
-    0x44, 0x00, 0x40, 0xf9, // ldr x4, [x2] (=previous_pc)
-    // __afl_area_ptr[current_pc ^ previous_pc]++;
-    0x84, 0x00, 0x00, 0xca, // eor x4, x4, x0
-    0x23, 0x68, 0x64, 0xf8, // ldr x3, [x1, x4]
-    0x63, 0x04, 0x00, 0x91, // add x3, x3, #1
-    0x23, 0x68, 0x24, 0xf8, // str x3, [x1, x2]
-    // previous_pc = current_pc >> 1;
-    0xe0, 0x07, 0x40, 0x8b, // add x0, xzr, x0, LSR #1
-    0x40, 0x00, 0x00, 0xf9, // str x0, [x2]
-    0xE3, 0x13, 0xc1, 0xA8, // ldp x3, x4, [sp], #0x10
-    0xE1, 0x0B, 0xc1, 0xA8, // ldp x1, x2, [sp], #0x10
-    0xC0, 0x03, 0x5F, 0xD6, // ret
-
-          // &afl_area_ptr
-          // &afl_prev_loc_ptr
-];
-
-/// The implementation of the FridaEdgeCoverageHelper
-impl<'a> FridaEdgeCoverageHelper<'a> {
-    /// Constructor function to create a new FridaEdgeCoverageHelper, given a module_name.
-    pub fn new(gum: &'a Gum, module_name: &str) -> Self {
-        let mut helper = Self {
-            map: [0u8; MAP_SIZE],
-            previous_pc: RefCell::new(0x0),
-            base_address: Module::find_base_address(module_name).0 as u64,
-            size: get_module_size(module_name),
-            current_log_impl: 0,
-            transformer: None,
-        };
-
-        let transformer = Transformer::from_callback(gum, |basic_block, _output| {
-            let mut first = true;
-            for instruction in basic_block {
-                if first {
-                    first = false;
-                    let address = unsafe { (*instruction.instr()).address };
-                    if address >= helper.base_address
-                        && address <= helper.base_address + helper.size as u64
-                    {
-                        let writer = _output.writer();
-                        if helper.current_log_impl == 0
-                            || !writer.can_branch_directly_to(helper.current_log_impl)
-                            || !writer.can_branch_directly_between(
-                                writer.pc() + 128,
-                                helper.current_log_impl,
-                            )
-                        {
-                            let after_log_impl = writer.code_offset() + 1;
-
-                            #[cfg(target_arch = "x86_64")]
-                            writer.put_jmp_near_label(after_log_impl);
-                            #[cfg(target_arch = "aarch64")]
-                            writer.put_b_label(after_log_impl);
-
-                            helper.current_log_impl = writer.pc();
-                            writer.put_bytes(&MAYBE_LOG_CODE);
-                            let prev_loc_pointer = helper.previous_pc.as_ptr() as *mut _ as usize;
-                            let map_pointer = helper.map.as_ptr() as usize;
-
-                            writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
-                            writer.put_bytes(&map_pointer.to_ne_bytes());
-
-                            writer.put_label(after_log_impl);
-                        }
-                        #[cfg(target_arch = "x86_64")]
-                        {
-                            println!("here");
-                            writer.put_lea_reg_reg_offset(
-                                X86Register::Rsp,
-                                X86Register::Rsp,
-                                -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
-                            );
-                            writer.put_push_reg(X86Register::Rdi);
-                            writer.put_mov_reg_address(
-                                X86Register::Rdi,
-                                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
-                            );
-                            writer.put_call_address(helper.current_log_impl);
-                            writer.put_pop_reg(X86Register::Rdi);
-                            writer.put_lea_reg_reg_offset(
-                                X86Register::Rsp,
-                                X86Register::Rsp,
-                                frida_gum_sys::GUM_RED_ZONE_SIZE as i32,
-                            );
-                        }
-                        #[cfg(target_arch = "aarch64")]
-                        {
-                            writer.put_stp_reg_reg_reg_offset(
-                                Aarch64Register::Lr,
-                                Aarch64Register::X0,
-                                Aarch64Register::Sp,
-                                -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
-                                IndexMode::PreAdjust,
-                            );
-                            writer.put_ldr_reg_u64(
-                                Aarch64Register::X0,
-                                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
-                            );
-                            writer.put_bl_imm(helper.current_log_impl);
-                            writer.put_ldp_reg_reg_reg_offset(
-                                Aarch64Register::Lr,
-                                Aarch64Register::X0,
-                                Aarch64Register::Sp,
-                                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
-                                IndexMode::PostAdjust,
-                            );
-                        }
-                    }
-                }
-                instruction.keep()
-            }
-        });
-
-        helper.transformer = Some(transformer);
-        helper
-    }
-}
-
-struct FridaInProcessExecutor<'a, FH, H, I, OT>
+struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    base: InProcessExecutor<'a, H, I, OT>,
+    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT>, I, OT>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
-    helper: &'a FH,
+    helper: &'c mut FH,
     followed: bool,
+    _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -258,22 +66,34 @@ where
     where
         EM: EventManager<I, S>,
     {
-        if !self.followed {
-            self.followed = true;
-            self.stalker
-                .follow_me::<NoneEventSink>(self.helper.transformer(), None);
-        } else {
-            self.stalker.activate(NativePointer(
-                self.base.harness_mut() as *mut _ as *mut c_void
-            ))
+        if self.helper.stalker_enabled() {
+            if !self.followed {
+                self.followed = true;
+                self.stalker
+                    .follow_me::<NoneEventSink>(self.helper.transformer(), None);
+            } else {
+                self.stalker.activate(NativePointer(
+                    self.base.inner().harness_mut() as *mut _ as *mut c_void
+                ))
+            }
         }
+
+        self.helper.pre_exec(input);
+
         self.base.pre_exec(state, event_mgr, input)
     }
 
     /// Instruct the target about the input and run
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        self.base.run_target(input)
+        let res = self.base.run_target(input);
+        if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
+            println!("Crashing target as it had ASAN errors");
+            unsafe {
+                libc::raise(libc::SIGABRT);
+            }
+        }
+        res
     }
 
     /// Called right after execution finished.
@@ -287,14 +107,17 @@ where
     where
         EM: EventManager<I, S>,
     {
-        self.stalker.deactivate();
+        if self.helper.stalker_enabled() {
+            self.stalker.deactivate();
+        }
+        self.helper.post_exec(input);
         self.base.post_exec(state, event_mgr, input)
     }
 }
 
-impl<'a, FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -310,9 +133,9 @@ where
     }
 }
 
-impl<'a, FH, H, I, OT> Named for FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> Named for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
@@ -322,31 +145,37 @@ where
     }
 }
 
-impl<'a, FH, H, I, OT> FridaInProcessExecutor<'a, FH, H, I, OT>
+impl<'a, 'b, 'c, FH, H, I, OT> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
 where
-    FH: FridaHelper<'a>,
+    FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT>, helper: &'a FH) -> Self {
-        let mut stalker = Stalker::new(gum);
+    pub fn new(
+        gum: &'a Gum,
+        base: InProcessExecutor<'a, H, I, OT>,
+        helper: &'c mut FH,
+        timeout: Duration,
+    ) -> Self {
+        let stalker = Stalker::new(gum);
 
         // Let's exclude the main module and libc.so at least:
-        stalker.exclude(&MemoryRange::new(
-            Module::find_base_address(&env::args().next().unwrap()),
-            get_module_size(&env::args().next().unwrap()),
-        ));
-        stalker.exclude(&MemoryRange::new(
-            Module::find_base_address("libc.so"),
-            get_module_size("libc.so"),
-        ));
+        //stalker.exclude(&MemoryRange::new(
+        //Module::find_base_address(&env::args().next().unwrap()),
+        //get_module_size(&env::args().next().unwrap()),
+        //));
+        //stalker.exclude(&MemoryRange::new(
+        //Module::find_base_address("libc.so"),
+        //get_module_size("libc.so"),
+        //));
 
         Self {
-            base,
+            base: TimeoutExecutor::new(base, timeout),
             stalker,
             helper,
             followed: false,
+            _phantom: PhantomData,
         }
     }
 }
@@ -365,6 +194,11 @@ pub fn main() {
         fuzz(
             &env::args().nth(1).expect("no module specified"),
             &env::args().nth(2).expect("no symbol specified"),
+            env::args()
+                .nth(3)
+                .expect("no modules to instrument specified")
+                .split(":")
+                .collect(),
             vec![PathBuf::from("./corpus")],
             PathBuf::from("./crashes"),
             1337,
@@ -390,6 +224,7 @@ fn fuzz(
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
+    modules_to_instrument: Vec<&str>,
     corpus_dirs: Vec<PathBuf>,
     objective_dir: PathBuf,
     broker_port: u16,
@@ -398,36 +233,42 @@ unsafe fn fuzz(
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-    let (state, mut restarting_mgr) =
-        match setup_restarting_mgr::<_, _, UnixShMem, _>(stats, broker_port) {
-            Ok(res) => res,
-            Err(err) => match err {
-                Error::ShuttingDown => {
-                    return Ok(());
-                }
-                _ => {
-                    panic!("Failed to setup the restarter: {}", err);
-                }
-            },
-        };
+    let (state, mut restarting_mgr) = match setup_restarting_mgr_std(stats, broker_port) {
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {}", err);
+            }
+        },
+    };
 
     let gum = Gum::obtain();
+
     let lib = libloading::Library::new(module_name).unwrap();
     let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
         lib.get(symbol_name.as_bytes()).unwrap();
-    let mut frida_helper = FridaEdgeCoverageHelper::new(&gum, module_name);
-
-    // Create an observation channel using the coverage map
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
-        "edges",
-        frida_helper.map.as_mut_ptr(),
-        MAP_SIZE,
-    ));
 
     let mut frida_harness = move |buf: &[u8]| {
         (target_func)(buf.as_ptr(), buf.len());
         ExitKind::Ok
     };
+
+    let mut frida_helper = FridaInstrumentationHelper::new(
+        &gum,
+        FridaOptions::parse_env_options(),
+        module_name,
+        &modules_to_instrument,
+    );
+
+    // Create an observation channel using the coverage map
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+        "edges",
+        frida_helper.map_ptr(),
+        MAP_SIZE,
+    ));
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -444,9 +285,14 @@ unsafe fn fuzz(
             )),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new(objective_dir).unwrap(),
+            OnDiskCorpus::new_save_meta(objective_dir, Some(OnDiskMetadataFormat::JsonPretty))
+                .unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new()),
+            tuple_list!(
+                CrashFeedback::new(),
+                TimeoutFeedback::new(),
+                AsanErrorsFeedback::new()
+            ),
         )
     });
 
@@ -477,21 +323,22 @@ unsafe fn fuzz(
         InProcessExecutor::new(
             "in-process(edges)",
             &mut frida_harness,
-            tuple_list!(edges_observer),
+            tuple_list!(edges_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
             &mut state,
             &mut restarting_mgr,
         )?,
-        &frida_helper,
+        &mut frida_helper,
+        Duration::new(10, 0),
     );
     // Let's exclude the main module and libc.so at least:
-    executor.stalker.exclude(&MemoryRange::new(
-        Module::find_base_address(&env::args().next().unwrap()),
-        get_module_size(&env::args().next().unwrap()),
-    ));
-    executor.stalker.exclude(&MemoryRange::new(
-        Module::find_base_address("libc.so"),
-        get_module_size("libc.so"),
-    ));
+    //executor.stalker.exclude(&MemoryRange::new(
+    //Module::find_base_address(&env::args().next().unwrap()),
+    //get_module_size(&env::args().next().unwrap()),
+    //));
+    //executor.stalker.exclude(&MemoryRange::new(
+    //Module::find_base_address("libc.so"),
+    //get_module_size("libc.so"),
+    //));
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
@@ -504,6 +351,7 @@ unsafe fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
+    //executor.helper.register_thread();
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached

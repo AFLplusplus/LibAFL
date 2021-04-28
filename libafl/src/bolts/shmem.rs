@@ -2,20 +2,39 @@
 // too.)
 
 #[cfg(all(feature = "std", unix))]
-pub use unix_shmem::UnixShMem;
+pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 #[cfg(all(feature = "std", unix))]
-pub type StdShMem = UnixShMem;
+pub type OsShMemProvider = UnixShMemProvider;
+#[cfg(all(feature = "std", unix))]
+pub type OsShMem = UnixShMem;
 
 #[cfg(all(windows, feature = "std"))]
-pub use win32_shmem::Win32ShMem;
+pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 #[cfg(all(windows, feature = "std"))]
-pub type StdShMem = Win32ShMem;
+pub type OsShMemProvider = Win32ShMemProvider;
+#[cfg(all(windows, feature = "std"))]
+pub type OsShMem = Win32ShMem;
 
-use alloc::string::{String, ToString};
+#[cfg(target_os = "android")]
+use crate::bolts::os::ashmem_server::ServedShMemProvider;
+#[cfg(target_os = "android")]
+pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider>;
+#[cfg(target_os = "android")]
+pub type StdShMem = RcShMem<ServedShMemProvider>;
+
+#[cfg(all(feature = "std", not(target_os = "android")))]
+pub type StdShMemProvider = OsShMemProvider;
+#[cfg(all(feature = "std", not(target_os = "android")))]
+pub type StdShMem = OsShMem;
+
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
+
+use alloc::{rc::Rc, string::ToString};
+use core::cell::RefCell;
+use core::mem::ManuallyDrop;
 
 use crate::Error;
 
@@ -25,419 +44,627 @@ use crate::Error;
 pub struct ShMemDescription {
     /// Size of this map
     pub size: usize,
-    /// of name of this map, as fixed 20 bytes c-string
-    pub str_bytes: [u8; 20],
+    /// Id of this map
+    pub id: ShMemId,
 }
 
-/// A Shared map
-pub trait ShMem: Sized + Debug {
-    /// Creates a new map with the given size
-    fn new_map(map_size: usize) -> Result<Self, Error>;
+impl ShMemDescription {
+    pub fn from_string_and_size(string: &str, size: usize) -> Self {
+        Self {
+            size,
+            id: ShMemId::from_string(string),
+        }
+    }
+}
 
-    /// Creates a new reference to the same map
-    fn clone_ref(old_ref: &Self) -> Result<Self, Error> {
-        Self::existing_from_shm_slice(old_ref.shm_slice(), old_ref.map().len())
+/// An id associated with a given shared memory mapping (ShMem), which can be used to
+/// establish shared-mappings between proccesses.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+pub struct ShMemId {
+    id: [u8; 20],
+}
+
+impl ShMemId {
+    /// Create a new id from a fixed-size string
+    pub fn from_slice(slice: &[u8; 20]) -> Self {
+        Self { id: *slice }
     }
 
-    /// Creates a nes variable with the given name, strigified to 20 bytes.
-    fn existing_from_shm_slice(map_str_bytes: &[u8; 20], map_size: usize) -> Result<Self, Error>;
+    /// Create a new id from an int
+    pub fn from_int(val: i32) -> Self {
+        Self::from_string(&val.to_string())
+    }
 
-    /// Initialize from a shm_str with fixed len of 20
-    fn existing_from_shm_str(shm_str: &str, map_size: usize) -> Result<Self, Error> {
+    /// Create a new id from a string
+    pub fn from_string(val: &str) -> Self {
         let mut slice: [u8; 20] = [0; 20];
-        for (i, val) in shm_str.as_bytes().iter().enumerate() {
+        for (i, val) in val.as_bytes().iter().enumerate() {
             slice[i] = *val;
         }
-        Self::existing_from_shm_slice(&slice, map_size)
+        Self { id: slice }
     }
 
-    /// The string to identify this shm
-    fn shm_str(&self) -> String {
-        let bytes = self.shm_slice();
-        let eof_pos = bytes.iter().position(|&c| c == 0).unwrap();
-        alloc::str::from_utf8(&bytes[..eof_pos])
-            .unwrap()
-            .to_string()
+    /// Get the id as a fixed-length slice
+    pub fn as_slice(&self) -> &[u8; 20] {
+        &self.id
     }
 
-    /// Let's just fix this to a large enough buf
-    fn shm_slice(&self) -> &[u8; 20];
+    /// Get a string representation of this id
+    pub fn to_string(&self) -> &str {
+        let eof_pos = self.id.iter().position(|&c| c == 0).unwrap();
+        alloc::str::from_utf8(&self.id[..eof_pos]).unwrap()
+    }
+
+    /// Get an integer representation of this id
+    pub fn to_int(&self) -> i32 {
+        let id: i32 = self.to_string().parse().unwrap();
+        id
+    }
+}
+
+pub trait ShMem: Sized + Debug + Clone {
+    /// Get the id of this shared memory mapping
+    fn id(&self) -> ShMemId;
+
+    /// Get the size of this mapping
+    fn len(&self) -> usize;
+
+    /// Check if the mapping is empty
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Get the description of the shared memory mapping
+    fn description(&self) -> ShMemDescription {
+        ShMemDescription {
+            size: self.len(),
+            id: self.id(),
+        }
+    }
 
     /// The actual shared map, in memory
     fn map(&self) -> &[u8];
 
     /// The actual shared map, mutable
     fn map_mut(&mut self) -> &mut [u8];
-
-    /// Describe this shared map in a recreatable fashion
-    fn description(&self) -> ShMemDescription {
-        ShMemDescription {
-            size: self.map().len(),
-            str_bytes: *self.shm_slice(),
-        }
-    }
-
-    /// Create a map from a map description
-    fn existing_from_description(description: &ShMemDescription) -> Result<Self, Error> {
-        Self::existing_from_shm_slice(&description.str_bytes, description.size)
-    }
-
+    ///
     /// Write this map's config to env
     #[cfg(feature = "std")]
     fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
-        let map_size = self.map().len();
+        let map_size = self.len();
         let map_size_env = format!("{}_SIZE", env_name);
-        env::set_var(env_name, self.shm_str());
+        env::set_var(env_name, self.id().to_string());
         env::set_var(map_size_env, format!("{}", map_size));
         Ok(())
+    }
+}
+
+pub trait ShMemProvider: Send + Clone + Default + Debug {
+    type Mem: ShMem;
+
+    /// Create a new instance of the provider
+    fn new() -> Result<Self, Error>;
+
+    /// Create a new shared memory mapping
+    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error>;
+
+    /// Get a mapping given its id and size
+    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error>;
+
+    /// Get a mapping given a description
+    fn from_description(&mut self, description: ShMemDescription) -> Result<Self::Mem, Error> {
+        self.from_id_and_size(description.id, description.size)
+    }
+
+    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
+        self.from_id_and_size(mapping.id(), mapping.len())
     }
 
     /// Reads an existing map config from env vars, then maps it
     #[cfg(feature = "std")]
-    fn existing_from_env(env_name: &str) -> Result<Self, Error> {
+    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::Mem, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
-        Self::existing_from_shm_str(&map_shm_str, map_size)
+        self.from_description(ShMemDescription::from_string_and_size(
+            &map_shm_str,
+            map_size,
+        ))
+    }
+
+    /// This method should be called after a fork or thread creation event, allowing the ShMem to
+    /// reset thread specific info.
+    fn post_fork(&mut self) {
+        // do nothing
+    }
+
+    /// Release the resources associated with the given ShMem
+    fn release_map(&mut self, _map: &mut Self::Mem) {
+        // do nothing
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RcShMem<T: ShMemProvider> {
+    internal: ManuallyDrop<T::Mem>,
+    provider: Rc<RefCell<T>>,
+}
+
+impl<T> ShMem for RcShMem<T>
+where
+    T: ShMemProvider + alloc::fmt::Debug,
+{
+    fn id(&self) -> ShMemId {
+        self.internal.id()
+    }
+
+    fn len(&self) -> usize {
+        self.internal.len()
+    }
+
+    fn map(&self) -> &[u8] {
+        self.internal.map()
+    }
+
+    fn map_mut(&mut self) -> &mut [u8] {
+        self.internal.map_mut()
+    }
+}
+
+impl<T: ShMemProvider> Drop for RcShMem<T> {
+    fn drop(&mut self) {
+        self.provider.borrow_mut().release_map(&mut self.internal)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RcShMemProvider<T: ShMemProvider> {
+    internal: Rc<RefCell<T>>,
+}
+
+unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
+
+impl<T> ShMemProvider for RcShMemProvider<T>
+where
+    T: ShMemProvider + alloc::fmt::Debug,
+{
+    type Mem = RcShMem<T>;
+
+    fn new() -> Result<Self, Error> {
+        return Ok(Self {
+            internal: Rc::new(RefCell::new(T::new()?)),
+        });
+    }
+
+    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+        Ok(Self::Mem {
+            internal: ManuallyDrop::new(self.internal.borrow_mut().new_map(map_size)?),
+            provider: self.internal.clone(),
+        })
+    }
+
+    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+        Ok(Self::Mem {
+            internal: ManuallyDrop::new(self.internal.borrow_mut().from_id_and_size(id, size)?),
+            provider: self.internal.clone(),
+        })
+    }
+
+    fn release_map(&mut self, map: &mut Self::Mem) {
+        self.internal.borrow_mut().release_map(&mut map.internal)
+    }
+
+    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
+        Ok(Self::Mem {
+            internal: ManuallyDrop::new(self.internal.borrow_mut().clone_ref(&mapping.internal)?),
+            provider: self.internal.clone(),
+        })
+    }
+
+    fn post_fork(&mut self) {
+        self.internal.borrow_mut().post_fork()
+    }
+}
+
+impl<T> Default for RcShMemProvider<T>
+where
+    T: ShMemProvider + alloc::fmt::Debug,
+{
+    fn default() -> Self {
+        Self::new().unwrap()
     }
 }
 
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 
-    use core::{mem::size_of, ptr, slice};
-    use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
     #[cfg(target_os = "android")]
-    use libc::{off_t, size_t, MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
-    use std::ffi::CStr;
+    pub type UnixShMemProvider = ashmem::AshmemShMemProvider;
     #[cfg(target_os = "android")]
-    use std::ffi::CString;
+    pub type UnixShMem = ashmem::AshmemShMem;
+    #[cfg(not(target_os = "android"))]
+    pub type UnixShMemProvider = default::CommonUnixShMemProvider;
+    #[cfg(not(target_os = "android"))]
+    pub type UnixShMem = ashmem::AshmemShMem;
 
-    use crate::Error;
+    #[cfg(all(unix, feature = "std", not(target_os = "android")))]
+    mod default {
+        use core::{ptr, slice};
+        use libc::{c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
 
-    use super::ShMem;
+        use crate::Error;
 
-    #[cfg(unix)]
-    extern "C" {
-        #[cfg(feature = "std")]
-        fn snprintf(_: *mut c_char, _: c_ulong, _: *const c_char, _: ...) -> c_int;
-        #[cfg(feature = "std")]
-        fn strncpy(_: *mut c_char, _: *const c_char, _: c_ulong) -> *mut c_char;
-        #[cfg(all(feature = "std", not(target_os = "android")))]
-        fn shmctl(__shmid: c_int, __cmd: c_int, __buf: *mut shmid_ds) -> c_int;
-        #[cfg(all(feature = "std", not(target_os = "android")))]
-        fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int;
-        #[cfg(all(feature = "std", not(target_os = "android")))]
-        fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
-        #[cfg(all(feature = "std", target_os = "android"))]
-        fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
-        #[cfg(all(feature = "std", target_os = "android"))]
-        fn open(path: *const c_char, oflag: c_int, ...) -> c_int;
-        #[cfg(all(feature = "std", target_os = "android"))]
-        fn close(fd: c_int) -> c_int;
-        #[cfg(all(feature = "std", target_os = "android"))]
-        fn mmap(
-            addr: *mut c_void,
-            len: size_t,
-            prot: c_int,
-            flags: c_int,
-            fd: c_int,
-            offset: off_t,
-        ) -> *mut c_void;
+        use super::super::{ShMem, ShMemId, ShMemProvider};
 
-    }
-
-    #[cfg(target_os = "android")]
-    #[derive(Copy, Clone)]
-    #[repr(C)]
-    struct ashmem_pin {
-        pub offset: c_uint,
-        pub len: c_uint,
-    }
-
-    #[cfg(target_os = "android")]
-    const ASHMEM_GET_SIZE: c_long = 0x00007704;
-    #[cfg(target_os = "android")]
-    const ASHMEM_UNPIN: c_long = 0x40087708;
-    #[cfg(target_os = "android")]
-    const ASHMEM_SET_NAME: c_long = 0x41007701;
-    #[cfg(target_os = "android")]
-    const ASHMEM_SET_SIZE: c_long = 0x40087703;
-    #[cfg(target_os = "android")]
-    const ASHMEM_DEVICE: &str = "/dev/ashmem";
-
-    #[cfg(target_os = "android")]
-    unsafe fn shmctl(__shmid: c_int, __cmd: c_int, _buf: *mut shmid_ds) -> c_int {
-        if __cmd == 0 {
-            let length = ioctl(__shmid, ASHMEM_GET_SIZE);
-
-            let ap = ashmem_pin {
-                offset: 0,
-                len: length as u32,
-            };
-
-            let ret = ioctl(__shmid, ASHMEM_UNPIN, &ap);
-            close(__shmid);
-            ret
-        } else {
-            0
-        }
-    }
-
-    #[cfg(target_os = "android")]
-    unsafe fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int {
-        let boot_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id").unwrap();
-
-        let path = CString::new(format!("{}{}", ASHMEM_DEVICE, boot_id).trim())
-            .expect("CString::new failed!");
-        let fd = open(path.as_ptr(), O_RDWR);
-
-        let mut ourkey: [c_char; 20] = [0; 20];
-        snprintf(
-            ourkey.as_mut_ptr() as *mut c_char,
-            size_of::<[c_char; 20]>() as c_ulong,
-            b"%d\x00" as *const u8 as *const c_char,
-            if __key == 0 { fd } else { __key },
-        );
-
-        if ioctl(fd, ASHMEM_SET_NAME, &ourkey) != 0 {
-            close(fd);
-            return 0;
-        };
-
-        if ioctl(fd, ASHMEM_SET_SIZE, __size) != 0 {
-            close(fd);
-            return 0;
-        };
-
-        fd
-    }
-
-    #[cfg(target_os = "android")]
-    unsafe fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void {
-        let size = ioctl(__shmid, ASHMEM_GET_SIZE);
-        if size < 0 {
-            return 0 as *mut c_void;
+        #[cfg(unix)]
+        #[derive(Copy, Clone)]
+        #[repr(C)]
+        struct ipc_perm {
+            pub __key: c_int,
+            pub uid: c_uint,
+            pub gid: c_uint,
+            pub cuid: c_uint,
+            pub cgid: c_uint,
+            pub mode: c_ushort,
+            pub __pad1: c_ushort,
+            pub __seq: c_ushort,
+            pub __pad2: c_ushort,
+            pub __glibc_reserved1: c_ulong,
+            pub __glibc_reserved2: c_ulong,
         }
 
-        let ptr = mmap(
-            0 as *mut c_void,
-            size as usize,
-            PROT_READ | PROT_WRITE,
-            MAP_SHARED,
-            __shmid,
-            0,
-        );
-        if ptr == usize::MAX as *mut c_void {
-            return 0 as *mut c_void;
+        #[cfg(unix)]
+        #[derive(Copy, Clone)]
+        #[repr(C)]
+        struct shmid_ds {
+            pub shm_perm: ipc_perm,
+            pub shm_segsz: c_ulong,
+            pub shm_atime: c_long,
+            pub shm_dtime: c_long,
+            pub shm_ctime: c_long,
+            pub shm_cpid: c_int,
+            pub shm_lpid: c_int,
+            pub shm_nattch: c_ulong,
+            pub __glibc_reserved4: c_ulong,
+            pub __glibc_reserved5: c_ulong,
         }
 
-        ptr
-    }
+        extern "C" {
+            fn shmctl(__shmid: c_int, __cmd: c_int, __buf: *mut shmid_ds) -> c_int;
+            fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int;
+            fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
+        }
 
-    #[cfg(unix)]
-    #[derive(Copy, Clone)]
-    #[repr(C)]
-    struct ipc_perm {
-        pub __key: c_int,
-        pub uid: c_uint,
-        pub gid: c_uint,
-        pub cuid: c_uint,
-        pub cgid: c_uint,
-        pub mode: c_ushort,
-        pub __pad1: c_ushort,
-        pub __seq: c_ushort,
-        pub __pad2: c_ushort,
-        pub __glibc_reserved1: c_ulong,
-        pub __glibc_reserved2: c_ulong,
-    }
-
-    #[cfg(unix)]
-    #[derive(Copy, Clone)]
-    #[repr(C)]
-    struct shmid_ds {
-        pub shm_perm: ipc_perm,
-        pub shm_segsz: c_ulong,
-        pub shm_atime: c_long,
-        pub shm_dtime: c_long,
-        pub shm_ctime: c_long,
-        pub shm_cpid: c_int,
-        pub shm_lpid: c_int,
-        pub shm_nattch: c_ulong,
-        pub __glibc_reserved4: c_ulong,
-        pub __glibc_reserved5: c_ulong,
-    }
-
-    /// The default Sharedmap impl for unix using shmctl & shmget
-    #[cfg(unix)]
-    #[derive(Clone, Debug)]
-    pub struct UnixShMem {
-        pub shm_str: [u8; 20],
-        pub shm_id: c_int,
-        pub map: *mut u8,
-        pub map_size: usize,
-    }
-
-    #[cfg(unix)]
-    impl ShMem for UnixShMem {
-        fn existing_from_shm_slice(
-            map_str_bytes: &[u8; 20],
+        /// The default sharedmap impl for unix using shmctl & shmget
+        #[derive(Clone, Debug)]
+        pub struct CommonUnixShMem {
+            id: ShMemId,
+            map: *mut u8,
             map_size: usize,
-        ) -> Result<Self, Error> {
-            unsafe {
-                let str_bytes = map_str_bytes as *const [u8; 20] as *const libc::c_char;
-                Self::from_str(CStr::from_ptr(str_bytes), map_size)
+        }
+
+        impl CommonUnixShMem {
+            /// Create a new shared memory mapping, using shmget/shmat
+            pub fn new(map_size: usize) -> Result<Self, Error> {
+                unsafe {
+                    let os_id = shmget(0, map_size as c_ulong, 0o1000 | 0o2000 | 0o600);
+
+                    if os_id < 0_i32 {
+                        return Err(Error::Unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
+                    }
+
+                    let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
+
+                    if map == usize::MAX as c_int as *mut c_void as *mut c_uchar || map.is_null() {
+                        shmctl(os_id, 0, ptr::null_mut());
+                        return Err(Error::Unknown(
+                            "Failed to map the shared mapping".to_string(),
+                        ));
+                    }
+
+                    Ok(Self {
+                        id: ShMemId::from_int(os_id),
+                        map,
+                        map_size,
+                    })
+                }
+            }
+
+            /// Get a UnixShMem of the existing shared memory mapping identified by id
+            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+                unsafe {
+                    let map = shmat(id.to_int(), ptr::null(), 0) as *mut c_uchar;
+
+                    if map == usize::MAX as *mut c_void as *mut c_uchar || map.is_null() {
+                        return Err(Error::Unknown(
+                            "Failed to map the shared mapping".to_string(),
+                        ));
+                    }
+
+                    Ok(Self { id, map, map_size })
+                }
             }
         }
 
-        fn new_map(map_size: usize) -> Result<Self, Error> {
-            Self::new(map_size)
+        #[cfg(unix)]
+        impl ShMem for CommonUnixShMem {
+            fn id(&self) -> ShMemId {
+                self.id
+            }
+
+            fn len(&self) -> usize {
+                self.map_size
+            }
+
+            fn map(&self) -> &[u8] {
+                unsafe { slice::from_raw_parts(self.map, self.map_size) }
+            }
+
+            fn map_mut(&mut self) -> &mut [u8] {
+                unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+            }
         }
 
-        fn shm_slice(&self) -> &[u8; 20] {
-            &self.shm_str
+        /// Drop implementation for UnixShMem, which cleans up the mapping
+        #[cfg(unix)]
+        impl Drop for CommonUnixShMem {
+            fn drop(&mut self) {
+                unsafe {
+                    shmctl(self.id.to_int(), 0, ptr::null_mut());
+                }
+            }
         }
 
-        fn map(&self) -> &[u8] {
-            unsafe { slice::from_raw_parts(self.map, self.map_size) }
+        /// A ShMemProvider which uses shmget/shmat/shmctl to provide shared memory mappings.
+        #[cfg(unix)]
+        #[derive(Clone, Debug)]
+        pub struct CommonUnixShMemProvider {}
+
+        unsafe impl Send for CommonUnixShMemProvider {}
+
+        #[cfg(unix)]
+        impl Default for CommonUnixShMemProvider {
+            fn default() -> Self {
+                Self::new().unwrap()
+            }
         }
 
-        fn map_mut(&mut self) -> &mut [u8] {
-            unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
-        }
-    }
+        /// Implement ShMemProvider for UnixShMemProvider
+        #[cfg(unix)]
+        impl ShMemProvider for CommonUnixShMemProvider {
+            type Mem = CommonUnixShMem;
 
-    /// Deinit sharedmaps on drop
-    impl Drop for UnixShMem {
-        fn drop(&mut self) {
-            unsafe {
-                unix_shmem_deinit(self);
+            fn new() -> Result<Self, Error> {
+                Ok(Self {})
+            }
+            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+                CommonUnixShMem::new(map_size)
+            }
+
+            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+                CommonUnixShMem::from_id_and_size(id, size)
             }
         }
     }
 
-    /// Create an uninitialized shmap
-    #[cfg(unix)]
-    const fn unix_shmem_unitialized() -> UnixShMem {
-        UnixShMem {
-            shm_str: [0; 20],
-            shm_id: -1,
-            map: 0 as *mut c_uchar,
-            map_size: 0,
-        }
-    }
+    #[cfg(all(unix, feature = "std"))]
+    pub mod ashmem {
+        use core::slice;
+        use libc::{
+            c_char, c_int, c_long, c_uint, c_void, off_t, size_t, MAP_SHARED, O_RDWR, PROT_READ,
+            PROT_WRITE,
+        };
+        use std::ffi::CString;
 
-    #[cfg(unix)]
-    impl UnixShMem {
-        pub fn from_str(shm_str: &CStr, map_size: usize) -> Result<Self, Error> {
-            let mut ret = unix_shmem_unitialized();
-            let map = unsafe { unix_shmem_by_str(&mut ret, shm_str, map_size) };
-            if !map.is_null() {
-                Ok(ret)
-            } else {
-                Err(Error::Unknown(format!(
-                    "Could not allocate map with id {:?} and size {}",
-                    shm_str, map_size
-                )))
+        use crate::Error;
+
+        use super::super::{ShMem, ShMemId, ShMemProvider};
+
+        extern "C" {
+            fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
+            fn open(path: *const c_char, oflag: c_int, ...) -> c_int;
+            fn close(fd: c_int) -> c_int;
+            fn mmap(
+                addr: *mut c_void,
+                len: size_t,
+                prot: c_int,
+                flags: c_int,
+                fd: c_int,
+                offset: off_t,
+            ) -> *mut c_void;
+
+        }
+
+        /// An ashmem based impl for linux/android
+        #[cfg(unix)]
+        #[derive(Clone, Debug)]
+        pub struct AshmemShMem {
+            id: ShMemId,
+            map: *mut u8,
+            map_size: usize,
+        }
+
+        #[derive(Copy, Clone)]
+        #[repr(C)]
+        struct ashmem_pin {
+            pub offset: c_uint,
+            pub len: c_uint,
+        }
+
+        const ASHMEM_GET_SIZE: c_long = 0x00007704;
+        const ASHMEM_UNPIN: c_long = 0x40087708;
+        //const ASHMEM_SET_NAME: c_long = 0x41007701;
+        const ASHMEM_SET_SIZE: c_long = 0x40087703;
+
+        impl AshmemShMem {
+            /// Create a new shared memory mapping, using shmget/shmat
+            pub fn new(map_size: usize) -> Result<Self, Error> {
+                unsafe {
+                    let device_path = CString::new(
+                        if let Ok(boot_id) =
+                            std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+                        {
+                            format!("{}{}", "/dev/ashmem", boot_id).trim().to_string()
+                        } else {
+                            "/dev/ashmem".to_string()
+                        },
+                    )
+                    .unwrap();
+
+                    let fd = open(device_path.as_ptr(), O_RDWR);
+                    if fd == -1 {
+                        return Err(Error::Unknown(format!(
+                            "Failed to open the ashmem device at {:?}",
+                            device_path
+                        )));
+                    }
+
+                    //if ioctl(fd, ASHMEM_SET_NAME, name) != 0 {
+                    //close(fd);
+                    //return Err(Error::Unknown("Failed to set the ashmem mapping's name".to_string()));
+                    //};
+
+                    if ioctl(fd, ASHMEM_SET_SIZE, map_size) != 0 {
+                        close(fd);
+                        return Err(Error::Unknown(
+                            "Failed to set the ashmem mapping's size".to_string(),
+                        ));
+                    };
+
+                    let map = mmap(
+                        std::ptr::null_mut(),
+                        map_size,
+                        PROT_READ | PROT_WRITE,
+                        MAP_SHARED,
+                        fd,
+                        0,
+                    );
+                    if map == usize::MAX as *mut c_void {
+                        close(fd);
+                        return Err(Error::Unknown(
+                            "Failed to map the ashmem mapping".to_string(),
+                        ));
+                    }
+
+                    Ok(Self {
+                        id: ShMemId::from_string(&format!("{}", fd)),
+                        map: map as *mut u8,
+                        map_size,
+                    })
+                }
+            }
+
+            /// Get a UnixShMem of the existing shared memory mapping identified by id
+            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+                unsafe {
+                    let fd: i32 = id.to_string().parse().unwrap();
+                    if ioctl(fd, ASHMEM_GET_SIZE) != map_size as i32 {
+                        return Err(Error::Unknown(
+                            "The mapping's size differs from the requested size".to_string(),
+                        ));
+                    };
+
+                    let map = mmap(
+                        std::ptr::null_mut(),
+                        map_size,
+                        PROT_READ | PROT_WRITE,
+                        MAP_SHARED,
+                        fd,
+                        0,
+                    );
+                    if map == usize::MAX as *mut c_void {
+                        close(fd);
+                        return Err(Error::Unknown(
+                            "Failed to map the ashmem mapping".to_string(),
+                        ));
+                    }
+
+                    Ok(Self {
+                        id,
+                        map: map as *mut u8,
+                        map_size,
+                    })
+                }
             }
         }
 
-        pub fn new(map_size: usize) -> Result<Self, Error> {
-            let mut ret = unix_shmem_unitialized();
-            let map = unsafe { unix_shmem_init(&mut ret, map_size) };
-            if map.is_null() {
-                Err(Error::Unknown(format!(
-                    "Could not allocate map of size {} - check OS limits, (i.e. shmall, shmmax)!",
-                    map_size
-                )))
-            } else {
-                Ok(ret)
+        #[cfg(unix)]
+        impl ShMem for AshmemShMem {
+            fn id(&self) -> ShMemId {
+                self.id
+            }
+
+            fn len(&self) -> usize {
+                self.map_size
+            }
+
+            fn map(&self) -> &[u8] {
+                unsafe { slice::from_raw_parts(self.map, self.map_size) }
+            }
+
+            fn map_mut(&mut self) -> &mut [u8] {
+                unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
-    }
 
-    /// Deinitialize this shmem instance
-    #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
-    unsafe fn unix_shmem_deinit(shm: *mut UnixShMem) {
-        if shm.is_null() || (*shm).map.is_null() {
-            /* Serialized map id */
-            // Not set or not initialized;
-            return;
-        }
-        (*shm).shm_str[0_usize] = 0u8;
-        shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
-        (*shm).map = ptr::null_mut();
-    }
+        /// Drop implementation for AshmemShMem, which cleans up the mapping
+        #[cfg(unix)]
+        impl Drop for AshmemShMem {
+            fn drop(&mut self) {
+                unsafe {
+                    let fd: i32 = self.id.to_string().parse().unwrap();
 
-    /// Functions to create Shared memory region, for observation channels and
-    /// opening inputs and stuff.
-    #[allow(clippy::clippy::unnecessary_cast)] // for c_ types
-    unsafe fn unix_shmem_init(shm: *mut UnixShMem, map_size: usize) -> *mut c_uchar {
-        (*shm).map_size = map_size;
-        (*shm).map = ptr::null_mut();
-        (*shm).shm_id = shmget(
-            0 as c_int,
-            map_size as c_ulong,
-            0o1000 as c_int | 0o2000 as c_int | 0o600 as c_int,
-        );
-        if (*shm).shm_id < 0 as c_int {
-            (*shm).shm_str[0] = 0u8;
-            return ptr::null_mut();
-        }
-        snprintf(
-            (*shm).shm_str.as_mut_ptr() as *mut c_char,
-            size_of::<[c_char; 20]>() as c_ulong,
-            b"%d\x00" as *const u8 as *const c_char,
-            (*shm).shm_id,
-        );
-        (*shm).shm_str
-            [(size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_ulong) as usize] = 0u8;
-        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
-        if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar || (*shm).map.is_null() {
-            shmctl((*shm).shm_id, 0 as c_int, ptr::null_mut());
-            (*shm).shm_id = -(1 as c_int);
-            (*shm).shm_str[0] = 0u8;
-            return ptr::null_mut();
-        }
-        (*shm).map
-    }
+                    let length = ioctl(fd, ASHMEM_GET_SIZE);
 
-    /// Uses a shmap id string to open a shared map
-    #[allow(clippy::unnecessary_cast)] // for c_int and c_long
-    unsafe fn unix_shmem_by_str(
-        shm: *mut UnixShMem,
-        shm_str: &CStr,
-        map_size: usize,
-    ) -> *mut c_uchar {
-        if shm.is_null() || shm_str.to_bytes().is_empty() || map_size == 0 {
-            return ptr::null_mut();
+                    let ap = ashmem_pin {
+                        offset: 0,
+                        len: length as u32,
+                    };
+
+                    ioctl(fd, ASHMEM_UNPIN, &ap);
+                    close(fd);
+                }
+            }
         }
-        (*shm).map = ptr::null_mut();
-        (*shm).map_size = map_size;
-        strncpy(
-            (*shm).shm_str.as_mut_ptr() as *mut c_char,
-            shm_str.as_ptr() as *const c_char,
-            (size_of::<[c_char; 20]>() as c_ulong).wrapping_sub(1 as c_ulong),
-        );
-        (*shm).shm_id = shm_str
-            .to_str()
-            .unwrap_or_else(|_| panic!("illegal shm_str {:?}", shm_str))
-            .parse::<i32>()
-            .unwrap();
-        (*shm).map = shmat((*shm).shm_id, ptr::null(), 0 as c_int) as *mut c_uchar;
-        if (*shm).map == -(1 as c_int) as *mut c_void as *mut c_uchar {
-            (*shm).map = ptr::null_mut();
-            (*shm).map_size = 0;
-            (*shm).shm_str[0] = 0u8;
-            return ptr::null_mut();
+
+        /// A ShMemProvider which uses ashmem to provide shared memory mappings.
+        #[cfg(unix)]
+        #[derive(Clone, Debug)]
+        pub struct AshmemShMemProvider {}
+
+        unsafe impl Send for AshmemShMemProvider {}
+
+        #[cfg(unix)]
+        impl Default for AshmemShMemProvider {
+            fn default() -> Self {
+                Self::new().unwrap()
+            }
         }
-        (*shm).map
+
+        /// Implement ShMemProvider for AshmemShMemProvider
+        #[cfg(unix)]
+        impl ShMemProvider for AshmemShMemProvider {
+            type Mem = AshmemShMem;
+
+            fn new() -> Result<Self, Error> {
+                Ok(Self {})
+            }
+
+            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+                let mapping = AshmemShMem::new(map_size)?;
+                Ok(mapping)
+            }
+
+            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+                AshmemShMem::from_id_and_size(id, size)
+            }
+        }
     }
 }
 
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
-    use super::ShMem;
+    use super::{ShMem, ShMemId, ShMemProvider};
     use crate::{
         bolts::bindings::{
             windows::win32::system_services::{
@@ -450,6 +677,7 @@ pub mod win32_shmem {
     };
 
     use core::{ffi::c_void, ptr, slice};
+    use std::convert::TryInto;
     use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: isize = -1;
@@ -458,80 +686,14 @@ pub mod win32_shmem {
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
     pub struct Win32ShMem {
-        pub shm_str: [u8; 20],
-        pub handle: HANDLE,
-        pub map: *mut u8,
-        pub map_size: usize,
-    }
-
-    impl ShMem for Win32ShMem {
-        fn existing_from_shm_slice(
-            map_str_bytes: &[u8; 20],
-            map_size: usize,
-        ) -> Result<Self, Error> {
-            Self::from_str(map_str_bytes, map_size)
-        }
-
-        fn new_map(map_size: usize) -> Result<Self, Error> {
-            Self::new(map_size)
-        }
-
-        fn shm_slice(&self) -> &[u8; 20] {
-            &self.shm_str
-        }
-
-        fn map(&self) -> &[u8] {
-            unsafe { slice::from_raw_parts(self.map, self.map_size) }
-        }
-
-        fn map_mut(&mut self) -> &mut [u8] {
-            unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
-        }
-    }
-
-    /// Deinit sharedmaps on drop
-    impl Drop for Win32ShMem {
-        fn drop(&mut self) {
-            unsafe {
-                UnmapViewOfFile(self.map as *mut c_void);
-                CloseHandle(self.handle);
-            }
-        }
+        id: ShMemId,
+        handle: HANDLE,
+        map: *mut u8,
+        map_size: usize,
     }
 
     impl Win32ShMem {
-        pub fn from_str(map_str_bytes: &[u8; 20], map_size: usize) -> Result<Self, Error> {
-            unsafe {
-                let handle = OpenFileMappingA(
-                    FILE_MAP_ALL_ACCESS,
-                    BOOL(0),
-                    PSTR(map_str_bytes as *const u8 as *mut u8),
-                );
-                if handle == HANDLE(0) {
-                    return Err(Error::Unknown(format!(
-                        "Cannot open shared memory {}",
-                        String::from_utf8_lossy(map_str_bytes)
-                    )));
-                }
-                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
-                if map.is_null() {
-                    return Err(Error::Unknown(format!(
-                        "Cannot map shared memory {}",
-                        String::from_utf8_lossy(map_str_bytes)
-                    )));
-                }
-                let mut ret = Self {
-                    shm_str: [0; 20],
-                    handle: handle,
-                    map: map,
-                    map_size: map_size,
-                };
-                ret.shm_str.clone_from_slice(map_str_bytes);
-                Ok(ret)
-            }
-        }
-
-        pub fn new(map_size: usize) -> Result<Self, Error> {
+        fn new_map(map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let uuid = Uuid::new_v4();
                 let mut map_str = format!("libafl_{}", uuid.to_simple());
@@ -558,39 +720,99 @@ pub mod win32_shmem {
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
-                let mut ret = Self {
-                    shm_str: [0; 20],
+
+                Ok(Self {
+                    id: ShMemId::from_slice(&map_str_bytes[0..20].try_into().unwrap()),
                     handle,
                     map,
                     map_size,
-                };
-                ret.shm_str.clone_from_slice(&map_str_bytes[0..20]);
-                Ok(ret)
+                })
+            }
+        }
+
+        fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            unsafe {
+                let map_str_bytes = id.id;
+
+                let handle = OpenFileMappingA(
+                    FILE_MAP_ALL_ACCESS,
+                    BOOL(0),
+                    PSTR(&map_str_bytes as *const u8 as *mut u8),
+                );
+                if handle == HANDLE(0) {
+                    return Err(Error::Unknown(format!(
+                        "Cannot open shared memory {}",
+                        String::from_utf8_lossy(&map_str_bytes)
+                    )));
+                }
+                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                if map.is_null() {
+                    return Err(Error::Unknown(format!(
+                        "Cannot map shared memory {}",
+                        String::from_utf8_lossy(&map_str_bytes)
+                    )));
+                }
+                Ok(Self {
+                    id,
+                    handle,
+                    map,
+                    map_size,
+                })
             }
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
+    impl ShMem for Win32ShMem {
+        fn id(&self) -> ShMemId {
+            self.id
+        }
 
-    #[cfg(all(unix, feature = "std"))]
-    use super::{ShMem, UnixShMem};
+        fn len(&self) -> usize {
+            self.map_size
+        }
 
-    #[cfg(all(unix, feature = "std"))]
-    #[test]
-    fn test_str_conversions() {
-        let mut shm_str: [u8; 20] = [0; 20];
-        shm_str[0] = 'A' as u8;
-        shm_str[1] = 'B' as u8;
-        shm_str[2] = 'C' as u8;
-        let faux_shmem = UnixShMem {
-            shm_id: 0,
-            shm_str,
-            map: 0 as *mut u8,
-            map_size: 20,
-        };
-        let str = faux_shmem.shm_str();
-        assert_eq!(str, "ABC");
+        fn map(&self) -> &[u8] {
+            unsafe { slice::from_raw_parts(self.map, self.map_size) }
+        }
+
+        fn map_mut(&mut self) -> &mut [u8] {
+            unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+        }
+    }
+
+    /// Deinit sharedmaps on drop
+    impl Drop for Win32ShMem {
+        fn drop(&mut self) {
+            unsafe {
+                UnmapViewOfFile(self.map as *mut c_void);
+                CloseHandle(self.handle);
+            }
+        }
+    }
+
+    /// A ShMemProvider which uses win32 functions to provide shared memory mappings.
+    #[derive(Clone, Debug)]
+    pub struct Win32ShMemProvider {}
+
+    impl Default for Win32ShMemProvider {
+        fn default() -> Self {
+            Self::new().unwrap()
+        }
+    }
+
+    /// Implement ShMemProvider for Win32ShMemProvider
+    impl ShMemProvider for Win32ShMemProvider {
+        type Mem = Win32ShMem;
+
+        fn new() -> Result<Self, Error> {
+            Ok(Self {})
+        }
+        fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+            Win32ShMem::new_map(map_size)
+        }
+
+        fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+            Win32ShMem::from_id_and_size(id, size)
+        }
     }
 }
