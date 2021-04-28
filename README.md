@@ -15,7 +15,7 @@ LibAFL is fast, multi-platform, no_std compatible, and scales over cores (and ma
 LibAFL offers integrations with popular instrumemntation frameworks too. At the moment, the supported backends are:
 
 + SanitizerCoverage, in [libafl_targets](./libafl_targets)
-+ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net>
++ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net> (Windows support will be added soon)
 
 ## Getting started
 
