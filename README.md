@@ -32,6 +32,11 @@ LibAFL offers integrations with popular instrumemntation frameworks. At the mome
 + Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net> (Windows support is broken atm, it relies on [this upstream issue](https://github.com/meme/frida-rust/issues/9) to be fixed.)
 + More to come (QEMU-mode, ...)
 
+LibAFL offers integrations with popular instrumemntation frameworks too. At the moment, the supported backends are:
+
++ SanitizerCoverage, in [libafl_targets](./libafl_targets)
++ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net> (Windows support will be added soon)
+
 ## Getting started
 
 Clone the LibAFL repository with

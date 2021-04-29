@@ -104,6 +104,9 @@ const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
 /// The sender on this map is exiting (if broker exits, clients should exit gracefully);
 const LLMP_TAG_EXITING: Tag = 0x13C5171;
 
+pub const LLMP_FLAG_INITIALIZED: Flag = 0x0;
+pub const LLMP_FLAG_COMPRESSED: Flag = 0x1;
+
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
 
@@ -124,6 +127,7 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
 
 /// TAGs used thorughout llmp
 pub type Tag = u32;
+pub type Flag = u64;
 
 /// This is for the server the broker will spawn.
 /// If an llmp connection is local - use sharedmaps
@@ -323,6 +327,8 @@ pub struct LlmpMsg {
     pub tag: Tag,
     /// Sender of this messge
     pub sender: u32,
+    /// flags, currently only used for indicating compression
+    pub flags: Flag,
     /// The message ID, unique per page
     pub message_id: u64,
     /// Buffer length as specified by the user
@@ -440,6 +446,13 @@ where
         match self {
             LlmpConnection::IsBroker { broker } => broker.send_buf(tag, buf),
             LlmpConnection::IsClient { client } => client.send_buf(tag, buf),
+        }
+    }
+
+    pub fn send_buf_with_flags(&mut self, tag: Tag, buf: &[u8], flags: Flag) -> Result<(), Error> {
+        match self {
+            LlmpConnection::IsBroker { broker } => broker.send_buf_with_flags(tag, flags, buf),
+            LlmpConnection::IsClient { client } => client.send_buf_with_flags(tag, flags, buf),
         }
     }
 }
@@ -898,6 +911,30 @@ where
         unsafe {
             let msg = self.alloc_next(buf.len())?;
             (*msg).tag = tag;
+            (*msg).flags = LLMP_FLAG_INITIALIZED;
+            buf.as_ptr()
+                .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
+            self.send(msg)
+        }
+    }
+
+    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flag, buf: &[u8]) -> Result<(), Error> {
+        // Make sure we don't reuse already allocated tags
+        if tag == LLMP_TAG_NEW_SHM_CLIENT
+            || tag == LLMP_TAG_END_OF_PAGE
+            || tag == LLMP_TAG_UNINITIALIZED
+            || tag == LLMP_TAG_UNSET
+        {
+            return Err(Error::Unknown(format!(
+                "Reserved tag supplied to send_buf ({:#X})",
+                tag
+            )));
+        }
+
+        unsafe {
+            let msg = self.alloc_next(buf.len())?;
+            (*msg).tag = tag;
+            (*msg).flags = flags;
             buf.as_ptr()
                 .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
             self.send(msg)
@@ -1114,12 +1151,22 @@ where
     /// Returns the next message, tag, buf, if avaliable, else None
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, &[u8])>, Error> {
+        if let Some((sender, tag, _flags, buf)) = self.recv_buf_with_flags()? {
+            Ok(Some((sender, tag, buf)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    pub fn recv_buf_with_flags(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
         unsafe {
             Ok(match self.recv()? {
                 Some(msg) => Some((
                     (*msg).sender,
                     (*msg).tag,
+                    (*msg).flags,
                     (*msg).as_slice(&mut self.current_recv_map)?,
                 )),
                 None => None,
@@ -1129,7 +1176,7 @@ where
 
     /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), Error> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, &[u8]), Error> {
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
@@ -1424,7 +1471,7 @@ where
     #[inline]
     pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<(), Error>
     where
-        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
+        F: FnMut(u32, Tag, Flag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         compiler_fence(Ordering::SeqCst);
         for i in 0..self.llmp_clients.len() {
@@ -1455,7 +1502,7 @@ where
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
     where
-        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
+        F: FnMut(u32, Tag, Flag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         #[cfg(unix)]
         if let Err(_e) = unsafe { setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) } {
@@ -1490,6 +1537,10 @@ where
     /// Broadcasts the given buf to all lients
     pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         self.llmp_out.send_buf(tag, buf)
+    }
+
+    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flag, buf: &[u8]) -> Result<(), Error> {
+        self.llmp_out.send_buf_with_flags(tag, flags, buf)
     }
 
     #[cfg(feature = "std")]
@@ -1595,7 +1646,7 @@ where
     #[inline]
     unsafe fn handle_new_msgs<F>(&mut self, client_id: u32, on_new_msg: &mut F) -> Result<(), Error>
     where
-        F: FnMut(u32, Tag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
+        F: FnMut(u32, Tag, Flag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         let mut next_id = self.llmp_clients.len() as u32;
 
@@ -1662,7 +1713,9 @@ where
 
                 let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
                 let msg_buf = (*msg).as_slice(map)?;
-                if let LlmpMsgHookResult::Handled = (on_new_msg)(client_id, (*msg).tag, msg_buf)? {
+                if let LlmpMsgHookResult::Handled =
+                    (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
+                {
                     should_forward_msg = false
                 };
                 if should_forward_msg {
@@ -1827,6 +1880,10 @@ where
         self.sender.send_buf(tag, buf)
     }
 
+    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flag, buf: &[u8]) -> Result<(), Error> {
+        self.sender.send_buf_with_flags(tag, flags, buf)
+    }
+
     /// Informs the broker about a new client in town, with the given map id
     pub fn send_client_added_msg(
         &mut self,
@@ -1876,14 +1933,18 @@ where
     /// Returns the next message, tag, buf, if avaliable, else None
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, u32, &[u8])>, Error> {
+    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, &[u8])>, Error> {
         self.receiver.recv_buf()
     }
 
     /// Receives a buf from the broker, looping until a messages becomes avaliable
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, u32, &[u8]), Error> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, &[u8]), Error> {
         self.receiver.recv_buf_blocking()
+    }
+
+    pub fn recv_buf_with_flags(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
+        self.receiver.recv_buf_with_flags()
     }
 
     #[cfg(feature = "std")]
@@ -1952,7 +2013,7 @@ mod tests {
         // Give the (background) tcp thread a few millis to post the message
         sleep(Duration::from_millis(100));
         broker
-            .once(&mut |_sender_id, _tag, _msg| Ok(ForwardToClients))
+            .once(&mut |_sender_id, _tag, _flags, _msg| Ok(ForwardToClients))
             .unwrap();
 
         let tag: Tag = 0x1337;
@@ -1975,7 +2036,7 @@ mod tests {
 
         // Forward stuff to clients
         broker
-            .once(&mut |_sender_id, _tag, _msg| Ok(ForwardToClients))
+            .once(&mut |_sender_id, _tag, _flags, _msg| Ok(ForwardToClients))
             .unwrap();
         let (_sender_id, tag2, arr2) = client.recv_buf_blocking().unwrap();
         assert_eq!(tag, tag2);
