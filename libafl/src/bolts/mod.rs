@@ -2,7 +2,7 @@
 
 pub mod bindings;
 
-#[cfg(feature = "llmp_compress")]
+#[cfg(feature = "llmp_compression")]
 pub mod compress;
 
 pub mod llmp;
