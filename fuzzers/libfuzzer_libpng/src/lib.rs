@@ -10,7 +10,7 @@ use libafl::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::setup_restarting_mgr_std,
+    events::{setup_restarting_mgr_std, EventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -51,18 +51,17 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let stats = SimpleStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-    let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port) {
-            Ok(res) => res,
-            Err(err) => match err {
-                Error::ShuttingDown => {
-                    return Ok(());
-                }
-                _ => {
-                    panic!("Failed to setup the restarter: {}", err);
-                }
-            },
-        };
+    let (state, mut restarting_mgr) = match setup_restarting_mgr_std(stats, broker_port) {
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {}", err);
+            }
+        },
+    };
 
     // Create an observation channel using the coverage map
     let edges_observer = HitcountsMapObserver::new(unsafe {
@@ -149,8 +148,22 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+    // This fuzzer restarts after 1 mio `fuzz_one` executions.
+    // Each fuzz_one will internally do many executions of the target.
+    // If your target is very instable, setting a low count here may help.
+    // However, you will lose a lot of performance that way.
+    let iters = 1_000_000;
+    fuzzer.fuzz_loop_for(
+        &mut state,
+        &mut executor,
+        &mut restarting_mgr,
+        &scheduler,
+        iters,
+    )?;
 
-    // Never reached
+    // It's important, that we store the state before restarting!
+    // Else, the parent will not respawn a new child and quit.
+    restarting_mgr.on_restart(&mut state)?;
+
     Ok(())
 }
