@@ -1,5 +1,7 @@
 # LibAFL, the fuzzer library.
 
+ <img align="right" src="https://github.com/AFLplusplus/Website/raw/master/static/logo_256x256.png" alt="AFL++ Logo">
+
 Advanced Fuzzing Library - Slot your own fuzzers together and extend their features using Rust.
 
 LibAFL is written and maintained by Andrea Fioraldi <andreafioraldi@gmail.com> and Dominik Maier <mail@dmnk.co>.

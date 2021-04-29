@@ -125,6 +125,13 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
 /// TAGs used thorughout llmp
 pub type Tag = u32;
 
+/// If an llmp connection is local - use sharedmaps
+/// or remote (broker2broker) - forwarded via tcp
+pub enum TcpConnectionType {
+    LocalClient {},
+    RemoteBroker,
+}
+
 /// Abstraction for listeners
 #[cfg(feature = "std")]
 pub enum Listener {
