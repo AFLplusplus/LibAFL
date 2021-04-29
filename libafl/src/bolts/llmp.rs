@@ -125,11 +125,25 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
 /// TAGs used thorughout llmp
 pub type Tag = u32;
 
+/// This is for the server the broker will spawn.
 /// If an llmp connection is local - use sharedmaps
 /// or remote (broker2broker) - forwarded via tcp
-pub enum TcpConnectionType {
-    LocalClient {},
-    RemoteBroker,
+pub enum TcpRequest {
+    LocalClientHello { shmem: ShMemDescription },
+    RemoteBrokerHello,
+    RemoteNewMessage { tag: Tag, payload: Vec<u8> },
+}
+
+/// Responses for requests to the server.
+pub enum TcpResponse {
+    LocalClientAccepted {
+        client_id: u32,
+        shmem: ShMemDescription,
+    },
+    RemoteBrokerAccepted {
+        broker_id: u32,
+        hostname: String,
+    },
 }
 
 /// Abstraction for listeners
