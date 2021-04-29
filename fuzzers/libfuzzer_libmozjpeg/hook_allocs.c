@@ -37,7 +37,9 @@ void *malloc(size_t size) {
   // Hence, even realloc(NULL, size) would loop in an optimized build.
   // We fall back to a stricter allocation function. Fingers crossed.
   void *ret = NULL;
-  posix_memalign(&ret, 1<<6, size);
+  if (posix_memalign(&ret, 1<<6, size) != 0) {
+    return NULL;
+  }
   return ret;
 
 }
@@ -52,8 +54,9 @@ void *calloc(size_t nmemb, size_t size) {
   libafl_alloc_map[k] = MAX(libafl_alloc_map[k], size);
 
   void *ret = NULL;
-  posix_memalign(&ret, 1<<6, size);
-  memset(ret, 0, size);
+  if (posix_memalign(&ret, 1<<6, size) != 0) {
+    return NULL;
+  };
   return ret;
 
 }
