@@ -27,7 +27,6 @@ impl GzipCompressor {
 impl GzipCompressor {
     pub fn compress(&self, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if buf.len() > self.threshold {
-            //let t1 = crate::utils::current_time();
             //compress if the buffer is large enough
             let compressed = buf
                 .iter()
@@ -36,14 +35,6 @@ impl GzipCompressor {
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Some(compressed))
         } else {
-            /*
-            let t1 = crate::utils::current_time();
-            let t2 = crate::utils::current_time();
-            println!(
-                "fn compress without compression {} nano sec",
-                (t2 - t1).as_nanos()
-            );
-            */
             Ok(None)
         }
     }
@@ -52,29 +43,13 @@ impl GzipCompressor {
     /// The buffer is decompressed, flag is used to indicate if it's compressed or not
     pub fn decompress(&self, flags: Flag, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-            //let t1 = crate::utils::current_time();
             let decompressed: Vec<u8> = buf
                 .iter()
                 .cloned()
                 .decode(&mut GZipDecoder::new())
                 .collect::<Result<Vec<_>, _>>()?;
-            //let t2 = crate::utils::current_time();
-            /*
-            println!(
-                "fn decompress with decompression {} nano sec",
-                (t2 - t1).as_nanos()
-            );
-            */
             Ok(Some(decompressed))
         } else {
-            /*
-            let t1 = crate::utils::current_time();
-            let t2 = crate::utils::current_time();
-            println!(
-                "fn decompress without decompression {} nano sec",
-                (t2 - t1).as_nanos()
-            );
-            */
             Ok(None)
         }
     }
