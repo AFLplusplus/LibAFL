@@ -317,6 +317,8 @@ unsafe fn fuzz(
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
+    frida_helper.register_thread();
+
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = FridaInProcessExecutor::new(
         &gum,
@@ -351,7 +353,6 @@ unsafe fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    //executor.helper.register_thread();
     fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
 
     // Never reached
