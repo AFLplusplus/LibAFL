@@ -1131,15 +1131,11 @@ where
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, &[u8])>, Error> {
-        unsafe {
-            Ok(match self.recv()? {
-                Some(msg) => Some((
-                    (*msg).sender,
-                    (*msg).tag,
-                    (*msg).as_slice(&mut self.current_recv_map)?,
-                )),
-                None => None,
-            })
+        if let Some((sender, tag, _flags, buf)) = self.recv_buf_with_flags()?{
+            Ok(Some((sender, tag, buf)))
+        }
+        else{
+            Ok(None)
         }
     }
 
