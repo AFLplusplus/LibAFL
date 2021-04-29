@@ -51,7 +51,7 @@ pub enum Error {
     /// Serialization error
     Serialize(String),
     /// Compression error
-    #[cfg(feature = "llmp_compress")]    
+    #[cfg(feature = "llmp_compress")]
     Compression(String),
     /// File related error
     #[cfg(feature = "std")]
@@ -107,8 +107,8 @@ impl From<postcard::Error> for Error {
 }
 
 #[cfg(feature = "llmp_compress")]
-impl From<compression::prelude::CompressionError> for Error{
-    fn from(err: compression::prelude::CompressionError) -> Self{
+impl From<compression::prelude::CompressionError> for Error {
+    fn from(err: compression::prelude::CompressionError) -> Self {
         Self::Compression(format!("{:?}", err))
     }
 }
