@@ -193,7 +193,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         gum: &'a Gum,
         options: FridaOptions,
         _harness_module_name: &str,
-        modules_to_instrument: &'a Vec<&str>,
+        modules_to_instrument: &'a [&str],
     ) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
@@ -247,7 +247,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                         .real_address_for_stalked(get_pc(&context))
                                     {
                                         Some(address) => *address,
-                                        _ => get_pc(&context),
+                                        None => get_pc(&context),
                                     };
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);

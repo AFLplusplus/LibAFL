@@ -230,9 +230,9 @@ where
     type Mem = RcShMem<T>;
 
     fn new() -> Result<Self, Error> {
-        return Ok(Self {
+        Ok(Self {
             internal: Rc::new(RefCell::new(T::new()?)),
-        });
+        })
     }
 
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
@@ -354,7 +354,7 @@ pub mod unix_shmem {
 
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
-                    if map == usize::MAX as c_int as *mut c_void as *mut c_uchar || map.is_null() {
+                    if map as c_int == -1 || map.is_null() {
                         shmctl(os_id, 0, ptr::null_mut());
                         return Err(Error::Unknown(
                             "Failed to map the shared mapping".to_string(),
@@ -557,7 +557,8 @@ pub mod unix_shmem {
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
-                    if ioctl(fd, ASHMEM_GET_SIZE) != map_size as i32 {
+                    #[allow(clippy::cast_sign_loss)]
+                    if ioctl(fd, ASHMEM_GET_SIZE) as u32 as usize != map_size {
                         return Err(Error::Unknown(
                             "The mapping's size differs from the requested size".to_string(),
                         ));
@@ -613,11 +614,12 @@ pub mod unix_shmem {
                 unsafe {
                     let fd: i32 = self.id.to_string().parse().unwrap();
 
-                    let length = ioctl(fd, ASHMEM_GET_SIZE);
+                    #[allow(clippy::cast_sign_loss)]
+                    let length = ioctl(fd, ASHMEM_GET_SIZE) as u32;
 
                     let ap = ashmem_pin {
                         offset: 0,
-                        len: length as u32,
+                        len: length,
                     };
 
                     ioctl(fd, ASHMEM_UNPIN, &ap);

@@ -215,7 +215,6 @@ enum AshmemResponse {
 
 impl AshmemService {
     /// Create a new AshMem service
-    #[must_use]
     fn new() -> Result<Self, Error> {
         Ok(AshmemService {
             provider: AshmemShMemProvider::new()?,
@@ -316,11 +315,7 @@ impl AshmemService {
                 client
                     .stream
                     .send_fds(&id.to_string().as_bytes(), &[server_fd])?;
-                client
-                    .maps
-                    .entry(server_fd)
-                    .or_default()
-                    .push(mapping.clone());
+                client.maps.entry(server_fd).or_default().push(mapping);
             }
             AshmemResponse::Id(id) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
@@ -342,7 +337,7 @@ impl AshmemService {
         let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle =
-            thread::spawn(move || Self::new()?.listen(ASHMEM_SERVER_NAME, childsyncpair));
+            thread::spawn(move || Self::new()?.listen(ASHMEM_SERVER_NAME, &childsyncpair));
 
         let (lock, cvar) = &*syncpair;
         let mut started = lock.lock().unwrap();
@@ -358,14 +353,14 @@ impl AshmemService {
     fn listen(
         &mut self,
         filename: &str,
-        syncpair: Arc<(Mutex<bool>, Condvar)>,
+        syncpair: &Arc<(Mutex<bool>, Condvar)>,
     ) -> Result<(), Error> {
         let listener = if let Ok(listener) =
             UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?)
         {
             listener
         } else {
-            let (lock, cvar) = &*syncpair;
+            let (lock, cvar) = &**syncpair;
             *lock.lock().unwrap() = true;
             cvar.notify_one();
             return Err(Error::Unknown(
@@ -377,7 +372,7 @@ impl AshmemService {
             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
         )];
 
-        let (lock, cvar) = &*syncpair;
+        let (lock, cvar) = &**syncpair;
         *lock.lock().unwrap() = true;
         cvar.notify_one();
 
