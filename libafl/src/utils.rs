@@ -581,6 +581,11 @@ where
     let mut handles = vec![];
 
     println!("spawning on cores: {:?}", cores);
+    let file = if let Some(filename) = stdout_file {
+        Some(File::create(filename).unwrap())
+    } else {
+        None
+    };
     //spawn clients
     for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
         if cores.iter().any(|&x| x == id) {
@@ -598,10 +603,9 @@ where
                     std::thread::sleep(std::time::Duration::from_secs(1));
 
                     #[cfg(feature = "std")]
-                    if stdout_file.is_some() {
-                        let file = File::create(stdout_file.unwrap()).unwrap();
-                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
-                        dup2(file.as_raw_fd(), libc::STDERR_FILENO).unwrap();
+                    if file.is_some() {
+                        dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDOUT_FILENO).unwrap();
+                        dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDERR_FILENO).unwrap();
                     }
                     //fuzzer client. keeps retrying the connection to broker till the broker starts
                     let stats = client_init_stats()?;
