@@ -177,7 +177,7 @@ where
                             #[cfg(feature = "llmp_compress")]
                             let event: Event<I> = match compressor.decompress(_flags, msg)? {
                                 Some(decompressed) => postcard::from_bytes(&decompressed)?,
-                                _ => postcard::from_bytes(msg)?,
+                                None => postcard::from_bytes(msg)?,
                             };
                             #[cfg(not(feature = "llmp_compress"))]
                             let event: Event<I> = postcard::from_bytes(msg)?;
@@ -342,7 +342,7 @@ where
                     #[cfg(feature = "llmp_compress")]
                     let event: Event<I> = match self.compressor.decompress(_flags, msg)? {
                         Some(decompressed) => postcard::from_bytes(&decompressed)?,
-                        _ => postcard::from_bytes(msg)?,
+                        None => postcard::from_bytes(msg)?,
                     };
                     #[cfg(not(feature = "llmp_compress"))]
                     let event: Event<I> = postcard::from_bytes(msg)?;

@@ -15,7 +15,7 @@ pub struct GzipCompressor {
 impl GzipCompressor {
     pub fn new(threshold: usize) -> Self {
         GzipCompressor {
-            threshold: threshold,
+            threshold,
         }
     }
 }
@@ -30,7 +30,7 @@ impl GzipCompressor {
             //let t1 = crate::utils::current_time();
             //compress if the buffer is large enough
             let compressed = buf
-                .into_iter()
+                .iter()
                 .cloned()
                 .encode(&mut GZipEncoder::new(), Action::Finish)
                 .collect::<Result<Vec<_>, _>>()?;
@@ -54,7 +54,7 @@ impl GzipCompressor {
         if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
             //let t1 = crate::utils::current_time();
             let decompressed: Vec<u8> = buf
-                .into_iter()
+                .iter()
                 .cloned()
                 .decode(&mut GZipDecoder::new())
                 .collect::<Result<Vec<_>, _>>()?;
