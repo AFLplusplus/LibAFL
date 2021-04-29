@@ -73,6 +73,10 @@ pub trait Fuzzer<E, EM, S, CS> {
 
     /// Fuzz for n iterations
     /// Returns the index of the last fuzzed corpus item
+    ///
+    /// If you use this fn in a restarting scenario to only run for `n` iterations,
+    /// before exiting, make sure you call `event_mgr.on_restart(state)?;`.
+    /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_loop_for(
         &mut self,
         state: &mut S,
@@ -95,6 +99,7 @@ pub trait Fuzzer<E, EM, S, CS> {
             ret = self.fuzz_one(state, executor, manager, scheduler)?;
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
+
         Ok(ret)
     }
 
