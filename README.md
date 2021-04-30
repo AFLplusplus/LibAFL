@@ -42,7 +42,12 @@ Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
-3. Build the library using
+If you want to get the latest and greatest features,
+```
+git checkout dev
+```
+
+Build the library using
 
 ```
 cargo build --release
