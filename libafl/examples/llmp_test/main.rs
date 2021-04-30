@@ -3,9 +3,8 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
-use alloc::rc::Rc;
 #[cfg(all(unix, feature = "std"))]
-use core::{cell::RefCell, convert::TryInto, time::Duration};
+use core::{convert::TryInto, time::Duration};
 #[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 
@@ -84,6 +83,7 @@ fn large_msg_loop(port: u16) -> ! {
 fn broker_message_hook(
     client_id: u32,
     tag: llmp::Tag,
+    _flags: llmp::Flag,
     message: &[u8],
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
     match tag {

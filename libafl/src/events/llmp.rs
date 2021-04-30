@@ -1,8 +1,8 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{string::ToString, vec::Vec};
-use core_affinity::CoreId;
 use core::{marker::PhantomData, time::Duration};
+use core_affinity::CoreId;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
@@ -16,7 +16,7 @@ use crate::bolts::{
 
 use crate::{
     bolts::{
-        llmp::{self, LlmpClientDescription, LlmpSender, Tag},
+        llmp::{self, Flag, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -28,6 +28,12 @@ use crate::{
     state::IfInteresting,
     stats::Stats,
     Error,
+};
+
+#[cfg(feature = "llmp_compression")]
+use crate::bolts::{
+    compress::GzipCompressor,
+    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 
 #[cfg(all(feature = "std", windows))]
@@ -46,7 +52,6 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 ///
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
@@ -61,8 +66,15 @@ where
 {
     stats: Option<ST>,
     llmp: llmp::LlmpConnection<SP>,
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
+
     phantom: PhantomData<(I, S)>,
 }
+
+/// The minimum buffer size at which to compress LLMP IPC messages.
+#[cfg(feature = "llmp_compression")]
+const COMPRESS_THRESHOLD: usize = 1024;
 
 impl<I, S, SP, ST> Drop for LlmpEventManager<I, S, SP, ST>
 where
@@ -92,6 +104,8 @@ where
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -122,6 +136,8 @@ where
             llmp: llmp::LlmpConnection::IsClient {
                 client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             },
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -144,6 +160,8 @@ where
                 shmem_provider,
                 description,
             )?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -171,10 +189,24 @@ where
         match &mut self.llmp {
             llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = self.stats.as_mut().unwrap();
+                #[cfg(feature = "llmp_compression")]
+                let compressor = &self.compressor;
                 broker.loop_forever(
-                    &mut |sender_id: u32, tag: Tag, msg: &[u8]| {
+                    &mut |sender_id: u32, tag: Tag, _flags: Flag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
-                            let event: Event<I> = postcard::from_bytes(msg)?;
+                            #[cfg(not(feature = "llmp_compression"))]
+                            let event_bytes = msg;
+                            #[cfg(feature = "llmp_compression")]
+                            let compressed;
+                            #[cfg(feature = "llmp_compression")]
+                            let event_bytes =
+                                if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                                    compressed = compressor.decompress(msg)?;
+                                    &compressed
+                                } else {
+                                    msg
+                                };
+                            let event: Event<I> = postcard::from_bytes(event_bytes)?;
                             match Self::handle_in_broker(stats, sender_id, &event)? {
                                 BrokerEventResult::Forward => {
                                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
@@ -329,11 +361,22 @@ where
         let mut events = vec![];
         match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {
-                while let Some((sender_id, tag, msg)) = client.recv_buf()? {
+                while let Some((sender_id, tag, _flags, msg)) = client.recv_buf_with_flags()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
-                    let event: Event<I> = postcard::from_bytes(msg)?;
+                    #[cfg(not(feature = "llmp_compression"))]
+                    let event_bytes = msg;
+                    #[cfg(feature = "llmp_compression")]
+                    let compressed;
+                    #[cfg(feature = "llmp_compression")]
+                    let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                        compressed = self.compressor.decompress(msg)?;
+                        &compressed
+                    } else {
+                        msg
+                    };
+                    let event: Event<I> = postcard::from_bytes(event_bytes)?;
                     events.push((sender_id, event));
                 }
             }
@@ -349,6 +392,27 @@ where
         Ok(count)
     }
 
+    #[cfg(feature = "llmp_compression")]
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+        let serialized = postcard::to_allocvec(&event)?;
+        let flags: Flag = LLMP_FLAG_INITIALIZED;
+
+        match self.compressor.compress(&serialized)? {
+            Some(comp_buf) => {
+                self.llmp.send_buf_with_flags(
+                    LLMP_TAG_EVENT_TO_BOTH,
+                    &comp_buf,
+                    flags | LLMP_FLAG_COMPRESSED,
+                )?;
+            }
+            None => {
+                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "llmp_compression"))]
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
@@ -535,27 +599,34 @@ where
         LlmpEventManager::<I, S, SP, ST>::new_on_port(shmem_provider.clone(), stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
-    let (sender, mut receiver, mut new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
-        .is_err()
+    let (sender, mut receiver, mut new_shmem_provider, core_id) = if std::env::var(
+        _ENV_FUZZER_SENDER,
+    )
+    .is_err()
     {
         let core_id = if mgr.is_broker() {
             match kind {
                 ManagerKind::Broker => {
                     // Yep, broker. Just loop here.
-                    println!("Doing broker things. Run this tool again to start fuzzing in a client.");
+                    println!(
+                        "Doing broker things. Run this tool again to start fuzzing in a client."
+                    );
                     mgr.broker_loop()?;
                     return Err(Error::ShuttingDown);
-
-                },
+                }
                 ManagerKind::Client(_) => {
-                    return Err(Error::IllegalState("Tried to start a client, but got a broker".to_string()));
+                    return Err(Error::IllegalState(
+                        "Tried to start a client, but got a broker".to_string(),
+                    ));
                 }
             }
         } else {
             match kind {
                 ManagerKind::Broker => {
-                    return Err(Error::IllegalState("Tried to start a broker, but got a client".to_string()));
-                },
+                    return Err(Error::IllegalState(
+                        "Tried to start a broker, but got a client".to_string(),
+                    ));
+                }
                 ManagerKind::Client(core_id) => core_id,
             }
         };

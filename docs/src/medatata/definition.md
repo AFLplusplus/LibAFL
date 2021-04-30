@@ -14,6 +14,6 @@ pub struct MyMetadata {
 }
 ```
 
-The struct must be static, so it cannot holds references to borrowed objects.
+The struct must be static, so it cannot hold references to borrowed objects.
 
 

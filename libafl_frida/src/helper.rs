@@ -1,3 +1,6 @@
+use ahash::AHasher;
+use std::hash::Hasher;
+
 use libafl::inputs::{HasTargetBytes, Input};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -6,7 +9,10 @@ use libafl::utils::find_mapping_for_path;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
-use capstone::arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand};
+use capstone::arch::{
+    arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+    ArchOperand::Arm64Operand,
+};
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone, Insn,
@@ -26,7 +32,7 @@ use frida_gum::{Gum, Module, PageProtection};
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
-use std::rc::Rc;
+use std::{path::PathBuf, rc::Rc};
 
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
@@ -82,10 +88,10 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
         if self.options.drcov_enabled() {
-            let filename = format!(
-                "./coverage/{:016x}.drcov",
-                seahash::hash(input.target_bytes().as_slice())
-            );
+            let mut hasher = AHasher::new_with_keys(0, 0);
+            hasher.write(input.target_bytes().as_slice());
+
+            let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
@@ -193,7 +199,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         gum: &'a Gum,
         options: FridaOptions,
         _harness_module_name: &str,
-        modules_to_instrument: &'a Vec<&str>,
+        modules_to_instrument: &'a [PathBuf],
     ) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
@@ -214,11 +220,15 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         if options.stalker_enabled() {
             for (id, module_name) in modules_to_instrument.iter().enumerate() {
-                let (lib_start, lib_end) = find_mapping_for_path(module_name);
-                println!("including range {:x}-{:x}", lib_start, lib_end);
-                helper
-                    .ranges
-                    .insert(lib_start..lib_end, (id as u16, module_name));
+                let (lib_start, lib_end) = find_mapping_for_path(module_name.to_str().unwrap());
+                println!(
+                    "including range {:x}-{:x} for {:?}",
+                    lib_start, lib_end, module_name
+                );
+                helper.ranges.insert(
+                    lib_start..lib_end,
+                    (id as u16, module_name.to_str().unwrap()),
+                );
             }
 
             if helper.options.drcov_enabled() {
@@ -247,7 +257,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                         .real_address_for_stalked(get_pc(&context))
                                     {
                                         Some(address) => *address,
-                                        _ => get_pc(&context),
+                                        None => get_pc(&context),
                                     };
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
@@ -262,7 +272,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             #[cfg(not(target_arch = "aarch64"))]
                             todo!("Implement ASAN for non-aarch64 targets");
                             #[cfg(target_arch = "aarch64")]
-                            if let Ok((basereg, indexreg, displacement, width)) =
+                            if let Ok((basereg, indexreg, displacement, width, shift, extender)) =
                                 helper.is_interesting_instruction(address, instr)
                             {
                                 helper.emit_shadow_check(
@@ -272,6 +282,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                     indexreg,
                                     displacement,
                                     width,
+                                    shift,
+                                    extender,
                                 );
                             }
                         }
@@ -310,6 +322,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
         indexreg: capstone::RegId,
         displacement: i32,
         width: u32,
+        shift: Arm64Shift,
+        extender: Arm64Extender,
     ) {
         let writer = output.writer();
 
@@ -363,11 +377,47 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     }
                 }
             }
-            writer.put_add_reg_reg_reg(
-                Aarch64Register::X0,
-                Aarch64Register::X0,
-                Aarch64Register::X1,
-            );
+
+            if let (Arm64Extender::ARM64_EXT_INVALID, Arm64Shift::Invalid) = (extender, shift) {
+                writer.put_add_reg_reg_reg(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    Aarch64Register::X1,
+                );
+            } else {
+                let extender_encoding: i32 = match extender {
+                    Arm64Extender::ARM64_EXT_UXTB => 0b000,
+                    Arm64Extender::ARM64_EXT_UXTH => 0b001,
+                    Arm64Extender::ARM64_EXT_UXTW => 0b010,
+                    Arm64Extender::ARM64_EXT_UXTX => 0b011,
+                    Arm64Extender::ARM64_EXT_SXTB => 0b100,
+                    Arm64Extender::ARM64_EXT_SXTH => 0b101,
+                    Arm64Extender::ARM64_EXT_SXTW => 0b110,
+                    Arm64Extender::ARM64_EXT_SXTX => 0b111,
+                    _ => -1,
+                };
+                let (shift_encoding, shift_amount): (i32, u32) = match shift {
+                    Arm64Shift::Lsl(amount) => (0b00, amount),
+                    Arm64Shift::Lsr(amount) => (0b01, amount),
+                    Arm64Shift::Asr(amount) => (0b10, amount),
+                    _ => (-1, 0),
+                };
+
+                if extender_encoding != -1 && shift_amount < 0b1000 {
+                    // emit add extended register: https://developer.arm.com/documentation/ddi0602/latest/Base-Instructions/ADD--extended-register---Add--extended-register--
+                    writer.put_bytes(
+                        &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
+                            .to_le_bytes(),
+                    );
+                } else if shift_encoding != -1 {
+                    writer.put_bytes(
+                        &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
+                            .to_le_bytes(),
+                    );
+                } else {
+                    panic!("extender: {:?}, shift: {:?}", extender, shift);
+                }
+            };
         }
 
         let displacement = displacement
@@ -512,7 +562,17 @@ impl<'a> FridaInstrumentationHelper<'a> {
         &self,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(capstone::RegId, capstone::RegId, i32, u32), ()> {
+    ) -> Result<
+        (
+            capstone::RegId,
+            capstone::RegId,
+            i32,
+            u32,
+            Arm64Shift,
+            Arm64Extender,
+        ),
+        (),
+    > {
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.mnemonic().unwrap() {
@@ -539,6 +599,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     opmem.index(),
                     opmem.disp(),
                     self.get_instruction_width(instr, &operands),
+                    arm64operand.shift,
+                    arm64operand.ext,
                 ));
             }
         }

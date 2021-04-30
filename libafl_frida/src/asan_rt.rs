@@ -24,13 +24,14 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(unix)]
 use gothook::GotHookLibrary;
-use libc::{sysconf, _SC_PAGESIZE};
+use libc::{getrlimit64, rlimit64, sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::{RefCell, RefMut},
     ffi::c_void,
-    io::Write,
+    io::{self, Write},
+    path::PathBuf,
     rc::Rc,
 };
 use termcolor::{Color, ColorSpec, WriteColor};
@@ -52,6 +53,7 @@ struct Allocator {
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
     allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
+    largest_allocation: usize,
 }
 
 macro_rules! map_to_shadow {
@@ -72,8 +74,13 @@ struct AllocationMetadata {
 }
 
 impl Allocator {
-    fn new(runtime: Rc<RefCell<AsanRuntime>>) {
-        let page_size = unsafe { sysconf(_SC_PAGESIZE) as usize };
+    fn setup(runtime: Rc<RefCell<AsanRuntime>>) {
+        let ret = unsafe { sysconf(_SC_PAGESIZE) };
+        if ret < 0 {
+            panic!("Failed to read pagesize {:?}", io::Error::last_os_error());
+        }
+        #[allow(clippy::cast_sign_loss)]
+        let page_size = ret as usize;
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
         for try_shadow_bit in &[46usize, 36usize] {
@@ -83,7 +90,10 @@ impl Allocator {
                     addr as *mut c_void,
                     page_size,
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_PRIVATE | MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED,
+                    MapFlags::MAP_PRIVATE
+                        | MapFlags::MAP_ANONYMOUS
+                        | MapFlags::MAP_FIXED
+                        | MapFlags::MAP_NORESERVE,
                     -1,
                     0,
                 )
@@ -98,22 +108,22 @@ impl Allocator {
 
         // attempt to pre-map the entire shadow-memory space
         let addr: usize = 1 << shadow_bit;
-        let pre_allocated_shadow = if let Ok(_) = unsafe {
+        let pre_allocated_shadow = unsafe {
             mmap(
                 addr as *mut c_void,
                 addr + addr,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED,
+                MapFlags::MAP_ANONYMOUS
+                    | MapFlags::MAP_FIXED
+                    | MapFlags::MAP_PRIVATE
+                    | MapFlags::MAP_NORESERVE,
                 -1,
                 0,
             )
-        } {
-            true
-        } else {
-            false
-        };
+        }
+        .is_ok();
 
-        let res = Self {
+        let allocator = Self {
             runtime,
             page_size,
             pre_allocated_shadow,
@@ -122,9 +132,10 @@ impl Allocator {
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: HashMap::new(),
+            largest_allocation: 0,
         };
         unsafe {
-            ALLOCATOR_SINGLETON = Some(RefCell::new(res));
+            ALLOCATOR_SINGLETON = Some(RefCell::new(allocator));
         }
     }
 
@@ -139,7 +150,7 @@ impl Allocator {
     }
 
     pub fn init(runtime: Rc<RefCell<AsanRuntime>>) {
-        Self::new(runtime);
+        Self::setup(runtime);
     }
 
     #[inline]
@@ -150,6 +161,20 @@ impl Allocator {
     #[inline]
     fn round_down_to_page(&self, value: usize) -> usize {
         (value / self.page_size) * self.page_size
+    }
+
+    fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
+        let mut current_size = size;
+        while current_size <= self.largest_allocation {
+            if self.allocation_queue.contains_key(&current_size) {
+                if let Some(metadata) = self.allocation_queue.entry(current_size).or_default().pop()
+                {
+                    return Some(metadata);
+                }
+            }
+            current_size *= 2;
+        }
+        None
     }
 
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
@@ -166,12 +191,7 @@ impl Allocator {
         }
         let rounded_up_size = self.round_up_to_page(size);
 
-        let metadata = if let Some(mut metadata) = self
-            .allocation_queue
-            .entry(rounded_up_size)
-            .or_default()
-            .pop()
-        {
+        let metadata = if let Some(mut metadata) = self.find_smallest_fit(rounded_up_size) {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
@@ -187,7 +207,7 @@ impl Allocator {
         } else {
             let mapping = match mmap(
                 std::ptr::null_mut(),
-                rounded_up_size + 2 * self.page_size,
+                rounded_up_size,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
                 -1,
@@ -200,17 +220,13 @@ impl Allocator {
                 }
             };
 
-            self.map_shadow_for_region(
-                mapping,
-                mapping + rounded_up_size + 2 * self.page_size,
-                false,
-            );
+            self.map_shadow_for_region(mapping, mapping + rounded_up_size, false);
 
             let mut metadata = AllocationMetadata {
-                address: mapping + self.page_size,
+                address: mapping,
                 size,
                 actual_size: rounded_up_size,
-                ..Default::default()
+                ..AllocationMetadata::default()
             };
 
             if self
@@ -225,6 +241,7 @@ impl Allocator {
             metadata
         };
 
+        self.largest_allocation = std::cmp::max(self.largest_allocation, metadata.actual_size);
         // unpoison the shadow memory for the allocation itself
         Self::unpoison(map_to_shadow!(self, metadata.address), size);
         let address = metadata.address as *mut c_void;
@@ -235,17 +252,16 @@ impl Allocator {
     }
 
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        let mut metadata = match self.allocations.get_mut(&(ptr as usize)) {
-            Some(metadata) => metadata,
-            None => {
-                if !ptr.is_null() {
-                    // TODO: report this as an observer
-                    self.runtime
-                        .borrow_mut()
-                        .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
-                }
-                return;
+        let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
+            metadata
+        } else {
+            if !ptr.is_null() {
+                // TODO: report this as an observer
+                self.runtime
+                    .borrow_mut()
+                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
             }
+            return;
         };
 
         if metadata.freed {
@@ -684,7 +700,7 @@ impl AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, modules_to_instrument: &[&str]) {
+    pub fn init(&mut self, modules_to_instrument: &[PathBuf]) {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
             for _ in 0..512 {
@@ -717,7 +733,7 @@ impl AsanRuntime {
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
             #[cfg(unix)]
-            self.hook_library(module_name);
+            self.hook_library(module_name.to_str().unwrap());
         }
     }
 
@@ -757,13 +773,13 @@ impl AsanRuntime {
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     fn unpoison_all_existing_memory(&self) {
         let mut allocator = Allocator::get();
-        walk_self_maps(&mut |start, end, _permissions, _path| {
-            //if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
-            if allocator.pre_allocated_shadow && start == 1 << allocator.shadow_bit {
-                return false;
+        walk_self_maps(&mut |start, end, permissions, _path| {
+            if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
+                if allocator.pre_allocated_shadow && start == 1 << allocator.shadow_bit {
+                    return false;
+                }
+                allocator.map_shadow_for_region(start, end, true);
             }
-            allocator.map_shadow_for_region(start, end, true);
-            //}
             false
         });
     }
@@ -787,14 +803,43 @@ impl AsanRuntime {
     pub fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;
         let stack_address = &stack_var as *const _ as *const c_void as usize;
-
         let (start, end, _, _) = find_mapping_for_address(stack_address).unwrap();
-        (start, end)
+
+        let mut stack_rlimit = rlimit64 {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        assert!(unsafe { getrlimit64(3, &mut stack_rlimit as *mut rlimit64) } == 0);
+
+        println!("stack_rlimit: {:?}", stack_rlimit);
+
+        let max_start = end - stack_rlimit.rlim_cur as usize;
+
+        if start != max_start {
+            let mapping = unsafe {
+                mmap(
+                    max_start as *mut c_void,
+                    start - max_start,
+                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                    MapFlags::MAP_ANONYMOUS
+                        | MapFlags::MAP_FIXED
+                        | MapFlags::MAP_PRIVATE
+                        | MapFlags::MAP_STACK,
+                    -1,
+                    0,
+                )
+            };
+            assert!(mapping.unwrap() as usize == max_start);
+        }
+        (max_start, end)
     }
 
     /// Determine the tls start, end for the currently running thread
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { get_tls_ptr() } as usize;
+        // we need to mask off the highest byte, due to 'High Byte Ignore"
+        #[cfg(target_os = "android")]
+        let tls_address = tls_address & 0xffffffffffffff;
 
         let (start, end, _, _) = find_mapping_for_address(tls_address).unwrap();
         (start, end)
@@ -876,7 +921,7 @@ impl AsanRuntime {
         let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
-            _ => actual_pc,
+            None => actual_pc,
         };
 
         let cs = Capstone::new()
@@ -1006,12 +1051,10 @@ impl AsanRuntime {
                     } else {
                         AsanError::OobRead(asan_readwrite_error)
                     }
+                } else if metadata.freed {
+                    AsanError::WriteAfterFree(asan_readwrite_error)
                 } else {
-                    if metadata.freed {
-                        AsanError::WriteAfterFree(asan_readwrite_error)
-                    } else {
-                        AsanError::OobWrite(asan_readwrite_error)
-                    }
+                    AsanError::OobWrite(asan_readwrite_error)
                 }
             } else {
                 AsanError::Unknown((
@@ -1043,6 +1086,7 @@ impl AsanRuntime {
                 )
             }));
 
+        #[allow(clippy::non_ascii_literal)]
         writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -1075,6 +1119,7 @@ impl AsanRuntime {
                 }
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
@@ -1094,11 +1139,12 @@ impl AsanRuntime {
                     .unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
-                        write!(output, "\n").unwrap();
+                        writeln!(output).unwrap();
                     }
                 }
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
@@ -1131,6 +1177,7 @@ impl AsanRuntime {
                     .print_trace(&error.backtrace, output)
                     .unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let offset: i64 = fault_address as i64 - error.metadata.address as i64;
                 let direction = if offset > 0 { "right" } else { "left" };
@@ -1152,6 +1199,7 @@ impl AsanRuntime {
                 }
 
                 if error.metadata.freed {
+                    #[allow(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                     if let Some(backtrace) = error.metadata.release_site_backtrace.as_mut() {
                         writeln!(output, "free site backtrace:").unwrap();
@@ -1183,6 +1231,7 @@ impl AsanRuntime {
                 }
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
@@ -1202,6 +1251,7 @@ impl AsanRuntime {
                 }
                 writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
@@ -1237,6 +1287,7 @@ impl AsanRuntime {
                 output.reset().unwrap();
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -1253,6 +1304,7 @@ impl AsanRuntime {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                 if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
                     writeln!(output, "previous free site backtrace:").unwrap();
@@ -1261,14 +1313,15 @@ impl AsanRuntime {
                 }
             }
             AsanError::UnallocatedFree((ptr, backtrace)) => {
-                writeln!(output, " of {:?}", ptr).unwrap();
+                writeln!(output, " of {:#016x}", ptr).unwrap();
                 output.reset().unwrap();
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::Leak((ptr, mut metadata)) => {
-                writeln!(output, " of {:?}", ptr).unwrap();
+                writeln!(output, " of {:#016x}", ptr).unwrap();
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -1310,6 +1363,7 @@ impl AsanRuntime {
                 }
                 output.reset().unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 for reg in 0..=30 {
                     if reg == basereg {
@@ -1329,6 +1383,7 @@ impl AsanRuntime {
                 }
                 writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
 
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
                 let mut cs = Capstone::new()
                     .arm64()
@@ -1367,6 +1422,7 @@ impl AsanRuntime {
     }
 
     /// Generate the instrumentation blobs for the current arch.
+    #[allow(clippy::similar_names)] // We allow things like dword and qword
     fn generate_instrumentation_blobs(&mut self) {
         let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check {
@@ -1475,7 +1531,7 @@ impl AsanRuntime {
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 1)
+                ; ubfx x1, x1, #0, #(shadow_bit + 2)
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
@@ -1595,7 +1651,7 @@ impl AsanRuntime {
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 1)
+                ; ubfx x1, x1, #0, #(shadow_bit + 2)
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
@@ -1765,6 +1821,7 @@ impl AsanRuntime {
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
 #[derive(Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
@@ -1832,7 +1889,7 @@ where
     ) -> Result<u32, Error> {
         let observer = observers
             .match_first_type::<AsanErrorsObserver>()
-            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver".into());
+            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         match observer.errors() {
             None => Ok(0),
             Some(errors) => {

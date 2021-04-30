@@ -47,6 +47,10 @@ where
 pub trait Fuzzer<E, EM, S, CS> {
     /// Fuzz for a single iteration
     /// Returns the index of the last fuzzed corpus item
+    ///
+    /// If you use this fn in a restarting scenario to only run for `n` iterations,
+    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
+    /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_one(
         &mut self,
         state: &mut S,
@@ -73,14 +77,22 @@ pub trait Fuzzer<E, EM, S, CS> {
 
     /// Fuzz for n iterations
     /// Returns the index of the last fuzzed corpus item
-    fn fuzz_loop_for(
+    ///
+    /// If you use this fn in a restarting scenario to only run for `n` iterations,
+    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
+    /// This way, the state will be available in the next, respawned, iteration.
+    fn fuzz_loop_for<I>(
         &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
         iters: u64,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, Error>
+    where
+        EM: EventManager<I, S>,
+        I: Input,
+    {
         if iters == 0 {
             return Err(Error::IllegalArgument(
                 "Cannot fuzz for 0 iterations!".to_string(),
@@ -95,6 +107,12 @@ pub trait Fuzzer<E, EM, S, CS> {
             ret = self.fuzz_one(state, executor, manager, scheduler)?;
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
+
+        // If we would assume the fuzzer loop will always exit after this, we could do this here:
+        // manager.on_restart(state)?;
+        // But as the state may grow to a few megabytes,
+        // for now we won' and the user has to do it (unless we find a way to do this on `Drop`).
+
         Ok(ret)
     }
 

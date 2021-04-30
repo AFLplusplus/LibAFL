@@ -228,6 +228,7 @@ pub fn main() {
 
     unsafe {
         fuzz(
+<<<<<<< HEAD
             matches.value_of("harness").unwrap(),
             matches.value_of("symbol").unwrap(),
             matches.value_of("modules_to_instrument")
@@ -236,6 +237,18 @@ pub fn main() {
                 .collect(),
             &vec![PathBuf::from("./corpus")],
             &PathBuf::from("./crashes"),
+=======
+            &env::args().nth(1).expect("no module specified"),
+            &env::args().nth(2).expect("no symbol specified"),
+            env::args()
+                .nth(3)
+                .expect("no modules to instrument specified")
+                .split(':')
+                .map(|module_name| std::fs::canonicalize(module_name).unwrap())
+                .collect(),
+            &vec![PathBuf::from("./corpus")],
+            PathBuf::from("./crashes"),
+>>>>>>> dev
             1337,
             &cores,
             matches.value_of("output"),
@@ -262,9 +275,15 @@ fn fuzz(
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
+<<<<<<< HEAD
     modules_to_instrument: Vec<&str>,
     corpus_dirs: &Vec<PathBuf>,
     objective_dir: &PathBuf,
+=======
+    modules_to_instrument: Vec<PathBuf>,
+    corpus_dirs: &Vec<PathBuf>,
+    objective_dir: PathBuf,
+>>>>>>> dev
     broker_port: u16,
     cores: &[usize],
     stdout_file: Option<&str>,
@@ -381,6 +400,7 @@ unsafe fn fuzz(
         //get_module_size("libc.so"),
         //));
 
+<<<<<<< HEAD
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
             state
@@ -399,6 +419,53 @@ unsafe fn fuzz(
 
         Ok(())
     };
+=======
+    // Setup a basic mutator with a mutational stage
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let stage = StdMutationalStage::new(mutator);
+
+    // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+
+    frida_helper.register_thread();
+
+    // Create the executor for an in-process function with just one observer for edge coverage
+    let mut executor = FridaInProcessExecutor::new(
+        &gum,
+        InProcessExecutor::new(
+            "in-process(edges)",
+            &mut frida_harness,
+            tuple_list!(edges_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
+            &mut state,
+            &mut restarting_mgr,
+        )?,
+        &mut frida_helper,
+        Duration::new(10, 0),
+    );
+    // Let's exclude the main module and libc.so at least:
+    //executor.stalker.exclude(&MemoryRange::new(
+    //Module::find_base_address(&env::args().next().unwrap()),
+    //get_module_size(&env::args().next().unwrap()),
+    //));
+    //executor.stalker.exclude(&MemoryRange::new(
+    //Module::find_base_address("libc.so"),
+    //get_module_size("libc.so"),
+    //));
+
+    // In case the corpus is empty (on first run), reset
+    if state.corpus().count() < 1 {
+        state
+            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
+            .expect(&format!(
+                "Failed to load initial corpus at {:?}",
+                &corpus_dirs
+            ));
+        println!("We imported {} inputs from disk.", state.corpus().count());
+    }
+
+    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+>>>>>>> dev
 
     launcher(shmem_provider.clone(), stats, &mut client_init_stats, &mut run_client, broker_port, cores, stdout_file)
 }
