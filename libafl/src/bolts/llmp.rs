@@ -2,9 +2,9 @@
 A library for low level message passing
 
 To send new messages, the clients place a new message at the end of their
-client_out_map. If the ringbuf is filled up, they start place a
+client_out_map. If the current map is filled up, they place a
 LLMP_AGE_END_OF_PAGE_V1 msg and alloc a new shmap.
-Once the broker mapped a page, it flags it save for unmapping.
+Once the broker mapped this same page, it flags it as safe for unmapping.
 
 ```text
 [client0]        [client1]    ...    [clientN]
@@ -41,7 +41,7 @@ current map.
 [client0]        [client1]    ...    [clientN]
 ```
 
-In the future, if we need zero copy, the current_broadcast_map could instead
+In the future, if we would need zero copy, the current_broadcast_map could instead
 list the client_out_map ID an offset for each message. In that case, the clients
 also need to create new shmaps once their bufs are filled up.
 
@@ -50,11 +50,14 @@ To use, you will have to create a broker using llmp_broker_new().
 Then register some clientloops using llmp_broker_register_threaded_clientloop
 (or launch them as seperate processes) and call llmp_broker_run();
 
+For broker2broker communication, all messages are forwarded via network sockets.
+
 */
 
 use alloc::{string::String, vec::Vec};
 use core::{
     cmp::max,
+    convert::TryFrom,
     fmt::Debug,
     mem::size_of,
     ptr, slice,
@@ -62,6 +65,7 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
+use std::{convert::TryInto, sync::mpsc::channel};
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -104,8 +108,16 @@ const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
 /// The sender on this map is exiting (if broker exits, clients should exit gracefully);
 const LLMP_TAG_EXITING: Tag = 0x13C5171;
 
-pub const LLMP_FLAG_INITIALIZED: Flag = 0x0;
-pub const LLMP_FLAG_COMPRESSED: Flag = 0x1;
+/// Unused...
+pub const LLMP_FLAG_INITIALIZED: Flags = 0x0;
+/// This message was compressed in transit
+pub const LLMP_FLAG_COMPRESSED: Flags = 0x1;
+/// From another broker.
+pub const LLMP_FLAG_FROM_B2B: Flags = 0x2;
+
+/// Timt the broker 2 broker connection waits for incoming data,
+/// before checking for own data to forward again.
+const LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(15_000);
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -127,27 +139,82 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
 
 /// TAGs used thorughout llmp
 pub type Tag = u32;
-pub type Flag = u64;
+pub type ClientId = u32;
+pub type BrokerId = u32;
+pub type Flags = u32;
+pub type MessageId = u64;
 
 /// This is for the server the broker will spawn.
 /// If an llmp connection is local - use sharedmaps
 /// or remote (broker2broker) - forwarded via tcp
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TcpRequest {
-    LocalClientHello { shmem: ShMemDescription },
+    LocalClientHello { shmem_description: ShMemDescription },
     RemoteBrokerHello,
-    RemoteNewMessage { tag: Tag, payload: Vec<u8> },
+}
+
+impl TryFrom<&Vec<u8>> for TcpRequest {
+    type Error = crate::Error;
+
+    fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
+        return Ok(postcard::from_bytes(bytes)?);
+    }
+}
+
+/// Messages for broker 2 broker connection.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TcpRemoteNewMessage {
+    // The client ID of the original broker
+    client_id: ClientId,
+    // The message tag
+    tag: Tag,
+    // The flags
+    flags: Flags,
+    // The actual content of the message
+    payload: Vec<u8>,
+}
+
+impl TryFrom<&Vec<u8>> for TcpRemoteNewMessage {
+    type Error = crate::Error;
+
+    fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
+        return Ok(postcard::from_bytes(bytes)?);
+    }
 }
 
 /// Responses for requests to the server.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TcpResponse {
-    LocalClientAccepted {
-        client_id: u32,
-        shmem: ShMemDescription,
-    },
-    RemoteBrokerAccepted {
-        broker_id: u32,
+    /// After receiving a new connection, the broker immediately sends a Hello.
+    BrokerConnectHello {
+        /// The broker page a new local client can listen on
+        broker_map_description: ShMemDescription,
+        /// This broker's hostname
         hostname: String,
     },
+    LocalClientAccepted {
+        /// The ClientId this client should send messages as
+        /// Mainly used for client-side deduplication of incoming messages
+        client_id: ClientId,
+    },
+    RemoteBrokerAccepted {
+        /// The broker id of this element
+        broker_id: BrokerId,
+        hostname: String,
+    },
+    /// Something went wrong when processing the request.
+    Error {
+        /// Error description
+        description: String,
+    },
+}
+
+impl TryFrom<&Vec<u8>> for TcpResponse {
+    type Error = crate::Error;
+
+    fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
+        return Ok(postcard::from_bytes(bytes)?);
+    }
 }
 
 /// Abstraction for listeners
@@ -224,6 +291,40 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
     } else {
         Some(msg_offset_str.parse()?)
     })
+}
+
+/// Send one message as `u32` len and `[u8;len]` bytes
+#[cfg(feature = "std")]
+fn send_tcp_msg<T>(stream: &mut TcpStream, msg: &T) -> Result<(), Error>
+where
+    T: Serialize,
+{
+    let msg = postcard::to_allocvec(msg)?;
+    if msg.len() > u32::MAX as usize {
+        return Err(Error::IllegalState(format!(
+            "Trying to send message a tcp message > u32! (size: {})",
+            msg.len()
+        )));
+    }
+    let size_bytes = (msg.len() as u32).to_be_bytes();
+    stream.write_all(&size_bytes)?;
+    stream.write_all(&msg)?;
+    Ok(())
+}
+
+/// Receive one message of `u32` len and `[u8; len]` bytes
+#[cfg(feature = "std")]
+fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
+    // Always receive one be u32 of size, then the command.
+    let mut size_bytes = [0u8; 4];
+    stream.read_exact(&mut size_bytes)?;
+    let size = u32::from_be_bytes(size_bytes);
+    let mut bytes = vec![];
+    bytes.resize(size as usize, 0u8);
+    stream
+        .read_exact(&mut bytes)
+        .expect("Failed to read message body");
+    Ok(bytes)
 }
 
 /// In case we don't have enough space, make sure the next page will be large
@@ -324,18 +425,22 @@ pub enum LlmpMsgHookResult {
 #[repr(C, packed)]
 pub struct LlmpMsg {
     /// A tag
-    pub tag: Tag,
+    pub tag: Tag, //u32
     /// Sender of this messge
-    pub sender: u32,
+    pub sender: ClientId, //u32
+    /// ID of another Broker, for b2b messages
+    pub broker: BrokerId, //u32
     /// flags, currently only used for indicating compression
-    pub flags: Flag,
+    pub flags: Flags, //u32
     /// The message ID, unique per page
-    pub message_id: u64,
+    pub message_id: MessageId, //u64
     /// Buffer length as specified by the user
     pub buf_len: u64,
     /// (Actual) buffer length after padding
+    // Padding makes sure the next msg is aligned.
     pub buf_len_padded: u64,
-    /// The buf
+    /// The actual payload buf
+    // We try to keep the start of buf 64-bit aligned!
     pub buf: [u8; 0],
 }
 
@@ -449,7 +554,7 @@ where
         }
     }
 
-    pub fn send_buf_with_flags(&mut self, tag: Tag, buf: &[u8], flags: Flag) -> Result<(), Error> {
+    pub fn send_buf_with_flags(&mut self, tag: Tag, buf: &[u8], flags: Flags) -> Result<(), Error> {
         match self {
             LlmpConnection::IsBroker { broker } => broker.send_buf_with_flags(tag, flags, buf),
             LlmpConnection::IsClient { client } => client.send_buf_with_flags(tag, flags, buf),
@@ -918,7 +1023,7 @@ where
         }
     }
 
-    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flag, buf: &[u8]) -> Result<(), Error> {
+    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flags, buf: &[u8]) -> Result<(), Error> {
         // Make sure we don't reuse already allocated tags
         if tag == LLMP_TAG_NEW_SHM_CLIENT
             || tag == LLMP_TAG_END_OF_PAGE
@@ -1159,8 +1264,9 @@ where
         }
     }
 
+    /// Receive the buffer, also reading the LLMP internal message flags
     #[inline]
-    pub fn recv_buf_with_flags(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
+    pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         unsafe {
             Ok(match self.recv()? {
                 Some(msg) => Some((
@@ -1176,7 +1282,7 @@ where
 
     /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, &[u8]), Error> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(ClientId, Tag, &[u8]), Error> {
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
@@ -1233,7 +1339,7 @@ where
     SHM: ShMem,
 {
     /// Creates a new page, initializing the passed shared mem struct
-    pub fn new(sender: u32, mut new_map: SHM) -> Self {
+    pub fn new(sender: ClientId, mut new_map: SHM) -> Self {
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
             "LLMP_DEBUG: Initializing map on {} with size {}",
@@ -1403,7 +1509,7 @@ impl Handler for LlmpBrokerSignalHandler {
 /// It may intercept messages passing through.
 impl<SP> LlmpBroker<SP>
 where
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     /// Create and initialize a new llmp_broker
     pub fn new(mut shmem_provider: SP) -> Result<Self, Error> {
@@ -1471,7 +1577,7 @@ where
     #[inline]
     pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<(), Error>
     where
-        F: FnMut(u32, Tag, Flag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
+        F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         compiler_fence(Ordering::SeqCst);
         for i in 0..self.llmp_clients.len() {
@@ -1502,7 +1608,7 @@ where
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
     where
-        F: FnMut(u32, Tag, Flag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
+        F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         #[cfg(unix)]
         if let Err(_e) = unsafe { setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) } {
@@ -1539,7 +1645,7 @@ where
         self.llmp_out.send_buf(tag, buf)
     }
 
-    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flag, buf: &[u8]) -> Result<(), Error> {
+    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flags, buf: &[u8]) -> Result<(), Error> {
         self.llmp_out.send_buf_with_flags(tag, flags, buf)
     }
 
@@ -1553,6 +1659,165 @@ where
         self.launch_listener(Listener::Tcp(listener))
     }
 
+    /// Anncounes a new client on the given shared map.
+    /// Called from a background thread, typically.
+    /// Upon receiving this message, the broker should map the announced page and start trckang it for new messages.
+    fn announce_new_client(
+        sender: &mut LlmpSender<SP>,
+        shmem_description: &ShMemDescription,
+    ) -> Result<(), Error> {
+        unsafe {
+            let msg = sender
+                .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
+                .expect("Could not allocate a new message in shared map.");
+            (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+            let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+            (*pageinfo).shm_str = *shmem_description.id.as_slice();
+            (*pageinfo).map_size = shmem_description.size;
+            sender.send(msg)
+        }
+    }
+
+    /// For broker to broker connections:
+    /// Launches a proxy thread.
+    /// It will read outgoing messages from the given broker map (and handle EOP by mapping a new page).
+    /// This function returns the ShMemDescription the client uses to place incoming messages.
+    /// The thread exits, when the remote broker disconnects.
+    fn b2b_thread_on(
+        mut stream: TcpStream,
+        shmem_provider: &SP,
+        b2b_client_id: ClientId,
+        broker_map_description: &ShMemDescription,
+    ) -> Result<ShMemDescription, Error> {
+        let broker_map_description = *broker_map_description;
+        let mut shmem_provider_clone = shmem_provider.clone();
+
+        // A channel to get the new "client's" sharedmap id from
+        let (send, recv) = channel();
+
+        // (For now) the thread remote broker 2 broker just acts like a "normal" llmp client, except it proxies all messages to the attached socket, in both directions.
+        thread::spawn(move || {
+            // as always, call post_fork to potentially reconnect the provider (for threaded/forked use)
+            shmem_provider_clone.post_fork();
+
+            // The background thread blocks on the incoming connection for 15 seconds (if no data is available), then checks if it should forward own messages, then blocks some more.
+            stream
+                .set_read_timeout(Some(LLMP_B2B_BLOCK_TIME))
+                .expect("Failed to set tcp stream timeout");
+
+            let mut new_sender =
+                match LlmpSender::new(shmem_provider_clone.clone(), b2b_client_id, false) {
+                    Ok(new_sender) => new_sender,
+                    Err(e) => {
+                        panic!("B2B: Could not map shared map: {}", e);
+                    }
+                };
+
+            send.send(new_sender.out_maps.first().unwrap().shmem.description())
+                .expect("B2B: Error sending map description to channel!");
+
+            // the receiver receives from the local broker, and forwards it to the tcp stream.
+            let mut local_receiver = LlmpReceiver::on_existing_from_description(
+                shmem_provider_clone,
+                &LlmpDescription {
+                    last_message_offset: None,
+                    shmem: broker_map_description,
+                },
+            )
+            .expect("Failed to map local page in broker 2 broker thread!");
+
+            loop {
+                // first, forward all data we have.
+                while let Some((client_id, tag, flags, payload)) = local_receiver
+                    .recv_buf_with_flags()
+                    .expect("Error reading from local page!")
+                {
+                    dbg!(
+                        "Fowarding message via broker2broker connection",
+                        payload.len()
+                    );
+                    // We got a new message! Forward...
+                    send_tcp_msg(
+                        &mut stream,
+                        &TcpRemoteNewMessage {
+                            client_id,
+                            tag,
+                            flags,
+                            payload: payload.to_vec(),
+                        },
+                    )
+                    .expect("Error sending message via broker 2 broker");
+                }
+
+                // Then, see if we can receive something.
+                // We set a timeout on the receive earlier.
+                // This makes sure we will still forward our own stuff.
+                // Forwarding happens between each recv, too, as simplification.
+                // We ignore errors completely as they may be timeout, or stream closings.
+                // Instead, we catch stream close when/if we next try to send.
+                if let Ok(val) = recv_tcp_msg(&mut stream) {
+                    let msg: TcpRemoteNewMessage = (&val).try_into().expect(
+                        "Illegal message received from broker 2 broker connection - shutting down.",
+                    );
+
+                    // TODO: Could probably optimize this somehow to forward all queued messages between locks... oh well.
+                    // Todo: somehow mangle in the other broker id? ClientId?
+                    new_sender
+                        .send_buf_with_flags(msg.tag, msg.flags | LLMP_FLAG_FROM_B2B, &msg.payload)
+                        .expect("B2B: Error forwarding message. Exiting.");
+                }
+            }
+        });
+
+        recv.recv().or(Err(Error::Unknown(
+            "Error launching background thread for b2b communcation".to_string(),
+        )))
+    }
+
+    /// handles a single tcp request in the current context.
+    fn handle_tcp_request(
+        mut stream: TcpStream,
+        request: &TcpRequest,
+        current_client_id: &mut u32,
+        sender: &mut LlmpSender<SP>,
+        shmem_provider: &SP,
+        broker_map_description: &ShMemDescription,
+    ) {
+        match request {
+            TcpRequest::LocalClientHello { shmem_description } => {
+                match Self::announce_new_client(sender, shmem_description) {
+                    Ok(()) => (),
+                    Err(e) => println!("Error forwarding client on map: {:?}", e),
+                };
+
+                if let Err(e) = send_tcp_msg(
+                    &mut stream,
+                    &TcpResponse::LocalClientAccepted {
+                        client_id: *current_client_id,
+                    },
+                ) {
+                    println!("An error occurred sending via tcp {}", e);
+                };
+                *current_client_id += 1;
+            }
+            TcpRequest::RemoteBrokerHello => {
+                *current_client_id += 1;
+
+                if let Ok(shmem_description) = Self::b2b_thread_on(
+                    stream,
+                    shmem_provider,
+                    *current_client_id,
+                    &broker_map_description,
+                ) {
+                    if Self::announce_new_client(sender, &shmem_description).is_err() {
+                        println!("B2B: Error announcing client {:?}", shmem_description);
+                    };
+                    *current_client_id += 1;
+                }
+            }
+        };
+    }
+
     #[cfg(feature = "std")]
     /// Launches a thread using a listener socket, on which new clients may connect to this broker
     pub fn launch_listener(&mut self, listener: Listener) -> Result<thread::JoinHandle<()>, Error> {
@@ -1562,37 +1827,43 @@ where
         // to read from the initial map id.
 
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
-        let broadcast_map_description = postcard::to_allocvec(&client_out_map_mem.description())?;
+        let broker_map_description = client_out_map_mem.description();
+        let hostname = hostname::get()
+            .unwrap_or("<unknown>".into())
+            .to_string_lossy()
+            .into();
+        let broker_hello = TcpResponse::BrokerConnectHello {
+            broker_map_description,
+            hostname,
+        };
 
-        let mut incoming_map_description_serialized = vec![0u8; broadcast_map_description.len()];
-
-        let llmp_tcp_id = self.llmp_clients.len() as u32;
+        let llmp_tcp_id = self.llmp_clients.len() as ClientId;
 
         // Tcp out map sends messages from background thread tcp server to foreground client
         let tcp_out_map = LlmpSharedMap::new(
             llmp_tcp_id,
             self.shmem_provider.new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
         );
-        let shmem_id = tcp_out_map.shmem.id();
-        let tcp_out_map_str = *shmem_id.as_slice();
-        let tcp_out_map_size = tcp_out_map.shmem.len();
+        let tcp_out_map_description = tcp_out_map.shmem.description();
         self.register_client(tcp_out_map);
 
         let mut shmem_provider_clone = self.shmem_provider.clone();
 
         Ok(thread::spawn(move || {
+            // Call `post_fork` (even though this is not forked) so we get a new connection to the cloned `ShMemServer` if we are using a `ServedShMemProvider`
             shmem_provider_clone.post_fork();
-            // Clone so we get a new connection to the AshmemServer if we are using
-            // ServedShMemProvider
-            let mut new_client_sender = LlmpSender {
-                id: 0,
+
+            let mut current_client_id = llmp_tcp_id + 1;
+
+            let mut tcp_incoming_sender = LlmpSender {
+                id: llmp_tcp_id,
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::existing(
                     shmem_provider_clone
-                        .from_id_and_size(ShMemId::from_slice(&tcp_out_map_str), tcp_out_map_size)
+                        .from_description(tcp_out_map_description)
                         .unwrap(),
                 )],
-                // drop pages to the broker if it already read them
+                // drop pages to the broker, if it already read them.
                 keep_pages_forever: false,
                 shmem_provider: shmem_provider_clone.clone(),
             };
@@ -1601,38 +1872,40 @@ where
                 match listener.accept() {
                     ListenerStream::Tcp(mut stream, addr) => {
                         dbg!("New connection", addr, stream.peer_addr().unwrap());
-                        match stream.write(&broadcast_map_description) {
-                            Ok(_) => {} // fire & forget
+
+                        // Send initial information, without anyone asking.
+                        // This makes it a tiny bit easier to map the  broker map for new Clients.
+                        match send_tcp_msg(&mut stream, &broker_hello) {
+                            Ok(()) => {}
                             Err(e) => {
-                                dbg!("Could not send to shmap to client", e);
+                                dbg!("Error sending initial hello: {:?}", e);
                                 continue;
-                            }
-                        };
-                        match stream.read_exact(&mut incoming_map_description_serialized) {
-                            Ok(()) => (),
-                            Err(e) => {
-                                dbg!("Ignoring failed read from client", e);
-                                continue;
-                            }
-                        };
-                        if let Ok(incoming_map_description) = postcard::from_bytes::<ShMemDescription>(
-                            &incoming_map_description_serialized,
-                        ) {
-                            unsafe {
-                                let msg = new_client_sender
-                                    .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
-                                    .expect("Could not allocate a new message in shared map.");
-                                (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
-                                let pageinfo =
-                                    (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                                (*pageinfo).shm_str = *incoming_map_description.id.as_slice();
-                                (*pageinfo).map_size = incoming_map_description.size;
-                                match new_client_sender.send(msg) {
-                                    Ok(()) => (),
-                                    Err(e) => println!("Error forwarding client on map: {:?}", e),
-                                };
                             }
                         }
+
+                        let buf = match recv_tcp_msg(&mut stream) {
+                            Ok(buf) => buf,
+                            Err(e) => {
+                                dbg!("Error receving from tcp", e);
+                                continue;
+                            }
+                        };
+                        let req = match (&buf).try_into() {
+                            Ok(req) => req,
+                            Err(e) => {
+                                dbg!("Could not deserialize tcp message", e);
+                                continue;
+                            }
+                        };
+
+                        Self::handle_tcp_request(
+                            stream,
+                            &req,
+                            &mut current_client_id,
+                            &mut tcp_incoming_sender,
+                            &shmem_provider_clone,
+                            &broker_map_description,
+                        );
                     }
                     ListenerStream::Empty() => {
                         continue;
@@ -1646,7 +1919,7 @@ where
     #[inline]
     unsafe fn handle_new_msgs<F>(&mut self, client_id: u32, on_new_msg: &mut F) -> Result<(), Error>
     where
-        F: FnMut(u32, Tag, Flag, &[u8]) -> Result<LlmpMsgHookResult, Error>,
+        F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         let mut next_id = self.llmp_clients.len() as u32;
 
@@ -1880,7 +2153,7 @@ where
         self.sender.send_buf(tag, buf)
     }
 
-    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flag, buf: &[u8]) -> Result<(), Error> {
+    pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flags, buf: &[u8]) -> Result<(), Error> {
         self.sender.send_buf_with_flags(tag, flags, buf)
     }
 
@@ -1943,7 +2216,7 @@ where
         self.receiver.recv_buf_blocking()
     }
 
-    pub fn recv_buf_with_flags(&mut self) -> Result<Option<(u32, Tag, Flag, &[u8])>, Error> {
+    pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         self.receiver.recv_buf_with_flags()
     }
 
@@ -1960,23 +2233,45 @@ where
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
         println!("Connected to port {}", port);
 
-        // First, get the serialized description size by serializing a dummy.
-        let dummy_description = ShMemDescription {
-            size: 0,
-            id: ShMemId::default(),
+        let broker_map_description = if let TcpResponse::BrokerConnectHello {
+            broker_map_description,
+            hostname: _,
+        } = (&recv_tcp_msg(&mut stream)?).try_into()?
+        {
+            broker_map_description
+        } else {
+            return Err(Error::IllegalState(
+                "Received unexpected Broker Hello".to_string(),
+            ));
         };
-        let mut new_broker_map_str = postcard::to_allocvec(&dummy_description)?;
-
-        stream.read_exact(&mut new_broker_map_str)?;
-
-        let broker_map_description: ShMemDescription = postcard::from_bytes(&new_broker_map_str)?;
 
         let map = LlmpSharedMap::existing(shmem_provider.from_description(broker_map_description)?);
-        let ret = Self::new(shmem_provider, map)?;
+        let mut ret = Self::new(shmem_provider, map)?;
 
-        let own_map_description_bytes =
-            postcard::to_allocvec(&ret.sender.out_maps.first().unwrap().shmem.description())?;
-        stream.write_all(&own_map_description_bytes)?;
+        let client_hello_req = TcpRequest::LocalClientHello {
+            shmem_description: ret.sender.out_maps.first().unwrap().shmem.description(),
+        };
+
+        send_tcp_msg(&mut stream, &client_hello_req)?;
+
+        let client_id = if let TcpResponse::LocalClientAccepted { client_id } =
+            (&recv_tcp_msg(&mut stream)?).try_into()?
+        {
+            client_id
+        } else {
+            return Err(Error::IllegalState(
+                "Unexpected Response from Broker".to_string(),
+            ));
+        };
+
+        // Set our ID to the one the broker sent us..
+        // This is mainly so we can filter out our own msgs later.
+        ret.sender.id = client_id;
+        // Also set the sender on our initial llmp map correctly.
+        unsafe {
+            (*ret.sender.out_maps.first_mut().unwrap().page_mut()).sender = client_id;
+        }
+
         Ok(ret)
     }
 }

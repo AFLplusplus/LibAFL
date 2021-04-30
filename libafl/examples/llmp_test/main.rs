@@ -83,7 +83,7 @@ fn large_msg_loop(port: u16) -> ! {
 fn broker_message_hook(
     client_id: u32,
     tag: llmp::Tag,
-    _flags: llmp::Flag,
+    _flags: llmp::Flags,
     message: &[u8],
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
     match tag {
