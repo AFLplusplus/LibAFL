@@ -65,12 +65,13 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
-use std::{convert::TryInto, sync::mpsc::channel};
 #[cfg(feature = "std")]
 use std::{
+    convert::TryInto,
     env,
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
+    sync::mpsc::channel,
     thread,
 };
 
@@ -117,7 +118,7 @@ pub const LLMP_FLAG_FROM_B2B: Flags = 0x2;
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
-const LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(15_000);
+const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(15_000);
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -157,7 +158,7 @@ impl TryFrom<&Vec<u8>> for TcpRequest {
     type Error = crate::Error;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
-        return Ok(postcard::from_bytes(bytes)?);
+        Ok(postcard::from_bytes(bytes)?)
     }
 }
 
@@ -178,7 +179,7 @@ impl TryFrom<&Vec<u8>> for TcpRemoteNewMessage {
     type Error = crate::Error;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
-        return Ok(postcard::from_bytes(bytes)?);
+        Ok(postcard::from_bytes(bytes)?)
     }
 }
 
@@ -213,7 +214,7 @@ impl TryFrom<&Vec<u8>> for TcpResponse {
     type Error = crate::Error;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
-        return Ok(postcard::from_bytes(bytes)?);
+        Ok(postcard::from_bytes(bytes)?)
     }
 }
 
@@ -1649,9 +1650,9 @@ where
         self.llmp_out.send_buf_with_flags(tag, flags, buf)
     }
 
-    #[cfg(feature = "std")]
     /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
     /// Does so on the given port.
+    #[cfg(feature = "std")]
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
         let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
         // accept connections and process them, spawning a new thread for each one
@@ -1662,6 +1663,7 @@ where
     /// Anncounes a new client on the given shared map.
     /// Called from a background thread, typically.
     /// Upon receiving this message, the broker should map the announced page and start trckang it for new messages.
+    #[allow(dead_code)]
     fn announce_new_client(
         sender: &mut LlmpSender<SP>,
         shmem_description: &ShMemDescription,
@@ -1683,6 +1685,7 @@ where
     /// It will read outgoing messages from the given broker map (and handle EOP by mapping a new page).
     /// This function returns the ShMemDescription the client uses to place incoming messages.
     /// The thread exits, when the remote broker disconnects.
+    #[cfg(feature = "std")]
     fn b2b_thread_on(
         mut stream: TcpStream,
         shmem_provider: &SP,
@@ -1702,7 +1705,7 @@ where
 
             // The background thread blocks on the incoming connection for 15 seconds (if no data is available), then checks if it should forward own messages, then blocks some more.
             stream
-                .set_read_timeout(Some(LLMP_B2B_BLOCK_TIME))
+                .set_read_timeout(Some(_LLMP_B2B_BLOCK_TIME))
                 .expect("Failed to set tcp stream timeout");
 
             let mut new_sender =
@@ -1769,12 +1772,15 @@ where
             }
         });
 
-        recv.recv().or(Err(Error::Unknown(
-            "Error launching background thread for b2b communcation".to_string(),
-        )))
+        recv.recv().or_else(|_| {
+            Err(Error::Unknown(
+                "Error launching background thread for b2b communcation".to_string(),
+            ))
+        })
     }
 
     /// handles a single tcp request in the current context.
+    #[cfg(feature = "std")]
     fn handle_tcp_request(
         mut stream: TcpStream,
         request: &TcpRequest,
@@ -1829,7 +1835,7 @@ where
         let client_out_map_mem = &self.llmp_out.out_maps.first().unwrap().shmem;
         let broker_map_description = client_out_map_mem.description();
         let hostname = hostname::get()
-            .unwrap_or("<unknown>".into())
+            .unwrap_or_else(|_| "<unknown>".into())
             .to_string_lossy()
             .into();
         let broker_hello = TcpResponse::BrokerConnectHello {
