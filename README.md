@@ -10,14 +10,12 @@ LibAFL is written and maintained by Andrea Fioraldi <andreafioraldi@gmail.com> a
 
 LibAFL gives you many of the benefits of an off-the-shelf fuzzer, while being completely customizable.
 Some highlight features currently include:
-- `multi platform`: LibAFL was confirmed to work on *Windows*, *MacOS*, *Linux*, and *Android* on *x86_64* and *aarch64*.
-- `portable`: `LibAFL` can be built in `no_std` mode. Inject LibAFL in obscure targets like embedded devices and hypervisors.
+- `fast`: We do everything we can at compile time, keeping runtime overhead minimal. Users reach 120k execs/sec in frida-mode on a phone (using all cores).
+- `scalable`: `Low Level Message Passing`, `LLMP` for short, allows LibAFL to scale almost linearly over cores, and via TCP to multiple machines soon!
 - `adaptable`: You can replace each part of LibAFL. For example, `BytesInput` is just one potential form input:
 feel free to add an AST-based input for structured fuzzing, and more.
-- `scalable`: `Low Level Message Passing`, `LLMP` for short, allows LibAFL to scale almost linearly over cores, and via TCP to multiple machines soon!
-- `fast`: We do everything we can at compile time, keeping runtime overhead minimal.
+- `multi platform`: LibAFL was confirmed to work on *Windows*, *MacOS*, *Linux*, and *Android* on *x86_64* and *aarch64*. `LibAFL` can be built in `no_std` mode to inject LibAFL into obscure targets like embedded devices and hypervisors.
 - `bring your own target`: We support binary-only modes, like Frida-Mode, as well as multiple compilation passes for sourced-based instrumentation. Of course it's easy to add custom instrumentation backends.
-- `usable`: We hope. But we'll let you be the judge. Enjoy LibAFL.
 
 ## Overview
 
