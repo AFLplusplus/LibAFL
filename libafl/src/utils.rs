@@ -160,28 +160,16 @@ pub fn current_time() -> time::Duration {
     time::Duration::from_millis(1)
 }
 
-#[cfg(feature = "std")]
-#[inline]
 /// Gets current nanoseconds since UNIX_EPOCH
+#[inline]
 pub fn current_nanos() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64
+    current_time().as_nanos() as u64
 }
 
-#[cfg(feature = "std")]
 /// Gets current milliseconds since UNIX_EPOCH
+#[inline]
 pub fn current_milliseconds() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
-}
-
-#[cfg(not(feature = "std"))]
-pub fn current_milliseconds() -> u64 {
-    1000
+    current_time().as_millis() as u64
 }
 
 /// XXH3 Based, hopefully speedy, rnd implementation
@@ -191,6 +179,7 @@ pub struct Xoshiro256StarRand {
 }
 
 impl Rand for Xoshiro256StarRand {
+    #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
         self.rand_seed[0] = xxh3_64_with_seed(&HASH_CONST.to_le_bytes(), seed);
         self.rand_seed[1] = self.rand_seed[0] ^ 0x1234567890abcdef;
@@ -235,6 +224,7 @@ pub struct XorShift64Rand {
 }
 
 impl Rand for XorShift64Rand {
+    #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
         self.rand_seed = seed ^ 0x1234567890abcdef;
     }
@@ -266,11 +256,13 @@ pub struct Lehmer64Rand {
 }
 
 impl Rand for Lehmer64Rand {
+    #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
-        self.rand_seed = (seed as u128) ^ 0x1234567890abcdef;
+        self.rand_seed = u128::from(seed) ^ 0x1234567890abcdef;
     }
 
     #[inline]
+    #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         self.rand_seed *= 0xda942042e4dd58b5;
         (self.rand_seed >> 64) as u64
@@ -315,6 +307,7 @@ impl Rand for RomuTrioRand {
     }
 
     #[inline]
+    #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         let xp = self.x_state;
         let yp = self.y_state;
@@ -351,6 +344,7 @@ impl Rand for RomuDuoJrRand {
     }
 
     #[inline]
+    #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         let xp = self.x_state;
         self.x_state = 15241094284759029579u64.wrapping_mul(self.y_state);
@@ -408,7 +402,7 @@ impl ChildHandle {
 }
 
 #[cfg(unix)]
-/// The ForkResult
+/// The `ForkResult` (result of a fork)
 pub enum ForkResult {
     Parent(ChildHandle),
     Child,
@@ -442,6 +436,77 @@ pub fn startable_self() -> Result<Command, Error> {
     let mut startable = Command::new(env::current_exe()?);
     startable.current_dir(env::current_dir()?).args(env::args());
     Ok(startable)
+}
+
+/// Allows one to walk the mappings in /proc/self/maps, caling a callback function for each
+/// mapping.
+/// If the callback returns true, we stop the walk.
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+pub fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
+    use regex::Regex;
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+    let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
+        .unwrap();
+
+    let mapsfile = File::open("/proc/self/maps").expect("Unable to open /proc/self/maps");
+
+    for line in BufReader::new(mapsfile).lines() {
+        let line = line.unwrap();
+        if let Some(caps) = re.captures(&line) {
+            if visitor(
+                usize::from_str_radix(caps.name("start").unwrap().as_str(), 16).unwrap(),
+                usize::from_str_radix(caps.name("end").unwrap().as_str(), 16).unwrap(),
+                caps.name("perm").unwrap().as_str().to_string(),
+                caps.name("path").unwrap().as_str().to_string(),
+            ) {
+                break;
+            };
+        }
+    }
+}
+
+/// Get the start and end address, permissions and path of the mapping containing a particular address
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+pub fn find_mapping_for_address(address: usize) -> Result<(usize, usize, String, String), Error> {
+    let mut result = (0, 0, "".to_string(), "".to_string());
+    walk_self_maps(&mut |start, end, permissions, path| {
+        if start <= address && address < end {
+            result = (start, end, permissions, path);
+            true
+        } else {
+            false
+        }
+    });
+
+    if result.0 != 0 {
+        Ok(result)
+    } else {
+        Err(Error::Unknown(
+            "Couldn't find a mapping for this address".to_string(),
+        ))
+    }
+}
+
+/// Get the start and end address of the mapping containing with a particular path
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
+    let mut libstart = 0;
+    let mut libend = 0;
+    walk_self_maps(&mut |start, end, _permissions, path| {
+        if libpath == path {
+            if libstart == 0 {
+                libstart = start;
+            }
+
+            libend = end;
+        }
+        false
+    });
+
+    (libstart, libend)
 }
 
 #[cfg(test)]

@@ -5,66 +5,102 @@ use alloc::{boxed::Box, vec::Vec};
 use core::{clone::Clone, fmt::Debug};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+/// Trait to convert into an Owned type
+pub trait IntoOwned {
+    fn is_owned(&self) -> bool;
+
+    fn into_owned(self) -> Self;
+}
+
 /// Wrap a reference and convert to a Box on serialize
 #[derive(Clone, Debug)]
-pub enum Ptr<'a, T: 'a + ?Sized> {
+pub enum OwnedRef<'a, T>
+where
+    T: 'a + ?Sized,
+{
     Ref(&'a T),
     Owned(Box<T>),
 }
 
-impl<'a, T: 'a + ?Sized + Serialize> Serialize for Ptr<'a, T> {
+impl<'a, T> Serialize for OwnedRef<'a, T>
+where
+    T: 'a + ?Sized + Serialize,
+{
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            Ptr::Ref(r) => r.serialize(se),
-            Ptr::Owned(b) => b.serialize(se),
+            OwnedRef::Ref(r) => r.serialize(se),
+            OwnedRef::Owned(b) => b.serialize(se),
         }
     }
 }
 
-impl<'de, 'a, T: 'a + ?Sized> Deserialize<'de> for Ptr<'a, T>
+impl<'de, 'a, T> Deserialize<'de> for OwnedRef<'a, T>
 where
+    T: 'a + ?Sized,
     Box<T>: Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(deserializer).map(Ptr::Owned)
+        Deserialize::deserialize(deserializer).map(OwnedRef::Owned)
     }
 }
 
-impl<'a, T: Sized> AsRef<T> for Ptr<'a, T> {
+impl<'a, T> AsRef<T> for OwnedRef<'a, T>
+where
+    T: Sized,
+{
     fn as_ref(&self) -> &T {
         match self {
-            Ptr::Ref(r) => r,
-            Ptr::Owned(v) => v.as_ref(),
+            OwnedRef::Ref(r) => r,
+            OwnedRef::Owned(v) => v.as_ref(),
+        }
+    }
+}
+
+impl<'a, T> IntoOwned for OwnedRef<'a, T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedRef::Ref(_) => false,
+            OwnedRef::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedRef::Ref(r) => OwnedRef::Owned(Box::new(r.clone())),
+            OwnedRef::Owned(v) => OwnedRef::Owned(v),
         }
     }
 }
 
 /// Wrap a mutable reference and convert to a Box on serialize
 #[derive(Debug)]
-pub enum PtrMut<'a, T: 'a + ?Sized> {
+pub enum OwnedRefMut<'a, T: 'a + ?Sized> {
     Ref(&'a mut T),
     Owned(Box<T>),
 }
 
-impl<'a, T: 'a + ?Sized + Serialize> Serialize for PtrMut<'a, T> {
+impl<'a, T: 'a + ?Sized + Serialize> Serialize for OwnedRefMut<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            PtrMut::Ref(r) => r.serialize(se),
-            PtrMut::Owned(b) => b.serialize(se),
+            OwnedRefMut::Ref(r) => r.serialize(se),
+            OwnedRefMut::Owned(b) => b.serialize(se),
         }
     }
 }
 
-impl<'de, 'a, T: 'a + ?Sized> Deserialize<'de> for PtrMut<'a, T>
+impl<'de, 'a, T: 'a + ?Sized> Deserialize<'de> for OwnedRefMut<'a, T>
 where
     Box<T>: Deserialize<'de>,
 {
@@ -72,48 +108,67 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(deserializer).map(PtrMut::Owned)
+        Deserialize::deserialize(deserializer).map(OwnedRefMut::Owned)
     }
 }
 
-impl<'a, T: Sized> AsRef<T> for PtrMut<'a, T> {
+impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
     fn as_ref(&self) -> &T {
         match self {
-            PtrMut::Ref(r) => r,
-            PtrMut::Owned(v) => v.as_ref(),
+            OwnedRefMut::Ref(r) => r,
+            OwnedRefMut::Owned(v) => v.as_ref(),
         }
     }
 }
 
-impl<'a, T: Sized> AsMut<T> for PtrMut<'a, T> {
+impl<'a, T: Sized> AsMut<T> for OwnedRefMut<'a, T> {
     fn as_mut(&mut self) -> &mut T {
         match self {
-            PtrMut::Ref(r) => r,
-            PtrMut::Owned(v) => v.as_mut(),
+            OwnedRefMut::Ref(r) => r,
+            OwnedRefMut::Owned(v) => v.as_mut(),
+        }
+    }
+}
+
+impl<'a, T> IntoOwned for OwnedRefMut<'a, T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedRefMut::Ref(_) => false,
+            OwnedRefMut::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedRefMut::Ref(r) => OwnedRefMut::Owned(Box::new(r.clone())),
+            OwnedRefMut::Owned(v) => OwnedRefMut::Owned(v),
         }
     }
 }
 
 /// Wrap a slice and convert to a Vec on serialize
 #[derive(Clone, Debug)]
-pub enum Slice<'a, T: 'a + Sized> {
+pub enum OwnedSlice<'a, T: 'a + Sized> {
     Ref(&'a [T]),
     Owned(Vec<T>),
 }
 
-impl<'a, T: 'a + Sized + Serialize> Serialize for Slice<'a, T> {
+impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSlice<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            Slice::Ref(r) => r.serialize(se),
-            Slice::Owned(b) => b.serialize(se),
+            OwnedSlice::Ref(r) => r.serialize(se),
+            OwnedSlice::Owned(b) => b.serialize(se),
         }
     }
 }
 
-impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for Slice<'a, T>
+impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for OwnedSlice<'a, T>
 where
     Vec<T>: Deserialize<'de>,
 {
@@ -121,39 +176,58 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(deserializer).map(Slice::Owned)
+        Deserialize::deserialize(deserializer).map(OwnedSlice::Owned)
     }
 }
 
-impl<'a, T: Sized> Slice<'a, T> {
+impl<'a, T: Sized> OwnedSlice<'a, T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
-            Slice::Ref(r) => r,
-            Slice::Owned(v) => v.as_slice(),
+            OwnedSlice::Ref(r) => r,
+            OwnedSlice::Owned(v) => v.as_slice(),
+        }
+    }
+}
+
+impl<'a, T> IntoOwned for OwnedSlice<'a, T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedSlice::Ref(_) => false,
+            OwnedSlice::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedSlice::Ref(r) => OwnedSlice::Owned(r.to_vec()),
+            OwnedSlice::Owned(v) => OwnedSlice::Owned(v),
         }
     }
 }
 
 /// Wrap a mutable slice and convert to a Vec on serialize
 #[derive(Debug)]
-pub enum SliceMut<'a, T: 'a + Sized> {
+pub enum OwnedSliceMut<'a, T: 'a + Sized> {
     Ref(&'a mut [T]),
     Owned(Vec<T>),
 }
 
-impl<'a, T: 'a + Sized + Serialize> Serialize for SliceMut<'a, T> {
+impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceMut<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            SliceMut::Ref(r) => r.serialize(se),
-            SliceMut::Owned(b) => b.serialize(se),
+            OwnedSliceMut::Ref(r) => r.serialize(se),
+            OwnedSliceMut::Owned(b) => b.serialize(se),
         }
     }
 }
 
-impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for SliceMut<'a, T>
+impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for OwnedSliceMut<'a, T>
 where
     Vec<T>: Deserialize<'de>,
 {
@@ -161,34 +235,53 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(deserializer).map(SliceMut::Owned)
+        Deserialize::deserialize(deserializer).map(OwnedSliceMut::Owned)
     }
 }
 
-impl<'a, T: Sized> SliceMut<'a, T> {
+impl<'a, T: Sized> OwnedSliceMut<'a, T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
-            SliceMut::Ref(r) => r,
-            SliceMut::Owned(v) => v.as_slice(),
+            OwnedSliceMut::Ref(r) => r,
+            OwnedSliceMut::Owned(v) => v.as_slice(),
         }
     }
 
-    pub fn as_mut_slice(&mut self) -> &[T] {
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
         match self {
-            SliceMut::Ref(r) => r,
-            SliceMut::Owned(v) => v.as_mut_slice(),
+            OwnedSliceMut::Ref(r) => r,
+            OwnedSliceMut::Owned(v) => v.as_mut_slice(),
+        }
+    }
+}
+
+impl<'a, T> IntoOwned for OwnedSliceMut<'a, T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedSliceMut::Ref(_) => false,
+            OwnedSliceMut::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedSliceMut::Ref(r) => OwnedSliceMut::Owned(r.to_vec()),
+            OwnedSliceMut::Owned(v) => OwnedSliceMut::Owned(v),
         }
     }
 }
 
 /// Wrap a C-style pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
-pub enum Cptr<T: Sized> {
-    Cptr(*const T),
+pub enum OwnedPtr<T: Sized> {
+    Ptr(*const T),
     Owned(Box<T>),
 }
 
-impl<T: Sized + Serialize> Serialize for Cptr<T> {
+impl<T: Sized + Serialize> Serialize for OwnedPtr<T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -197,7 +290,7 @@ impl<T: Sized + Serialize> Serialize for Cptr<T> {
     }
 }
 
-impl<'de, T: Sized + serde::de::DeserializeOwned> Deserialize<'de> for Cptr<T>
+impl<'de, T: Sized + serde::de::DeserializeOwned> Deserialize<'de> for OwnedPtr<T>
 where
     Vec<T>: Deserialize<'de>,
 {
@@ -205,27 +298,46 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(de).map(Cptr::Owned)
+        Deserialize::deserialize(de).map(OwnedPtr::Owned)
     }
 }
 
-impl<T: Sized> AsRef<T> for Cptr<T> {
+impl<T: Sized> AsRef<T> for OwnedPtr<T> {
     fn as_ref(&self) -> &T {
         match self {
-            Cptr::Cptr(p) => unsafe { p.as_ref().unwrap() },
-            Cptr::Owned(v) => v.as_ref(),
+            OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap() },
+            OwnedPtr::Owned(v) => v.as_ref(),
+        }
+    }
+}
+
+impl<T> IntoOwned for OwnedPtr<T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedPtr::Ptr(_) => false,
+            OwnedPtr::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedPtr::Ptr(p) => unsafe { OwnedPtr::Owned(Box::new(p.as_ref().unwrap().clone())) },
+            OwnedPtr::Owned(v) => OwnedPtr::Owned(v),
         }
     }
 }
 
 /// Wrap a C-style mutable pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
-pub enum CptrMut<T: Sized> {
-    Cptr(*mut T),
+pub enum OwnedPtrMut<T: Sized> {
+    Ptr(*mut T),
     Owned(Box<T>),
 }
 
-impl<T: Sized + Serialize> Serialize for CptrMut<T> {
+impl<T: Sized + Serialize> Serialize for OwnedPtrMut<T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -234,7 +346,7 @@ impl<T: Sized + Serialize> Serialize for CptrMut<T> {
     }
 }
 
-impl<'de, T: Sized + serde::de::DeserializeOwned> Deserialize<'de> for CptrMut<T>
+impl<'de, T: Sized + serde::de::DeserializeOwned> Deserialize<'de> for OwnedPtrMut<T>
 where
     Vec<T>: Deserialize<'de>,
 {
@@ -242,36 +354,57 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(de).map(CptrMut::Owned)
+        Deserialize::deserialize(de).map(OwnedPtrMut::Owned)
     }
 }
 
-impl<T: Sized> AsRef<T> for CptrMut<T> {
+impl<T: Sized> AsRef<T> for OwnedPtrMut<T> {
     fn as_ref(&self) -> &T {
         match self {
-            CptrMut::Cptr(p) => unsafe { p.as_ref().unwrap() },
-            CptrMut::Owned(b) => b.as_ref(),
+            OwnedPtrMut::Ptr(p) => unsafe { p.as_ref().unwrap() },
+            OwnedPtrMut::Owned(b) => b.as_ref(),
         }
     }
 }
 
-impl<T: Sized> AsMut<T> for CptrMut<T> {
+impl<T: Sized> AsMut<T> for OwnedPtrMut<T> {
     fn as_mut(&mut self) -> &mut T {
         match self {
-            CptrMut::Cptr(p) => unsafe { p.as_mut().unwrap() },
-            CptrMut::Owned(b) => b.as_mut(),
+            OwnedPtrMut::Ptr(p) => unsafe { p.as_mut().unwrap() },
+            OwnedPtrMut::Owned(b) => b.as_mut(),
+        }
+    }
+}
+
+impl<T> IntoOwned for OwnedPtrMut<T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedPtrMut::Ptr(_) => false,
+            OwnedPtrMut::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedPtrMut::Ptr(p) => unsafe {
+                OwnedPtrMut::Owned(Box::new(p.as_ref().unwrap().clone()))
+            },
+            OwnedPtrMut::Owned(v) => OwnedPtrMut::Owned(v),
         }
     }
 }
 
 /// Wrap a C-style pointer to an array (with size= and convert to a Vec on serialize
 #[derive(Clone, Debug)]
-pub enum Array<T: Sized> {
-    Cptr((*const T, usize)),
+pub enum OwnedArrayPtr<T: Sized> {
+    ArrayPtr((*const T, usize)),
     Owned(Vec<T>),
 }
 
-impl<T: Sized + Serialize> Serialize for Array<T> {
+impl<T: Sized + Serialize> Serialize for OwnedArrayPtr<T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -280,7 +413,7 @@ impl<T: Sized + Serialize> Serialize for Array<T> {
     }
 }
 
-impl<'de, T: Sized + Serialize> Deserialize<'de> for Array<T>
+impl<'de, T: Sized + Serialize> Deserialize<'de> for OwnedArrayPtr<T>
 where
     Vec<T>: Deserialize<'de>,
 {
@@ -288,27 +421,48 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(de).map(Array::Owned)
+        Deserialize::deserialize(de).map(OwnedArrayPtr::Owned)
     }
 }
 
-impl<T: Sized> Array<T> {
+impl<T: Sized> OwnedArrayPtr<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
-            Array::Cptr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
-            Array::Owned(v) => v.as_slice(),
+            OwnedArrayPtr::ArrayPtr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
+            OwnedArrayPtr::Owned(v) => v.as_slice(),
+        }
+    }
+}
+
+impl<T> IntoOwned for OwnedArrayPtr<T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedArrayPtr::ArrayPtr(_) => false,
+            OwnedArrayPtr::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedArrayPtr::ArrayPtr(p) => unsafe {
+                OwnedArrayPtr::Owned(core::slice::from_raw_parts(p.0, p.1).to_vec())
+            },
+            OwnedArrayPtr::Owned(v) => OwnedArrayPtr::Owned(v),
         }
     }
 }
 
 /// Wrap a C-style mutable pointer to an array (with size= and convert to a Vec on serialize
 #[derive(Clone, Debug)]
-pub enum ArrayMut<T: Sized> {
-    Cptr((*mut T, usize)),
+pub enum OwnedArrayPtrMut<T: Sized> {
+    ArrayPtr((*mut T, usize)),
     Owned(Vec<T>),
 }
 
-impl<T: Sized + Serialize> Serialize for ArrayMut<T> {
+impl<T: Sized + Serialize> Serialize for OwnedArrayPtrMut<T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -317,7 +471,7 @@ impl<T: Sized + Serialize> Serialize for ArrayMut<T> {
     }
 }
 
-impl<'de, T: Sized + Serialize> Deserialize<'de> for ArrayMut<T>
+impl<'de, T: Sized + Serialize> Deserialize<'de> for OwnedArrayPtrMut<T>
 where
     Vec<T>: Deserialize<'de>,
 {
@@ -325,22 +479,43 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(de).map(ArrayMut::Owned)
+        Deserialize::deserialize(de).map(OwnedArrayPtrMut::Owned)
     }
 }
 
-impl<T: Sized> ArrayMut<T> {
+impl<T: Sized> OwnedArrayPtrMut<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
-            ArrayMut::Cptr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
-            ArrayMut::Owned(v) => v.as_slice(),
+            OwnedArrayPtrMut::ArrayPtr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
+            OwnedArrayPtrMut::Owned(v) => v.as_slice(),
         }
     }
 
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match self {
-            ArrayMut::Cptr(p) => unsafe { core::slice::from_raw_parts_mut(p.0, p.1) },
-            ArrayMut::Owned(v) => v.as_mut_slice(),
+            OwnedArrayPtrMut::ArrayPtr(p) => unsafe { core::slice::from_raw_parts_mut(p.0, p.1) },
+            OwnedArrayPtrMut::Owned(v) => v.as_mut_slice(),
+        }
+    }
+}
+
+impl<T> IntoOwned for OwnedArrayPtrMut<T>
+where
+    T: Sized + Clone,
+{
+    fn is_owned(&self) -> bool {
+        match self {
+            OwnedArrayPtrMut::ArrayPtr(_) => false,
+            OwnedArrayPtrMut::Owned(_) => true,
+        }
+    }
+
+    fn into_owned(self) -> Self {
+        match self {
+            OwnedArrayPtrMut::ArrayPtr(p) => unsafe {
+                OwnedArrayPtrMut::Owned(core::slice::from_raw_parts(p.0, p.1).to_vec())
+            },
+            OwnedArrayPtrMut::Owned(v) => OwnedArrayPtrMut::Owned(v),
         }
     }
 }

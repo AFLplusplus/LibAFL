@@ -25,7 +25,7 @@ use crate::{
 use crate::inputs::bytes::BytesInput;
 
 /// The maximum size of a testcase
-pub const DEFAULT_MAX_SIZE: usize = 1048576;
+pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
 /// Trait for elements offering a corpus
 pub trait HasCorpus<C, I>
@@ -169,7 +169,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple;
@@ -198,7 +198,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<u32, Error>
+    ) -> Result<(u32, Option<usize>), Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -448,14 +448,13 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple,
     {
-        Ok(self
-            .feedbacks_mut()
-            .is_interesting_all(input, observers, exit_kind)?)
+        self.feedbacks_mut()
+            .is_interesting_all(input, observers, exit_kind)
     }
 
     /// Adds this input to the corpus, if it's intersting, and return the index
@@ -499,7 +498,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<u32, Error>
+    ) -> Result<(u32, Option<usize>), Error>
     where
         E: Executor<I> + HasObservers<OT>,
         OT: ObserversTuple,
@@ -512,13 +511,15 @@ where
 
         if is_solution {
             // If the input is a solution, add it to the respective corpus
-            self.solutions_mut().add(Testcase::new(input.clone()))?;
+            let mut testcase = Testcase::new(input.clone());
+            self.objectives_mut().append_metadata_all(&mut testcase)?;
+            self.solutions_mut().add(testcase)?;
+        } else {
+            self.objectives_mut().discard_metadata_all(&input)?;
         }
 
-        if self
-            .add_if_interesting(&input, fitness, scheduler)?
-            .is_some()
-        {
+        let corpus_idx = self.add_if_interesting(&input, fitness, scheduler)?;
+        if corpus_idx.is_some() {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
                 self,
@@ -533,7 +534,7 @@ where
             )?;
         }
 
-        Ok(fitness)
+        Ok((fitness, corpus_idx))
     }
 }
 
@@ -653,13 +654,13 @@ where
         executor.post_exec_observers()?;
 
         let observers = executor.observers();
-        let fitness =
-            self.feedbacks_mut()
-                .is_interesting_all(&input, observers, exit_kind.clone())?;
+        let fitness = self
+            .feedbacks_mut()
+            .is_interesting_all(&input, observers, &exit_kind)?;
 
         let is_solution = self
             .objectives_mut()
-            .is_interesting_all(&input, observers, exit_kind)?
+            .is_interesting_all(&input, observers, &exit_kind)?
             > 0;
         Ok((fitness, is_solution))
     }
@@ -683,7 +684,7 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let fitness = self.evaluate_input(input, executor, manager, scheduler)?;
+            let (fitness, _) = self.evaluate_input(input, executor, manager, scheduler)?;
             if fitness > 0 {
                 added += 1;
             }

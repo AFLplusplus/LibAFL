@@ -8,9 +8,16 @@ debug = true
 members = [
     "libafl",
     "libafl_derive",
-
-    #example fuzzers
-    "fuzzers/libfuzzer_libpng",
-    "fuzzers/libfuzzer_libmozjpeg",
-    "fuzzers/libfuzzer_libpng_cmpalloc",
+    "libafl_cc",
+    "libafl_targets",
+    "libafl_frida",
+]
+default-members = [
+    "libafl",
+    "libafl_derive",
+    "libafl_cc",
+    "libafl_targets",
+]
+exclude = [
+    "fuzzers",
 ]

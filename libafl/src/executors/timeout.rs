@@ -1,4 +1,4 @@
-//! A TimeoutExecutor set a timeout before each target run
+//! A `TimeoutExecutor` sets a timeout before each target run
 
 use core::{marker::PhantomData, time::Duration};
 
@@ -91,6 +91,10 @@ where
             phantom: PhantomData,
         }
     }
+
+    pub fn inner(&mut self) -> &mut E {
+        &mut self.executor
+    }
 }
 
 impl<E, I, OT> Executor<I> for TimeoutExecutor<E, I, OT>
@@ -126,6 +130,11 @@ where
                 null_mut(),
             );
         }
+        #[cfg(windows)]
+        {
+            // TODO
+            let _ = self.exec_tmout.as_millis();
+        }
         self.executor.pre_exec(_state, _event_mgr, _input)
     }
 
@@ -154,6 +163,10 @@ where
                 },
                 null_mut(),
             );
+        }
+        #[cfg(windows)]
+        {
+            // TODO
         }
         self.executor.post_exec(_state, _event_mgr, _input)
     }

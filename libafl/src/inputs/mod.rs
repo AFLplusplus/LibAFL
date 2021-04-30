@@ -14,7 +14,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::Error;
+use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
 pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug {
@@ -60,22 +60,8 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
 pub struct NopInput {}
 impl Input for NopInput {}
 impl HasTargetBytes for NopInput {
-    fn target_bytes(&self) -> TargetBytes {
-        TargetBytes::Owned(vec![0])
-    }
-}
-
-pub enum TargetBytes<'a> {
-    Ref(&'a [u8]),
-    Owned(Vec<u8>),
-}
-
-impl<'a> TargetBytes<'a> {
-    pub fn as_slice(&self) -> &[u8] {
-        match self {
-            TargetBytes::Ref(r) => r,
-            TargetBytes::Owned(v) => v.as_slice(),
-        }
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::Owned(vec![0])
     }
 }
 
@@ -84,7 +70,7 @@ impl<'a> TargetBytes<'a> {
 /// Instead, it can be used as bytes input for a target
 pub trait HasTargetBytes {
     /// Target bytes, that can be written to a target
-    fn target_bytes(&self) -> TargetBytes;
+    fn target_bytes(&self) -> OwnedSlice<u8>;
 }
 
 /// Contains an internal bytes Vector

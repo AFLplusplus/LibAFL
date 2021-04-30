@@ -1,22 +1,26 @@
 # TODOs
 
-- [x] ~~Minset corpus scheduler~~ still doc missing
-- [ ] Win32 shared mem and crash handler to have Windows in-process executor
-- [x] Other feedbacks examples (e.g. maximize allocations to spot OOMs)
+- [ ] Conditional composition of feedbacks (issue #24)
 - [ ] Other objectives examples (e.g. execution of a given program point)
 - [ ] Objective-Specific Corpuses (named per objective)
-- [x] A macro crate with derive directives (e.g. for SerdeAny impl).
 - [ ] Good documentation
-- [ ] LLMP brotli compression
+- [ ] LLMP compression
 - [ ] AFL-Style Forkserver Executor
-- [x] Restarting EventMgr could use forks on unix
-- [ ] Android Ashmem support
 - [ ] Restart Count in Fuzzing Loop
 - [ ] LAIN / structured fuzzing example
-- [ ] Errors in the Fuzzer should exit the fuzz run
 - [ ] More informative outpus, deeper introspection (stats, what mutation did x, etc.)
-- [x] Timeouts for executors
 - [ ] Timeout handling for llmp clients (no ping for n seconds -> treat as disconnected)
 - [ ] LLMP Cross Machine Link (2 brokers connected via TCP)
 - [ ] "Launcher" example that spawns broker + n clients
 - [ ] Heap for signal handling (bumpallo or llmp directly?)
+- [ ] Frida support for Windows
+- [ ] QEMU based instrumentation
+- [ ] AFL++ LLVM passes in libafl_cc
+- [x] Minset corpus scheduler
+- [x] Win32 shared mem and crash handler to have Windows in-process executor
+- [x] Other feedbacks examples (e.g. maximize allocations to spot OOMs)
+- [x] A macro crate with derive directives (e.g. for SerdeAny impl).
+- [x] Restarting EventMgr could use forks on Unix
+- [x] Android Ashmem support
+- [x] Errors in the Fuzzer should exit the fuzz run
+- [x] Timeouts for executors (WIP on Windows)

@@ -1,0 +1,6 @@
+[book]
+authors = ["Andrea Fioraldi", "Dominik Maier"]
+language = "en"
+multilingual = false
+src = "src"
+title = "The LibAFL Fuzzing Library"

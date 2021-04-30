@@ -25,26 +25,25 @@ use crate::{
     Error,
 };
 
-/// The inmem executor harness
-type HarnessFunction<E> = fn(&E, &[u8]) -> ExitKind;
-
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InProcessExecutor<I, OT>
+pub struct InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
     /// The name of this executor instance, to address it from other components
     name: &'static str,
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: HarnessFunction<Self>,
+    harness_fn: &'a mut H,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<I>,
 }
 
-impl<I, OT> Executor<I> for InProcessExecutor<I, OT>
+impl<'a, H, I, OT> Executor<I> for InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -95,7 +94,7 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
-        let ret = (self.harness_fn)(self, bytes.as_slice());
+        let ret = (self.harness_fn)(bytes.as_slice());
         Ok(ret)
     }
 
@@ -126,8 +125,9 @@ where
     }
 }
 
-impl<I, OT> Named for InProcessExecutor<I, OT>
+impl<'a, H, I, OT> Named for InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -136,8 +136,9 @@ where
     }
 }
 
-impl<I, OT> HasObservers<OT> for InProcessExecutor<I, OT>
+impl<'a, H, I, OT> HasObservers<OT> for InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -152,8 +153,9 @@ where
     }
 }
 
-impl<I, OT> InProcessExecutor<I, OT>
+impl<'a, H, I, OT> InProcessExecutor<'a, H, I, OT>
 where
+    H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -166,7 +168,7 @@ where
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OC, OFT, S>(
         name: &'static str,
-        harness_fn: HarnessFunction<Self>,
+        harness_fn: &'a mut H,
         observers: OT,
         _state: &mut S,
         _event_mgr: &mut EM,
@@ -215,13 +217,25 @@ where
             phantom: PhantomData,
         })
     }
+
+    /// Retrieve the harness function.
+    #[inline]
+    pub fn harness(&self) -> &H {
+        self.harness_fn
+    }
+
+    /// Retrieve the harness function for a mutable reference.
+    #[inline]
+    pub fn harness_mut(&mut self) -> &mut H {
+        self.harness_fn
+    }
 }
 
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
     use core::ptr;
-    use libc::{c_void, siginfo_t};
+    use libc::{c_void, siginfo_t, ucontext_t};
     #[cfg(feature = "std")]
     use std::io::{stdout, Write};
 
@@ -259,8 +273,8 @@ mod unix_signal_handler {
         pub event_mgr_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
-        pub crash_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
-        pub timeout_handler: unsafe fn(Signal, siginfo_t, c_void, data: &mut Self),
+        pub crash_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
+        pub timeout_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
@@ -269,21 +283,21 @@ mod unix_signal_handler {
     unsafe fn nop_handler(
         _signal: Signal,
         _info: siginfo_t,
-        _void: c_void,
+        _context: &mut ucontext_t,
         _data: &mut InProcessExecutorHandlerData,
     ) {
     }
 
     #[cfg(unix)]
     impl Handler for InProcessExecutorHandlerData {
-        fn handle(&mut self, signal: Signal, info: siginfo_t, void: c_void) {
+        fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
-                        (data.timeout_handler)(signal, info, void, data)
+                        (data.timeout_handler)(signal, info, context, data)
                     }
-                    _ => (data.crash_handler)(signal, info, void, data),
+                    _ => (data.crash_handler)(signal, info, context, data),
                 }
             }
         }
@@ -298,6 +312,7 @@ mod unix_signal_handler {
                 Signal::SigFloatingPointException,
                 Signal::SigIllegalInstruction,
                 Signal::SigSegmentationFault,
+                Signal::SigTrap,
             ]
         }
     }
@@ -306,7 +321,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _void: c_void,
+        _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
@@ -334,7 +349,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Timeout)
+                .is_interesting_all(&input, observers, &ExitKind::Timeout)
                 .expect("In timeout handler objectives failure.");
             if obj_fitness > 0 {
                 state
@@ -368,7 +383,7 @@ mod unix_signal_handler {
     pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
-        _void: c_void,
+        _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventManager<I, S>,
@@ -378,6 +393,10 @@ mod unix_signal_handler {
         S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
+        #[cfg(all(target_os = "android", target_arch = "aarch64"))]
+        let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void
+            as *mut ucontext_t);
+
         #[cfg(feature = "std")]
         println!("Crashed with {}", _signal);
         if !data.current_input_ptr.is_null() {
@@ -387,6 +406,45 @@ mod unix_signal_handler {
 
             #[cfg(feature = "std")]
             println!("Child crashed!");
+
+            #[cfg(all(
+                feature = "std",
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            ))]
+            {
+                use crate::utils::find_mapping_for_address;
+                println!("{:━^100}", " CRASH ");
+                println!(
+                    "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
+                    _signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
+                );
+                if let Ok((start, _, _, path)) =
+                    find_mapping_for_address(_context.uc_mcontext.pc as usize)
+                {
+                    println!(
+                        "pc is at offset 0x{:08x} in  {}",
+                        _context.uc_mcontext.pc as usize - start,
+                        path
+                    );
+                }
+
+                println!("{:━^100}", " REGISTERS ");
+                for reg in 0..31 {
+                    print!(
+                        "x{:02}: 0x{:016x} ",
+                        reg, _context.uc_mcontext.regs[reg as usize]
+                    );
+                    if reg % 4 == 3 {
+                        println!();
+                    }
+                }
+                println!("pc : 0x{:016x} ", _context.uc_mcontext.pc);
+
+                //println!("{:━^100}", " BACKTRACE ");
+                //println!("{:?}", backtrace::Backtrace::new())
+            }
+
             #[cfg(feature = "std")]
             let _ = stdout().flush();
 
@@ -396,7 +454,7 @@ mod unix_signal_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, &ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();
@@ -560,7 +618,7 @@ mod windows_exception_handler {
 
             let obj_fitness = state
                 .objectives_mut()
-                .is_interesting_all(&input, observers, ExitKind::Crash)
+                .is_interesting_all(&input, observers, &ExitKind::Crash)
                 .expect("In crash handler objectives failure.");
             if obj_fitness > 0 {
                 let new_input = input.clone();
@@ -627,19 +685,15 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         executors::{Executor, ExitKind, InProcessExecutor},
-        inputs::Input,
+        inputs::NopInput,
     };
-
-    fn test_harness_fn_nop<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
-        ExitKind::Ok
-    }
 
     #[test]
     fn test_inmem_exec() {
-        use crate::inputs::NopInput;
+        let mut harness = |_buf: &[u8]| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<NopInput, ()> {
-            harness_fn: test_harness_fn_nop,
+        let mut in_process_executor = InProcessExecutor::<_, NopInput, ()> {
+            harness_fn: &mut harness,
             observers: tuple_list!(),
             name: "main",
             phantom: PhantomData,

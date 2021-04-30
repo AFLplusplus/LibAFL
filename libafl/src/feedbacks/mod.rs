@@ -7,7 +7,7 @@ pub use map::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{Named, TupleList},
+    bolts::tuples::Named,
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
@@ -24,12 +24,12 @@ pub trait Feedback<I>: Named + serde::Serialize + serde::de::DeserializeOwned + 
 where
     I: Input,
 {
-    /// is_interesting should return the "Interestingness" from 0 to 255 (percent times 2.55)
+    /// `is_interesting ` should return the "Interestingness" from 0 to 255 (percent times 2.55)
     fn is_interesting<OT: ObserversTuple>(
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
@@ -54,7 +54,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>;
 
     /// Write metadata for this testcase
@@ -73,7 +73,7 @@ where
         &mut self,
         _: &I,
         _: &OT,
-        _: ExitKind,
+        _: &ExitKind,
     ) -> Result<u32, Error> {
         Ok(0)
     }
@@ -92,16 +92,16 @@ where
 impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
 where
     Head: Feedback<I>,
-    Tail: FeedbacksTuple<I> + TupleList,
+    Tail: FeedbacksTuple<I>,
     I: Input,
 {
     fn is_interesting_all<OT: ObserversTuple>(
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        Ok(self.0.is_interesting(input, observers, exit_kind.clone())?
+        Ok(self.0.is_interesting(input, observers, exit_kind)?
             + self.1.is_interesting_all(input, observers, exit_kind)?)
     }
 
@@ -128,9 +128,9 @@ where
         &mut self,
         _input: &I,
         _observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        if exit_kind == ExitKind::Crash {
+        if let ExitKind::Crash = exit_kind {
             Ok(1)
         } else {
             Ok(0)
@@ -168,9 +168,9 @@ where
         &mut self,
         _input: &I,
         _observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        if exit_kind == ExitKind::Timeout {
+        if let ExitKind::Timeout = exit_kind {
             Ok(1)
         } else {
             Ok(0)
@@ -211,7 +211,7 @@ where
         &mut self,
         _input: &I,
         observers: &OT,
-        _exit_kind: ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
         let observer = observers.match_first_type::<TimeObserver>().unwrap();
         self.exec_time = *observer.last_runtime();

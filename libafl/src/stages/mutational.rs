@@ -39,8 +39,9 @@ where
     fn iterations(&self, state: &mut S) -> usize;
 
     /// Runs this (mutational) stage for the given testcase
+    #[allow(clippy::clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
-        &self,
+        &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
@@ -55,11 +56,10 @@ where
                 .borrow_mut()
                 .load_input()?
                 .clone();
-            self.mutator().mutate(state, &mut input_mut, i as i32)?;
+            self.mutator_mut().mutate(state, &mut input_mut, i as i32)?;
+            let (_, corpus_idx) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
 
-            let fitness = state.evaluate_input(input_mut, executor, manager, scheduler)?;
-
-            self.mutator().post_exec(state, fitness, i as i32)?;
+            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
         }
         Ok(())
     }
@@ -82,6 +82,7 @@ where
     R: Rand,
 {
     mutator: M,
+    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, CS, E, EM, I, OT, R, S)>,
 }
 
@@ -131,7 +132,7 @@ where
 {
     #[inline]
     fn perform(
-        &self,
+        &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,

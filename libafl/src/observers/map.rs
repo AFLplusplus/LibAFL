@@ -1,9 +1,14 @@
-use alloc::string::{String, ToString};
+//! The `MapObserver` provides access a map, usually injected into the target
+
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        ownedref::{ArrayMut, Cptr},
+        ownedref::{OwnedArrayPtrMut, OwnedPtr},
         tuples::Named,
     },
     observers::Observer,
@@ -53,11 +58,12 @@ where
 /// A well-known example is the AFL-Style coverage map.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    map: ArrayMut<T>,
+    map: OwnedArrayPtrMut<T>,
     initial: T,
     name: String,
 }
@@ -117,10 +123,21 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T]) -> Self {
+    pub fn new(name: &'static str, map: &'static mut [T], len: usize) -> Self {
+        assert!(map.len() >= len);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
+            map: OwnedArrayPtrMut::ArrayPtr((map.as_mut_ptr(), len)),
+            name: name.to_string(),
+            initial,
+        }
+    }
+
+    /// Creates a new MapObserver with an owned map
+    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: OwnedArrayPtrMut::Owned(map),
             name: name.to_string(),
             initial,
         }
@@ -132,7 +149,7 @@ where
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
         let initial = if len > 0 { *map_ptr } else { T::default() };
         StdMapObserver {
-            map: ArrayMut::Cptr((map_ptr, len)),
+            map: OwnedArrayPtrMut::ArrayPtr((map_ptr, len)),
             name: name.to_string(),
             initial,
         }
@@ -142,12 +159,13 @@ where
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    map: ArrayMut<T>,
-    size: Cptr<usize>,
+    map: OwnedArrayPtrMut<T>,
+    size: OwnedPtr<usize>,
     initial: T,
     name: String,
 }
@@ -212,11 +230,11 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T], size: &usize) -> Self {
+    pub fn new(name: &'static str, map: &'static mut [T], size: *const usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: ArrayMut::Cptr((map.as_mut_ptr(), map.len())),
-            size: Cptr::Cptr(size as *const _),
+            map: OwnedArrayPtrMut::ArrayPtr((map.as_mut_ptr(), map.len())),
+            size: OwnedPtr::Ptr(size),
             name: name.into(),
             initial,
         }
@@ -233,8 +251,8 @@ where
     ) -> Self {
         let initial = if max_len > 0 { *map_ptr } else { T::default() };
         VariableMapObserver {
-            map: ArrayMut::Cptr((map_ptr, max_len)),
-            size: Cptr::Cptr(size_ptr),
+            map: OwnedArrayPtrMut::ArrayPtr((map_ptr, max_len)),
+            size: OwnedPtr::Ptr(size_ptr),
             name: name.into(),
             initial,
         }

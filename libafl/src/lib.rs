@@ -9,8 +9,9 @@ extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
 #[cfg(feature = "std")]
-#[macro_use]
 extern crate ctor;
+#[cfg(feature = "std")]
+pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "libafl_derive")]
@@ -49,6 +50,9 @@ use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
 pub enum Error {
     /// Serialization error
     Serialize(String),
+    /// Compression error
+    #[cfg(feature = "llmp_compression")]
+    Compression(String),
     /// File related error
     #[cfg(feature = "std")]
     File(io::Error),
@@ -76,6 +80,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Serialize(s) => write!(f, "Error in Serialization: `{0}`", &s),
+            #[cfg(feature = "llmp_compression")]
+            Self::Compression(s) => write!(f, "Error in Compression: `{0}`", &s),
             #[cfg(feature = "std")]
             Self::File(err) => write!(f, "File IO failed: {:?}", &err),
             Self::EmptyOptional(s) => write!(f, "Optional value `{0}` was not set", &s),
@@ -96,6 +102,21 @@ impl fmt::Display for Error {
 /// Stringify the postcard serializer error
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
+        Self::Serialize(format!("{:?}", err))
+    }
+}
+
+#[cfg(feature = "llmp_compression")]
+impl From<compression::prelude::CompressionError> for Error {
+    fn from(err: compression::prelude::CompressionError) -> Self {
+        Self::Compression(format!("{:?}", err))
+    }
+}
+
+/// Stringify the json serializer error
+#[cfg(feature = "std")]
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
         Self::Serialize(format!("{:?}", err))
     }
 }
@@ -137,9 +158,9 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
-        executors::{Executor, ExitKind, InProcessExecutor},
-        inputs::{BytesInput, Input},
-        mutators::{mutation_bitflip, ComposedByMutations, StdScheduledMutator},
+        executors::{ExitKind, InProcessExecutor},
+        inputs::BytesInput,
+        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, State},
         stats::SimpleStats,
@@ -149,10 +170,6 @@ mod tests {
 
     #[cfg(feature = "std")]
     use crate::events::SimpleEventManager;
-
-    fn harness<E: Executor<I>, I: Input>(_executor: &E, _buf: &[u8]) -> ExitKind {
-        ExitKind::Ok
-    }
 
     #[test]
     fn test_fuzzer() {
@@ -175,9 +192,10 @@ mod tests {
         });
         let mut event_manager = SimpleEventManager::new(stats);
 
+        let mut harness = |_buf: &[u8]| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
             "main",
-            harness,
+            &mut harness,
             tuple_list!(),
             //Box::new(|_, _, _, _, _| ()),
             &mut state,
@@ -185,14 +203,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut mutator = StdScheduledMutator::new();
-        mutator.add_mutation(mutation_bitflip);
+        let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
         let stage = StdMutationalStage::new(mutator);
-        let fuzzer = StdFuzzer::new(RandCorpusScheduler::new(), tuple_list!(stage));
+        let scheduler = RandCorpusScheduler::new();
+        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut state, &mut executor, &mut event_manager)
+                .fuzz_one(&mut state, &mut executor, &mut event_manager, &scheduler)
                 .expect(&format!("Error in iter {}", i));
         }
 

@@ -4,27 +4,29 @@ pub mod inprocess;
 pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
-#[cfg(feature = "runtime")]
-pub mod runtime;
 
-use core::cmp::PartialEq;
 use core::marker::PhantomData;
 
 use crate::{
-    bolts::tuples::Named,
+    bolts::{serdeany::SerdeAny, tuples::Named},
     events::EventManager,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
 
+use alloc::boxed::Box;
+
+pub trait CustomExitKind: core::fmt::Debug + SerdeAny + 'static {}
+
 /// How an execution finished.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum ExitKind {
     Ok,
     Crash,
-    OOM,
+    Oom,
     Timeout,
+    Custom(Box<dyn CustomExitKind>),
 }
 
 pub trait HasObservers<OT>
@@ -51,7 +53,7 @@ where
 }
 
 /// A simple executor that does nothing.
-/// If intput len is 0, run_target will return Err
+/// If intput len is 0, `run_target` will return Err
 struct NopExecutor<I> {
     phantom: PhantomData<I>,
 }
