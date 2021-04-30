@@ -319,9 +319,17 @@ where
             msg.len()
         )));
     }
+
+    #[cfg(feature = "llmp_debug")]
+    println!("LLMP TCP: Sending {} bytes", msg.len());
+
     let size_bytes = (msg.len() as u32).to_be_bytes();
     stream.write_all(&size_bytes)?;
     stream.write_all(&msg)?;
+
+    #[cfg(feature = "llmp_debug")]
+    println!("LLMP TCP: Send finished", msg.len());
+
     Ok(())
 }
 
@@ -329,11 +337,22 @@ where
 #[cfg(feature = "std")]
 fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     // Always receive one be u32 of size, then the command.
+
+    #[cfg(feature = "llmp_debug")]
+    println!(
+        "LLMP TCP: Waiting for packet... (Timeout: {:?})",
+        stream.read_timeout().unwrap_or(None)
+    );
+
     let mut size_bytes = [0u8; 4];
     stream.read_exact(&mut size_bytes)?;
     let size = u32::from_be_bytes(size_bytes);
     let mut bytes = vec![];
     bytes.resize(size as usize, 0u8);
+
+    #[cfg(feature = "llmp_debug")]
+    println!("LLMP TCP: Receiving payload of size {}", size);
+
     stream
         .read_exact(&mut bytes)
         .expect("Failed to read message body");
@@ -1608,13 +1627,14 @@ where
             }
         };
 
+        // TODO: use broker ids!
         println!("B2B: We are broker {}", broker_id);
 
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
             stream,
             &self.shmem_provider,
-            self.llmp_clients.len() as u32,
+            self.llmp_clients.len() as ClientId,
             &self.llmp_out.out_maps.first().unwrap().shmem.description(),
         )?;
 
@@ -1777,6 +1797,9 @@ where
             // as always, call post_fork to potentially reconnect the provider (for threaded/forked use)
             shmem_provider_clone.post_fork();
 
+            #[cfg(fature = "llmp_debug")]
+            println!("B2b: Spawned proxy thread");
+
             // The background thread blocks on the incoming connection for 15 seconds (if no data is available), then checks if it should forward own messages, then blocks some more.
             stream
                 .set_read_timeout(Some(_LLMP_B2B_BLOCK_TIME))
@@ -1804,7 +1827,7 @@ where
             .expect("Failed to map local page in broker 2 broker thread!");
 
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            dbg!("B2B: Starting to loop :)");
+            dbg!("B2B: Starting proxy loop :)");
 
             loop {
                 // first, forward all data we have.
@@ -1864,9 +1887,14 @@ where
             }
         });
 
-        recv.recv().map_err(|_| {
+        let ret = recv.recv().map_err(|_| {
             Error::Unknown("Error launching background thread for b2b communcation".to_string())
-        })
+        });
+
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        dbg!("B2B: returning from loop. Success: {}", ret.is_ok());
+
+        ret
     }
 
     /// handles a single tcp request in the current context.
@@ -1899,7 +1927,18 @@ where
             TcpRequest::RemoteBrokerHello { hostname } => {
                 println!("B2B new client: {}", hostname);
 
-                *current_client_id += 1;
+                // TODO: Clean up broker ids.
+                if send_tcp_msg(
+                    &mut stream,
+                    &TcpResponse::RemoteBrokerAccepted {
+                        broker_id: *current_client_id,
+                    },
+                )
+                .is_err()
+                {
+                    println!("Error accepting broker, ignoring.");
+                    return;
+                }
 
                 if let Ok(shmem_description) = Self::b2b_thread_on(
                     stream,
