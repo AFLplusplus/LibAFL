@@ -770,13 +770,13 @@ impl AsanRuntime {
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     fn unpoison_all_existing_memory(&self) {
         let mut allocator = Allocator::get();
-        walk_self_maps(&mut |start, end, _permissions, _path| {
-            //if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
-            if allocator.pre_allocated_shadow && start == 1 << allocator.shadow_bit {
-                return false;
+        walk_self_maps(&mut |start, end, permissions, _path| {
+            if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
+                if allocator.pre_allocated_shadow && start == 1 << allocator.shadow_bit {
+                    return false;
+                }
+                allocator.map_shadow_for_region(start, end, true);
             }
-            allocator.map_shadow_for_region(start, end, true);
-            //}
             false
         });
     }
