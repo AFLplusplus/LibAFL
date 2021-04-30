@@ -1,10 +1,9 @@
 //! Utility functions for AFL
 
-use crate::bolts::{os::ashmem_server::AshmemService, shmem::StdShMemProvider};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::shmem::ShMemProvider, corpus::Corpus, events::{EventManager, llmp::{LlmpRestartingEventManager, ManagerKind, setup_restarting_mgr}},
-    feedbacks::FeedbacksTuple, fuzzer::Fuzzer, inputs::Input, state::{IfInteresting, State}, stats::Stats,
+    bolts::shmem::ShMemProvider, events::llmp::{LlmpRestartingEventManager, ManagerKind, setup_restarting_mgr},
+    inputs::Input, state::IfInteresting, stats::Stats,
 };
 
 use alloc::{string::String, vec::Vec};
@@ -456,7 +455,6 @@ pub fn startable_self() -> Result<Command, Error> {
 pub fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
     use regex::Regex;
     use std::{
-        fs::File,
         io::{BufRead, BufReader},
     };
     let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
@@ -598,9 +596,8 @@ where
                 ForkResult::Child => {
                     shmem_provider.post_fork();
 
-
                     #[cfg(feature = "std")]
-                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    std::thread::sleep(std::time::Duration::from_secs(id as u64));
 
                     #[cfg(feature = "std")]
                     if file.is_some() {

@@ -110,24 +110,6 @@ where
         })
     }
 
-    #[cfg(feature = "std")]
-    pub fn new_broker_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
-        Ok(Self {
-            stats: Some(stats),
-            llmp: llmp::LlmpConnection::broker_on_port(shmem_provider, port)?,
-            phantom: PhantomData,
-        })
-    }
-
-    #[cfg(feature = "std")]
-    pub fn new_client_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
-        Ok(Self {
-            stats: Some(stats),
-            llmp: llmp::LlmpConnection::client_on_port(shmem_provider, port)?,
-            phantom: PhantomData,
-        })
-    }
-
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
     pub fn existing_client_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
