@@ -26,7 +26,7 @@ It is fast, multi-platform, no_std compatible, and scales over cores and machine
 
 It offers a main crate that provide building blocks for custom fuzzers, [libafl](./libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./libafl_cc).
 
-LibAFL offers integrations with popular instrumemntation frameworks. At the moment, the supported backends are:
+LibAFL offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
 
 + SanitizerCoverage, in [libafl_targets](./libafl_targets)
 + Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net> (Windows support is broken atm, it relies on [this upstream issue](https://github.com/meme/frida-rust/issues/9) to be fixed.)
