@@ -137,22 +137,14 @@ fn main() {
     match mode.as_str() {
         "broker" => {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
-            broker
-                .launch_listener(llmp::Listener::Tcp(
-                    std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap(),
-                ))
-                .unwrap();
+            broker.launch_tcp_listener_on(port).unwrap();
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
         }
         "b2b" => {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
-            broker
-                .launch_listener(llmp::Listener::Tcp(
-                    std::net::TcpListener::bind(("127.0.0.1", b2b_port)).unwrap(),
-                ))
-                .unwrap();
-            // connect to the main broker.
-            broker.connect_b2b(("127.0.0.1", b2b_port)).unwrap();
+            broker.launch_tcp_listener_on(b2b_port).unwrap();
+            // connect back to the main broker.
+            broker.connect_b2b(("127.0.0.1", port)).unwrap();
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
         }
         "ctr" => {
