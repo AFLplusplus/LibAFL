@@ -197,9 +197,10 @@ pub fn main() {
             env::args()
                 .nth(3)
                 .expect("no modules to instrument specified")
-                .split(":")
+                .split(':')
+                .map(|module_name| std::fs::canonicalize(module_name).unwrap())
                 .collect(),
-            vec![PathBuf::from("./corpus")],
+            &vec![PathBuf::from("./corpus")],
             PathBuf::from("./crashes"),
             1337,
         )
@@ -224,8 +225,8 @@ fn fuzz(
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
-    modules_to_instrument: Vec<&str>,
-    corpus_dirs: Vec<PathBuf>,
+    modules_to_instrument: Vec<PathBuf>,
+    corpus_dirs: &Vec<PathBuf>,
     objective_dir: PathBuf,
     broker_port: u16,
 ) -> Result<(), Error> {

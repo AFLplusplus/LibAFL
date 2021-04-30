@@ -1,3 +1,6 @@
+use ahash::AHasher;
+use std::hash::Hasher;
+
 use libafl::inputs::{HasTargetBytes, Input};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -26,7 +29,7 @@ use frida_gum::{Gum, Module, PageProtection};
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
-use std::rc::Rc;
+use std::{path::PathBuf, rc::Rc};
 
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
@@ -82,9 +85,12 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
         if self.options.drcov_enabled() {
+            let mut hasher = AHasher::new_with_keys(0, 0);
+            hasher.write(input.target_bytes().as_slice());
+
             let filename = format!(
                 "./coverage/{:016x}.drcov",
-                seahash::hash(input.target_bytes().as_slice())
+                hasher.finish(),
             );
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
@@ -193,7 +199,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         gum: &'a Gum,
         options: FridaOptions,
         _harness_module_name: &str,
-        modules_to_instrument: &'a [&str],
+        modules_to_instrument: &'a [PathBuf],
     ) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
@@ -214,11 +220,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         if options.stalker_enabled() {
             for (id, module_name) in modules_to_instrument.iter().enumerate() {
-                let (lib_start, lib_end) = find_mapping_for_path(module_name);
-                println!("including range {:x}-{:x} for {}", lib_start, lib_end, module_name);
+                let (lib_start, lib_end) = find_mapping_for_path(module_name.to_str().unwrap());
+                println!("including range {:x}-{:x} for {:?}", lib_start, lib_end, module_name);
                 helper
                     .ranges
-                    .insert(lib_start..lib_end, (id as u16, module_name));
+                    .insert(lib_start..lib_end, (id as u16, module_name.to_str().unwrap()));
             }
 
             if helper.options.drcov_enabled() {
