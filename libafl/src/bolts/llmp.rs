@@ -1754,7 +1754,7 @@ where
         self.launch_listener(Listener::Tcp(listener))
     }
 
-    /// Anncounes a new client on the given shared map.
+    /// Announces a new client on the given shared map.
     /// Called from a background thread, typically.
     /// Upon receiving this message, the broker should map the announced page and start trckang it for new messages.
     #[allow(dead_code)]
