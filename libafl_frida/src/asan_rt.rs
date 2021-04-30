@@ -31,6 +31,7 @@ use std::{
     cell::{RefCell, RefMut},
     ffi::c_void,
     io::{self, Write},
+    path::PathBuf,
     rc::Rc,
 };
 use termcolor::{Color, ColorSpec, WriteColor};
@@ -697,7 +698,7 @@ impl AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, modules_to_instrument: &[&str]) {
+    pub fn init(&mut self, modules_to_instrument: &[PathBuf]) {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
             for _ in 0..512 {
@@ -730,7 +731,7 @@ impl AsanRuntime {
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
             #[cfg(unix)]
-            self.hook_library(module_name);
+            self.hook_library(module_name.to_str().unwrap());
         }
     }
 
@@ -786,15 +787,14 @@ impl AsanRuntime {
     pub fn register_thread(&self) {
         let mut allocator = Allocator::get();
         let (stack_start, stack_end) = Self::current_stack();
-        println!("current stack: {:#016x}-{:#016x}", stack_start, stack_end);
         allocator.map_shadow_for_region(stack_start, stack_end, true);
 
-        //let (tls_start, tls_end) = Self::current_tls();
-        //allocator.map_shadow_for_region(tls_start, tls_end, true);
-        //println!(
-            //"registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
-            //stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
-        //);
+        let (tls_start, tls_end) = Self::current_tls();
+        allocator.map_shadow_for_region(tls_start, tls_end, true);
+        println!(
+            "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
+            stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
+        );
     }
 
     /// Determine the stack start, end for the currently running thread
@@ -829,6 +829,9 @@ impl AsanRuntime {
     /// Determine the tls start, end for the currently running thread
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { get_tls_ptr() } as usize;
+        // we need to mask off the highest byte, due to 'High Byte Ignore"
+        #[cfg(target_os = "android")]
+        let tls_address = tls_address  & 0xffffffffffffff;
 
         let (start, end, _, _) = find_mapping_for_address(tls_address).unwrap();
         (start, end)
