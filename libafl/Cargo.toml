@@ -51,14 +51,14 @@ required-features = ["std"]
 [dependencies]
 tuple_list = "0.1.2"
 hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
-num = "*"
+num = "0.4.0"
 xxhash-rust = { version = "0.8.0", features = ["xxh3", "const_xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 erased-serde = "0.3.12"
 postcard = { version = "0.5.1", features = ["alloc"] } # no_std compatible serde serialization fromat
 static_assertions = "1.1.0"
-ctor = "*"
-libafl_derive = { version = "*", optional = true, path = "../libafl_derive" }
+ctor = "0.1.20"
+libafl_derive = { version = "0.1.0", optional = true, path = "../libafl_derive" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] } # an easy way to debug print SerdeAnyMap
 compression = { version = "0.1.5" }
 num_enum = "0.5.1"
