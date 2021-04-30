@@ -42,6 +42,7 @@ impl GzipCompressor {
 
     /// Decompression.
     /// Flag is used to indicate if it's compressed or not
+    #[allow(clippy::unused_self)]
     pub fn decompress(&self, buf: &[u8]) -> Result<Vec<u8>, Error> {
         Ok(buf
             .iter()

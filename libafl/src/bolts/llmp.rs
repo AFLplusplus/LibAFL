@@ -70,7 +70,7 @@ use std::{
     convert::TryInto,
     env,
     io::{Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
     sync::mpsc::channel,
     thread,
 };
@@ -118,7 +118,14 @@ pub const LLMP_FLAG_FROM_B2B: Flags = 0x2;
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
-const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(15_000);
+const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(3_000);
+
+/// If broker2broker is enabled, bind to public IP
+#[cfg(feature = "llmp_bind_public")]
+const _LLMP_BIND_ADDR: &str = "0.0.0.0";
+/// If broker2broker is disabled, bind to localhost
+#[cfg(not(feature = "llmp_bind_public"))]
+const _LLMP_BIND_ADDR: &str = "127.0.0.1";
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -140,9 +147,13 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
 
 /// TAGs used thorughout llmp
 pub type Tag = u32;
+/// The client ID == the sender id.
 pub type ClientId = u32;
+/// The broker ID, for broker 2 broker communication.
 pub type BrokerId = u32;
+/// The flags, indicating, for example, enabled compression.
 pub type Flags = u32;
+/// The message ID, an ever-increasing number, unique only to a sharedmap/page.
 pub type MessageId = u64;
 
 /// This is for the server the broker will spawn.
@@ -150,8 +161,10 @@ pub type MessageId = u64;
 /// or remote (broker2broker) - forwarded via tcp
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TcpRequest {
+    /// We would like to be a local client.
     LocalClientHello { shmem_description: ShMemDescription },
-    RemoteBrokerHello,
+    /// We would like to establish a b2b connection.
+    RemoteBrokerHello { hostname: String },
 }
 
 impl TryFrom<&Vec<u8>> for TcpRequest {
@@ -201,7 +214,6 @@ pub enum TcpResponse {
     RemoteBrokerAccepted {
         /// The broker id of this element
         broker_id: BrokerId,
-        hostname: String,
     },
     /// Something went wrong when processing the request.
     Error {
@@ -505,7 +517,7 @@ where
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
     pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+        match TcpListener::bind(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
                 dbg!("We're the broker");
@@ -806,7 +818,7 @@ where
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
             dbg!(
                 page,
-                (*page),
+                *page,
                 (*page).size_used,
                 complete_msg_size,
                 EOP_MSG_SIZE,
@@ -1554,6 +1566,68 @@ where
         });
     }
 
+    /// Connects to a broker running on another machine.
+    /// This will spawn a new background thread, registered as client, that proxies all messages to a remote machine.
+    /// Returns the description of the new page that still needs to be announced/added to the broker afterwards.
+    #[cfg(feature = "std")]
+    pub fn connect_b2b<A>(&mut self, addr: A) -> Result<(), Error>
+    where
+        A: ToSocketAddrs,
+    {
+        let mut stream = TcpStream::connect(addr)?;
+        println!("B2B: Connected to {:?}", stream);
+
+        match (&recv_tcp_msg(&mut stream)?).try_into()? {
+            TcpResponse::BrokerConnectHello {
+                broker_map_description: _,
+                hostname,
+            } => println!("B2B: Connected to {}", hostname),
+            _ => {
+                return Err(Error::IllegalState(
+                    "Unexpected response from B2B server received.".to_string(),
+                ))
+            }
+        };
+
+        let hostname = hostname::get()
+            .unwrap_or_else(|_| "<unknown>".into())
+            .to_string_lossy()
+            .into();
+
+        send_tcp_msg(&mut stream, &TcpRequest::RemoteBrokerHello { hostname })?;
+
+        let broker_id = match (&recv_tcp_msg(&mut stream)?).try_into()? {
+            TcpResponse::RemoteBrokerAccepted { broker_id } => {
+                println!("B2B: Got Connection Ack, broker_id {}", broker_id);
+                broker_id
+            }
+            _ => {
+                return Err(Error::IllegalState(
+                    "Unexpected response from B2B server received.".to_string(),
+                ));
+            }
+        };
+
+        println!("B2B: We are broker {}", broker_id);
+
+        // TODO: handle broker_ids properly/at all.
+        let map_description = Self::b2b_thread_on(
+            stream,
+            &self.shmem_provider,
+            self.llmp_clients.len() as u32,
+            &self.llmp_out.out_maps.first().unwrap().shmem.description(),
+        )?;
+
+        let new_map =
+            LlmpSharedMap::existing(self.shmem_provider.from_description(map_description)?);
+
+        {
+            self.register_client(new_map);
+        }
+
+        Ok(())
+    }
+
     /// For internal use: Forward the current message to the out map.
     unsafe fn forward_msg(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
         let mut out: *mut LlmpMsg = self.alloc_next((*msg).buf_len_padded as usize)?;
@@ -1654,7 +1728,7 @@ where
     /// Does so on the given port.
     #[cfg(feature = "std")]
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
+        let listener = TcpListener::bind(format!("{}:{}", _LLMP_BIND_ADDR, port))?;
         // accept connections and process them, spawning a new thread for each one
         println!("Server listening on port {}", port);
         self.launch_listener(Listener::Tcp(listener))
@@ -1729,12 +1803,21 @@ where
             )
             .expect("Failed to map local page in broker 2 broker thread!");
 
+            #[cfg(all(feature = "llmp_debug", feature = "std"))]
+            dbg!("B2B: Starting to loop :)");
+
             loop {
                 // first, forward all data we have.
                 while let Some((client_id, tag, flags, payload)) = local_receiver
                     .recv_buf_with_flags()
                     .expect("Error reading from local page!")
                 {
+                    if client_id == b2b_client_id {
+                        dbg!("Ignored message we probably sent earlier (same id)", tag);
+                        continue;
+                    }
+
+                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     dbg!(
                         "Fowarding message via broker2broker connection",
                         payload.len()
@@ -1763,19 +1846,26 @@ where
                         "Illegal message received from broker 2 broker connection - shutting down.",
                     );
 
+                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
+                    dbg!(
+                        "Fowarding incoming message from broker2broker connection",
+                        msg.payload.len()
+                    );
+
                     // TODO: Could probably optimize this somehow to forward all queued messages between locks... oh well.
                     // Todo: somehow mangle in the other broker id? ClientId?
                     new_sender
                         .send_buf_with_flags(msg.tag, msg.flags | LLMP_FLAG_FROM_B2B, &msg.payload)
                         .expect("B2B: Error forwarding message. Exiting.");
+                } else {
+                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
+                    dbg!("Received no input, timeout or closed. Looping back up :)");
                 }
             }
         });
 
-        recv.recv().or_else(|_| {
-            Err(Error::Unknown(
-                "Error launching background thread for b2b communcation".to_string(),
-            ))
+        recv.recv().map_err(|_| {
+            Error::Unknown("Error launching background thread for b2b communcation".to_string())
         })
     }
 
@@ -1806,7 +1896,9 @@ where
                 };
                 *current_client_id += 1;
             }
-            TcpRequest::RemoteBrokerHello => {
+            TcpRequest::RemoteBrokerHello { hostname } => {
+                println!("B2B new client: {}", hostname);
+
                 *current_client_id += 1;
 
                 if let Ok(shmem_description) = Self::b2b_thread_on(
@@ -2236,7 +2328,7 @@ where
     #[cfg(feature = "std")]
     /// Create a LlmpClient, getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
+        let mut stream = TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port))?;
         println!("Connected to port {}", port);
 
         let broker_map_description = if let TcpResponse::BrokerConnectHello {
