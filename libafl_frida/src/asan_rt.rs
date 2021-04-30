@@ -1424,7 +1424,6 @@ impl AsanRuntime {
                 ; b >skip_report
 
                 ; report:
-                ; brk 0x11
                 ; stp x29, x30, [sp, #-0x10]!
                 ; mov x29, sp
 
@@ -1544,7 +1543,6 @@ impl AsanRuntime {
                 ; b >skip_report
 
                 ; report:
-                ; brk 0x22
                 ; stp x29, x30, [sp, #-0x10]!
                 ; mov x29, sp
 
