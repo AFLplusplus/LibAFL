@@ -14,7 +14,7 @@ Some highlight features currently include:
 - `portable`: `LibAFL` can be built in `no_std` mode. Inject LibAFL in obscure targets like embedded devices and hypervisors.
 - `adaptable`: You can replace each part of LibAFL. For example, `BytesInput` is just one potential form input:
 feel free to add an AST-based input for structured fuzzing, and more.
-- `scalable`: `Low Level Message Passing`, `LLMP` for short, allows LibAFL to scale almost linearly over cores, and via TCP to multiple machines!
+- `scalable`: `Low Level Message Passing`, `LLMP` for short, allows LibAFL to scale almost linearly over cores, and via TCP to multiple machines soon!
 - `fast`: We do everything we can at compile time, keeping runtime overhead minimal.
 - `bring your own target`: We support binary-only modes, like Frida-Mode, as well as multiple compilation passes for sourced-based instrumentation. Of course it's easy to add custom instrumentation backends.
 - `usable`: We hope. But we'll let you be the judge. Enjoy LibAFL.
@@ -31,11 +31,6 @@ LibAFL offers integrations with popular instrumemntation frameworks. At the mome
 + SanitizerCoverage, in [libafl_targets](./libafl_targets)
 + Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net> (Windows support is broken atm, it relies on [this upstream issue](https://github.com/meme/frida-rust/issues/9) to be fixed.)
 + More to come (QEMU-mode, ...)
-
-LibAFL offers integrations with popular instrumemntation frameworks too. At the moment, the supported backends are:
-
-+ SanitizerCoverage, in [libafl_targets](./libafl_targets)
-+ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net> (Windows support will be added soon)
 
 ## Getting started
 
