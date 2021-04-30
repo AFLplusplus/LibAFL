@@ -34,29 +34,34 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 
 ## Getting started
 
-Clone the LibAFL repository with
+1. Install the Rust development language. We highly recommend *not* to use e.g.
+your Linux distribution package as this is likely outdated. So rather install
+Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
+
+2. Clone the LibAFL repository with
 
 ```
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
-Build the library using
+3. Build the library using
 
 ```
 cargo build --release
 ```
 
-Build the API documentation with
+4. Build the API documentation with
 
 ```
 cargo doc
 ```
 
-Browse the LibAFL book (WIP!) with (requires [mdbook](https://github.com/rust-lang/mdBook))
+5. Browse the LibAFL book (WIP!) with (requires [mdbook](https://github.com/rust-lang/mdBook))
 
 ```
 cd docs && mdbook serve
 ```
+
 
 We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*
