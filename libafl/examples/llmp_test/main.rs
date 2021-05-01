@@ -83,7 +83,7 @@ fn large_msg_loop(port: u16) -> ! {
 fn broker_message_hook(
     client_id: u32,
     tag: llmp::Tag,
-    _flags: llmp::Flag,
+    _flags: llmp::Flags,
     message: &[u8],
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
     match tag {
@@ -120,10 +120,16 @@ fn main() {
 
     let mode = std::env::args()
         .nth(1)
-        .expect("no mode specified, chose 'broker', 'ctr', 'adder', or 'large'");
+        .expect("no mode specified, chose 'broker', 'b2b', 'ctr', 'adder', or 'large'");
     let port: u16 = std::env::args()
         .nth(2)
         .unwrap_or("1337".into())
+        .parse::<u16>()
+        .unwrap();
+    // in the b2b use-case, this is our "own" port, we connect to the "normal" broker node on startup.
+    let b2b_port: u16 = std::env::args()
+        .nth(3)
+        .unwrap_or("4242".into())
         .parse::<u16>()
         .unwrap();
     println!("Launching in mode {} on port {}", mode, port);
@@ -131,11 +137,14 @@ fn main() {
     match mode.as_str() {
         "broker" => {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
-            broker
-                .launch_listener(llmp::Listener::Tcp(
-                    std::net::TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap(),
-                ))
-                .unwrap();
+            broker.launch_tcp_listener_on(port).unwrap();
+            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
+        }
+        "b2b" => {
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
+            broker.launch_tcp_listener_on(b2b_port).unwrap();
+            // connect back to the main broker.
+            broker.connect_b2b(("127.0.0.1", port)).unwrap();
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
         }
         "ctr" => {
