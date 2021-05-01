@@ -1,3 +1,6 @@
+use ahash::AHasher;
+use std::hash::Hasher;
+
 use libafl::inputs::{HasTargetBytes, Input};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -6,7 +9,10 @@ use libafl::utils::find_mapping_for_path;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
-use capstone::arch::{arm64::{Arm64OperandType, Arm64Extender, Arm64Shift}, ArchOperand::Arm64Operand};
+use capstone::arch::{
+    arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+    ArchOperand::Arm64Operand,
+};
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone, Insn,
@@ -26,7 +32,7 @@ use frida_gum::{Gum, Module, PageProtection};
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
-use std::rc::Rc;
+use std::{path::PathBuf, rc::Rc};
 
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
@@ -82,10 +88,10 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
         if self.options.drcov_enabled() {
-            let filename = format!(
-                "./coverage/{:016x}.drcov",
-                seahash::hash(input.target_bytes().as_slice())
-            );
+            let mut hasher = AHasher::new_with_keys(0, 0);
+            hasher.write(input.target_bytes().as_slice());
+
+            let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
@@ -193,7 +199,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         gum: &'a Gum,
         options: FridaOptions,
         _harness_module_name: &str,
-        modules_to_instrument: &'a [&str],
+        modules_to_instrument: &'a [PathBuf],
     ) -> Self {
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
@@ -214,11 +220,15 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         if options.stalker_enabled() {
             for (id, module_name) in modules_to_instrument.iter().enumerate() {
-                let (lib_start, lib_end) = find_mapping_for_path(module_name);
-                println!("including range {:x}-{:x} for {}", lib_start, lib_end, module_name);
-                helper
-                    .ranges
-                    .insert(lib_start..lib_end, (id as u16, module_name));
+                let (lib_start, lib_end) = find_mapping_for_path(module_name.to_str().unwrap());
+                println!(
+                    "including range {:x}-{:x} for {:?}",
+                    lib_start, lib_end, module_name
+                );
+                helper.ranges.insert(
+                    lib_start..lib_end,
+                    (id as u16, module_name.to_str().unwrap()),
+                );
             }
 
             if helper.options.drcov_enabled() {
@@ -395,14 +405,18 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
                 if extender_encoding != -1 && shift_amount < 0b1000 {
                     // emit add extended register: https://developer.arm.com/documentation/ddi0602/latest/Base-Instructions/ADD--extended-register---Add--extended-register--
-                    writer.put_bytes(&(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10)).to_le_bytes());
+                    writer.put_bytes(
+                        &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
+                            .to_le_bytes(),
+                    );
                 } else if shift_encoding != -1 {
-                    writer.put_bytes(&(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10)).to_le_bytes());
+                    writer.put_bytes(
+                        &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
+                            .to_le_bytes(),
+                    );
                 } else {
                     panic!("extender: {:?}, shift: {:?}", extender, shift);
                 }
-
-
             };
         }
 
@@ -548,7 +562,17 @@ impl<'a> FridaInstrumentationHelper<'a> {
         &self,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(capstone::RegId, capstone::RegId, i32, u32, Arm64Shift, Arm64Extender), ()> {
+    ) -> Result<
+        (
+            capstone::RegId,
+            capstone::RegId,
+            i32,
+            u32,
+            Arm64Shift,
+            Arm64Extender,
+        ),
+        (),
+    > {
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.mnemonic().unwrap() {
