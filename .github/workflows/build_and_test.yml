@@ -59,9 +59,7 @@ jobs:
     - name: Test Docs
       run: cargo test --doc
     - name: Run clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: ./clippy.sh
+      run: ./clippy.sh
   windows:
     runs-on: windows-latest
     steps:
