@@ -1297,6 +1297,7 @@ where
     }
 
     /// Receive the buffer, also reading the LLMP internal message flags
+    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         unsafe {
@@ -1780,6 +1781,7 @@ where
     /// This function returns the ShMemDescription the client uses to place incoming messages.
     /// The thread exits, when the remote broker disconnects.
     #[cfg(feature = "std")]
+    #[allow(clippy::let_and_return)]
     fn b2b_thread_on(
         mut stream: TcpStream,
         shmem_provider: &SP,
@@ -2353,6 +2355,7 @@ where
         self.receiver.recv_buf_blocking()
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         self.receiver.recv_buf_with_flags()
     }
