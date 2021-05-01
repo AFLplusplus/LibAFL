@@ -1,18 +1,11 @@
 //! Utility functions for AFL
 
-use crate::bolts::{os::ashmem_server::AshmemService, shmem::StdShMemProvider};
 #[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
-    corpus::Corpus,
-    events::{
-        llmp::{setup_restarting_mgr, LlmpRestartingEventManager, ManagerKind},
-        EventManager,
-    },
-    feedbacks::FeedbacksTuple,
-    fuzzer::Fuzzer,
+    events::llmp::{setup_restarting_mgr, LlmpRestartingEventManager, ManagerKind},
     inputs::Input,
-    state::{IfInteresting, State},
+    state::IfInteresting,
     stats::Stats,
 };
 
@@ -464,10 +457,7 @@ pub fn startable_self() -> Result<Command, Error> {
 #[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
 pub fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
     use regex::Regex;
-    use std::{
-        fs::File,
-        io::{BufRead, BufReader},
-    };
+    use std::io::{BufRead, BufReader};
     let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
         .unwrap();
 

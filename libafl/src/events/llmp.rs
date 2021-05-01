@@ -114,6 +114,7 @@ where
     pub fn new_broker_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             llmp: llmp::LlmpConnection::broker_on_port(shmem_provider, port)?,
             phantom: PhantomData,
         })
@@ -123,6 +124,7 @@ where
     pub fn new_client_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             llmp: llmp::LlmpConnection::client_on_port(shmem_provider, port)?,
             phantom: PhantomData,
         })
