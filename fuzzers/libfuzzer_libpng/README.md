@@ -1,6 +1,11 @@
 # Libfuzzer for libpng
 
 This folder contains an example fuzzer for libpng, using LLMP for fast multi-process fuzzing and crash detection.
+
+In contrast to other fuzzer examples, this setup uses `fuzz_loop_for`, to occasionally respawn the fuzzer executor.
+While this costs performance, it can be useful for targets with memory leaks or other instabilities.
+If your target is really instable, however, consider exchanging the `InProcessExecutor` for a `ForkserverExecutor` instead.
+
 To show off crash detection, we added a `ud2` instruction to the harness, edit harness.cc if you want a non-crashing example.
 It has been tested on Linux.
 
@@ -15,6 +20,8 @@ cargo build --release
 This will build the library with the fuzzer (src/lib.rs) with the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback.
 In addition, it will also build two C and C++ compiler wrappers (bin/libafl_c(libafl_c/xx).rs) that you must use to compile the target.
 
+The compiler wrappers, `libafl_cc` and libafl_cxx`, will end up in `./target/release/` (or `./target/debug`, in case you did not build with the `--release` flag).
+
 Then download libpng, and unpack the archive:
 ```bash
 wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
@@ -26,7 +33,7 @@ Now compile libpng, using the libafl_cc compiler wrapper:
 ```bash
 cd libpng-1.6.37
 ./configure
-make CC=../target/release/libafl_cc CXX=../target/release/libafl_cxx -j `nproc`
+make CC=$(realpath ../target/release/libafl_cc) CXX=$(realpath ../target/release/libafl_cxx) -j `nproc`
 ```
 
 You can find the static lib at `libpng-1.6.37/.libs/libpng16.a`.
@@ -38,7 +45,9 @@ cd ..
 ./target/release/libafl_cxx ./harness.cc libpng-1.6.37/.libs/libpng16.a -I libpng-1.6.37/ -o fuzzer_libpng -lz -lm
 ```
 
-Afterwards, the fuzzer will be ready to run.
+Afterward, the fuzzer will be ready to run.
+Note that, unless you use the `launcher`, you will have to run the binary multiple times to actually start the fuzz process, see `Run` in the following.
+This allows you to run multiple different builds of the same fuzzer alongside, for example, with and without ASAN (`-fsanitize=address`) or with different mutators.
 
 ## Run
 

@@ -47,6 +47,10 @@ where
 pub trait Fuzzer<E, EM, S, CS> {
     /// Fuzz for a single iteration
     /// Returns the index of the last fuzzed corpus item
+    ///
+    /// If you use this fn in a restarting scenario to only run for `n` iterations,
+    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
+    /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_one(
         &mut self,
         state: &mut S,
@@ -73,14 +77,22 @@ pub trait Fuzzer<E, EM, S, CS> {
 
     /// Fuzz for n iterations
     /// Returns the index of the last fuzzed corpus item
-    fn fuzz_loop_for(
+    ///
+    /// If you use this fn in a restarting scenario to only run for `n` iterations,
+    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
+    /// This way, the state will be available in the next, respawned, iteration.
+    fn fuzz_loop_for<I>(
         &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
         iters: u64,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, Error>
+    where
+        EM: EventManager<I, S>,
+        I: Input,
+    {
         if iters == 0 {
             return Err(Error::IllegalArgument(
                 "Cannot fuzz for 0 iterations!".to_string(),
@@ -95,6 +107,12 @@ pub trait Fuzzer<E, EM, S, CS> {
             ret = self.fuzz_one(state, executor, manager, scheduler)?;
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
+
+        // If we would assume the fuzzer loop will always exit after this, we could do this here:
+        // manager.on_restart(state)?;
+        // But as the state may grow to a few megabytes,
+        // for now we won' and the user has to do it (unless we find a way to do this on `Drop`).
+
         Ok(ret)
     }
 
@@ -178,8 +196,8 @@ where
     ) -> Result<Duration, Error> {
         let cur = current_time();
         if cur - last > stats_timeout {
-            // Default no perf_stats implmentation
-            #[cfg(not(feature = "perf_stats"))]
+            // Default no introspection implmentation
+            #[cfg(not(feature = "introspection"))]
             manager.fire(
                 state,
                 Event::UpdateStats {
@@ -190,10 +208,10 @@ where
             )?;
 
             // If performance stats are requested, fire the `UpdatePerfStats` event
-            #[cfg(feature = "perf_stats")]
+            #[cfg(feature = "introspection")]
             {
                 state
-                    .perf_stats_mut()
+                    .introspection_stats_mut()
                     .set_current_time(crate::cpu::read_time_counter());
 
                 // Send the current stats over to the manager. This `.clone` shouldn't be
@@ -203,7 +221,7 @@ where
                     Event::UpdatePerfStats {
                         executions: *state.executions(),
                         time: cur,
-                        perf_stats: state.perf_stats().clone(),
+                        introspection_stats: state.introspection_stats().clone(),
                         phantom: PhantomData,
                     },
                 )?;
@@ -224,34 +242,34 @@ where
         scheduler: &CS,
     ) -> Result<usize, Error> {
         // Init timer for scheduler
-        #[cfg(feature = "perf_stats")]
-        state.perf_stats_mut().start_timer();
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().start_timer();
 
         // Get the next index from the scheduler
         let idx = scheduler.next(state)?;
 
         // Mark the elapsed time for the scheduler
-        #[cfg(feature = "perf_stats")]
-        state.perf_stats_mut().mark_scheduler_time();
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().mark_scheduler_time();
 
         // Mark the elapsed time for the scheduler
-        #[cfg(feature = "perf_stats")]
-        state.perf_stats_mut().reset_stage_index();
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().reset_stage_index();
 
         // Execute all stages
         self.stages_mut()
             .perform_all(state, executor, manager, scheduler, idx)?;
 
         // Init timer for manager
-        #[cfg(feature = "perf_stats")]
-        state.perf_stats_mut().start_timer();
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().start_timer();
 
         // Execute the manager
         manager.process(state, executor, scheduler)?;
 
         // Mark the elapsed time for the manager
-        #[cfg(feature = "perf_stats")]
-        state.perf_stats_mut().mark_manager_time();
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().mark_manager_time();
 
         Ok(idx)
     }

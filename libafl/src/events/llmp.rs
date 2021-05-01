@@ -1,31 +1,21 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{rc::Rc, string::ToString, vec::Vec};
-use core::{cell::RefCell, marker::PhantomData, time::Duration};
+use alloc::{string::ToString, vec::Vec};
+use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
 use core::ptr::read_volatile;
 
 #[cfg(feature = "std")]
-use crate::bolts::llmp::LlmpReceiver;
+use crate::bolts::{
+    llmp::{LlmpClient, LlmpReceiver},
+    shmem::StdShMemProvider,
+};
 
-#[cfg(all(feature = "std", windows))]
-use crate::utils::startable_self;
-
-#[cfg(all(feature = "std", unix))]
-use crate::utils::{fork, ForkResult};
-
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::shmem::UnixShMemProvider;
-
-#[cfg(all(feature = "std", target_os = "android"))]
-use crate::bolts::os::ashmem_server::AshmemService;
-#[cfg(feature = "std")]
-use crate::bolts::shmem::StdShMemProvider;
 use crate::{
     bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, LlmpSender, Tag},
+        llmp::{self, Flag, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -39,6 +29,21 @@ use crate::{
     Error,
 };
 
+#[cfg(feature = "llmp_compression")]
+use crate::bolts::{
+    compress::GzipCompressor,
+    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
+};
+
+#[cfg(all(feature = "std", windows))]
+use crate::utils::startable_self;
+
+#[cfg(all(feature = "std", unix))]
+use crate::utils::{fork, ForkResult};
+
+#[cfg(all(feature = "std", target_os = "android"))]
+use crate::bolts::os::ashmem_server::AshmemService;
+
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
 /// Only handle this in the broker
@@ -46,7 +51,6 @@ const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
 /// Handle in both
 ///
 const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
@@ -61,43 +65,15 @@ where
 {
     stats: Option<ST>,
     llmp: llmp::LlmpConnection<SP>,
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
+
     phantom: PhantomData<(I, S)>,
 }
 
-#[cfg(feature = "std")]
-#[cfg(unix)]
-impl<I, S, ST> LlmpEventManager<I, S, UnixShMemProvider, ST>
-where
-    I: Input,
-    S: IfInteresting<I>,
-    ST: Stats,
-{
-    /// Create llmp on a port
-    /// If the port is not yet bound, it will act as broker
-    /// Else, it will act as client.
-    #[cfg(feature = "std")]
-    pub fn new_on_port_std(
-        shmem_provider: &Rc<RefCell<UnixShMemProvider>>,
-        stats: ST,
-        port: u16,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            stats: Some(stats),
-            llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
-            phantom: PhantomData,
-        })
-    }
-
-    /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
-    /// Std uses UnixShMem.
-    #[cfg(feature = "std")]
-    pub fn existing_client_from_env_std(
-        shmem_provider: &Rc<RefCell<UnixShMemProvider>>,
-        env_name: &str,
-    ) -> Result<Self, Error> {
-        Self::existing_client_from_env(shmem_provider, env_name)
-    }
-}
+/// The minimum buffer size at which to compress LLMP IPC messages.
+#[cfg(feature = "llmp_compression")]
+const COMPRESS_THRESHOLD: usize = 1024;
 
 impl<I, S, SP, ST> Drop for LlmpEventManager<I, S, SP, ST>
 where
@@ -123,29 +99,26 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port(
-        shmem_provider: &Rc<RefCell<SP>>,
-        stats: ST,
-        port: u16,
-    ) -> Result<Self, Error> {
+    pub fn new_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
         Ok(Self {
             stats: Some(stats),
             llmp: llmp::LlmpConnection::on_port(shmem_provider, port)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
 
     /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env(
-        shmem_provider: &Rc<RefCell<SP>>,
-        env_name: &str,
-    ) -> Result<Self, Error> {
+    pub fn existing_client_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
             stats: None,
             llmp: llmp::LlmpConnection::IsClient {
                 client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             },
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -159,7 +132,7 @@ where
 
     /// Create an existing client from description
     pub fn existing_client_from_description(
-        shmem_provider: &Rc<RefCell<SP>>,
+        shmem_provider: SP,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -168,6 +141,8 @@ where
                 shmem_provider,
                 description,
             )?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             // Inserting a nop-stats element here so rust won't complain.
             // In any case, the client won't currently use it.
             phantom: PhantomData,
@@ -195,10 +170,24 @@ where
         match &mut self.llmp {
             llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = self.stats.as_mut().unwrap();
+                #[cfg(feature = "llmp_compression")]
+                let compressor = &self.compressor;
                 broker.loop_forever(
-                    &mut |sender_id: u32, tag: Tag, msg: &[u8]| {
+                    &mut |sender_id: u32, tag: Tag, _flags: Flag, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
-                            let event: Event<I> = postcard::from_bytes(msg)?;
+                            #[cfg(not(feature = "llmp_compression"))]
+                            let event_bytes = msg;
+                            #[cfg(feature = "llmp_compression")]
+                            let compressed;
+                            #[cfg(feature = "llmp_compression")]
+                            let event_bytes =
+                                if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                                    compressed = compressor.decompress(msg)?;
+                                    &compressed
+                                } else {
+                                    msg
+                                };
+                            let event: Event<I> = postcard::from_bytes(event_bytes)?;
                             match Self::handle_in_broker(stats, sender_id, &event)? {
                                 BrokerEventResult::Forward => {
                                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
@@ -255,11 +244,11 @@ where
                 }
                 Ok(BrokerEventResult::Handled)
             }
-            #[cfg(feature = "perf_stats")]
+            #[cfg(feature = "introspection")]
             Event::UpdatePerfStats {
                 time,
                 executions,
-                perf_stats,
+                introspection_stats,
                 phantom: _,
             } => {
                 // TODO: The stats buffer should be added on client add.
@@ -271,7 +260,7 @@ where
                 client.update_executions(*executions as u64, *time);
 
                 // Update the performance stats for this client
-                client.update_perf_stats(*perf_stats);
+                client.update_introspection_stats(*introspection_stats);
 
                 // Display the stats via `.display` only on core #1
                 if sender_id == 1 {
@@ -331,7 +320,7 @@ where
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
-                let fitness = state.is_interesting(&input, &observers, ExitKind::Ok)?;
+                let fitness = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
                 if fitness > 0
                     && state
                         .add_if_interesting(&input, fitness, scheduler)?
@@ -381,11 +370,22 @@ where
         let mut events = vec![];
         match &mut self.llmp {
             llmp::LlmpConnection::IsClient { client } => {
-                while let Some((sender_id, tag, msg)) = client.recv_buf()? {
+                while let Some((sender_id, tag, _flags, msg)) = client.recv_buf_with_flags()? {
                     if tag == _LLMP_TAG_EVENT_TO_BROKER {
                         panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
                     }
-                    let event: Event<I> = postcard::from_bytes(msg)?;
+                    #[cfg(not(feature = "llmp_compression"))]
+                    let event_bytes = msg;
+                    #[cfg(feature = "llmp_compression")]
+                    let compressed;
+                    #[cfg(feature = "llmp_compression")]
+                    let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                        compressed = self.compressor.decompress(msg)?;
+                        &compressed
+                    } else {
+                        msg
+                    };
+                    let event: Event<I> = postcard::from_bytes(event_bytes)?;
                     events.push((sender_id, event));
                 }
             }
@@ -401,6 +401,27 @@ where
         Ok(count)
     }
 
+    #[cfg(feature = "llmp_compression")]
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+        let serialized = postcard::to_allocvec(&event)?;
+        let flags: Flag = LLMP_FLAG_INITIALIZED;
+
+        match self.compressor.compress(&serialized)? {
+            Some(comp_buf) => {
+                self.llmp.send_buf_with_flags(
+                    LLMP_TAG_EVENT_TO_BOTH,
+                    &comp_buf,
+                    flags | LLMP_FLAG_COMPRESSED,
+                )?;
+            }
+            None => {
+                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "llmp_compression"))]
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
@@ -427,7 +448,7 @@ where
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 #[allow(clippy::type_complexity)]
 pub fn deserialize_state_mgr<I, S, SP, ST>(
-    shmem_provider: &Rc<RefCell<SP>>,
+    shmem_provider: SP,
     state_corpus_serialized: &[u8],
 ) -> Result<(S, LlmpEventManager<I, S, SP, ST>), Error>
 where
@@ -552,7 +573,7 @@ where
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Error starting Ashmem Service");
 
-    setup_restarting_mgr(StdShMemProvider::new(), stats, broker_port)
+    setup_restarting_mgr(StdShMemProvider::new()?, stats, broker_port)
 }
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
@@ -564,7 +585,7 @@ where
     clippy::similar_names
 )] // for { mgr = LlmpEventManager... }
 pub fn setup_restarting_mgr<I, S, SP, ST>(
-    shmem_provider: SP,
+    mut shmem_provider: SP,
     //mgr: &mut LlmpEventManager<I, S, SH, ST>,
     stats: ST,
     broker_port: u16,
@@ -575,13 +596,13 @@ where
     SP: ShMemProvider,
     ST: Stats,
 {
-    let shmem_provider = Rc::new(RefCell::new(shmem_provider));
-
     let mut mgr =
-        LlmpEventManager::<I, S, SP, ST>::new_on_port(&shmem_provider, stats, broker_port)?;
+        LlmpEventManager::<I, S, SP, ST>::new_on_port(shmem_provider.clone(), stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
-    let (sender, mut receiver, shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+    let (sender, mut receiver, mut new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER)
+        .is_err()
+    {
         if mgr.is_broker() {
             // Yep, broker. Just loop here.
             println!("Doing broker things. Run this tool again to start fuzzing in a client.");
@@ -593,13 +614,9 @@ where
         mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
         // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-        let sender = { LlmpSender::new(&shmem_provider, 0, false)? };
+        let sender = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
 
-        let map = {
-            shmem_provider
-                .borrow_mut()
-                .clone_ref(&sender.out_maps.last().unwrap().shmem)?
-        };
+        let map = { shmem_provider.clone_ref(&sender.out_maps.last().unwrap().shmem)? };
         let receiver = LlmpReceiver::on_existing_map(shmem_provider.clone(), map, None)?;
         // Store the information to a map.
         sender.to_env(_ENV_FUZZER_SENDER)?;
@@ -612,18 +629,25 @@ where
 
             // On Unix, we fork (todo: measure if that is actually faster.)
             #[cfg(unix)]
-            let _ = match unsafe { fork() }? {
+            let child_status = match unsafe { fork() }? {
                 ForkResult::Parent(handle) => handle.status(),
                 ForkResult::Child => break (sender, receiver, shmem_provider),
             };
 
             // On windows, we spawn ourself again
             #[cfg(windows)]
-            startable_self()?.status()?;
+            let child_status = startable_self()?.status()?;
 
             if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
+                #[cfg(unix)]
+                if child_status == 137 {
+                    // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
+                    // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
+                    panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
+                }
+
                 // Storing state in the last round did not work
-                panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client!");
+                panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! (Child exited with: {})", child_status);
             }
 
             ctr = ctr.wrapping_add(1);
@@ -633,13 +657,15 @@ where
         // A sender and a receiver for single communication
         // Clone so we get a new connection to the AshmemServer if we are using
         // ServedShMemProvider
-        let shmem_provider = Rc::new(RefCell::new(shmem_provider.borrow_mut().clone()));
+        shmem_provider.post_fork();
         (
-            LlmpSender::on_existing_from_env(&shmem_provider, _ENV_FUZZER_SENDER)?,
-            LlmpReceiver::on_existing_from_env(&shmem_provider, _ENV_FUZZER_RECEIVER)?,
+            LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
+            LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
             shmem_provider,
         )
     };
+
+    new_shmem_provider.post_fork();
 
     println!("We're a client, let's fuzz :)");
 
@@ -653,7 +679,7 @@ where
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
             let client_mgr = LlmpEventManager::<I, S, SP, ST>::existing_client_from_env(
-                &shmem_provider,
+                new_shmem_provider,
                 _ENV_FUZZER_BROKER_CLIENT_INITIAL,
             )?;
 
@@ -663,7 +689,7 @@ where
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
             let (state, mgr): (S, LlmpEventManager<I, S, SP, ST>) =
-                deserialize_state_mgr(&shmem_provider, &msg)?;
+                deserialize_state_mgr(new_shmem_provider, &msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))
         }

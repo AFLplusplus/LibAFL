@@ -5,10 +5,9 @@ use serde::{Deserialize, Serialize};
 use alloc::{string::String, vec::Vec};
 use core::{time, time::Duration};
 
-#[cfg(feature = "std")]
-use std::convert::TryInto;
-
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "introspection")]
+use alloc::string::ToString;
+#[cfg(feature = "introspection")]
 use core::convert::TryInto;
 
 use crate::utils::current_time;
@@ -33,8 +32,8 @@ pub struct ClientStats {
     pub last_execs_per_sec: f32,
 
     /// Client performance statistics
-    #[cfg(feature = "perf_stats")]
-    pub perf_stats: ClientPerfStats,
+    #[cfg(feature = "introspection")]
+    pub introspection_stats: ClientPerfStats,
 }
 
 impl ClientStats {
@@ -92,9 +91,9 @@ impl ClientStats {
     }
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
-    #[cfg(feature = "perf_stats")]
-    pub fn update_perf_stats(&mut self, perf_stats: ClientPerfStats) {
-        self.perf_stats = perf_stats;
+    #[cfg(feature = "introspection")]
+    pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
+        self.introspection_stats = introspection_stats;
     }
 }
 
@@ -199,16 +198,16 @@ where
         (self.print_fn)(fmt);
 
         // Only print perf stats if the feature is enabled
-        #[cfg(feature = "perf_stats")]
+        #[cfg(feature = "introspection")]
         {
             // Print the client performance stats. Skip the Client 0 which is the broker
             for (i, client) in self.client_stats.iter().skip(1).enumerate() {
-                let fmt = format!("Client {:03}: {}", i + 1, client.perf_stats);
+                let fmt = format!("Client {:03}: {}", i + 1, client.introspection_stats);
                 (self.print_fn)(fmt);
             }
 
             // Separate the spacing just a bit
-            print!("\n");
+            (self.print_fn)("\n".to_string());
         }
     }
 }
@@ -240,8 +239,8 @@ where
 macro_rules! start_timer {
     ($state:expr) => {{
         // Start the timer
-        #[cfg(feature = "perf_stats")]
-        $state.perf_stats_mut().start_timer();
+        #[cfg(feature = "introspection")]
+        $state.introspection_stats_mut().start_timer();
     }};
 }
 
@@ -249,8 +248,8 @@ macro_rules! start_timer {
 macro_rules! mark_feature_time {
     ($state:expr, $feature:expr) => {{
         // Mark the elapsed time for the given feature
-        #[cfg(feature = "perf_stats")]
-        $state.perf_stats_mut().mark_feature_time($feature);
+        #[cfg(feature = "introspection")]
+        $state.introspection_stats_mut().mark_feature_time($feature);
     }};
 }
 
@@ -258,8 +257,8 @@ macro_rules! mark_feature_time {
 macro_rules! mark_feedback_time {
     ($state:expr) => {{
         // Mark the elapsed time for the given feature
-        #[cfg(feature = "perf_stats")]
-        $state.perf_stats_mut().mark_feedback_time();
+        #[cfg(feature = "introspection")]
+        $state.introspection_stats_mut().mark_feedback_time();
     }};
 }
 
@@ -387,9 +386,10 @@ impl From<usize> for PerfFeature {
 }
 
 /// Number of features we can measure for performance
+#[cfg(feature = "introspection")]
 const NUM_PERF_FEATURES: usize = PerfFeature::Count as usize;
 
-#[cfg(feature = "perf_stats")]
+#[cfg(feature = "introspection")]
 impl ClientPerfStats {
     /// Create a blank [`ClientPerfStats`] with the `start_time` and `current_time` with
     /// the current clock counter
@@ -438,6 +438,7 @@ impl ClientPerfStats {
         match self.timer_start {
             None => {
                 // Warning message if marking time without starting the timer first
+                #[cfg(feature = "std")]
                 eprint!("Attempted to `mark_time` without starting timer first.");
 
                 // Return 0 for no time marked
@@ -598,7 +599,7 @@ impl ClientPerfStats {
     }
 }
 
-#[cfg(feature = "perf_stats")]
+#[cfg(feature = "introspection")]
 impl core::fmt::Display for ClientPerfStats {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         // Calculate the elapsed time from the stats
@@ -676,7 +677,7 @@ impl core::fmt::Display for ClientPerfStats {
     }
 }
 
-#[cfg(feature = "perf_stats")]
+#[cfg(feature = "introspection")]
 impl Default for ClientPerfStats {
     fn default() -> Self {
         Self::new()

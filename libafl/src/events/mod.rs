@@ -17,7 +17,7 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "perf_stats")]
+#[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
 
 /// The log event severity
@@ -101,7 +101,7 @@ where
         phantom: PhantomData<I>,
     },
     /// New stats with performance stats.
-    #[cfg(feature = "perf_stats")]
+    #[cfg(feature = "introspection")]
     UpdatePerfStats {
         /// The time of generation of the event
         time: Duration,
@@ -110,7 +110,7 @@ where
         executions: usize,
 
         /// Current performance statistics
-        perf_stats: ClientPerfStats,
+        introspection_stats: ClientPerfStats,
 
         phantom: PhantomData<I>,
     },
@@ -153,11 +153,11 @@ where
                 executions: _,
                 phantom: _,
             } => "Stats",
-            #[cfg(feature = "perf_stats")]
+            #[cfg(feature = "introspection")]
             Event::UpdatePerfStats {
                 time: _,
                 executions: _,
-                perf_stats: _,
+                introspection_stats: _,
                 phantom: _,
             } => "PerfStats",
             Event::Objective { objective_size: _ } => "Objective",

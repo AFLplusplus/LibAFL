@@ -19,10 +19,13 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     start_timer,
-    stats::{ClientPerfStats, PerfFeature},
+    stats::ClientPerfStats,
     utils::Rand,
     Error,
 };
+
+#[cfg(feature = "introspection")]
+use crate::stats::PerfFeature;
 
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
@@ -76,10 +79,10 @@ where
 /// Trait for offering a [`ClientPerfStats`]
 pub trait HasClientPerfStats {
     /// [`ClientPerfStats`] itself
-    fn perf_stats(&self) -> &ClientPerfStats;
+    fn introspection_stats(&self) -> &ClientPerfStats;
 
     /// Mutatable ref to [`ClientPerfStats`]
-    fn perf_stats_mut(&mut self) -> &mut ClientPerfStats;
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats;
 }
 
 /// Trait for elements offering metadata
@@ -181,7 +184,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple;
@@ -250,8 +253,8 @@ where
     max_size: usize,
 
     /// Performance statistics for this fuzzer
-    #[cfg(feature = "perf_stats")]
-    perf_stats: ClientPerfStats,
+    #[cfg(feature = "introspection")]
+    introspection_stats: ClientPerfStats,
 
     phantom: PhantomData<I>,
 }
@@ -410,14 +413,14 @@ where
     }
 }
 
-/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "perf_stats"
-/// feature is enabled, and only [`HasExecution`] when "perf_stats" is disabled
-#[cfg(feature = "perf_stats")]
+/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "introspection"
+/// feature is enabled, and only [`HasExecution`] when "introspection" is disabled
+#[cfg(feature = "introspection")]
 pub trait HasFuzzerStats: HasExecutions + HasClientPerfStats {}
 
-/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "perf_stats"
-/// feature is enabled, and only [`HasExecution`] when "perf_stats" is disabled
-#[cfg(not(feature = "perf_stats"))]
+/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "introspection"
+/// feature is enabled, and only [`HasExecution`] when "introspection" is disabled
+#[cfg(not(feature = "introspection"))]
 pub trait HasFuzzerStats: HasExecutions {}
 
 impl<C, FT, I, OFT, R, SC> HasFuzzerStats for State<C, FT, I, OFT, R, SC>
@@ -485,7 +488,7 @@ where
         &mut self,
         input: &I,
         observers: &OT,
-        exit_kind: ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<u32, Error>
     where
         OT: ObserversTuple,
@@ -706,29 +709,30 @@ where
         mark_feature_time!(self, PerfFeature::PostExecObservers);
 
         let observers = executor.observers();
-        #[cfg(not(feature = "perf_stats"))]
-        let fitness =
-            self.feedbacks_mut()
-                .is_interesting_all(&input, observers, exit_kind.clone())?;
+        #[cfg(not(feature = "introspection"))]
+        let fitness = self
+            .feedbacks_mut()
+            .is_interesting_all(&input, observers, &exit_kind)?;
 
-        #[cfg(feature = "perf_stats")]
+        #[cfg(feature = "introspection")]
         let fitness = {
             // Init temporary feedback stats here. We can't use the typical pattern above
             // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
             // new `mut self` to `is_interesting_all_with_perf`. We use this stack
             // variable to get the stats and then update the feedbacks directly
             let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
-            let mut feedback_index = 0;
+            let feedback_index = 0;
             let fitness = self.feedbacks_mut().is_interesting_all_with_perf(
                 &input,
                 observers,
-                exit_kind.clone(),
+                &exit_kind,
                 &mut feedback_stats,
                 feedback_index,
             )?;
 
             // Update the feedback stats
-            self.perf_stats_mut().update_feedbacks(feedback_stats);
+            self.introspection_stats_mut()
+                .update_feedbacks(feedback_stats);
 
             // Return the total fitness
             fitness
@@ -737,7 +741,7 @@ where
         start_timer!(self);
         let is_solution = self
             .objectives_mut()
-            .is_interesting_all(&input, observers, exit_kind)?
+            .is_interesting_all(&input, observers, &exit_kind)?
             > 0;
         mark_feature_time!(self, PerfFeature::GetObjectivesInterestingAll);
 
@@ -791,14 +795,14 @@ where
             solutions,
             objectives,
             max_size: DEFAULT_MAX_SIZE,
-            #[cfg(feature = "perf_stats")]
-            perf_stats: ClientPerfStats::new(),
+            #[cfg(feature = "introspection")]
+            introspection_stats: ClientPerfStats::new(),
             phantom: PhantomData,
         }
     }
 }
 
-#[cfg(feature = "perf_stats")]
+#[cfg(feature = "introspection")]
 impl<C, FT, I, OFT, R, SC> HasClientPerfStats for State<C, FT, I, OFT, R, SC>
 where
     C: Corpus<I>,
@@ -808,16 +812,16 @@ where
     SC: Corpus<I>,
     OFT: FeedbacksTuple<I>,
 {
-    fn perf_stats(&self) -> &ClientPerfStats {
-        &self.perf_stats
+    fn introspection_stats(&self) -> &ClientPerfStats {
+        &self.introspection_stats
     }
 
-    fn perf_stats_mut(&mut self) -> &mut ClientPerfStats {
-        &mut self.perf_stats
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
+        &mut self.introspection_stats
     }
 }
 
-#[cfg(not(feature = "perf_stats"))]
+#[cfg(not(feature = "introspection"))]
 impl<C, FT, I, OFT, R, SC> HasClientPerfStats for State<C, FT, I, OFT, R, SC>
 where
     C: Corpus<I>,
@@ -827,11 +831,11 @@ where
     SC: Corpus<I>,
     OFT: FeedbacksTuple<I>,
 {
-    fn perf_stats(&self) -> &ClientPerfStats {
+    fn introspection_stats(&self) -> &ClientPerfStats {
         unimplemented!()
     }
 
-    fn perf_stats_mut(&mut self) -> &mut ClientPerfStats {
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
         unimplemented!()
     }
 }

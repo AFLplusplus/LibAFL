@@ -20,7 +20,7 @@ which = { version = "4.0.2" }
 num_cpus = "1.0"
 
 [dependencies]
-libafl = { path = "../../libafl/", features = ["default", "perf_stats"] }
+libafl = { path = "../../libafl/", features = ["default", "introspection"] }
 # libafl = { path = "../../libafl/", features = ["default"] }
 libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc

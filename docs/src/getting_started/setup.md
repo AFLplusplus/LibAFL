@@ -37,17 +37,17 @@ In addition, if you want to perform source-level fuzz testing of C/C++ applicati
 you will likely need Clang with its instrumentation options to compile the programs
 under test.
 
-You can download and build the LLVM source tree, Clang included, following the steps
-explained [here](https://clang.llvm.org/get_started.html).
-
-Alternatively, on Linux, you can use your distro's package manager to get Clang,
+On Linux you can use your distro's package manager to get Clang,
 but these packages are not always updated, so we suggest you to use the
 Debian/Ubuntu prebuilt packages from LLVM that are available using their [official repository](https://apt.llvm.org/).
 
-For Miscrosoft Windows, you can download the [installer package](https://llvm.org/builds/) that LLVM generates periodically.
+For Microsoft Windows, you can download the [installer package](https://llvm.org/builds/) that LLVM generates periodically.
 
 Despite that Clang is the default C compiler on macOS, we discourage the use of the build shipped by Apple and encourage
-the installation from `brew` or direclty a fresh build from the source code.
+the installation from `brew` or directly a fresh build from the source code.
+
+Alternatively you can download and build the LLVM source tree - Clang included - following the steps
+explained [here](https://clang.llvm.org/get_started.html).
 
 ## Rust installation
 

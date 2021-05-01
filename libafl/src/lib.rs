@@ -3,7 +3,6 @@ Welcome to libAFL
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "perf_stats", feature(link_llvm_intrinsics))]
 
 #[macro_use]
 extern crate alloc;
@@ -52,6 +51,9 @@ use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
 pub enum Error {
     /// Serialization error
     Serialize(String),
+    /// Compression error
+    #[cfg(feature = "llmp_compression")]
+    Compression(String),
     /// File related error
     #[cfg(feature = "std")]
     File(io::Error),
@@ -79,6 +81,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Serialize(s) => write!(f, "Error in Serialization: `{0}`", &s),
+            #[cfg(feature = "llmp_compression")]
+            Self::Compression(s) => write!(f, "Error in Compression: `{0}`", &s),
             #[cfg(feature = "std")]
             Self::File(err) => write!(f, "File IO failed: {:?}", &err),
             Self::EmptyOptional(s) => write!(f, "Optional value `{0}` was not set", &s),
@@ -100,6 +104,13 @@ impl fmt::Display for Error {
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
         Self::Serialize(format!("{:?}", err))
+    }
+}
+
+#[cfg(feature = "llmp_compression")]
+impl From<compression::prelude::CompressionError> for Error {
+    fn from(err: compression::prelude::CompressionError) -> Self {
+        Self::Compression(format!("{:?}", err))
     }
 }
 

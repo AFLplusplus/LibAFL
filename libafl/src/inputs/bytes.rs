@@ -11,10 +11,11 @@ use std::{
     path::Path,
 };
 
+#[cfg(feature = "std")]
+use crate::Error;
 use crate::{
     bolts::ownedref::OwnedSlice,
     inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
-    Error,
 };
 
 /// A bytes input is the basic input

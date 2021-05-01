@@ -11,10 +11,12 @@ use crate::{
     stages::Stage,
     start_timer,
     state::{Evaluator, HasClientPerfStats, HasCorpus, HasRand},
-    stats::PerfFeature,
     utils::Rand,
     Error,
 };
+
+#[cfg(feature = "introspection")]
+use crate::stats::PerfFeature;
 
 // TODO multi mutators stage
 
