@@ -87,6 +87,14 @@ Check the [TODO.md](./TODO.md) file for features that we plan to support.
 
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
 
+Even though we will gladly assist you in finishing up your PR, try to
+- use *stable* rust
+- run `cargo fmt` on your code before pushing
+- check the output of `cargo clippy --all` or `./clippy.sh`
+- run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
+
+Some of the parts in this list may be hard, don't be afraid to open a PR if you cannot fix them by yourself, so we can help.
+
 #### License
 
 <sup>
