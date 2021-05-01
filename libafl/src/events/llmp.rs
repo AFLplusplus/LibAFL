@@ -5,7 +5,7 @@ use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
-use core::ptr::read_volatile;
+use core::ptr::{addr_of, read_volatile};
 
 #[cfg(feature = "std")]
 use crate::bolts::{
@@ -610,7 +610,9 @@ where
             #[cfg(windows)]
             let child_status = startable_self()?.status()?;
 
-            if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
+            if unsafe { read_volatile(addr_of!((*receiver.current_recv_map.page()).size_used)) }
+                == 0
+            {
                 #[cfg(unix)]
                 if child_status == 137 {
                     // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
