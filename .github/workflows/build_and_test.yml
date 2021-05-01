@@ -61,8 +61,7 @@ jobs:
     - name: Run clippy
       uses: actions-rs/cargo@v1
       with:
-        command: clippy
-        args: --all
+        command: ./clippy.sh
   windows:
     runs-on: windows-latest
     steps:
