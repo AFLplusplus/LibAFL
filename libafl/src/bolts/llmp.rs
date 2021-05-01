@@ -328,7 +328,7 @@ where
     stream.write_all(&msg)?;
 
     #[cfg(feature = "llmp_debug")]
-    println!("LLMP TCP: Send finished", msg.len());
+    println!("LLMP TCP: Sending {} bytes finished.", msg.len());
 
     Ok(())
 }
