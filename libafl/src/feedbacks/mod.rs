@@ -11,7 +11,7 @@ use crate::{
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
-    observers::{ObserversTuple, TimeObserver, ReachabilityObserver},
+    observers::{ObserversTuple, ReachabilityObserver, TimeObserver},
     Error,
 };
 
@@ -254,12 +254,11 @@ impl Default for TimeFeedback {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ReachabilityFeedback {
-}
+pub struct ReachabilityFeedback {}
 
-impl ReachabilityFeedback{
-    pub fn new() -> Self{
-        Self{}
+impl ReachabilityFeedback {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -273,19 +272,20 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<u32, Error> {
-        let observer = observers.match_first_type::<ReachabilityObserver>().unwrap();
-        if observer.has_reached(){
+        let observer = observers
+            .match_first_type::<ReachabilityObserver>()
+            .unwrap();
+        if observer.has_reached() {
             Ok(1)
-        }
-        else{
+        } else {
             Ok(0)
         }
     }
 }
 
-impl Named for ReachabilityFeedback{
+impl Named for ReachabilityFeedback {
     #[inline]
-    fn name(&self) -> &str{
+    fn name(&self) -> &str {
         "ReachabilityFeedback"
     }
 }
