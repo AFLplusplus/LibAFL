@@ -80,7 +80,7 @@ Generators are traditionally less used in Feedback-driven Fuzzing, but there are
 
 A Stage is an entity that operates on a single Input got from the Corpus.
 
-For instamce, a Mutational Stage, given an input of the corpus, applies a Mutator and executes the generated input one or more time. How many times this has to be done can be scheduled, AFL for instance use a performance score of the input to choose how many times the havoc mutator should be invoked. This can depends also on other parameters, for instance, the length of the input if we want to just apply a sequential bitflip, or be a fixed value.
+For instance, a Mutational Stage, given an input of the corpus, applies a Mutator and executes the generated input one or more time. How many times this has to be done can be scheduled, AFL for instance use a performance score of the input to choose how many times the havoc mutator should be invoked. This can depends also on other parameters, for instance, the length of the input if we want to just apply a sequential bitflip, or be a fixed value.
 
 A stage can be also an analysis stage, for instance, the Colorization stage of Redqueen that aims to introduce more entropy in a testcase or the Trimming stage of AFL that aims to reduce the size of a testcase.
 
