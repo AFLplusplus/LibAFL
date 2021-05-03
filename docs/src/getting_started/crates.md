@@ -11,7 +11,7 @@ This is the main crate that contains all the components needed to build a fuzzer
 
 This crate has the following feature flags:
 
-- std, that enables the parts of the code that use the Rust standard library. Without this flags, libafl is no_std.
+- std, that enables the parts of the code that use the Rust standard library. Without this flag, libafl is no_std.
 - derive, that enables the usage of the `derive(...)` macros defined in libafl_derive from libafl.
 
 By default, std and derive are both set.
