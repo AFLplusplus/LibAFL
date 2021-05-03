@@ -390,7 +390,7 @@ where
     }
 
     fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        if self.target_idx.len() > 0 {
+        if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
             testcase.add_metadata(meta);
         };
