@@ -593,6 +593,7 @@ extern "C" {
 
 pub struct AsanRuntime {
     regs: [usize; 32],
+    blob_report: Option<Box<[u8]>>,
     blob_check_mem_byte: Option<Box<[u8]>>,
     blob_check_mem_halfword: Option<Box<[u8]>>,
     blob_check_mem_dword: Option<Box<[u8]>>,
@@ -677,6 +678,7 @@ impl AsanRuntime {
     pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
         let res = Rc::new(RefCell::new(Self {
             regs: [0; 32],
+            blob_report: None,
             blob_check_mem_byte: None,
             blob_check_mem_halfword: None,
             blob_check_mem_dword: None,
@@ -1413,113 +1415,12 @@ impl AsanRuntime {
         }
     }
 
-    /// Generate the instrumentation blobs for the current arch.
-    #[allow(clippy::similar_names)] // We allow things like dword and qword
-    fn generate_instrumentation_blobs(&mut self) {
+    fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
         let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check {
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch aarch64
-                //; brk #5
-                ; b >skip_report
 
-                ; report:
-                ; stp x29, x30, [sp, #-0x10]!
-                ; mov x29, sp
-
-                ; ldr x0, >self_regs_addr
-                ; stp x2, x3, [x0, #0x10]
-                ; stp x4, x5, [x0, #0x20]
-                ; stp x6, x7, [x0, #0x30]
-                ; stp x8, x9, [x0, #0x40]
-                ; stp x10, x11, [x0, #0x50]
-                ; stp x12, x13, [x0, #0x60]
-                ; stp x14, x15, [x0, #0x70]
-                ; stp x16, x17, [x0, #0x80]
-                ; stp x18, x19, [x0, #0x90]
-                ; stp x20, x21, [x0, #0xa0]
-                ; stp x22, x23, [x0, #0xb0]
-                ; stp x24, x25, [x0, #0xc0]
-                ; stp x26, x27, [x0, #0xd0]
-                ; stp x28, x29, [x0, #0xe0]
-                ; stp x30, xzr, [x0, #0xf0]
-                ; mov x28, x0
-                ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
-                //; ldp x0, x1, [sp], #144
-                ; ldp x0, x1, [sp, 0x10]
-                ; stp x0, x1, [x28]
-
-                ; adr x25, >done
-                ; str x25, [x28, 0xf8]
-
-                ; adr x25, <report
-                ; adr x0, >eh_frame_fde
-                ; adr x27, >fde_address
-                ; ldr w26, [x27]
-                ; cmp w26, #0x0
-                ; b.ne >skip_register
-                ; sub x25, x25, x27
-                ; str w25, [x27]
-                ; ldr x1, >register_frame_func
-                //; brk #11
-                ; blr x1
-                ; skip_register:
-                ; ldr x0, >self_addr
-                ; ldr x1, >trap_func
-                ; blr x1
-
-                ; .dword (0xd51b4218u32 as i32) // msr nzcv, x24
-                ; ldr x0, >self_regs_addr
-                ; ldp x2, x3, [x0, #0x10]
-                ; ldp x4, x5, [x0, #0x20]
-                ; ldp x6, x7, [x0, #0x30]
-                ; ldp x8, x9, [x0, #0x40]
-                ; ldp x10, x11, [x0, #0x50]
-                ; ldp x12, x13, [x0, #0x60]
-                ; ldp x14, x15, [x0, #0x70]
-                ; ldp x16, x17, [x0, #0x80]
-                ; ldp x18, x19, [x0, #0x90]
-                ; ldp x20, x21, [x0, #0xa0]
-                ; ldp x22, x23, [x0, #0xb0]
-                ; ldp x24, x25, [x0, #0xc0]
-                ; ldp x26, x27, [x0, #0xd0]
-                ; ldp x28, x29, [x0, #0xe0]
-                ; ldp x30, xzr, [x0, #0xf0]
-
-                ; ldp x29, x30, [sp], #0x10
-                ; b >done
-                ; self_addr:
-                ; .qword self as *mut _  as *mut c_void as i64
-                ; self_regs_addr:
-                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
-                ; trap_func:
-                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
-                ; register_frame_func:
-                ; .qword __register_frame as *mut c_void as i64
-                ; eh_frame_cie:
-                ; .dword 0x14
-                ; .dword 0x00
-                ; .dword 0x00527a01
-                ; .dword 0x011e7c01
-                ; .dword 0x001f0c1b
-                ; eh_frame_fde:
-                ; .dword 0x14
-                ; .dword 0x18
-                ; fde_address:
-                ; .dword 0x0 // <-- address offset goes here
-                ; .dword 0x104
-                    //advance_loc 12
-                    //def_cfa r29 (x29) at offset 16
-                    //offset r30 (x30) at cfa-8
-                    //offset r29 (x29) at cfa-16
-                ; .dword 0x1d0c4c00
-                ; .dword (0x9d029e10 as u32 as i32)
-                ; .dword 0x04
-                // empty next FDE:
-                ; .dword 0x0
-                ; .dword 0x0
-
-                ; skip_report:
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
@@ -1531,115 +1432,26 @@ impl AsanRuntime {
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
                 ; tbnz x1, #$bit, >done
-                ; b <report
 
+                ; adr x1, >done
+                ; nop // will be replaced by b to report
                 ; done:
             );};
         }
 
+        let mut ops =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check!(ops, bit);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
+    }
+
+    fn generate_shadow_check_exact_blob(&mut self, val: u32) -> Box<[u8]> {
+        let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check_exact {
             ($ops:ident, $val:expr) => {dynasm!($ops
                 ; .arch aarch64
-                ; b >skip_report
 
-                ; report:
-                ; stp x29, x30, [sp, #-0x10]!
-                ; mov x29, sp
-
-                ; ldr x0, >self_regs_addr
-                ; stp x2, x3, [x0, #0x10]
-                ; stp x4, x5, [x0, #0x20]
-                ; stp x6, x7, [x0, #0x30]
-                ; stp x8, x9, [x0, #0x40]
-                ; stp x10, x11, [x0, #0x50]
-                ; stp x12, x13, [x0, #0x60]
-                ; stp x14, x15, [x0, #0x70]
-                ; stp x16, x17, [x0, #0x80]
-                ; stp x18, x19, [x0, #0x90]
-                ; stp x20, x21, [x0, #0xa0]
-                ; stp x22, x23, [x0, #0xb0]
-                ; stp x24, x25, [x0, #0xc0]
-                ; stp x26, x27, [x0, #0xd0]
-                ; stp x28, x29, [x0, #0xe0]
-                ; stp x30, xzr, [x0, #0xf0]
-                ; mov x28, x0
-                ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
-                ; ldp x0, x1, [sp, 0x10]
-                ; stp x0, x1, [x28]
-
-                ; adr x25, >done
-                ; add x25, x25, 4
-                ; str x25, [x28, 0xf8]
-
-                ; adr x25, <report
-                ; adr x0, >eh_frame_fde
-                ; adr x27, >fde_address
-                ; ldr w26, [x27]
-                ; cmp w26, #0x0
-                ; b.ne >skip_register
-                ; sub x25, x25, x27
-                ; str w25, [x27]
-                ; ldr x1, >register_frame_func
-                //; brk #11
-                ; blr x1
-                ; skip_register:
-                ; ldr x0, >self_addr
-                ; ldr x1, >trap_func
-                ; blr x1
-
-                ; .dword (0xd51b4218u32 as i32) // msr nzcv, x24
-                ; ldr x0, >self_regs_addr
-                ; ldp x2, x3, [x0, #0x10]
-                ; ldp x4, x5, [x0, #0x20]
-                ; ldp x6, x7, [x0, #0x30]
-                ; ldp x8, x9, [x0, #0x40]
-                ; ldp x10, x11, [x0, #0x50]
-                ; ldp x12, x13, [x0, #0x60]
-                ; ldp x14, x15, [x0, #0x70]
-                ; ldp x16, x17, [x0, #0x80]
-                ; ldp x18, x19, [x0, #0x90]
-                ; ldp x20, x21, [x0, #0xa0]
-                ; ldp x22, x23, [x0, #0xb0]
-                ; ldp x24, x25, [x0, #0xc0]
-                ; ldp x26, x27, [x0, #0xd0]
-                ; ldp x28, x29, [x0, #0xe0]
-                ; ldp x30, xzr, [x0, #0xf0]
-
-                ; ldp x29, x30, [sp], #0x10
-                ; b >done
-                ; self_addr:
-                ; .qword self as *mut _  as *mut c_void as i64
-                ; self_regs_addr:
-                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
-                ; trap_func:
-                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
-                ; register_frame_func:
-                ; .qword __register_frame as *mut c_void as i64
-                ; eh_frame_cie:
-                ; .dword 0x14
-                ; .dword 0x00
-                ; .dword 0x00527a01
-                ; .dword 0x011e7c01
-                ; .dword 0x001f0c1b
-                ; eh_frame_fde:
-                ; .dword 0x14
-                ; .dword 0x18
-                ; fde_address:
-                ; .dword 0x0 // <-- address offset goes here
-                ; .dword 0x104
-                    //advance_loc 12
-                    //def_cfa r29 (x29) at offset 16
-                    //offset r30 (x30) at cfa-8
-                    //offset r29 (x29) at cfa-16
-                ; .dword 0x1d0c4c00
-                ; .dword (0x9d029e10 as u32 as i32)
-                ; .dword 0x04
-                // empty next FDE:
-                ; .dword 0x0
-                ; .dword 0x0
-
-
-                ; skip_report:
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
@@ -1651,92 +1463,155 @@ impl AsanRuntime {
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
                 ; .dword -717536768 // 0xd53b4200 //mrs x0, NZCV
-                ; and x1, x1, #$val
+                ; and x1, x1, #$val as u64
                 ; cmp x1, #$val
                 ; b.eq >done
-                ; b <report
 
+                ; adr x1, >done
+                ; nop // will be replaced by b to report
                 ; done:
-                ; .dword -719633920 //0xd51b4200 // msr nvcz, x0
             );};
         }
 
-        let mut ops_check_mem_byte =
+        let mut ops =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_byte, 0);
-        self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_halfword =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_halfword, 1);
-        self.blob_check_mem_halfword = Some(
-            ops_check_mem_halfword
-                .finalize()
-                .unwrap()
-                .into_boxed_slice(),
-        );
-
-        let mut ops_check_mem_dword =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_dword, 2);
-        self.blob_check_mem_dword =
-            Some(ops_check_mem_dword.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_qword =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_qword, 3);
-        self.blob_check_mem_qword =
-            Some(ops_check_mem_qword.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_16bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_16bytes, 4);
-        self.blob_check_mem_16bytes =
-            Some(ops_check_mem_16bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_3bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_3bytes, 3);
-        self.blob_check_mem_3bytes =
-            Some(ops_check_mem_3bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_6bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_6bytes, 6);
-        self.blob_check_mem_6bytes =
-            Some(ops_check_mem_6bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_12bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_12bytes, 12);
-        self.blob_check_mem_12bytes =
-            Some(ops_check_mem_12bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_24bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_24bytes, 24);
-        self.blob_check_mem_24bytes =
-            Some(ops_check_mem_24bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_32bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_32bytes, 32);
-        self.blob_check_mem_32bytes =
-            Some(ops_check_mem_32bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_48bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_48bytes, 48);
-        self.blob_check_mem_48bytes =
-            Some(ops_check_mem_48bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_64bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_64bytes, 64);
-        self.blob_check_mem_64bytes =
-            Some(ops_check_mem_64bytes.finalize().unwrap().into_boxed_slice());
+        shadow_check_exact!(ops, val);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
 
+    ///
+    /// Generate the instrumentation blobs for the current arch.
+    #[allow(clippy::similar_names)] // We allow things like dword and qword
+    fn generate_instrumentation_blobs(&mut self) {
+        let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        dynasm!(ops_report
+            ; .arch aarch64
+
+            ; report:
+            ; stp x29, x30, [sp, #-0x10]!
+            ; mov x29, sp
+            // save the nvcz and the 'return-address'/address of instrumented instruction
+            ; stp x0, x1, [sp, #-0x10]!
+
+            ; ldr x0, >self_regs_addr
+            ; stp x2, x3, [x0, #0x10]
+            ; stp x4, x5, [x0, #0x20]
+            ; stp x6, x7, [x0, #0x30]
+            ; stp x8, x9, [x0, #0x40]
+            ; stp x10, x11, [x0, #0x50]
+            ; stp x12, x13, [x0, #0x60]
+            ; stp x14, x15, [x0, #0x70]
+            ; stp x16, x17, [x0, #0x80]
+            ; stp x18, x19, [x0, #0x90]
+            ; stp x20, x21, [x0, #0xa0]
+            ; stp x22, x23, [x0, #0xb0]
+            ; stp x24, x25, [x0, #0xc0]
+            ; stp x26, x27, [x0, #0xd0]
+            ; stp x28, x29, [x0, #0xe0]
+            ; stp x30, xzr, [x0, #0xf0]
+            ; mov x28, x0
+
+            ; mov x25, x1 // address of instrumented instruction.
+            ; str x25, [x28, 0xf8]
+
+            ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
+            ; ldp x0, x1, [sp, 0x20]
+            ; stp x0, x1, [x28]
+
+            ; adr x25, <report
+            ; adr x0, >eh_frame_fde
+            ; adr x27, >fde_address
+            ; ldr w26, [x27]
+            ; cmp w26, #0x0
+            ; b.ne >skip_register
+            ; sub x25, x25, x27
+            ; str w25, [x27]
+            ; ldr x1, >register_frame_func
+            //; brk #11
+            ; blr x1
+            ; skip_register:
+            ; ldr x0, >self_addr
+            ; ldr x1, >trap_func
+            ; blr x1
+
+            ; .dword 0xd51b4218u32 as i32 // msr nzcv, x24
+            ; ldr x0, >self_regs_addr
+            ; ldp x2, x3, [x0, #0x10]
+            ; ldp x4, x5, [x0, #0x20]
+            ; ldp x6, x7, [x0, #0x30]
+            ; ldp x8, x9, [x0, #0x40]
+            ; ldp x10, x11, [x0, #0x50]
+            ; ldp x12, x13, [x0, #0x60]
+            ; ldp x14, x15, [x0, #0x70]
+            ; ldp x16, x17, [x0, #0x80]
+            ; ldp x18, x19, [x0, #0x90]
+            ; ldp x20, x21, [x0, #0xa0]
+            ; ldp x22, x23, [x0, #0xb0]
+            ; ldp x24, x25, [x0, #0xc0]
+            ; ldp x26, x27, [x0, #0xd0]
+            ; ldp x28, x29, [x0, #0xe0]
+            ; ldp x30, xzr, [x0, #0xf0]
+
+            // restore nzcv. and 'return address'
+            ; ldp x0, x1, [sp], #0x10
+            ; ldp x29, x30, [sp], #0x10
+            ; br x1 // go back to the 'return address'
+
+            ; self_addr:
+            ; .qword self as *mut _  as *mut c_void as i64
+            ; self_regs_addr:
+            ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+            ; trap_func:
+            ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+            ; register_frame_func:
+            ; .qword __register_frame as *mut c_void as i64
+            ; eh_frame_cie:
+            ; .dword 0x14
+            ; .dword 0x00
+            ; .dword 0x00527a01
+            ; .dword 0x011e7c01
+            ; .dword 0x001f0c1b
+            ; eh_frame_fde:
+            ; .dword 0x14
+            ; .dword 0x18
+            ; fde_address:
+            ; .dword 0x0 // <-- address offset goes here
+            ; .dword 0x104
+                //advance_loc 12
+                //def_cfa r29 (x29) at offset 16
+                //offset r30 (x30) at cfa-8
+                //offset r29 (x29) at cfa-16
+            ; .dword 0x1d0c4c00
+            ; .dword 0x9d029e10 as u32 as i32
+            ; .dword 0x04
+            // empty next FDE:
+            ; .dword 0x0
+            ; .dword 0x0
+        );
+        self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
+
+
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
+
+        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_exact_blob(3));
+        self.blob_check_mem_6bytes = Some(self.generate_shadow_check_exact_blob(6));
+        self.blob_check_mem_12bytes = Some(self.generate_shadow_check_exact_blob(12));
+        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_exact_blob(24));
+        self.blob_check_mem_32bytes = Some(self.generate_shadow_check_exact_blob(32));
+        self.blob_check_mem_48bytes = Some(self.generate_shadow_check_exact_blob(48));
+        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_exact_blob(64));
+    }
+
+    /// Get the blob which implements the report funclet
+    #[inline]
+    pub fn blob_report(&self) -> &[u8] {
+        self.blob_report.as_ref().unwrap()
+    }
     /// Get the blob which checks a byte access
     #[inline]
     pub fn blob_check_mem_byte(&self) -> &[u8] {

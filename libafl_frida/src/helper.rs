@@ -55,6 +55,7 @@ pub struct FridaInstrumentationHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
     current_log_impl: u64,
+    current_report_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
     capstone: Capstone,
@@ -205,6 +206,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],
             current_log_impl: 0,
+            current_report_impl: 0,
             transformer: None,
             capstone: Capstone::new()
                 .arm64()
@@ -311,7 +313,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     #[cfg(target_arch = "aarch64")]
     #[inline]
     fn emit_shadow_check(
-        &self,
+        &mut self,
         _address: u64,
         output: &StalkerOutput,
         basereg: capstone::RegId,
@@ -330,6 +332,22 @@ impl<'a> FridaInstrumentationHelper<'a> {
             None
         };
 
+        if self.current_report_impl == 0
+            || !writer.can_branch_directly_to(self.current_report_impl)
+            || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
+        {
+            let after_report_impl = writer.code_offset() + 2;
+
+            #[cfg(target_arch = "x86_64")]
+            writer.put_jmp_near_label(after_report_impl);
+            #[cfg(target_arch = "aarch64")]
+            writer.put_b_label(after_report_impl);
+
+            self.current_report_impl = writer.pc();
+            writer.put_bytes(self.asan_runtime.borrow().blob_report());
+
+            writer.put_label(after_report_impl);
+        }
         //writer.put_brk_imm(1);
 
         // Preserve x0, x1:
@@ -469,8 +487,22 @@ impl<'a> FridaInstrumentationHelper<'a> {
             16 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_16bytes()),
             24 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_24bytes()),
             32 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_32bytes()),
+            48 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_48bytes()),
+            64 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_64bytes()),
             _ => false,
         };
+
+        // Add the branch to report
+        //writer.put_brk_imm(0x12);
+        writer.put_branch_address(self.current_report_impl);
+
+        match width {
+            3 | 6 | 12 | 24 | 32 | 48 | 64 => {
+                let msr_nvcz_x0: u32 = 0xd51b4200;
+                writer.put_bytes(&msr_nvcz_x0.to_le_bytes());
+            },
+            _ => ()
+        }
 
         // Restore x0, x1
         assert!(writer.put_ldp_reg_reg_reg_offset(
