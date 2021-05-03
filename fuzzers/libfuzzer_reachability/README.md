@@ -27,7 +27,7 @@ Then download libpng, and unpack the archive:
 wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
 tar -xvf libpng-1.6.37.tar.xz
 ```
-
+Run `patch libpng-1.6.37/png.c diff.patch` before compiling the libpng
 Now compile libpng, using the libafl_cc compiler wrapper:
 
 ```bash
