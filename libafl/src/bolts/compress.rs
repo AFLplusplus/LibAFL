@@ -18,7 +18,7 @@ impl GzipCompressor {
     /// If the buffer is at lest larger as large as the `threshold` value, we compress the buffer.
     /// When given a `threshold` of `0`, the `GzipCompressor` will always compress.
     pub fn new(threshold: usize) -> Self {
-        GzipCompressor { threshold }
+        Self { threshold }
     }
 }
 

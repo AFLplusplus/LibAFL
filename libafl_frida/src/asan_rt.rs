@@ -24,13 +24,14 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(unix)]
 use gothook::GotHookLibrary;
-use libc::{_SC_PAGESIZE, getrlimit64, rlimit64, sysconf};
+use libc::{getrlimit64, rlimit64, sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::{RefCell, RefMut},
     ffi::c_void,
     io::{self, Write},
+    path::PathBuf,
     rc::Rc,
 };
 use termcolor::{Color, ColorSpec, WriteColor};
@@ -89,7 +90,10 @@ impl Allocator {
                     addr as *mut c_void,
                     page_size,
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_PRIVATE | MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_NORESERVE,
+                    MapFlags::MAP_PRIVATE
+                        | MapFlags::MAP_ANONYMOUS
+                        | MapFlags::MAP_FIXED
+                        | MapFlags::MAP_NORESERVE,
                     -1,
                     0,
                 )
@@ -109,7 +113,10 @@ impl Allocator {
                 addr as *mut c_void,
                 addr + addr,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                MapFlags::MAP_ANONYMOUS
+                    | MapFlags::MAP_FIXED
+                    | MapFlags::MAP_PRIVATE
+                    | MapFlags::MAP_NORESERVE,
                 -1,
                 0,
             )
@@ -160,7 +167,8 @@ impl Allocator {
         let mut current_size = size;
         while current_size <= self.largest_allocation {
             if self.allocation_queue.contains_key(&current_size) {
-                if let Some(metadata) = self.allocation_queue.entry(current_size).or_default().pop() {
+                if let Some(metadata) = self.allocation_queue.entry(current_size).or_default().pop()
+                {
                     return Some(metadata);
                 }
             }
@@ -183,8 +191,7 @@ impl Allocator {
         }
         let rounded_up_size = self.round_up_to_page(size);
 
-        let metadata = if let Some(mut metadata) = self.find_smallest_fit(rounded_up_size)
-        {
+        let metadata = if let Some(mut metadata) = self.find_smallest_fit(rounded_up_size) {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
@@ -213,11 +220,7 @@ impl Allocator {
                 }
             };
 
-            self.map_shadow_for_region(
-                mapping,
-                mapping + rounded_up_size,
-                false,
-            );
+            self.map_shadow_for_region(mapping, mapping + rounded_up_size, false);
 
             let mut metadata = AllocationMetadata {
                 address: mapping,
@@ -697,7 +700,7 @@ impl AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, modules_to_instrument: &[&str]) {
+    pub fn init(&mut self, modules_to_instrument: &[PathBuf]) {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
             for _ in 0..512 {
@@ -730,7 +733,7 @@ impl AsanRuntime {
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
             #[cfg(unix)]
-            self.hook_library(module_name);
+            self.hook_library(module_name.to_str().unwrap());
         }
     }
 
@@ -786,15 +789,14 @@ impl AsanRuntime {
     pub fn register_thread(&self) {
         let mut allocator = Allocator::get();
         let (stack_start, stack_end) = Self::current_stack();
-        println!("current stack: {:#016x}-{:#016x}", stack_start, stack_end);
         allocator.map_shadow_for_region(stack_start, stack_end, true);
 
-        //let (tls_start, tls_end) = Self::current_tls();
-        //allocator.map_shadow_for_region(tls_start, tls_end, true);
-        //println!(
-            //"registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
-            //stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
-        //);
+        let (tls_start, tls_end) = Self::current_tls();
+        allocator.map_shadow_for_region(tls_start, tls_end, true);
+        println!(
+            "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
+            stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
+        );
     }
 
     /// Determine the stack start, end for the currently running thread
@@ -803,8 +805,11 @@ impl AsanRuntime {
         let stack_address = &stack_var as *const _ as *const c_void as usize;
         let (start, end, _, _) = find_mapping_for_address(stack_address).unwrap();
 
-        let mut stack_rlimit = rlimit64 { rlim_cur: 0, rlim_max: 0 };
-        assert!(unsafe { getrlimit64(3, &mut stack_rlimit as *mut rlimit64 ) } == 0);
+        let mut stack_rlimit = rlimit64 {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        assert!(unsafe { getrlimit64(3, &mut stack_rlimit as *mut rlimit64) } == 0);
 
         println!("stack_rlimit: {:?}", stack_rlimit);
 
@@ -816,7 +821,10 @@ impl AsanRuntime {
                     max_start as *mut c_void,
                     start - max_start,
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE | MapFlags::MAP_STACK,
+                    MapFlags::MAP_ANONYMOUS
+                        | MapFlags::MAP_FIXED
+                        | MapFlags::MAP_PRIVATE
+                        | MapFlags::MAP_STACK,
                     -1,
                     0,
                 )
@@ -829,6 +837,9 @@ impl AsanRuntime {
     /// Determine the tls start, end for the currently running thread
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { get_tls_ptr() } as usize;
+        // we need to mask off the highest byte, due to 'High Byte Ignore"
+        #[cfg(target_os = "android")]
+        let tls_address = tls_address & 0xffffffffffffff;
 
         let (start, end, _, _) = find_mapping_for_address(tls_address).unwrap();
         (start, end)
@@ -1421,7 +1432,6 @@ impl AsanRuntime {
                 ; b >skip_report
 
                 ; report:
-                ; brk 0x11
                 ; stp x29, x30, [sp, #-0x10]!
                 ; mov x29, sp
 
@@ -1541,7 +1551,6 @@ impl AsanRuntime {
                 ; b >skip_report
 
                 ; report:
-                ; brk 0x22
                 ; stp x29, x30, [sp, #-0x10]!
                 ; mov x29, sp
 

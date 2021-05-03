@@ -15,7 +15,7 @@ use libafl::{
     },
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{HasTargetBytes, Input, BytesInput},
+    inputs::{HasTargetBytes, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
@@ -31,7 +31,7 @@ use frida_gum::{
     Gum, NativePointer,
 };
 
-use std::{env, ffi::c_void, fs::{File, OpenOptions}, marker::PhantomData, path::PathBuf, time::Duration};
+use std::{env, ffi::c_void, marker::PhantomData, path::PathBuf, time::Duration};
 
 use libafl_frida::{
     asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
@@ -232,10 +232,11 @@ pub fn main() {
             matches.value_of("symbol").unwrap(),
             matches.value_of("modules_to_instrument")
                 .unwrap()
-                .split(":")
+                .split(':')
+                .map(|module_name| std::fs::canonicalize(module_name).unwrap())
                 .collect(),
             &vec![PathBuf::from("./corpus")],
-            &PathBuf::from("./crashes"),
+            PathBuf::from("./crashes"),
             1337,
             &cores,
             matches.value_of("output"),
@@ -262,9 +263,9 @@ fn fuzz(
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
-    modules_to_instrument: Vec<&str>,
+    modules_to_instrument: Vec<PathBuf>,
     corpus_dirs: &Vec<PathBuf>,
-    objective_dir: &PathBuf,
+    objective_dir: PathBuf,
     broker_port: u16,
     cores: &[usize],
     stdout_file: Option<&str>,
@@ -358,6 +359,7 @@ unsafe fn fuzz(
         let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
         let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
+        frida_helper.register_thread();
         // Create the executor for an in-process function with just one observer for edge coverage
         let mut executor = FridaInProcessExecutor::new(
             &gum,
@@ -392,7 +394,6 @@ unsafe fn fuzz(
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        //executor.helper.register_thread();
         fuzzer.fuzz_loop(&mut state, &mut executor, &mut mgr, &scheduler)?;
 
         // Never reached

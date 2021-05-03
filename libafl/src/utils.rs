@@ -2,8 +2,11 @@
 
 #[cfg(feature = "std")]
 use crate::{
-    bolts::shmem::ShMemProvider, events::llmp::{LlmpRestartingEventManager, ManagerKind, setup_restarting_mgr},
-    inputs::Input, state::IfInteresting, stats::Stats,
+    bolts::shmem::ShMemProvider,
+    events::llmp::{setup_restarting_mgr, LlmpRestartingEventManager, ManagerKind},
+    inputs::Input,
+    state::IfInteresting,
+    stats::Stats,
 };
 
 use alloc::{string::String, vec::Vec};
@@ -454,9 +457,7 @@ pub fn startable_self() -> Result<Command, Error> {
 #[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
 pub fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
     use regex::Regex;
-    use std::{
-        io::{BufRead, BufReader},
-    };
+    use std::io::{BufRead, BufReader};
     let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
         .unwrap();
 
@@ -562,7 +563,10 @@ pub fn launcher<I, S, SP, ST>(
     mut shmem_provider: SP,
     stats: ST,
     client_init_stats: &mut dyn FnMut() -> Result<ST, Error>,
-    run_client: &mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>) -> Result<(), Error>,
+    run_client: &mut dyn FnMut(
+        Option<S>,
+        LlmpRestartingEventManager<I, S, SP, ST>,
+    ) -> Result<(), Error>,
     broker_port: u16,
     cores: &[usize],
     stdout_file: Option<&str>,
@@ -571,8 +575,7 @@ where
     I: Input,
     ST: Stats,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + IfInteresting<I>
-
+    S: DeserializeOwned + IfInteresting<I>,
 {
     let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
@@ -606,11 +609,15 @@ where
                     }
                     //fuzzer client. keeps retrying the connection to broker till the broker starts
                     let stats = client_init_stats()?;
-                    let (state, mgr) = setup_restarting_mgr(shmem_provider.clone(), stats, broker_port, ManagerKind::Client(Some(*bind_to)))?;
+                    let (state, mgr) = setup_restarting_mgr(
+                        shmem_provider.clone(),
+                        stats,
+                        broker_port,
+                        ManagerKind::Client(Some(*bind_to)),
+                    )?;
                     run_client(state, mgr)?;
                     break;
                 }
-
             };
         }
     }
@@ -688,7 +695,7 @@ where
                 }
             }
             //finished spawning clients. start the broker
-            let _ = setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, _ , _>(
+            let _ = setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, _, _>(
                 shmem_provider,
                 stats,
                 broker_port,

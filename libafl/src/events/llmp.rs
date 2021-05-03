@@ -1,8 +1,8 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{string::ToString, vec::Vec};
-use core_affinity::CoreId;
 use core::{marker::PhantomData, time::Duration};
+use core_affinity::CoreId;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
@@ -581,27 +581,34 @@ where
         LlmpEventManager::<I, S, SP, ST>::new_on_port(shmem_provider.clone(), stats, broker_port)?;
 
     // We start ourself as child process to actually fuzz
-    let (sender, mut receiver, mut new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
-        .is_err()
+    let (sender, mut receiver, mut new_shmem_provider, core_id) = if std::env::var(
+        _ENV_FUZZER_SENDER,
+    )
+    .is_err()
     {
         let core_id = if mgr.is_broker() {
             match kind {
                 ManagerKind::Broker => {
                     // Yep, broker. Just loop here.
-                    println!("Doing broker things. Run this tool again to start fuzzing in a client.");
+                    println!(
+                        "Doing broker things. Run this tool again to start fuzzing in a client."
+                    );
                     mgr.broker_loop()?;
                     return Err(Error::ShuttingDown);
-
-                },
+                }
                 ManagerKind::Client(_) => {
-                    return Err(Error::IllegalState("Tried to start a client, but got a broker".to_string()));
+                    return Err(Error::IllegalState(
+                        "Tried to start a client, but got a broker".to_string(),
+                    ));
                 }
             }
         } else {
             match kind {
                 ManagerKind::Broker => {
-                    return Err(Error::IllegalState("Tried to start a broker, but got a client".to_string()));
-                },
+                    return Err(Error::IllegalState(
+                        "Tried to start a broker, but got a client".to_string(),
+                    ));
+                }
                 ManagerKind::Client(core_id) => core_id,
             }
         };
