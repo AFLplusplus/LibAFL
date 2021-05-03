@@ -388,15 +388,15 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     };
     (*page).magic = PAGE_INITIALIZED_MAGIC;
     (*page).sender = sender;
-    ptr::write_volatile(&mut (*page).current_msg_id, 0);
+    ptr::write_volatile(ptr::addr_of_mut!((*page).current_msg_id), 0);
     (*page).max_alloc_size = 0;
     // Don't forget to subtract our own header size
     (*page).size_total = map_size - LLMP_PAGE_HEADER_LEN;
     (*page).size_used = 0;
     (*(*page).messages.as_mut_ptr()).message_id = 0;
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
-    ptr::write_volatile(&mut (*page).save_to_unmap, 0);
-    ptr::write_volatile(&mut (*page).sender_dead, 0);
+    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 0);
+    ptr::write_volatile(ptr::addr_of_mut!((*page).sender_dead), 0);
     assert!((*page).size_total != 0);
 }
 
@@ -719,7 +719,7 @@ where
         unsafe {
             compiler_fence(Ordering::SeqCst);
             // println!("Reading save_to_unmap from {:?}", current_out_map.page() as *const _);
-            ptr::read_volatile(&(*current_out_map.page()).save_to_unmap) != 0
+            ptr::read_volatile(ptr::addr_of!((*current_out_map.page()).save_to_unmap)) != 0
         }
     }
 
@@ -775,7 +775,7 @@ where
         let last_msg = self.last_msg_sent;
         if (*page).size_used + EOP_MSG_SIZE > (*page).size_total {
             panic!("PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
-                (*page).size_used, (*page).size_total);
+                ptr::addr_of!((*page).size_used), ptr::addr_of!((*page).size_total));
         }
         let mut ret: *mut LlmpMsg = if !last_msg.is_null() {
             llmp_next_msg_ptr_checked(&mut map, last_msg, EOP_MSG_SIZE)?
@@ -856,7 +856,7 @@ where
             }
         } else if (*page).current_msg_id != (*last_msg).message_id {
             /* Oops, wrong usage! */
-            panic!("BUG: The current message never got commited using send! (page->current_msg_id {:?}, last_msg->message_id: {})", (*page).current_msg_id, (*last_msg).message_id);
+            panic!("BUG: The current message never got commited using send! (page->current_msg_id {:?}, last_msg->message_id: {})", ptr::addr_of!((*page).current_msg_id), *ptr::addr_of!((*last_msg).message_id));
         } else {
             buf_len_padded = complete_msg_size - size_of::<LlmpMsg>();
             /* DBG("XXX ret %p id %u buf_len_padded %lu complete_msg_size %lu\n", ret, ret->message_id, buf_len_padded,
@@ -891,7 +891,7 @@ where
             || ((ret as usize) - (*page).messages.as_mut_ptr() as usize) != (*page).size_used
         {
             panic!("Allocated new message without calling send() inbetween. ret: {:?}, page: {:?}, complete_msg_size: {:?}, size_used: {:?}, last_msg: {:?}", ret, page,
-                buf_len_padded, (*page).size_used, last_msg);
+                buf_len_padded, ptr::addr_of!((*page).size_used), last_msg);
         }
         (*page).size_used += complete_msg_size;
         (*ret).buf_len_padded = buf_len_padded as u64;
@@ -914,7 +914,10 @@ where
             panic!("Message sent twice!");
         }
         if (*msg).tag == LLMP_TAG_UNSET {
-            panic!("No tag set on message with id {}", (*msg).message_id);
+            panic!(
+                "No tag set on message with id {}",
+                *ptr::addr_of!((*msg).message_id)
+            );
         }
         let page = self.out_maps.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
@@ -925,7 +928,7 @@ where
         }
         (*msg).message_id = (*page).current_msg_id + 1;
         compiler_fence(Ordering::SeqCst);
-        ptr::write_volatile(&mut (*page).current_msg_id, (*msg).message_id);
+        ptr::write_volatile(ptr::addr_of_mut!((*page).current_msg_id), (*msg).message_id);
         compiler_fence(Ordering::SeqCst);
         self.last_msg_sent = msg;
         Ok(())
@@ -964,7 +967,10 @@ where
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!("got new map at: {:?}", new_map);
 
-        ptr::write_volatile(&mut (*new_map).current_msg_id, (*old_map).current_msg_id);
+        ptr::write_volatile(
+            ptr::addr_of_mut!((*new_map).current_msg_id),
+            (*old_map).current_msg_id,
+        );
 
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
@@ -1174,7 +1180,7 @@ where
         compiler_fence(Ordering::SeqCst);
         let mut page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
-        let current_msg_id = ptr::read_volatile(&(*page).current_msg_id);
+        let current_msg_id = ptr::read_volatile(ptr::addr_of!((*page).current_msg_id));
 
         // Read the message from the page
         let ret = if current_msg_id == 0 {
@@ -1205,7 +1211,7 @@ where
                 LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
                 LLMP_TAG_EXITING => {
                     // The other side is done.
-                    assert_eq!((*msg).buf_len, 0);
+                    assert_eq!(*ptr::addr_of!((*msg).buf_len), 0);
                     return Err(Error::ShuttingDown);
                 }
                 LLMP_TAG_END_OF_PAGE => {
@@ -1215,8 +1221,8 @@ where
                     if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
                         panic!(
                             "Illegal message length for EOP (is {}/{}, expected {})",
-                            (*msg).buf_len,
-                            (*msg).buf_len_padded,
+                            *ptr::addr_of!((*msg).buf_len),
+                            *ptr::addr_of!((*msg).buf_len_padded),
                             size_of::<LlmpPayloadSharedMapInfo>()
                         );
                     }
@@ -1230,7 +1236,7 @@ where
                     self.last_msg_recvd = ptr::null();
 
                     // Mark the old page save to unmap, in case we didn't so earlier.
-                    ptr::write_volatile(&mut (*page).save_to_unmap, 1);
+                    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 1);
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_map =
@@ -1240,7 +1246,7 @@ where
                         )?);
                     page = self.current_recv_map.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
-                    ptr::write_volatile(&mut (*page).save_to_unmap, 1);
+                    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 1);
 
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
@@ -1276,7 +1282,7 @@ where
         }
         loop {
             compiler_fence(Ordering::SeqCst);
-            if ptr::read_volatile(&(*page).current_msg_id) != current_msg_id {
+            if ptr::read_volatile(ptr::addr_of!((*page).current_msg_id)) != current_msg_id {
                 return match self.recv()? {
                     Some(msg) => Ok(msg),
                     None => panic!("BUG: blocking llmp message should never be NULL"),
@@ -1419,7 +1425,7 @@ where
     /// This indicates, that the page may safely be unmapped by the sender.
     pub fn mark_save_to_unmap(&mut self) {
         unsafe {
-            ptr::write_volatile(&mut (*self.page_mut()).save_to_unmap, 1);
+            ptr::write_volatile(ptr::addr_of_mut!((*self.page_mut()).save_to_unmap), 1);
         }
     }
 
@@ -2078,15 +2084,16 @@ where
             if (*msg).tag == LLMP_TAG_NEW_SHM_CLIENT {
                 /* This client informs us about yet another new client
                 add it to the list! Also, no need to forward this msg. */
+                let msg_buf_len_padded = *ptr::addr_of!((*msg).buf_len_padded);
                 if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
                     #[cfg(feature = "std")]
                     println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
-                        (*msg).buf_len_padded,
+                        msg_buf_len_padded,
                         size_of::<LlmpPayloadSharedMapInfo>()
                     );
                     #[cfg(not(feature = "std"))]
                     return Err(Error::Unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
-                       (*msg).buf_len_padded,
+                        msg_buf_len_padded,
                         size_of::<LlmpPayloadSharedMapInfo>()
                     )));
                 } else {
