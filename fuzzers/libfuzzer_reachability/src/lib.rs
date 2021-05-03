@@ -16,7 +16,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, ReachabilityObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -26,8 +26,12 @@ use libafl::{
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
+#[cfg(unix)]
+const TARGET_SIZE: usize = 4;
+
+#[cfg(unix)]
 extern "C" {
-    static mut libafl_target_ctr: usize;
+    static __libafl_target_list: *mut usize;
 }
 
 /// The main fn, no_mangle as it is a C main
@@ -72,8 +76,10 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         StdMapObserver::new("edges", &mut EDGES_MAP, MAX_EDGES_NUM)
     });
 
-    let reachability_observer =
-        ReachabilityObserver::new("png()", unsafe { &mut libafl_target_ctr });
+    let reachability_observer = 
+    unsafe{
+        StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE)
+    };
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -85,14 +91,13 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Feedbacks to rate the interestingness of an input
             tuple_list!(
                 MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
-                ReachabilityFeedback::new(),
                 TimeFeedback::new()
             ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new(), TimeoutFeedback::new()),
+            tuple_list!(CrashFeedback::new(), TimeoutFeedback::new(), ReachabilityFeedback::new_with_observer(&reachability_observer)),
         )
     });
 
@@ -130,7 +135,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         InProcessExecutor::new(
             "in-process(edges,time)",
             &mut harness,
-            tuple_list!(edges_observer, reachability_observer,TimeObserver::new("time")),
+            tuple_list!(edges_observer, reachability_observer, TimeObserver::new("time")),
             &mut state,
             &mut restarting_mgr,
         )?,

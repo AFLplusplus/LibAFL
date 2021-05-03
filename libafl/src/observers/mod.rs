@@ -11,10 +11,7 @@ use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        ownedref::OwnedPtrMut,
-        tuples::{MatchFirstType, MatchNameAndType, MatchType, Named},
-    },
+    bolts::tuples::{MatchFirstType, MatchNameAndType, MatchType, Named},
     utils::current_time,
     Error,
 };
@@ -130,38 +127,6 @@ impl Observer for TimeObserver {
 }
 
 impl Named for TimeObserver {
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ReachabilityObserver {
-    name: String,
-    counter: OwnedPtrMut<usize>,
-}
-
-impl ReachabilityObserver {
-    pub fn new(name: &'static str, ctr: &'static mut usize) -> Self {
-        Self {
-            name: name.to_string(),
-            counter: OwnedPtrMut::Ptr(ctr),
-        }
-    }
-
-    pub fn has_reached(&self) -> bool {
-        *self.counter.as_ref() > 0
-    }
-}
-
-impl Observer for ReachabilityObserver {
-    fn pre_exec(&mut self) -> Result<(), Error> {
-        *self.counter.as_mut() = 0;
-        Ok(())
-    }
-}
-
-impl Named for ReachabilityObserver {
     fn name(&self) -> &str {
         &self.name
     }

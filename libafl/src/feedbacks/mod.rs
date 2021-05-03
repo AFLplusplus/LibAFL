@@ -11,7 +11,7 @@ use crate::{
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
-    observers::{ObserversTuple, ReachabilityObserver, TimeObserver},
+    observers::{ObserversTuple, TimeObserver},
     Error,
 };
 
@@ -250,42 +250,5 @@ impl TimeFeedback {
 impl Default for TimeFeedback {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ReachabilityFeedback {}
-
-impl ReachabilityFeedback {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl<I> Feedback<I> for ReachabilityFeedback
-where
-    I: Input,
-{
-    fn is_interesting<OT: ObserversTuple>(
-        &mut self,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
-        let observer = observers
-            .match_first_type::<ReachabilityObserver>()
-            .unwrap();
-        if observer.has_reached() {
-            Ok(1)
-        } else {
-            Ok(0)
-        }
-    }
-}
-
-impl Named for ReachabilityFeedback {
-    #[inline]
-    fn name(&self) -> &str {
-        "ReachabilityFeedback"
     }
 }
