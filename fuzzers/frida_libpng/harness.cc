@@ -89,7 +89,8 @@ __attribute__((noinline))
 void func3( char * alloc) {
   printf("func3\n");
   if (random() == 0) {
-    //alloc[0xff] = 0xde;
+    alloc[0x1ff] = 0xde;
+    printf("alloc[0x200]: %d\n", alloc[0x200]);
   }
 }
 __attribute__((noinline))
