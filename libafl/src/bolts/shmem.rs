@@ -171,8 +171,8 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
         ))
     }
 
-    /// This method should be called after a fork or thread creation event, allowing the ShMem to
-    /// reset thread specific info.
+    /// This method should be called after a fork or after cloning/a thread creation event, allowing the ShMem to
+    /// reset thread specific info, and potentially reconnect.
     fn post_fork(&mut self) {
         // do nothing
     }
@@ -183,6 +183,9 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
     }
 }
 
+/// A Refernce Counted shared map,
+/// that can use internal mutability.
+/// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 pub struct RcShMem<T: ShMemProvider> {
     internal: ManuallyDrop<T::Mem>,
@@ -216,6 +219,9 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
     }
 }
 
+/// A Refernce Counted `ShMemProvider`,
+/// that can use internal mutability.
+/// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 pub struct RcShMemProvider<T: ShMemProvider> {
     internal: Rc<RefCell<T>>,
@@ -274,6 +280,11 @@ where
     }
 }
 
+/// A Unix sharedmem implementation.
+///
+/// On Android, this is partially reused to wrap `Ashmem`,
+/// Although for an `AshmemShMemProvider using a unix domain socket
+/// Is needed on top.
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 

@@ -40,7 +40,8 @@ anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disab
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 llmp_small_maps = [] # reduces initial map size for llmp
 llmp_debug = ["backtrace"] # Enables debug output for LLMP
-llmp_compression = [] #llmp compression using GZip
+llmp_compression = [] # llmp compression using GZip
+llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
 
 [[example]]
 name = "llmp_test"
@@ -62,6 +63,7 @@ serde_json = { version = "1.0", optional = true, default-features = false, featu
 compression = { version = "0.1.5" }
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs" }
 num_enum = "0.5.1"
+hostname = "^0.3" # Is there really no gethostname in the stdlib?
 
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug

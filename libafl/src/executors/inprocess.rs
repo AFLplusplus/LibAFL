@@ -380,6 +380,10 @@ mod unix_signal_handler {
         }
     }
 
+    /// Crash-Handler for in-process fuzzing.
+    /// Will be used for signal handling.
+    /// It will store the current State to shmem, then exit.
+    #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,

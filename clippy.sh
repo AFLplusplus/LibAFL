@@ -9,6 +9,7 @@ RUST_BACKTRACE=full cargo clippy --all -- \
    -W clippy::cast_possible_wrap \
    -W clippy::unused_self \
    -W clippy::too_many_lines \
+   -W clippy::option_if_let_else \
    -A missing-docs \
    -A clippy::doc_markdown \
    -A clippy::must-use-candidate \

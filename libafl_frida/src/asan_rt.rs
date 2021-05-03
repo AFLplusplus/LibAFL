@@ -1210,80 +1210,6 @@ impl AsanRuntime {
                     }
                 }
             }
-            AsanError::Unknown((registers, pc, fault, backtrace)) => {
-                let (basereg, indexreg, _displacement, fault_address) = fault;
-
-                if let Ok((start, _, _, path)) = find_mapping_for_address(pc) {
-                    writeln!(
-                        output,
-                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
-                        pc,
-                        path,
-                        pc - start,
-                        fault_address
-                    )
-                    .unwrap();
-                } else {
-                    writeln!(
-                        output,
-                        " at 0x{:x}, faulting address 0x{:x}",
-                        pc, fault_address
-                    )
-                    .unwrap();
-                }
-                output.reset().unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
-                for reg in 0..=30 {
-                    if reg == basereg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                    } else if reg == indexreg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
-                            .unwrap();
-                    }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
-                    output.reset().unwrap();
-                    if reg % 4 == 3 {
-                        writeln!(output).unwrap();
-                    }
-                }
-                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " CODE ").unwrap();
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
-                cs.set_skipdata(true).expect("failed to set skipdata");
-
-                let start_pc = pc - 4 * 5;
-                for insn in cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                    .iter()
-                {
-                    if insn.address() as usize == pc {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
-                        output.reset().unwrap();
-                    } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
-                    }
-                }
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
-            }
             AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
@@ -1341,7 +1267,8 @@ impl AsanRuntime {
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
             }
-            AsanError::StackOobRead((registers, pc, fault, backtrace))
+            AsanError::Unknown((registers, pc, fault, backtrace))
+            | AsanError::StackOobRead((registers, pc, fault, backtrace))
             | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
