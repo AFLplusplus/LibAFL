@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
-    executors::{CustomExitKind, ExitKind},
+    executors::{CustomExitKind, ExitKind, HasExecHooks},
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
@@ -1625,8 +1625,10 @@ pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl Observer for AsanErrorsObserver {
-    fn pre_exec(&mut self) -> Result<(), Error> {
+impl Observer for AsanErrorsObserver {}
+
+impl<EM, I, S> HasExecHooks<EM, I, S> for AsanErrorsObserver {
+    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
