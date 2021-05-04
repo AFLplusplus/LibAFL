@@ -14,10 +14,11 @@ use crate::bolts::os::unix_signals::setup_signal_handler;
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
 use crate::{
-    bolts::tuples::Named,
     corpus::Corpus,
     events::EventManager,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{
+        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
+    },
     feedbacks::FeedbacksTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
@@ -26,34 +27,41 @@ use crate::{
 };
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InProcessExecutor<'a, H, I, OT>
+pub struct InProcessExecutor<'a, EM, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    /// The name of this executor instance, to address it from other components
-    name: &'static str,
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: &'a mut H,
     /// The observers, observing each run
     observers: OT,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(EM, I, S)>,
 }
 
-impl<'a, H, I, OT> Executor<I> for InProcessExecutor<'a, H, I, OT>
+impl<'a, EM, H, I, OT, S> Executor<I> for InProcessExecutor<'a, EM, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec<EM, S>(
-        &mut self,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+        let bytes = input.target_bytes();
+        let ret = (self.harness_fn)(bytes.as_slice());
+        Ok(ret)
+    }
+}
+
+impl<'a, EM, H, I, OT, S> HasExecHooks<EM, I, S> for InProcessExecutor<'a, EM, H, I, OT, S>
+where
+    H: FnMut(&[u8]) -> ExitKind,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn pre_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
@@ -92,19 +100,7 @@ where
     }
 
     #[inline]
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        let bytes = input.target_bytes();
-        let ret = (self.harness_fn)(bytes.as_slice());
-        Ok(ret)
-    }
-
-    #[inline]
-    fn post_exec<EM, S>(
-        &mut self,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -125,18 +121,7 @@ where
     }
 }
 
-impl<'a, H, I, OT> Named for InProcessExecutor<'a, H, I, OT>
-where
-    H: FnMut(&[u8]) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
-{
-    fn name(&self) -> &str {
-        self.name
-    }
-}
-
-impl<'a, H, I, OT> HasObservers<OT> for InProcessExecutor<'a, H, I, OT>
+impl<'a, EM, H, I, OT, S> HasObservers<OT> for InProcessExecutor<'a, EM, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
@@ -153,7 +138,15 @@ where
     }
 }
 
-impl<'a, H, I, OT> InProcessExecutor<'a, H, I, OT>
+impl<'a, EM, H, I, OT, S> HasObserversHooks<EM, I, OT, S> for InProcessExecutor<'a, EM, H, I, OT, S>
+where
+    H: FnMut(&[u8]) -> ExitKind,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+{
+}
+
+impl<'a, EM, H, I, OT, S> InProcessExecutor<'a, EM, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
@@ -162,12 +155,10 @@ where
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
-    /// * `name` - the name of this executor (to address it along the way)
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<EM, OC, OFT, S>(
-        name: &'static str,
+    pub fn new<OC, OFT>(
         harness_fn: &'a mut H,
         observers: OT,
         _state: &mut S,
@@ -213,7 +204,6 @@ where
         Ok(Self {
             harness_fn,
             observers,
-            name,
             phantom: PhantomData,
         })
     }
@@ -696,10 +686,9 @@ mod tests {
     fn test_inmem_exec() {
         let mut harness = |_buf: &[u8]| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<_, NopInput, ()> {
+        let mut in_process_executor = InProcessExecutor::<(), _, NopInput, (), ()> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
-            name: "main",
             phantom: PhantomData,
         };
         let mut input = NopInput {};
