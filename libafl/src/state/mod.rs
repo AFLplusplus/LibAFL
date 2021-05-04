@@ -15,7 +15,7 @@ use crate::{
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::FeedbacksTuple,
+    feedbacks::Feedback,
     generators::Generator,
     inputs::Input,
     observers::ObserversTuple,
@@ -98,30 +98,30 @@ pub trait HasMetadata {
     }
 }
 
-/// Trait for elements offering a feedbacks tuple
-pub trait HasFeedbacks<FT, I>: Sized
+/// Trait for elements offering a feedback
+pub trait HasFeedback<F, I>: Sized
 where
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     I: Input,
 {
-    /// The feedbacks tuple
-    fn feedbacks(&self) -> &FT;
+    /// The feedback
+    fn feedback(&self) -> &F;
 
-    /// The feedbacks tuple (mut)
-    fn feedbacks_mut(&mut self) -> &mut FT;
+    /// The feedback (mut)
+    fn feedback_mut(&mut self) -> &mut F;
 }
 
-/// Trait for elements offering an objective feedbacks tuple
-pub trait HasObjectives<FT, I>: Sized
+/// Trait for elements offering an objective feedback tuple
+pub trait HasObjective<OF, I>: Sized
 where
-    FT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
     I: Input,
 {
-    /// The objective feedbacks tuple
-    fn objectives(&self) -> &FT;
+    /// The objective feedback
+    fn objective(&self) -> &OF;
 
-    /// The objective feedbacks tuple (mut)
-    fn objectives_mut(&mut self) -> &mut FT;
+    /// The objective feedback (mut)
+    fn objective_mut(&mut self) -> &mut OF;
 }
 
 /// Trait for the execution counter
@@ -153,7 +153,7 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple;
 
@@ -161,7 +161,7 @@ where
     fn add_if_interesting<CS>(
         &mut self,
         input: &I,
-        fitness: u32,
+        is_interesting: bool,
         scheduler: &CS,
     ) -> Result<Option<usize>, Error>
     where
@@ -169,7 +169,7 @@ where
         Self: Sized;
 }
 
-/// Evaluate an input modyfing the state of the fuzzer and returning a fitness
+/// Evaluate an input modyfing the state of the fuzzer
 pub trait Evaluator<I>: Sized
 where
     I: Input,
@@ -181,7 +181,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<(u32, Option<usize>), Error>
+    ) -> Result<(bool, Option<usize>), Error>
     where
         E: Executor<I>
             + HasObservers<OT>
@@ -194,15 +194,15 @@ where
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct State<C, FT, I, OFT, R, SC>
+#[serde(bound = "F: serde::de::DeserializeOwned")]
+pub struct State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// RNG instance
     rand: R,
@@ -213,11 +213,11 @@ where
     /// The corpus
     corpus: C,
     /// Feedbacks used to evaluate an input
-    feedbacks: FT,
+    feedback: F,
     // Solutions corpus
     solutions: SC,
     /// Objective Feedbacks
-    objectives: OFT,
+    objective: OF,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
@@ -226,14 +226,14 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<C, FT, I, OFT, R, SC> HasRand<R> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasRand<R> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// The rand instance
     #[inline]
@@ -248,14 +248,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasCorpus<C, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasCorpus<C, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Returns the corpus
     #[inline]
@@ -270,14 +270,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasSolutions<SC, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasSolutions<SC, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Returns the solutions corpus
     #[inline]
@@ -292,14 +292,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasMetadata for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasMetadata for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Get all the metadata into an HashMap
     #[inline]
@@ -314,58 +314,58 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasFeedbacks<FT, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasFeedback<F, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
-    /// The feedbacks tuple
+    /// The feedback
     #[inline]
-    fn feedbacks(&self) -> &FT {
-        &self.feedbacks
+    fn feedback(&self) -> &F {
+        &self.feedback
     }
 
-    /// The feedbacks tuple (mut)
+    /// The feedback (mut)
     #[inline]
-    fn feedbacks_mut(&mut self) -> &mut FT {
-        &mut self.feedbacks
+    fn feedback_mut(&mut self) -> &mut F {
+        &mut self.feedback
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasObjectives<OFT, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasObjective<OF, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
-    /// The objective feedbacks tuple
+    /// The objective feedback
     #[inline]
-    fn objectives(&self) -> &OFT {
-        &self.objectives
+    fn objective(&self) -> &OF {
+        &self.objective
     }
 
-    /// The objective feedbacks tuple (mut)
+    /// The objective feedback (mut)
     #[inline]
-    fn objectives_mut(&mut self) -> &mut OFT {
-        &mut self.objectives
+    fn objective_mut(&mut self) -> &mut OF {
+        &mut self.objective
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasExecutions for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasExecutions for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// The executions counter
     #[inline]
@@ -380,14 +380,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasMaxSize for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasMaxSize for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     fn max_size(&self) -> usize {
         self.max_size
@@ -398,14 +398,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasStartTime for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasStartTime for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// The starting time
     #[inline]
@@ -420,14 +420,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> IfInteresting<I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> IfInteresting<I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn is_interesting<OT>(
@@ -435,12 +435,12 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
-        self.feedbacks_mut()
-            .is_interesting_all(input, observers, exit_kind)
+        self.feedback_mut()
+            .is_interesting(input, observers, exit_kind)
     }
 
     /// Adds this input to the corpus, if it's intersting, and return the index
@@ -448,33 +448,33 @@ where
     fn add_if_interesting<CS>(
         &mut self,
         input: &I,
-        fitness: u32,
+        is_interesting: bool,
         scheduler: &CS,
     ) -> Result<Option<usize>, Error>
     where
         CS: CorpusScheduler<I, Self>,
     {
-        if fitness > 0 {
-            let mut testcase = Testcase::with_fitness(input.clone(), fitness);
-            self.feedbacks_mut().append_metadata_all(&mut testcase)?;
+        if is_interesting {
+            let mut testcase = Testcase::new(input.clone());
+            self.feedback_mut().append_metadata(&mut testcase)?;
             let idx = self.corpus.add(testcase)?;
             scheduler.on_add(self, idx)?;
             Ok(Some(idx))
         } else {
-            self.feedbacks_mut().discard_metadata_all(&input)?;
+            self.feedback_mut().discard_metadata(&input)?;
             Ok(None)
         }
     }
 }
 
-impl<C, FT, I, OFT, R, SC> Evaluator<I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> Evaluator<I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -485,7 +485,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<(u32, Option<usize>), Error>
+    ) -> Result<(bool, Option<usize>), Error>
     where
         E: Executor<I>
             + HasObservers<OT>
@@ -496,19 +496,19 @@ where
         EM: EventManager<I, Self>,
         CS: CorpusScheduler<I, Self>,
     {
-        let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
+        let (is_interesting, is_solution) = self.execute_input(&input, executor, manager)?;
         let observers = executor.observers();
 
         if is_solution {
             // If the input is a solution, add it to the respective corpus
             let mut testcase = Testcase::new(input.clone());
-            self.objectives_mut().append_metadata_all(&mut testcase)?;
+            self.objective_mut().append_metadata(&mut testcase)?;
             self.solutions_mut().add(testcase)?;
         } else {
-            self.objectives_mut().discard_metadata_all(&input)?;
+            self.objective_mut().discard_metadata(&input)?;
         }
 
-        let corpus_idx = self.add_if_interesting(&input, fitness, scheduler)?;
+        let corpus_idx = self.add_if_interesting(&input, is_interesting, scheduler)?;
         if corpus_idx.is_some() {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
@@ -524,18 +524,18 @@ where
             )?;
         }
 
-        Ok((fitness, corpus_idx))
+        Ok((is_interesting, corpus_idx))
     }
 }
 
 #[cfg(feature = "std")]
-impl<C, FT, OFT, R, SC> State<C, FT, BytesInput, OFT, R, SC>
+impl<C, F, OF, R, SC> State<C, F, BytesInput, OF, R, SC>
 where
     C: Corpus<BytesInput>,
     R: Rand,
-    FT: FeedbacksTuple<BytesInput>,
+    F: Feedback<BytesInput>,
     SC: Corpus<BytesInput>,
-    OFT: FeedbacksTuple<BytesInput>,
+    OF: Feedback<BytesInput>,
 {
     pub fn load_from_directory<CS, E, OT, EM>(
         &mut self,
@@ -568,9 +568,10 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
+                let (is_interesting, is_solution) =
+                    self.execute_input(&input, executor, manager)?;
                 if self
-                    .add_if_interesting(&input, fitness, scheduler)?
+                    .add_if_interesting(&input, is_interesting, scheduler)?
                     .is_none()
                 {
                     println!("File {:?} was not interesting, skipped.", &path);
@@ -618,14 +619,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Runs the input and triggers observers and feedback
     pub fn execute_input<E, EM, OT>(
@@ -633,7 +634,7 @@ where
         input: &I,
         executor: &mut E,
         event_mgr: &mut EM,
-    ) -> Result<(u32, bool), Error>
+    ) -> Result<(bool, bool), Error>
     where
         E: Executor<I>
             + HasObservers<OT>
@@ -653,15 +654,14 @@ where
         executor.post_exec_observers(self, event_mgr, input)?;
 
         let observers = executor.observers();
-        let fitness = self
-            .feedbacks_mut()
-            .is_interesting_all(&input, observers, &exit_kind)?;
+        let is_interesting = self
+            .feedback_mut()
+            .is_interesting(&input, observers, &exit_kind)?;
 
         let is_solution = self
-            .objectives_mut()
-            .is_interesting_all(&input, observers, &exit_kind)?
-            > 0;
-        Ok((fitness, is_solution))
+            .objective_mut()
+            .is_interesting(&input, observers, &exit_kind)?;
+        Ok((is_interesting, is_solution))
     }
 
     pub fn generate_initial_inputs<CS, G, E, OT, EM>(
@@ -686,8 +686,8 @@ where
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let (fitness, _) = self.evaluate_input(input, executor, manager, scheduler)?;
-            if fitness > 0 {
+            let (is_interesting, _) = self.evaluate_input(input, executor, manager, scheduler)?;
+            if is_interesting {
                 added += 1;
             }
         }
@@ -703,16 +703,16 @@ where
         Ok(())
     }
 
-    pub fn new(rand: R, corpus: C, feedbacks: FT, solutions: SC, objectives: OFT) -> Self {
+    pub fn new(rand: R, corpus: C, feedback: F, solutions: SC, objective: OF) -> Self {
         Self {
             rand,
             executions: 0,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             corpus,
-            feedbacks,
+            feedback,
             solutions,
-            objectives,
+            objective,
             max_size: DEFAULT_MAX_SIZE,
             phantom: PhantomData,
         }

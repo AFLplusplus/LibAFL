@@ -15,12 +15,12 @@ use crate::{
     Error,
 };
 
-use core::time::Duration;
+use core::{marker::PhantomData, time::Duration};
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I>: Named + serde::Serialize + serde::de::DeserializeOwned + 'static
+pub trait Feedback<I>: Named + serde::Serialize + serde::de::DeserializeOwned
 where
     I: Input,
 {
@@ -30,7 +30,7 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple;
 
@@ -47,77 +47,239 @@ where
     }
 }
 
-pub trait FeedbacksTuple<I>: serde::Serialize + serde::de::DeserializeOwned
+/// Compose feedbacks with an AND operation
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct AndFeedback<A, B, I>
 where
+    A: Feedback<I>,
+    B: Feedback<I>,
     I: Input,
 {
-    /// Get the total interestingness value from all feedbacks
-    fn is_interesting_all<OT>(
+    pub first: A,
+    pub second: B,
+    phantom: PhantomData<I>,
+}
+
+impl<A, B, I> Feedback<I> for AndFeedback<A, B, I>
+where
+    A: Feedback<I>,
+    B: Feedback<I>,
+    I: Input,
+{
+    fn is_interesting<OT>(
         &mut self,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
-    where
-        OT: ObserversTuple;
-
-    /// Write metadata for this testcase
-    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error>;
-
-    /// Discards metadata - the end of this input's execution
-    fn discard_metadata_all(&mut self, input: &I) -> Result<(), Error>;
-}
-
-impl<I> FeedbacksTuple<I> for ()
-where
-    I: Input,
-{
-    #[inline]
-    fn is_interesting_all<OT>(&mut self, _: &I, _: &OT, _: &ExitKind) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
-        Ok(0)
-    }
-
-    #[inline]
-    fn append_metadata_all(&mut self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
-        Ok(())
-    }
-
-    #[inline]
-    fn discard_metadata_all(&mut self, _input: &I) -> Result<(), Error> {
-        Ok(())
+        let a = self.first.is_interesting(input, observers, exit_kind)?;
+        let b = self.second.is_interesting(input, observers, exit_kind)?;
+        Ok(a && b)
     }
 }
 
-impl<Head, Tail, I> FeedbacksTuple<I> for (Head, Tail)
+impl<A, B, I> Named for AndFeedback<A, B, I>
 where
-    Head: Feedback<I>,
-    Tail: FeedbacksTuple<I>,
+    A: Feedback<I>,
+    B: Feedback<I>,
     I: Input,
 {
-    fn is_interesting_all<OT>(
+    #[inline]
+    fn name(&self) -> &str {
+        //format!("And({}, {})", self.first.name(), self.second.name())
+        "AndFeedback"
+    }
+}
+
+impl<A, B, I> AndFeedback<A, B, I>
+where
+    A: Feedback<I>,
+    B: Feedback<I>,
+    I: Input,
+{
+    pub fn new(first: A, second: B) -> Self {
+        Self {
+            first,
+            second,
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Compose feedbacks with an OR operation
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct OrFeedback<A, B, I>
+where
+    A: Feedback<I>,
+    B: Feedback<I>,
+    I: Input,
+{
+    pub first: A,
+    pub second: B,
+    phantom: PhantomData<I>,
+}
+
+impl<A, B, I> Feedback<I> for OrFeedback<A, B, I>
+where
+    A: Feedback<I>,
+    B: Feedback<I>,
+    I: Input,
+{
+    fn is_interesting<OT>(
         &mut self,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
-        Ok(self.0.is_interesting(input, observers, exit_kind)?
-            + self.1.is_interesting_all(input, observers, exit_kind)?)
+        let a = self.first.is_interesting(input, observers, exit_kind)?;
+        let b = self.second.is_interesting(input, observers, exit_kind)?;
+        Ok(a || b)
     }
+}
 
-    fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.0.append_metadata(testcase)?;
-        self.1.append_metadata_all(testcase)
+impl<A, B, I> Named for OrFeedback<A, B, I>
+where
+    A: Feedback<I>,
+    B: Feedback<I>,
+    I: Input,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        //format!("Or({}, {})", self.first.name(), self.second.name())
+        "OrFeedback"
     }
+}
 
-    fn discard_metadata_all(&mut self, input: &I) -> Result<(), Error> {
-        self.0.discard_metadata(input)?;
-        self.1.discard_metadata_all(input)
+impl<A, B, I> OrFeedback<A, B, I>
+where
+    A: Feedback<I>,
+    B: Feedback<I>,
+    I: Input,
+{
+    pub fn new(first: A, second: B) -> Self {
+        Self {
+            first,
+            second,
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Compose feedbacks with an OR operation
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct NotFeedback<A, I>
+where
+    A: Feedback<I>,
+    I: Input,
+{
+    pub first: A,
+    phantom: PhantomData<I>,
+}
+
+impl<A, I> Feedback<I> for NotFeedback<A, I>
+where
+    A: Feedback<I>,
+    I: Input,
+{
+    fn is_interesting<OT>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        Ok(!self.first.is_interesting(input, observers, exit_kind)?)
+    }
+}
+
+impl<A, I> Named for NotFeedback<A, I>
+where
+    A: Feedback<I>,
+    I: Input,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        //format!("Not({})", self.first.name())
+        "NotFeedback"
+    }
+}
+
+impl<A, I> NotFeedback<A, I>
+where
+    A: Feedback<I>,
+    I: Input,
+{
+    pub fn new(first: A) -> Self {
+        Self {
+            first,
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Variadic macro to create a chain of AndFeedback
+#[macro_export]
+macro_rules! feedback_and {
+    ( $last:expr ) => { $last };
+
+    ( $head:expr, $($tail:expr), +) => {
+        // recursive call
+        AndFeedback::new($head , feedback_and!($($tail),+))
+    };
+}
+
+/// Variadic macro to create a chain of OrFeedback
+#[macro_export]
+macro_rules! feedback_or {
+    ( $last:expr ) => { $last };
+
+    ( $head:expr, $($tail:expr), +) => {
+        // recursive call
+        OrFeedback::new($head , feedback_or!($($tail),+))
+    };
+}
+
+/// Variadic macro to create a NotFeedback
+#[macro_export]
+macro_rules! feedback_not {
+    ( $last:expr ) => {
+        NotFeedback::new($last)
+    };
+}
+
+/// Hack to use () as empty Feedback
+impl<I> Feedback<I> for ()
+where
+    I: Input,
+{
+    fn is_interesting<OT>(
+        &mut self,
+        _input: &I,
+        _observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        Ok(false)
+    }
+}
+
+impl Named for () {
+    #[inline]
+    fn name(&self) -> &str {
+        "Empty"
     }
 }
 
@@ -134,14 +296,14 @@ where
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
         if let ExitKind::Crash = exit_kind {
-            Ok(1)
+            Ok(true)
         } else {
-            Ok(0)
+            Ok(false)
         }
     }
 }
@@ -177,14 +339,14 @@ where
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
         if let ExitKind::Timeout = exit_kind {
-            Ok(1)
+            Ok(true)
         } else {
-            Ok(0)
+            Ok(false)
         }
     }
 }
@@ -209,6 +371,7 @@ impl Default for TimeoutFeedback {
 }
 
 /// Nop feedback that annotates execution time in the new testcase, if any
+/// For this Feedback, the testcase is never interesting (use with an OR)
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
     exec_time: Option<Duration>,
@@ -223,13 +386,13 @@ where
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
         let observer = observers.match_first_type::<TimeObserver>().unwrap();
         self.exec_time = *observer.last_runtime();
-        Ok(0)
+        Ok(false)
     }
 
     /// Append to the testcase the generated metadata in case of a new corpus item
