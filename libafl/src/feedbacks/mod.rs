@@ -84,13 +84,13 @@ where
     #[inline]
     fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         self.first.append_metadata(testcase)?;
-        self.first.append_metadata(testcase)
+        self.second.append_metadata(testcase)
     }
 
     #[inline]
     fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
         self.first.discard_metadata(input)?;
-        self.first.discard_metadata(input)
+        self.second.discard_metadata(input)
     }
 }
 
@@ -159,13 +159,13 @@ where
     #[inline]
     fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         self.first.append_metadata(testcase)?;
-        self.first.append_metadata(testcase)
+        self.second.append_metadata(testcase)
     }
 
     #[inline]
     fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
         self.first.discard_metadata(input)?;
-        self.first.discard_metadata(input)
+        self.second.discard_metadata(input)
     }
 }
 
