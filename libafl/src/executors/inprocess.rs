@@ -528,10 +528,10 @@ mod windows_exception_handler {
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
         executors::ExitKind,
-        feedback::Feedback,
+        feedbacks::Feedback,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::{HasObjectives, HasSolutions},
+        state::{HasObjective, HasSolutions},
     };
 
     /// Signal handling on unix systems needs some nasty unsafe.
