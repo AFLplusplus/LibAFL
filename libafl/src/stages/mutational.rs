@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::{Corpus, CorpusScheduler},
     events::EventManager,
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
     mutators::Mutator,
     observers::ObserversTuple,
@@ -25,8 +25,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I>,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
 {
     /// The mutator registered for this stage
@@ -76,8 +76,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {
@@ -94,8 +94,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {
@@ -125,8 +125,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {
@@ -150,8 +150,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {

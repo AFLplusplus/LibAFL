@@ -120,7 +120,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
-            "in-process(edges,time)",
             &mut harness,
             tuple_list!(edges_observer, TimeObserver::new("time")),
             &mut state,
