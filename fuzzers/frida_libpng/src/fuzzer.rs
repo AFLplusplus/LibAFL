@@ -2,15 +2,17 @@
 //! The example harness is built for libpng.
 
 use libafl::{
-    bolts::tuples::{tuple_list, Named},
+    bolts::tuples::tuple_list,
     corpus::{
         ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
         IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
-    events::{setup_restarting_mgr_std, EventManager},
+    events::setup_restarting_mgr_std,
     executors::{
-        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
+        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasExecHooks,
+        HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
+    feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
@@ -37,14 +39,14 @@ use libafl_frida::{
     FridaOptions,
 };
 
-struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
+struct FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT>, I, OT>,
+    base: TimeoutExecutor<InProcessExecutor<'a, EM, H, I, OT, S>, I>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -53,19 +55,17 @@ where
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c, FH, H, I, OT> Executor<I> for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S> Executor<I>
+    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    /// Called right before exexution starts
+    /// Instruct the target about the input and run
     #[inline]
-    fn pre_exec<EM, S>(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error>
-    where
-        EM: EventManager<I, S>,
-    {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         if self.helper.stalker_enabled() {
             if !self.followed {
                 self.followed = true;
@@ -77,15 +77,6 @@ where
                 ))
             }
         }
-
-        self.helper.pre_exec(input);
-
-        self.base.pre_exec(state, event_mgr, input)
-    }
-
-    /// Instruct the target about the input and run
-    #[inline]
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let res = self.base.run_target(input);
         if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
             println!("Crashing target as it had ASAN errors");
@@ -93,29 +84,38 @@ where
                 libc::raise(libc::SIGABRT);
             }
         }
+        if self.helper.stalker_enabled() {
+            self.stalker.deactivate();
+        }
         res
+    }
+}
+
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasExecHooks<EM, I, S>
+    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+where
+    FH: FridaHelper<'b>,
+    H: FnMut(&[u8]) -> ExitKind,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    /// Called right before exexution starts
+    #[inline]
+    fn pre_exec(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error> {
+        self.helper.pre_exec(input);
+        self.base.pre_exec(state, event_mgr, input)
     }
 
     /// Called right after execution finished.
     #[inline]
-    fn post_exec<EM, S>(
-        &mut self,
-        state: &mut S,
-        event_mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error>
-    where
-        EM: EventManager<I, S>,
-    {
-        if self.helper.stalker_enabled() {
-            self.stalker.deactivate();
-        }
+    fn post_exec(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error> {
         self.helper.post_exec(input);
         self.base.post_exec(state, event_mgr, input)
     }
 }
 
-impl<'a, 'b, 'c, FH, H, I, OT> HasObservers<OT> for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasObservers<OT>
+    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -133,19 +133,17 @@ where
     }
 }
 
-impl<'a, 'b, 'c, FH, H, I, OT> Named for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasObserversHooks<EM, I, OT, S>
+    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
 {
-    fn name(&self) -> &str {
-        self.base.name()
-    }
 }
 
-impl<'a, 'b, 'c, FH, H, I, OT> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -154,7 +152,7 @@ where
 {
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT>,
+        base: InProcessExecutor<'a, EM, H, I, OT, S>,
         helper: &'c mut FH,
         timeout: Duration,
     ) -> Self {
@@ -279,17 +277,13 @@ unsafe fn fuzz(
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(MaxMapFeedback::new_with_observer_track(
-                &edges_observer,
-                true,
-                false
-            )),
+            MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new_save_meta(objective_dir, Some(OnDiskMetadataFormat::JsonPretty))
                 .unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(
+            feedback_or!(
                 CrashFeedback::new(),
                 TimeoutFeedback::new(),
                 AsanErrorsFeedback::new()
@@ -324,7 +318,6 @@ unsafe fn fuzz(
     let mut executor = FridaInProcessExecutor::new(
         &gum,
         InProcessExecutor::new(
-            "in-process(edges)",
             &mut frida_harness,
             tuple_list!(edges_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
             &mut state,

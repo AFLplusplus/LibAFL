@@ -5,7 +5,7 @@ use core::{marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
-use core::ptr::read_volatile;
+use core::ptr::{addr_of, read_volatile};
 
 #[cfg(feature = "std")]
 use crate::bolts::{
@@ -15,7 +15,7 @@ use crate::bolts::{
 
 use crate::{
     bolts::{
-        llmp::{self, Flag, LlmpClientDescription, LlmpSender, Tag},
+        llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     corpus::CorpusScheduler,
@@ -173,7 +173,7 @@ where
                 #[cfg(feature = "llmp_compression")]
                 let compressor = &self.compressor;
                 broker.loop_forever(
-                    &mut |sender_id: u32, tag: Tag, _flags: Flag, msg: &[u8]| {
+                    &mut |sender_id: u32, tag: Tag, _flags: Flags, msg: &[u8]| {
                         if tag == LLMP_TAG_EVENT_TO_BOTH {
                             #[cfg(not(feature = "llmp_compression"))]
                             let event_bytes = msg;
@@ -292,11 +292,10 @@ where
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
-                let fitness = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
-                if fitness > 0
-                    && state
-                        .add_if_interesting(&input, fitness, scheduler)?
-                        .is_some()
+                let is_interesting = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
+                if state
+                    .add_if_interesting(&input, is_interesting, scheduler)?
+                    .is_some()
                 {
                     #[cfg(feature = "std")]
                     println!("Added received Testcase");
@@ -376,7 +375,7 @@ where
     #[cfg(feature = "llmp_compression")]
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        let flags: Flag = LLMP_FLAG_INITIALIZED;
+        let flags: Flags = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.compress(&serialized)? {
             Some(comp_buf) => {
@@ -610,7 +609,9 @@ where
             #[cfg(windows)]
             let child_status = startable_self()?.status()?;
 
-            if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
+            if unsafe { read_volatile(addr_of!((*receiver.current_recv_map.page()).size_used)) }
+                == 0
+            {
                 #[cfg(unix)]
                 if child_status == 137 {
                     // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html

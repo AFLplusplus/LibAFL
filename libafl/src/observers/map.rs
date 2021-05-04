@@ -11,6 +11,7 @@ use crate::{
         ownedref::{OwnedArrayPtrMut, OwnedPtr},
         tuples::Named,
     },
+    executors::HasExecHooks,
     observers::Observer,
     Error,
 };
@@ -68,12 +69,18 @@ where
     name: String,
 }
 
-impl<T> Observer for StdMapObserver<T>
+impl<T> Observer for StdMapObserver<T> where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
+{
+}
+
+impl<EM, I, S, T> HasExecHooks<EM, I, S> for StdMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    Self: MapObserver<T>,
 {
     #[inline]
-    fn pre_exec(&mut self) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -170,12 +177,17 @@ where
     name: String,
 }
 
-impl<T> Observer for VariableMapObserver<T>
+impl<T> Observer for VariableMapObserver<T> where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
+{
+}
+
+impl<EM, I, S, T> HasExecHooks<EM, I, S> for VariableMapObserver<T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn pre_exec(&mut self) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -264,7 +276,7 @@ where
 #[serde(bound = "M: serde::de::DeserializeOwned")]
 pub struct HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: serde::Serialize + serde::de::DeserializeOwned,
 {
     base: M,
 }
@@ -284,27 +296,29 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
 ];
 
-impl<M> Observer for HitcountsMapObserver<M>
+impl<M> Observer for HitcountsMapObserver<M> where M: MapObserver<u8> {}
+
+impl<EM, I, S, M> HasExecHooks<EM, I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: MapObserver<u8> + HasExecHooks<EM, I, S>,
 {
     #[inline]
-    fn pre_exec(&mut self) -> Result<(), Error> {
-        self.reset_map()
+    fn pre_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
+        self.base.pre_exec(state, mgr, input)
     }
 
     #[inline]
-    fn post_exec(&mut self) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
         for x in self.map_mut().iter_mut() {
             *x = COUNT_CLASS_LOOKUP[*x as usize];
         }
-        Ok(())
+        self.base.post_exec(state, mgr, input)
     }
 }
 
 impl<M> Named for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: Named + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -349,7 +363,7 @@ where
 
 impl<M> HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
     pub fn new(base: M) -> Self {

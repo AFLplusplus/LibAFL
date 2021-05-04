@@ -23,8 +23,6 @@ where
     input: Option<I>,
     /// Filename, if this testcase is backed by a file in the filesystem
     filename: Option<String>,
-    /// Accumulated fitness from all the feedbacks
-    fitness: u32,
     /// Map of metadata associated with this testcase
     metadata: SerdeAnyMap,
     /// Time needed to execute the input
@@ -120,24 +118,6 @@ where
         self.filename = Some(filename);
     }
 
-    /// Get the fitness
-    #[inline]
-    pub fn fitness(&self) -> u32 {
-        self.fitness
-    }
-
-    /// Get the fitness (mutable)
-    #[inline]
-    pub fn fitness_mut(&mut self) -> &mut u32 {
-        &mut self.fitness
-    }
-
-    /// Set the fitness
-    #[inline]
-    pub fn set_fitness(&mut self, fitness: u32) {
-        self.fitness = fitness;
-    }
-
     /// Get the execution time of the testcase
     pub fn exec_time(&self) -> &Option<Duration> {
         &self.exec_time
@@ -157,7 +137,6 @@ where
         Testcase {
             input: Some(input.into()),
             filename: None,
-            fitness: 0,
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
@@ -170,20 +149,6 @@ where
         Testcase {
             input: Some(input),
             filename: Some(filename),
-            fitness: 0,
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
-        }
-    }
-
-    /// Create a new Testcase instace given an input and a fitness
-    #[inline]
-    pub fn with_fitness(input: I, fitness: u32) -> Self {
-        Testcase {
-            input: Some(input),
-            filename: None,
-            fitness,
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
@@ -195,7 +160,6 @@ where
         Testcase {
             input: None,
             filename: None,
-            fitness: 0,
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,

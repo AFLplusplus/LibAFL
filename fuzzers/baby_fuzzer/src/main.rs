@@ -56,13 +56,13 @@ pub fn main() {
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
-        // Feedbacks to rate the interestingness of an input
-        tuple_list!(MaxMapFeedback::new_with_observer(&observer)),
+        // Feedback to rate the interestingness of an input
+        MaxMapFeedback::new_with_observer(&observer),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // Feedbacks to recognize an input as solution
-        tuple_list!(CrashFeedback::new()),
+        CrashFeedback::new(),
     );
 
     // Setup a basic mutator with a mutational stage
@@ -77,7 +77,6 @@ pub fn main() {
 
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
-        "in-process(signals)",
         &mut harness,
         tuple_list!(observer),
         &mut state,
