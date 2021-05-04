@@ -80,6 +80,18 @@ where
         let b = self.second.is_interesting(input, observers, exit_kind)?;
         Ok(a && b)
     }
+
+    #[inline]
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        self.first.append_metadata(testcase)?;
+        self.first.append_metadata(testcase)
+    }
+
+    #[inline]
+    fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
+        self.first.discard_metadata(input)?;
+        self.first.discard_metadata(input)
+    }
 }
 
 impl<A, B, I> Named for AndFeedback<A, B, I>
@@ -143,6 +155,18 @@ where
         let b = self.second.is_interesting(input, observers, exit_kind)?;
         Ok(a || b)
     }
+
+    #[inline]
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        self.first.append_metadata(testcase)?;
+        self.first.append_metadata(testcase)
+    }
+
+    #[inline]
+    fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
+        self.first.discard_metadata(input)?;
+        self.first.discard_metadata(input)
+    }
 }
 
 impl<A, B, I> Named for OrFeedback<A, B, I>
@@ -200,6 +224,16 @@ where
         OT: ObserversTuple,
     {
         Ok(!self.first.is_interesting(input, observers, exit_kind)?)
+    }
+
+    #[inline]
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        self.first.append_metadata(testcase)
+    }
+
+    #[inline]
+    fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
+        self.first.discard_metadata(input)
     }
 }
 
