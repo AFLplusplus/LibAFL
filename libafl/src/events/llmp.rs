@@ -292,11 +292,10 @@ where
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
-                let fitness = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
-                if fitness > 0
-                    && state
-                        .add_if_interesting(&input, fitness, scheduler)?
-                        .is_some()
+                let is_interesting = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
+                if state
+                    .add_if_interesting(&input, is_interesting, scheduler)?
+                    .is_some()
                 {
                     #[cfg(feature = "std")]
                     println!("Added received Testcase");
