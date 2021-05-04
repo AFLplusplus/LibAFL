@@ -25,7 +25,7 @@ libafl = { path = "../../libafl/", features = [ "std", "llmp_compression" ] } #,
 capstone = "0.8.0"
 frida-gum = { version = "0.4", git = "https://github.com/s1341/frida-rust", features = [ "auto-download", "event-sink", "invocation-listener"] }
 #frida-gum = { version = "0.4", path = "../../../frida-rust/frida-gum", features = [ "auto-download", "event-sink", "invocation-listener"] }
-libafl_frida = { path = "../../libafl_frida", version = "0.1.0" }
+libafl_frida = { path = "../../libafl_frida", version = "0.2.0" }
 lazy_static = "1.4.0"
 libc = "0.2"
 libloading = "0.7.0"

@@ -1687,18 +1687,18 @@ where
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<bool, Error> {
         let observer = observers
             .match_first_type::<AsanErrorsObserver>()
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         match observer.errors() {
-            None => Ok(0),
+            None => Ok(false),
             Some(errors) => {
                 if !errors.errors.is_empty() {
                     self.errors = Some(errors.clone());
-                    Ok(1)
+                    Ok(true)
                 } else {
-                    Ok(0)
+                    Ok(false)
                 }
             }
         }

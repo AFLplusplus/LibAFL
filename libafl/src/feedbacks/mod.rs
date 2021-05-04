@@ -235,7 +235,7 @@ macro_rules! feedback_and {
 
     ( $head:expr, $($tail:expr), +) => {
         // recursive call
-        AndFeedback::new($head , feedback_and!($($tail),+))
+        $crate::feedbacks::AndFeedback::new($head , feedback_and!($($tail),+))
     };
 }
 
@@ -246,7 +246,7 @@ macro_rules! feedback_or {
 
     ( $head:expr, $($tail:expr), +) => {
         // recursive call
-        OrFeedback::new($head , feedback_or!($($tail),+))
+        $crate::feedbacks::OrFeedback::new($head , feedback_or!($($tail),+))
     };
 }
 
@@ -254,7 +254,7 @@ macro_rules! feedback_or {
 #[macro_export]
 macro_rules! feedback_not {
     ( $last:expr ) => {
-        NotFeedback::new($last)
+        $crate::feedbacks::NotFeedback::new($last)
     };
 }
 
