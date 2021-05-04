@@ -43,7 +43,7 @@ pub trait HasExecHooks<EM, I, S> {
     }
 }
 
-/// A haskell-style tuple of observers
+/// A haskell-style tuple of objects that have pre and post exec hooks
 pub trait HasExecHooksTuple<EM, I, S> {
     /// This is called right before the next execution.
     fn pre_exec_all(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error>;
@@ -90,6 +90,7 @@ where
     fn observers_mut(&mut self) -> &mut OT;
 }
 
+/// Execute the exec hooks of the observers if they all implement HasExecHooks
 pub trait HasObserversHooks<EM, I, OT, S>: HasObservers<OT>
 where
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
