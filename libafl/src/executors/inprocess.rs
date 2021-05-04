@@ -19,10 +19,10 @@ use crate::{
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::FeedbacksTuple,
+    feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::{HasObjectives, HasSolutions},
+    state::{HasObjective, HasSolutions},
     Error,
 };
 
@@ -158,7 +158,7 @@ where
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<OC, OFT>(
+    pub fn new<OC, OF>(
         harness_fn: &'a mut H,
         observers: OT,
         _state: &mut S,
@@ -167,19 +167,19 @@ where
     where
         EM: EventManager<I, S>,
         OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        OF: Feedback<I>,
+        S: HasObjective<OF, I> + HasSolutions<OC, I>,
     {
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S>,
             );
             write_volatile(
                 &mut data.timeout_handler,
-                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S>,
             );
 
             setup_signal_handler(data)?;
@@ -190,11 +190,11 @@ where
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S>,
             );
             //write_volatile(
             //    &mut data.timeout_handler,
-            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S>,
             //);
 
             setup_exception_handler(data)?;
@@ -234,10 +234,10 @@ mod unix_signal_handler {
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
         executors::ExitKind,
-        feedbacks::FeedbacksTuple,
+        feedbacks::Feedback,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::{HasObjectives, HasSolutions},
+        state::{HasObjective, HasSolutions},
     };
 
     // TODO merge GLOBAL_STATE with the Windows one
@@ -308,7 +308,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_timeout_handler<EM, I, OC, OF, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -317,8 +317,8 @@ mod unix_signal_handler {
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        OF: Feedback<I>,
+        S: HasObjective<OF, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
@@ -337,11 +337,11 @@ mod unix_signal_handler {
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
 
-            let obj_fitness = state
-                .objectives_mut()
-                .is_interesting_all(&input, observers, &ExitKind::Timeout)
-                .expect("In timeout handler objectives failure.");
-            if obj_fitness > 0 {
+            let interesting = state
+                .objective_mut()
+                .is_interesting(&input, observers, &ExitKind::Timeout)
+                .expect("In timeout handler objective failure.");
+            if interesting {
                 state
                     .solutions_mut()
                     .add(Testcase::new(input.clone()))
@@ -374,7 +374,7 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -383,8 +383,8 @@ mod unix_signal_handler {
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        OF: Feedback<I>,
+        S: HasObjective<OF, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
@@ -446,11 +446,11 @@ mod unix_signal_handler {
             // Make sure we don't crash in the crash handler forever.
             data.current_input_ptr = ptr::null();
 
-            let obj_fitness = state
-                .objectives_mut()
-                .is_interesting_all(&input, observers, &ExitKind::Crash)
-                .expect("In crash handler objectives failure.");
-            if obj_fitness > 0 {
+            let interesting = state
+                .objective_mut()
+                .is_interesting(&input, observers, &ExitKind::Crash)
+                .expect("In crash handler objective failure.");
+            if interesting {
                 let new_input = input.clone();
                 state
                     .solutions_mut()
@@ -528,10 +528,10 @@ mod windows_exception_handler {
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
         executors::ExitKind,
-        feedbacks::FeedbacksTuple,
+        feedbacks::Feedback,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::{HasObjectives, HasSolutions},
+        state::{HasObjective, HasSolutions},
     };
 
     /// Signal handling on unix systems needs some nasty unsafe.
@@ -582,7 +582,7 @@ mod windows_exception_handler {
         }
     }
 
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S>(
         code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
@@ -590,8 +590,8 @@ mod windows_exception_handler {
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OFT: FeedbacksTuple<I>,
-        S: HasObjectives<OFT, I> + HasSolutions<OC, I>,
+        OF: Feedback<I>,
+        S: HasObjective<OF, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
         #[cfg(feature = "std")]
@@ -610,11 +610,11 @@ mod windows_exception_handler {
             // Make sure we don't crash in the crash handler forever.
             data.current_input_ptr = ptr::null();
 
-            let obj_fitness = state
-                .objectives_mut()
-                .is_interesting_all(&input, observers, &ExitKind::Crash)
-                .expect("In crash handler objectives failure.");
-            if obj_fitness > 0 {
+            let interesting = state
+                .objective_mut()
+                .is_interesting(&input, observers, &ExitKind::Crash)
+                .expect("In crash handler objective failure.");
+            if interesting {
                 let new_input = input.clone();
                 state
                     .solutions_mut()

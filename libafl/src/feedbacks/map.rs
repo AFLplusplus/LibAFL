@@ -139,11 +139,11 @@ where
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
-        let mut interesting = 0;
+        let mut interesting = false;
         // TODO optimize
         let observer = observers.match_name_type::<O>(&self.name).unwrap();
         let size = observer.usable_count();
@@ -157,7 +157,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                 }
             }
         } else if self.indexes.is_some() && self.novelties.is_none() {
@@ -171,7 +171,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                 }
             }
         } else if self.indexes.is_none() && self.novelties.is_some() {
@@ -182,7 +182,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
@@ -197,7 +197,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
