@@ -113,7 +113,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create the executor for an in-process function with observers for edge coverage, value-profile and allocations sizes
     let mut executor = InProcessExecutor::new(
-        "in-process(edges,cmp,alloc)",
         &mut harness,
         tuple_list!(edges_observer, cmps_observer, allocs_observer),
         &mut state,

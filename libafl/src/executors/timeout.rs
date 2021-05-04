@@ -3,10 +3,10 @@
 use core::{marker::PhantomData, time::Duration};
 
 use crate::{
-    bolts::tuples::Named,
-    events::EventManager,
-    executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input},
+    executors::{
+        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
+    },
+    inputs::Input,
     observers::ObserversTuple,
     Error,
 };
@@ -39,50 +39,20 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout excutor is a wrapper that set a timeout before each run
-pub struct TimeoutExecutor<E, I, OT>
+pub struct TimeoutExecutor<E, I>
 where
-    E: Executor<I> + HasObservers<OT>,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    E: Executor<I>,
+    I: Input,
 {
     executor: E,
     exec_tmout: Duration,
-    phantom: PhantomData<(I, OT)>,
+    phantom: PhantomData<I>,
 }
 
-impl<E, I, OT> Named for TimeoutExecutor<E, I, OT>
+impl<E, I> TimeoutExecutor<E, I>
 where
-    E: Executor<I> + HasObservers<OT>,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
-{
-    fn name(&self) -> &str {
-        self.executor.name()
-    }
-}
-
-impl<E, I, OT> HasObservers<OT> for TimeoutExecutor<E, I, OT>
-where
-    E: Executor<I> + HasObservers<OT>,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        self.executor.observers()
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        self.executor.observers_mut()
-    }
-}
-
-impl<E, I, OT> TimeoutExecutor<E, I, OT>
-where
-    E: Executor<I> + HasObservers<OT>,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    E: Executor<I>,
+    I: Input,
 {
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         Self {
@@ -97,19 +67,48 @@ where
     }
 }
 
-impl<E, I, OT> Executor<I> for TimeoutExecutor<E, I, OT>
+impl<E, I> Executor<I> for TimeoutExecutor<E, I>
+where
+    E: Executor<I>,
+    I: Input,
+{
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+        self.executor.run_target(input)
+    }
+}
+
+impl<E, I, OT> HasObservers<OT> for TimeoutExecutor<E, I>
 where
     E: Executor<I> + HasObservers<OT>,
-    I: Input + HasTargetBytes,
+    I: Input,
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec<EM: EventManager<I, S>, S>(
-        &mut self,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn observers(&self) -> &OT {
+        self.executor.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.executor.observers_mut()
+    }
+}
+
+impl<E, EM, I, OT, S> HasObserversHooks<EM, I, OT, S> for TimeoutExecutor<E, I>
+where
+    E: Executor<I> + HasObservers<OT>,
+    I: Input,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+{
+}
+
+impl<E, EM, I, S> HasExecHooks<EM, I, S> for TimeoutExecutor<E, I>
+where
+    E: Executor<I> + HasExecHooks<EM, I, S>,
+    I: Input,
+{
+    #[inline]
+    fn pre_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             let milli_sec = self.exec_tmout.as_millis();
@@ -135,16 +134,11 @@ where
             // TODO
             let _ = self.exec_tmout.as_millis();
         }
-        self.executor.pre_exec(_state, _event_mgr, _input)
+        self.executor.pre_exec(state, mgr, input)
     }
 
     #[inline]
-    fn post_exec<EM: EventManager<I, S>, S>(
-        &mut self,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             let it_value = Timeval {
@@ -168,10 +162,6 @@ where
         {
             // TODO
         }
-        self.executor.post_exec(_state, _event_mgr, _input)
-    }
-
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        self.executor.run_target(input)
+        self.executor.post_exec(state, mgr, input)
     }
 }

@@ -25,12 +25,14 @@ where
     I: Input,
 {
     /// `is_interesting ` should return the "Interestingness" from 0 to 255 (percent times 2.55)
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>;
+    ) -> Result<u32, Error>
+    where
+        OT: ObserversTuple;
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
@@ -50,12 +52,14 @@ where
     I: Input,
 {
     /// Get the total interestingness value from all feedbacks
-    fn is_interesting_all<OT: ObserversTuple>(
+    fn is_interesting_all<OT>(
         &mut self,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>;
+    ) -> Result<u32, Error>
+    where
+        OT: ObserversTuple;
 
     /// Write metadata for this testcase
     fn append_metadata_all(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error>;
@@ -69,12 +73,10 @@ where
     I: Input,
 {
     #[inline]
-    fn is_interesting_all<OT: ObserversTuple>(
-        &mut self,
-        _: &I,
-        _: &OT,
-        _: &ExitKind,
-    ) -> Result<u32, Error> {
+    fn is_interesting_all<OT>(&mut self, _: &I, _: &OT, _: &ExitKind) -> Result<u32, Error>
+    where
+        OT: ObserversTuple,
+    {
         Ok(0)
     }
 
@@ -95,12 +97,15 @@ where
     Tail: FeedbacksTuple<I>,
     I: Input,
 {
-    fn is_interesting_all<OT: ObserversTuple>(
+    fn is_interesting_all<OT>(
         &mut self,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<u32, Error>
+    where
+        OT: ObserversTuple,
+    {
         Ok(self.0.is_interesting(input, observers, exit_kind)?
             + self.1.is_interesting_all(input, observers, exit_kind)?)
     }
@@ -124,12 +129,15 @@ impl<I> Feedback<I> for CrashFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<u32, Error>
+    where
+        OT: ObserversTuple,
+    {
         if let ExitKind::Crash = exit_kind {
             Ok(1)
         } else {
@@ -164,12 +172,15 @@ impl<I> Feedback<I> for TimeoutFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<u32, Error>
+    where
+        OT: ObserversTuple,
+    {
         if let ExitKind::Timeout = exit_kind {
             Ok(1)
         } else {
@@ -207,12 +218,15 @@ impl<I> Feedback<I> for TimeFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<u32, Error>
+    where
+        OT: ObserversTuple,
+    {
         let observer = observers.match_first_type::<TimeObserver>().unwrap();
         self.exec_time = *observer.last_runtime();
         Ok(0)

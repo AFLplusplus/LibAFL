@@ -12,7 +12,9 @@ use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
     corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventManager, LogSeverity},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{
+        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
+    },
     feedbacks::FeedbacksTuple,
     generators::Generator,
     inputs::Input,
@@ -97,7 +99,7 @@ pub trait HasMetadata {
 }
 
 /// Trait for elements offering a feedbacks tuple
-pub trait HasFeedbacks<FT, I>
+pub trait HasFeedbacks<FT, I>: Sized
 where
     FT: FeedbacksTuple<I>,
     I: Input,
@@ -107,29 +109,10 @@ where
 
     /// The feedbacks tuple (mut)
     fn feedbacks_mut(&mut self) -> &mut FT;
-
-    /// Resets all metadata holds by feedbacks
-    #[inline]
-    fn discard_feedbacks_metadata(&mut self, input: &I) -> Result<(), Error> {
-        // TODO: This could probably be automatic in the feedback somehow?
-        self.feedbacks_mut().discard_metadata_all(&input)
-    }
-
-    /// Creates a new testcase, appending the metadata from each feedback
-    #[inline]
-    fn testcase_with_feedbacks_metadata(
-        &mut self,
-        input: I,
-        fitness: u32,
-    ) -> Result<Testcase<I>, Error> {
-        let mut testcase = Testcase::with_fitness(input, fitness);
-        self.feedbacks_mut().append_metadata_all(&mut testcase)?;
-        Ok(testcase)
-    }
 }
 
 /// Trait for elements offering an objective feedbacks tuple
-pub trait HasObjectives<FT, I>
+pub trait HasObjectives<FT, I>: Sized
 where
     FT: FeedbacksTuple<I>,
     I: Input,
@@ -160,7 +143,7 @@ pub trait HasStartTime {
 }
 
 /// Add to the state if interesting
-pub trait IfInteresting<I>
+pub trait IfInteresting<I>: Sized
 where
     I: Input,
 {
@@ -200,8 +183,11 @@ where
         scheduler: &CS,
     ) -> Result<(u32, Option<usize>), Error>
     where
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         EM: EventManager<I, Self>,
         CS: CorpusScheduler<I, Self>;
 }
@@ -469,12 +455,13 @@ where
         CS: CorpusScheduler<I, Self>,
     {
         if fitness > 0 {
-            let testcase = self.testcase_with_feedbacks_metadata(input.clone(), fitness)?;
+            let mut testcase = Testcase::with_fitness(input.clone(), fitness);
+            self.feedbacks_mut().append_metadata_all(&mut testcase)?;
             let idx = self.corpus.add(testcase)?;
             scheduler.on_add(self, idx)?;
             Ok(Some(idx))
         } else {
-            self.discard_feedbacks_metadata(input)?;
+            self.feedbacks_mut().discard_metadata_all(&input)?;
             Ok(None)
         }
     }
@@ -500,8 +487,11 @@ where
         scheduler: &CS,
     ) -> Result<(u32, Option<usize>), Error>
     where
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         C: Corpus<I>,
         EM: EventManager<I, Self>,
         CS: CorpusScheduler<I, Self>,
@@ -555,8 +545,11 @@ where
         in_dir: &Path,
     ) -> Result<(), Error>
     where
-        E: Executor<BytesInput> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<BytesInput>
+            + HasObservers<OT>
+            + HasExecHooks<EM, BytesInput, Self>
+            + HasObserversHooks<EM, BytesInput, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, BytesInput, Self>,
         EM: EventManager<BytesInput, Self>,
         CS: CorpusScheduler<BytesInput, Self>,
     {
@@ -601,8 +594,11 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: Executor<BytesInput> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<BytesInput>
+            + HasObservers<OT>
+            + HasExecHooks<EM, BytesInput, Self>
+            + HasObserversHooks<EM, BytesInput, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, BytesInput, Self>,
         EM: EventManager<BytesInput, Self>,
         CS: CorpusScheduler<BytesInput, Self>,
     {
@@ -639,19 +635,22 @@ where
         event_mgr: &mut EM,
     ) -> Result<(u32, bool), Error>
     where
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         C: Corpus<I>,
         EM: EventManager<I, Self>,
     {
-        executor.pre_exec_observers()?;
+        executor.pre_exec_observers(self, event_mgr, input)?;
 
         executor.pre_exec(self, event_mgr, input)?;
         let exit_kind = executor.run_target(input)?;
         executor.post_exec(self, event_mgr, input)?;
 
         *self.executions_mut() += 1;
-        executor.post_exec_observers()?;
+        executor.post_exec_observers(self, event_mgr, input)?;
 
         let observers = executor.observers();
         let fitness = self
@@ -676,8 +675,11 @@ where
     where
         G: Generator<I, R>,
         C: Corpus<I>,
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         EM: EventManager<I, Self>,
         CS: CorpusScheduler<I, Self>,
     {
