@@ -358,7 +358,7 @@ where
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<bool, Error> {
         let observer = observers.match_name_type::<O>(&self.name).unwrap();
         let size = observer.usable_count();
         let mut hit_target: bool = false;
@@ -370,9 +370,9 @@ where
             }
         }
         if hit_target {
-            Ok(1)
+            Ok(true)
         } else {
-            Ok(0)
+            Ok(false)
         }
     }
 
