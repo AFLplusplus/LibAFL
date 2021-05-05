@@ -746,6 +746,7 @@ impl AsanRuntime {
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
+    #[allow(clippy::unused_self)]
     pub fn reset_allocations(&self) {
         Allocator::get().reset();
     }
@@ -759,11 +760,13 @@ impl AsanRuntime {
         }
     }
 
+    #[allow(clippy::unused_self)]
     pub fn errors(&mut self) -> &Option<AsanErrors> {
         unsafe { &ASAN_ERRORS }
     }
 
     /// Make sure the specified memory is unpoisoned
+    #[allow(clippy::unused_self)]
     pub fn unpoison(&self, address: usize, size: usize) {
         Allocator::get().map_shadow_for_region(address, address + size, true);
     }
@@ -779,6 +782,7 @@ impl AsanRuntime {
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
+    #[allow(clippy::unused_self)]
     fn unpoison_all_existing_memory(&self) {
         let mut allocator = Allocator::get();
         walk_self_maps(&mut |start, end, permissions, _path| {
@@ -794,6 +798,7 @@ impl AsanRuntime {
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
+    #[allow(clippy::unused_self)]
     pub fn register_thread(&self) {
         let mut allocator = Allocator::get();
         let (stack_start, stack_end) = Self::current_stack();
@@ -855,6 +860,7 @@ impl AsanRuntime {
 
     /// Locate the target library and hook it's memory allocation functions
     #[cfg(unix)]
+    #[allow(clippy::unused_self)]
     fn hook_library(&mut self, path: &str) {
         let target_lib = GotHookLibrary::new(path, false);
 
@@ -925,6 +931,8 @@ impl AsanRuntime {
         }
     }
 
+    #[allow(clippy::cast_sign_loss)] // for displacement
+    #[allow(clippy::too_many_lines)]
     extern "C" fn handle_trap(&mut self) {
         let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
@@ -990,6 +998,7 @@ impl AsanRuntime {
             base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
         }
 
+        #[allow(clippy::clippy::cast_possible_wrap)]
         let mut fault_address =
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
@@ -1043,6 +1052,7 @@ impl AsanRuntime {
             }
         } else {
             let mut allocator = Allocator::get();
+            #[allow(clippy::option_if_let_else)]
             if let Some(metadata) =
                 allocator.find_metadata(fault_address, self.regs[base_reg as usize])
             {
@@ -1076,6 +1086,7 @@ impl AsanRuntime {
         self.report_error(error);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn report_error(&mut self, error: AsanError) {
         unsafe {
             ASAN_ERRORS.as_mut().unwrap().errors.push(error.clone());
@@ -1356,6 +1367,7 @@ impl AsanRuntime {
         }
     }
 
+    #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
         let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check {
@@ -1386,6 +1398,7 @@ impl AsanRuntime {
         ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
 
+    #[allow(clippy::unused_self)]
     fn generate_shadow_check_exact_blob(&mut self, val: u32) -> Box<[u8]> {
         let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check_exact {
@@ -1422,6 +1435,8 @@ impl AsanRuntime {
     ///
     /// Generate the instrumentation blobs for the current arch.
     #[allow(clippy::similar_names)] // We allow things like dword and qword
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::too_many_lines)]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops_report
@@ -1522,7 +1537,7 @@ impl AsanRuntime {
                 //offset r30 (x30) at cfa-8
                 //offset r29 (x29) at cfa-16
             ; .dword 0x1d0c4c00
-            ; .dword 0x9d029e10 as u32 as i32
+            ; .dword 0x9d029e10u32 as i32
             ; .dword 0x04
             // empty next FDE:
             ; .dword 0x0
