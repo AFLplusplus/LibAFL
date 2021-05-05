@@ -108,6 +108,7 @@ where
         severity_level: LogSeverity,
         /// The message
         message: String,
+        /// `PhantomData`
         phantom: PhantomData<I>,
     },
     /*/// A custom type

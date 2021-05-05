@@ -16,15 +16,21 @@ use crate::{
 
 use alloc::boxed::Box;
 
+/// A `CustomExitKind` for exits that do not fit the default `ExitKind`
 pub trait CustomExitKind: core::fmt::Debug + SerdeAny + 'static {}
 
 /// How an execution finished.
 #[derive(Debug)]
 pub enum ExitKind {
+    /// The run exited normally.
     Ok,
+    /// The run resulted in a target crash.
     Crash,
+    /// The run hit an out of memory error.
     Oom,
+    /// The run timed out
     Timeout,
+    /// The run resulted in a custom `ExitKind`.
     Custom(Box<dyn CustomExitKind>),
 }
 

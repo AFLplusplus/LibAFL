@@ -212,9 +212,12 @@ where
     }
 }
 
+/// Allows prepending of values to a tuple
 pub trait Prepend<T>: TupleList {
     type PreprendResult: TupleList;
 
+    /// Prepend a value to this tuple, returning a new tuple with prepended value.
+    #[must_use]
     fn prepend(self, value: T) -> (T, Self::PreprendResult);
 }
 
@@ -230,9 +233,12 @@ where
     }
 }
 
+/// Append to a `TupeList`
 pub trait Append<T>: TupleList {
     type AppendResult: TupleList;
 
+    /// Append Value and return the tuple
+    #[must_use]
     fn append(self, value: T) -> Self::AppendResult;
 }
 

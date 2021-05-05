@@ -15,6 +15,7 @@ use core::marker::PhantomData;
 use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
+/// Default probability to skip the non-favored values
 pub const DEFAULT_SKIP_NOT_FAV_PROB: u64 = 95;
 
 /// A testcase metadata saying if a testcase is favored
