@@ -3,6 +3,7 @@ Welcome to libAFL
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(feature = "RUSTC_IS_NIGHTLY", feature(specialization))]
 
 #[macro_use]
 extern crate alloc;
