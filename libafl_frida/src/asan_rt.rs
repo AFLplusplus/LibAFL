@@ -2,12 +2,12 @@ use hashbrown::HashMap;
 use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
-    executors::{CustomExitKind, ExitKind},
+    executors::{CustomExitKind, ExitKind, HasExecHooks},
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
     state::HasMetadata,
-    utils::{find_mapping_for_address, walk_self_maps},
+    utils::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
     Error, SerdeAny,
 };
 use nix::{
@@ -25,6 +25,7 @@ use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(unix)]
 use gothook::GotHookLibrary;
 use libc::{getrlimit64, rlimit64, sysconf, _SC_PAGESIZE};
+use rangemap::RangeMap;
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -610,6 +611,7 @@ pub struct AsanRuntime {
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
     options: FridaOptions,
+    instrumented_ranges: RangeMap<usize, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -695,6 +697,7 @@ impl AsanRuntime {
             blob_check_mem_64bytes: None,
             stalked_addresses: HashMap::new(),
             options,
+            instrumented_ranges: RangeMap::new(),
         }));
         Allocator::init(res.clone());
         res
@@ -734,6 +737,9 @@ impl AsanRuntime {
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
+            let (start, end) = find_mapping_for_path(module_name.to_str().unwrap());
+            self.instrumented_ranges
+                .insert(start..end, module_name.to_str().unwrap().to_string());
             #[cfg(unix)]
             self.hook_library(module_name.to_str().unwrap());
         }
@@ -1101,13 +1107,13 @@ impl AsanRuntime {
             | AsanError::WriteAfterFree(mut error) => {
                 let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
-                if let Ok((start, _, _, path)) = find_mapping_for_address(error.pc) {
+                if let Some((range, path)) = self.instrumented_ranges.get_key_value(&error.pc) {
                     writeln!(
                         output,
-                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
+                        " at 0x{:x} ({}@0x{:04x}), faulting address 0x{:x}",
                         error.pc,
                         path,
-                        error.pc - start,
+                        error.pc - range.start,
                         fault_address
                     )
                     .unwrap();
@@ -1625,8 +1631,10 @@ pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl Observer for AsanErrorsObserver {
-    fn pre_exec(&mut self) -> Result<(), Error> {
+impl Observer for AsanErrorsObserver {}
+
+impl<EM, I, S> HasExecHooks<EM, I, S> for AsanErrorsObserver {
+    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
@@ -1685,18 +1693,18 @@ where
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<bool, Error> {
         let observer = observers
             .match_first_type::<AsanErrorsObserver>()
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         match observer.errors() {
-            None => Ok(0),
+            None => Ok(false),
             Some(errors) => {
                 if !errors.errors.is_empty() {
                     self.errors = Some(errors.clone());
-                    Ok(1)
+                    Ok(true)
                 } else {
-                    Ok(0)
+                    Ok(false)
                 }
             }
         }

@@ -12,6 +12,7 @@ use libafl::{
     },
     events::{setup_restarting_mgr_std, EventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
@@ -76,7 +77,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(
+            feedback_or!(
                 MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
                 TimeFeedback::new()
             ),
@@ -84,7 +85,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new(), TimeoutFeedback::new()),
+            feedback_or!(CrashFeedback::new(), TimeoutFeedback::new()),
         )
     });
 
@@ -120,7 +121,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
-            "in-process(edges,time)",
             &mut harness,
             tuple_list!(edges_observer, TimeObserver::new("time")),
             &mut state,

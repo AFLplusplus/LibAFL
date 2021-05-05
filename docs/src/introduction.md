@@ -25,5 +25,5 @@ To give an example, as opposed to old-skool fuzzers, a `BytesInput` is just one 
 feel free to use and mutate an Abstract Syntax Tree instead, for structured fuzzing.
 - `scalable`: As part of LibAFL, we developed `Low Level Message Passing`, `LLMP` for short, which allows LibAFL to scale almost linearly over cores. That is, if you chose to use this feature - it is your fuzzer, after all. Scaling to multiple machines over TCP is on the near road-map.
 - `fast`: We do everything we can at compiletime so that the runtime overhead is as minimal as it can get.
-- `bring your own target`: We support binary-only modes, like Frida-Mode with ASAN and CmpLog, as well as multiple compilation passes for sourced-based instrumentation, and of course supoprt custom instrumentation.
+- `bring your own target`: We support binary-only modes, like Frida-Mode with ASAN and CmpLog, as well as multiple compilation passes for sourced-based instrumentation, and of course support custom instrumentation.
 - `usable`: This one is on you to decide. Dig right in!

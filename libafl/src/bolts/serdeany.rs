@@ -58,7 +58,7 @@ where
     where
         D: serde::de::Deserializer<'de>,
     {
-        let mut erased = erased_serde::Deserializer::erase(deserializer);
+        let mut erased = <dyn erased_serde::Deserializer>::erase(deserializer);
         (self.cb)(&mut erased).map_err(serde::de::Error::custom)
     }
 }

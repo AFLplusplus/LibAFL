@@ -14,14 +14,14 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     inputs::Input,
-    observers::{MapObserver, Observer, ObserversTuple},
+    observers::{MapObserver, ObserversTuple},
     state::HasMetadata,
     utils::AsSlice,
     Error,
 };
 
-pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
-pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
+pub type MaxMapFeedback<O, T> = MapFeedback<O, MaxReducer, T>;
+pub type MinMapFeedback<O, T> = MapFeedback<O, MinReducer, T>;
 
 /// A Reducer function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
@@ -32,14 +32,9 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MaxReducer<T>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-{
-    phantom: PhantomData<T>,
-}
+pub struct MaxReducer {}
 
-impl<T> Reducer<T> for MaxReducer<T>
+impl<T> Reducer<T> for MaxReducer
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -54,14 +49,9 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MinReducer<T>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-{
-    phantom: PhantomData<T>,
-}
+pub struct MinReducer {}
 
-impl<T> Reducer<T> for MinReducer<T>
+impl<T> Reducer<T> for MinReducer
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -119,7 +109,7 @@ impl MapNoveltiesMetadata {
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<T, R, O>
+pub struct MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -137,26 +127,23 @@ where
     phantom: PhantomData<(R, O)>,
 }
 
-impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
+impl<O, R, T, I> Feedback<I> for MapFeedback<O, R, T>
 where
-    T: Integer
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + core::fmt::Debug,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
-        let mut interesting = 0;
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        let mut interesting = false;
         // TODO optimize
         let observer = observers.match_name_type::<O>(&self.name).unwrap();
         let size = observer.usable_count();
@@ -170,7 +157,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                 }
             }
         } else if self.indexes.is_some() && self.novelties.is_none() {
@@ -184,7 +171,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                 }
             }
         } else if self.indexes.is_none() && self.novelties.is_some() {
@@ -195,7 +182,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
@@ -210,7 +197,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
@@ -243,7 +230,7 @@ where
     }
 }
 
-impl<T, R, O> Named for MapFeedback<T, R, O>
+impl<O, R, T> Named for MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -255,11 +242,11 @@ where
     }
 }
 
-impl<T, R, O> MapFeedback<T, R, O>
+impl<O, R, T> MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
-    O: MapObserver<T> + Observer,
+    O: MapObserver<T>,
 {
     /// Create new `MapFeedback`
     pub fn new(name: &'static str, map_size: usize) -> Self {
@@ -315,7 +302,7 @@ where
     }
 }
 
-impl<T, R, O> MapFeedback<T, R, O>
+impl<O, R, T> MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,

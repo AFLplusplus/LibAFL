@@ -6,7 +6,7 @@ use core_affinity::CoreId;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "std")]
-use core::ptr::read_volatile;
+use core::ptr::{addr_of, read_volatile};
 
 #[cfg(feature = "std")]
 use crate::bolts::{
@@ -293,11 +293,10 @@ where
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
-                let fitness = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
-                if fitness > 0
-                    && state
-                        .add_if_interesting(&input, fitness, scheduler)?
-                        .is_some()
+                let is_interesting = state.is_interesting(&input, &observers, &ExitKind::Ok)?;
+                if state
+                    .add_if_interesting(&input, is_interesting, scheduler)?
+                    .is_some()
                 {
                     #[cfg(feature = "std")]
                     println!("Added received Testcase");
@@ -641,7 +640,9 @@ where
             #[cfg(windows)]
             let child_status = startable_self()?.status()?;
 
-            if unsafe { read_volatile(&(*receiver.current_recv_map.page()).size_used) } == 0 {
+            if unsafe { read_volatile(addr_of!((*receiver.current_recv_map.page()).size_used)) }
+                == 0
+            {
                 #[cfg(unix)]
                 if child_status == 137 {
                     // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html

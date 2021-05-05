@@ -194,7 +194,6 @@ mod tests {
 
         let mut harness = |_buf: &[u8]| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
-            "main",
             &mut harness,
             tuple_list!(),
             //Box::new(|_, _, _, _, _| ()),

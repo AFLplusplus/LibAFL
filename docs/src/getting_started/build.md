@@ -20,6 +20,6 @@ The directory contains a set of crates that are not part of the workspace.
 
 Each of these example fuzzers uses particular features of LibAFL, sometimes combined with different instrumentation backends (e.g. [SanitizerCoverage](https://clang.llvm.org/docs/SanitizerCoverage.html), [Frida](https://frida.re/), ...).
 
-You can use these crates as examples and as skeletons for custom fuzzers with similar featuresets.
+You can use these crates as examples and as skeletons for custom fuzzers with similar feature sets.
 
 To build an example fuzzer you have to invoke cargo from its respective folder (`fuzzers/[FUZZER_NAME]).
