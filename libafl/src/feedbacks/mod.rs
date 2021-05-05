@@ -426,7 +426,7 @@ where
         OT: ObserversTuple,
     {
         // TODO Replace with match_name_type when stable
-        let observer = unsafe { observers.match_name::<TimeObserver>(self.name()).unwrap() };
+        let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
         self.exec_time = *observer.last_runtime();
         Ok(false)
     }

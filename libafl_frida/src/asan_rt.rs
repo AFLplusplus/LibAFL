@@ -1694,11 +1694,9 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        let observer = unsafe {
-            observers
-                .match_name::<AsanErrorsObserver>("AsanErrors")
-                .expect("An AsanErrorsFeedback needs an AsanErrorsObserver")
-        };
+        let observer = observers
+            .match_name::<AsanErrorsObserver>("AsanErrors")
+            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         match observer.errors() {
             None => Ok(false),
             Some(errors) => {
@@ -1729,7 +1727,7 @@ where
 impl Named for AsanErrorsFeedback {
     #[inline]
     fn name(&self) -> &str {
-        "AsanErrorsFeedback"
+        "AsanErrors"
     }
 }
 
