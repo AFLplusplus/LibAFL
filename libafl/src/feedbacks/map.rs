@@ -320,3 +320,82 @@ where
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ReachabilityFeedback<O> {
+    name: String,
+    target_idx: Vec<usize>,
+    phantom: PhantomData<O>,
+}
+
+impl<O> ReachabilityFeedback<O>
+where
+    O: MapObserver<usize>,
+{
+    pub fn new_with_observer(map_observer: &O) -> Self {
+        Self {
+            name: map_observer.name().to_string(),
+            target_idx: vec![],
+            phantom: PhantomData,
+        }
+    }
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: name.to_string(),
+            target_idx: vec![],
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I, O> Feedback<I> for ReachabilityFeedback<O>
+where
+    I: Input,
+    O: MapObserver<usize>,
+{
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        let observer = observers.match_name_type::<O>(&self.name).unwrap();
+        let size = observer.usable_count();
+        let mut hit_target: bool = false;
+        //check if we've hit any targets.
+        for i in 0..size {
+            if observer.map()[i] > 0 {
+                self.target_idx.push(i);
+                hit_target = true;
+            }
+        }
+        if hit_target {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        if !self.target_idx.is_empty() {
+            let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
+            testcase.add_metadata(meta);
+        };
+        Ok(())
+    }
+
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+        self.target_idx.clear();
+        Ok(())
+    }
+}
+
+impl<O> Named for ReachabilityFeedback<O>
+where
+    O: MapObserver<usize>,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
