@@ -342,9 +342,11 @@ mod unix_signal_handler {
                 .is_interesting(&input, observers, &ExitKind::Timeout)
                 .expect("In timeout handler objective failure.");
             if interesting {
+                let mut new_testcase = Testcase::new(input.clone());
+                state.objective_mut().append_metadata(&mut new_testcase).expect("Failed adding metadata");
                 state
                     .solutions_mut()
-                    .add(Testcase::new(input.clone()))
+                    .add(new_testcase)
                     .expect("In timeout handler solutions failure.");
                 event_mgr
                     .fire(
@@ -452,9 +454,11 @@ mod unix_signal_handler {
                 .expect("In crash handler objective failure.");
             if interesting {
                 let new_input = input.clone();
+                let mut new_testcase = Testcase::new(new_input);
+                state.objective_mut().append_metadata(&mut new_testcase).expect("Failed adding metadata");
                 state
                     .solutions_mut()
-                    .add(Testcase::new(new_input))
+                    .add(new_testcase)
                     .expect("In crash handler solutions failure.");
                 event_mgr
                     .fire(
@@ -616,9 +620,11 @@ mod windows_exception_handler {
                 .expect("In crash handler objective failure.");
             if interesting {
                 let new_input = input.clone();
+                let mut new_testcase = Testcase::new(new_input);
+                state.objective_mut().append_metadata(&mut new_testcase).expect("Failed adding metadata");
                 state
                     .solutions_mut()
-                    .add(Testcase::new(new_input))
+                    .add(new_testcase)
                     .expect("In crash handler solutions failure.");
                 event_mgr
                     .fire(
