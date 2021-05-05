@@ -537,7 +537,8 @@ where
     SC: Corpus<BytesInput>,
     OF: Feedback<BytesInput>,
 {
-    pub fn load_from_directory<CS, E, OT, EM>(
+    /// loads inputs from a directory
+    fn load_from_directory<CS, E, OT, EM>(
         &mut self,
         executor: &mut E,
         manager: &mut EM,
@@ -587,6 +588,7 @@ where
         Ok(())
     }
 
+    /// Loads initial inputs from the passed-in `in_dirs`.
     pub fn load_initial_inputs<CS, E, OT, EM>(
         &mut self,
         executor: &mut E,
@@ -664,6 +666,7 @@ where
         Ok((is_interesting, is_solution))
     }
 
+    /// Generate `num` initial inputs, using the passed-in generator.
     pub fn generate_initial_inputs<CS, G, E, OT, EM>(
         &mut self,
         executor: &mut E,
@@ -703,6 +706,7 @@ where
         Ok(())
     }
 
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
     pub fn new(rand: R, corpus: C, feedback: F, solutions: SC, objective: OF) -> Self {
         Self {
             rand,

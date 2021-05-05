@@ -16,7 +16,7 @@ use crate::{
 
 use alloc::boxed::Box;
 
-/// A `CustomExitKind` for exits that do not fit the default `ExitKind`
+/// A `CustomExitKind` for exits that do not fit to one of the default `ExitKind`.
 pub trait CustomExitKind: core::fmt::Debug + SerdeAny + 'static {}
 
 /// How an execution finished.

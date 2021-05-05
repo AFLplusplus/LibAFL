@@ -58,6 +58,7 @@ impl TimeObserver {
         }
     }
 
+    /// Gets the runtime for the last execution of this target.
     pub fn last_runtime(&self) -> &Option<Duration> {
         &self.last_runtime
     }

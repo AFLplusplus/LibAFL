@@ -18,11 +18,15 @@ use std::{
 #[cfg(any(unix, feature = "std"))]
 use crate::Error;
 
+/// Can be converted to a slice
 pub trait AsSlice<T> {
     /// Convert to a slice
     fn as_slice(&self) -> &[T];
 }
 
+/// The standard rand implementation for LibAFL.
+/// It is usually the right choice, with very good speed and a reasonable randomness.
+/// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuTrioRand;
 
 /// Ways to get random around here
@@ -120,6 +124,7 @@ default_rand!(RomuDuoJrRand);
 /// Default implementations are provided with the "std" feature enabled, using system time in
 /// nanoseconds as the initial seed.
 pub trait RandomSeed: Rand + Default {
+    /// Creates a new `RandomSeed`
     fn new() -> Self;
 }
 
@@ -288,6 +293,7 @@ pub struct RomuTrioRand {
 }
 
 impl RomuTrioRand {
+    /// Creates a new `RomuTrioRand` with the given seed.
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
@@ -327,6 +333,7 @@ pub struct RomuDuoJrRand {
 }
 
 impl RomuDuoJrRand {
+    /// Creates a new `RomuDuoJrRand` with the given seed.
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
@@ -401,10 +408,13 @@ impl ChildHandle {
     }
 }
 
-#[cfg(unix)]
 /// The `ForkResult` (result of a fork)
+#[cfg(unix)]
 pub enum ForkResult {
+    /// The fork finished, we are the parent process.
+    /// The child has the handle `ChildHandle`.
     Parent(ChildHandle),
+    /// The fork finished, we are the child process.
     Child,
 }
 
