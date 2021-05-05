@@ -295,7 +295,7 @@ where
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
             let mut log = Vec::<String>::new();
             while let Some(idx) = self.mutation_log.pop() {
-                let name = String::from(self.scheduled.mutations().get_name(idx).unwrap()); // TODO maybe return an Error on None
+                let name = String::from(self.scheduled.mutations().name(idx).unwrap()); // TODO maybe return an Error on None
                 log.push(name)
             }
             let meta = LogMutationMetadata::new(log);
@@ -411,12 +411,8 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let mut rand = XKCDRand::with_seed(5);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into())
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into())
-            .unwrap();
+        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
+        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
 
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
@@ -433,7 +429,7 @@ mod tests {
 
         // The pre-seeded rand should have spliced at position 2.
         // TODO: Maybe have a fixed rand for this purpose?
-        assert_eq!(input.bytes(), &['a' as u8, 'b' as u8, 'f' as u8])
+        assert_eq!(input.bytes(), &[b'a', b'b', b'f'])
     }
 
     #[test]
@@ -441,12 +437,8 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into())
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into())
-            .unwrap();
+        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
+        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
 
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();

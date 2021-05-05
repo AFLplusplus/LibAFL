@@ -363,6 +363,7 @@ impl Rand for RomuDuoJrRand {
 /// fake rand, for testing purposes
 #[cfg(test)]
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct XKCDRand {
     val: u64,
 }
@@ -523,7 +524,9 @@ pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::utils::{Rand, *};
+    use crate::utils::{
+        Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand, Xoshiro256StarRand,
+    };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());

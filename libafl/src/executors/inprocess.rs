@@ -706,7 +706,7 @@ mod tests {
             observers: tuple_list!(),
             phantom: PhantomData,
         };
-        let mut input = NopInput {};
-        assert!(in_process_executor.run_target(&mut input).is_ok());
+        let input = NopInput {};
+        assert!(in_process_executor.run_target(&input).is_ok());
     }
 }

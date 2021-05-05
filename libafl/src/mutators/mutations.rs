@@ -551,7 +551,7 @@ where
         } else {
             let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
             unsafe {
-                // Moar speed, no bound check
+                // Moar speed, no bounds checks
                 let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
                 let num = 1 + state.rand_mut().below(ARITH_MAX) as u16;
                 match state.rand_mut().below(4) {
@@ -687,7 +687,7 @@ where
         } else {
             let idx = state.rand_mut().below(input.bytes().len() as u64 - 7) as usize;
             unsafe {
-                // Moar speed, no bound check
+                // Moar speed, no bounds checks
                 let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u64;
                 let num = 1 + state.rand_mut().below(ARITH_MAX) as u64;
                 match state.rand_mut().below(4) {
@@ -822,7 +822,7 @@ where
             let val =
                 INTERESTING_16[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u16;
             unsafe {
-                // Moar speed, no bound check
+                // Moar speed, no bounds checks
                 let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
                 if state.rand_mut().below(2) == 0 {
                     *ptr = val;
@@ -891,7 +891,7 @@ where
             let val =
                 INTERESTING_32[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u32;
             unsafe {
-                // Moar speed, no bound check
+                // Moar speed, no bounds checks
                 let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
                 if state.rand_mut().below(2) == 0 {
                     *ptr = val;
@@ -1870,7 +1870,7 @@ mod tests {
         for _ in 0..2 {
             let mut new_testcases = vec![];
             for idx in 0..(mutations.len()) {
-                for input in inputs.iter() {
+                for input in &inputs {
                     let mut mutant = input.clone();
                     match mutations
                         .get_and_mutate(idx, &mut state, &mut mutant, 0)

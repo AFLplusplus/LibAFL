@@ -38,6 +38,7 @@ use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 const ASHMEM_SERVER_NAME: &str = "@ashmem_server";
 
+/// Hands out served shared maps, as used on Android.
 #[derive(Debug)]
 pub struct ServedShMemProvider {
     stream: UnixStream,
@@ -45,6 +46,8 @@ pub struct ServedShMemProvider {
     id: i32,
 }
 
+/// [`ShMem`] that got served from a [`AshmemService`] via domain sockets and can now be used in this program.
+/// It works around Android's lack of "proper" shared maps.
 #[derive(Clone, Debug)]
 pub struct ServedShMem {
     inner: ManuallyDrop<AshmemShMem>,
@@ -199,6 +202,8 @@ impl AshmemClient {
     }
 }
 
+/// The AshmemService is a service handing out [`ShMem`] pages via unix domain sockets.
+/// It is mainly used and needed on Android.
 #[derive(Debug)]
 pub struct AshmemService {
     provider: AshmemShMemProvider,

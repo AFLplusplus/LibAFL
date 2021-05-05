@@ -101,6 +101,7 @@ impl Display for Signal {
     }
 }
 
+/// A trait for `LibAFL` signal handling
 pub trait Handler {
     /// Handle a signal
     fn handle(&mut self, signal: Signal, info: siginfo_t, _context: &mut ucontext_t);

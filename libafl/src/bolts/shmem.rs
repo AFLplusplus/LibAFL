@@ -3,8 +3,10 @@
 
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
+/// The default [`ShMemProvider`] for this os.
 #[cfg(all(feature = "std", unix))]
 pub type OsShMemProvider = UnixShMemProvider;
+/// The default [`ShMem`] for this os.
 #[cfg(all(feature = "std", unix))]
 pub type OsShMem = UnixShMem;
 
@@ -22,8 +24,10 @@ pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider>;
 #[cfg(target_os = "android")]
 pub type StdShMem = RcShMem<ServedShMemProvider>;
 
+/// The default [`ShMemProvider`] for this os.
 #[cfg(all(feature = "std", not(target_os = "android")))]
 pub type StdShMemProvider = OsShMemProvider;
+/// The default [`ShMem`] for this os.
 #[cfg(all(feature = "std", not(target_os = "android")))]
 pub type StdShMem = OsShMem;
 
@@ -49,10 +53,11 @@ pub struct ShMemDescription {
 }
 
 impl ShMemDescription {
-    pub fn from_string_and_size(string: &str, size: usize) -> Self {
+    /// Create a description from a `id_str` and a `size`.
+    pub fn from_string_and_size(id_str: &str, size: usize) -> Self {
         Self {
             size,
-            id: ShMemId::from_string(string),
+            id: ShMemId::from_string(id_str),
         }
     }
 }
@@ -102,6 +107,9 @@ impl ShMemId {
     }
 }
 
+/// A [`ShMem`] is an interface to shared maps.
+/// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
+/// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
 pub trait ShMem: Sized + Debug + Clone {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
@@ -139,7 +147,11 @@ pub trait ShMem: Sized + Debug + Clone {
     }
 }
 
+/// A [`ShMemProvider`] provides access to shared maps.
+/// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
+/// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Send + Clone + Default + Debug {
+    /// The actual shared map handed out by this [`ShMemProvider`].
     type Mem: ShMem;
 
     /// Create a new instance of the provider
@@ -156,6 +168,7 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
         self.from_id_and_size(description.id, description.size)
     }
 
+    /// Create a new sharedmap reference from an existing `id` and `len`
     fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
         self.from_id_and_size(mapping.id(), mapping.len())
     }
@@ -288,12 +301,16 @@ where
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
 
+    /// Shared memory provider for Android, allocating and forwarding maps over unix domain sockets.
     #[cfg(target_os = "android")]
     pub type UnixShMemProvider = ashmem::AshmemShMemProvider;
+    /// Shared memory for Android
     #[cfg(target_os = "android")]
     pub type UnixShMem = ashmem::AshmemShMem;
+    /// Shared memory Provider for Unix
     #[cfg(not(target_os = "android"))]
     pub type UnixShMemProvider = default::CommonUnixShMemProvider;
+    /// Shared memory for Unix
     #[cfg(not(target_os = "android"))]
     pub type UnixShMem = ashmem::AshmemShMem;
 
@@ -457,6 +474,7 @@ pub mod unix_shmem {
         }
     }
 
+    /// Module containing `ashmem` shared memory support, commonly used on Android.
     #[cfg(all(unix, feature = "std"))]
     pub mod ashmem {
         use core::slice;

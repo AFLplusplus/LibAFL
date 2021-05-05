@@ -162,9 +162,15 @@ pub type MessageId = u64;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TcpRequest {
     /// We would like to be a local client.
-    LocalClientHello { shmem_description: ShMemDescription },
+    LocalClientHello {
+        /// The sharedmem description of the connecting client.
+        shmem_description: ShMemDescription,
+    },
     /// We would like to establish a b2b connection.
-    RemoteBrokerHello { hostname: String },
+    RemoteBrokerHello {
+        /// The hostname of our broker, trying to connect.
+        hostname: String,
+    },
 }
 
 impl TryFrom<&Vec<u8>> for TcpRequest {
@@ -206,11 +212,13 @@ pub enum TcpResponse {
         /// This broker's hostname
         hostname: String,
     },
+    /// Notify the client on the other side that it has been accepted.
     LocalClientAccepted {
         /// The ClientId this client should send messages as
         /// Mainly used for client-side deduplication of incoming messages
         client_id: ClientId,
     },
+    /// Notify the remote broker has been accepted.
     RemoteBrokerAccepted {
         /// The broker id of this element
         broker_id: BrokerId,
@@ -233,12 +241,16 @@ impl TryFrom<&Vec<u8>> for TcpResponse {
 /// Abstraction for listeners
 #[cfg(feature = "std")]
 pub enum Listener {
+    /// Listener listening on `tcp`.
     Tcp(TcpListener),
 }
 
+/// A listener stream abstraction
 #[cfg(feature = "std")]
 pub enum ListenerStream {
+    /// Listener listening on `tcp`.
     Tcp(TcpStream, SocketAddr),
+    /// No listener provided.
     Empty(),
 }
 
@@ -524,9 +536,15 @@ where
     SP: ShMemProvider + 'static,
 {
     /// A broker and a thread using this tcp background thread
-    IsBroker { broker: LlmpBroker<SP> },
+    IsBroker {
+        /// The [`LlmpBroker`] of this [`LlmpConnection`].
+        broker: LlmpBroker<SP>,
+    },
     /// A client, connected to the port
-    IsClient { client: LlmpClient<SP> },
+    IsClient {
+        /// The [`LlmpClient`] of this [`LlmpConnection`].
+        client: LlmpClient<SP>,
+    },
 }
 
 impl<SP> LlmpConnection<SP>
@@ -586,6 +604,7 @@ where
         }
     }
 
+    /// Send the `buf` with given `flags`.
     pub fn send_buf_with_flags(&mut self, tag: Tag, buf: &[u8], flags: Flags) -> Result<(), Error> {
         match self {
             LlmpConnection::IsBroker { broker } => broker.send_buf_with_flags(tag, flags, buf),
@@ -659,6 +678,9 @@ impl<SP> LlmpSender<SP>
 where
     SP: ShMemProvider,
 {
+    /// Create a new [`LlmpSender`] using a given [`ShMemProvider`], and `id`.
+    /// If `keep_pages_forever` is `true`, `ShMem` will never be freed.
+    /// If it is `false`, the pages will be unmapped once they are full, and have been mapped by at least one `LlmpReceiver`.
     pub fn new(mut shmem_provider: SP, id: u32, keep_pages_forever: bool) -> Result<Self, Error> {
         Ok(Self {
             id,
@@ -1058,6 +1080,7 @@ where
         }
     }
 
+    /// Send a `buf` with the given `flags`.
     pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flags, buf: &[u8]) -> Result<(), Error> {
         // Make sure we don't reuse already allocated tags
         if tag == LLMP_TAG_NEW_SHM_CLIENT
@@ -1081,7 +1104,7 @@ where
         }
     }
 
-    // Describe this cient in a way, that it can be restored later with `Self::on_existing_from_description`
+    /// Describe this [`LlmpClient`] in a way that it can be restored later, using [`Self::on_existing_from_description`].
     pub fn describe(&self) -> Result<LlmpDescription, Error> {
         let map = self.out_maps.last().unwrap();
         let last_message_offset = if self.last_msg_sent.is_null() {
@@ -1095,7 +1118,8 @@ where
         })
     }
 
-    // Create this client on an existing map from the given description. acquired with `self.describe`
+    /// Create this client on an existing map from the given description.
+    /// Acquired with [`self.describe`].
     pub fn on_existing_from_description(
         mut shmem_provider: SP,
         description: &LlmpDescription,
@@ -1114,6 +1138,7 @@ pub struct LlmpReceiver<SP>
 where
     SP: ShMemProvider,
 {
+    /// Id of this provider
     pub id: u32,
     /// Pointer to the last meg this received
     pub last_msg_recvd: *const LlmpMsg,
@@ -1329,7 +1354,7 @@ where
         }
     }
 
-    // Describe this cient in a way, that it can be restored later with `Self::on_existing_from_description`
+    /// Describe this client in a way, that it can be restored later with [`Self::on_existing_from_description`]
     pub fn describe(&self) -> Result<LlmpDescription, Error> {
         let map = &self.current_recv_map;
         let last_message_offset = if self.last_msg_recvd.is_null() {
@@ -1343,7 +1368,7 @@ where
         })
     }
 
-    // Create this client on an existing map from the given description. acquired with `self.describe`
+    /// Create this client on an existing map from the given description. acquired with `self.describe`
     pub fn on_existing_from_description(
         mut shmem_provider: SP,
         description: &LlmpDescription,
@@ -1525,6 +1550,7 @@ where
     shmem_provider: SP,
 }
 
+/// A signal handler for the [`LlmpBroker`].
 #[cfg(unix)]
 pub struct LlmpBrokerSignalHandler {
     shutting_down: bool,
@@ -1744,6 +1770,7 @@ where
         self.llmp_out.send_buf(tag, buf)
     }
 
+    /// Sends a `buf` with the given `flags`.
     pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flags, buf: &[u8]) -> Result<(), Error> {
         self.llmp_out.send_buf_with_flags(tag, flags, buf)
     }
@@ -2296,6 +2323,7 @@ where
         self.sender.send_buf(tag, buf)
     }
 
+    /// Send a `buf` with the given `flags`.
     pub fn send_buf_with_flags(&mut self, tag: Tag, flags: Flags, buf: &[u8]) -> Result<(), Error> {
         self.sender.send_buf_with_flags(tag, flags, buf)
     }
@@ -2359,6 +2387,7 @@ where
         self.receiver.recv_buf_blocking()
     }
 
+    /// Receive a `buf` from the broker, including the `flags` used during transmission.
     #[allow(clippy::type_complexity)]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         self.receiver.recv_buf_with_flags()

@@ -11,6 +11,7 @@ pub mod libfuzzer;
 pub use libfuzzer::*;
 
 #[cfg(all(feature = "value_profile", feature = "cmplog"))]
+#[cfg(not(any(doc, feature = "clippy")))]
 compile_error!("the libafl_targets `value_profile` and `cmplog` features are mutually exclusive.");
 
 #[cfg(feature = "value_profile")]
