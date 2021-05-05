@@ -101,12 +101,13 @@ pub trait HasObserversHooks<EM, I, OT, S>: HasObservers<OT>
 where
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
 {
+    /// Run the pre exec hook for all [`crate::observers::Observer`]`s` linked to this [`Executor`].
     #[inline]
     fn pre_exec_observers(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
         self.observers_mut().pre_exec_all(state, mgr, input)
     }
 
-    /// Run the post exec hook for all the observes linked to this executor
+    /// Run the post exec hook for all the [`crate::observers::Observer`]`s` linked to this [`Executor`].
     #[inline]
     fn post_exec_observers(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
         self.observers_mut().post_exec_all(state, mgr, input)

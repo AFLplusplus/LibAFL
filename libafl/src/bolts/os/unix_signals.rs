@@ -23,26 +23,42 @@ use crate::Error;
 
 pub use libc::{c_void, siginfo_t};
 
+/// All signals on this system, as `enum`.
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
 #[allow(clippy::pub_enum_variant_names)]
 pub enum Signal {
+    /// `SIGABRT` signal id
     SigAbort = SIGABRT,
+    /// `SIGBUS` signal id
     SigBus = SIGBUS,
+    /// `SIGFPE` signal id
     SigFloatingPointException = SIGFPE,
+    /// `SIGILL` signal id
     SigIllegalInstruction = SIGILL,
+    /// `SIGPIPE` signal id
     SigPipe = SIGPIPE,
+    /// `SIGSEGV` signal id
     SigSegmentationFault = SIGSEGV,
+    /// `SIGUSR2` signal id
     SigUser2 = SIGUSR2,
+    /// `SIGALARM` signal id
     SigAlarm = SIGALRM,
+    /// `SIGHUP` signal id
     SigHangUp = SIGHUP,
+    /// `SIGKILL` signal id
     SigKill = SIGKILL,
+    /// `SIGQUIT` signal id
     SigQuit = SIGQUIT,
+    /// `SIGTERM` signal id
     SigTerm = SIGTERM,
+    /// `SIGINT` signal id
     SigInterrupt = SIGINT,
+    /// `SIGTRAP` signal id
     SigTrap = SIGTRAP,
 }
 
+/// A list of crashing signals
 pub static CRASH_SIGNALS: &[Signal] = &[
     Signal::SigAbort,
     Signal::SigBus,

@@ -143,7 +143,7 @@ where
         }
     }
 
-    /// Create a new Testcase instace given an input and a filename
+    /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
     pub fn with_filename(input: I, filename: String) -> Self {
         Testcase {
@@ -155,6 +155,7 @@ where
         }
     }
 
+    /// Create a new, empty, [`Testcase`].
     #[inline]
     pub fn default() -> Self {
         Testcase {

@@ -77,6 +77,8 @@ impl<I> InMemoryCorpus<I>
 where
     I: Input,
 {
+    /// Creates a new [`InMemoryCorpus`], keeping all [`Testcase`]`s` in memory.
+    /// This is the simplest and fastest option, however test progress will be lost on exit or on OOM.
     pub fn new() -> Self {
         Self {
             entries: vec![],

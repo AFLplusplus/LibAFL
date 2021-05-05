@@ -243,8 +243,11 @@ where
     }
 }
 
+/// Finds an element of a `type` by the given `name`.
 pub trait MatchNameAndType {
+    /// Finds an element of a `type` by the given `name`, and returns a borrow, or [`Option::None`].
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T>;
+    /// Finds an element of a `type` by the given `name`, and returns a mut borrow, or [`Option::None`].
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T>;
 }
 
@@ -283,6 +286,8 @@ where
 
 /// Allows prepending of values to a tuple
 pub trait Prepend<T>: TupleList {
+    /// The Resulting [`TupleList`], of an [`Prepend::prepend()`] call,
+    /// including the prepended entry.
     type PreprendResult: TupleList;
 
     /// Prepend a value to this tuple, returning a new tuple with prepended value.
@@ -304,6 +309,8 @@ where
 
 /// Append to a `TupeList`
 pub trait Append<T>: TupleList {
+    /// The Resulting [`TupleList`], of an [`Append::append()`] call,
+    /// including the appended entry.
     type AppendResult: TupleList;
 
     /// Append Value and return the tuple

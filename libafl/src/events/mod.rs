@@ -91,10 +91,11 @@ where
     },
     /// New stats.
     UpdateStats {
-        /// The time of generation of the event
+        /// The time of generation of the [`Event`]
         time: Duration,
         /// The executions of this client
         executions: usize,
+        /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
     /// A new objective was found

@@ -37,7 +37,7 @@ impl AsSlice<String> for LogMutationMetadata {
 }
 
 impl LogMutationMetadata {
-    /// Creates new [`struct@MutationsMetadata`].
+    /// Creates new [`struct@LogMutationMetadata`].
     pub fn new(list: Vec<String>) -> Self {
         Self { list }
     }
@@ -52,7 +52,7 @@ where
     /// Get the mutations
     fn mutations(&self) -> &MT;
 
-    // Get the mutations (mut)
+    /// Get the mutations (mut)
     fn mutations_mut(&mut self) -> &mut MT;
 }
 
