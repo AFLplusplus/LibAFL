@@ -45,10 +45,25 @@ impl FridaOptions {
                         options.enable_asan_allocation_backtraces = value.parse().unwrap();
                     }
                     "instrument-suppress-locations" => {
-                        options.instrument_suppress_locations = Some(value.split(',').map(|val| {
-                            let (module, offset) = val.split_at(val.find('@').expect("Expected an '@' in location specifier"));
-                            (module.to_string(), usize::from_str_radix(offset.get(1..).unwrap().trim_start_matches("0x"), 16).unwrap())
-                        }).collect());
+                        options.instrument_suppress_locations = Some(
+                            value
+                                .split(',')
+                                .map(|val| {
+                                    let (module, offset) = val.split_at(
+                                        val.find('@')
+                                            .expect("Expected an '@' in location specifier"),
+                                    );
+                                    (
+                                        module.to_string(),
+                                        usize::from_str_radix(
+                                            offset.get(1..).unwrap().trim_start_matches("0x"),
+                                            16,
+                                        )
+                                        .unwrap(),
+                                    )
+                                })
+                                .collect(),
+                        );
                     }
                     "coverage" => {
                         options.enable_coverage = value.parse().unwrap();

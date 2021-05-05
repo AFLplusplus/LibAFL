@@ -235,9 +235,16 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
             if let Some(suppressed_specifiers) = helper.options().dont_instrument_locations() {
                 for (module_name, offset) in suppressed_specifiers {
-                    let (lib_start, _) = find_mapping_for_path(std::fs::canonicalize(&module_name).unwrap().to_str().unwrap());
+                    let (lib_start, _) = find_mapping_for_path(
+                        std::fs::canonicalize(&module_name)
+                            .unwrap()
+                            .to_str()
+                            .unwrap(),
+                    );
                     println!("removing address: {:#x}", lib_start + offset);
-                    helper.ranges.remove((lib_start + offset)..(lib_start + offset + 4));
+                    helper
+                        .ranges
+                        .remove((lib_start + offset)..(lib_start + offset + 4));
                 }
             }
 

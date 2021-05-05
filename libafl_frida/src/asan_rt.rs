@@ -25,6 +25,7 @@ use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(unix)]
 use gothook::GotHookLibrary;
 use libc::{getrlimit64, rlimit64, sysconf, _SC_PAGESIZE};
+use rangemap::RangeMap;
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -34,7 +35,6 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
-use rangemap::RangeMap;
 use termcolor::{Color, ColorSpec, WriteColor};
 
 use crate::FridaOptions;
@@ -738,7 +738,8 @@ impl AsanRuntime {
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
             let (start, end) = find_mapping_for_path(module_name.to_str().unwrap());
-            self.instrumented_ranges.insert(start..end, module_name.to_str().unwrap().to_string());
+            self.instrumented_ranges
+                .insert(start..end, module_name.to_str().unwrap().to_string());
             #[cfg(unix)]
             self.hook_library(module_name.to_str().unwrap());
         }
