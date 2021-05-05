@@ -1,3 +1,11 @@
+/*!
+The frida address sanitizer runtime provides address sanitization.
+When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+The runtime can report memory errors that occurred during execution,
+even if the target would not have crashed under normal conditions.
+this helps finding mem errors early.
+*/
+
 use hashbrown::HashMap;
 use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
@@ -594,6 +602,11 @@ extern "C" {
     fn get_tls_ptr() -> *const c_void;
 }
 
+/// The frida address sanitizer runtime, providing address sanitization.
+/// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+/// The runtime can report memory errors that occurred during execution,
+/// even if the target would not have crashed under normal conditions.
+/// this helps finding mem errors early.
 pub struct AsanRuntime {
     regs: [usize; 32],
     blob_report: Option<Box<[u8]>>,
@@ -654,24 +667,29 @@ impl AsanError {
     }
 }
 
+/// A struct holding errors that occurred during frida address sanitizer runs
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
+    /// Creates a new `AsanErrors` struct
     fn new() -> Self {
         Self { errors: Vec::new() }
     }
 
+    /// Clears this `AsanErrors` struct
     pub fn clear(&mut self) {
         self.errors.clear()
     }
 
+    /// Gets the amount of `AsanErrors` in this struct
     pub fn len(&self) -> usize {
         self.errors.len()
     }
 
+    /// Returns `true` if no errors occurred
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
@@ -679,6 +697,7 @@ impl AsanErrors {
 impl CustomExitKind for AsanErrors {}
 
 impl AsanRuntime {
+    /// Create a new `AsanRuntime`
     pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
         let res = Rc::new(RefCell::new(Self {
             regs: [0; 32],
@@ -760,6 +779,7 @@ impl AsanRuntime {
         }
     }
 
+    /// Returns the `AsanErrors` from the recent run
     #[allow(clippy::unused_self)]
     pub fn errors(&mut self) -> &Option<AsanErrors> {
         unsafe { &ASAN_ERRORS }
@@ -777,6 +797,7 @@ impl AsanRuntime {
         self.stalked_addresses.insert(stalked, real);
     }
 
+    /// Resolves the real address from a stalker stalked address
     pub fn real_address_for_stalked(&self, stalked: usize) -> Option<&usize> {
         self.stalked_addresses.get(&stalked)
     }
@@ -1638,8 +1659,10 @@ impl AsanRuntime {
     }
 }
 
+/// static field for `AsanErrors` for a run
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
+/// An observer for frida address sanitizer `AsanError`s for a frida executor run
 #[derive(Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct AsanErrorsObserver {
@@ -1668,24 +1691,28 @@ impl Named for AsanErrorsObserver {
 }
 
 impl AsanErrorsObserver {
+    /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
     pub fn new(errors: &'static Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>),
         }
     }
 
+    /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
     pub fn new_owned(errors: Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Owned(Box::new(errors)),
         }
     }
 
+    /// Creates a new `AsanErrorsObserver` from a raw ptr
     pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors),
         }
     }
 
+    /// gets the `AsanErrors` from the previous run
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
@@ -1694,6 +1721,7 @@ impl AsanErrorsObserver {
     }
 }
 
+/// A feedback reporting potential AsanErrors from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,
@@ -1747,6 +1775,8 @@ impl Named for AsanErrorsFeedback {
 }
 
 impl AsanErrorsFeedback {
+    /// Create a new `AsanErrorsFeedback`
+    #[must_use]
     pub fn new() -> Self {
         Self { errors: None }
     }

@@ -37,19 +37,26 @@ use crate::{asan_rt::AsanRuntime, FridaOptions};
 
 /// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
 pub trait FridaHelper<'a> {
+    /// Access to the stalker `Transformer`
     fn transformer(&self) -> &Transformer<'a>;
 
+    /// Register a new thread with this `FridaHelper`
     fn register_thread(&self);
 
+    /// Called prior to execution of an input
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
 
+    /// Called after execution of an input
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
 
+    /// Returns `true` if stalker is enabled
     fn stalker_enabled(&self) -> bool;
 
+    /// pointer to the frida coverage map
     fn map_ptr(&mut self) -> *mut u8;
 }
 
+/// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
 /// An helper that feeds FridaInProcessExecutor with edge-coverage instrumentation

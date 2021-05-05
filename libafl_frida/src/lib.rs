@@ -1,4 +1,11 @@
+/*!
+The FRIDA executor is a binary-only mode for LibAFL.
+It can report coverage and, on supported architecutres, even reports memory access errors.
+*/
+
+/// The frida address sanitizer runtime
 pub mod asan_rt;
+/// The LibAFL firda helper
 pub mod helper;
 
 /// A representation of the various Frida options
