@@ -343,7 +343,10 @@ mod unix_signal_handler {
                 .expect("In timeout handler objective failure.");
             if interesting {
                 let mut new_testcase = Testcase::new(input.clone());
-                state.objective_mut().append_metadata(&mut new_testcase).expect("Failed adding metadata");
+                state
+                    .objective_mut()
+                    .append_metadata(&mut new_testcase)
+                    .expect("Failed adding metadata");
                 state
                     .solutions_mut()
                     .add(new_testcase)
@@ -455,7 +458,10 @@ mod unix_signal_handler {
             if interesting {
                 let new_input = input.clone();
                 let mut new_testcase = Testcase::new(new_input);
-                state.objective_mut().append_metadata(&mut new_testcase).expect("Failed adding metadata");
+                state
+                    .objective_mut()
+                    .append_metadata(&mut new_testcase)
+                    .expect("Failed adding metadata");
                 state
                     .solutions_mut()
                     .add(new_testcase)
@@ -621,7 +627,10 @@ mod windows_exception_handler {
             if interesting {
                 let new_input = input.clone();
                 let mut new_testcase = Testcase::new(new_input);
-                state.objective_mut().append_metadata(&mut new_testcase).expect("Failed adding metadata");
+                state
+                    .objective_mut()
+                    .append_metadata(&mut new_testcase)
+                    .expect("Failed adding metadata");
                 state
                     .solutions_mut()
                     .add(new_testcase)
