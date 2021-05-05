@@ -914,10 +914,7 @@ where
             panic!("Message sent twice!");
         }
         if (*msg).tag == LLMP_TAG_UNSET {
-            panic!(
-                "No tag set on message with id {}",
-                *ptr::addr_of!((*msg).message_id)
-            );
+            panic!("No tag set on message with id {}", (*msg).message_id);
         }
         let page = self.out_maps.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
@@ -1211,7 +1208,7 @@ where
                 LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
                 LLMP_TAG_EXITING => {
                     // The other side is done.
-                    assert_eq!(*ptr::addr_of!((*msg).buf_len), 0);
+                    assert_eq!((*msg).buf_len, 0);
                     return Err(Error::ShuttingDown);
                 }
                 LLMP_TAG_END_OF_PAGE => {
@@ -1221,8 +1218,8 @@ where
                     if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
                         panic!(
                             "Illegal message length for EOP (is {}/{}, expected {})",
-                            *ptr::addr_of!((*msg).buf_len),
-                            *ptr::addr_of!((*msg).buf_len_padded),
+                            (*msg).buf_len,
+                            (*msg).buf_len_padded,
                             size_of::<LlmpPayloadSharedMapInfo>()
                         );
                     }
