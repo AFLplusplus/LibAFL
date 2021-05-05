@@ -13,7 +13,9 @@ use libafl::{
     events::{setup_restarting_mgr_std, EventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback, ReachabilityFeedback},
+    feedbacks::{
+        CrashFeedback, MaxMapFeedback, ReachabilityFeedback, TimeFeedback, TimeoutFeedback,
+    },
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
@@ -77,10 +79,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         StdMapObserver::new("edges", &mut EDGES_MAP, MAX_EDGES_NUM)
     });
 
-    let reachability_observer = 
-    unsafe{
-        StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE)
-    };
+    let reachability_observer =
+        unsafe { StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
         State::new(
@@ -97,7 +97,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            feedback_or!(CrashFeedback::new(), TimeoutFeedback::new(), ReachabilityFeedback::new_with_observer(&reachability_observer)),
+            feedback_or!(
+                CrashFeedback::new(),
+                TimeoutFeedback::new(),
+                ReachabilityFeedback::new_with_observer(&reachability_observer)
+            ),
         )
     });
 
@@ -134,7 +138,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
             &mut harness,
-            tuple_list!(edges_observer, reachability_observer, TimeObserver::new("time")),
+            tuple_list!(
+                edges_observer,
+                reachability_observer,
+                TimeObserver::new("time")
+            ),
             &mut state,
             &mut restarting_mgr,
         )?,
