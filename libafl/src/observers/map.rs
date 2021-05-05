@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        ownedref::{OwnedPtr, OwnedSliceMut},
+        ownedref::{OwnedRefMut, OwnedSliceMut},
         tuples::Named,
     },
     executors::HasExecHooks,
@@ -131,8 +131,7 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'a mut [T], len: usize) -> Self {
-        assert!(map.len() >= len);
+    pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedSliceMut::Ref(map),
@@ -173,7 +172,7 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
-    size: OwnedPtr<usize>,
+    size: OwnedRefMut<'a, usize>,
     initial: T,
     name: String,
 }
@@ -243,11 +242,11 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'a mut [T], size: *const usize) -> Self {
+    pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedSliceMut::Ref(map),
-            size: OwnedPtr::Ptr(size),
+            size: OwnedRefMut::Ref(size),
             name: name.into(),
             initial,
         }
@@ -255,17 +254,17 @@ where
 
     /// Creates a new MapObserver from a raw pointer
     /// # Safety
-    /// Dereferences map_ptr with up to max_len elements of size_ptr.
+    /// Dereferences map_ptr with up to max_len elements of size.
     pub unsafe fn new_from_ptr(
         name: &'static str,
         map_ptr: *mut T,
         max_len: usize,
-        size_ptr: *const usize,
+        size: &'a mut usize,
     ) -> Self {
         let initial = if max_len > 0 { *map_ptr } else { T::default() };
         VariableMapObserver {
             map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, max_len)),
-            size: OwnedPtr::Ptr(size_ptr),
+            size: OwnedRefMut::Ref(size),
             name: name.into(),
             initial,
         }

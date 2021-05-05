@@ -1648,7 +1648,7 @@ impl<EM, I, S> HasExecHooks<EM, I, S> for AsanErrorsObserver {
 impl Named for AsanErrorsObserver {
     #[inline]
     fn name(&self) -> &str {
-        "AsanErrorsObserver"
+        "AsanErrors"
     }
 }
 
@@ -1694,9 +1694,11 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        let observer = observers
-            .match_first_type::<AsanErrorsObserver>()
-            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
+        let observer = unsafe {
+            observers
+                .match_name::<AsanErrorsObserver>("AsanErrors")
+                .expect("An AsanErrorsFeedback needs an AsanErrorsObserver")
+        };
         match observer.errors() {
             None => Ok(false),
             Some(errors) => {

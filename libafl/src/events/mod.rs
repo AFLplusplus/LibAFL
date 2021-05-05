@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
-        let obv = StdMapObserver::new("test", unsafe { &mut MAP }, unsafe { MAP.len() });
+        let obv = StdMapObserver::new("test", unsafe { &mut MAP });
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
 

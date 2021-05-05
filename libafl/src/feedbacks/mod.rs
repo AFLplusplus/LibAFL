@@ -461,4 +461,11 @@ impl TimeFeedback {
             name: name.to_string(),
         }
     }
+
+    pub fn new_with_observer(observer: &TimeObserver) -> Self {
+        Self {
+            exec_time: None,
+            name: observer.name().to_string(),
+        }
+    }
 }
