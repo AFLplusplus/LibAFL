@@ -10,11 +10,9 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
 use capstone::arch::{
+    arch::{self, BuildsCapstone},
     arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
     ArchOperand::Arm64Operand,
-};
-use capstone::{
-    arch::{self, BuildsCapstone},
     Capstone, Insn,
 };
 
@@ -29,6 +27,7 @@ use frida_gum::{
     CpuContext,
 };
 use frida_gum::{Gum, Module, PageProtection};
+#[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
@@ -58,9 +57,11 @@ pub struct FridaInstrumentationHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
     current_log_impl: u64,
+    #[cfg(target_arch = "aarch64")]
     current_report_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
+    #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
     asan_runtime: Rc<RefCell<AsanRuntime>>,
     ranges: RangeMap<usize, (u16, &'a str)>,
@@ -196,6 +197,7 @@ fn get_pc(context: &CpuContext) -> usize {
 /// The implementation of the FridaInstrumentationHelper
 impl<'a> FridaInstrumentationHelper<'a> {
     /// Constructor function to create a new FridaInstrumentationHelper, given a module_name.
+    #[allow(clippy::clippy::too_many_lines)]
     pub fn new(
         gum: &'a Gum,
         options: &'a FridaOptions,
@@ -206,8 +208,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],
             current_log_impl: 0,
+            #[cfg(target_arch = "aarch64")]
             current_report_impl: 0,
             transformer: None,
+            #[cfg(target_arch = "aarch64")]
             capstone: Capstone::new()
                 .arm64()
                 .mode(arch::arm64::ArchMode::Arm)
@@ -216,7 +220,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(options.clone()),
             ranges: RangeMap::new(),
-            options: options,
+            options,
             drcov_basic_blocks: vec![],
         };
 
