@@ -1,7 +1,7 @@
 /*!
-A `Stage` is a technique used during fuzzing, working on one `Corpus` entry, and potentially altering it or creating new entries.
-A well-known `Stage`, for example, is the mutational stage, running mutliple `Mutations` against a `Testcase`, potentially storing new ones, according to `Feedback`.
-Other stages may enrich `Testcases` with `Metadata`.
+A [`Stage`] is a technique used during fuzzing, working on one [`crate::corpus::Corpus`] entry, and potentially altering it or creating new entries.
+A well-known [`Stage`], for example, is the mutational stage, running multiple [`crate::mutators::Mutator`]s against a [`crate::corpus::Testcase`], potentially storing new ones, according to [`crate::feedbacks::Feedback`].
+Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
 /// Mutational stage is the normal fuzzing stage,

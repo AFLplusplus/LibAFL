@@ -123,6 +123,7 @@ impl Tokens {
     }
 }
 
+/// Inserts a random token at a random position in the `Input`.
 #[derive(Default)]
 pub struct TokenInsert<I, R, S>
 where
@@ -198,6 +199,7 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    /// Create a `TokenInsert` `Mutation`.
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -205,6 +207,8 @@ where
     }
 }
 
+/// A `TokenReplace` [`Mutator`] replaces a random part of the input with one of a range of tokens.
+/// From AFL terms, this is called as `Dictionary` mutation (which doesn't really make sense ;) ).
 #[derive(Default)]
 pub struct TokenReplace<I, R, S>
 where
@@ -276,6 +280,7 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    /// Creates a new `TokenReplace` struct.
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

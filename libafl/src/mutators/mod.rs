@@ -21,9 +21,9 @@ use crate::{
 /// will not be executed with the returned input.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MutationResult {
-    /// The `Mutator` mutated this `Input`.
+    /// The [`Mutator`] mutated this `Input`.
     Mutated,
-    /// The `Mutator` did not mutate this `Input`. It was `Skipped`.
+    /// The [`Mutator`] did not mutate this `Input`. It was `Skipped`.
     Skipped,
 }
 
@@ -73,7 +73,7 @@ where
         corpus_idx: Option<usize>,
     ) -> Result<(), Error>;
 
-    /// Gets the `Mutator` at the given index and runs the `mutate` function on it.
+    /// Gets the [`Mutator`] at the given index and runs the `mutate` function on it.
     fn get_and_mutate(
         &mut self,
         index: usize,
@@ -82,7 +82,7 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
-    /// Gets the `Mutator` at the given index and runs the `post_exec` function on it.
+    /// Gets the [`Mutator`] at the given index and runs the `post_exec` function on it.
     fn get_and_post_exec(
         &mut self,
         index: usize,

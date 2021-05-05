@@ -21,25 +21,29 @@ use crate::{
 pub use crate::mutators::mutations::*;
 pub use crate::mutators::token_mutations::*;
 
+/// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
 #[derive(Serialize, Deserialize)]
-pub struct MutationsMetadata {
+pub struct LogMutationMetadata {
+    /// A list of logs
     pub list: Vec<String>,
 }
 
-crate::impl_serdeany!(MutationsMetadata);
+crate::impl_serdeany!(LogMutationMetadata);
 
-impl AsSlice<String> for MutationsMetadata {
+impl AsSlice<String> for LogMutationMetadata {
     fn as_slice(&self) -> &[String] {
         self.list.as_slice()
     }
 }
 
-impl MutationsMetadata {
+impl LogMutationMetadata {
+    /// Creates new [`struct@MutationsMetadata`].
     pub fn new(list: Vec<String>) -> Self {
         Self { list }
     }
 }
 
+/// A [`Mutator`] that composes multiple mutations into one.
 pub trait ComposedByMutations<I, MT, S>
 where
     I: Input,
@@ -52,6 +56,7 @@ where
     fn mutations_mut(&mut self) -> &mut MT;
 }
 
+/// A [`Mutator`] scheduling multiple [`Mutator`]s for an input.
 pub trait ScheduledMutator<I, MT, S>: ComposedByMutations<I, MT, S> + Mutator<I, S>
 where
     I: Input,
@@ -86,6 +91,7 @@ where
     }
 }
 
+/// A [`Mutator`] that schedules one of the embedded mutations on each call.
 pub struct StdScheduledMutator<I, MT, R, S>
 where
     I: Input,
@@ -227,7 +233,7 @@ where
     )
 }
 
-//wraps around StdScheduledMutator
+/// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
 pub struct LoggerScheduledMutator<C, I, MT, R, S, SM>
 where
     C: Corpus<I>,
@@ -292,7 +298,7 @@ where
                 let name = String::from(self.scheduled.mutations().get_name(idx).unwrap()); // TODO maybe return an Error on None
                 log.push(name)
             }
-            let meta = MutationsMetadata::new(log);
+            let meta = LogMutationMetadata::new(log);
             testcase.add_metadata(meta);
         };
         // Always reset the log for each run

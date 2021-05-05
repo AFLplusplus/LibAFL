@@ -98,7 +98,7 @@ macro_rules! default_rand {
     ($rand: ty) => {
         /// A default RNG will usually produce a nondeterministic stream of random numbers.
         /// As we do not have any way to get random seeds for no_std, they have to be reproducible there.
-        /// Use [`RandomSeed::with_seed`] to generate a reproducible RNG.
+        /// Use [`$rand::with_seed`] to generate a reproducible RNG.
         impl core::default::Default for $rand {
             #[cfg(feature = "std")]
             fn default() -> Self {
@@ -124,7 +124,7 @@ default_rand!(RomuDuoJrRand);
 /// Default implementations are provided with the "std" feature enabled, using system time in
 /// nanoseconds as the initial seed.
 pub trait RandomSeed: Rand + Default {
-    /// Creates a new `RandomSeed`
+    /// Creates a new [`RandomSeed`].
     fn new() -> Self;
 }
 
