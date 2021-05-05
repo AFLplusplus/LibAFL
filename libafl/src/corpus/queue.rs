@@ -53,6 +53,7 @@ where
     C: Corpus<I>,
     I: Input,
 {
+    /// Creates a new `QueueCorpusScheduler`
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

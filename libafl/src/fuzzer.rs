@@ -237,6 +237,7 @@ where
     EM: EventManager<I, S>,
     I: Input,
 {
+    /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(stages: ST) -> Self {
         Self {
             stages,
