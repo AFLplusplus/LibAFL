@@ -4,9 +4,7 @@
 pub mod map;
 pub use map::*;
 
-use alloc::{
-    string::{String, ToString},
-};
+use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
 use crate::{
