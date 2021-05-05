@@ -2,7 +2,7 @@ pub mod asan_rt;
 pub mod helper;
 
 /// A representation of the various Frida options
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct FridaOptions {
     enable_asan: bool,
@@ -11,6 +11,7 @@ pub struct FridaOptions {
     enable_asan_allocation_backtraces: bool,
     enable_coverage: bool,
     enable_drcov: bool,
+    instrument_suppress_locations: Option<Vec<(String, usize)>>,
 }
 
 impl FridaOptions {
@@ -21,7 +22,7 @@ impl FridaOptions {
         let mut options = Self::default();
 
         if let Ok(env_options) = std::env::var("LIBAFL_FRIDA_OPTIONS") {
-            for option in env_options.trim().to_lowercase().split(':') {
+            for option in env_options.trim().split(':') {
                 let (name, mut value) =
                     option.split_at(option.find('=').expect("Expected a '=' in option string"));
                 value = value.get(1..).unwrap();
@@ -42,6 +43,27 @@ impl FridaOptions {
                     }
                     "asan-allocation-backtraces" => {
                         options.enable_asan_allocation_backtraces = value.parse().unwrap();
+                    }
+                    "instrument-suppress-locations" => {
+                        options.instrument_suppress_locations = Some(
+                            value
+                                .split(',')
+                                .map(|val| {
+                                    let (module, offset) = val.split_at(
+                                        val.find('@')
+                                            .expect("Expected an '@' in location specifier"),
+                                    );
+                                    (
+                                        module.to_string(),
+                                        usize::from_str_radix(
+                                            offset.get(1..).unwrap().trim_start_matches("0x"),
+                                            16,
+                                        )
+                                        .unwrap(),
+                                    )
+                                })
+                                .collect(),
+                        );
                     }
                     "coverage" => {
                         options.enable_coverage = value.parse().unwrap();
@@ -67,45 +89,50 @@ impl FridaOptions {
 
     /// Is ASAN enabled?
     #[inline]
-    pub fn asan_enabled(self) -> bool {
+    pub fn asan_enabled(&self) -> bool {
         self.enable_asan
     }
 
     /// Is coverage enabled?
     #[inline]
-    pub fn coverage_enabled(self) -> bool {
+    pub fn coverage_enabled(&self) -> bool {
         self.enable_coverage
     }
 
     /// Is DrCov enabled?
     #[inline]
-    pub fn drcov_enabled(self) -> bool {
+    pub fn drcov_enabled(&self) -> bool {
         self.enable_drcov
     }
 
     /// Should ASAN detect leaks
     #[inline]
-    pub fn asan_detect_leaks(self) -> bool {
+    pub fn asan_detect_leaks(&self) -> bool {
         self.enable_asan_leak_detection
     }
 
     /// Should ASAN continue after a memory error is detected
     #[inline]
-    pub fn asan_continue_after_error(self) -> bool {
+    pub fn asan_continue_after_error(&self) -> bool {
         self.enable_asan_continue_after_error
     }
 
     /// Should ASAN gather (and report) allocation-/free-site backtraces
     #[inline]
-    pub fn asan_allocation_backtraces(self) -> bool {
+    pub fn asan_allocation_backtraces(&self) -> bool {
         self.enable_asan_allocation_backtraces
     }
 
     /// Whether stalker should be enabled. I.e. whether at least one stalker requiring option is
     /// enabled.
     #[inline]
-    pub fn stalker_enabled(self) -> bool {
+    pub fn stalker_enabled(&self) -> bool {
         self.enable_asan || self.enable_coverage || self.enable_drcov
+    }
+
+    /// A list of locations which will not be instrumented for ASAN or coverage purposes
+    pub fn dont_instrument_locations(&self) -> Option<Vec<(String, usize)>> {
+        self.instrument_suppress_locations.clone()
     }
 }
 
@@ -118,6 +145,7 @@ impl Default for FridaOptions {
             enable_asan_allocation_backtraces: true,
             enable_coverage: true,
             enable_drcov: false,
+            instrument_suppress_locations: None,
         }
     }
 }
