@@ -378,7 +378,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+            -(16 + redzone_size) as i64,
             IndexMode::PreAdjust,
         );
 
@@ -459,7 +459,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         let displacement = displacement
             + if basereg == Aarch64Register::Sp {
-                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+                16 + redzone_size
             } else {
                 0
             };
@@ -536,7 +536,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+            16 + redzone_size as i64,
             IndexMode::PostAdjust,
         ));
     }
@@ -662,6 +662,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
     #[inline]
     fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
         let writer = output.writer();
+        #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         if self.current_log_impl == 0
             || !writer.can_branch_directly_to(self.current_log_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_log_impl)
@@ -686,11 +688,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         #[cfg(target_arch = "x86_64")]
         {
             println!("here");
-            writer.put_lea_reg_reg_offset(
-                X86Register::Rsp,
-                X86Register::Rsp,
-                -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
-            );
+            writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
             writer.put_push_reg(X86Register::Rdi);
             writer.put_mov_reg_address(
                 X86Register::Rdi,
@@ -698,11 +696,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             );
             writer.put_call_address(self.current_log_impl);
             writer.put_pop_reg(X86Register::Rdi);
-            writer.put_lea_reg_reg_offset(
-                X86Register::Rsp,
-                X86Register::Rsp,
-                frida_gum_sys::GUM_RED_ZONE_SIZE as i32,
-            );
+            writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
         }
         #[cfg(target_arch = "aarch64")]
         {
@@ -710,7 +704,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                -(16 + redzone_size) as i64,
                 IndexMode::PreAdjust,
             );
             writer.put_ldr_reg_u64(
@@ -722,7 +716,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                16 + redzone_size as i64,
                 IndexMode::PostAdjust,
             );
         }
