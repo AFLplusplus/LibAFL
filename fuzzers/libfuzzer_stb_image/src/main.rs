@@ -63,8 +63,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer =
-        StdMapObserver::new("edges", unsafe { &mut EDGES_MAP }, unsafe { MAX_EDGES_NUM });
+    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+    let edges_observer = StdMapObserver::new("edges", edges);
+
+    // Create an observation channel to keep track of the execution time
+    let time_observer = TimeObserver::new("time");
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -76,7 +79,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Feedbacks to rate the interestingness of an input
             feedback_or!(
                 MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
-                TimeFeedback::new()
+                TimeFeedback::new_with_observer(&time_observer)
             ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
@@ -118,7 +121,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(edges_observer, TimeObserver::new("time")),
+        tuple_list!(edges_observer, time_observer),
         &mut state,
         &mut restarting_mgr,
     )?;
