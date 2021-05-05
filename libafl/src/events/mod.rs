@@ -151,7 +151,7 @@ where
     }
 }
 
-/// EventManager is the main communications hub.
+/// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
 pub trait EventManager<I, S>
 where

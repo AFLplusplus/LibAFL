@@ -17,7 +17,7 @@ use crate::{
     Error,
 };
 
-/// A MapObserver observes the static map, as oftentimes used for afl-like coverage information
+/// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>: Observer
 where
     T: Default + Copy,
@@ -130,7 +130,7 @@ impl<'a, T> StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    /// Creates a new MapObserver
+    /// Creates a new [`MapObserver`]
     pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
@@ -140,7 +140,7 @@ where
         }
     }
 
-    /// Creates a new MapObserver with an owned map
+    /// Creates a new [`MapObserver`] with an owned map
     pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
@@ -150,9 +150,10 @@ where
         }
     }
 
-    /// Creates a new MapObserver from a raw pointer
+    /// Creates a new [`MapObserver`] from a raw pointer
+    ///
     /// # Safety
-    /// Will dereference the map_ptr with up to len elements.
+    /// Will dereference the `map_ptr` with up to len elements.
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
         let initial = if len > 0 { *map_ptr } else { T::default() };
         StdMapObserver {
@@ -241,7 +242,7 @@ impl<'a, T> VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    /// Creates a new MapObserver
+    /// Creates a new [`MapObserver`]
     pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
@@ -252,9 +253,10 @@ where
         }
     }
 
-    /// Creates a new MapObserver from a raw pointer
+    /// Creates a new [`MapObserver`] from a raw pointer
+    ///
     /// # Safety
-    /// Dereferences map_ptr with up to max_len elements of size.
+    /// Dereferences `map_ptr` with up to `max_len` elements of size.
     pub unsafe fn new_from_ptr(
         name: &'static str,
         map_ptr: *mut T,
@@ -365,7 +367,7 @@ impl<M> HitcountsMapObserver<M>
 where
     M: serde::Serialize + serde::de::DeserializeOwned,
 {
-    /// Creates a new MapObserver
+    /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
         Self { base }
     }

@@ -62,7 +62,7 @@ impl ShMemDescription {
     }
 }
 
-/// An id associated with a given shared memory mapping (ShMem), which can be used to
+/// An id associated with a given shared memory mapping ([`ShMem`]), which can be used to
 /// establish shared-mappings between proccesses.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct ShMemId {
@@ -184,13 +184,13 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
         ))
     }
 
-    /// This method should be called after a fork or after cloning/a thread creation event, allowing the ShMem to
+    /// This method should be called after a fork or after cloning/a thread creation event, allowing the [`ShMem`] to
     /// reset thread specific info, and potentially reconnect.
     fn post_fork(&mut self) {
         // do nothing
     }
 
-    /// Release the resources associated with the given ShMem
+    /// Release the resources associated with the given [`ShMem`]
     fn release_map(&mut self, _map: &mut Self::Mem) {
         // do nothing
     }
@@ -295,8 +295,8 @@ where
 
 /// A Unix sharedmem implementation.
 ///
-/// On Android, this is partially reused to wrap `Ashmem`,
-/// Although for an `AshmemShMemProvider using a unix domain socket
+/// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
+/// Although for an [`unix_shmem::ashmem::AshmemShMemProvider`] using a unix domain socket
 /// Is needed on top.
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
@@ -397,7 +397,7 @@ pub mod unix_shmem {
                 }
             }
 
-            /// Get a UnixShMem of the existing shared memory mapping identified by id
+            /// Get a [`UnixShMem`] of the existing shared memory mapping identified by id
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let map = shmat(id.to_int(), ptr::null(), 0) as *mut c_uchar;
@@ -432,7 +432,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// Drop implementation for UnixShMem, which cleans up the mapping
+        /// [`Drop`] implementation for [`UnixShMem`], which cleans up the mapping.
         #[cfg(unix)]
         impl Drop for CommonUnixShMem {
             fn drop(&mut self) {
@@ -442,7 +442,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// A ShMemProvider which uses shmget/shmat/shmctl to provide shared memory mappings.
+        /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct CommonUnixShMemProvider {}
@@ -456,7 +456,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// Implement ShMemProvider for UnixShMemProvider
+        /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for CommonUnixShMemProvider {
             type Mem = CommonUnixShMem;
@@ -582,7 +582,7 @@ pub mod unix_shmem {
                 }
             }
 
-            /// Get a UnixShMem of the existing shared memory mapping identified by id
+            /// Get a [`crate::bolts::shmem::unix_shmem::UnixShMem`] of the existing [`ShMem`] mapping identified by id.
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
@@ -636,7 +636,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// Drop implementation for AshmemShMem, which cleans up the mapping
+        /// [`Drop`] implementation for [`AshmemShMem`], which cleans up the mapping.
         #[cfg(unix)]
         impl Drop for AshmemShMem {
             fn drop(&mut self) {
@@ -657,7 +657,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// A ShMemProvider which uses ashmem to provide shared memory mappings.
+        /// A [`ShMemProvider`] which uses ashmem to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMemProvider {}
@@ -671,7 +671,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// Implement ShMemProvider for AshmemShMemProvider
+        /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
         #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
             type Mem = AshmemShMem;

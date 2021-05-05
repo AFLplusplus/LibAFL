@@ -131,7 +131,7 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 /// Internal function that is being called whenever a signal we are registered for arrives.
 /// # Safety
 /// This should be somewhat safe to call for signals previously registered,
-/// unless the signal handlers registered using [setup_signal_handler] are broken.
+/// unless the signal handlers registered using [`setup_signal_handler()`] are broken.
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
@@ -145,7 +145,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
 
 /// Setup signal handlers in a somewhat rusty way.
 /// This will allocate a signal stack and set the signal handlers accordingly.
-/// It is, for example, used in the [crate::executors::InProcessExecutor] to restart the fuzzer in case of a crash,
+/// It is, for example, used in the [`struct@crate::executors::InProcessExecutor`] to restart the fuzzer in case of a crash,
 /// or to handle `SIGINT` in the broker process.
 /// # Safety
 /// The signal handlers will be called on any signal. They should (tm) be async safe.

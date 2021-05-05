@@ -115,7 +115,7 @@ impl Clone for ServedShMemProvider {
 impl ShMemProvider for ServedShMemProvider {
     type Mem = ServedShMem;
 
-    /// Connect to the server and return a new ServedShMemProvider
+    /// Connect to the server and return a new [`ServedShMemProvider`]
     fn new() -> Result<Self, Error> {
         let mut res = Self {
             stream: UnixStream::connect_to_unix_addr(
@@ -173,7 +173,7 @@ impl ShMemProvider for ServedShMemProvider {
     }
 }
 
-/// A request sent to the ShMem server to receive a fd to a shared map
+/// A request sent to the [`ShMem`] server to receive a fd to a shared map
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum AshmemRequest {
     /// Register a new map with a given size.
@@ -202,7 +202,7 @@ impl AshmemClient {
     }
 }
 
-/// The AshmemService is a service handing out [`ShMem`] pages via unix domain sockets.
+/// The [`AshmemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
 /// It is mainly used and needed on Android.
 #[derive(Debug)]
 pub struct AshmemService {
@@ -219,7 +219,7 @@ enum AshmemResponse {
 }
 
 impl AshmemService {
-    /// Create a new AshMem service
+    /// Create a new [`AshMem`] service
     fn new() -> Result<Self, Error> {
         Ok(AshmemService {
             provider: AshmemShMemProvider::new()?,
@@ -336,7 +336,7 @@ impl AshmemService {
         Ok(())
     }
 
-    /// Create a new AshmemService, then listen and service incoming connections in a new thread.
+    /// Create a new [`AshmemService`], then listen and service incoming connections in a new thread.
     pub fn start() -> Result<thread::JoinHandle<Result<(), Error>>, Error> {
         #[allow(clippy::mutex_atomic)]
         let syncpair = Arc::new((Mutex::new(false), Condvar::new()));

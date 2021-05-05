@@ -1,5 +1,5 @@
 /*!
-Welcome to libAFL
+Welcome to `LibAFL`
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]

@@ -1,11 +1,11 @@
 /*!
-The FRIDA executor is a binary-only mode for LibAFL.
+The frida executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architecutres, even reports memory access errors.
 */
 
 /// The frida address sanitizer runtime
 pub mod asan_rt;
-/// The LibAFL firda helper
+/// The `LibAFL` firda helper
 pub mod helper;
 
 /// A representation of the various Frida options
@@ -22,7 +22,7 @@ pub struct FridaOptions {
 }
 
 impl FridaOptions {
-    /// Parse the frida options from the LIBAFL_FRIDA_OPTIONS environment variable.
+    /// Parse the frida options from the [`LIBAFL_FRIDA_OPTIONS`] environment variable.
     ///
     /// Options are ':' separated, and each options is a 'name=value' string.
     pub fn parse_env_options() -> Self {
@@ -106,7 +106,7 @@ impl FridaOptions {
         self.enable_coverage
     }
 
-    /// Is DrCov enabled?
+    /// Is `DrCov` enabled?
     #[inline]
     pub fn drcov_enabled(&self) -> bool {
         self.enable_drcov

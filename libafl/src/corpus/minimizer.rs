@@ -76,9 +76,9 @@ where
     }
 }
 
-/// The Minimizer scheduler employs a genetic algorithm to compute a subset of the
+/// The [`MinimizerCorpusScheduler`] employs a genetic algorithm to compute a subset of the
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
-/// prioritizing testcases using FavFactor
+/// prioritizing [`Testcase`]`s` using [`FavFactor`]
 pub struct MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
 where
     CS: CorpusScheduler<I, S>,
@@ -250,11 +250,11 @@ where
     }
 }
 
-/// A MinimizerCorpusScheduler with LenTimeMulFavFactor to prioritize quick and small testcases
+/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
 pub type LenTimeMinimizerCorpusScheduler<C, CS, I, M, R, S> =
     MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, M, R, S>;
 
-/// A MinimizerCorpusScheduler with LenTimeMulFavFactor to prioritize quick and small testcases
-/// that exercise all the entries registered in the MapIndexesMetadata
+/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
+/// that exercise all the entries registered in the [`MapIndexesMetadata`].
 pub type IndexesLenTimeMinimizerCorpusScheduler<C, CS, I, R, S> =
     MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, R, S>;

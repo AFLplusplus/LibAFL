@@ -111,7 +111,7 @@ where
         })
     }
 
-    /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
+    /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
     #[cfg(feature = "std")]
     pub fn existing_client_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
@@ -151,7 +151,7 @@ where
         })
     }
 
-    /// Write the config for a client eventmgr to env vars, a new client can reattach using existing_client_from_env
+    /// Write the config for a client [`EventManager`] to env vars, a new client can reattach using [`LlmpEventManager::existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         match &self.llmp {

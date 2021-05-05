@@ -24,7 +24,7 @@ pub trait AsSlice<T> {
     fn as_slice(&self) -> &[T];
 }
 
-/// The standard rand implementation for LibAFL.
+/// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuTrioRand;
@@ -73,7 +73,7 @@ pub trait HasRand<R>
 where
     R: Rand,
 {
-    /// Get the hold RefCell Rand instance
+    /// Get the hold [`RefCell`] Rand instance
     fn rand(&self) -> &RefCell<R>;
 
     /// Gets the next 64 bit value
@@ -97,7 +97,7 @@ where
 macro_rules! default_rand {
     ($rand: ty) => {
         /// A default RNG will usually produce a nondeterministic stream of random numbers.
-        /// As we do not have any way to get random seeds for no_std, they have to be reproducible there.
+        /// As we do not have any way to get random seeds for `no_std`, they have to be reproducible there.
         /// Use [`$rand::with_seed`] to generate a reproducible RNG.
         impl core::default::Default for $rand {
             #[cfg(feature = "std")]
@@ -165,13 +165,13 @@ pub fn current_time() -> time::Duration {
     time::Duration::from_millis(1)
 }
 
-/// Gets current nanoseconds since UNIX_EPOCH
+/// Gets current nanoseconds since [`UNIX_EPOCH`]
 #[inline]
 pub fn current_nanos() -> u64 {
     current_time().as_nanos() as u64
 }
 
-/// Gets current milliseconds since UNIX_EPOCH
+/// Gets current milliseconds since [`UNIX_EPOCH`]
 #[inline]
 pub fn current_milliseconds() -> u64 {
     current_time().as_millis() as u64

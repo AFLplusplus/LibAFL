@@ -136,7 +136,7 @@ where
     I: Input,
     R: Rand,
 {
-    /// Create a new RandCorpusScheduler that just schedules randomly.
+    /// Create a new [`RandCorpusScheduler`] that just schedules randomly.
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -156,6 +156,6 @@ where
     }
 }
 
-/// A [`StdCorpusScheduler`] uses the default scheduler in LibAFL to schedule [`Testcase`]s
+/// A [`StdCorpusScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s
 /// The current `Std` is a [`RandCorpusScheduler`], although this may change in the future, if another [`CorpusScheduler`] delivers better results.
 pub type StdCorpusScheduler<C, I, R, S> = RandCorpusScheduler<C, I, R, S>;

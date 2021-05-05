@@ -35,7 +35,7 @@ use std::{path::PathBuf, rc::Rc};
 
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
-/// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
+/// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
 pub trait FridaHelper<'a> {
     /// Access to the stalker `Transformer`
     fn transformer(&self) -> &Transformer<'a>;
@@ -59,7 +59,7 @@ pub trait FridaHelper<'a> {
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
-/// An helper that feeds FridaInProcessExecutor with edge-coverage instrumentation
+/// An helper that feeds [`FridaInProcessExecutor`] with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
@@ -81,7 +81,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.transformer.as_ref().unwrap()
     }
 
-    /// Register the current thread with the FridaInstrumentationHelper
+    /// Register the current thread with the [`FridaInstrumentationHelper`]
     fn register_thread(&self) {
         self.asan_runtime.borrow().register_thread();
     }
@@ -133,7 +133,7 @@ pub fn get_module_size(module_name: &str) -> usize {
     code_size
 }
 
-/// A minimal maybe_log implementation. We insert this into the transformed instruction stream
+/// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
 /// every time we need a copy that is within a direct branch of the start of the transformed basic
 /// block.
 #[cfg(target_arch = "x86_64")]
@@ -201,9 +201,9 @@ fn get_pc(context: &CpuContext) -> usize {
     context.rip() as usize
 }
 
-/// The implementation of the FridaInstrumentationHelper
+/// The implementation of the [`FridaInstrumentationHelper`]
 impl<'a> FridaInstrumentationHelper<'a> {
-    /// Constructor function to create a new FridaInstrumentationHelper, given a module_name.
+    /// Constructor function to create a new [`FridaInstrumentationHelper`], given a `module_name`.
     #[allow(clippy::clippy::too_many_lines)]
     pub fn new(
         gum: &'a Gum,

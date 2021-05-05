@@ -42,7 +42,7 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
     }
 }
 
-/// A simple buffer_set.
+/// A simple way to set buffer contents.
 /// The compiler does the heavy lifting.
 /// see <https://stackoverflow.com/a/51732799/1345238/>
 #[inline]

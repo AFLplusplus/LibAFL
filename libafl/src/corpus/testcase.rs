@@ -35,13 +35,13 @@ impl<I> HasMetadata for Testcase<I>
 where
     I: Input,
 {
-    /// Get all the metadata into an HashMap
+    /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
-    /// Get all the metadata into an HashMap (mutable)
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata

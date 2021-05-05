@@ -2,8 +2,8 @@
 A library for low level message passing
 
 To send new messages, the clients place a new message at the end of their
-client_out_map. If the current map is filled up, they place a
-LLMP_AGE_END_OF_PAGE_V1 msg and alloc a new shmap.
+`client_out_map`. If the current map is filled up, they place an end of page (`EOP`)
+msg and alloc a new [`ShMem`].
 Once the broker mapped this same page, it flags it as safe for unmapping.
 
 ```text
@@ -17,14 +17,14 @@ Once the broker mapped this same page, it flags it as safe for unmapping.
 [broker]
 ```
 
-After the broker received a new message for clientN, (clientN_out->current_id
-!= last_message->message_id) the broker will copy the message content to its
+After the broker received a new message for clientN, (`clientN_out->current_id
+!= last_message->message_id`) the broker will copy the message content to its
 own, centralized page.
 
-The clients periodically check (current_broadcast_map->current_id !=
-last_message->message_id) for new incoming messages. If the page is filled up,
-the broker instead creates a new page and places a LLMP_TAG_END_OF_PAGE_V1
-message in its queue. The LLMP_TAG_END_PAGE_V1 buf contains the new string to
+The clients periodically check (`current_broadcast_map->current_id !=
+last_message->message_id`) for new incoming messages. If the page is filled up,
+the broker instead creates a new page and places an end of page (`EOP`)
+message in its queue. The `EOP` buf contains the new description to
 access the shared map. The clients then switch over to read from that new
 current map.
 
@@ -41,16 +41,19 @@ current map.
 [client0]        [client1]    ...    [clientN]
 ```
 
-In the future, if we would need zero copy, the current_broadcast_map could instead
-list the client_out_map ID an offset for each message. In that case, the clients
-also need to create new shmaps once their bufs are filled up.
+In the future, if we would need zero copy, the `current_broadcast_map` could instead
+list the `client_out_map` ID an offset for each message. In that case, the clients
+also need to create a new [`ShMem`] each time their bufs are filled up.
 
 
-To use, you will have to create a broker using llmp_broker_new().
-Then register some clientloops using llmp_broker_register_threaded_clientloop
-(or launch them as seperate processes) and call llmp_broker_run();
+To use, you will have to create a broker using [`LlmpBroker::new()`].
+Then, create some [`LlmpClient`]`s` in other threads and register them
+with the main thread using [`LlmpBroker::register_client`].
+Finally, call [`LlmpBroker::loop_forever()`].
 
 For broker2broker communication, all messages are forwarded via network sockets.
+
+Check out the `llmp_test` example in ./examples, or build it with `cargo run --example llmp_test`.
 
 */
 
@@ -90,11 +93,11 @@ use libc::ucontext_t;
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
 const LLMP_CFG_INITIAL_MAP_SIZE: usize = 1 << 28;
-/// If llmp_small_maps is set, we start off with 1 meg.
+/// If the `llmp_small_maps` feature is set, we start off with 1 meg.
 #[cfg(feature = "llmp_small_maps")]
 const LLMP_CFG_INITIAL_MAP_SIZE: usize = 1 << 20;
 /// What byte count to align messages to
-/// LlmpMsg sizes (including header) will always be rounded up to be a multiple of this value
+/// [`LlmpMsg`] sizes (including header) will always be rounded up to be a multiple of this value.
 const LLMP_CFG_ALIGNNMENT: usize = 64;
 
 /// A msg fresh from the press: No tag got sent by the user yet
@@ -289,7 +292,7 @@ unsafe fn llmp_msg_in_page(page: *const LlmpPage, msg: *const LlmpMsg) -> bool {
         && (page as *const u8).add((*page).size_total) > msg as *const u8
 }
 
-/// allign to LLMP_CFG_ALIGNNMENT=64 bytes
+/// Align the page to `LLMP_CFG_ALIGNNMENT=64` bytes
 #[inline]
 const fn llmp_align(to_align: usize) -> usize {
     // check if we need to align first
@@ -305,8 +308,8 @@ const fn llmp_align(to_align: usize) -> usize {
     }
 }
 
-/// Reads the stored message offset for the given env_name (by appending _OFFSET)
-/// If the content of the env is _NULL, returns None
+/// Reads the stored message offset for the given `env_name` (by appending `_OFFSET`).
+/// If the content of the env is `_NULL`, returns [`Option::None`].
 #[cfg(feature = "std")]
 #[inline]
 fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
@@ -373,7 +376,7 @@ fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
 
 /// In case we don't have enough space, make sure the next page will be large
 /// enough. For now, we want to have at least enough space to store 2 of the
-/// largest messages we encountered (plus message one new_page message).
+/// largest messages we encountered (plus message one `new_page` message).
 #[inline]
 fn new_map_size(max_alloc: usize) -> usize {
     max(
@@ -383,8 +386,8 @@ fn new_map_size(max_alloc: usize) -> usize {
     .next_power_of_two()
 }
 
-/// Initialize a new llmp_page. size should be relative to
-/// llmp_page->messages
+/// Initialize a new `llmp_page`. The size should be relative to
+/// `llmp_page->messages`
 unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit: bool) {
     #[cfg(all(feature = "llmp_debug", feature = "std"))]
     dbg!("_llmp_page_init: shmem {}", &shmem);
@@ -640,9 +643,9 @@ pub struct LlmpPage {
     pub messages: [LlmpMsg; 0],
 }
 
-/// Message payload when a client got added LLMP_TAG_CLIENT_ADDED_V1 */
+/// Message payload when a client got added */
 /// This is an internal message!
-/// LLMP_TAG_END_OF_PAGE_V1
+/// [`LLMP_TAG_END_OF_PAGE_V1`]
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 struct LlmpPayloadSharedMapInfo {
@@ -705,7 +708,7 @@ where
         self.last_msg_sent = ptr::null_mut();
     }
 
-    /// Reattach to a vacant out_map, to with a previous sender stored the information in an env before.
+    /// Reattach to a vacant `out_map`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(mut shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         let msg_sent_offset = msg_offset_from_env(env_name)?;
@@ -717,7 +720,7 @@ where
     }
 
     /// Store the info to this sender to env.
-    /// A new client can reattach to it using on_existing_from_env
+    /// A new client can reattach to it using [`LlmpSender::on_existing_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_map = self.out_maps.last().unwrap();
@@ -745,7 +748,7 @@ where
         }
     }
 
-    /// Reattach to a vacant out_map.
+    /// Reattach to a vacant `out_map`.
     /// It is essential, that the receiver (or someone else) keeps a pointer to this map
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_map(
@@ -787,10 +790,10 @@ where
         self.out_maps.drain(0..unmap_until_excl);
     }
 
-    /// Intern: Special allocation function for EOP messages (and nothing else!)
-    /// The normal alloc will fail if there is not enough space for buf_len_padded + EOP
-    /// So if alloc_next fails, create new page if necessary, use this function,
-    /// place EOP, commit EOP, reset, alloc again on the new space.
+    /// Intern: Special allocation function for `EOP` messages (and nothing else!)
+    /// The normal alloc will fail if there is not enough space for `buf_len_padded + EOP`
+    /// So if [`alloc_next`] fails, create new page if necessary, use this function,
+    /// place `EOP`, commit `EOP`, reset, alloc again on the new space.
     unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, Error> {
         let mut map = self.out_maps.last_mut().unwrap();
         let page = map.page_mut();
@@ -822,7 +825,7 @@ where
     }
 
     /// Intern: Will return a ptr to the next msg buf, or None if map is full.
-    /// Never call alloc_next without either sending or cancelling the last allocated message for this page!
+    /// Never call [`alloc_next`] without either sending or cancelling the last allocated message for this page!
     /// There can only ever be up to one message allocated per page at each given time.
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
         let buf_len_padded;
@@ -925,9 +928,9 @@ where
         Some(ret)
     }
 
-    /// Commit the message last allocated by alloc_next to the queue.
+    /// Commit the message last allocated by [`alloc_next`] to the queue.
     /// After commiting, the msg shall no longer be altered!
-    /// It will be read by the consuming threads (broker->clients or client->broker)
+    /// It will be read by the consuming threads (`broker->clients` or `client->broker`)
     #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
     unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
         // dbg!("Sending msg {:?}", msg);
@@ -1153,7 +1156,7 @@ impl<SP> LlmpReceiver<SP>
 where
     SP: ShMemProvider,
 {
-    /// Reattach to a vacant recv_map, to with a previous sender stored the information in an env before.
+    /// Reattach to a vacant `recv_map`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(mut shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Self::on_existing_map(
@@ -1164,7 +1167,7 @@ where
     }
 
     /// Store the info to this receiver to env.
-    /// A new client can reattach to it using on_existing_from_env
+    /// A new client can reattach to it using [`LlmpReceiver::on_existing_from_env()`]
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_map = &self.current_recv_map;
@@ -1173,7 +1176,7 @@ where
     }
 
     /// Create a Receiver, reattaching to an existing sender map.
-    /// It is essential, that the sender (or someone else) keeps a pointer to the sender_map
+    /// It is essential, that the sender (or someone else) keeps a pointer to the `sender_map`
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_map(
         shmem_provider: SP,
@@ -1394,7 +1397,7 @@ where
 
 // TODO: May be obsolete
 /// The page struct, placed on a shared mem instance.
-/// A thin wrapper around a ShMem implementation, with special Llmp funcs
+/// A thin wrapper around a [`ShMem`] implementation, with special [`crate::bolts::llmp`] funcs
 impl<SHM> LlmpSharedMap<SHM>
 where
     SHM: ShMem,
@@ -1466,7 +1469,8 @@ where
     }
 
     /// Gets the offset of a message on this here page.
-    /// Will return IllegalArgument error if msg is not on page.
+    /// Will return [`crate::Error::IllegalArgument`] error if msg is not on page.
+    ///
     /// # Safety
     /// This dereferences msg, make sure to pass a proper pointer to it.
     #[allow(clippy::cast_sign_loss)]
@@ -1483,8 +1487,8 @@ where
         }
     }
 
-    /// Retrieve the stored msg from env_name + _OFFSET.
-    /// It will restore the stored offset by env_name and return the message.
+    /// Retrieve the stored msg from `env_name` + `_OFFSET`.
+    /// It will restore the stored offset by `env_name` and return the message.
     #[cfg(feature = "std")]
     pub fn msg_from_env(&mut self, map_env_name: &str) -> Result<*mut LlmpMsg, Error> {
         match msg_offset_from_env(map_env_name)? {
@@ -1493,8 +1497,9 @@ where
         }
     }
 
-    /// Store this msg offset to env_name + _OFFSET env variable.
-    /// It can be restored using msg_from_env with the same env_name later.
+    /// Store this msg offset to `env_name` + `_OFFSET` env variable.
+    /// It can be restored using [`LlmpSharedMap::msg_from_env()`] with the same `env_name` later.
+    ///
     /// # Safety
     /// This function will dereference the msg ptr, make sure it's valid.
     #[cfg(feature = "std")]
@@ -1511,7 +1516,7 @@ where
     }
 
     /// Gets this message from this page, at the indicated offset.
-    /// Will return IllegalArgument error if the offset is out of bounds.
+    /// Will return [`crate::Error::IllegalArgument`] error if the offset is out of bounds.
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         let offset = offset as usize;
         unsafe {
@@ -1573,7 +1578,7 @@ impl<SP> LlmpBroker<SP>
 where
     SP: ShMemProvider + 'static,
 {
-    /// Create and initialize a new llmp_broker
+    /// Create and initialize a new [`LlmpBroker`]
     pub fn new(mut shmem_provider: SP) -> Result<Self, Error> {
         Ok(LlmpBroker {
             llmp_out: LlmpSender {
@@ -1601,7 +1606,7 @@ where
     }
 
     /// Registers a new client for the given sharedmap str and size.
-    /// Returns the id of the new client in broker.client_map
+    /// Returns the id of the new client in [`broker.client_map`]
     pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::Mem>) {
         // Tell the client it may unmap this page now.
         client_page.mark_save_to_unmap();
@@ -1808,7 +1813,7 @@ where
     /// For broker to broker connections:
     /// Launches a proxy thread.
     /// It will read outgoing messages from the given broker map (and handle EOP by mapping a new page).
-    /// This function returns the ShMemDescription the client uses to place incoming messages.
+    /// This function returns the [`ShMemDescription`] the client uses to place incoming messages.
     /// The thread exits, when the remote broker disconnects.
     #[cfg(feature = "std")]
     #[allow(clippy::let_and_return)]
@@ -2198,7 +2203,7 @@ where
     SP: ShMemProvider,
 {
     /// Reattach to a vacant client map.
-    /// It is essential, that the broker (or someone else) kept a pointer to the out_map
+    /// It is essential, that the broker (or someone else) kept a pointer to the `out_map`
     /// else reattach will get a new, empty page, from the OS, or fail
     #[allow(clippy::needless_pass_by_value)]
     pub fn on_existing_map(
@@ -2223,7 +2228,7 @@ where
         })
     }
 
-    /// Recreate this client from a previous client.to_env
+    /// Recreate this client from a previous [`client.to_env()`]
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
@@ -2240,7 +2245,7 @@ where
     }
 
     /// Write the current state to env.
-    /// A new client can attach to exactly the same state by calling on_existing_map.
+    /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_map()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         self.sender.to_env(&format!("{}_SENDER", env_name))?;
@@ -2284,7 +2289,7 @@ where
         self.sender.save_to_unmap()
     }
 
-    /// Creates a new LlmpClient
+    /// Creates a new [`LlmpClient`]
     pub fn new(
         mut shmem_provider: SP,
         initial_broker_map: LlmpSharedMap<SP::Mem>,
@@ -2394,14 +2399,14 @@ where
     }
 
     #[cfg(feature = "std")]
-    /// Creates a new LlmpClient, reading the map id and len from env
+    /// Creates a new [`LlmpClient`], reading the map id and len from env
     pub fn create_using_env(mut shmem_provider: SP, env_var: &str) -> Result<Self, Error> {
         let map = LlmpSharedMap::existing(shmem_provider.existing_from_env(env_var)?);
         Self::new(shmem_provider, map)
     }
 
     #[cfg(feature = "std")]
-    /// Create a LlmpClient, getting the ID from a given port
+    /// Create a [`LlmpClient`], getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
         let mut stream = TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port))?;
         println!("Connected to port {}", port);

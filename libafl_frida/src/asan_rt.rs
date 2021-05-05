@@ -552,7 +552,7 @@ pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, _nothrow: *const 
     }
 }
 
-/// Hook for delete
+/// Hook for `delete`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
@@ -566,7 +566,7 @@ pub unsafe extern "C" fn asan_delete_aligned_nothrow(
     }
 }
 
-/// Hook for malloc_usable_size
+/// Hook for `malloc_usable_size`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
@@ -574,12 +574,12 @@ pub unsafe extern "C" fn asan_malloc_usable_size(ptr: *mut c_void) -> usize {
     Allocator::get().get_usable_size(ptr)
 }
 
-/// Hook for memalign
+/// Hook for `memalign`
 pub extern "C" fn asan_memalign(size: usize, alignment: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
 
-/// Hook for posix_memalign
+/// Hook for `posix_memalign`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
@@ -1712,7 +1712,7 @@ impl AsanErrorsObserver {
         }
     }
 
-    /// gets the `AsanErrors` from the previous run
+    /// gets the [`AsanErrors`] from the previous run
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
@@ -1721,7 +1721,7 @@ impl AsanErrorsObserver {
     }
 }
 
-/// A feedback reporting potential AsanErrors from an `AsanErrorsObserver`
+/// A feedback reporting potential [`AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,

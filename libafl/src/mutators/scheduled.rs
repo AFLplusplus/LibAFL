@@ -184,7 +184,7 @@ where
     R: Rand,
     S: HasRand<R>,
 {
-    /// Create a new StdScheduledMutator instance specifying mutations
+    /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
             mutations,
@@ -382,7 +382,7 @@ where
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
 {
-    /// Create a new StdScheduledMutator instance without mutations and corpus
+    /// Create a new [`StdScheduledMutator`] instance without mutations and corpus
     pub fn new(scheduled: SM) -> Self {
         Self {
             scheduled,

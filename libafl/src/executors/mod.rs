@@ -96,7 +96,7 @@ where
     fn observers_mut(&mut self) -> &mut OT;
 }
 
-/// Execute the exec hooks of the observers if they all implement HasExecHooks
+/// Execute the exec hooks of the observers if they all implement [`HasExecHooks`].
 pub trait HasObserversHooks<EM, I, OT, S>: HasObservers<OT>
 where
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,

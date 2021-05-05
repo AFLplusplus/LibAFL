@@ -1,4 +1,4 @@
-//! The InProcess Executor is a libfuzzer-like executor, that will simply call a function.
+//! The [`InProcessExecutor`] is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
 use core::{

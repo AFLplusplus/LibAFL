@@ -46,7 +46,7 @@ pub struct TimeObserver {
 }
 
 impl TimeObserver {
-    /// Creates a new TimeObserver with the given name.
+    /// Creates a new [`TimeObserver`] with the given name.
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),

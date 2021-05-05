@@ -1,4 +1,4 @@
-//! Compiletime lists/tuples used throughout the LibAFL universe
+//! Compiletime lists/tuples used throughout the `LibAFL` universe
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
@@ -227,7 +227,7 @@ where
 /// Match for a name and return the value
 ///
 /// # Safety
-/// This operation is unsafe with Rust stable, wait for https://stackoverflow.com/a/60138532/7658998
+/// This operation is unsafe with Rust stable, wait for [specialization](https://stackoverflow.com/a/60138532/7658998).
 pub trait MatchName {
     /// Match for a name and return the borrowed value
     fn match_name<T>(&self, name: &str) -> Option<&T>;
