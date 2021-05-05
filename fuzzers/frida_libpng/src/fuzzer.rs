@@ -184,6 +184,8 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
+    color_backtrace::install();
+
     println!(
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
@@ -255,9 +257,10 @@ unsafe fn fuzz(
         ExitKind::Ok
     };
 
+    let frida_options = FridaOptions::parse_env_options();
     let mut frida_helper = FridaInstrumentationHelper::new(
         &gum,
-        FridaOptions::parse_env_options(),
+        &frida_options,
         module_name,
         &modules_to_instrument,
     );

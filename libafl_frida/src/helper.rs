@@ -64,7 +64,7 @@ pub struct FridaInstrumentationHelper<'a> {
     capstone: Capstone,
     asan_runtime: Rc<RefCell<AsanRuntime>>,
     ranges: RangeMap<usize, (u16, &'a str)>,
-    options: FridaOptions,
+    options: &'a FridaOptions,
     drcov_basic_blocks: Vec<DrCovBasicBlock>,
 }
 
@@ -198,7 +198,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     /// Constructor function to create a new FridaInstrumentationHelper, given a module_name.
     pub fn new(
         gum: &'a Gum,
-        options: FridaOptions,
+        options: &'a FridaOptions,
         _harness_module_name: &str,
         modules_to_instrument: &'a [PathBuf],
     ) -> Self {
@@ -214,13 +214,13 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
-            asan_runtime: AsanRuntime::new(options),
+            asan_runtime: AsanRuntime::new(options.clone()),
             ranges: RangeMap::new(),
-            options,
+            options: options,
             drcov_basic_blocks: vec![],
         };
 
-        if options.stalker_enabled() {
+        if helper.options().stalker_enabled() {
             for (id, module_name) in modules_to_instrument.iter().enumerate() {
                 let (lib_start, lib_end) = find_mapping_for_path(module_name.to_str().unwrap());
                 println!(
@@ -233,7 +233,15 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 );
             }
 
-            if helper.options.drcov_enabled() {
+            if let Some(suppressed_specifiers) = helper.options().dont_instrument_locations() {
+                for (module_name, offset) in suppressed_specifiers {
+                    let (lib_start, _) = find_mapping_for_path(std::fs::canonicalize(&module_name).unwrap().to_str().unwrap());
+                    println!("removing address: {:#x}", lib_start + offset);
+                    helper.ranges.remove((lib_start + offset)..(lib_start + offset + 4));
+                }
+            }
+
+            if helper.options().drcov_enabled() {
                 std::fs::create_dir_all("./coverage")
                     .expect("failed to create directory for coverage files");
             }
@@ -243,15 +251,15 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 for instruction in basic_block {
                     let instr = instruction.instr();
                     let address = instr.address();
-                    //println!("address: {:x} contains: {:?}", address, helper.ranges.contains(&(address as usize)));
+                    //println!("address: {:x} contains: {:?}", address, helper.ranges.contains_key(&(address as usize)));
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {
                             first = false;
                             //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                            if helper.options.coverage_enabled() {
+                            if helper.options().coverage_enabled() {
                                 helper.emit_coverage_mapping(address, &output);
                             }
-                            if helper.options.drcov_enabled() {
+                            if helper.options().drcov_enabled() {
                                 instruction.put_callout(|context| {
                                     let real_address = match helper
                                         .asan_runtime
@@ -270,7 +278,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             }
                         }
 
-                        if helper.options.asan_enabled() {
+                        if helper.options().asan_enabled() {
                             #[cfg(not(target_arch = "aarch64"))]
                             todo!("Implement ASAN for non-aarch64 targets");
                             #[cfg(target_arch = "aarch64")]
@@ -289,7 +297,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                 );
                             }
                         }
-                        if helper.options.asan_enabled() || helper.options.drcov_enabled() {
+                        if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                             helper.asan_runtime.borrow_mut().add_stalked_address(
                                 output.writer().pc() as usize - 4,
                                 address as usize,
@@ -300,13 +308,17 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 }
             });
             helper.transformer = Some(transformer);
-            if helper.options.asan_enabled() || helper.options.drcov_enabled() {
+            if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.borrow_mut().init(modules_to_instrument);
             }
         }
         helper
     }
 
+    #[inline]
+    fn options(&self) -> &FridaOptions {
+        &self.options
+    }
     #[cfg(target_arch = "aarch64")]
     #[inline]
     fn get_writer_register(&self, reg: capstone::RegId) -> Aarch64Register {
