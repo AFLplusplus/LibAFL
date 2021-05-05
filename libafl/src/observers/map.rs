@@ -4,11 +4,12 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::slice::from_raw_parts_mut;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        ownedref::{OwnedArrayPtrMut, OwnedPtr},
+        ownedref::{OwnedPtr, OwnedSliceMut},
         tuples::Named,
     },
     executors::HasExecHooks,
@@ -57,24 +58,24 @@ where
 /// The Map Observer retrieves the state of a map,
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct StdMapObserver<T>
+pub struct StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    map: OwnedArrayPtrMut<T>,
+    map: OwnedSliceMut<'a, T>,
     initial: T,
     name: String,
 }
 
-impl<T> Observer for StdMapObserver<T> where
+impl<'a, T> Observer for StdMapObserver<'a, T> where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
 {
 }
 
-impl<EM, I, S, T> HasExecHooks<EM, I, S> for StdMapObserver<T>
+impl<'a, EM, I, S, T> HasExecHooks<EM, I, S> for StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
@@ -85,7 +86,7 @@ where
     }
 }
 
-impl<T> Named for StdMapObserver<T>
+impl<'a, T> Named for StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -95,7 +96,7 @@ where
     }
 }
 
-impl<T> MapObserver<T> for StdMapObserver<T>
+impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -125,16 +126,16 @@ where
     }
 }
 
-impl<T> StdMapObserver<T>
+impl<'a, T> StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T], len: usize) -> Self {
+    pub fn new(name: &'static str, map: &'a mut [T], len: usize) -> Self {
         assert!(map.len() >= len);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedArrayPtrMut::ArrayPtr((map.as_mut_ptr(), len)),
+            map: OwnedSliceMut::Ref(map),
             name: name.to_string(),
             initial,
         }
@@ -144,7 +145,7 @@ where
     pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedArrayPtrMut::Owned(map),
+            map: OwnedSliceMut::Owned(map),
             name: name.to_string(),
             initial,
         }
@@ -156,7 +157,7 @@ where
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
         let initial = if len > 0 { *map_ptr } else { T::default() };
         StdMapObserver {
-            map: OwnedArrayPtrMut::ArrayPtr((map_ptr, len)),
+            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, len)),
             name: name.to_string(),
             initial,
         }
@@ -164,25 +165,25 @@ where
 }
 
 /// Overlooking a variable bitmap
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct VariableMapObserver<T>
+pub struct VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    map: OwnedArrayPtrMut<T>,
+    map: OwnedSliceMut<'a, T>,
     size: OwnedPtr<usize>,
     initial: T,
     name: String,
 }
 
-impl<T> Observer for VariableMapObserver<T> where
+impl<'a, T> Observer for VariableMapObserver<'a, T> where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
 {
 }
 
-impl<EM, I, S, T> HasExecHooks<EM, I, S> for VariableMapObserver<T>
+impl<'a, EM, I, S, T> HasExecHooks<EM, I, S> for VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -192,7 +193,7 @@ where
     }
 }
 
-impl<T> Named for VariableMapObserver<T>
+impl<'a, T> Named for VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -202,7 +203,7 @@ where
     }
 }
 
-impl<T> MapObserver<T> for VariableMapObserver<T>
+impl<'a, T> MapObserver<T> for VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -237,15 +238,15 @@ where
     }
 }
 
-impl<T> VariableMapObserver<T>
+impl<'a, T> VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new MapObserver
-    pub fn new(name: &'static str, map: &'static mut [T], size: *const usize) -> Self {
+    pub fn new(name: &'static str, map: &'a mut [T], size: *const usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedArrayPtrMut::ArrayPtr((map.as_mut_ptr(), map.len())),
+            map: OwnedSliceMut::Ref(map),
             size: OwnedPtr::Ptr(size),
             name: name.into(),
             initial,
@@ -263,7 +264,7 @@ where
     ) -> Self {
         let initial = if max_len > 0 { *map_ptr } else { T::default() };
         VariableMapObserver {
-            map: OwnedArrayPtrMut::ArrayPtr((map_ptr, max_len)),
+            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, max_len)),
             size: OwnedPtr::Ptr(size_ptr),
             name: name.into(),
             initial,

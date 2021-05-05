@@ -8,7 +8,7 @@ use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchFirstType, MatchNameAndType, MatchType, Named},
+    bolts::tuples::{MatchName, Named},
     executors::HasExecHooks,
     utils::current_time,
     Error,
@@ -16,7 +16,7 @@ use crate::{
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'static {
+pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
@@ -26,10 +26,7 @@ pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned + 'st
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple:
-    MatchNameAndType + MatchType + MatchFirstType + serde::Serialize + serde::de::DeserializeOwned
-{
-}
+pub trait ObserversTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {}
 
 impl ObserversTuple for () {}
 

@@ -409,6 +409,7 @@ impl Default for TimeoutFeedback {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
     exec_time: Option<Duration>,
+    name: String,
 }
 
 impl<I> Feedback<I> for TimeFeedback
@@ -424,7 +425,8 @@ where
     where
         OT: ObserversTuple,
     {
-        let observer = observers.match_first_type::<TimeObserver>().unwrap();
+        // TODO Replace with match_name_type when stable
+        let observer = unsafe { observers.match_name::<TimeObserver>(self.name()).unwrap() };
         self.exec_time = *observer.last_runtime();
         Ok(false)
     }
@@ -448,18 +450,15 @@ where
 impl Named for TimeFeedback {
     #[inline]
     fn name(&self) -> &str {
-        "TimeFeedback"
+        self.name.as_str()
     }
 }
 
 impl TimeFeedback {
-    pub fn new() -> Self {
-        Self { exec_time: None }
-    }
-}
-
-impl Default for TimeFeedback {
-    fn default() -> Self {
-        Self::new()
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            exec_time: None,
+            name: name.to_string(),
+        }
     }
 }
