@@ -2081,7 +2081,7 @@ where
             if (*msg).tag == LLMP_TAG_NEW_SHM_CLIENT {
                 /* This client informs us about yet another new client
                 add it to the list! Also, no need to forward this msg. */
-                let msg_buf_len_padded = *ptr::addr_of!((*msg).buf_len_padded);
+                let msg_buf_len_padded = (*msg).buf_len_padded;
                 if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
                     #[cfg(feature = "std")]
                     println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
