@@ -38,6 +38,7 @@ impl AsSlice<String> for LogMutationMetadata {
 
 impl LogMutationMetadata {
     /// Creates new [`struct@LogMutationMetadata`].
+    #[must_use]
     pub fn new(list: Vec<String>) -> Self {
         Self { list }
     }
@@ -194,6 +195,7 @@ where
 }
 
 /// Get the mutations that compose the Havoc mutator
+#[must_use]
 pub fn havoc_mutations<C, I, R, S>() -> impl MutatorsTuple<I, S>
 where
     I: Input + HasBytesVec,
@@ -403,13 +405,13 @@ mod tests {
             Mutator,
         },
         state::State,
-        utils::{Rand, StdRand, XKCDRand},
+        utils::{Rand, StdRand, XkcdRand},
     };
 
     #[test]
     fn test_mut_scheduled() {
         // With the current impl, seed of 1 will result in a split at pos 2.
-        let mut rand = XKCDRand::with_seed(5);
+        let mut rand = XkcdRand::with_seed(5);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
         corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
         corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();

@@ -54,6 +54,7 @@ pub struct ShMemDescription {
 
 impl ShMemDescription {
     /// Create a description from a `id_str` and a `size`.
+    #[must_use]
     pub fn from_string_and_size(id_str: &str, size: usize) -> Self {
         Self {
             size,
@@ -71,16 +72,19 @@ pub struct ShMemId {
 
 impl ShMemId {
     /// Create a new id from a fixed-size string
+    #[must_use]
     pub fn from_slice(slice: &[u8; 20]) -> Self {
         Self { id: *slice }
     }
 
     /// Create a new id from an int
+    #[must_use]
     pub fn from_int(val: i32) -> Self {
         Self::from_string(&val.to_string())
     }
 
     /// Create a new id from a string
+    #[must_use]
     pub fn from_string(val: &str) -> Self {
         let mut slice: [u8; 20] = [0; 20];
         for (i, val) in val.as_bytes().iter().enumerate() {
@@ -90,17 +94,20 @@ impl ShMemId {
     }
 
     /// Get the id as a fixed-length slice
+    #[must_use]
     pub fn as_slice(&self) -> &[u8; 20] {
         &self.id
     }
 
     /// Get a string representation of this id
+    #[must_use]
     pub fn to_string(&self) -> &str {
         let eof_pos = self.id.iter().position(|&c| c == 0).unwrap();
         alloc::str::from_utf8(&self.id[..eof_pos]).unwrap()
     }
 
     /// Get an integer representation of this id
+    #[must_use]
     pub fn to_int(&self) -> i32 {
         let id: i32 = self.to_string().parse().unwrap();
         id

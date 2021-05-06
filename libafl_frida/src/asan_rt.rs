@@ -431,26 +431,31 @@ impl Allocator {
 }
 
 /// Hook for malloc.
+#[must_use]
 pub extern "C" fn asan_malloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new.
+#[must_use]
 pub extern "C" fn asan_new(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new.
+#[must_use]
 pub extern "C" fn asan_new_nothrow(size: usize, _nothrow: *const c_void) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new with alignment.
+#[must_use]
 pub extern "C" fn asan_new_aligned(size: usize, alignment: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
 
 /// Hook for new with alignment.
+#[must_use]
 pub extern "C" fn asan_new_aligned_nothrow(
     size: usize,
     alignment: usize,
@@ -460,16 +465,19 @@ pub extern "C" fn asan_new_aligned_nothrow(
 }
 
 /// Hook for pvalloc
+#[must_use]
 pub extern "C" fn asan_pvalloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for valloc
+#[must_use]
 pub extern "C" fn asan_valloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for calloc
+#[must_use]
 pub extern "C" fn asan_calloc(nmemb: usize, size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size * nmemb, 0x8) }
 }
@@ -478,6 +486,7 @@ pub extern "C" fn asan_calloc(nmemb: usize, size: usize) -> *mut c_void {
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     let mut allocator = Allocator::get();
     let ret = allocator.alloc(size, 0x8);
@@ -570,11 +579,13 @@ pub unsafe extern "C" fn asan_delete_aligned_nothrow(
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_malloc_usable_size(ptr: *mut c_void) -> usize {
     Allocator::get().get_usable_size(ptr)
 }
 
 /// Hook for `memalign`
+#[must_use]
 pub extern "C" fn asan_memalign(size: usize, alignment: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
@@ -583,6 +594,7 @@ pub extern "C" fn asan_memalign(size: usize, alignment: usize) -> *mut c_void {
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_posix_memalign(
     pptr: *mut *mut c_void,
     size: usize,
@@ -593,6 +605,7 @@ pub unsafe extern "C" fn asan_posix_memalign(
 }
 
 /// Hook for mallinfo
+#[must_use]
 pub extern "C" fn asan_mallinfo() -> *mut c_void {
     std::ptr::null_mut()
 }
@@ -675,6 +688,7 @@ pub struct AsanErrors {
 
 impl AsanErrors {
     /// Creates a new `AsanErrors` struct
+    #[must_use]
     fn new() -> Self {
         Self { errors: Vec::new() }
     }
@@ -685,11 +699,13 @@ impl AsanErrors {
     }
 
     /// Gets the amount of `AsanErrors` in this struct
+    #[must_use]
     pub fn len(&self) -> usize {
         self.errors.len()
     }
 
     /// Returns `true` if no errors occurred
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
@@ -698,6 +714,7 @@ impl CustomExitKind for AsanErrors {}
 
 impl AsanRuntime {
     /// Create a new `AsanRuntime`
+    #[must_use]
     pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
         let res = Rc::new(RefCell::new(Self {
             regs: [0; 32],
@@ -798,6 +815,7 @@ impl AsanRuntime {
     }
 
     /// Resolves the real address from a stalker stalked address
+    #[must_use]
     pub fn real_address_for_stalked(&self, stalked: usize) -> Option<&usize> {
         self.stalked_addresses.get(&stalked)
     }
@@ -834,6 +852,7 @@ impl AsanRuntime {
     }
 
     /// Determine the stack start, end for the currently running thread
+    #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;
         let stack_address = &stack_var as *const _ as *const c_void as usize;
@@ -1582,77 +1601,91 @@ impl AsanRuntime {
     }
 
     /// Get the blob which implements the report funclet
+    #[must_use]
     #[inline]
     pub fn blob_report(&self) -> &[u8] {
         self.blob_report.as_ref().unwrap()
     }
+
     /// Get the blob which checks a byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_byte(&self) -> &[u8] {
         self.blob_check_mem_byte.as_ref().unwrap()
     }
 
     /// Get the blob which checks a halfword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_halfword(&self) -> &[u8] {
         self.blob_check_mem_halfword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a dword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_dword(&self) -> &[u8] {
         self.blob_check_mem_dword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a qword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_qword(&self) -> &[u8] {
         self.blob_check_mem_qword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 16 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_16bytes(&self) -> &[u8] {
         self.blob_check_mem_16bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 3 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_3bytes(&self) -> &[u8] {
         self.blob_check_mem_3bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 6 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_6bytes(&self) -> &[u8] {
         self.blob_check_mem_6bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 12 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_12bytes(&self) -> &[u8] {
         self.blob_check_mem_12bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 24 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_24bytes(&self) -> &[u8] {
         self.blob_check_mem_24bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 32 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_32bytes(&self) -> &[u8] {
         self.blob_check_mem_32bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 48 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_48bytes(&self) -> &[u8] {
         self.blob_check_mem_48bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 64 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_64bytes(&self) -> &[u8] {
         self.blob_check_mem_64bytes.as_ref().unwrap()
@@ -1692,6 +1725,7 @@ impl Named for AsanErrorsObserver {
 
 impl AsanErrorsObserver {
     /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
+    #[must_use]
     pub fn new(errors: &'static Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>),
@@ -1699,6 +1733,7 @@ impl AsanErrorsObserver {
     }
 
     /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
+    #[must_use]
     pub fn new_owned(errors: Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Owned(Box::new(errors)),
@@ -1706,6 +1741,7 @@ impl AsanErrorsObserver {
     }
 
     /// Creates a new `AsanErrorsObserver` from a raw ptr
+    #[must_use]
     pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors),
@@ -1713,6 +1749,7 @@ impl AsanErrorsObserver {
     }
 
     /// gets the [`AsanErrors`] from the previous run
+    #[must_use]
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },

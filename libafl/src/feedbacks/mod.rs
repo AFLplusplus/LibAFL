@@ -360,6 +360,7 @@ impl Named for CrashFeedback {
 
 impl CrashFeedback {
     /// Creates a new [`CrashFeedback`]
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -470,6 +471,7 @@ impl Named for TimeFeedback {
 
 impl TimeFeedback {
     /// Creates a new [`TimeFeedback`], deciding if the value of a [`TimeObserver`] with the given `name` of a run is interesting.
+    #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
             exec_time: None,
@@ -478,6 +480,7 @@ impl TimeFeedback {
     }
 
     /// Creates a new [`TimeFeedback`], deciding if the given [`TimeObserver`] value of a run is interesting.
+    #[must_use]
     pub fn new_with_observer(observer: &TimeObserver) -> Self {
         Self {
             exec_time: None,

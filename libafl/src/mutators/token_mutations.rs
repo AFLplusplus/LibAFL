@@ -33,6 +33,7 @@ crate::impl_serdeany!(Tokens);
 /// The metadata used for token mutators
 impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
+    #[must_use]
     pub fn new(token_vec: Vec<Vec<u8>>) -> Self {
         Self { token_vec }
     }
@@ -118,6 +119,7 @@ impl Tokens {
     }
 
     /// Gets the tokens stored in this db
+    #[must_use]
     pub fn tokens(&self) -> &[Vec<u8>] {
         &self.token_vec
     }
@@ -200,6 +202,7 @@ where
     R: Rand,
 {
     /// Create a `TokenInsert` `Mutation`.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -281,6 +284,7 @@ where
     R: Rand,
 {
     /// Creates a new `TokenReplace` struct.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

@@ -88,6 +88,7 @@ impl AsSlice<usize> for MapIndexesMetadata {
 
 impl MapIndexesMetadata {
     /// Creates a new [`struct@MapIndexesMetadata`].
+    #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
         Self { list }
     }
@@ -104,12 +105,14 @@ crate::impl_serdeany!(MapNoveltiesMetadata);
 
 impl AsSlice<usize> for MapNoveltiesMetadata {
     /// Convert to a slice
+    #[must_use]
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
 impl MapNoveltiesMetadata {
     /// Creates a new [`struct@MapNoveltiesMetadata`]
+    #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
         Self { list }
     }
@@ -258,6 +261,7 @@ where
     O: MapObserver<T>,
 {
     /// Create new `MapFeedback`
+    #[must_use]
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
@@ -280,7 +284,8 @@ where
     }
 
     /// Create new `MapFeedback` specifying if it must track indexes of novelties
-    pub fn new_track(
+    #[must_use]
+    pub fn new_tracking(
         name: &'static str,
         map_size: usize,
         track_indexes: bool,
@@ -296,7 +301,7 @@ where
     }
 
     /// Create new `MapFeedback` for the observer type if it must track indexes of novelties
-    pub fn new_with_observer_track(
+    pub fn new_tracking_with_observer(
         map_observer: &O,
         track_indexes: bool,
         track_novelties: bool,
@@ -319,6 +324,7 @@ where
 {
     /// Create new `MapFeedback` using a map observer, and a map.
     /// The map can be shared.
+    #[must_use]
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
             history_map,
@@ -343,6 +349,7 @@ where
     O: MapObserver<usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
+    #[must_use]
     pub fn new_with_observer(map_observer: &O) -> Self {
         Self {
             name: map_observer.name().to_string(),
@@ -350,7 +357,9 @@ where
             phantom: PhantomData,
         }
     }
+
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`] with the given `name`.
+    #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),

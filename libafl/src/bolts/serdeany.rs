@@ -12,6 +12,7 @@ use core::any::{Any, TypeId};
 ///
 /// # Safety
 /// Probably not safe for future compilers, fine for now.
+#[must_use]
 pub fn pack_type_id(id: u64) -> TypeId {
     assert_eq_size!(TypeId, u64);
     unsafe { *(&id as *const u64 as *const TypeId) }
@@ -22,6 +23,7 @@ pub fn pack_type_id(id: u64) -> TypeId {
 ///
 /// # Safety
 /// Probably not safe for future compilers, fine for now.
+#[must_use]
 pub fn unpack_type_id(id: TypeId) -> u64 {
     assert_eq_size!(TypeId, u64);
     unsafe { *(&id as *const _ as *const u64) }
@@ -214,6 +216,7 @@ macro_rules! create_serde_registry_for_trait {
 
             impl SerdeAnyMap {
                 /// Get an element from the map.
+                #[must_use]
                 #[inline]
                 pub fn get<T>(&self) -> Option<&T>
                 where
@@ -225,6 +228,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Get a mutable borrow for an element in the map.
+                #[must_use]
                 #[inline]
                 pub fn get_mut<T>(&mut self) -> Option<&mut T>
                 where
@@ -246,12 +250,14 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Returns the count of elements in this map.
+                #[must_use]
                 #[inline]
                 pub fn len(&self) -> usize {
                     self.map.len()
                 }
 
                 /// Returns if the map contains the given type.
+                #[must_use]
                 #[inline]
                 pub fn contains<T>(&self) -> bool
                 where
@@ -261,6 +267,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Create a new [`SerdeAnyMap`].
+                #[must_use]
                 pub fn new() -> Self {
                     SerdeAnyMap {
                         map: HashMap::default(),
@@ -282,6 +289,7 @@ macro_rules! create_serde_registry_for_trait {
 
             impl NamedSerdeAnyMap {
                 /// Get an element by name
+                #[must_use]
                 #[inline]
                 pub fn get<T>(&self, name: &str) -> Option<&T>
                 where
@@ -296,6 +304,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Get an element of a given type contained in this map by [`TypeId`].
+                #[must_use]
                 #[inline]
                 pub fn by_typeid(&self, name: &str, typeid: &TypeId) -> Option<&dyn $trait_name> {
                     match self.map.get(&unpack_type_id(*typeid)) {
@@ -307,6 +316,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Get an element of a given type contained in this map by [`TypeId`], as mut.
+                #[must_use]
                 #[inline]
                 pub fn get_mut<T>(&mut self, name: &str) -> Option<&mut T>
                 where
@@ -321,6 +331,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Get an element of a given type contained in this map by [`TypeId`], as mut.
+                #[must_use]
                 #[inline]
                 pub fn by_typeid_mut(
                     &mut self,
@@ -336,6 +347,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Get all elements of a type contained in this map.
+                #[must_use]
                 #[inline]
                 pub fn get_all<T>(
                     &self,
@@ -357,6 +369,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Get all elements of a given type contained in this map by [`TypeId`].
+                #[must_use]
                 #[inline]
                 pub fn all_by_typeid(
                     &self,
@@ -465,12 +478,14 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Returns the `len` of this map.
+                #[must_use]
                 #[inline]
                 pub fn len(&self) -> usize {
                     self.map.len()
                 }
 
                 /// Returns if the element with a given type is contained in this map.
+                #[must_use]
                 #[inline]
                 pub fn contains_type<T>(&self) -> bool
                 where
@@ -480,6 +495,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Returns if the element by a given `name` is contained in this map.
+                #[must_use]
                 #[inline]
                 pub fn contains<T>(&self, name: &str) -> bool
                 where
@@ -492,6 +508,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Create a new `SerdeAny` map.
+                #[must_use]
                 pub fn new() -> Self {
                     Self {
                         map: HashMap::default(),

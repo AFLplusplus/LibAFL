@@ -131,6 +131,7 @@ where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
+    #[must_use]
     pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
@@ -141,6 +142,7 @@ where
     }
 
     /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
     pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {

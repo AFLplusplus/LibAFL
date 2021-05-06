@@ -35,6 +35,7 @@ crate::impl_serdeany!(TopRatedsMetadata);
 
 impl TopRatedsMetadata {
     /// Creates a new [`struct@TopRatedsMetadata`]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: HashMap::default(),

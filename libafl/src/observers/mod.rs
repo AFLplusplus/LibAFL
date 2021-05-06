@@ -47,6 +47,7 @@ pub struct TimeObserver {
 
 impl TimeObserver {
     /// Creates a new [`TimeObserver`] with the given name.
+    #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
@@ -56,6 +57,7 @@ impl TimeObserver {
     }
 
     /// Gets the runtime for the last execution of this target.
+    #[must_use]
     pub fn last_runtime(&self) -> &Option<Duration> {
         &self.last_runtime
     }

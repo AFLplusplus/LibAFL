@@ -24,7 +24,8 @@ pub struct FridaOptions {
 impl FridaOptions {
     /// Parse the frida options from the [`LIBAFL_FRIDA_OPTIONS`] environment variable.
     ///
-    /// Options are ':' separated, and each options is a 'name=value' string.
+    /// Options are `:` separated, and each options is a `name=value` string.
+    #[must_use]
     pub fn parse_env_options() -> Self {
         let mut options = Self::default();
 
@@ -95,36 +96,42 @@ impl FridaOptions {
     }
 
     /// Is ASAN enabled?
+    #[must_use]
     #[inline]
     pub fn asan_enabled(&self) -> bool {
         self.enable_asan
     }
 
     /// Is coverage enabled?
+    #[must_use]
     #[inline]
     pub fn coverage_enabled(&self) -> bool {
         self.enable_coverage
     }
 
     /// Is `DrCov` enabled?
+    #[must_use]
     #[inline]
     pub fn drcov_enabled(&self) -> bool {
         self.enable_drcov
     }
 
     /// Should ASAN detect leaks
+    #[must_use]
     #[inline]
     pub fn asan_detect_leaks(&self) -> bool {
         self.enable_asan_leak_detection
     }
 
     /// Should ASAN continue after a memory error is detected
+    #[must_use]
     #[inline]
     pub fn asan_continue_after_error(&self) -> bool {
         self.enable_asan_continue_after_error
     }
 
     /// Should ASAN gather (and report) allocation-/free-site backtraces
+    #[must_use]
     #[inline]
     pub fn asan_allocation_backtraces(&self) -> bool {
         self.enable_asan_allocation_backtraces
@@ -132,12 +139,14 @@ impl FridaOptions {
 
     /// Whether stalker should be enabled. I.e. whether at least one stalker requiring option is
     /// enabled.
+    #[must_use]
     #[inline]
     pub fn stalker_enabled(&self) -> bool {
         self.enable_asan || self.enable_coverage || self.enable_drcov
     }
 
     /// A list of locations which will not be instrumented for ASAN or coverage purposes
+    #[must_use]
     pub fn dont_instrument_locations(&self) -> Option<Vec<(String, usize)>> {
         self.instrument_suppress_locations.clone()
     }

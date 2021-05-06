@@ -143,6 +143,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BitFlipMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -204,6 +205,7 @@ where
     R: Rand,
 {
     /// Creates a new [`ByteFlipMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -266,6 +268,7 @@ where
     R: Rand,
 {
     /// Creates a new [`ByteIncMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -328,6 +331,7 @@ where
     R: Rand,
 {
     /// Creates a a new [`ByteDecMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -389,6 +393,7 @@ where
     R: Rand,
 {
     /// Creates a new [`ByteNegMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -450,6 +455,7 @@ where
     R: Rand,
 {
     /// Creates a new [`ByteRandMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -516,6 +522,7 @@ where
     R: Rand,
 {
     /// Creates a new [`ByteAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -584,6 +591,7 @@ where
     R: Rand,
 {
     /// Creates a new [`WordAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -652,6 +660,7 @@ where
     R: Rand,
 {
     /// Creates a new [`DwordAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -720,6 +729,7 @@ where
     R: Rand,
 {
     /// Creates a new [`QwordAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -784,6 +794,7 @@ where
     R: Rand,
 {
     /// Creates a new [`ByteInterestingMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -853,6 +864,7 @@ where
     R: Rand,
 {
     /// Creates a new [`WordInterestingMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -922,6 +934,7 @@ where
     R: Rand,
 {
     /// Creates a new [`DwordInterestingMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -983,6 +996,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BytesDeleteMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1051,6 +1065,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BytesExpandMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1125,6 +1140,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BytesInsertMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1196,6 +1212,7 @@ where
     R: Rand,
 {
     /// Create a new [`BytesRandInsertMutator`]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1259,6 +1276,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BytesSetMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1322,6 +1340,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BytesRandSetMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1385,6 +1404,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BytesCopyMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1450,6 +1470,7 @@ where
     R: Rand,
 {
     /// Creates a new [`BytesSwapMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1548,6 +1569,7 @@ where
     S: HasRand<R> + HasCorpus<C, I> + HasMaxSize,
 {
     /// Creates a new [`CrossoverInsertMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1635,6 +1657,7 @@ where
     S: HasRand<R> + HasCorpus<C, I>,
 {
     /// Creates a new [`CrossoverReplaceMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1743,6 +1766,7 @@ where
     S: HasRand<R> + HasCorpus<C, I>,
 {
     /// Creates a new [`SpliceMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

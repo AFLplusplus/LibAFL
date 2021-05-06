@@ -137,6 +137,7 @@ where
     R: Rand,
 {
     /// Create a new [`RandCorpusScheduler`] that just schedules randomly.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

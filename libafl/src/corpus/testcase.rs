@@ -156,6 +156,7 @@ where
     }
 
     /// Create a new, empty, [`Testcase`].
+    #[must_use]
     #[inline]
     pub fn default() -> Self {
         Testcase {

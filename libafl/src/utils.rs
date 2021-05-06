@@ -151,6 +151,7 @@ const HASH_CONST: u64 = 0xa5b35705;
 
 /// Current time
 #[cfg(feature = "std")]
+#[must_use]
 #[inline]
 pub fn current_time() -> time::Duration {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
@@ -166,12 +167,14 @@ pub fn current_time() -> time::Duration {
 }
 
 /// Gets current nanoseconds since [`UNIX_EPOCH`]
+#[must_use]
 #[inline]
 pub fn current_nanos() -> u64 {
     current_time().as_nanos() as u64
 }
 
 /// Gets current milliseconds since [`UNIX_EPOCH`]
+#[must_use]
 #[inline]
 pub fn current_milliseconds() -> u64 {
     current_time().as_millis() as u64
@@ -215,6 +218,7 @@ impl Rand for Xoshiro256StarRand {
 
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self { rand_seed: [0; 4] };
         rand.set_seed(seed); // TODO: Proper random seed?
@@ -247,6 +251,7 @@ impl Rand for XorShift64Rand {
 
 impl XorShift64Rand {
     /// Creates a new Xoshiro rand with the given seed
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed); // TODO: Proper random seed?
@@ -276,6 +281,7 @@ impl Rand for Lehmer64Rand {
 
 impl Lehmer64Rand {
     /// Creates a new Lehmer rand with the given seed
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed);
@@ -294,6 +300,7 @@ pub struct RomuTrioRand {
 
 impl RomuTrioRand {
     /// Creates a new `RomuTrioRand` with the given seed.
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
@@ -334,6 +341,7 @@ pub struct RomuDuoJrRand {
 
 impl RomuDuoJrRand {
     /// Creates a new `RomuDuoJrRand` with the given seed.
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
@@ -364,12 +372,12 @@ impl Rand for RomuDuoJrRand {
 #[cfg(test)]
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct XKCDRand {
+pub struct XkcdRand {
     val: u64,
 }
 
 #[cfg(test)]
-impl Rand for XKCDRand {
+impl Rand for XkcdRand {
     fn set_seed(&mut self, val: u64) {
         self.val = val
     }
@@ -381,11 +389,16 @@ impl Rand for XKCDRand {
 
 /// A test rng that will return the same value (chose by fair dice roll) for testing.
 #[cfg(test)]
-impl XKCDRand {
+impl XkcdRand {
+    /// Creates a new [`XkCDRand`] with the rand of 4, [chosen by fair dice roll, guaranteed to be random](https://xkcd.com/221/).
+    /// Will always return this seed.
+    #[must_use]
     pub fn new() -> Self {
         Self::with_seed(4)
     }
 
+    /// Creates a new [`XkcdRand`] with the given seed. Will always return this seed.
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         Self { val: seed }
     }
@@ -400,6 +413,7 @@ pub struct ChildHandle {
 #[cfg(unix)]
 impl ChildHandle {
     /// Block until the child exited and the status code becomes available
+    #[must_use]
     pub fn status(&self) -> i32 {
         let mut status = -1;
         unsafe {
@@ -503,6 +517,7 @@ pub fn find_mapping_for_address(address: usize) -> Result<(usize, usize, String,
 
 /// Get the start and end address of the mapping containing with a particular path
 #[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+#[must_use]
 pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
     let mut libstart = 0;
     let mut libend = 0;

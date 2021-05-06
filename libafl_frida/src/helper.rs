@@ -122,6 +122,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 }
 
 /// Helper function to get the size of a module's CODE section from frida
+#[must_use]
 pub fn get_module_size(module_name: &str) -> usize {
     let mut code_size = 0;
     let code_size_ref = &mut code_size;
@@ -205,6 +206,7 @@ fn get_pc(context: &CpuContext) -> usize {
 impl<'a> FridaInstrumentationHelper<'a> {
     /// Constructor function to create a new [`FridaInstrumentationHelper`], given a `module_name`.
     #[allow(clippy::clippy::too_many_lines)]
+    #[must_use]
     pub fn new(
         gum: &'a Gum,
         options: &'a FridaOptions,

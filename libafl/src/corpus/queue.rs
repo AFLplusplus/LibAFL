@@ -54,6 +54,7 @@ where
     I: Input,
 {
     /// Creates a new `QueueCorpusScheduler`
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

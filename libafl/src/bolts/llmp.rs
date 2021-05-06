@@ -496,6 +496,7 @@ impl LlmpMsg {
     /// Gets the buffer from this message as slice, with the corrent length.
     /// # Safety
     /// This is unsafe if somebody has access to shared mem pages on the system.
+    #[must_use]
     pub unsafe fn as_slice_unsafe(&self) -> &[u8] {
         slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize)
     }
