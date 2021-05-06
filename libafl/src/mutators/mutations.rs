@@ -55,6 +55,7 @@ fn buffer_set(data: &mut [u8], from: usize, len: usize, val: u8) {
     }
 }
 
+/// The max value that will be added or subtracted during add mutations
 const ARITH_MAX: u64 = 35;
 
 const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
@@ -533,7 +534,7 @@ where
 }
 
 /// Word add mutation for inputs with a bytes vector
-/// adds or subtracts a random value at a random place in the [`Vec`] with a random [`u16`].
+/// adds or subtracts a random value up to [`ARITH_MAX`] to a [`u16`] at a random place in the [`Vec`].
 #[derive(Default)]
 pub struct WordAddMutator<I, R, S>
 where
@@ -563,14 +564,15 @@ where
             let idx = state
                 .rand_mut()
                 .below((bytes.len() - size_of::<u16>() + 1) as u64) as usize;
-            let val = u16::from_le_bytes(bytes[idx..idx + size_of::<u16>()].try_into().unwrap());
-            let num = 1 + state.rand_mut().below(u64::from(u16::MAX)) as u16;
+            let val = u16::from_ne_bytes(bytes[idx..idx + size_of::<u16>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(ARITH_MAX) as u16;
             let new_bytes = match state.rand_mut().below(4) {
-                0 => val.wrapping_add(num).to_le_bytes(),
-                1 => val.wrapping_sub(num).to_le_bytes(),
-                2 => val.wrapping_add(num).to_be_bytes(),
-                _ => val.wrapping_sub(num).to_be_bytes(),
-            };
+                0 => val.wrapping_add(num),
+                1 => val.wrapping_sub(num),
+                2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
+                _ => val.swap_bytes().wrapping_sub(num).swap_bytes(),
+            }
+            .to_ne_bytes();
             bytes[idx..idx + size_of::<u16>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
@@ -604,7 +606,7 @@ where
 }
 
 /// Dword add mutation for inputs with a bytes vector.
-/// Replaces a random place in the [`Vec`] with a random [`u32`] in random order.
+/// Adds a random value up to `ARITH_MAX` to a [`u32`] at a random place in the [`Vec`], in random byte order.
 #[derive(Default)]
 pub struct DwordAddMutator<I, R, S>
 where
@@ -634,14 +636,15 @@ where
             let idx = state
                 .rand_mut()
                 .below((bytes.len() - size_of::<u32>() + 1) as u64) as usize;
-            let val = u32::from_le_bytes(bytes[idx..idx + size_of::<u32>()].try_into().unwrap());
-            let num = 1 + state.rand_mut().below(u64::from(u32::MAX)) as u32;
+            let val = u32::from_ne_bytes(bytes[idx..idx + size_of::<u32>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
             let new_bytes = match state.rand_mut().below(4) {
-                0 => val.wrapping_add(num).to_le_bytes(),
-                1 => val.wrapping_sub(num).to_le_bytes(),
-                2 => val.wrapping_add(num).to_be_bytes(),
-                _ => val.wrapping_sub(num).to_be_bytes(),
-            };
+                0 => val.wrapping_add(num),
+                1 => val.wrapping_sub(num),
+                2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
+                _ => val.swap_bytes().wrapping_sub(num).swap_bytes(),
+            }
+            .to_ne_bytes();
             bytes[idx..idx + size_of::<u32>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
@@ -704,14 +707,15 @@ where
             let idx = state
                 .rand_mut()
                 .below((bytes.len() - size_of::<u64>() + 1) as u64) as usize;
-            let val = u64::from_le_bytes(bytes[idx..idx + size_of::<u64>()].try_into().unwrap());
-            let num = 1 + state.rand_mut().below(u64::MAX) as u64;
+            let val = u64::from_ne_bytes(bytes[idx..idx + size_of::<u64>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(ARITH_MAX) as u64;
             let new_bytes = match state.rand_mut().below(4) {
-                0 => val.wrapping_add(num).to_le_bytes(),
-                1 => val.wrapping_sub(num).to_le_bytes(),
-                2 => val.wrapping_add(num).to_be_bytes(),
-                _ => val.wrapping_sub(num).to_be_bytes(),
-            };
+                0 => val.wrapping_add(num),
+                1 => val.wrapping_sub(num),
+                2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
+                _ => val.swap_bytes().wrapping_sub(num).swap_bytes(),
+            }
+            .to_ne_bytes();
             bytes[idx..idx + size_of::<u64>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
