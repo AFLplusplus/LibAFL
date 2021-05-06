@@ -111,7 +111,7 @@ where
         executions: usize,
 
         /// Current performance statistics
-        introspection_stats: ClientPerfStats,
+        introspection_stats: Box<ClientPerfStats>,
 
         phantom: PhantomData<I>,
     },

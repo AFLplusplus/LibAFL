@@ -396,11 +396,12 @@ const NUM_PERF_FEATURES: usize = PerfFeature::Count as usize;
 impl ClientPerfStats {
     /// Create a blank [`ClientPerfStats`] with the `start_time` and `current_time` with
     /// the current clock counter
+    #[must_use]
     pub fn new() -> Self {
-        let start_time = crate::cpu::read_time_counter().try_into().unwrap();
+        let start_time = crate::cpu::read_time_counter();
 
         Self {
-            start_time: start_time,
+            start_time,
             current_time: start_time,
             scheduler: 0,
             manager: 0,
@@ -604,6 +605,7 @@ impl ClientPerfStats {
 
 #[cfg(feature = "introspection")]
 impl core::fmt::Display for ClientPerfStats {
+    #[allow(clippy::cast_precision_loss)]
     fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         // Calculate the elapsed time from the stats
         let elapsed: f64 = (self.current_time - self.start_time) as f64;
@@ -620,7 +622,7 @@ impl core::fmt::Display for ClientPerfStats {
         // Create the formatted string
         writeln!(
             f,
-            "Scheduler: {:4.2} | Manager: {:4.2} | Stages:\n",
+            "Scheduler: {:4.2} | Manager: {:4.2} | Stages:",
             scheduler_percent, manager_percent
         )?;
 
@@ -632,7 +634,7 @@ impl core::fmt::Display for ClientPerfStats {
             }
 
             // Write the stage header
-            write!(f, "  Stage {}:\n", stage_index)?;
+            writeln!(f, "  Stage {}:", stage_index)?;
 
             for (feature_index, feature) in features.iter().enumerate() {
                 // Calculate this current stage's percentage
@@ -650,7 +652,7 @@ impl core::fmt::Display for ClientPerfStats {
                 let feature: PerfFeature = feature_index.into();
 
                 // Write the percentage for this feature
-                write!(f, "    {:6.4}: {:?}\n", feature_percent, feature)?;
+                writeln!(f, "    {:6.4}: {:?}", feature_percent, feature)?;
             }
 
             for (feedback_index, feedback) in self.feedbacks.iter().enumerate() {
@@ -666,9 +668,9 @@ impl core::fmt::Display for ClientPerfStats {
                 other_percent -= feedback_percent;
 
                 // Write the percentage for this feedback
-                write!(
+                writeln!(
                     f,
-                    "    {:6.4}: Feedback index {}\n",
+                    "    {:6.4}: Feedback index {}",
                     feedback_percent, feedback_index
                 )?;
             }

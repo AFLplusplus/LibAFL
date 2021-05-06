@@ -63,7 +63,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             }
         },
     };
-    
+
     // Create an observation channel using the coverage map
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
@@ -78,7 +78,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
-
             // Feedbacks to rate the interestingness of an input
             feedback_or!(
                 MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
@@ -91,7 +90,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             feedback_or!(CrashFeedback::new(), TimeoutFeedback::new()),
         )
     });
-
 
     println!("We're a client, let's fuzz :)");
 
