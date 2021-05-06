@@ -23,7 +23,7 @@ pub struct CmpLogHeader {
     kind: u8,
 }
 
-/// The operands logged during `CmpLog.
+/// The operands logged during `CmpLog`.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct CmpLogOperands(u64, u64);
