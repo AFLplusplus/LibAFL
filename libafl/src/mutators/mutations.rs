@@ -13,7 +13,9 @@ use crate::{
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{
     cmp::{max, min},
+    convert::TryInto,
     marker::PhantomData,
+    mem::size_of,
 };
 
 /// Mem move in the own vec
@@ -531,6 +533,7 @@ where
 }
 
 /// Word add mutation for inputs with a bytes vector
+/// adds or subtracts a random value at a random place in the [`Vec`] with a random [`u16`].
 #[derive(Default)]
 pub struct WordAddMutator<I, R, S>
 where
@@ -553,21 +556,22 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.bytes().len() < 2 {
+        if input.bytes().len() < size_of::<u16>() {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
-            unsafe {
-                // Moar speed, no bounds checks
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
-                let num = 1 + state.rand_mut().below(ARITH_MAX) as u16;
-                match state.rand_mut().below(4) {
-                    0 => *ptr = (*ptr).wrapping_add(num),
-                    1 => *ptr = (*ptr).wrapping_sub(num),
-                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-                };
-            }
+            let bytes = input.bytes_mut();
+            let idx = state
+                .rand_mut()
+                .below((bytes.len() - size_of::<u16>() + 1) as u64) as usize;
+            let val = u16::from_le_bytes(bytes[idx..idx + size_of::<u32>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(u64::from(u16::MAX)) as u16;
+            let new_bytes = match state.rand_mut().below(4) {
+                0 => val.wrapping_add(num).to_le_bytes(),
+                1 => val.wrapping_sub(num).to_le_bytes(),
+                2 => val.wrapping_add(num).to_be_bytes(),
+                _ => val.wrapping_sub(num).to_be_bytes(),
+            };
+            bytes[idx..idx + size_of::<u16>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -599,7 +603,8 @@ where
     }
 }
 
-/// Dword add mutation for inputs with a bytes vector
+/// Dword add mutation for inputs with a bytes vector.
+/// Replaces a random place in the [`Vec`] with a random [`u32`] in random order.
 #[derive(Default)]
 pub struct DwordAddMutator<I, R, S>
 where
@@ -622,21 +627,22 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.bytes().len() < 4 {
+        if input.bytes().len() < size_of::<u32>() {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
-            unsafe {
-                // Moar speed, no bound check
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
-                let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
-                match state.rand_mut().below(4) {
-                    0 => *ptr = (*ptr).wrapping_add(num),
-                    1 => *ptr = (*ptr).wrapping_sub(num),
-                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-                };
-            }
+            let bytes = input.bytes_mut();
+            let idx = state
+                .rand_mut()
+                .below((bytes.len() - size_of::<u32>() + 1) as u64) as usize;
+            let val = u32::from_le_bytes(bytes[idx..idx + size_of::<u32>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(u64::from(u32::MAX)) as u32;
+            let new_bytes = match state.rand_mut().below(4) {
+                0 => val.wrapping_add(num).to_le_bytes(),
+                1 => val.wrapping_sub(num).to_le_bytes(),
+                2 => val.wrapping_add(num).to_be_bytes(),
+                _ => val.wrapping_sub(num).to_be_bytes(),
+            };
+            bytes[idx..idx + size_of::<u32>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -694,18 +700,19 @@ where
         if input.bytes().len() < 8 {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 7) as usize;
-            unsafe {
-                // Moar speed, no bounds checks
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u64;
-                let num = 1 + state.rand_mut().below(ARITH_MAX) as u64;
-                match state.rand_mut().below(4) {
-                    0 => *ptr = (*ptr).wrapping_add(num),
-                    1 => *ptr = (*ptr).wrapping_sub(num),
-                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-                };
-            }
+            let bytes = input.bytes_mut();
+            let idx = state
+                .rand_mut()
+                .below((bytes.len() - size_of::<u64>() + 1) as u64) as usize;
+            let val = u64::from_le_bytes(bytes[idx..idx + size_of::<u64>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(u64::MAX) as u64;
+            let new_bytes = match state.rand_mut().below(4) {
+                0 => val.wrapping_add(num).to_le_bytes(),
+                1 => val.wrapping_sub(num).to_le_bytes(),
+                2 => val.wrapping_add(num).to_be_bytes(),
+                _ => val.wrapping_sub(num).to_be_bytes(),
+            };
+            bytes[idx..idx + size_of::<u64>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -829,18 +836,16 @@ where
         if input.bytes().len() < 2 {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
+            let bytes = input.bytes_mut();
+            let idx = state.rand_mut().below(bytes.len() as u64 - 1) as usize;
             let val =
                 INTERESTING_16[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u16;
-            unsafe {
-                // Moar speed, no bounds checks
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
-                if state.rand_mut().below(2) == 0 {
-                    *ptr = val;
-                } else {
-                    *ptr = val.swap_bytes();
-                }
-            }
+            let mut new_bytes = if state.rand_mut().below(2) == 0 {
+                val.to_be_bytes()
+            } else {
+                val.to_le_bytes()
+            };
+            new_bytes.swap_with_slice(&mut bytes[idx..]);
             Ok(MutationResult::Mutated)
         }
     }
@@ -899,18 +904,16 @@ where
         if input.bytes().len() < 4 {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
+            let bytes = input.bytes_mut();
+            let idx = state.rand_mut().below(bytes.len() as u64 - 3) as usize;
             let val =
                 INTERESTING_32[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u32;
-            unsafe {
-                // Moar speed, no bounds checks
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
-                if state.rand_mut().below(2) == 0 {
-                    *ptr = val;
-                } else {
-                    *ptr = val.swap_bytes();
-                }
-            }
+            let new_bytes = if state.rand_mut().below(2) == 0 {
+                val.to_be_bytes()
+            } else {
+                val.to_le_bytes()
+            };
+            bytes[idx..idx + new_bytes.len()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
