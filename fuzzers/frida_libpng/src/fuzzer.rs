@@ -21,6 +21,10 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
+    bolts::{
+        os::ashmem_server::AshmemService,
+        shmem::{StdShMemProvider, ShMemProvider},
+    },
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
@@ -80,14 +84,14 @@ where
             }
         }
         let res = self.base.run_target(input);
+        if self.helper.stalker_enabled() {
+            self.stalker.deactivate();
+        }
         if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
             println!("Crashing target as it had ASAN errors");
             unsafe {
                 libc::raise(libc::SIGABRT);
             }
-        }
-        if self.helper.stalker_enabled() {
-            self.stalker.deactivate();
         }
         res
     }
@@ -236,7 +240,7 @@ pub fn main() {
                 .map(|module_name| std::fs::canonicalize(module_name).unwrap())
                 .collect(),
             &vec![PathBuf::from("./corpus")],
-            PathBuf::from("./crashes"),
+            &PathBuf::from("./crashes"),
             1337,
             &cores,
             matches.value_of("output"),
@@ -265,7 +269,7 @@ unsafe fn fuzz(
     symbol_name: &str,
     modules_to_instrument: Vec<PathBuf>,
     corpus_dirs: &Vec<PathBuf>,
-    objective_dir: PathBuf,
+    objective_dir: &PathBuf,
     broker_port: u16,
     cores: &[usize],
     stdout_file: Option<&str>,
@@ -298,9 +302,10 @@ unsafe fn fuzz(
         };
 
         let gum = Gum::obtain();
+        let frida_options = FridaOptions::parse_env_options();
         let mut frida_helper = FridaInstrumentationHelper::new(
             &gum,
-            FridaOptions::parse_env_options(),
+            &frida_options,
             module_name,
             &modules_to_instrument,
         );
@@ -323,7 +328,7 @@ unsafe fn fuzz(
                 MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
-                OnDiskCorpus::new_save_meta(objective_dir, Some(OnDiskMetadataFormat::JsonPretty))
+                OnDiskCorpus::new_save_meta(objective_dir.clone(), Some(OnDiskMetadataFormat::JsonPretty))
                     .unwrap(),
                 // Feedbacks to recognize an input as solution
                 feedback_or!(
@@ -360,7 +365,6 @@ unsafe fn fuzz(
         let mut executor = FridaInProcessExecutor::new(
             &gum,
             InProcessExecutor::new(
-                "in-process(edges)",
                 &mut frida_harness,
                 tuple_list!(edges_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
                 &mut state,

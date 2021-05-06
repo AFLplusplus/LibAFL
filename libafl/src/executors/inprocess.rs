@@ -34,7 +34,7 @@ where
     OT: ObserversTuple,
 {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: H,
+    harness_fn: &'a mut H,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<(EM, I, S)>,
