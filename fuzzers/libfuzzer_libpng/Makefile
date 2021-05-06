@@ -18,6 +18,14 @@ run: all
 	sleep 0.2
 	./$(FUZZER_NAME) >/dev/null 2>/dev/null &
 
+short_test: all
+	timeout 11s ./$(FUZZER_NAME) &
+	sleep 0.2
+	timeout 10s taskset -c 0 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
+	timeout 10s taskset -c 1 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
+	timeout 10s taskset -c 2 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
+	timeout 10s taskset -c 3 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
+
 test: all
 	timeout 60s ./$(FUZZER_NAME) &
 	sleep 0.2
