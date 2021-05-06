@@ -506,12 +506,12 @@ pub fn find_mapping_for_address(address: usize) -> Result<(usize, usize, String,
         }
     });
 
-    if result.0 != 0 {
-        Ok(result)
-    } else {
+    if result.0 == 0 {
         Err(Error::Unknown(
             "Couldn't find a mapping for this address".to_string(),
         ))
+    } else {
+        Ok(result)
     }
 }
 

@@ -398,7 +398,39 @@ mod unix_signal_handler {
 
         #[cfg(feature = "std")]
         println!("Crashed with {}", _signal);
-        if !data.current_input_ptr.is_null() {
+        if data.current_input_ptr.is_null() {
+            #[cfg(feature = "std")]
+            {
+                println!("Double crash\n");
+                #[cfg(target_os = "android")]
+                let si_addr =
+                    { ((_info._pad[0] as usize) | ((_info._pad[1] as usize) << 32)) as usize };
+                #[cfg(not(target_os = "android"))]
+                let si_addr = { _info.si_addr() as usize };
+
+                println!(
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
+                si_addr
+                );
+            }
+            // let's yolo-cat the maps for debugging, if possible.
+            #[cfg(all(target_os = "linux", feature = "std"))]
+            match std::fs::read_to_string("/proc/self/maps") {
+                Ok(maps) => println!("maps:\n{}", maps),
+                Err(e) => println!("Couldn't load mappings: {:?}", e),
+            };
+            #[cfg(feature = "std")]
+            {
+                println!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
+
+            // TODO tell the parent to not restart
+            libc::_exit(1);
+        } else {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
@@ -484,38 +516,6 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             println!("Bye!");
 
-            libc::_exit(1);
-        } else {
-            #[cfg(feature = "std")]
-            {
-                println!("Double crash\n");
-                #[cfg(target_os = "android")]
-                let si_addr =
-                    { ((_info._pad[0] as usize) | ((_info._pad[1] as usize) << 32)) as usize };
-                #[cfg(not(target_os = "android"))]
-                let si_addr = { _info.si_addr() as usize };
-
-                println!(
-                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
-                si_addr
-                );
-            }
-            // let's yolo-cat the maps for debugging, if possible.
-            #[cfg(all(target_os = "linux", feature = "std"))]
-            match std::fs::read_to_string("/proc/self/maps") {
-                Ok(maps) => println!("maps:\n{}", maps),
-                Err(e) => println!("Couldn't load mappings: {:?}", e),
-            };
-            #[cfg(feature = "std")]
-            {
-                println!("Type QUIT to restart the child");
-                let mut line = String::new();
-                while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
-                }
-            }
-
-            // TODO tell the parent to not restart
             libc::_exit(1);
         }
     }

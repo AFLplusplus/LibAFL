@@ -803,10 +803,10 @@ where
             panic!("PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
                 ptr::addr_of!((*page).size_used), ptr::addr_of!((*page).size_total));
         }
-        let mut ret: *mut LlmpMsg = if !last_msg.is_null() {
-            llmp_next_msg_ptr_checked(&mut map, last_msg, EOP_MSG_SIZE)?
-        } else {
+        let mut ret: *mut LlmpMsg = if last_msg.is_null() {
             (*page).messages.as_mut_ptr()
+        } else {
+            llmp_next_msg_ptr_checked(&mut map, last_msg, EOP_MSG_SIZE)?
         };
         if (*ret).tag == LLMP_TAG_UNINITIALIZED {
             panic!("Did not call send() on last message!");
@@ -815,10 +815,10 @@ where
 
         // We don't need to pad the EOP message: it'll always be the last in this page.
         (*ret).buf_len_padded = (*ret).buf_len;
-        (*ret).message_id = if !last_msg.is_null() {
-            (*last_msg).message_id + 1
-        } else {
+        (*ret).message_id = if last_msg.is_null() {
             1
+        } else {
+            (*last_msg).message_id + 1
         };
         (*ret).tag = LLMP_TAG_END_OF_PAGE;
         (*page).size_used += EOP_MSG_SIZE;
@@ -880,10 +880,7 @@ where
             } else {
                 (*last_msg).message_id + 1
             }
-        } else if (*page).current_msg_id != (*last_msg).message_id {
-            /* Oops, wrong usage! */
-            panic!("BUG: The current message never got commited using send! (page->current_msg_id {:?}, last_msg->message_id: {})", ptr::addr_of!((*page).current_msg_id), (*last_msg).message_id);
-        } else {
+        } else if (*page).current_msg_id == (*last_msg).message_id {
             buf_len_padded = complete_msg_size - size_of::<LlmpMsg>();
             /* DBG("XXX ret %p id %u buf_len_padded %lu complete_msg_size %lu\n", ret, ret->message_id, buf_len_padded,
              * complete_msg_size); */
@@ -905,6 +902,9 @@ where
                 }
             };
             (*ret).message_id = (*last_msg).message_id + 1
+        } else {
+            /* Oops, wrong usage! */
+            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {})", ptr::addr_of!((*page).current_msg_id), (*last_msg).message_id);
         }
 
         /* The beginning of our message should be messages + size_used, else nobody
