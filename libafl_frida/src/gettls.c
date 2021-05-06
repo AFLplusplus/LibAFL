@@ -4,6 +4,6 @@ __declspec( thread ) int i = 0;
 __thread int i = 0;
 #endif
 
-void * get_tls_ptr() {
+void * tls_ptr() {
         return (void*)&i;
 }
