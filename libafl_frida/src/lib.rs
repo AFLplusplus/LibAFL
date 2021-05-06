@@ -25,6 +25,9 @@ impl FridaOptions {
     /// Parse the frida options from the [`LIBAFL_FRIDA_OPTIONS`] environment variable.
     ///
     /// Options are `:` separated, and each options is a `name=value` string.
+    ///
+    /// # Panics
+    /// Panics, if no `=` sign exists in input, or or `value` behind `=` has zero length.
     #[must_use]
     pub fn parse_env_options() -> Self {
         let mut options = Self::default();

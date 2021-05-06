@@ -852,6 +852,9 @@ impl AsanRuntime {
     }
 
     /// Determine the stack start, end for the currently running thread
+    ///
+    /// # Panics
+    /// Panics, if no mapping for the `stack_address` at `0xeadbeef` could be found.
     #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;

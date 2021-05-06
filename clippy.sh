@@ -11,6 +11,7 @@ RUST_BACKTRACE=full cargo clippy --all --all-features --tests -- \
    -W clippy::too_many_lines \
    -W clippy::option_if_let_else \
    -W clippy::must-use-candidate \
+   -W clippy::if-not-else \
    -A clippy::type_repetition_in_bounds \
    -A clippy::missing-errors-doc \
    -A clippy::cast-possible-truncation \
@@ -21,4 +22,3 @@ RUST_BACKTRACE=full cargo clippy --all --all-features --tests -- \
    -A clippy::unseparated-literal-suffix \
    -A clippy::module-name-repetitions \
    -A clippy::unreadable-literal \
-   -A clippy::if-not-else \
