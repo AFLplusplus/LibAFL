@@ -563,7 +563,7 @@ where
             let idx = state
                 .rand_mut()
                 .below((bytes.len() - size_of::<u16>() + 1) as u64) as usize;
-            let val = u16::from_le_bytes(bytes[idx..idx + size_of::<u32>()].try_into().unwrap());
+            let val = u16::from_le_bytes(bytes[idx..idx + size_of::<u16>()].try_into().unwrap());
             let num = 1 + state.rand_mut().below(u64::from(u16::MAX)) as u16;
             let new_bytes = match state.rand_mut().below(4) {
                 0 => val.wrapping_add(num).to_le_bytes(),
@@ -840,12 +840,12 @@ where
             let idx = state.rand_mut().below(bytes.len() as u64 - 1) as usize;
             let val =
                 INTERESTING_16[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u16;
-            let mut new_bytes = if state.rand_mut().below(2) == 0 {
+            let new_bytes = if state.rand_mut().below(2) == 0 {
                 val.to_be_bytes()
             } else {
                 val.to_le_bytes()
             };
-            new_bytes.swap_with_slice(&mut bytes[idx..]);
+            bytes[idx..idx + size_of::<u16>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
