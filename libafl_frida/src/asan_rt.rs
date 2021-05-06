@@ -1045,7 +1045,9 @@ impl AsanRuntime {
         let mut fault_address =
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
-        if index_reg != 0 {
+        if index_reg == 0 {
+            index_reg = 0xffff
+        } else {
             if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
                 && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
             {
@@ -1070,8 +1072,6 @@ impl AsanRuntime {
                 index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
             }
             fault_address += self.regs[index_reg as usize] as usize;
-        } else {
-            index_reg = 0xffff
         }
 
         let backtrace = Backtrace::new();
@@ -1783,11 +1783,11 @@ where
         match observer.errors() {
             None => Ok(false),
             Some(errors) => {
-                if !errors.errors.is_empty() {
+                if errors.errors.is_empty() {
+                    Ok(false)
+                } else {
                     self.errors = Some(errors.clone());
                     Ok(true)
-                } else {
-                    Ok(false)
                 }
             }
         }
