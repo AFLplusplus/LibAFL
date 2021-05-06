@@ -64,6 +64,7 @@ where
     I: Input,
     ST: Stats, //TODO CE: CustomEvent,
 {
+    /// Creates a new [`SimpleEventManager`].
     pub fn new(stats: ST) -> Self {
         Self {
             stats,

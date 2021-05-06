@@ -8,6 +8,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
+    feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
@@ -21,7 +22,7 @@ use libafl::{
 };
 
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CMP_MAP, CMP_MAP_SIZE, EDGES_MAP, MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, CMP_MAP, EDGES_MAP, MAX_EDGES_NUM,
 };
 
 const ALLOC_MAP_SIZE: usize = 16 * 1024;
@@ -58,15 +59,14 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         setup_restarting_mgr_std(stats, broker_port).expect("Failed to setup the restarter".into());
 
     // Create an observation channel using the coverage map
-    let edges_observer =
-        StdMapObserver::new("edges", unsafe { &mut EDGES_MAP }, unsafe { MAX_EDGES_NUM });
+    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+    let edges_observer = StdMapObserver::new("edges", edges);
 
     // Create an observation channel using the cmp map
-    let cmps_observer = StdMapObserver::new("cmps", unsafe { &mut CMP_MAP }, CMP_MAP_SIZE);
+    let cmps_observer = StdMapObserver::new("cmps", unsafe { &mut CMP_MAP });
 
     // Create an observation channel using the allocations map
-    let allocs_observer =
-        StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map }, ALLOC_MAP_SIZE);
+    let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -76,7 +76,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(
+            feedback_or!(
                 MaxMapFeedback::new_with_observer(&edges_observer),
                 MaxMapFeedback::new_with_observer(&cmps_observer),
                 MaxMapFeedback::new_with_observer(&allocs_observer)
@@ -85,7 +85,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new()),
+            CrashFeedback::new(),
         )
     });
 
@@ -113,7 +113,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create the executor for an in-process function with observers for edge coverage, value-profile and allocations sizes
     let mut executor = InProcessExecutor::new(
-        "in-process(edges,cmp,alloc)",
         &mut harness,
         tuple_list!(edges_observer, cmps_observer, allocs_observer),
         &mut state,

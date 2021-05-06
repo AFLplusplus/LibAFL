@@ -59,6 +59,8 @@ impl<R> RandBytesGenerator<R>
 where
     R: Rand,
 {
+    /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
+    #[must_use]
     pub fn new(max_size: usize) -> Self {
         Self {
             max_size,
@@ -101,6 +103,8 @@ impl<R> RandPrintablesGenerator<R>
 where
     R: Rand,
 {
+    /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
+    #[must_use]
     pub fn new(max_size: usize) -> Self {
         Self {
             max_size,

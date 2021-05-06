@@ -155,6 +155,7 @@ pub trait Stats {
     }
 }
 
+/// Tracking stats during fuzzing.
 #[derive(Clone, Debug)]
 pub struct SimpleStats<F>
 where
@@ -216,6 +217,7 @@ impl<F> SimpleStats<F>
 where
     F: FnMut(String),
 {
+    /// Creates the stats, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn,
@@ -225,6 +227,7 @@ where
         }
     }
 
+    /// Creates the stats with a given `start_time`.
     pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
         Self {
             print_fn,
@@ -615,7 +618,7 @@ impl core::fmt::Display for ClientPerfStats {
         other_percent -= manager_percent;
 
         // Create the formatted string
-        write!(
+        writeln!(
             f,
             "Scheduler: {:4.2} | Manager: {:4.2} | Stages:\n",
             scheduler_percent, manager_percent

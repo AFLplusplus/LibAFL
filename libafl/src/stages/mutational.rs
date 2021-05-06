@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::{Corpus, CorpusScheduler},
     events::EventManager,
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
     mark_feature_time,
     mutators::Mutator,
@@ -30,8 +30,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasClientPerfStats,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
 {
     /// The mutator registered for this stage
@@ -44,7 +44,7 @@ where
     fn iterations(&self, state: &mut S) -> usize;
 
     /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
+    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
         state: &mut S,
@@ -80,6 +80,8 @@ where
     }
 }
 
+/// Default value, how many iterations each stage gets, as an upper bound
+/// It may randomly continue earlier.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
@@ -91,8 +93,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {
@@ -109,8 +111,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R> + HasClientPerfStats,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {
@@ -140,8 +142,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R> + HasClientPerfStats,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {
@@ -165,8 +167,8 @@ where
     S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
     C: Corpus<I>,
     EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {

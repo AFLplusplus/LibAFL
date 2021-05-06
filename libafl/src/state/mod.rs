@@ -12,8 +12,10 @@ use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
     corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventManager, LogSeverity},
-    executors::{Executor, ExitKind, HasObservers},
-    feedbacks::FeedbacksTuple,
+    executors::{
+        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
+    },
+    feedbacks::Feedback,
     generators::Generator,
     inputs::Input,
     mark_feature_time,
@@ -111,49 +113,30 @@ pub trait HasMetadata {
     }
 }
 
-/// Trait for elements offering a feedbacks tuple
-pub trait HasFeedbacks<FT, I>
+/// Trait for elements offering a feedback
+pub trait HasFeedback<F, I>: Sized
 where
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     I: Input,
 {
-    /// The feedbacks tuple
-    fn feedbacks(&self) -> &FT;
+    /// The feedback
+    fn feedback(&self) -> &F;
 
-    /// The feedbacks tuple (mut)
-    fn feedbacks_mut(&mut self) -> &mut FT;
-
-    /// Resets all metadata holds by feedbacks
-    #[inline]
-    fn discard_feedbacks_metadata(&mut self, input: &I) -> Result<(), Error> {
-        // TODO: This could probably be automatic in the feedback somehow?
-        self.feedbacks_mut().discard_metadata_all(&input)
-    }
-
-    /// Creates a new testcase, appending the metadata from each feedback
-    #[inline]
-    fn testcase_with_feedbacks_metadata(
-        &mut self,
-        input: I,
-        fitness: u32,
-    ) -> Result<Testcase<I>, Error> {
-        let mut testcase = Testcase::with_fitness(input, fitness);
-        self.feedbacks_mut().append_metadata_all(&mut testcase)?;
-        Ok(testcase)
-    }
+    /// The feedback (mut)
+    fn feedback_mut(&mut self) -> &mut F;
 }
 
-/// Trait for elements offering an objective feedbacks tuple
-pub trait HasObjectives<FT, I>
+/// Trait for elements offering an objective feedback tuple
+pub trait HasObjective<OF, I>: Sized
 where
-    FT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
     I: Input,
 {
-    /// The objective feedbacks tuple
-    fn objectives(&self) -> &FT;
+    /// The objective feedback
+    fn objective(&self) -> &OF;
 
-    /// The objective feedbacks tuple (mut)
-    fn objectives_mut(&mut self) -> &mut FT;
+    /// The objective feedback (mut)
+    fn objective_mut(&mut self) -> &mut OF;
 }
 
 /// Trait for the execution counter
@@ -175,7 +158,7 @@ pub trait HasStartTime {
 }
 
 /// Add to the state if interesting
-pub trait IfInteresting<I>
+pub trait IfInteresting<I>: Sized
 where
     I: Input,
 {
@@ -185,7 +168,7 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple;
 
@@ -193,7 +176,7 @@ where
     fn add_if_interesting<CS>(
         &mut self,
         input: &I,
-        fitness: u32,
+        is_interesting: bool,
         scheduler: &CS,
     ) -> Result<Option<usize>, Error>
     where
@@ -201,7 +184,7 @@ where
         Self: Sized;
 }
 
-/// Evaluate an input modyfing the state of the fuzzer and returning a fitness
+/// Evaluate an input modyfing the state of the fuzzer
 pub trait Evaluator<I>: Sized
 where
     I: Input,
@@ -213,25 +196,28 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<(u32, Option<usize>), Error>
+    ) -> Result<(bool, Option<usize>), Error>
     where
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         EM: EventManager<I, Self>,
         CS: CorpusScheduler<I, Self>;
 }
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct State<C, FT, I, OFT, R, SC>
+#[serde(bound = "F: serde::de::DeserializeOwned")]
+pub struct State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// RNG instance
     rand: R,
@@ -242,11 +228,11 @@ where
     /// The corpus
     corpus: C,
     /// Feedbacks used to evaluate an input
-    feedbacks: FT,
+    feedback: F,
     // Solutions corpus
     solutions: SC,
     /// Objective Feedbacks
-    objectives: OFT,
+    objective: OF,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
@@ -259,14 +245,14 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<C, FT, I, OFT, R, SC> HasRand<R> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasRand<R> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// The rand instance
     #[inline]
@@ -281,14 +267,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasCorpus<C, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasCorpus<C, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Returns the corpus
     #[inline]
@@ -303,14 +289,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasSolutions<SC, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasSolutions<SC, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Returns the solutions corpus
     #[inline]
@@ -325,80 +311,80 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasMetadata for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasMetadata for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
-    /// Get all the metadata into an HashMap
+    /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
-    /// Get all the metadata into an HashMap (mutable)
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasFeedbacks<FT, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasFeedback<F, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
-    /// The feedbacks tuple
+    /// The feedback
     #[inline]
-    fn feedbacks(&self) -> &FT {
-        &self.feedbacks
+    fn feedback(&self) -> &F {
+        &self.feedback
     }
 
-    /// The feedbacks tuple (mut)
+    /// The feedback (mut)
     #[inline]
-    fn feedbacks_mut(&mut self) -> &mut FT {
-        &mut self.feedbacks
+    fn feedback_mut(&mut self) -> &mut F {
+        &mut self.feedback
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasObjectives<OFT, I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasObjective<OF, I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
-    /// The objective feedbacks tuple
+    /// The objective feedback
     #[inline]
-    fn objectives(&self) -> &OFT {
-        &self.objectives
+    fn objective(&self) -> &OF {
+        &self.objective
     }
 
-    /// The objective feedbacks tuple (mut)
+    /// The objective feedback (mut)
     #[inline]
-    fn objectives_mut(&mut self) -> &mut OFT {
-        &mut self.objectives
+    fn objective_mut(&mut self) -> &mut OF {
+        &mut self.objective
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasExecutions for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasExecutions for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// The executions counter
     #[inline]
@@ -413,35 +399,14 @@ where
     }
 }
 
-/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "introspection"
-/// feature is enabled, and only [`HasExecution`] when "introspection" is disabled
-#[cfg(feature = "introspection")]
-pub trait HasFuzzerStats: HasExecutions + HasClientPerfStats {}
-
-/// Trait that that has [`HasExecution`] and [`HasClientPerfStats`] when "introspection"
-/// feature is enabled, and only [`HasExecution`] when "introspection" is disabled
-#[cfg(not(feature = "introspection"))]
-pub trait HasFuzzerStats: HasExecutions {}
-
-impl<C, FT, I, OFT, R, SC> HasFuzzerStats for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasMaxSize for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
-{
-}
-
-impl<C, FT, I, OFT, R, SC> HasMaxSize for State<C, FT, I, OFT, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    FT: FeedbacksTuple<I>,
-    SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     fn max_size(&self) -> usize {
         self.max_size
@@ -452,14 +417,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> HasStartTime for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasStartTime for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// The starting time
     #[inline]
@@ -474,14 +439,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> IfInteresting<I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> IfInteresting<I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn is_interesting<OT>(
@@ -489,12 +454,12 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<u32, Error>
+    ) -> Result<bool, Error>
     where
         OT: ObserversTuple,
     {
-        self.feedbacks_mut()
-            .is_interesting_all(input, observers, exit_kind)
+        self.feedback_mut()
+            .is_interesting(input, observers, exit_kind)
     }
 
     /// Adds this input to the corpus, if it's intersting, and return the index
@@ -502,32 +467,33 @@ where
     fn add_if_interesting<CS>(
         &mut self,
         input: &I,
-        fitness: u32,
+        is_interesting: bool,
         scheduler: &CS,
     ) -> Result<Option<usize>, Error>
     where
         CS: CorpusScheduler<I, Self>,
     {
-        if fitness > 0 {
-            let testcase = self.testcase_with_feedbacks_metadata(input.clone(), fitness)?;
+        if is_interesting {
+            let mut testcase = Testcase::new(input.clone());
+            self.feedback_mut().append_metadata(&mut testcase)?;
             let idx = self.corpus.add(testcase)?;
             scheduler.on_add(self, idx)?;
             Ok(Some(idx))
         } else {
-            self.discard_feedbacks_metadata(input)?;
+            self.feedback_mut().discard_metadata(&input)?;
             Ok(None)
         }
     }
 }
 
-impl<C, FT, I, OFT, R, SC> Evaluator<I> for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> Evaluator<I> for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -538,29 +504,30 @@ where
         executor: &mut E,
         manager: &mut EM,
         scheduler: &CS,
-    ) -> Result<(u32, Option<usize>), Error>
+    ) -> Result<(bool, Option<usize>), Error>
     where
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         C: Corpus<I>,
         EM: EventManager<I, Self>,
         CS: CorpusScheduler<I, Self>,
     {
-        let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
-
+        let (is_interesting, is_solution) = self.execute_input(&input, executor, manager)?;
         let observers = executor.observers();
 
         if is_solution {
             // If the input is a solution, add it to the respective corpus
             let mut testcase = Testcase::new(input.clone());
-            self.objectives_mut().append_metadata_all(&mut testcase)?;
+            self.objective_mut().append_metadata(&mut testcase)?;
             self.solutions_mut().add(testcase)?;
         } else {
-            self.objectives_mut().discard_metadata_all(&input)?;
+            self.objective_mut().discard_metadata(&input)?;
         }
 
-        let corpus_idx = self.add_if_interesting(&input, fitness, scheduler)?;
-
+        let corpus_idx = self.add_if_interesting(&input, is_interesting, scheduler)?;
         if corpus_idx.is_some() {
             let observers_buf = manager.serialize_observers(observers)?;
             manager.fire(
@@ -576,20 +543,21 @@ where
             )?;
         }
 
-        Ok((fitness, corpus_idx))
+        Ok((is_interesting, corpus_idx))
     }
 }
 
 #[cfg(feature = "std")]
-impl<C, FT, OFT, R, SC> State<C, FT, BytesInput, OFT, R, SC>
+impl<C, F, OF, R, SC> State<C, F, BytesInput, OF, R, SC>
 where
     C: Corpus<BytesInput>,
     R: Rand,
-    FT: FeedbacksTuple<BytesInput>,
+    F: Feedback<BytesInput>,
     SC: Corpus<BytesInput>,
-    OFT: FeedbacksTuple<BytesInput>,
+    OF: Feedback<BytesInput>,
 {
-    pub fn load_from_directory<CS, E, OT, EM>(
+    /// loads inputs from a directory
+    fn load_from_directory<CS, E, OT, EM>(
         &mut self,
         executor: &mut E,
         manager: &mut EM,
@@ -597,8 +565,11 @@ where
         in_dir: &Path,
     ) -> Result<(), Error>
     where
-        E: Executor<BytesInput> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<BytesInput>
+            + HasObservers<OT>
+            + HasExecHooks<EM, BytesInput, Self>
+            + HasObserversHooks<EM, BytesInput, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, BytesInput, Self>,
         EM: EventManager<BytesInput, Self>,
         CS: CorpusScheduler<BytesInput, Self>,
     {
@@ -617,9 +588,10 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let (fitness, is_solution) = self.execute_input(&input, executor, manager)?;
+                let (is_interesting, is_solution) =
+                    self.execute_input(&input, executor, manager)?;
                 if self
-                    .add_if_interesting(&input, fitness, scheduler)?
+                    .add_if_interesting(&input, is_interesting, scheduler)?
                     .is_none()
                 {
                     println!("File {:?} was not interesting, skipped.", &path);
@@ -635,6 +607,7 @@ where
         Ok(())
     }
 
+    /// Loads initial inputs from the passed-in `in_dirs`.
     pub fn load_initial_inputs<CS, E, OT, EM>(
         &mut self,
         executor: &mut E,
@@ -643,8 +616,11 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: Executor<BytesInput> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<BytesInput>
+            + HasObservers<OT>
+            + HasExecHooks<EM, BytesInput, Self>
+            + HasObserversHooks<EM, BytesInput, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, BytesInput, Self>,
         EM: EventManager<BytesInput, Self>,
         CS: CorpusScheduler<BytesInput, Self>,
     {
@@ -664,14 +640,14 @@ where
     }
 }
 
-impl<C, FT, I, OFT, R, SC> State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     /// Runs the input and triggers observers and feedback
     pub fn execute_input<E, EM, OT>(
@@ -679,15 +655,18 @@ where
         input: &I,
         executor: &mut E,
         event_mgr: &mut EM,
-    ) -> Result<(u32, bool), Error>
+    ) -> Result<(bool, bool), Error>
     where
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         C: Corpus<I>,
         EM: EventManager<I, Self>,
     {
         start_timer!(self);
-        executor.pre_exec_observers()?;
+        executor.pre_exec_observers(self, event_mgr, input)?;
         mark_feature_time!(self, PerfFeature::PreExecObservers);
 
         start_timer!(self);
@@ -705,24 +684,24 @@ where
         *self.executions_mut() += 1;
 
         start_timer!(self);
-        executor.post_exec_observers()?;
+        executor.post_exec_observers(self, event_mgr, input)?;
         mark_feature_time!(self, PerfFeature::PostExecObservers);
 
         let observers = executor.observers();
         #[cfg(not(feature = "introspection"))]
-        let fitness = self
-            .feedbacks_mut()
-            .is_interesting_all(&input, observers, &exit_kind)?;
+        let is_interesting = self
+            .feedback_mut()
+            .is_interesting(&input, observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let fitness = {
+        let is_interesting = {
             // Init temporary feedback stats here. We can't use the typical pattern above
             // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
             // new `mut self` to `is_interesting_all_with_perf`. We use this stack
             // variable to get the stats and then update the feedbacks directly
             let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
             let feedback_index = 0;
-            let fitness = self.feedbacks_mut().is_interesting_all_with_perf(
+            let is_interesting = self.feedback_mut().is_interesting_with_perf(
                 &input,
                 observers,
                 &exit_kind,
@@ -735,19 +714,20 @@ where
                 .update_feedbacks(feedback_stats);
 
             // Return the total fitness
-            fitness
+            is_interesting
         };
 
         start_timer!(self);
         let is_solution = self
-            .objectives_mut()
-            .is_interesting_all(&input, observers, &exit_kind)?
-            > 0;
+            .objective_mut()
+            .is_interesting(&input, observers, &exit_kind)?;
+
         mark_feature_time!(self, PerfFeature::GetObjectivesInterestingAll);
 
-        Ok((fitness, is_solution))
+        Ok((is_interesting, is_solution))
     }
 
+    /// Generate `num` initial inputs, using the passed-in generator.
     pub fn generate_initial_inputs<CS, G, E, OT, EM>(
         &mut self,
         executor: &mut E,
@@ -759,16 +739,19 @@ where
     where
         G: Generator<I, R>,
         C: Corpus<I>,
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, Self>
+            + HasObserversHooks<EM, I, OT, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
         EM: EventManager<I, Self>,
         CS: CorpusScheduler<I, Self>,
     {
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let (fitness, _) = self.evaluate_input(input, executor, manager, scheduler)?;
-            if fitness > 0 {
+            let (is_interesting, _) = self.evaluate_input(input, executor, manager, scheduler)?;
+            if is_interesting {
                 added += 1;
             }
         }
@@ -784,16 +767,17 @@ where
         Ok(())
     }
 
-    pub fn new(rand: R, corpus: C, feedbacks: FT, solutions: SC, objectives: OFT) -> Self {
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
+    pub fn new(rand: R, corpus: C, feedback: F, solutions: SC, objective: OF) -> Self {
         Self {
             rand,
             executions: 0,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             corpus,
-            feedbacks,
+            feedback,
             solutions,
-            objectives,
+            objective,
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_stats: ClientPerfStats::new(),
@@ -803,14 +787,14 @@ where
 }
 
 #[cfg(feature = "introspection")]
-impl<C, FT, I, OFT, R, SC> HasClientPerfStats for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasClientPerfStats for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     fn introspection_stats(&self) -> &ClientPerfStats {
         &self.introspection_stats
@@ -822,14 +806,14 @@ where
 }
 
 #[cfg(not(feature = "introspection"))]
-impl<C, FT, I, OFT, R, SC> HasClientPerfStats for State<C, FT, I, OFT, R, SC>
+impl<C, F, I, OF, R, SC> HasClientPerfStats for State<C, F, I, OF, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbacksTuple<I>,
+    F: Feedback<I>,
     SC: Corpus<I>,
-    OFT: FeedbacksTuple<I>,
+    OF: Feedback<I>,
 {
     fn introspection_stats(&self) -> &ClientPerfStats {
         unimplemented!()

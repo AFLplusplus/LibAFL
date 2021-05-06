@@ -39,16 +39,8 @@ pub fn main() {
         ExitKind::Ok
     };
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| println!("{}", s));
-
-    // The event manager handle the various events generated during the fuzzing loop
-    // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
-
-    // Create an observation channel using the siganls map
-    let observer =
-        StdMapObserver::new("signals", unsafe { &mut SIGNALS }, unsafe { SIGNALS.len() });
+    // Create an observation channel using the signals map
+    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
     // create a State from scratch
     let mut state = State::new(
@@ -56,34 +48,29 @@ pub fn main() {
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
-        // Feedbacks to rate the interestingness of an input
-        tuple_list!(MaxMapFeedback::new_with_observer(&observer)),
+        // Feedback to rate the interestingness of an input
+        MaxMapFeedback::new_with_observer(&observer),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // Feedbacks to recognize an input as solution
-        tuple_list!(CrashFeedback::new()),
+        CrashFeedback::new(),
     );
 
-    // Setup a basic mutator with a mutational stage
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let stage = StdMutationalStage::new(mutator);
+    // The Stats trait define how the fuzzer stats are reported to the user
+    let stats = SimpleStats::new(|s| println!("{}", s));
 
-    // A fuzzer with just one stage
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+    // The event manager handle the various events generated during the fuzzing loop
+    // such as the notification of the addition of a new item to the corpus
+    let mut mgr = SimpleEventManager::new(stats);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        "in-process(signals)",
-        &mut harness,
-        tuple_list!(observer),
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor".into());
+    let mut executor =
+        InProcessExecutor::new(&mut harness, tuple_list!(observer), &mut state, &mut mgr)
+            .expect("Failed to create the Executor".into());
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
@@ -92,6 +79,13 @@ pub fn main() {
     state
         .generate_initial_inputs(&mut executor, &mut generator, &mut mgr, &scheduler, 8)
         .expect("Failed to generate the initial corpus".into());
+
+    // Setup a basic mutator with a mutational stage
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let stage = StdMutationalStage::new(mutator);
+
+    // A fuzzer with just one stage
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     fuzzer
         .fuzz_loop(&mut state, &mut executor, &mut mgr, &scheduler)

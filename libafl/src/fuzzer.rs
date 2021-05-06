@@ -27,8 +27,10 @@ where
     I: Input,
     Self: Sized,
 {
+    /// The stages
     fn stages(&self) -> &ST;
 
+    /// The stages (mut)
     fn stages_mut(&mut self) -> &mut ST;
 }
 
@@ -38,8 +40,10 @@ where
     CS: CorpusScheduler<I, S>,
     I: Input,
 {
+    /// The scheduler
     fn scheduler(&self) -> &CS;
 
+    /// The scheduler (mut)
     fn scheduler_mut(&mut self) -> &mut CS;
 }
 
@@ -283,6 +287,7 @@ where
     EM: EventManager<I, S>,
     I: Input,
 {
+    /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(stages: ST) -> Self {
         Self {
             stages,

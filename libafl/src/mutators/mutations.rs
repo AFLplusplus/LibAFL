@@ -13,7 +13,9 @@ use crate::{
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{
     cmp::{max, min},
+    convert::TryInto,
     marker::PhantomData,
+    mem::size_of,
 };
 
 /// Mem move in the own vec
@@ -42,7 +44,7 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
     }
 }
 
-/// A simple buffer_set.
+/// A simple way to set buffer contents.
 /// The compiler does the heavy lifting.
 /// see <https://stackoverflow.com/a/51732799/1345238/>
 #[inline]
@@ -53,6 +55,7 @@ fn buffer_set(data: &mut [u8], from: usize, len: usize, val: u8) {
     }
 }
 
+/// The max value that will be added or subtracted during add mutations
 const ARITH_MAX: u64 = 35;
 
 const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
@@ -142,6 +145,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`BitFlipMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -202,6 +207,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`ByteFlipMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -263,6 +270,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`ByteIncMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -324,6 +333,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a a new [`ByteDecMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -384,6 +395,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`ByteNegMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -444,6 +457,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`ByteRandMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -509,6 +524,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`ByteAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -517,6 +534,7 @@ where
 }
 
 /// Word add mutation for inputs with a bytes vector
+/// adds or subtracts a random value up to [`ARITH_MAX`] to a [`u16`] at a random place in the [`Vec`].
 #[derive(Default)]
 pub struct WordAddMutator<I, R, S>
 where
@@ -539,21 +557,23 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.bytes().len() < 2 {
+        if input.bytes().len() < size_of::<u16>() {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
-            unsafe {
-                // Moar speed, no bound check
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
-                let num = 1 + state.rand_mut().below(ARITH_MAX) as u16;
-                match state.rand_mut().below(4) {
-                    0 => *ptr = (*ptr).wrapping_add(num),
-                    1 => *ptr = (*ptr).wrapping_sub(num),
-                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-                };
+            let bytes = input.bytes_mut();
+            let idx = state
+                .rand_mut()
+                .below((bytes.len() - size_of::<u16>() + 1) as u64) as usize;
+            let val = u16::from_ne_bytes(bytes[idx..idx + size_of::<u16>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(ARITH_MAX) as u16;
+            let new_bytes = match state.rand_mut().below(4) {
+                0 => val.wrapping_add(num),
+                1 => val.wrapping_sub(num),
+                2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
+                _ => val.swap_bytes().wrapping_sub(num).swap_bytes(),
             }
+            .to_ne_bytes();
+            bytes[idx..idx + size_of::<u16>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -576,6 +596,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`WordAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -583,7 +605,8 @@ where
     }
 }
 
-/// Dword add mutation for inputs with a bytes vector
+/// Dword add mutation for inputs with a bytes vector.
+/// Adds a random value up to `ARITH_MAX` to a [`u32`] at a random place in the [`Vec`], in random byte order.
 #[derive(Default)]
 pub struct DwordAddMutator<I, R, S>
 where
@@ -606,21 +629,23 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.bytes().len() < 4 {
+        if input.bytes().len() < size_of::<u32>() {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
-            unsafe {
-                // Moar speed, no bound check
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
-                let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
-                match state.rand_mut().below(4) {
-                    0 => *ptr = (*ptr).wrapping_add(num),
-                    1 => *ptr = (*ptr).wrapping_sub(num),
-                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-                };
+            let bytes = input.bytes_mut();
+            let idx = state
+                .rand_mut()
+                .below((bytes.len() - size_of::<u32>() + 1) as u64) as usize;
+            let val = u32::from_ne_bytes(bytes[idx..idx + size_of::<u32>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
+            let new_bytes = match state.rand_mut().below(4) {
+                0 => val.wrapping_add(num),
+                1 => val.wrapping_sub(num),
+                2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
+                _ => val.swap_bytes().wrapping_sub(num).swap_bytes(),
             }
+            .to_ne_bytes();
+            bytes[idx..idx + size_of::<u32>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -643,6 +668,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`DwordAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -676,18 +703,20 @@ where
         if input.bytes().len() < 8 {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 7) as usize;
-            unsafe {
-                // Moar speed, no bound check
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u64;
-                let num = 1 + state.rand_mut().below(ARITH_MAX) as u64;
-                match state.rand_mut().below(4) {
-                    0 => *ptr = (*ptr).wrapping_add(num),
-                    1 => *ptr = (*ptr).wrapping_sub(num),
-                    2 => *ptr = ((*ptr).swap_bytes().wrapping_add(num)).swap_bytes(),
-                    _ => *ptr = ((*ptr).swap_bytes().wrapping_sub(num)).swap_bytes(),
-                };
+            let bytes = input.bytes_mut();
+            let idx = state
+                .rand_mut()
+                .below((bytes.len() - size_of::<u64>() + 1) as u64) as usize;
+            let val = u64::from_ne_bytes(bytes[idx..idx + size_of::<u64>()].try_into().unwrap());
+            let num = 1 + state.rand_mut().below(ARITH_MAX) as u64;
+            let new_bytes = match state.rand_mut().below(4) {
+                0 => val.wrapping_add(num),
+                1 => val.wrapping_sub(num),
+                2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
+                _ => val.swap_bytes().wrapping_sub(num).swap_bytes(),
             }
+            .to_ne_bytes();
+            bytes[idx..idx + size_of::<u64>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -710,6 +739,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`QwordAddMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -773,6 +804,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`ByteInterestingMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -807,18 +840,16 @@ where
         if input.bytes().len() < 2 {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 1) as usize;
+            let bytes = input.bytes_mut();
+            let idx = state.rand_mut().below(bytes.len() as u64 - 1) as usize;
             let val =
                 INTERESTING_16[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u16;
-            unsafe {
-                // Moar speed, no bound check
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u16;
-                if state.rand_mut().below(2) == 0 {
-                    *ptr = val;
-                } else {
-                    *ptr = val.swap_bytes();
-                }
-            }
+            let new_bytes = if state.rand_mut().below(2) == 0 {
+                val.to_be_bytes()
+            } else {
+                val.to_le_bytes()
+            };
+            bytes[idx..idx + size_of::<u16>()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -841,6 +872,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`WordInterestingMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -875,18 +908,16 @@ where
         if input.bytes().len() < 4 {
             Ok(MutationResult::Skipped)
         } else {
-            let idx = state.rand_mut().below(input.bytes().len() as u64 - 3) as usize;
+            let bytes = input.bytes_mut();
+            let idx = state.rand_mut().below(bytes.len() as u64 - 3) as usize;
             let val =
                 INTERESTING_32[state.rand_mut().below(INTERESTING_8.len() as u64) as usize] as u32;
-            unsafe {
-                // Moar speed, no bound check
-                let ptr = input.bytes_mut().get_unchecked_mut(idx) as *mut _ as *mut u32;
-                if state.rand_mut().below(2) == 0 {
-                    *ptr = val;
-                } else {
-                    *ptr = val.swap_bytes();
-                }
-            }
+            let new_bytes = if state.rand_mut().below(2) == 0 {
+                val.to_be_bytes()
+            } else {
+                val.to_le_bytes()
+            };
+            bytes[idx..idx + new_bytes.len()].copy_from_slice(&new_bytes);
             Ok(MutationResult::Mutated)
         }
     }
@@ -909,6 +940,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`DwordInterestingMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -969,6 +1002,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`BytesDeleteMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1036,6 +1071,8 @@ where
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    /// Creates a new [`BytesExpandMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1109,6 +1146,8 @@ where
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    /// Creates a new [`BytesInsertMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1179,6 +1218,8 @@ where
     S: HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    /// Create a new [`BytesRandInsertMutator`]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1241,6 +1282,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`BytesSetMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1303,6 +1346,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`BytesRandSetMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1365,6 +1410,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`BytesCopyMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1429,6 +1476,8 @@ where
     S: HasRand<R>,
     R: Rand,
 {
+    /// Creates a new [`BytesSwapMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1526,6 +1575,8 @@ where
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I> + HasMaxSize,
 {
+    /// Creates a new [`CrossoverInsertMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1612,6 +1663,8 @@ where
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
 {
+    /// Creates a new [`CrossoverReplaceMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1719,6 +1772,8 @@ where
     R: Rand,
     S: HasRand<R> + HasCorpus<C, I>,
 {
+    /// Creates a new [`SpliceMutator`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -1846,7 +1901,7 @@ mod tests {
         for _ in 0..2 {
             let mut new_testcases = vec![];
             for idx in 0..(mutations.len()) {
-                for input in inputs.iter() {
+                for input in &inputs {
                     let mut mutant = input.clone();
                     match mutations
                         .get_and_mutate(idx, &mut state, &mut mutant, 0)

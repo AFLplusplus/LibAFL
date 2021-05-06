@@ -14,32 +14,31 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     inputs::Input,
-    observers::{MapObserver, Observer, ObserversTuple},
+    observers::{MapObserver, ObserversTuple},
     state::HasMetadata,
     utils::AsSlice,
     Error,
 };
 
-pub type MaxMapFeedback<T, O> = MapFeedback<T, MaxReducer<T>, O>;
-pub type MinMapFeedback<T, O> = MapFeedback<T, MinReducer<T>, O>;
+/// A [`MapFeedback`] that strives to maximize the map contents.
+pub type MaxMapFeedback<O, T> = MapFeedback<O, MaxReducer, T>;
+/// A [`MapFeedback`] that strives to minimize the map contents.
+pub type MinMapFeedback<O, T> = MapFeedback<O, MinReducer, T>;
 
 /// A Reducer function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
+    /// Reduce two values to one value, with the current [`Reducer`].
     fn reduce(first: T, second: T) -> T;
 }
 
+/// A [`MinReducer`] reduces [`Integer`] values and returns their maximum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MaxReducer<T>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-{
-    phantom: PhantomData<T>,
-}
+pub struct MaxReducer {}
 
-impl<T> Reducer<T> for MaxReducer<T>
+impl<T> Reducer<T> for MaxReducer
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -53,15 +52,11 @@ where
     }
 }
 
+/// A [`MinReducer`] reduces [`Integer`] values and returns their minimum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MinReducer<T>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-{
-    phantom: PhantomData<T>,
-}
+pub struct MinReducer {}
 
-impl<T> Reducer<T> for MinReducer<T>
+impl<T> Reducer<T> for MinReducer
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -78,6 +73,7 @@ where
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Serialize, Deserialize)]
 pub struct MapIndexesMetadata {
+    /// The list of indexes.
     pub list: Vec<usize>,
 }
 
@@ -91,6 +87,8 @@ impl AsSlice<usize> for MapIndexesMetadata {
 }
 
 impl MapIndexesMetadata {
+    /// Creates a new [`struct@MapIndexesMetadata`].
+    #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
         Self { list }
     }
@@ -99,6 +97,7 @@ impl MapIndexesMetadata {
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Serialize, Deserialize)]
 pub struct MapNoveltiesMetadata {
+    /// A `list` of novelties.
     pub list: Vec<usize>,
 }
 
@@ -106,11 +105,14 @@ crate::impl_serdeany!(MapNoveltiesMetadata);
 
 impl AsSlice<usize> for MapNoveltiesMetadata {
     /// Convert to a slice
+    #[must_use]
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
 impl MapNoveltiesMetadata {
+    /// Creates a new [`struct@MapNoveltiesMetadata`]
+    #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
         Self { list }
     }
@@ -119,7 +121,7 @@ impl MapNoveltiesMetadata {
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<T, R, O>
+pub struct MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -137,28 +139,25 @@ where
     phantom: PhantomData<(R, O)>,
 }
 
-impl<T, R, O, I> Feedback<I> for MapFeedback<T, R, O>
+impl<O, R, T, I> Feedback<I> for MapFeedback<O, R, T>
 where
-    T: Integer
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + core::fmt::Debug,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
     I: Input,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
-        let mut interesting = 0;
-        // TODO optimize
-        let observer = observers.match_name_type::<O>(&self.name).unwrap();
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        let mut interesting = false;
+        // TODO Replace with match_name_type when stable
+        let observer = observers.match_name::<O>(&self.name).unwrap();
         let size = observer.usable_count();
         let initial = observer.initial();
 
@@ -170,7 +169,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                 }
             }
         } else if self.indexes.is_some() && self.novelties.is_none() {
@@ -184,7 +183,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                 }
             }
         } else if self.indexes.is_none() && self.novelties.is_some() {
@@ -195,7 +194,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
@@ -210,7 +209,7 @@ where
                 let reduced = R::reduce(history, item);
                 if history != reduced {
                     self.history_map[i] = reduced;
-                    interesting += 1;
+                    interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
@@ -243,7 +242,7 @@ where
     }
 }
 
-impl<T, R, O> Named for MapFeedback<T, R, O>
+impl<O, R, T> Named for MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -255,13 +254,14 @@ where
     }
 }
 
-impl<T, R, O> MapFeedback<T, R, O>
+impl<O, R, T> MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
-    O: MapObserver<T> + Observer,
+    O: MapObserver<T>,
 {
     /// Create new `MapFeedback`
+    #[must_use]
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
@@ -284,7 +284,8 @@ where
     }
 
     /// Create new `MapFeedback` specifying if it must track indexes of novelties
-    pub fn new_track(
+    #[must_use]
+    pub fn new_tracking(
         name: &'static str,
         map_size: usize,
         track_indexes: bool,
@@ -300,7 +301,7 @@ where
     }
 
     /// Create new `MapFeedback` for the observer type if it must track indexes of novelties
-    pub fn new_with_observer_track(
+    pub fn new_tracking_with_observer(
         map_observer: &O,
         track_indexes: bool,
         track_novelties: bool,
@@ -315,7 +316,7 @@ where
     }
 }
 
-impl<T, R, O> MapFeedback<T, R, O>
+impl<O, R, T> MapFeedback<O, R, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -323,6 +324,7 @@ where
 {
     /// Create new `MapFeedback` using a map observer, and a map.
     /// The map can be shared.
+    #[must_use]
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
             history_map,
@@ -331,5 +333,91 @@ where
             novelties: None,
             phantom: PhantomData,
         }
+    }
+}
+
+/// A [`ReachabilityFeedback`] reports if a target has been reached.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ReachabilityFeedback<O> {
+    name: String,
+    target_idx: Vec<usize>,
+    phantom: PhantomData<O>,
+}
+
+impl<O> ReachabilityFeedback<O>
+where
+    O: MapObserver<usize>,
+{
+    /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
+    #[must_use]
+    pub fn new_with_observer(map_observer: &O) -> Self {
+        Self {
+            name: map_observer.name().to_string(),
+            target_idx: vec![],
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`] with the given `name`.
+    #[must_use]
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: name.to_string(),
+            target_idx: vec![],
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I, O> Feedback<I> for ReachabilityFeedback<O>
+where
+    I: Input,
+    O: MapObserver<usize>,
+{
+    fn is_interesting<OT: ObserversTuple>(
+        &mut self,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        // TODO Replace with match_name_type when stable
+        let observer = observers.match_name::<O>(&self.name).unwrap();
+        let size = observer.usable_count();
+        let mut hit_target: bool = false;
+        //check if we've hit any targets.
+        for i in 0..size {
+            if observer.map()[i] > 0 {
+                self.target_idx.push(i);
+                hit_target = true;
+            }
+        }
+        if hit_target {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        if !self.target_idx.is_empty() {
+            let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
+            testcase.add_metadata(meta);
+        };
+        Ok(())
+    }
+
+    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+        self.target_idx.clear();
+        Ok(())
+    }
+}
+
+impl<O> Named for ReachabilityFeedback<O>
+where
+    O: MapObserver<usize>,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
     }
 }

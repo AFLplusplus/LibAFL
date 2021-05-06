@@ -5,6 +5,7 @@ authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Common code for target instrumentation that can be used combined with LibAFL"
 documentation = "https://docs.rs/libafl_targets"
 repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2018"
@@ -17,6 +18,7 @@ libfuzzer = []
 value_profile = []
 cmplog = []
 pcguard = ["pcguard_hitcounts"]
+clippy = [] # Ignore compiler warnings during clippy
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

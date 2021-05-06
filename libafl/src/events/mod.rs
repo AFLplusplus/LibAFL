@@ -94,10 +94,11 @@ where
     },
     /// New stats.
     UpdateStats {
-        /// The time of generation of the event
+        /// The time of generation of the [`Event`]
         time: Duration,
         /// The executions of this client
         executions: usize,
+        /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
     /// New stats with performance stats.
@@ -125,6 +126,7 @@ where
         severity_level: LogSeverity,
         /// The message
         message: String,
+        /// `PhantomData`
         phantom: PhantomData<I>,
     },
     /*/// A custom type
@@ -173,7 +175,7 @@ where
     }
 }
 
-/// EventManager is the main communications hub.
+/// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
 pub trait EventManager<I, S>
 where
@@ -270,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
-        let obv = StdMapObserver::new("test", unsafe { &mut MAP }, unsafe { MAP.len() });
+        let obv = StdMapObserver::new("test", unsafe { &mut MAP });
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
 

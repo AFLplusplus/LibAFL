@@ -1,13 +1,21 @@
+/*!
+The frida address sanitizer runtime provides address sanitization.
+When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+The runtime can report memory errors that occurred during execution,
+even if the target would not have crashed under normal conditions.
+this helps finding mem errors early.
+*/
+
 use hashbrown::HashMap;
 use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
-    executors::{CustomExitKind, ExitKind},
+    executors::{CustomExitKind, ExitKind, HasExecHooks},
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
     state::HasMetadata,
-    utils::{find_mapping_for_address, walk_self_maps},
+    utils::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
     Error, SerdeAny,
 };
 use nix::{
@@ -25,6 +33,7 @@ use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(unix)]
 use gothook::GotHookLibrary;
 use libc::{getrlimit64, rlimit64, sysconf, _SC_PAGESIZE};
+use rangemap::RangeMap;
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -422,26 +431,31 @@ impl Allocator {
 }
 
 /// Hook for malloc.
+#[must_use]
 pub extern "C" fn asan_malloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new.
+#[must_use]
 pub extern "C" fn asan_new(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new.
+#[must_use]
 pub extern "C" fn asan_new_nothrow(size: usize, _nothrow: *const c_void) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new with alignment.
+#[must_use]
 pub extern "C" fn asan_new_aligned(size: usize, alignment: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
 
 /// Hook for new with alignment.
+#[must_use]
 pub extern "C" fn asan_new_aligned_nothrow(
     size: usize,
     alignment: usize,
@@ -451,16 +465,19 @@ pub extern "C" fn asan_new_aligned_nothrow(
 }
 
 /// Hook for pvalloc
+#[must_use]
 pub extern "C" fn asan_pvalloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for valloc
+#[must_use]
 pub extern "C" fn asan_valloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for calloc
+#[must_use]
 pub extern "C" fn asan_calloc(nmemb: usize, size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size * nmemb, 0x8) }
 }
@@ -469,6 +486,7 @@ pub extern "C" fn asan_calloc(nmemb: usize, size: usize) -> *mut c_void {
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     let mut allocator = Allocator::get();
     let ret = allocator.alloc(size, 0x8);
@@ -543,7 +561,7 @@ pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, _nothrow: *const 
     }
 }
 
-/// Hook for delete
+/// Hook for `delete`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
@@ -557,23 +575,26 @@ pub unsafe extern "C" fn asan_delete_aligned_nothrow(
     }
 }
 
-/// Hook for malloc_usable_size
+/// Hook for `malloc_usable_size`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_malloc_usable_size(ptr: *mut c_void) -> usize {
     Allocator::get().get_usable_size(ptr)
 }
 
-/// Hook for memalign
+/// Hook for `memalign`
+#[must_use]
 pub extern "C" fn asan_memalign(size: usize, alignment: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
 
-/// Hook for posix_memalign
+/// Hook for `posix_memalign`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_posix_memalign(
     pptr: *mut *mut c_void,
     size: usize,
@@ -584,17 +605,24 @@ pub unsafe extern "C" fn asan_posix_memalign(
 }
 
 /// Hook for mallinfo
+#[must_use]
 pub extern "C" fn asan_mallinfo() -> *mut c_void {
     std::ptr::null_mut()
 }
 
 /// Get the current thread's TLS address
 extern "C" {
-    fn get_tls_ptr() -> *const c_void;
+    fn tls_ptr() -> *const c_void;
 }
 
+/// The frida address sanitizer runtime, providing address sanitization.
+/// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+/// The runtime can report memory errors that occurred during execution,
+/// even if the target would not have crashed under normal conditions.
+/// this helps finding mem errors early.
 pub struct AsanRuntime {
     regs: [usize; 32],
+    blob_report: Option<Box<[u8]>>,
     blob_check_mem_byte: Option<Box<[u8]>>,
     blob_check_mem_halfword: Option<Box<[u8]>>,
     blob_check_mem_dword: Option<Box<[u8]>>,
@@ -609,6 +637,7 @@ pub struct AsanRuntime {
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
     options: FridaOptions,
+    instrumented_ranges: RangeMap<usize, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -651,24 +680,32 @@ impl AsanError {
     }
 }
 
+/// A struct holding errors that occurred during frida address sanitizer runs
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
+    /// Creates a new `AsanErrors` struct
+    #[must_use]
     fn new() -> Self {
         Self { errors: Vec::new() }
     }
 
+    /// Clears this `AsanErrors` struct
     pub fn clear(&mut self) {
         self.errors.clear()
     }
 
+    /// Gets the amount of `AsanErrors` in this struct
+    #[must_use]
     pub fn len(&self) -> usize {
         self.errors.len()
     }
 
+    /// Returns `true` if no errors occurred
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
@@ -676,9 +713,12 @@ impl AsanErrors {
 impl CustomExitKind for AsanErrors {}
 
 impl AsanRuntime {
+    /// Create a new `AsanRuntime`
+    #[must_use]
     pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
         let res = Rc::new(RefCell::new(Self {
             regs: [0; 32],
+            blob_report: None,
             blob_check_mem_byte: None,
             blob_check_mem_halfword: None,
             blob_check_mem_dword: None,
@@ -693,6 +733,7 @@ impl AsanRuntime {
             blob_check_mem_64bytes: None,
             stalked_addresses: HashMap::new(),
             options,
+            instrumented_ranges: RangeMap::new(),
         }));
         Allocator::init(res.clone());
         res
@@ -732,12 +773,16 @@ impl AsanRuntime {
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
         for module_name in modules_to_instrument {
+            let (start, end) = find_mapping_for_path(module_name.to_str().unwrap());
+            self.instrumented_ranges
+                .insert(start..end, module_name.to_str().unwrap().to_string());
             #[cfg(unix)]
             self.hook_library(module_name.to_str().unwrap());
         }
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
+    #[allow(clippy::unused_self)]
     pub fn reset_allocations(&self) {
         Allocator::get().reset();
     }
@@ -751,11 +796,14 @@ impl AsanRuntime {
         }
     }
 
+    /// Returns the `AsanErrors` from the recent run
+    #[allow(clippy::unused_self)]
     pub fn errors(&mut self) -> &Option<AsanErrors> {
         unsafe { &ASAN_ERRORS }
     }
 
     /// Make sure the specified memory is unpoisoned
+    #[allow(clippy::unused_self)]
     pub fn unpoison(&self, address: usize, size: usize) {
         Allocator::get().map_shadow_for_region(address, address + size, true);
     }
@@ -766,11 +814,14 @@ impl AsanRuntime {
         self.stalked_addresses.insert(stalked, real);
     }
 
+    /// Resolves the real address from a stalker stalked address
+    #[must_use]
     pub fn real_address_for_stalked(&self, stalked: usize) -> Option<&usize> {
         self.stalked_addresses.get(&stalked)
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
+    #[allow(clippy::unused_self)]
     fn unpoison_all_existing_memory(&self) {
         let mut allocator = Allocator::get();
         walk_self_maps(&mut |start, end, permissions, _path| {
@@ -786,6 +837,7 @@ impl AsanRuntime {
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
+    #[allow(clippy::unused_self)]
     pub fn register_thread(&self) {
         let mut allocator = Allocator::get();
         let (stack_start, stack_end) = Self::current_stack();
@@ -800,6 +852,10 @@ impl AsanRuntime {
     }
 
     /// Determine the stack start, end for the currently running thread
+    ///
+    /// # Panics
+    /// Panics, if no mapping for the `stack_address` at `0xeadbeef` could be found.
+    #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;
         let stack_address = &stack_var as *const _ as *const c_void as usize;
@@ -836,7 +892,7 @@ impl AsanRuntime {
 
     /// Determine the tls start, end for the currently running thread
     fn current_tls() -> (usize, usize) {
-        let tls_address = unsafe { get_tls_ptr() } as usize;
+        let tls_address = unsafe { tls_ptr() } as usize;
         // we need to mask off the highest byte, due to 'High Byte Ignore"
         #[cfg(target_os = "android")]
         let tls_address = tls_address & 0xffffffffffffff;
@@ -847,6 +903,7 @@ impl AsanRuntime {
 
     /// Locate the target library and hook it's memory allocation functions
     #[cfg(unix)]
+    #[allow(clippy::unused_self)]
     fn hook_library(&mut self, path: &str) {
         let target_lib = GotHookLibrary::new(path, false);
 
@@ -917,6 +974,8 @@ impl AsanRuntime {
         }
     }
 
+    #[allow(clippy::cast_sign_loss)] // for displacement
+    #[allow(clippy::too_many_lines)]
     extern "C" fn handle_trap(&mut self) {
         let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
@@ -982,10 +1041,13 @@ impl AsanRuntime {
             base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
         }
 
+        #[allow(clippy::clippy::cast_possible_wrap)]
         let mut fault_address =
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
-        if index_reg != 0 {
+        if index_reg == 0 {
+            index_reg = 0xffff
+        } else {
             if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
                 && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
             {
@@ -1010,8 +1072,6 @@ impl AsanRuntime {
                 index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
             }
             fault_address += self.regs[index_reg as usize] as usize;
-        } else {
-            index_reg = 0xffff
         }
 
         let backtrace = Backtrace::new();
@@ -1035,6 +1095,7 @@ impl AsanRuntime {
             }
         } else {
             let mut allocator = Allocator::get();
+            #[allow(clippy::option_if_let_else)]
             if let Some(metadata) =
                 allocator.find_metadata(fault_address, self.regs[base_reg as usize])
             {
@@ -1068,6 +1129,7 @@ impl AsanRuntime {
         self.report_error(error);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn report_error(&mut self, error: AsanError) {
         unsafe {
             ASAN_ERRORS.as_mut().unwrap().errors.push(error.clone());
@@ -1099,13 +1161,13 @@ impl AsanRuntime {
             | AsanError::WriteAfterFree(mut error) => {
                 let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
-                if let Ok((start, _, _, path)) = find_mapping_for_address(error.pc) {
+                if let Some((range, path)) = self.instrumented_ranges.get_key_value(&error.pc) {
                     writeln!(
                         output,
-                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
+                        " at 0x{:x} ({}@0x{:04x}), faulting address 0x{:x}",
                         error.pc,
                         path,
-                        error.pc - start,
+                        error.pc - range.start,
                         fault_address
                     )
                     .unwrap();
@@ -1208,80 +1270,6 @@ impl AsanRuntime {
                     }
                 }
             }
-            AsanError::Unknown((registers, pc, fault, backtrace)) => {
-                let (basereg, indexreg, _displacement, fault_address) = fault;
-
-                if let Ok((start, _, _, path)) = find_mapping_for_address(pc) {
-                    writeln!(
-                        output,
-                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
-                        pc,
-                        path,
-                        pc - start,
-                        fault_address
-                    )
-                    .unwrap();
-                } else {
-                    writeln!(
-                        output,
-                        " at 0x{:x}, faulting address 0x{:x}",
-                        pc, fault_address
-                    )
-                    .unwrap();
-                }
-                output.reset().unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
-                for reg in 0..=30 {
-                    if reg == basereg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                    } else if reg == indexreg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
-                            .unwrap();
-                    }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
-                    output.reset().unwrap();
-                    if reg % 4 == 3 {
-                        writeln!(output).unwrap();
-                    }
-                }
-                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " CODE ").unwrap();
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
-                cs.set_skipdata(true).expect("failed to set skipdata");
-
-                let start_pc = pc - 4 * 5;
-                for insn in cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                    .iter()
-                {
-                    if insn.address() as usize == pc {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
-                        output.reset().unwrap();
-                    } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
-                    }
-                }
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
-            }
             AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();
                 output.reset().unwrap();
@@ -1339,7 +1327,8 @@ impl AsanRuntime {
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
             }
-            AsanError::StackOobRead((registers, pc, fault, backtrace))
+            AsanError::Unknown((registers, pc, fault, backtrace))
+            | AsanError::StackOobRead((registers, pc, fault, backtrace))
             | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
@@ -1421,113 +1410,13 @@ impl AsanRuntime {
         }
     }
 
-    /// Generate the instrumentation blobs for the current arch.
-    #[allow(clippy::similar_names)] // We allow things like dword and qword
-    fn generate_instrumentation_blobs(&mut self) {
+    #[allow(clippy::unused_self)]
+    fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
         let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check {
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch aarch64
-                //; brk #5
-                ; b >skip_report
 
-                ; report:
-                ; stp x29, x30, [sp, #-0x10]!
-                ; mov x29, sp
-
-                ; ldr x0, >self_regs_addr
-                ; stp x2, x3, [x0, #0x10]
-                ; stp x4, x5, [x0, #0x20]
-                ; stp x6, x7, [x0, #0x30]
-                ; stp x8, x9, [x0, #0x40]
-                ; stp x10, x11, [x0, #0x50]
-                ; stp x12, x13, [x0, #0x60]
-                ; stp x14, x15, [x0, #0x70]
-                ; stp x16, x17, [x0, #0x80]
-                ; stp x18, x19, [x0, #0x90]
-                ; stp x20, x21, [x0, #0xa0]
-                ; stp x22, x23, [x0, #0xb0]
-                ; stp x24, x25, [x0, #0xc0]
-                ; stp x26, x27, [x0, #0xd0]
-                ; stp x28, x29, [x0, #0xe0]
-                ; stp x30, xzr, [x0, #0xf0]
-                ; mov x28, x0
-                ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
-                //; ldp x0, x1, [sp], #144
-                ; ldp x0, x1, [sp, 0x10]
-                ; stp x0, x1, [x28]
-
-                ; adr x25, >done
-                ; str x25, [x28, 0xf8]
-
-                ; adr x25, <report
-                ; adr x0, >eh_frame_fde
-                ; adr x27, >fde_address
-                ; ldr w26, [x27]
-                ; cmp w26, #0x0
-                ; b.ne >skip_register
-                ; sub x25, x25, x27
-                ; str w25, [x27]
-                ; ldr x1, >register_frame_func
-                //; brk #11
-                ; blr x1
-                ; skip_register:
-                ; ldr x0, >self_addr
-                ; ldr x1, >trap_func
-                ; blr x1
-
-                ; .dword (0xd51b4218u32 as i32) // msr nzcv, x24
-                ; ldr x0, >self_regs_addr
-                ; ldp x2, x3, [x0, #0x10]
-                ; ldp x4, x5, [x0, #0x20]
-                ; ldp x6, x7, [x0, #0x30]
-                ; ldp x8, x9, [x0, #0x40]
-                ; ldp x10, x11, [x0, #0x50]
-                ; ldp x12, x13, [x0, #0x60]
-                ; ldp x14, x15, [x0, #0x70]
-                ; ldp x16, x17, [x0, #0x80]
-                ; ldp x18, x19, [x0, #0x90]
-                ; ldp x20, x21, [x0, #0xa0]
-                ; ldp x22, x23, [x0, #0xb0]
-                ; ldp x24, x25, [x0, #0xc0]
-                ; ldp x26, x27, [x0, #0xd0]
-                ; ldp x28, x29, [x0, #0xe0]
-                ; ldp x30, xzr, [x0, #0xf0]
-
-                ; ldp x29, x30, [sp], #0x10
-                ; b >done
-                ; self_addr:
-                ; .qword self as *mut _  as *mut c_void as i64
-                ; self_regs_addr:
-                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
-                ; trap_func:
-                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
-                ; register_frame_func:
-                ; .qword __register_frame as *mut c_void as i64
-                ; eh_frame_cie:
-                ; .dword 0x14
-                ; .dword 0x00
-                ; .dword 0x00527a01
-                ; .dword 0x011e7c01
-                ; .dword 0x001f0c1b
-                ; eh_frame_fde:
-                ; .dword 0x14
-                ; .dword 0x18
-                ; fde_address:
-                ; .dword 0x0 // <-- address offset goes here
-                ; .dword 0x104
-                    //advance_loc 12
-                    //def_cfa r29 (x29) at offset 16
-                    //offset r30 (x30) at cfa-8
-                    //offset r29 (x29) at cfa-16
-                ; .dword 0x1d0c4c00
-                ; .dword (0x9d029e10 as u32 as i32)
-                ; .dword 0x04
-                // empty next FDE:
-                ; .dword 0x0
-                ; .dword 0x0
-
-                ; skip_report:
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
@@ -1539,115 +1428,26 @@ impl AsanRuntime {
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
                 ; tbnz x1, #$bit, >done
-                ; b <report
 
+                ; adr x1, >done
+                ; nop // will be replaced by b to report
                 ; done:
             );};
         }
 
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check!(ops, bit);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
+    }
+
+    #[allow(clippy::unused_self)]
+    fn generate_shadow_check_exact_blob(&mut self, val: u32) -> Box<[u8]> {
+        let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check_exact {
             ($ops:ident, $val:expr) => {dynasm!($ops
                 ; .arch aarch64
-                ; b >skip_report
 
-                ; report:
-                ; stp x29, x30, [sp, #-0x10]!
-                ; mov x29, sp
-
-                ; ldr x0, >self_regs_addr
-                ; stp x2, x3, [x0, #0x10]
-                ; stp x4, x5, [x0, #0x20]
-                ; stp x6, x7, [x0, #0x30]
-                ; stp x8, x9, [x0, #0x40]
-                ; stp x10, x11, [x0, #0x50]
-                ; stp x12, x13, [x0, #0x60]
-                ; stp x14, x15, [x0, #0x70]
-                ; stp x16, x17, [x0, #0x80]
-                ; stp x18, x19, [x0, #0x90]
-                ; stp x20, x21, [x0, #0xa0]
-                ; stp x22, x23, [x0, #0xb0]
-                ; stp x24, x25, [x0, #0xc0]
-                ; stp x26, x27, [x0, #0xd0]
-                ; stp x28, x29, [x0, #0xe0]
-                ; stp x30, xzr, [x0, #0xf0]
-                ; mov x28, x0
-                ; .dword (0xd53b4218u32 as i32) // mrs x24, nzcv
-                ; ldp x0, x1, [sp, 0x10]
-                ; stp x0, x1, [x28]
-
-                ; adr x25, >done
-                ; add x25, x25, 4
-                ; str x25, [x28, 0xf8]
-
-                ; adr x25, <report
-                ; adr x0, >eh_frame_fde
-                ; adr x27, >fde_address
-                ; ldr w26, [x27]
-                ; cmp w26, #0x0
-                ; b.ne >skip_register
-                ; sub x25, x25, x27
-                ; str w25, [x27]
-                ; ldr x1, >register_frame_func
-                //; brk #11
-                ; blr x1
-                ; skip_register:
-                ; ldr x0, >self_addr
-                ; ldr x1, >trap_func
-                ; blr x1
-
-                ; .dword (0xd51b4218u32 as i32) // msr nzcv, x24
-                ; ldr x0, >self_regs_addr
-                ; ldp x2, x3, [x0, #0x10]
-                ; ldp x4, x5, [x0, #0x20]
-                ; ldp x6, x7, [x0, #0x30]
-                ; ldp x8, x9, [x0, #0x40]
-                ; ldp x10, x11, [x0, #0x50]
-                ; ldp x12, x13, [x0, #0x60]
-                ; ldp x14, x15, [x0, #0x70]
-                ; ldp x16, x17, [x0, #0x80]
-                ; ldp x18, x19, [x0, #0x90]
-                ; ldp x20, x21, [x0, #0xa0]
-                ; ldp x22, x23, [x0, #0xb0]
-                ; ldp x24, x25, [x0, #0xc0]
-                ; ldp x26, x27, [x0, #0xd0]
-                ; ldp x28, x29, [x0, #0xe0]
-                ; ldp x30, xzr, [x0, #0xf0]
-
-                ; ldp x29, x30, [sp], #0x10
-                ; b >done
-                ; self_addr:
-                ; .qword self as *mut _  as *mut c_void as i64
-                ; self_regs_addr:
-                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
-                ; trap_func:
-                ; .qword AsanRuntime::handle_trap as *mut c_void as i64
-                ; register_frame_func:
-                ; .qword __register_frame as *mut c_void as i64
-                ; eh_frame_cie:
-                ; .dword 0x14
-                ; .dword 0x00
-                ; .dword 0x00527a01
-                ; .dword 0x011e7c01
-                ; .dword 0x001f0c1b
-                ; eh_frame_fde:
-                ; .dword 0x14
-                ; .dword 0x18
-                ; fde_address:
-                ; .dword 0x0 // <-- address offset goes here
-                ; .dword 0x104
-                    //advance_loc 12
-                    //def_cfa r29 (x29) at offset 16
-                    //offset r30 (x30) at cfa-8
-                    //offset r29 (x29) at cfa-16
-                ; .dword 0x1d0c4c00
-                ; .dword (0x9d029e10 as u32 as i32)
-                ; .dword 0x04
-                // empty next FDE:
-                ; .dword 0x0
-                ; .dword 0x0
-
-
-                ; skip_report:
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
@@ -1659,175 +1459,256 @@ impl AsanRuntime {
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
                 ; .dword -717536768 // 0xd53b4200 //mrs x0, NZCV
-                ; and x1, x1, #$val
+                ; and x1, x1, #$val as u64
                 ; cmp x1, #$val
                 ; b.eq >done
-                ; b <report
 
+                ; adr x1, >done
+                ; nop // will be replaced by b to report
                 ; done:
-                ; .dword -719633920 //0xd51b4200 // msr nvcz, x0
             );};
         }
 
-        let mut ops_check_mem_byte =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_byte, 0);
-        self.blob_check_mem_byte = Some(ops_check_mem_byte.finalize().unwrap().into_boxed_slice());
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        shadow_check_exact!(ops, val);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
+    }
 
-        let mut ops_check_mem_halfword =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_halfword, 1);
-        self.blob_check_mem_halfword = Some(
-            ops_check_mem_halfword
-                .finalize()
-                .unwrap()
-                .into_boxed_slice(),
+    ///
+    /// Generate the instrumentation blobs for the current arch.
+    #[allow(clippy::similar_names)] // We allow things like dword and qword
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::too_many_lines)]
+    fn generate_instrumentation_blobs(&mut self) {
+        let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        dynasm!(ops_report
+            ; .arch aarch64
+
+            ; report:
+            ; stp x29, x30, [sp, #-0x10]!
+            ; mov x29, sp
+            // save the nvcz and the 'return-address'/address of instrumented instruction
+            ; stp x0, x1, [sp, #-0x10]!
+
+            ; ldr x0, >self_regs_addr
+            ; stp x2, x3, [x0, #0x10]
+            ; stp x4, x5, [x0, #0x20]
+            ; stp x6, x7, [x0, #0x30]
+            ; stp x8, x9, [x0, #0x40]
+            ; stp x10, x11, [x0, #0x50]
+            ; stp x12, x13, [x0, #0x60]
+            ; stp x14, x15, [x0, #0x70]
+            ; stp x16, x17, [x0, #0x80]
+            ; stp x18, x19, [x0, #0x90]
+            ; stp x20, x21, [x0, #0xa0]
+            ; stp x22, x23, [x0, #0xb0]
+            ; stp x24, x25, [x0, #0xc0]
+            ; stp x26, x27, [x0, #0xd0]
+            ; stp x28, x29, [x0, #0xe0]
+            ; stp x30, xzr, [x0, #0xf0]
+            ; mov x28, x0
+
+            ; mov x25, x1 // address of instrumented instruction.
+            ; str x25, [x28, 0xf8]
+
+            ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
+            ; ldp x0, x1, [sp, 0x20]
+            ; stp x0, x1, [x28]
+
+            ; adr x25, <report
+            ; adr x0, >eh_frame_fde
+            ; adr x27, >fde_address
+            ; ldr w26, [x27]
+            ; cmp w26, #0x0
+            ; b.ne >skip_register
+            ; sub x25, x25, x27
+            ; str w25, [x27]
+            ; ldr x1, >register_frame_func
+            //; brk #11
+            ; blr x1
+            ; skip_register:
+            ; ldr x0, >self_addr
+            ; ldr x1, >trap_func
+            ; blr x1
+
+            ; .dword 0xd51b4218u32 as i32 // msr nzcv, x24
+            ; ldr x0, >self_regs_addr
+            ; ldp x2, x3, [x0, #0x10]
+            ; ldp x4, x5, [x0, #0x20]
+            ; ldp x6, x7, [x0, #0x30]
+            ; ldp x8, x9, [x0, #0x40]
+            ; ldp x10, x11, [x0, #0x50]
+            ; ldp x12, x13, [x0, #0x60]
+            ; ldp x14, x15, [x0, #0x70]
+            ; ldp x16, x17, [x0, #0x80]
+            ; ldp x18, x19, [x0, #0x90]
+            ; ldp x20, x21, [x0, #0xa0]
+            ; ldp x22, x23, [x0, #0xb0]
+            ; ldp x24, x25, [x0, #0xc0]
+            ; ldp x26, x27, [x0, #0xd0]
+            ; ldp x28, x29, [x0, #0xe0]
+            ; ldp x30, xzr, [x0, #0xf0]
+
+            // restore nzcv. and 'return address'
+            ; ldp x0, x1, [sp], #0x10
+            ; ldp x29, x30, [sp], #0x10
+            ; br x1 // go back to the 'return address'
+
+            ; self_addr:
+            ; .qword self as *mut _  as *mut c_void as i64
+            ; self_regs_addr:
+            ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+            ; trap_func:
+            ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+            ; register_frame_func:
+            ; .qword __register_frame as *mut c_void as i64
+            ; eh_frame_cie:
+            ; .dword 0x14
+            ; .dword 0x00
+            ; .dword 0x00527a01
+            ; .dword 0x011e7c01
+            ; .dword 0x001f0c1b
+            ; eh_frame_fde:
+            ; .dword 0x14
+            ; .dword 0x18
+            ; fde_address:
+            ; .dword 0x0 // <-- address offset goes here
+            ; .dword 0x104
+                //advance_loc 12
+                //def_cfa r29 (x29) at offset 16
+                //offset r30 (x30) at cfa-8
+                //offset r29 (x29) at cfa-16
+            ; .dword 0x1d0c4c00
+            ; .dword 0x9d029e10u32 as i32
+            ; .dword 0x04
+            // empty next FDE:
+            ; .dword 0x0
+            ; .dword 0x0
         );
+        self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
-        let mut ops_check_mem_dword =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_dword, 2);
-        self.blob_check_mem_dword =
-            Some(ops_check_mem_dword.finalize().unwrap().into_boxed_slice());
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
 
-        let mut ops_check_mem_qword =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_qword, 3);
-        self.blob_check_mem_qword =
-            Some(ops_check_mem_qword.finalize().unwrap().into_boxed_slice());
+        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_exact_blob(3));
+        self.blob_check_mem_6bytes = Some(self.generate_shadow_check_exact_blob(6));
+        self.blob_check_mem_12bytes = Some(self.generate_shadow_check_exact_blob(12));
+        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_exact_blob(24));
+        self.blob_check_mem_32bytes = Some(self.generate_shadow_check_exact_blob(32));
+        self.blob_check_mem_48bytes = Some(self.generate_shadow_check_exact_blob(48));
+        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_exact_blob(64));
+    }
 
-        let mut ops_check_mem_16bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops_check_mem_16bytes, 4);
-        self.blob_check_mem_16bytes =
-            Some(ops_check_mem_16bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_3bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_3bytes, 3);
-        self.blob_check_mem_3bytes =
-            Some(ops_check_mem_3bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_6bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_6bytes, 6);
-        self.blob_check_mem_6bytes =
-            Some(ops_check_mem_6bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_12bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_12bytes, 12);
-        self.blob_check_mem_12bytes =
-            Some(ops_check_mem_12bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_24bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_24bytes, 24);
-        self.blob_check_mem_24bytes =
-            Some(ops_check_mem_24bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_32bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_32bytes, 32);
-        self.blob_check_mem_32bytes =
-            Some(ops_check_mem_32bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_48bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_48bytes, 48);
-        self.blob_check_mem_48bytes =
-            Some(ops_check_mem_48bytes.finalize().unwrap().into_boxed_slice());
-
-        let mut ops_check_mem_64bytes =
-            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops_check_mem_64bytes, 64);
-        self.blob_check_mem_64bytes =
-            Some(ops_check_mem_64bytes.finalize().unwrap().into_boxed_slice());
+    /// Get the blob which implements the report funclet
+    #[must_use]
+    #[inline]
+    pub fn blob_report(&self) -> &[u8] {
+        self.blob_report.as_ref().unwrap()
     }
 
     /// Get the blob which checks a byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_byte(&self) -> &[u8] {
         self.blob_check_mem_byte.as_ref().unwrap()
     }
 
     /// Get the blob which checks a halfword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_halfword(&self) -> &[u8] {
         self.blob_check_mem_halfword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a dword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_dword(&self) -> &[u8] {
         self.blob_check_mem_dword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a qword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_qword(&self) -> &[u8] {
         self.blob_check_mem_qword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 16 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_16bytes(&self) -> &[u8] {
         self.blob_check_mem_16bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 3 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_3bytes(&self) -> &[u8] {
         self.blob_check_mem_3bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 6 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_6bytes(&self) -> &[u8] {
         self.blob_check_mem_6bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 12 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_12bytes(&self) -> &[u8] {
         self.blob_check_mem_12bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 24 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_24bytes(&self) -> &[u8] {
         self.blob_check_mem_24bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 32 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_32bytes(&self) -> &[u8] {
         self.blob_check_mem_32bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 48 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_48bytes(&self) -> &[u8] {
         self.blob_check_mem_48bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 64 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_64bytes(&self) -> &[u8] {
         self.blob_check_mem_64bytes.as_ref().unwrap()
     }
 }
 
+/// static field for `AsanErrors` for a run
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
+/// An observer for frida address sanitizer `AsanError`s for a frida executor run
 #[derive(Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl Observer for AsanErrorsObserver {
-    fn pre_exec(&mut self) -> Result<(), Error> {
+impl Observer for AsanErrorsObserver {}
+
+impl<EM, I, S> HasExecHooks<EM, I, S> for AsanErrorsObserver {
+    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
@@ -1841,29 +1722,37 @@ impl Observer for AsanErrorsObserver {
 impl Named for AsanErrorsObserver {
     #[inline]
     fn name(&self) -> &str {
-        "AsanErrorsObserver"
+        "AsanErrors"
     }
 }
 
 impl AsanErrorsObserver {
+    /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
+    #[must_use]
     pub fn new(errors: &'static Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>),
         }
     }
 
+    /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
+    #[must_use]
     pub fn new_owned(errors: Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Owned(Box::new(errors)),
         }
     }
 
+    /// Creates a new `AsanErrorsObserver` from a raw ptr
+    #[must_use]
     pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors),
         }
     }
 
+    /// gets the [`AsanErrors`] from the previous run
+    #[must_use]
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
@@ -1872,6 +1761,7 @@ impl AsanErrorsObserver {
     }
 }
 
+/// A feedback reporting potential [`AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,
@@ -1886,18 +1776,18 @@ where
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<u32, Error> {
+    ) -> Result<bool, Error> {
         let observer = observers
-            .match_first_type::<AsanErrorsObserver>()
+            .match_name::<AsanErrorsObserver>("AsanErrors")
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         match observer.errors() {
-            None => Ok(0),
+            None => Ok(false),
             Some(errors) => {
-                if !errors.errors.is_empty() {
-                    self.errors = Some(errors.clone());
-                    Ok(1)
+                if errors.errors.is_empty() {
+                    Ok(false)
                 } else {
-                    Ok(0)
+                    self.errors = Some(errors.clone());
+                    Ok(true)
                 }
             }
         }
@@ -1920,11 +1810,13 @@ where
 impl Named for AsanErrorsFeedback {
     #[inline]
     fn name(&self) -> &str {
-        "AsanErrorsFeedback"
+        "AsanErrors"
     }
 }
 
 impl AsanErrorsFeedback {
+    /// Create a new `AsanErrorsFeedback`
+    #[must_use]
     pub fn new() -> Self {
         Self { errors: None }
     }

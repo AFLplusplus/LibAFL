@@ -7,18 +7,24 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Trait to convert into an Owned type
 pub trait IntoOwned {
+    /// Returns if the current type is an owned type.
+    #[must_use]
     fn is_owned(&self) -> bool;
 
+    /// Transfer the current type into an owned type.
+    #[must_use]
     fn into_owned(self) -> Self;
 }
 
-/// Wrap a reference and convert to a Box on serialize
+/// Wrap a reference and convert to a [`Box`] on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedRef<'a, T>
 where
     T: 'a + ?Sized,
 {
+    /// A ref to a type
     Ref(&'a T),
+    /// An owned [`Box`] of a type
     Owned(Box<T>),
 }
 
@@ -54,6 +60,7 @@ impl<'a, T> AsRef<T> for OwnedRef<'a, T>
 where
     T: Sized,
 {
+    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedRef::Ref(r) => r,
@@ -66,6 +73,7 @@ impl<'a, T> IntoOwned for OwnedRef<'a, T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedRef::Ref(_) => false,
@@ -73,6 +81,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedRef::Ref(r) => OwnedRef::Owned(Box::new(r.clone())),
@@ -84,7 +93,9 @@ where
 /// Wrap a mutable reference and convert to a Box on serialize
 #[derive(Debug)]
 pub enum OwnedRefMut<'a, T: 'a + ?Sized> {
+    /// A mutable ref to a type
     Ref(&'a mut T),
+    /// An owned [`Box`] of a type
     Owned(Box<T>),
 }
 
@@ -113,6 +124,7 @@ where
 }
 
 impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
+    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedRefMut::Ref(r) => r,
@@ -122,6 +134,7 @@ impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
 }
 
 impl<'a, T: Sized> AsMut<T> for OwnedRefMut<'a, T> {
+    #[must_use]
     fn as_mut(&mut self) -> &mut T {
         match self {
             OwnedRefMut::Ref(r) => r,
@@ -134,6 +147,7 @@ impl<'a, T> IntoOwned for OwnedRefMut<'a, T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedRefMut::Ref(_) => false,
@@ -141,6 +155,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedRefMut::Ref(r) => OwnedRefMut::Owned(Box::new(r.clone())),
@@ -152,7 +167,9 @@ where
 /// Wrap a slice and convert to a Vec on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedSlice<'a, T: 'a + Sized> {
+    /// A ref to a slice
     Ref(&'a [T]),
+    /// A ref to an owned [`Vec`]
     Owned(Vec<T>),
 }
 
@@ -181,6 +198,8 @@ where
 }
 
 impl<'a, T: Sized> OwnedSlice<'a, T> {
+    /// Get the [`OwnedSlice`] as slice.
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         match self {
             OwnedSlice::Ref(r) => r,
@@ -193,6 +212,7 @@ impl<'a, T> IntoOwned for OwnedSlice<'a, T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedSlice::Ref(_) => false,
@@ -200,6 +220,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedSlice::Ref(r) => OwnedSlice::Owned(r.to_vec()),
@@ -211,7 +232,9 @@ where
 /// Wrap a mutable slice and convert to a Vec on serialize
 #[derive(Debug)]
 pub enum OwnedSliceMut<'a, T: 'a + Sized> {
+    /// A ptr to a mutable slice of the type
     Ref(&'a mut [T]),
+    /// An owned [`Vec`] of the type
     Owned(Vec<T>),
 }
 
@@ -240,6 +263,8 @@ where
 }
 
 impl<'a, T: Sized> OwnedSliceMut<'a, T> {
+    /// Get the value as slice
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         match self {
             OwnedSliceMut::Ref(r) => r,
@@ -247,6 +272,8 @@ impl<'a, T: Sized> OwnedSliceMut<'a, T> {
         }
     }
 
+    /// Get the value as mut slice
+    #[must_use]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match self {
             OwnedSliceMut::Ref(r) => r,
@@ -259,6 +286,7 @@ impl<'a, T> IntoOwned for OwnedSliceMut<'a, T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedSliceMut::Ref(_) => false,
@@ -266,6 +294,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedSliceMut::Ref(r) => OwnedSliceMut::Owned(r.to_vec()),
@@ -277,7 +306,9 @@ where
 /// Wrap a C-style pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedPtr<T: Sized> {
+    /// Ptr to the content
     Ptr(*const T),
+    /// Ptr to an owned [`Box`] of the content.
     Owned(Box<T>),
 }
 
@@ -303,6 +334,7 @@ where
 }
 
 impl<T: Sized> AsRef<T> for OwnedPtr<T> {
+    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap() },
@@ -315,6 +347,7 @@ impl<T> IntoOwned for OwnedPtr<T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedPtr::Ptr(_) => false,
@@ -322,6 +355,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedPtr::Ptr(p) => unsafe { OwnedPtr::Owned(Box::new(p.as_ref().unwrap().clone())) },
@@ -333,7 +367,9 @@ where
 /// Wrap a C-style mutable pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedPtrMut<T: Sized> {
+    /// A mut ptr to the content
     Ptr(*mut T),
+    /// An owned [`Box`] to the content
     Owned(Box<T>),
 }
 
@@ -359,6 +395,7 @@ where
 }
 
 impl<T: Sized> AsRef<T> for OwnedPtrMut<T> {
+    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedPtrMut::Ptr(p) => unsafe { p.as_ref().unwrap() },
@@ -380,6 +417,7 @@ impl<T> IntoOwned for OwnedPtrMut<T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedPtrMut::Ptr(_) => false,
@@ -387,6 +425,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedPtrMut::Ptr(p) => unsafe {
@@ -397,10 +436,12 @@ where
     }
 }
 
-/// Wrap a C-style pointer to an array (with size= and convert to a Vec on serialize
+/// Wrap a C-style pointer to an array (with size) and convert to a Vec on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedArrayPtr<T: Sized> {
+    /// Ptr to a slice
     ArrayPtr((*const T, usize)),
+    /// A owned [`Vec`].
     Owned(Vec<T>),
 }
 
@@ -426,6 +467,8 @@ where
 }
 
 impl<T: Sized> OwnedArrayPtr<T> {
+    /// Get a slice from this array.
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         match self {
             OwnedArrayPtr::ArrayPtr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
@@ -438,6 +481,7 @@ impl<T> IntoOwned for OwnedArrayPtr<T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedArrayPtr::ArrayPtr(_) => false,
@@ -445,6 +489,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedArrayPtr::ArrayPtr(p) => unsafe {
@@ -455,10 +500,12 @@ where
     }
 }
 
-/// Wrap a C-style mutable pointer to an array (with size= and convert to a Vec on serialize
+/// Wrap a C-style mutable pointer to an array (with size) and convert to a Vec on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedArrayPtrMut<T: Sized> {
+    /// A ptr to the array (or slice).
     ArrayPtr((*mut T, usize)),
+    /// An owned [`Vec`].
     Owned(Vec<T>),
 }
 
@@ -484,6 +531,8 @@ where
 }
 
 impl<T: Sized> OwnedArrayPtrMut<T> {
+    /// Return this array as slice
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         match self {
             OwnedArrayPtrMut::ArrayPtr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
@@ -491,6 +540,8 @@ impl<T: Sized> OwnedArrayPtrMut<T> {
         }
     }
 
+    /// Return this array as mut slice
+    #[must_use]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match self {
             OwnedArrayPtrMut::ArrayPtr(p) => unsafe { core::slice::from_raw_parts_mut(p.0, p.1) },
@@ -503,6 +554,7 @@ impl<T> IntoOwned for OwnedArrayPtrMut<T>
 where
     T: Sized + Clone,
 {
+    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedArrayPtrMut::ArrayPtr(_) => false,
@@ -510,6 +562,7 @@ where
         }
     }
 
+    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedArrayPtrMut::ArrayPtr(p) => unsafe {

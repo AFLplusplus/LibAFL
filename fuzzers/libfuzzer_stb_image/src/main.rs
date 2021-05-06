@@ -11,6 +11,7 @@ use libafl::{
     },
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
+    feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
@@ -62,8 +63,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer =
-        StdMapObserver::new("edges", unsafe { &mut EDGES_MAP }, unsafe { MAX_EDGES_NUM });
+    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+    let edges_observer = StdMapObserver::new("edges", edges);
+
+    // Create an observation channel to keep track of the execution time
+    let time_observer = TimeObserver::new("time");
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -73,15 +77,15 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            tuple_list!(
-                MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
-                TimeFeedback::new()
+            feedback_or!(
+                MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
+                TimeFeedback::new_with_observer(&time_observer)
             ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
-            // Feedbacks to recognize an input as solution
-            tuple_list!(CrashFeedback::new()),
+            // Feedback to recognize an input as solution
+            CrashFeedback::new(),
         )
     });
 
@@ -116,9 +120,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
-        "in-process(edges,time)",
         &mut harness,
-        tuple_list!(edges_observer, TimeObserver::new("time")),
+        tuple_list!(edges_observer, time_observer),
         &mut state,
         &mut restarting_mgr,
     )?;
