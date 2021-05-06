@@ -9,10 +9,13 @@ use libafl::utils::find_mapping_for_path;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
-use capstone::arch::{
-    arch::{self, BuildsCapstone},
-    arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
-    ArchOperand::Arm64Operand,
+use capstone::{
+    arch::{
+        self,
+        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        ArchOperand::Arm64Operand,
+        BuildsCapstone,
+    },
     Capstone, Insn,
 };
 
@@ -100,10 +103,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
             let mut hasher = AHasher::new_with_keys(0, 0);
             hasher.write(input.target_bytes().as_slice());
 
-            let filename = format!(
-                "./coverage/{:016x}.drcov",
-                hasher.finish(),
-            );
+            let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
@@ -362,6 +362,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         shift: Arm64Shift,
         extender: Arm64Extender,
     ) {
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
         let basereg = self.get_writer_register(basereg);
