@@ -35,13 +35,13 @@ impl<I> HasMetadata for Testcase<I>
 where
     I: Input,
 {
-    /// Get all the metadata into an HashMap
+    /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
-    /// Get all the metadata into an HashMap (mutable)
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
@@ -143,7 +143,7 @@ where
         }
     }
 
-    /// Create a new Testcase instace given an input and a filename
+    /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
     pub fn with_filename(input: I, filename: String) -> Self {
         Testcase {
@@ -155,6 +155,8 @@ where
         }
     }
 
+    /// Create a new, empty, [`Testcase`].
+    #[must_use]
     #[inline]
     pub fn default() -> Self {
         Testcase {

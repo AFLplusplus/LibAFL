@@ -1,7 +1,7 @@
 #!/bin/sh
 # Clippy checks
 cargo clean -p libafl
-RUST_BACKTRACE=full cargo clippy --all -- \
+RUST_BACKTRACE=full cargo clippy --all --all-features --tests -- \
    -D clippy::pedantic \
    -W clippy::cast_sign_loss \
    -W clippy::similar-names \
@@ -10,9 +10,9 @@ RUST_BACKTRACE=full cargo clippy --all -- \
    -W clippy::unused_self \
    -W clippy::too_many_lines \
    -W clippy::option_if_let_else \
-   -A missing-docs \
-   -A clippy::doc_markdown \
-   -A clippy::must-use-candidate \
+   -W clippy::must-use-candidate \
+   -W clippy::if-not-else \
+   -W clippy::doc-markdown \
    -A clippy::type_repetition_in_bounds \
    -A clippy::missing-errors-doc \
    -A clippy::cast-possible-truncation \
@@ -23,4 +23,3 @@ RUST_BACKTRACE=full cargo clippy --all -- \
    -A clippy::unseparated-literal-suffix \
    -A clippy::module-name-repetitions \
    -A clippy::unreadable-literal \
-   -A clippy::if-not-else \

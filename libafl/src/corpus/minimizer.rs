@@ -16,7 +16,7 @@ use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 /// Default probability to skip the non-favored values
-pub const DEFAULT_SKIP_NOT_FAV_PROB: u64 = 95;
+pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
 
 /// A testcase metadata saying if a testcase is favored
 #[derive(Serialize, Deserialize)]
@@ -34,6 +34,8 @@ pub struct TopRatedsMetadata {
 crate::impl_serdeany!(TopRatedsMetadata);
 
 impl TopRatedsMetadata {
+    /// Creates a new [`struct@TopRatedsMetadata`]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: HashMap::default(),
@@ -47,11 +49,12 @@ impl Default for TopRatedsMetadata {
     }
 }
 
-/// Compute the favor factor of a testcase. Lower is better.
+/// Compute the favor factor of a [`Testcase`]. Lower is better.
 pub trait FavFactor<I>
 where
     I: Input,
 {
+    /// Computes the favor factor of a [`Testcase`]. Lower is better.
     fn compute(testcase: &mut Testcase<I>) -> Result<u64, Error>;
 }
 
@@ -74,9 +77,9 @@ where
     }
 }
 
-/// The Minimizer scheduler employs a genetic algorithm to compute a subset of the
+/// The [`MinimizerCorpusScheduler`] employs a genetic algorithm to compute a subset of the
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
-/// prioritizing testcases using FavFactor
+/// prioritizing [`Testcase`]`s` using [`FavFactor`]
 pub struct MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
 where
     CS: CorpusScheduler<I, S>,
@@ -87,7 +90,7 @@ where
     C: Corpus<I>,
 {
     base: CS,
-    skip_not_fav_prob: u64,
+    skip_non_favored_prob: u64,
     phantom: PhantomData<(C, F, I, M, R, S)>,
 }
 
@@ -133,7 +136,7 @@ where
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
-        } && state.rand_mut().below(100) < self.skip_not_fav_prob
+        } && state.rand_mut().below(100) < self.skip_non_favored_prob
         {
             idx = self.base.next(state)?;
         }
@@ -227,28 +230,32 @@ where
         Ok(())
     }
 
+    /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
+    /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(base: CS) -> Self {
         Self {
             base,
-            skip_not_fav_prob: DEFAULT_SKIP_NOT_FAV_PROB,
+            skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
             phantom: PhantomData,
         }
     }
 
-    pub fn with_skip_prob(base: CS, skip_not_fav_prob: u64) -> Self {
+    /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
+    /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
+    pub fn with_skip_prob(base: CS, skip_non_favored_prob: u64) -> Self {
         Self {
             base,
-            skip_not_fav_prob,
+            skip_non_favored_prob,
             phantom: PhantomData,
         }
     }
 }
 
-/// A MinimizerCorpusScheduler with LenTimeMulFavFactor to prioritize quick and small testcases
+/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
 pub type LenTimeMinimizerCorpusScheduler<C, CS, I, M, R, S> =
     MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, M, R, S>;
 
-/// A MinimizerCorpusScheduler with LenTimeMulFavFactor to prioritize quick and small testcases
-/// that exercise all the entries registered in the MapIndexesMetadata
+/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
+/// that exercise all the entries registered in the [`MapIndexesMetadata`].
 pub type IndexesLenTimeMinimizerCorpusScheduler<C, CS, I, R, S> =
     MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, R, S>;

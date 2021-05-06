@@ -78,7 +78,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
             feedback_or!(
-                MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
+                MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
                 TimeFeedback::new_with_observer(&time_observer)
             ),
             // Corpus in which we store solutions (crashes in this example),

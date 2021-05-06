@@ -20,7 +20,9 @@ use crate::{
     Error,
 };
 
+/// A [`MapFeedback`] that strives to maximize the map contents.
 pub type MaxMapFeedback<O, T> = MapFeedback<O, MaxReducer, T>;
+/// A [`MapFeedback`] that strives to minimize the map contents.
 pub type MinMapFeedback<O, T> = MapFeedback<O, MinReducer, T>;
 
 /// A Reducer function is used to aggregate values for the novelty search
@@ -28,9 +30,11 @@ pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
+    /// Reduce two values to one value, with the current [`Reducer`].
     fn reduce(first: T, second: T) -> T;
 }
 
+/// A [`MinReducer`] reduces [`Integer`] values and returns their maximum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MaxReducer {}
 
@@ -48,6 +52,7 @@ where
     }
 }
 
+/// A [`MinReducer`] reduces [`Integer`] values and returns their minimum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MinReducer {}
 
@@ -68,6 +73,7 @@ where
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Serialize, Deserialize)]
 pub struct MapIndexesMetadata {
+    /// The list of indexes.
     pub list: Vec<usize>,
 }
 
@@ -81,6 +87,8 @@ impl AsSlice<usize> for MapIndexesMetadata {
 }
 
 impl MapIndexesMetadata {
+    /// Creates a new [`struct@MapIndexesMetadata`].
+    #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
         Self { list }
     }
@@ -89,6 +97,7 @@ impl MapIndexesMetadata {
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Serialize, Deserialize)]
 pub struct MapNoveltiesMetadata {
+    /// A `list` of novelties.
     pub list: Vec<usize>,
 }
 
@@ -96,11 +105,14 @@ crate::impl_serdeany!(MapNoveltiesMetadata);
 
 impl AsSlice<usize> for MapNoveltiesMetadata {
     /// Convert to a slice
+    #[must_use]
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
 impl MapNoveltiesMetadata {
+    /// Creates a new [`struct@MapNoveltiesMetadata`]
+    #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
         Self { list }
     }
@@ -249,6 +261,7 @@ where
     O: MapObserver<T>,
 {
     /// Create new `MapFeedback`
+    #[must_use]
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
@@ -271,7 +284,8 @@ where
     }
 
     /// Create new `MapFeedback` specifying if it must track indexes of novelties
-    pub fn new_track(
+    #[must_use]
+    pub fn new_tracking(
         name: &'static str,
         map_size: usize,
         track_indexes: bool,
@@ -287,7 +301,7 @@ where
     }
 
     /// Create new `MapFeedback` for the observer type if it must track indexes of novelties
-    pub fn new_with_observer_track(
+    pub fn new_tracking_with_observer(
         map_observer: &O,
         track_indexes: bool,
         track_novelties: bool,
@@ -310,6 +324,7 @@ where
 {
     /// Create new `MapFeedback` using a map observer, and a map.
     /// The map can be shared.
+    #[must_use]
     pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
         Self {
             history_map,
@@ -321,6 +336,7 @@ where
     }
 }
 
+/// A [`ReachabilityFeedback`] reports if a target has been reached.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ReachabilityFeedback<O> {
     name: String,
@@ -332,6 +348,8 @@ impl<O> ReachabilityFeedback<O>
 where
     O: MapObserver<usize>,
 {
+    /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
+    #[must_use]
     pub fn new_with_observer(map_observer: &O) -> Self {
         Self {
             name: map_observer.name().to_string(),
@@ -339,6 +357,9 @@ where
             phantom: PhantomData,
         }
     }
+
+    /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`] with the given `name`.
+    #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),

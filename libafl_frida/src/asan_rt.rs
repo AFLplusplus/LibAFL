@@ -1,3 +1,11 @@
+/*!
+The frida address sanitizer runtime provides address sanitization.
+When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+The runtime can report memory errors that occurred during execution,
+even if the target would not have crashed under normal conditions.
+this helps finding mem errors early.
+*/
+
 use hashbrown::HashMap;
 use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
@@ -423,26 +431,31 @@ impl Allocator {
 }
 
 /// Hook for malloc.
+#[must_use]
 pub extern "C" fn asan_malloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new.
+#[must_use]
 pub extern "C" fn asan_new(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new.
+#[must_use]
 pub extern "C" fn asan_new_nothrow(size: usize, _nothrow: *const c_void) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for new with alignment.
+#[must_use]
 pub extern "C" fn asan_new_aligned(size: usize, alignment: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
 
 /// Hook for new with alignment.
+#[must_use]
 pub extern "C" fn asan_new_aligned_nothrow(
     size: usize,
     alignment: usize,
@@ -452,16 +465,19 @@ pub extern "C" fn asan_new_aligned_nothrow(
 }
 
 /// Hook for pvalloc
+#[must_use]
 pub extern "C" fn asan_pvalloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for valloc
+#[must_use]
 pub extern "C" fn asan_valloc(size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, 0x8) }
 }
 
 /// Hook for calloc
+#[must_use]
 pub extern "C" fn asan_calloc(nmemb: usize, size: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size * nmemb, 0x8) }
 }
@@ -470,6 +486,7 @@ pub extern "C" fn asan_calloc(nmemb: usize, size: usize) -> *mut c_void {
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     let mut allocator = Allocator::get();
     let ret = allocator.alloc(size, 0x8);
@@ -544,7 +561,7 @@ pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, _nothrow: *const 
     }
 }
 
-/// Hook for delete
+/// Hook for `delete`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
@@ -558,23 +575,26 @@ pub unsafe extern "C" fn asan_delete_aligned_nothrow(
     }
 }
 
-/// Hook for malloc_usable_size
+/// Hook for `malloc_usable_size`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_malloc_usable_size(ptr: *mut c_void) -> usize {
     Allocator::get().get_usable_size(ptr)
 }
 
-/// Hook for memalign
+/// Hook for `memalign`
+#[must_use]
 pub extern "C" fn asan_memalign(size: usize, alignment: usize) -> *mut c_void {
     unsafe { Allocator::get().alloc(size, alignment) }
 }
 
-/// Hook for posix_memalign
+/// Hook for `posix_memalign`
 ///
 /// # Safety
 /// This function is inherently unsafe, as it takes a raw pointer
+#[must_use]
 pub unsafe extern "C" fn asan_posix_memalign(
     pptr: *mut *mut c_void,
     size: usize,
@@ -585,6 +605,7 @@ pub unsafe extern "C" fn asan_posix_memalign(
 }
 
 /// Hook for mallinfo
+#[must_use]
 pub extern "C" fn asan_mallinfo() -> *mut c_void {
     std::ptr::null_mut()
 }
@@ -594,6 +615,11 @@ extern "C" {
     fn get_tls_ptr() -> *const c_void;
 }
 
+/// The frida address sanitizer runtime, providing address sanitization.
+/// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+/// The runtime can report memory errors that occurred during execution,
+/// even if the target would not have crashed under normal conditions.
+/// this helps finding mem errors early.
 pub struct AsanRuntime {
     regs: [usize; 32],
     blob_report: Option<Box<[u8]>>,
@@ -654,24 +680,32 @@ impl AsanError {
     }
 }
 
+/// A struct holding errors that occurred during frida address sanitizer runs
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
+    /// Creates a new `AsanErrors` struct
+    #[must_use]
     fn new() -> Self {
         Self { errors: Vec::new() }
     }
 
+    /// Clears this `AsanErrors` struct
     pub fn clear(&mut self) {
         self.errors.clear()
     }
 
+    /// Gets the amount of `AsanErrors` in this struct
+    #[must_use]
     pub fn len(&self) -> usize {
         self.errors.len()
     }
 
+    /// Returns `true` if no errors occurred
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
@@ -679,6 +713,8 @@ impl AsanErrors {
 impl CustomExitKind for AsanErrors {}
 
 impl AsanRuntime {
+    /// Create a new `AsanRuntime`
+    #[must_use]
     pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
         let res = Rc::new(RefCell::new(Self {
             regs: [0; 32],
@@ -760,6 +796,7 @@ impl AsanRuntime {
         }
     }
 
+    /// Returns the `AsanErrors` from the recent run
     #[allow(clippy::unused_self)]
     pub fn errors(&mut self) -> &Option<AsanErrors> {
         unsafe { &ASAN_ERRORS }
@@ -777,6 +814,8 @@ impl AsanRuntime {
         self.stalked_addresses.insert(stalked, real);
     }
 
+    /// Resolves the real address from a stalker stalked address
+    #[must_use]
     pub fn real_address_for_stalked(&self, stalked: usize) -> Option<&usize> {
         self.stalked_addresses.get(&stalked)
     }
@@ -813,6 +852,10 @@ impl AsanRuntime {
     }
 
     /// Determine the stack start, end for the currently running thread
+    ///
+    /// # Panics
+    /// Panics, if no mapping for the `stack_address` at `0xeadbeef` could be found.
+    #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;
         let stack_address = &stack_var as *const _ as *const c_void as usize;
@@ -1561,85 +1604,101 @@ impl AsanRuntime {
     }
 
     /// Get the blob which implements the report funclet
+    #[must_use]
     #[inline]
     pub fn blob_report(&self) -> &[u8] {
         self.blob_report.as_ref().unwrap()
     }
+
     /// Get the blob which checks a byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_byte(&self) -> &[u8] {
         self.blob_check_mem_byte.as_ref().unwrap()
     }
 
     /// Get the blob which checks a halfword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_halfword(&self) -> &[u8] {
         self.blob_check_mem_halfword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a dword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_dword(&self) -> &[u8] {
         self.blob_check_mem_dword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a qword access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_qword(&self) -> &[u8] {
         self.blob_check_mem_qword.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 16 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_16bytes(&self) -> &[u8] {
         self.blob_check_mem_16bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 3 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_3bytes(&self) -> &[u8] {
         self.blob_check_mem_3bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 6 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_6bytes(&self) -> &[u8] {
         self.blob_check_mem_6bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 12 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_12bytes(&self) -> &[u8] {
         self.blob_check_mem_12bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 24 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_24bytes(&self) -> &[u8] {
         self.blob_check_mem_24bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 32 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_32bytes(&self) -> &[u8] {
         self.blob_check_mem_32bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 48 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_48bytes(&self) -> &[u8] {
         self.blob_check_mem_48bytes.as_ref().unwrap()
     }
 
     /// Get the blob which checks a 64 byte access
+    #[must_use]
     #[inline]
     pub fn blob_check_mem_64bytes(&self) -> &[u8] {
         self.blob_check_mem_64bytes.as_ref().unwrap()
     }
 }
 
+/// static field for `AsanErrors` for a run
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
+/// An observer for frida address sanitizer `AsanError`s for a frida executor run
 #[derive(Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct AsanErrorsObserver {
@@ -1668,24 +1727,32 @@ impl Named for AsanErrorsObserver {
 }
 
 impl AsanErrorsObserver {
+    /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
+    #[must_use]
     pub fn new(errors: &'static Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>),
         }
     }
 
+    /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
+    #[must_use]
     pub fn new_owned(errors: Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Owned(Box::new(errors)),
         }
     }
 
+    /// Creates a new `AsanErrorsObserver` from a raw ptr
+    #[must_use]
     pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors),
         }
     }
 
+    /// gets the [`AsanErrors`] from the previous run
+    #[must_use]
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
@@ -1694,6 +1761,7 @@ impl AsanErrorsObserver {
     }
 }
 
+/// A feedback reporting potential [`AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,
@@ -1747,6 +1815,8 @@ impl Named for AsanErrorsFeedback {
 }
 
 impl AsanErrorsFeedback {
+    /// Create a new `AsanErrorsFeedback`
+    #[must_use]
     pub fn new() -> Self {
         Self { errors: None }
     }

@@ -21,25 +21,30 @@ use crate::{
 pub use crate::mutators::mutations::*;
 pub use crate::mutators::token_mutations::*;
 
+/// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
 #[derive(Serialize, Deserialize)]
-pub struct MutationsMetadata {
+pub struct LogMutationMetadata {
+    /// A list of logs
     pub list: Vec<String>,
 }
 
-crate::impl_serdeany!(MutationsMetadata);
+crate::impl_serdeany!(LogMutationMetadata);
 
-impl AsSlice<String> for MutationsMetadata {
+impl AsSlice<String> for LogMutationMetadata {
     fn as_slice(&self) -> &[String] {
         self.list.as_slice()
     }
 }
 
-impl MutationsMetadata {
+impl LogMutationMetadata {
+    /// Creates new [`struct@LogMutationMetadata`].
+    #[must_use]
     pub fn new(list: Vec<String>) -> Self {
         Self { list }
     }
 }
 
+/// A [`Mutator`] that composes multiple mutations into one.
 pub trait ComposedByMutations<I, MT, S>
 where
     I: Input,
@@ -48,10 +53,11 @@ where
     /// Get the mutations
     fn mutations(&self) -> &MT;
 
-    // Get the mutations (mut)
+    /// Get the mutations (mut)
     fn mutations_mut(&mut self) -> &mut MT;
 }
 
+/// A [`Mutator`] scheduling multiple [`Mutator`]s for an input.
 pub trait ScheduledMutator<I, MT, S>: ComposedByMutations<I, MT, S> + Mutator<I, S>
 where
     I: Input,
@@ -86,6 +92,7 @@ where
     }
 }
 
+/// A [`Mutator`] that schedules one of the embedded mutations on each call.
 pub struct StdScheduledMutator<I, MT, R, S>
 where
     I: Input,
@@ -178,7 +185,7 @@ where
     R: Rand,
     S: HasRand<R>,
 {
-    /// Create a new StdScheduledMutator instance specifying mutations
+    /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
             mutations,
@@ -188,6 +195,7 @@ where
 }
 
 /// Get the mutations that compose the Havoc mutator
+#[must_use]
 pub fn havoc_mutations<C, I, R, S>() -> impl MutatorsTuple<I, S>
 where
     I: Input + HasBytesVec,
@@ -227,7 +235,7 @@ where
     )
 }
 
-//wraps around StdScheduledMutator
+/// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
 pub struct LoggerScheduledMutator<C, I, MT, R, S, SM>
 where
     C: Corpus<I>,
@@ -289,10 +297,10 @@ where
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
             let mut log = Vec::<String>::new();
             while let Some(idx) = self.mutation_log.pop() {
-                let name = String::from(self.scheduled.mutations().get_name(idx).unwrap()); // TODO maybe return an Error on None
+                let name = String::from(self.scheduled.mutations().name(idx).unwrap()); // TODO maybe return an Error on None
                 log.push(name)
             }
-            let meta = MutationsMetadata::new(log);
+            let meta = LogMutationMetadata::new(log);
             testcase.add_metadata(meta);
         };
         // Always reset the log for each run
@@ -376,7 +384,7 @@ where
     S: HasRand<R> + HasCorpus<C, I>,
     SM: ScheduledMutator<I, MT, S>,
 {
-    /// Create a new StdScheduledMutator instance without mutations and corpus
+    /// Create a new [`StdScheduledMutator`] instance without mutations and corpus
     pub fn new(scheduled: SM) -> Self {
         Self {
             scheduled,
@@ -397,20 +405,16 @@ mod tests {
             Mutator,
         },
         state::State,
-        utils::{Rand, StdRand, XKCDRand},
+        utils::{Rand, StdRand, XkcdRand},
     };
 
     #[test]
     fn test_mut_scheduled() {
         // With the current impl, seed of 1 will result in a split at pos 2.
-        let mut rand = XKCDRand::with_seed(5);
+        let mut rand = XkcdRand::with_seed(5);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into())
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into())
-            .unwrap();
+        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
+        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
 
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
@@ -427,7 +431,7 @@ mod tests {
 
         // The pre-seeded rand should have spliced at position 2.
         // TODO: Maybe have a fixed rand for this purpose?
-        assert_eq!(input.bytes(), &['a' as u8, 'b' as u8, 'f' as u8])
+        assert_eq!(input.bytes(), &[b'a', b'b', b'f'])
     }
 
     #[test]
@@ -435,12 +439,8 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec!['a' as u8, 'b' as u8, 'c' as u8]).into())
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec!['d' as u8, 'e' as u8, 'f' as u8]).into())
-            .unwrap();
+        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
+        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
 
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();

@@ -276,7 +276,7 @@ unsafe fn fuzz(
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            MaxMapFeedback::new_with_observer_track(&edges_observer, true, false),
+            MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new_save_meta(objective_dir, Some(OnDiskMetadataFormat::JsonPretty))

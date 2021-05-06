@@ -17,6 +17,7 @@ libfuzzer = []
 value_profile = []
 cmplog = []
 pcguard = ["pcguard_hitcounts"]
+clippy = [] # Ignore compiler warnings during clippy
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

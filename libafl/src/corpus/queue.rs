@@ -54,6 +54,7 @@ where
     I: Input,
 {
     /// Creates a new `QueueCorpusScheduler`
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -93,7 +94,7 @@ mod tests {
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
         let t = Testcase::with_filename(
-            BytesInput::new(vec![0 as u8; 4]),
+            BytesInput::new(vec![0_u8; 4]),
             "target/.test/fancy/path/fancyfile".into(),
         );
         q.add(t).unwrap();

@@ -1,5 +1,5 @@
 /*!
-Welcome to libAFL
+Welcome to `LibAFL`
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -173,11 +173,12 @@ mod tests {
     use crate::events::SimpleEventManager;
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_fuzzer() {
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4]).into();
+        let testcase = Testcase::new(vec![0; 4]);
         corpus.add(testcase).unwrap();
 
         let mut state = State::new(
@@ -211,7 +212,7 @@ mod tests {
         for i in 0..1000 {
             fuzzer
                 .fuzz_one(&mut state, &mut executor, &mut event_manager, &scheduler)
-                .expect(&format!("Error in iter {}", i));
+                .unwrap_or_else(|_| panic!("Error in iter {}", i));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();

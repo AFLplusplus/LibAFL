@@ -54,6 +54,8 @@ const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 
+/// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
+/// using low-level message passing, [`crate::bolts::llmp`].
 #[derive(Debug)]
 pub struct LlmpEventManager<I, S, SP, ST>
 where
@@ -109,7 +111,7 @@ where
         })
     }
 
-    /// If a client respawns, it may reuse the existing connection, previously stored by LlmpClient::to_env
+    /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
     #[cfg(feature = "std")]
     pub fn existing_client_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
@@ -149,7 +151,7 @@ where
         })
     }
 
-    /// Write the config for a client eventmgr to env vars, a new client can reattach using existing_client_from_env
+    /// Write the config for a client [`EventManager`] to env vars, a new client can reattach using [`LlmpEventManager::existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         match &self.llmp {
@@ -523,6 +525,9 @@ where
     }
 }
 
+/// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
+/// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
+/// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
 pub fn setup_restarting_mgr_std<I, S, ST>(
@@ -547,7 +552,7 @@ where
     setup_restarting_mgr(StdShMemProvider::new()?, stats, broker_port)
 }
 
-/// A restarting state is a combination of restarter and runner, that can be used on systems without `fork`.
+/// A restarting state is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will start a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(

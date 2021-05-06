@@ -18,11 +18,15 @@ use std::{
 #[cfg(any(unix, feature = "std"))]
 use crate::Error;
 
+/// Can be converted to a slice
 pub trait AsSlice<T> {
     /// Convert to a slice
     fn as_slice(&self) -> &[T];
 }
 
+/// The standard rand implementation for `LibAFL`.
+/// It is usually the right choice, with very good speed and a reasonable randomness.
+/// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuTrioRand;
 
 /// Ways to get random around here
@@ -69,7 +73,7 @@ pub trait HasRand<R>
 where
     R: Rand,
 {
-    /// Get the hold RefCell Rand instance
+    /// Get the hold [`RefCell`] Rand instance
     fn rand(&self) -> &RefCell<R>;
 
     /// Gets the next 64 bit value
@@ -93,8 +97,8 @@ where
 macro_rules! default_rand {
     ($rand: ty) => {
         /// A default RNG will usually produce a nondeterministic stream of random numbers.
-        /// As we do not have any way to get random seeds for no_std, they have to be reproducible there.
-        /// Use [`RandomSeed::with_seed`] to generate a reproducible RNG.
+        /// As we do not have any way to get random seeds for `no_std`, they have to be reproducible there.
+        /// Use [`$rand::with_seed`] to generate a reproducible RNG.
         impl core::default::Default for $rand {
             #[cfg(feature = "std")]
             fn default() -> Self {
@@ -120,6 +124,7 @@ default_rand!(RomuDuoJrRand);
 /// Default implementations are provided with the "std" feature enabled, using system time in
 /// nanoseconds as the initial seed.
 pub trait RandomSeed: Rand + Default {
+    /// Creates a new [`RandomSeed`].
     fn new() -> Self;
 }
 
@@ -146,6 +151,7 @@ const HASH_CONST: u64 = 0xa5b35705;
 
 /// Current time
 #[cfg(feature = "std")]
+#[must_use]
 #[inline]
 pub fn current_time() -> time::Duration {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
@@ -160,13 +166,15 @@ pub fn current_time() -> time::Duration {
     time::Duration::from_millis(1)
 }
 
-/// Gets current nanoseconds since UNIX_EPOCH
+/// Gets current nanoseconds since [`UNIX_EPOCH`]
+#[must_use]
 #[inline]
 pub fn current_nanos() -> u64 {
     current_time().as_nanos() as u64
 }
 
-/// Gets current milliseconds since UNIX_EPOCH
+/// Gets current milliseconds since [`UNIX_EPOCH`]
+#[must_use]
 #[inline]
 pub fn current_milliseconds() -> u64 {
     current_time().as_millis() as u64
@@ -210,6 +218,7 @@ impl Rand for Xoshiro256StarRand {
 
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self { rand_seed: [0; 4] };
         rand.set_seed(seed); // TODO: Proper random seed?
@@ -242,6 +251,7 @@ impl Rand for XorShift64Rand {
 
 impl XorShift64Rand {
     /// Creates a new Xoshiro rand with the given seed
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed); // TODO: Proper random seed?
@@ -271,6 +281,7 @@ impl Rand for Lehmer64Rand {
 
 impl Lehmer64Rand {
     /// Creates a new Lehmer rand with the given seed
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut ret: Self = Self { rand_seed: 0 };
         ret.set_seed(seed);
@@ -288,6 +299,8 @@ pub struct RomuTrioRand {
 }
 
 impl RomuTrioRand {
+    /// Creates a new `RomuTrioRand` with the given seed.
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
@@ -327,6 +340,8 @@ pub struct RomuDuoJrRand {
 }
 
 impl RomuDuoJrRand {
+    /// Creates a new `RomuDuoJrRand` with the given seed.
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         let mut rand = Self {
             x_state: 0,
@@ -356,12 +371,13 @@ impl Rand for RomuDuoJrRand {
 /// fake rand, for testing purposes
 #[cfg(test)]
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
-pub struct XKCDRand {
+#[allow(clippy::upper_case_acronyms)]
+pub struct XkcdRand {
     val: u64,
 }
 
 #[cfg(test)]
-impl Rand for XKCDRand {
+impl Rand for XkcdRand {
     fn set_seed(&mut self, val: u64) {
         self.val = val
     }
@@ -373,11 +389,16 @@ impl Rand for XKCDRand {
 
 /// A test rng that will return the same value (chose by fair dice roll) for testing.
 #[cfg(test)]
-impl XKCDRand {
+impl XkcdRand {
+    /// Creates a new [`XkCDRand`] with the rand of 4, [chosen by fair dice roll, guaranteed to be random](https://xkcd.com/221/).
+    /// Will always return this seed.
+    #[must_use]
     pub fn new() -> Self {
         Self::with_seed(4)
     }
 
+    /// Creates a new [`XkcdRand`] with the given seed. Will always return this seed.
+    #[must_use]
     pub fn with_seed(seed: u64) -> Self {
         Self { val: seed }
     }
@@ -392,6 +413,7 @@ pub struct ChildHandle {
 #[cfg(unix)]
 impl ChildHandle {
     /// Block until the child exited and the status code becomes available
+    #[must_use]
     pub fn status(&self) -> i32 {
         let mut status = -1;
         unsafe {
@@ -401,10 +423,13 @@ impl ChildHandle {
     }
 }
 
-#[cfg(unix)]
 /// The `ForkResult` (result of a fork)
+#[cfg(unix)]
 pub enum ForkResult {
+    /// The fork finished, we are the parent process.
+    /// The child has the handle `ChildHandle`.
     Parent(ChildHandle),
+    /// The fork finished, we are the child process.
     Child,
 }
 
@@ -492,6 +517,7 @@ pub fn find_mapping_for_address(address: usize) -> Result<(usize, usize, String,
 
 /// Get the start and end address of the mapping containing with a particular path
 #[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+#[must_use]
 pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
     let mut libstart = 0;
     let mut libend = 0;
@@ -513,7 +539,9 @@ pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::utils::{Rand, *};
+    use crate::utils::{
+        Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand, Xoshiro256StarRand,
+    };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
