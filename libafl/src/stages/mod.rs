@@ -1,4 +1,12 @@
+/*!
+A [`Stage`] is a technique used during fuzzing, working on one [`crate::corpus::Corpus`] entry, and potentially altering it or creating new entries.
+A well-known [`Stage`], for example, is the mutational stage, running multiple [`crate::mutators::Mutator`]s against a [`crate::corpus::Testcase`], potentially storing new ones, according to [`crate::feedbacks::Feedback`].
+Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
+*/
+
+/// Mutational stage is the normal fuzzing stage,
 pub mod mutational;
+
 pub use mutational::{MutationalStage, StdMutationalStage};
 
 //pub mod power;
@@ -27,12 +35,14 @@ where
     ) -> Result<(), Error>;
 }
 
+/// A tuple holding all `Stages` used for fuzzing.
 pub trait StagesTuple<CS, E, EM, I, S>
 where
     EM: EventManager<I, S>,
     E: Executor<I>,
     I: Input,
 {
+    /// Performs all `Stages` in this tuple
     fn perform_all(
         &mut self,
         state: &mut S,

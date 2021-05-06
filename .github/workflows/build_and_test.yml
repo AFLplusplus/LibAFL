@@ -57,7 +57,7 @@ jobs:
     - name: Build Docs
       run: cargo doc
     - name: Test Docs
-      run: cargo test --doc
+      run: cargo test --all-features --doc
     - name: Run clippy
       run: ./clippy.sh
   windows:

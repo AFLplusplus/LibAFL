@@ -115,8 +115,8 @@ impl<I> OnDiskCorpus<I>
 where
     I: Input,
 {
-    /// Creates the OnDiskCorpus.
-    /// Will error, if `std::fs::create_dir_all` failed for `dir_path`.
+    /// Creates the [`OnDiskCorpus`].
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn new(dir_path: PathBuf) -> Result<Self, Error> {
         fs::create_dir_all(&dir_path)?;
         Ok(Self {
@@ -127,8 +127,8 @@ where
         })
     }
 
-    /// Creates the OnDiskCorpus specifying the type of metatada to be saved to disk.
-    /// Will error, if `std::fs::create_dir_all` failed for `dir_path`.
+    /// Creates the [`OnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn new_save_meta(
         dir_path: PathBuf,
         meta_format: Option<OnDiskMetadataFormat>,

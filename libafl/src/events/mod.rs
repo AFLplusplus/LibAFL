@@ -91,10 +91,11 @@ where
     },
     /// New stats.
     UpdateStats {
-        /// The time of generation of the event
+        /// The time of generation of the [`Event`]
         time: Duration,
         /// The executions of this client
         executions: usize,
+        /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
     /// A new objective was found
@@ -150,7 +151,7 @@ where
     }
 }
 
-/// EventManager is the main communications hub.
+/// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
 pub trait EventManager<I, S>
 where

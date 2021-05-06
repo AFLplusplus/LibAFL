@@ -1,4 +1,4 @@
-//! The InProcess Executor is a libfuzzer-like executor, that will simply call a function.
+//! The [`InProcessExecutor`] is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
 use core::{
@@ -706,7 +706,7 @@ mod tests {
             observers: tuple_list!(),
             phantom: PhantomData,
         };
-        let mut input = NopInput {};
-        assert!(in_process_executor.run_target(&mut input).is_ok());
+        let input = NopInput {};
+        assert!(in_process_executor.run_target(&input).is_ok());
     }
 }
