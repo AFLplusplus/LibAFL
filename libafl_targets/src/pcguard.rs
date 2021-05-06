@@ -1,4 +1,4 @@
-//! PcGuard runtime for LibAFL.
+//! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
 #[cfg(all(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -7,16 +7,16 @@ compile_error!(
 );
 
 // TODO compile time flag
-/// The map size for SanCov edges.
+/// The map size for `SanCov` edges.
 pub const EDGES_MAP_SIZE: usize = 65536;
 
-/// The map for SanCov edges.
+/// The map for `SanCov` edges.
 pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 //pub static mut CMP_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 /// The max count of edges tracked.
 pub static mut MAX_EDGES_NUM: usize = 0;
 
-/// Callback for sancov pc_guard - usually called by llvm on each block or edge.
+/// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
 ///
 /// # Safety
 /// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
@@ -35,7 +35,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     }
 }
 
-/// Initialize the sancov pc_guard - usually called by llvm.
+/// Initialize the sancov `pc_guard` - usually called by `llvm`.
 ///
 /// # Safety
 /// Dereferences at `start` and writes to it.

@@ -1,20 +1,20 @@
-//! CmpLog logs and reports back values touched during fuzzing.
+//! `CmpLog` logs and reports back values touched during fuzzing.
 //! The values will then be used in subsequent mutations.
 
 // TODO compile time flag
-/// The CmpLogMap W value
+/// The `CmpLogMap` W value
 pub const CMPLOG_MAP_W: usize = 65536;
-/// The CmpLogMap H value
+/// The `CmpLogMap` H value
 pub const CMPLOG_MAP_H: usize = 32;
-/// The CmpLog map size
+/// The `CmpLog` map size
 pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 
-/// CmpLog ins kind
+/// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
-/// CmpLog return kind
+/// `CmpLog` return kind
 pub const CMPLOG_KIND_RTN: u8 = 1;
 
-/// The header for CmpLog hits.
+/// The header for `CmpLog` hits.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct CmpLogHeader {
@@ -23,12 +23,12 @@ pub struct CmpLogHeader {
     kind: u8,
 }
 
-/// The operands logged during CmpLog.
+/// The operands logged during `CmpLog`.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct CmpLogOperands(u64, u64);
 
-/// A struct containing the CmpLog metadata for a LibAFL run.
+/// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct CmpLogMap {
@@ -36,7 +36,7 @@ pub struct CmpLogMap {
     operands: [[CmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W],
 }
 
-/// The global CmpLog map for the current LibAFL run.
+/// The global `CmpLog` map for the current `LibAFL` run.
 #[no_mangle]
 pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
     headers: [CmpLogHeader {
