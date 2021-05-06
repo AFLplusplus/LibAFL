@@ -10,11 +10,9 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
 use capstone::arch::{
+    arch::{self, BuildsCapstone},
     arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
     ArchOperand::Arm64Operand,
-};
-use capstone::{
-    arch::{self, BuildsCapstone},
     Capstone, Insn,
 };
 
@@ -29,6 +27,7 @@ use frida_gum::{
     CpuContext,
 };
 use frida_gum::{Gum, Module, PageProtection};
+#[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
@@ -36,31 +35,40 @@ use std::{path::PathBuf, rc::Rc};
 
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
-/// An helper that feeds FridaInProcessExecutor with user-supplied instrumentation
+/// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
 pub trait FridaHelper<'a> {
+    /// Access to the stalker `Transformer`
     fn transformer(&self) -> &Transformer<'a>;
 
+    /// Register a new thread with this `FridaHelper`
     fn register_thread(&self);
 
+    /// Called prior to execution of an input
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
 
+    /// Called after execution of an input
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
 
+    /// Returns `true` if stalker is enabled
     fn stalker_enabled(&self) -> bool;
 
+    /// pointer to the frida coverage map
     fn map_ptr(&mut self) -> *mut u8;
 }
 
+/// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
-/// An helper that feeds FridaInProcessExecutor with edge-coverage instrumentation
+/// An helper that feeds [`FridaInProcessExecutor`] with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
     current_log_impl: u64,
+    #[cfg(target_arch = "aarch64")]
     current_report_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
+    #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
     asan_runtime: Rc<RefCell<AsanRuntime>>,
     ranges: RangeMap<usize, (u16, &'a str)>,
@@ -73,7 +81,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.transformer.as_ref().unwrap()
     }
 
-    /// Register the current thread with the FridaInstrumentationHelper
+    /// Register the current thread with the [`FridaInstrumentationHelper`]
     fn register_thread(&self) {
         self.asan_runtime.borrow().register_thread();
     }
@@ -117,6 +125,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 }
 
 /// Helper function to get the size of a module's CODE section from frida
+#[must_use]
 pub fn get_module_size(module_name: &str) -> usize {
     let mut code_size = 0;
     let code_size_ref = &mut code_size;
@@ -128,7 +137,7 @@ pub fn get_module_size(module_name: &str) -> usize {
     code_size
 }
 
-/// A minimal maybe_log implementation. We insert this into the transformed instruction stream
+/// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
 /// every time we need a copy that is within a direct branch of the start of the transformed basic
 /// block.
 #[cfg(target_arch = "x86_64")]
@@ -196,9 +205,11 @@ fn get_pc(context: &CpuContext) -> usize {
     context.rip() as usize
 }
 
-/// The implementation of the FridaInstrumentationHelper
+/// The implementation of the [`FridaInstrumentationHelper`]
 impl<'a> FridaInstrumentationHelper<'a> {
-    /// Constructor function to create a new FridaInstrumentationHelper, given a module_name.
+    /// Constructor function to create a new [`FridaInstrumentationHelper`], given a `module_name`.
+    #[allow(clippy::clippy::too_many_lines)]
+    #[must_use]
     pub fn new(
         gum: &'a Gum,
         options: &'a FridaOptions,
@@ -209,8 +220,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],
             current_log_impl: 0,
+            #[cfg(target_arch = "aarch64")]
             current_report_impl: 0,
             transformer: None,
+            #[cfg(target_arch = "aarch64")]
             capstone: Capstone::new()
                 .arm64()
                 .mode(arch::arm64::ArchMode::Arm)
@@ -219,7 +232,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(options.clone()),
             ranges: RangeMap::new(),
-            options: options,
+            options,
             drcov_basic_blocks: vec![],
         };
 
@@ -381,7 +394,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+            -(16 + redzone_size) as i64,
             IndexMode::PreAdjust,
         );
 
@@ -462,7 +475,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         let displacement = displacement
             + if basereg == Aarch64Register::Sp {
-                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+                16 + redzone_size
             } else {
                 0
             };
@@ -539,7 +552,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+            16 + redzone_size as i64,
             IndexMode::PostAdjust,
         ));
     }
@@ -665,6 +678,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
     #[inline]
     fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
         let writer = output.writer();
+        #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         if self.current_log_impl == 0
             || !writer.can_branch_directly_to(self.current_log_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_log_impl)
@@ -689,11 +704,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         #[cfg(target_arch = "x86_64")]
         {
             println!("here");
-            writer.put_lea_reg_reg_offset(
-                X86Register::Rsp,
-                X86Register::Rsp,
-                -(frida_gum_sys::GUM_RED_ZONE_SIZE as i32),
-            );
+            writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
             writer.put_push_reg(X86Register::Rdi);
             writer.put_mov_reg_address(
                 X86Register::Rdi,
@@ -701,11 +712,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             );
             writer.put_call_address(self.current_log_impl);
             writer.put_pop_reg(X86Register::Rdi);
-            writer.put_lea_reg_reg_offset(
-                X86Register::Rsp,
-                X86Register::Rsp,
-                frida_gum_sys::GUM_RED_ZONE_SIZE as i32,
-            );
+            writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
         }
         #[cfg(target_arch = "aarch64")]
         {
@@ -713,7 +720,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                -(16 + redzone_size) as i64,
                 IndexMode::PreAdjust,
             );
             writer.put_ldr_reg_u64(
@@ -725,7 +732,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                16 + redzone_size as i64,
                 IndexMode::PostAdjust,
             );
         }

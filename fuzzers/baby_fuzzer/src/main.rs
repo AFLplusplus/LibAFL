@@ -46,9 +46,8 @@ pub fn main() {
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(stats);
 
-    // Create an observation channel using the siganls map
-    let observer =
-        StdMapObserver::new("signals", unsafe { &mut SIGNALS }, unsafe { SIGNALS.len() });
+    // Create an observation channel using the signals map
+    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
     // create a State from scratch
     let mut state = State::new(
@@ -76,13 +75,9 @@ pub fn main() {
     let scheduler = QueueCorpusScheduler::new();
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor".into());
+    let mut executor =
+        InProcessExecutor::new(&mut harness, tuple_list!(observer), &mut state, &mut mgr)
+            .expect("Failed to create the Executor".into());
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);

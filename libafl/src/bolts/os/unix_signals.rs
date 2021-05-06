@@ -23,26 +23,42 @@ use crate::Error;
 
 pub use libc::{c_void, siginfo_t};
 
+/// All signals on this system, as `enum`.
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
 #[allow(clippy::pub_enum_variant_names)]
 pub enum Signal {
+    /// `SIGABRT` signal id
     SigAbort = SIGABRT,
+    /// `SIGBUS` signal id
     SigBus = SIGBUS,
+    /// `SIGFPE` signal id
     SigFloatingPointException = SIGFPE,
+    /// `SIGILL` signal id
     SigIllegalInstruction = SIGILL,
+    /// `SIGPIPE` signal id
     SigPipe = SIGPIPE,
+    /// `SIGSEGV` signal id
     SigSegmentationFault = SIGSEGV,
+    /// `SIGUSR2` signal id
     SigUser2 = SIGUSR2,
+    /// `SIGALARM` signal id
     SigAlarm = SIGALRM,
+    /// `SIGHUP` signal id
     SigHangUp = SIGHUP,
+    /// `SIGKILL` signal id
     SigKill = SIGKILL,
+    /// `SIGQUIT` signal id
     SigQuit = SIGQUIT,
+    /// `SIGTERM` signal id
     SigTerm = SIGTERM,
+    /// `SIGINT` signal id
     SigInterrupt = SIGINT,
+    /// `SIGTRAP` signal id
     SigTrap = SIGTRAP,
 }
 
+/// A list of crashing signals
 pub static CRASH_SIGNALS: &[Signal] = &[
     Signal::SigAbort,
     Signal::SigBus,
@@ -85,6 +101,7 @@ impl Display for Signal {
     }
 }
 
+/// A trait for `LibAFL` signal handling
 pub trait Handler {
     /// Handle a signal
     fn handle(&mut self, signal: Signal, info: siginfo_t, _context: &mut ucontext_t);
@@ -114,7 +131,7 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 /// Internal function that is being called whenever a signal we are registered for arrives.
 /// # Safety
 /// This should be somewhat safe to call for signals previously registered,
-/// unless the signal handlers registered using [setup_signal_handler] are broken.
+/// unless the signal handlers registered using [`setup_signal_handler()`] are broken.
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
@@ -128,7 +145,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
 
 /// Setup signal handlers in a somewhat rusty way.
 /// This will allocate a signal stack and set the signal handlers accordingly.
-/// It is, for example, used in the [crate::executors::InProcessExecutor] to restart the fuzzer in case of a crash,
+/// It is, for example, used in the [`struct@crate::executors::InProcessExecutor`] to restart the fuzzer in case of a crash,
 /// or to handle `SIGINT` in the broker process.
 /// # Safety
 /// The signal handlers will be called on any signal. They should (tm) be async safe.

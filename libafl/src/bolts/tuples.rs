@@ -1,4 +1,4 @@
-//! Compiletime lists used throughout the libafl universe
+//! Compiletime lists/tuples used throughout the `LibAFL` universe
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
@@ -6,10 +6,42 @@ use core::any::TypeId;
 
 use xxhash_rust::const_xxh3::xxh3_64;
 
+#[cfg(feature = "RUSTC_IS_NIGHTLY")]
+/// From https://stackoverflow.com/a/60138532/7658998
+const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    // Helper trait. `VALUE` is false, except for the specialization of the
+    // case where `T == U`.
+    trait TypeEq<U: ?Sized> {
+        const VALUE: bool;
+    }
+
+    // Default implementation.
+    impl<T: ?Sized, U: ?Sized> TypeEq<U> for T {
+        default const VALUE: bool = false;
+    }
+
+    // Specialization for `T == U`.
+    impl<T: ?Sized> TypeEq<T> for T {
+        const VALUE: bool = true;
+    }
+
+    <T as TypeEq<U>>::VALUE
+}
+
+#[cfg(not(feature = "RUSTC_IS_NIGHTLY"))]
+const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    // BEWARE! This is not unsafe, it is SUPER UNSAFE
+    true
+}
+
+/// Gets the length of the element
 pub trait HasLen {
+    /// The length as constant `usize`
     const LEN: usize;
 
+    /// The length
     fn len(&self) -> usize;
+    /// Returns true, if empty
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -34,54 +66,63 @@ where
     }
 }
 
+/// Finds the `const_name` and `name_id`
 pub trait HasNameId {
+    /// Gets the `const_name` for this entry
     fn const_name(&self) -> &'static str;
 
+    /// Gets the `name_id` for this entry
     fn name_id(&self) -> u64 {
         xxh3_64(self.const_name().as_bytes())
     }
 }
 
+/// Gets the id and `const_name` for the given index in a tuple
 pub trait HasNameIdTuple: HasLen {
-    fn get_const_name(&self, index: usize) -> Option<&'static str>;
+    /// Gets the `const_name` for the entry at the given index
+    fn const_name_for(&self, index: usize) -> Option<&'static str>;
 
-    fn get_name_id(&self, index: usize) -> Option<u64>;
+    /// Gets the `name_id` for the entry at the given index
+    fn name_id_for(&self, index: usize) -> Option<u64>;
 }
 
 impl HasNameIdTuple for () {
-    fn get_const_name(&self, _index: usize) -> Option<&'static str> {
+    fn const_name_for(&self, _index: usize) -> Option<&'static str> {
         None
     }
 
-    fn get_name_id(&self, _index: usize) -> Option<u64> {
+    fn name_id_for(&self, _index: usize) -> Option<u64> {
         None
     }
 }
 
 impl<Head, Tail> HasNameIdTuple for (Head, Tail)
 where
-    Head: 'static + HasNameId,
+    Head: HasNameId,
     Tail: HasNameIdTuple,
 {
-    fn get_const_name(&self, index: usize) -> Option<&'static str> {
+    fn const_name_for(&self, index: usize) -> Option<&'static str> {
         if index == 0 {
             Some(self.0.const_name())
         } else {
-            self.1.get_const_name(index - 1)
+            self.1.const_name_for(index - 1)
         }
     }
 
-    fn get_name_id(&self, index: usize) -> Option<u64> {
+    fn name_id_for(&self, index: usize) -> Option<u64> {
         if index == 0 {
             Some(self.0.name_id())
         } else {
-            self.1.get_name_id(index - 1)
+            self.1.name_id_for(index - 1)
         }
     }
 }
 
+/// Returns the first element with the given type
 pub trait MatchFirstType {
+    /// Returns the first element with the given type as borrow, or [`Option::None`]
     fn match_first_type<T: 'static>(&self) -> Option<&T>;
+    /// Returns the first element with the given type as mutable borrow, or [`Option::None`]
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T>;
 }
 
@@ -116,8 +157,11 @@ where
     }
 }
 
+/// Match by type
 pub trait MatchType {
+    /// Match by type and call the passed `f` function with a borrow, if found
     fn match_type<T: 'static>(&self, f: fn(t: &T));
+    /// Match by type and call the passed `f` function with a mutable borrow, if found
     fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T));
 }
 
@@ -132,6 +176,7 @@ where
     Tail: MatchType,
 {
     fn match_type<T: 'static>(&self, f: fn(t: &T)) {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             f(unsafe { (&self.0 as *const _ as *const T).as_ref() }.unwrap());
         }
@@ -139,6 +184,7 @@ where
     }
 
     fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             f(unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }.unwrap());
         }
@@ -152,32 +198,79 @@ pub trait Named {
     fn name(&self) -> &str;
 }
 
+/// A named tuple
 pub trait NamedTuple: HasLen {
-    fn get_name(&self, index: usize) -> Option<&str>;
+    /// Gets the name of this tuple
+    fn name(&self, index: usize) -> Option<&str>;
 }
 
 impl NamedTuple for () {
-    fn get_name(&self, _index: usize) -> Option<&str> {
+    fn name(&self, _index: usize) -> Option<&str> {
         None
     }
 }
 
 impl<Head, Tail> NamedTuple for (Head, Tail)
 where
-    Head: 'static + Named,
+    Head: Named,
     Tail: NamedTuple,
 {
-    fn get_name(&self, index: usize) -> Option<&str> {
+    fn name(&self, index: usize) -> Option<&str> {
         if index == 0 {
             Some(self.0.name())
         } else {
-            self.1.get_name(index - 1)
+            self.1.name(index - 1)
         }
     }
 }
 
+/// Match for a name and return the value
+///
+/// # Safety
+/// This operation is unsafe with Rust stable, wait for [specialization](https://stackoverflow.com/a/60138532/7658998).
+pub trait MatchName {
+    /// Match for a name and return the borrowed value
+    fn match_name<T>(&self, name: &str) -> Option<&T>;
+    /// Match for a name and return the mut borrowed value
+    fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T>;
+}
+
+impl MatchName for () {
+    fn match_name<T>(&self, _name: &str) -> Option<&T> {
+        None
+    }
+    fn match_name_mut<T>(&mut self, _name: &str) -> Option<&mut T> {
+        None
+    }
+}
+
+impl<Head, Tail> MatchName for (Head, Tail)
+where
+    Head: Named,
+    Tail: MatchName,
+{
+    fn match_name<T>(&self, name: &str) -> Option<&T> {
+        if type_eq::<Head, T>() && name == self.0.name() {
+            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+        } else {
+            self.1.match_name::<T>(name)
+        }
+    }
+
+    fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
+        if type_eq::<Head, T>() && name == self.0.name() {
+            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+        } else {
+            self.1.match_name_mut::<T>(name)
+        }
+    }
+}
+
+/// Finds an element of a `type` by the given `name`.
 pub trait MatchNameAndType {
+    /// Finds an element of a `type` by the given `name`, and returns a borrow, or [`Option::None`].
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T>;
+    /// Finds an element of a `type` by the given `name`, and returns a mut borrow, or [`Option::None`].
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T>;
 }
 
@@ -196,6 +289,7 @@ where
     Tail: MatchNameAndType,
 {
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
             unsafe { (&self.0 as *const _ as *const T).as_ref() }
         } else {
@@ -204,6 +298,7 @@ where
     }
 
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
             unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
         } else {
@@ -212,9 +307,14 @@ where
     }
 }
 
+/// Allows prepending of values to a tuple
 pub trait Prepend<T>: TupleList {
+    /// The Resulting [`TupleList`], of an [`Prepend::prepend()`] call,
+    /// including the prepended entry.
     type PreprendResult: TupleList;
 
+    /// Prepend a value to this tuple, returning a new tuple with prepended value.
+    #[must_use]
     fn prepend(self, value: T) -> (T, Self::PreprendResult);
 }
 
@@ -230,9 +330,14 @@ where
     }
 }
 
+/// Append to a `TupeList`
 pub trait Append<T>: TupleList {
+    /// The Resulting [`TupleList`], of an [`Append::append()`] call,
+    /// including the appended entry.
     type AppendResult: TupleList;
 
+    /// Append Value and return the tuple
+    #[must_use]
     fn append(self, value: T) -> Self::AppendResult;
 }
 
@@ -260,6 +365,7 @@ where
     }
 }
 
+/// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
 macro_rules! tuple_for_each {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
@@ -291,6 +397,7 @@ macro_rules! tuple_for_each {
     };
 }
 
+/// Iterate over a tuple, executing the given `expr` for each element, granting mut access.
 #[macro_export]
 macro_rules! tuple_for_each_mut {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {

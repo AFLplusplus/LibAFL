@@ -16,15 +16,21 @@ use crate::{
 
 use alloc::boxed::Box;
 
+/// A `CustomExitKind` for exits that do not fit to one of the default `ExitKind`.
 pub trait CustomExitKind: core::fmt::Debug + SerdeAny + 'static {}
 
 /// How an execution finished.
 #[derive(Debug)]
 pub enum ExitKind {
+    /// The run exited normally.
     Ok,
+    /// The run resulted in a target crash.
     Crash,
+    /// The run hit an out of memory error.
     Oom,
+    /// The run timed out
     Timeout,
+    /// The run resulted in a custom `ExitKind`.
     Custom(Box<dyn CustomExitKind>),
 }
 
@@ -90,17 +96,18 @@ where
     fn observers_mut(&mut self) -> &mut OT;
 }
 
-/// Execute the exec hooks of the observers if they all implement HasExecHooks
+/// Execute the exec hooks of the observers if they all implement [`HasExecHooks`].
 pub trait HasObserversHooks<EM, I, OT, S>: HasObservers<OT>
 where
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
 {
+    /// Run the pre exec hook for all [`crate::observers::Observer`]`s` linked to this [`Executor`].
     #[inline]
     fn pre_exec_observers(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
         self.observers_mut().pre_exec_all(state, mgr, input)
     }
 
-    /// Run the post exec hook for all the observes linked to this executor
+    /// Run the post exec hook for all the [`crate::observers::Observer`]`s` linked to this [`Executor`].
     #[inline]
     fn post_exec_observers(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
         self.observers_mut().post_exec_all(state, mgr, input)

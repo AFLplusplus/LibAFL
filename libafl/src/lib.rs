@@ -1,8 +1,9 @@
 /*!
-Welcome to libAFL
+Welcome to `LibAFL`
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(feature = "RUSTC_IS_NIGHTLY", feature(specialization))]
 
 #[macro_use]
 extern crate alloc;
@@ -172,11 +173,12 @@ mod tests {
     use crate::events::SimpleEventManager;
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_fuzzer() {
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4]).into();
+        let testcase = Testcase::new(vec![0; 4]);
         corpus.add(testcase).unwrap();
 
         let mut state = State::new(

@@ -86,6 +86,7 @@ pub trait HasLen {
     /// The length
     fn len(&self) -> usize;
 
+    /// Returns `true` if it has no elements.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }

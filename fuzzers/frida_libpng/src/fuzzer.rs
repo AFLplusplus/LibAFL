@@ -87,7 +87,7 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
-        if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
+if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
             println!("Crashing target as it had ASAN errors");
             unsafe {
                 libc::raise(libc::SIGABRT);

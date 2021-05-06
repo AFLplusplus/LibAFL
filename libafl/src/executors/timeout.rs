@@ -54,6 +54,8 @@ where
     E: Executor<I>,
     I: Input,
 {
+    /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
+    /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         Self {
             executor,
@@ -62,6 +64,7 @@ where
         }
     }
 
+    /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
     pub fn inner(&mut self) -> &mut E {
         &mut self.executor
     }

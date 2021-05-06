@@ -32,6 +32,7 @@ crate::impl_serdeany!(Tokens);
 /// The metadata used for token mutators
 impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
+    #[must_use]
     pub fn new(token_vec: Vec<Vec<u8>>) -> Self {
         Self { token_vec }
     }
@@ -117,11 +118,13 @@ impl Tokens {
     }
 
     /// Gets the tokens stored in this db
+    #[must_use]
     pub fn tokens(&self) -> &[Vec<u8>] {
         &self.token_vec
     }
 }
 
+/// Inserts a random token at a random position in the `Input`.
 #[derive(Default)]
 pub struct TokenInsert<I, R, S>
 where
@@ -197,6 +200,8 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    /// Create a `TokenInsert` `Mutation`.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -204,6 +209,8 @@ where
     }
 }
 
+/// A `TokenReplace` [`Mutator`] replaces a random part of the input with one of a range of tokens.
+/// From AFL terms, this is called as `Dictionary` mutation (which doesn't really make sense ;) ).
 #[derive(Default)]
 pub struct TokenReplace<I, R, S>
 where
@@ -275,6 +282,8 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    /// Creates a new `TokenReplace` struct.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

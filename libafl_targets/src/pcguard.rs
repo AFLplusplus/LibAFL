@@ -1,21 +1,26 @@
+//! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
+
 #[cfg(all(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]
+#[cfg(not(any(doc, feature = "clippy")))]
 compile_error!(
     "the libafl_targets `pcguard_edges` and `pcguard_hitcounts` features are mutually exclusive."
 );
 
 // TODO compile time flag
+/// The map size for `SanCov` edges.
 pub const EDGES_MAP_SIZE: usize = 65536;
 
+/// The map for `SanCov` edges.
 pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 //pub static mut CMP_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
+/// The max count of edges tracked.
 pub static mut MAX_EDGES_NUM: usize = 0;
 
-/// Sanitizer Coverage PC_Guard implementation.
-/// Will trace edges if `pcguard_edges` is set.
-/// Will trace hitcounts, if `pcguard_hitcounts` is set.
+/// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
 ///
 /// # Safety
-/// The function write to the `EDGES_MAP` global map, if guard exceeds this size, access is out of bounds.
+/// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
+/// Should usually not be called directly.
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     let pos = *guard as usize;
@@ -30,10 +35,10 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     }
 }
 
-/// Pcguard sancov implementation, used for coverage feedback.
+/// Initialize the sancov `pc_guard` - usually called by `llvm`.
 ///
 /// # Safety
-/// Dereferences, and writes to the handed `start` pointer.
+/// Dereferences at `start` and writes to it.
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
     if start == stop || *start != 0 {
@@ -41,7 +46,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     }
 
     while start < stop {
-        MAX_EDGES_NUM += 1;
+        MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1);
         *start = (MAX_EDGES_NUM & (EDGES_MAP_SIZE - 1)) as u32;
         start = start.offset(1);
     }

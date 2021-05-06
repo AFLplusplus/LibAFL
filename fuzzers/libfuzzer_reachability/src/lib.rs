@@ -1,31 +1,34 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
-//! The example harness is built for stb_image.
+//! The example harness is built for libpng.
 
 use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::tuples::tuple_list,
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
-    events::setup_restarting_mgr_std,
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
+    events::{setup_restarting_mgr_std, EventManager},
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{MaxMapFeedback, ReachabilityFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
-    observers::{StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
     utils::{current_nanos, StdRand},
     Error,
 };
-
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
+const TARGET_SIZE: usize = 4;
+
+extern "C" {
+    static __libafl_target_list: *mut usize;
+}
+
+/// The main fn, no_mangle as it is a C main
+#[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -62,12 +65,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     };
 
     // Create an observation channel using the coverage map
-    // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
-    // Create an observation channel to keep track of the execution time
-    let time_observer = TimeObserver::new("time");
+    let reachability_observer =
+        unsafe { StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -77,15 +79,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Feedbacks to rate the interestingness of an input
-            feedback_or!(
-                MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
-                TimeFeedback::new_with_observer(&time_observer)
-            ),
+            MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
-            // Feedback to recognize an input as solution
-            CrashFeedback::new(),
+            // Feedbacks to recognize an input as solution
+            ReachabilityFeedback::new_with_observer(&reachability_observer),
         )
     });
 
@@ -106,11 +105,11 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let stage = StdMutationalStage::new(mutator);
 
-    // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
+    // A fuzzer with just one stage
     let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
-    // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    // A random policy to get testcasess from the corpus
+    let scheduler = RandCorpusScheduler::new();
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |buf: &[u8]| {
@@ -118,10 +117,10 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         ExitKind::Ok
     };
 
-    // Create the executor for an in-process function with just one observer for edge coverage
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(edges_observer, time_observer),
+        tuple_list!(edges_observer, reachability_observer,),
         &mut state,
         &mut restarting_mgr,
     )?;
@@ -144,8 +143,22 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+    // This fuzzer restarts after 1 mio `fuzz_one` executions.
+    // Each fuzz_one will internally do many executions of the target.
+    // If your target is very instable, setting a low count here may help.
+    // However, you will lose a lot of performance that way.
+    let iters = 1_000_000;
+    fuzzer.fuzz_loop_for(
+        &mut state,
+        &mut executor,
+        &mut restarting_mgr,
+        &scheduler,
+        iters,
+    )?;
 
-    // Never reached
+    // It's important, that we store the state before restarting!
+    // Else, the parent will not respawn a new child and quit.
+    restarting_mgr.on_restart(&mut state)?;
+
     Ok(())
 }

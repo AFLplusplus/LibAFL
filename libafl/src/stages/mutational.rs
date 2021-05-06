@@ -65,6 +65,8 @@ where
     }
 }
 
+/// Default value, how many iterations each stage gets, as an upper bound
+/// It may randomly continue earlier.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage

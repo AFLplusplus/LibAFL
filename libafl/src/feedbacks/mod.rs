@@ -4,6 +4,7 @@
 pub mod map;
 pub use map::*;
 
+use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -47,7 +48,7 @@ where
     }
 }
 
-/// Compose feedbacks with an AND operation
+/// Compose [`Feedback`]`s` with an `AND` operation
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct AndFeedback<A, B, I>
@@ -56,7 +57,9 @@ where
     B: Feedback<I>,
     I: Input,
 {
+    /// The first [`Feedback`] to `AND`.
     pub first: A,
+    /// The second [`Feedback`] to `AND`.
     pub second: B,
     phantom: PhantomData<I>,
 }
@@ -113,6 +116,7 @@ where
     B: Feedback<I>,
     I: Input,
 {
+    /// Creates a new [`AndFeedback`], resulting in the `AND` of two feedbacks.
     pub fn new(first: A, second: B) -> Self {
         Self {
             first,
@@ -131,7 +135,9 @@ where
     B: Feedback<I>,
     I: Input,
 {
+    /// The first [`Feedback`]
     pub first: A,
+    /// The second [`Feedback`], `OR`ed with the first.
     pub second: B,
     phantom: PhantomData<I>,
 }
@@ -188,6 +194,7 @@ where
     B: Feedback<I>,
     I: Input,
 {
+    /// Creates a new [`OrFeedback`] for two feedbacks.
     pub fn new(first: A, second: B) -> Self {
         Self {
             first,
@@ -205,6 +212,7 @@ where
     A: Feedback<I>,
     I: Input,
 {
+    /// The feedback to invert
     pub first: A,
     phantom: PhantomData<I>,
 }
@@ -254,6 +262,7 @@ where
     A: Feedback<I>,
     I: Input,
 {
+    /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
         Self {
             first,
@@ -317,7 +326,7 @@ impl Named for () {
     }
 }
 
-/// Is a crash feedback
+/// A [`CrashFeedback`] reports as interesting if the target crashed.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {}
 
@@ -350,6 +359,8 @@ impl Named for CrashFeedback {
 }
 
 impl CrashFeedback {
+    /// Creates a new [`CrashFeedback`]
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -361,6 +372,7 @@ impl Default for CrashFeedback {
     }
 }
 
+/// A [`TimeoutFeedback`] reduces the timeout value of a run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {}
 
@@ -393,6 +405,8 @@ impl Named for TimeoutFeedback {
 }
 
 impl TimeoutFeedback {
+    /// Returns a new [`TimeoutFeedback`].
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -405,10 +419,12 @@ impl Default for TimeoutFeedback {
 }
 
 /// Nop feedback that annotates execution time in the new testcase, if any
-/// For this Feedback, the testcase is never interesting (use with an OR)
+/// for this Feedback, the testcase is never interesting (use with an OR)
+/// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
     exec_time: Option<Duration>,
+    name: String,
 }
 
 impl<I> Feedback<I> for TimeFeedback
@@ -424,7 +440,8 @@ where
     where
         OT: ObserversTuple,
     {
-        let observer = observers.match_first_type::<TimeObserver>().unwrap();
+        // TODO Replace with match_name_type when stable
+        let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
         self.exec_time = *observer.last_runtime();
         Ok(false)
     }
@@ -448,18 +465,26 @@ where
 impl Named for TimeFeedback {
     #[inline]
     fn name(&self) -> &str {
-        "TimeFeedback"
+        self.name.as_str()
     }
 }
 
 impl TimeFeedback {
-    pub fn new() -> Self {
-        Self { exec_time: None }
+    /// Creates a new [`TimeFeedback`], deciding if the value of a [`TimeObserver`] with the given `name` of a run is interesting.
+    #[must_use]
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            exec_time: None,
+            name: name.to_string(),
+        }
     }
-}
 
-impl Default for TimeFeedback {
-    fn default() -> Self {
-        Self::new()
+    /// Creates a new [`TimeFeedback`], deciding if the given [`TimeObserver`] value of a run is interesting.
+    #[must_use]
+    pub fn new_with_observer(observer: &TimeObserver) -> Self {
+        Self {
+            exec_time: None,
+            name: observer.name().to_string(),
+        }
     }
 }
