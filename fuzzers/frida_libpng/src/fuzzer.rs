@@ -258,12 +258,8 @@ unsafe fn fuzz(
     };
 
     let frida_options = FridaOptions::parse_env_options();
-    let mut frida_helper = FridaInstrumentationHelper::new(
-        &gum,
-        &frida_options,
-        module_name,
-        &modules_to_instrument,
-    );
+    let mut frida_helper =
+        FridaInstrumentationHelper::new(&gum, &frida_options, module_name, &modules_to_instrument);
 
     // Create an observation channel using the coverage map
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(

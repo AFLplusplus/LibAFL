@@ -6,6 +6,34 @@ use core::any::TypeId;
 
 use xxhash_rust::const_xxh3::xxh3_64;
 
+#[cfg(feature = "RUSTC_IS_NIGHTLY")]
+/// From https://stackoverflow.com/a/60138532/7658998
+const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    // Helper trait. `VALUE` is false, except for the specialization of the
+    // case where `T == U`.
+    trait TypeEq<U: ?Sized> {
+        const VALUE: bool;
+    }
+
+    // Default implementation.
+    impl<T: ?Sized, U: ?Sized> TypeEq<U> for T {
+        default const VALUE: bool = false;
+    }
+
+    // Specialization for `T == U`.
+    impl<T: ?Sized> TypeEq<T> for T {
+        const VALUE: bool = true;
+    }
+
+    <T as TypeEq<U>>::VALUE
+}
+
+#[cfg(not(feature = "RUSTC_IS_NIGHTLY"))]
+const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    // BEWARE! This is not unsafe, it is SUPER UNSAFE
+    true
+}
+
 pub trait HasLen {
     const LEN: usize;
 
@@ -60,7 +88,7 @@ impl HasNameIdTuple for () {
 
 impl<Head, Tail> HasNameIdTuple for (Head, Tail)
 where
-    Head: 'static + HasNameId,
+    Head: HasNameId,
     Tail: HasNameIdTuple,
 {
     fn get_const_name(&self, index: usize) -> Option<&'static str> {
@@ -132,6 +160,7 @@ where
     Tail: MatchType,
 {
     fn match_type<T: 'static>(&self, f: fn(t: &T)) {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             f(unsafe { (&self.0 as *const _ as *const T).as_ref() }.unwrap());
         }
@@ -139,6 +168,7 @@ where
     }
 
     fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             f(unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }.unwrap());
         }
@@ -164,7 +194,7 @@ impl NamedTuple for () {
 
 impl<Head, Tail> NamedTuple for (Head, Tail)
 where
-    Head: 'static + Named,
+    Head: Named,
     Tail: NamedTuple,
 {
     fn get_name(&self, index: usize) -> Option<&str> {
@@ -172,6 +202,43 @@ where
             Some(self.0.name())
         } else {
             self.1.get_name(index - 1)
+        }
+    }
+}
+
+/// This operation is unsafe with Rust stable, wait for https://stackoverflow.com/a/60138532/7658998
+pub trait MatchName {
+    fn match_name<T>(&self, name: &str) -> Option<&T>;
+    fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T>;
+}
+
+impl MatchName for () {
+    fn match_name<T>(&self, _name: &str) -> Option<&T> {
+        None
+    }
+    fn match_name_mut<T>(&mut self, _name: &str) -> Option<&mut T> {
+        None
+    }
+}
+
+impl<Head, Tail> MatchName for (Head, Tail)
+where
+    Head: Named,
+    Tail: MatchName,
+{
+    fn match_name<T>(&self, name: &str) -> Option<&T> {
+        if type_eq::<Head, T>() && name == self.0.name() {
+            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+        } else {
+            self.1.match_name::<T>(name)
+        }
+    }
+
+    fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
+        if type_eq::<Head, T>() && name == self.0.name() {
+            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+        } else {
+            self.1.match_name_mut::<T>(name)
         }
     }
 }
@@ -196,6 +263,7 @@ where
     Tail: MatchNameAndType,
 {
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
             unsafe { (&self.0 as *const _ as *const T).as_ref() }
         } else {
@@ -204,6 +272,7 @@ where
     }
 
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
+        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
             unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
         } else {
