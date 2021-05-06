@@ -22,4 +22,4 @@ Each of these example fuzzers uses particular features of LibAFL, sometimes comb
 
 You can use these crates as examples and as skeletons for custom fuzzers with similar feature sets.
 
-To build an example fuzzer you have to invoke cargo from its respective folder (`fuzzers/[FUZZER_NAME]).
+To build an example fuzzer you have to invoke cargo from its respective folder (`fuzzers/[FUZZER_NAME]`).
