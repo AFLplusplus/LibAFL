@@ -1,4 +1,6 @@
-//! DrCov support for LibAFL Frida, writing trace files to be read by lighthouse etc.
+//! [`DrCov`](https://dynamorio.org/page_drcov.html) support for `LibAFL` frida mode,
+//! writing basic-block trace files to be read by coverage analysis tools, such as [Lighthouse](https://github.com/gaasedelen/lighthouse),
+//! [bncov](https://github.com/ForAllSecure/bncov), [dragondance](https://github.com/0ffffffffh/dragondance), etc.
 
 use rangemap::RangeMap;
 use std::{
@@ -13,7 +15,7 @@ pub struct DrCovBasicBlock {
     end: usize,
 }
 
-/// A writer for DrCov files
+/// A writer for `DrCov` files
 pub struct DrCovWriter<'a> {
     writer: BufWriter<File>,
     module_mapping: &'a RangeMap<usize, (u16, &'a str)>,
@@ -29,6 +31,7 @@ struct DrCovBasicBlockEntry {
 
 impl DrCovBasicBlock {
     /// Create a new [`DrCovBasicBlock`] with the given `start` and `end` addresses.
+    #[must_use]
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
@@ -49,7 +52,7 @@ impl<'a> DrCovWriter<'a> {
         }
     }
 
-    /// Write the DrCov file.
+    /// Write the `DrCov` file.
     pub fn write(&mut self) {
         self.writer
             .write_all(b"DRCOV VERSION: 2\nDRCOV FLAVOR: libafl\n")
