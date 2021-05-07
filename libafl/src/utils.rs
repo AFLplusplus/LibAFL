@@ -3,7 +3,7 @@
 #[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
-    events::llmp::{setup_restarting_mgr, LlmpRestartingEventManager, ManagerKind},
+    events::llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgrBuilder},
     inputs::Input,
     state::IfInteresting,
     stats::Stats,
@@ -664,14 +664,17 @@ where
                         }
                         //fuzzer client. keeps retrying the connection to broker till the broker starts
                         let stats = (self.client_init_stats)()?;
-                        let (state, mgr) = setup_restarting_mgr(
-                            self.shmem_provider.clone(),
-                            stats,
-                            self.broker_port,
-                            ManagerKind::Client {
+                        let (state, mgr) = RestartingMgrBuilder::default()
+                            .shmem_provider(self.shmem_provider.clone())
+                            .stats(stats)
+                            .broker_port(self.broker_port)
+                            .kind(ManagerKind::Client {
                                 cpu_core: Some(*bind_to),
-                            },
-                        )?;
+                            })
+                            .build()
+                            .unwrap()
+                            .launch()?;
+
                         (self.run_client)(state, mgr)?;
                         break;
                     }
@@ -682,21 +685,25 @@ where
         println!("I am broker!!.");
 
         if let Some(b2b_addr) = self.b2b_addr {
-            setup_restarting_mgr::<I, S, SP, ST>(
-                self.shmem_provider.clone(),
-                self.stats.clone(),
-                self.broker_port,
-                ManagerKind::ConnectedBroker {
+            RestartingMgrBuilder::<I, S, SP, ST>::default()
+                .shmem_provider(self.shmem_provider.clone())
+                .stats(self.stats.clone())
+                .broker_port(self.broker_port)
+                .kind(ManagerKind::ConnectedBroker {
                     connect_to: b2b_addr,
-                },
-            )?;
+                })
+                .build()
+                .unwrap()
+                .launch()?;
         } else {
-            setup_restarting_mgr::<I, S, SP, ST>(
-                self.shmem_provider.clone(),
-                self.stats.clone(),
-                self.broker_port,
-                ManagerKind::Broker,
-            )?;
+            RestartingMgrBuilder::<I, S, SP, ST>::default()
+                .shmem_provider(self.shmem_provider.clone())
+                .stats(self.stats.clone())
+                .broker_port(self.broker_port)
+                .kind(ManagerKind::Broker)
+                .build()
+                .unwrap()
+                .launch()?;
         }
 
         //broker exited. kill all clients.
