@@ -27,7 +27,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    utils::{current_nanos, launcher, parse_core_bind_arg, StdRand},
+    utils::{current_nanos, LauncherBuilder, parse_core_bind_arg, StdRand},
     Error,
 };
 
@@ -419,5 +419,15 @@ unsafe fn fuzz(
         Ok(())
     };
 
-    launcher(shmem_provider.clone(), stats, &mut client_init_stats, &mut run_client, broker_port, cores, stdout_file, broker_addr)
+    LauncherBuilder::default()
+        .shmem_provider(shmem_provider.clone())
+        .stats(stats)
+        .client_init_stats(&mut client_init_stats)
+        .run_client(&mut run_client)
+        .cores(cores)
+        .stdout_file(stdout_file)
+        .b2b_addr(broker_addr)
+        .build()
+        .unwrap()
+        .launch()
 }
