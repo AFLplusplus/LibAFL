@@ -697,7 +697,7 @@ where
         let is_interesting = {
             // Init temporary feedback stats here. We can't use the typical pattern above
             // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
-            // new `mut self` to `is_interesting_all_with_perf`. We use this stack
+            // new `mut self` to `is_interesting_with_perf`. We use this stack
             // variable to get the stats and then update the feedbacks directly
             let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
             let feedback_index = 0;

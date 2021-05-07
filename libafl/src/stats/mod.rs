@@ -266,10 +266,10 @@ macro_rules! mark_feedback_time {
 }
 
 /// Number of stages in the fuzzer
-pub(crate) const NUM_STAGES: usize = 4;
+pub(crate) const NUM_STAGES: usize = 8;
 
 /// Number of feedback mechanisms to measure for performance
-pub(crate) const NUM_FEEDBACKS: usize = 4;
+pub(crate) const NUM_FEEDBACKS: usize = 16;
 
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -296,6 +296,7 @@ pub struct ClientPerfStats {
     /// stages if they are not in use.
     stages_used: [bool; NUM_STAGES],
 
+    // TODO(andrea) use an hashmap and indetify feaures using a &'static str
     /// Clock cycles spent in the the various features of each stage
     stages: [[u64; PerfFeature::Count as usize]; NUM_STAGES],
 
@@ -334,10 +335,10 @@ pub enum PerfFeature {
     /// Time spent in the [`post_exec_observers`](crate::executors::Executor::post_exec_observers) callback
     PostExecObservers = 7,
 
-    /// Time spent getting the feedback from [`is_interesting_all`] from all feedbacks
+    /// Time spent getting the feedback from [`is_interesting`] from all feedbacks
     GetFeedbackInterestingAll = 8,
 
-    /// Time spent getting the feedback from [`is_interesting_all`] from all observers
+    /// Time spent getting the feedback from [`is_interesting`] from all objectives
     GetObjectivesInterestingAll = 9,
 
     /// Used as a counter to know how many elements are in [`PerfFeature`]. Must be the
