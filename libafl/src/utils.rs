@@ -607,10 +607,8 @@ where
     /// A closure or function which generates stats instances for newly spawned clients
     client_init_stats: &'a mut dyn FnMut() -> Result<ST, Error>,
     /// The 'main' function to run for each client forked. This probably shouldn't return
-    run_client: &'a mut dyn FnMut(
-        Option<S>,
-        LlmpRestartingEventManager<I, S, SP, ST>,
-    ) -> Result<(), Error>,
+    run_client:
+        &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>) -> Result<(), Error>,
     /// The broker port to use
     #[builder(default = "1337")]
     broker_port: u16,
@@ -640,7 +638,9 @@ where
         let mut handles = vec![];
 
         println!("spawning on cores: {:?}", self.cores);
-        let file = self.stdout_file.map(|filename| File::create(filename).unwrap());
+        let file = self
+            .stdout_file
+            .map(|filename| File::create(filename).unwrap());
 
         //spawn clients
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
