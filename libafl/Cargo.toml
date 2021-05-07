@@ -1,6 +1,6 @@
 [package]
 name = "libafl"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
@@ -61,7 +61,7 @@ erased-serde = "0.3.12"
 postcard = { version = "0.5.1", features = ["alloc"] } # no_std compatible serde serialization fromat
 static_assertions = "1.1.0"
 ctor = "0.1.20"
-libafl_derive = { version = "0.1.0", optional = true, path = "../libafl_derive" }
+libafl_derive = { optional = true, path = "../libafl_derive", version = "0.2.1" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] } # an easy way to debug print SerdeAnyMap
 compression = { version = "0.1.5" }
 num_enum = "0.5.1"
