@@ -15,8 +15,8 @@ default = []
 pcguard_edges = []
 pcguard_hitcounts = []
 libfuzzer = []
-value_profile = []
-cmplog = []
+sancov_value_profile = []
+sancov_cmplog = []
 pcguard = ["pcguard_hitcounts"]
 clippy = [] # Ignore compiler warnings during clippy
 
