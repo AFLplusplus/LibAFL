@@ -673,7 +673,7 @@ where
             #[cfg(unix)]
             let child_status = match unsafe { fork() }? {
                 ForkResult::Parent(handle) => handle.status(),
-                ForkResult::Child => break (sender, receiver, shmem_provider, cpu_core),
+                ForkResult::Child => break (sender, receiver, shmem_provider, core_id),
             };
 
             // On windows, we spawn ourself again

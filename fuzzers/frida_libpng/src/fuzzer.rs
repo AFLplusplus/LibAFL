@@ -222,7 +222,7 @@ pub fn main() {
         )
         .get_matches();
 
-    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap().to_string()).unwrap();
+    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap().to_string()).unwrap();
 
     color_backtrace::install();
 
@@ -403,5 +403,5 @@ unsafe fn fuzz(
         Ok(())
     };
 
-    launcher(shmem_provider.clone(), stats, &mut client_init_stats, &mut run_client, broker_port, cores, stdout_file)
+    launcher(shmem_provider.clone(), stats, &mut client_init_stats, &mut run_client, broker_port, cores, stdout_file, None)
 }

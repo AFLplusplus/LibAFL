@@ -12,7 +12,6 @@ use crate::{
 use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{net::SocketAddr, process::Stdio};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(unix)]
@@ -20,11 +19,12 @@ use libc::pid_t;
 #[cfg(feature = "std")]
 use std::{
     env,
+    net::SocketAddr,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 #[cfg(all(unix, feature = "std"))]
-use std::{ffi::CString, os::unix::io::AsRawFd};
+use std::{ffi::CString, fs::File, os::unix::io::AsRawFd};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::Error;
@@ -611,19 +611,19 @@ where
     SP: ShMemProvider + 'static,
     S: DeserializeOwned + IfInteresting<I>,
 {
-    let core_ids = core_affinity::get_core_ids()?;
+    let core_ids = core_affinity::get_core_ids().unwrap();
     let num_cores = core_ids.len();
     let mut handles = vec![];
 
     println!("spawning on cores: {:?}", cores);
-    let file = stdout_file.map(|filename| File::create(filename))?;
+    let file = stdout_file.map(|filename| File::create(filename).unwrap());
 
     //spawn clients
     for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
         if cores.iter().any(|&x| x == id) {
             match unsafe { fork() }? {
                 ForkResult::Parent(child) => {
-                    child.push(child.pid);
+                    handles.push(child.pid);
                     #[cfg(feature = "std")]
                     println!("child spawned and bound to core {}", id);
                 }
@@ -635,8 +635,8 @@ where
 
                     #[cfg(feature = "std")]
                     if file.is_some() {
-                        dup2(file.as_ref()?.as_raw_fd(), libc::STDOUT_FILENO)?;
-                        dup2(file.as_ref()?.as_raw_fd(), libc::STDERR_FILENO)?;
+                        dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDOUT_FILENO)?;
+                        dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDERR_FILENO)?;
                     }
                     //fuzzer client. keeps retrying the connection to broker till the broker starts
                     let stats = client_init_stats()?;

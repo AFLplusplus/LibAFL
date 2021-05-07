@@ -9,10 +9,13 @@ use libafl::utils::find_mapping_for_path;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
-use capstone::arch::{
-    arch::{self, BuildsCapstone},
-    arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
-    ArchOperand::Arm64Operand,
+use capstone::{
+    arch::{
+        self,
+        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        ArchOperand::Arm64Operand,
+        BuildsCapstone,
+    },
     Capstone, Insn,
 };
 
