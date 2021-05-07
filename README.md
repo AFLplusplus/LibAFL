@@ -42,11 +42,6 @@ Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
-If you want to get the latest and greatest features,
-```
-git checkout dev
-```
-
 Build the library using
 
 ```
@@ -64,7 +59,6 @@ cargo doc
 ```
 cd docs && mdbook serve
 ```
-
 
 We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*

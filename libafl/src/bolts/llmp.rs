@@ -55,6 +55,8 @@ For broker2broker communication, all messages are forwarded via network sockets.
 
 Check out the `llmp_test` example in ./examples, or build it with `cargo run --example llmp_test`.
 
+For broker2broker communication, all messages are forwarded via network sockets.
+
 */
 
 use alloc::{string::String, vec::Vec};
