@@ -584,7 +584,8 @@ where
 #[allow(
     clippy::unnecessary_operation,
     clippy::type_complexity,
-    clippy::similar_names
+    clippy::similar_names,
+    clippy::too_many_lines
 )] // for { mgr = LlmpEventManager... }
 pub fn setup_restarting_mgr<I, S, SP, ST>(
     mut shmem_provider: SP,

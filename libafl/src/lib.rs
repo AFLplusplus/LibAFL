@@ -122,6 +122,13 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+#[cfg(unix)]
+impl From<nix::Error> for Error {
+    fn from(err: nix::Error) -> Self {
+        Self::Unknown(format!("{:?}", err))
+    }
+}
+
 /// Create an AFL Error from io Error
 #[cfg(feature = "std")]
 impl From<io::Error> for Error {

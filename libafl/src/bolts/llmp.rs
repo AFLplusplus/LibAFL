@@ -68,6 +68,7 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
+use std::io::ErrorKind;
 #[cfg(feature = "std")]
 use std::{
     convert::TryInto,
@@ -89,6 +90,10 @@ use crate::{
 };
 #[cfg(unix)]
 use libc::ucontext_t;
+#[cfg(all(unix, feature = "std"))]
+use nix::sys::socket::{self, sockopt::ReusePort};
+#[cfg(all(unix, feature = "std"))]
+use std::os::unix::io::AsRawFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
@@ -319,6 +324,19 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
     } else {
         Some(msg_offset_str.parse()?)
     })
+}
+
+/// Bind to a tcp port on the [`_LLMP_BIND_ADDR`] (local, or global)
+/// on a given `port`.
+/// Will set `SO_REUSEPORT` on unix.
+#[cfg(feature = "std")]
+fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
+    let listener = TcpListener::bind((_LLMP_BIND_ADDR, port))?;
+
+    #[cfg(unix)]
+    socket::setsockopt(listener.as_raw_fd(), ReusePort, &true)?;
+
+    Ok(listener)
 }
 
 /// Send one message as `u32` len and `[u8;len]` bytes
@@ -558,40 +576,39 @@ where
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
     pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        match TcpListener::bind(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+        match tcp_bind(port) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
                 dbg!("We're the broker");
+
                 let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
-            Err(e) => {
-                println!("error: {:?}", e);
-                match e.kind() {
-                    std::io::ErrorKind::AddrInUse => {
-                        // We are the client :)
-                        dbg!("We're the client", e);
-                        Ok(LlmpConnection::IsClient {
-                            client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
-                        })
-                    }
-                    _ => Err(Error::File(e)),
-                }
+            Err(Error::File(e)) if e.kind() == ErrorKind::AddrInUse => {
+                // We are the client :)
+                println!(
+                    "We're the client (internal port already bound by broker, {:#?})",
+                    e
+                );
+                Ok(LlmpConnection::IsClient {
+                    client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+                })
             }
+            Err(e) => Err(dbg!(e)),
         }
     }
 
     /// Creates a new broker on the given port
     #[cfg(feature = "std")]
     pub fn broker_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+        match tcp_bind(port) {
             Ok(listener) => {
                 let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
-            Err(e) => Err(Error::File(e)),
+            Err(e) => Err(e),
         }
     }
 
@@ -1806,7 +1823,7 @@ where
     /// Does so on the given port.
     #[cfg(feature = "std")]
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
-        let listener = TcpListener::bind(format!("{}:{}", _LLMP_BIND_ADDR, port))?;
+        let listener = tcp_bind(port)?;
         // accept connections and process them, spawning a new thread for each one
         println!("Server listening on port {}", port);
         self.launch_listener(Listener::Tcp(listener))
