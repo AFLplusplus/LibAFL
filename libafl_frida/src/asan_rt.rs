@@ -611,7 +611,7 @@ pub extern "C" fn asan_mallinfo() -> *mut c_void {
 
 /// Get the current thread's TLS address
 extern "C" {
-    fn get_tls_ptr() -> *const c_void;
+    fn tls_ptr() -> *const c_void;
 }
 
 /// The frida address sanitizer runtime, providing address sanitization.
@@ -889,7 +889,7 @@ impl AsanRuntime {
 
     /// Determine the tls start, end for the currently running thread
     fn current_tls() -> (usize, usize) {
-        let tls_address = unsafe { get_tls_ptr() } as usize;
+        let tls_address = unsafe { tls_ptr() } as usize;
         // we need to mask off the highest byte, due to 'High Byte Ignore"
         #[cfg(target_os = "android")]
         let tls_address = tls_address & 0xffffffffffffff;

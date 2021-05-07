@@ -675,8 +675,8 @@ where
 
     new_shmem_provider.post_fork();
 
-    if core_id.is_some() {
-        core_affinity::set_for_current(core_id.unwrap());
+    if let Some(core_id) = core_id {
+        core_affinity::set_for_current(core_id);
     }
 
     println!("We're a client, let's fuzz :)");

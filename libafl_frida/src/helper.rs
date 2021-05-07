@@ -9,13 +9,10 @@ use libafl::utils::find_mapping_for_path;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
-use capstone::{
-    arch::{
-        self,
-        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
-        ArchOperand::Arm64Operand,
-        BuildsCapstone,
-    },
+use capstone::arch::{
+    arch::{self, BuildsCapstone},
+    arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+    ArchOperand::Arm64Operand,
     Capstone, Insn,
 };
 
@@ -196,12 +193,12 @@ const MAYBE_LOG_CODE: [u8; 60] = [
 ];
 
 #[cfg(target_arch = "aarch64")]
-fn get_pc(context: &CpuContext) -> usize {
+fn pc(context: &CpuContext) -> usize {
     context.pc() as usize
 }
 
 #[cfg(target_arch = "x86_64")]
-fn get_pc(context: &CpuContext) -> usize {
+fn pc(context: &CpuContext) -> usize {
     context.rip() as usize
 }
 
@@ -287,10 +284,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                     let real_address = match helper
                                         .asan_runtime
                                         .borrow()
-                                        .real_address_for_stalked(get_pc(&context))
+                                        .real_address_for_stalked(pc(&context))
                                     {
                                         Some(address) => *address,
-                                        None => get_pc(&context),
+                                        None => pc(&context),
                                     };
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
@@ -344,7 +341,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     }
     #[cfg(target_arch = "aarch64")]
     #[inline]
-    fn get_writer_register(&self, reg: capstone::RegId) -> Aarch64Register {
+    fn writer_register(&self, reg: capstone::RegId) -> Aarch64Register {
         let regint: u16 = reg.0;
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
@@ -365,9 +362,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
-        let basereg = self.get_writer_register(basereg);
+        let basereg = self.writer_register(basereg);
         let indexreg = if indexreg.0 != 0 {
-            Some(self.get_writer_register(indexreg))
+            Some(self.writer_register(indexreg))
         } else {
             None
         };
@@ -560,7 +557,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
     #[cfg(target_arch = "aarch64")]
     #[inline]
-    fn get_instruction_width(&self, instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
+    fn instruction_width(&self, instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
         use capstone::arch::arm64::Arm64Insn as I;
         use capstone::arch::arm64::Arm64Reg as R;
         use capstone::arch::arm64::Arm64Vas as V;
@@ -666,7 +663,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    self.get_instruction_width(instr, &operands),
+                    self.instruction_width(instr, &operands),
                     arm64operand.shift,
                     arm64operand.ext,
                 ));

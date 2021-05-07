@@ -587,6 +587,7 @@ mod tests {
 
 /// utility function which spawns a broker and n clients and binds each client to a cpu core
 #[cfg(all(unix, feature = "std"))]
+#[allow(clippy::similar_names, clippy::type_complexity)]
 pub fn launcher<I, S, SP, ST>(
     mut shmem_provider: SP,
     stats: ST,
@@ -610,11 +611,8 @@ where
     let mut handles = vec![];
 
     println!("spawning on cores: {:?}", cores);
-    let file = if let Some(filename) = stdout_file {
-        Some(File::create(filename).unwrap())
-    } else {
-        None
-    };
+    let file = stdout_file.map(|filename| File::create(filename).unwrap());
+
     //spawn clients
     for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
         if cores.iter().any(|&x| x == id) {
@@ -655,7 +653,7 @@ where
     setup_restarting_mgr::<I, S, SP, ST>(shmem_provider, stats, broker_port, ManagerKind::Broker)?;
 
     //broker exited. kill all clients.
-    for handle in handles.iter() {
+    for handle in &handles {
         unsafe {
             libc::kill(*handle, libc::SIGINT);
         }
@@ -754,7 +752,8 @@ fn dup2(fd: i32, device: i32) -> Result<(), Error> {
 /// Returns a Vec of CPU IDs.
 /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
 /// ` ./fuzzer --cores all` -> one client runs on each available core
-pub fn parse_core_bind_arg(args: String) -> Option<Vec<usize>> {
+#[must_use]
+pub fn parse_core_bind_arg(args: &str) -> Option<Vec<usize>> {
     let mut cores: Vec<usize> = vec![];
     if args == "all" {
         let num_cores = core_affinity::get_core_ids().unwrap().len();
@@ -772,7 +771,7 @@ pub fn parse_core_bind_arg(args: String) -> Option<Vec<usize>> {
                 cores.push(core_range[0].parse::<usize>().unwrap());
             } else if core_range.len() == 2 {
                 for x in core_range[0].parse::<usize>().unwrap()
-                    ..(core_range[1].parse::<usize>().unwrap() + 1)
+                    ..=(core_range[1].parse::<usize>().unwrap())
                 {
                     cores.push(x);
                 }

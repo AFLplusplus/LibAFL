@@ -2439,7 +2439,7 @@ where
                         loop {
                             match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
                                 Ok(stream) => break stream,
-                                _ => {
+                                Err(_) => {
                                     dbg!("Connection Refused.. Retrying");
                                 }
                             }

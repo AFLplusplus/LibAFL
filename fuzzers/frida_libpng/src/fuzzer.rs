@@ -92,6 +92,9 @@ if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() }
                 libc::raise(libc::SIGABRT);
             }
         }
+        if self.helper.stalker_enabled() {
+            self.stalker.deactivate();
+        }
         res
     }
 }

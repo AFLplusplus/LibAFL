@@ -217,7 +217,7 @@ where
     /// Retrieve the harness function for a mutable reference.
     #[inline]
     pub fn harness_mut(&mut self) -> &mut H {
-        &mut self.harness_fn
+        self.harness_fn
     }
 }
 

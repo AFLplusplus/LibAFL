@@ -5,6 +5,7 @@ authors = ["s1341 <github@shmarya.net>"]
 description = "Frida backend library for LibAFL"
 documentation = "https://docs.rs/libafl_frida"
 repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "frida", "instrumentation"]
 edition = "2018"

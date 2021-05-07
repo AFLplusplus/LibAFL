@@ -39,13 +39,6 @@ pub fn main() {
         ExitKind::Ok
     };
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| println!("{}", s));
-
-    // The event manager handle the various events generated during the fuzzing loop
-    // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
-
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
@@ -64,12 +57,12 @@ pub fn main() {
         CrashFeedback::new(),
     );
 
-    // Setup a basic mutator with a mutational stage
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let stage = StdMutationalStage::new(mutator);
+    // The Stats trait define how the fuzzer stats are reported to the user
+    let stats = SimpleStats::new(|s| println!("{}", s));
 
-    // A fuzzer with just one stage
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+    // The event manager handle the various events generated during the fuzzing loop
+    // such as the notification of the addition of a new item to the corpus
+    let mut mgr = SimpleEventManager::new(stats);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();
@@ -86,6 +79,13 @@ pub fn main() {
     state
         .generate_initial_inputs(&mut executor, &mut generator, &mut mgr, &scheduler, 8)
         .expect("Failed to generate the initial corpus".into());
+
+    // Setup a basic mutator with a mutational stage
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let stage = StdMutationalStage::new(mutator);
+
+    // A fuzzer with just one stage
+    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
 
     fuzzer
         .fuzz_loop(&mut state, &mut executor, &mut mgr, &scheduler)
