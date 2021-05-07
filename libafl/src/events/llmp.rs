@@ -4,6 +4,7 @@ use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use core_affinity::CoreId;
 use serde::{de::DeserializeOwned, Serialize};
+use std::net::{SocketAddr, ToSocketAddrs};
 
 #[cfg(feature = "std")]
 use core::ptr::{addr_of, read_volatile};
@@ -166,6 +167,18 @@ where
     /// Returns if we are the broker
     pub fn is_broker(&self) -> bool {
         matches!(self.llmp, llmp::LlmpConnection::IsBroker { broker: _ })
+    }
+
+    pub fn connect_b2b<A>(&mut self, addr: A) -> Result<(), Error>
+    where
+        A: ToSocketAddrs,
+    {
+        match &mut self.llmp {
+            llmp::LlmpConnection::IsBroker { broker } => broker.connect_b2b(addr),
+            llmp::LlmpConnection::IsClient { client: _ } => Err(Error::IllegalState(
+                "Called broker loop in the client".into(),
+            )),
+        }
     }
 
     /// Run forever in the broker
@@ -526,10 +539,15 @@ where
     }
 }
 
+/// The kind of manager we're creating right now
 #[derive(Debug, Clone, Copy)]
 pub enum ManagerKind {
-    Client(Option<CoreId>),
+    /// A client, getting messages from a local broker.
+    Client { cpu_core: Option<CoreId> },
+    /// A [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
+    /// A [`LlmpBroker`] that establishes a Broker 2 Broker communication before starting up.
+    ConnectedBroker { connect_to: SocketAddr },
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
@@ -590,7 +608,7 @@ where
     )
     .is_err()
     {
-        let core_id = if mgr.is_broker() {
+        let cpu_core = if mgr.is_broker() {
             match kind {
                 ManagerKind::Broker => {
                     // Yep, broker. Just loop here.
@@ -600,7 +618,18 @@ where
                     mgr.broker_loop()?;
                     return Err(Error::ShuttingDown);
                 }
-                ManagerKind::Client(_) => {
+                ManagerKind::ConnectedBroker { connect_to } => {
+                    // Yep, broker. Just loop here.
+                    // But first, connect to another broker :)
+                    println!("Connecting to remote broker at {:?}...", connect_to);
+                    mgr.connect_b2b(connect_to)?;
+                    println!(
+                        "Doing broker things. Run this tool again to start fuzzing in a client."
+                    );
+                    mgr.broker_loop()?;
+                    return Err(Error::ShuttingDown);
+                }
+                ManagerKind::Client { cpu_core: _ } => {
                     return Err(Error::IllegalState(
                         "Tried to start a client, but got a broker".to_string(),
                     ));
@@ -608,12 +637,12 @@ where
             }
         } else {
             match kind {
-                ManagerKind::Broker => {
+                ManagerKind::Broker | ManagerKind::ConnectedBroker { connect_to: _ } => {
                     return Err(Error::IllegalState(
                         "Tried to start a broker, but got a client".to_string(),
                     ));
                 }
-                ManagerKind::Client(core_id) => core_id,
+                ManagerKind::Client { cpu_core } => cpu_core,
             }
         };
 
@@ -638,7 +667,7 @@ where
             #[cfg(unix)]
             let child_status = match unsafe { fork() }? {
                 ForkResult::Parent(handle) => handle.status(),
-                ForkResult::Child => break (sender, receiver, shmem_provider, core_id),
+                ForkResult::Child => break (sender, receiver, shmem_provider, cpu_core),
             };
 
             // On windows, we spawn ourself again

@@ -639,7 +639,9 @@ where
                         shmem_provider.clone(),
                         stats,
                         broker_port,
-                        ManagerKind::Client(Some(*bind_to)),
+                        ManagerKind::Client {
+                            cpu_core: Some(*bind_to),
+                        },
                     )?;
                     run_client(state, mgr)?;
                     break;
