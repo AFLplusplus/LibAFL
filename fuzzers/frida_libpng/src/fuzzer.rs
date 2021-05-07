@@ -36,7 +36,7 @@ use frida_gum::{
     Gum, NativePointer,
 };
 
-use std::{env, ffi::c_void, marker::PhantomData, path::PathBuf, time::Duration};
+use std::{env, ffi::c_void, marker::PhantomData, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl_frida::{
     asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
@@ -220,6 +220,13 @@ pub fn main() {
             .required(false)
             .takes_value(true)
         )
+        .arg(Arg::with_name("b2baddr")
+            .short("B")
+            .long("b2baddr")
+            .value_name("B2BADDR")
+            .required(false)
+            .takes_value(true)
+        )
         .get_matches();
 
     let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap().to_string()).unwrap();
@@ -231,6 +238,11 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
+    let broker_addr = if let Some(addrstr) = matches.value_of("b2baddr") {
+        Some(addrstr.parse().unwrap())
+    } else {
+        None
+    };
 
     unsafe {
         fuzz(
@@ -246,6 +258,7 @@ pub fn main() {
             1337,
             &cores,
             matches.value_of("output"),
+            broker_addr,
         )
         .expect("An error occurred while fuzzing");
     }
@@ -260,6 +273,8 @@ fn fuzz(
     _objective_dir: PathBuf,
     _broker_port: u16,
     _cores: &[usize],
+    _stdout_file: Option<&str>,
+    _broker_addr: Option<SocketAddr>,
 ) -> Result<(), ()> {
     todo!("Example not supported on Windows");
 }
@@ -275,6 +290,7 @@ unsafe fn fuzz(
     broker_port: u16,
     cores: &[usize],
     stdout_file: Option<&str>,
+    broker_addr: Option<SocketAddr>,
 ) -> Result<(), Error> {
     let stats_closure = |s| {
         println!("{}", s)
@@ -403,5 +419,5 @@ unsafe fn fuzz(
         Ok(())
     };
 
-    launcher(shmem_provider.clone(), stats, &mut client_init_stats, &mut run_client, broker_port, cores, stdout_file, None)
+    launcher(shmem_provider.clone(), stats, &mut client_init_stats, &mut run_client, broker_port, cores, stdout_file, broker_addr)
 }
