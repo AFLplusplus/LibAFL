@@ -609,7 +609,7 @@ where
     )
     .is_err()
     {
-        let cpu_core = if mgr.is_broker() {
+        let core_id = if mgr.is_broker() {
             match kind {
                 ManagerKind::Broker => {
                     // Yep, broker. Just loop here.
@@ -646,6 +646,11 @@ where
                 ManagerKind::Client { cpu_core } => cpu_core,
             }
         };
+
+        if let Some(core_id) = core_id {
+            println!("Setting core affinity to {:?}", core_id);
+            core_affinity::set_for_current(core_id);
+        }
 
         // We are the fuzzer respawner in a llmp client
         mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);

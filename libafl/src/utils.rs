@@ -9,10 +9,10 @@ use crate::{
     stats::Stats,
 };
 
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, process::Stdio};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(unix)]
@@ -20,7 +20,6 @@ use libc::pid_t;
 #[cfg(feature = "std")]
 use std::{
     env,
-    fs::File,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -29,6 +28,9 @@ use std::{ffi::CString, os::unix::io::AsRawFd};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::Error;
+
+#[cfg(all(windows, feature = "std"))]
+use core_affinity::CoreId;
 
 /// Can be converted to a slice
 pub trait AsSlice<T> {
@@ -609,19 +611,19 @@ where
     SP: ShMemProvider + 'static,
     S: DeserializeOwned + IfInteresting<I>,
 {
-    let core_ids = core_affinity::get_core_ids().unwrap();
+    let core_ids = core_affinity::get_core_ids()?;
     let num_cores = core_ids.len();
     let mut handles = vec![];
 
     println!("spawning on cores: {:?}", cores);
-    let file = stdout_file.map(|filename| File::create(filename).unwrap());
+    let file = stdout_file.map(|filename| File::create(filename))?;
 
     //spawn clients
     for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
         if cores.iter().any(|&x| x == id) {
             match unsafe { fork() }? {
-                ForkResult::Parent(handle) => {
-                    handles.push(handle.pid);
+                ForkResult::Parent(child) => {
+                    child.push(child.pid);
                     #[cfg(feature = "std")]
                     println!("child spawned and bound to core {}", id);
                 }
@@ -633,8 +635,8 @@ where
 
                     #[cfg(feature = "std")]
                     if file.is_some() {
-                        dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDOUT_FILENO).unwrap();
-                        dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDERR_FILENO).unwrap();
+                        dup2(file.as_ref()?.as_raw_fd(), libc::STDOUT_FILENO)?;
+                        dup2(file.as_ref()?.as_raw_fd(), libc::STDERR_FILENO)?;
                     }
                     //fuzzer client. keeps retrying the connection to broker till the broker starts
                     let stats = client_init_stats()?;
@@ -679,85 +681,123 @@ where
             libc::kill(*handle, libc::SIGINT);
         }
     }
+
     Ok(())
 }
 
 const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
 
-#[cfg(windows)]
-pub fn launcher<CF, FZ, EX, EM, CS, ST, C, FT, I, OFT, R, SC, SP>(
-    shmem_provider: SP,
+/// utility function which spawns a broker and n clients and binds each client to a cpu core
+/// Connects to a b2b broker.
+#[cfg(all(windows, feature = "std"))]
+#[allow(clippy::similar_names, clippy::type_complexity)]
+#[allow(unused_mut)]
+pub fn launcher<I, S, SP, ST>(
+    mut shmem_provider: SP,
     stats: ST,
+    client_init_stats: &mut dyn FnMut() -> Result<ST, Error>,
+    run_client: &mut dyn FnMut(
+        Option<S>,
+        LlmpRestartingEventManager<I, S, SP, ST>,
+    ) -> Result<(), Error>,
     broker_port: u16,
     cores: &[usize],
-    client_fn: CF,
+    stdout_file: Option<&str>,
+    b2b_addr: Option<SocketAddr>,
 ) -> Result<(), Error>
 where
-    ST: Stats,
-    CF: Fn() -> Result<(FZ, EX, EM, State<C, FT, I, OFT, R, SC>, CS), Error>,
-    C: Corpus<I>,
-    FT: FeedbacksTuple<I>,
     I: Input,
-    OFT: FeedbacksTuple<I>,
-    R: Rand,
-    SC: Corpus<I>,
-    SP: ShMemProvider,
-    FZ: Fuzzer<EX, EM, State<C, FT, I, OFT, R, SC>, CS>,
+    ST: Stats,
+    SP: ShMemProvider + 'static,
+    S: DeserializeOwned + IfInteresting<I>,
 {
-    let core_ids = core_affinity::get_core_ids().unwrap();
-    let num_cores = core_ids.len();
-
     let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 
-    match is_client {
+    let mut handles = match is_client {
         Ok(core_conf) => {
-            if core_conf == "bound" {
-                //restarting client. continue fuzzing
-                let (mut fuzzer, mut executor, mut restarting_mgr, mut state, scheduler) =
-                    client_fn().unwrap();
-                fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
-                Ok(())
-            } else {
-                //first instance of a spawned client. bind to the specified core and start fuzzing
-                let core: usize = core_conf.parse().unwrap();
-                let bind_to = core_ids[core];
-                core_affinity::set_for_current(bind_to);
-                std::env::set_var(_AFL_LAUNCHER_CLIENT, "bound");
-                //todo: silence stdout and stderr for clients
-                let (mut fuzzer, mut executor, mut restarting_mgr, mut state, scheduler) =
-                    client_fn().unwrap();
-                fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
-                Ok(())
-            }
+            //todo: silence stdout and stderr for clients
+
+            // the actual client. do the fuzzing
+            let stats = client_init_stats()?;
+            let (state, mgr) = setup_restarting_mgr(
+                shmem_provider,
+                stats,
+                broker_port,
+                ManagerKind::Client {
+                    cpu_core: Some(CoreId {
+                        id: core_conf.parse()?,
+                    }),
+                },
+            )?;
+            run_client(state, mgr)?;
+
+            unreachable!("Fuzzer client code should never get here!");
         }
         Err(std::env::VarError::NotPresent) => {
             // I am a broker
             // before going to the broker loop, spawn n clients
-            let mut children = vec![];
-            for id in 0..num_cores {
+
+            if stdout_file.is_some() {
+                println!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
+            }
+
+            let core_ids = core_affinity::get_core_ids().unwrap();
+            let num_cores = core_ids.len();
+            let mut handles = vec![];
+
+            println!("spawning on cores: {:?}", cores);
+
+            //spawn clients
+            for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                 if cores.iter().any(|&x| x == id) {
-                    std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                    let child = startable_self().unwrap().spawn().unwrap();
-                    children.push(child);
+                    for id in 0..num_cores {
+                        let stdio = if stdout_file.is_some() {
+                            Stdio::inherit()
+                        } else {
+                            Stdio::null()
+                        };
+
+                        if cores.iter().any(|&x| x == id) {
+                            std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                            let child = startable_self()?.stdout(stdio).spawn()?;
+                            handles.push(child);
+                        }
+                    }
                 }
             }
-            //finished spawning clients. start the broker
-            let _ = setup_new_llmp_broker::<I, State<C, FT, I, OFT, R, SC>, _, _>(
-                shmem_provider,
-                stats,
-                broker_port,
-            );
 
-            //broker exited. kill clients
-            for child in children.iter_mut() {
-                child.kill().unwrap();
-            }
-            Ok(())
+            handles
         }
-        _ => {
-            return Err(Error::IllegalState("Env var is non unicode".to_string()));
-        }
+        Err(_) => panic!("Env variables are broken, received non-unicode!"),
+    };
+
+    #[cfg(feature = "std")]
+    println!("I am broker!!.");
+
+    if let Some(b2b_addr) = b2b_addr {
+        setup_restarting_mgr::<I, S, SP, ST>(
+            shmem_provider,
+            stats,
+            broker_port,
+            ManagerKind::ConnectedBroker {
+                connect_to: b2b_addr,
+            },
+        )?;
+    } else {
+        setup_restarting_mgr::<I, S, SP, ST>(
+            shmem_provider,
+            stats,
+            broker_port,
+            ManagerKind::Broker,
+        )?;
     }
+
+    //broker exited. kill all clients.
+    for handle in &mut handles {
+        handle.kill()?;
+    }
+
+    Ok(())
 }
 
 /// "Safe" wrapper around dup2

@@ -752,7 +752,7 @@ pub mod win32_shmem {
                     )));
                 }
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
-                if map == ptr::null_mut() {
+                if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
