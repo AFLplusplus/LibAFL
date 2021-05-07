@@ -13,9 +13,6 @@ pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]
 pub use libfuzzer::*;
 
-pub mod coverage;
-pub use coverage::*;
-
 pub mod value_profile;
 pub use value_profile::*;
 

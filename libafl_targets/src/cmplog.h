@@ -29,7 +29,9 @@ extern CmpLogMap libafl_cmplog_map;
 
 extern uint8_t libafl_cmplog_enabled;
 
-static void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
+
+void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
+
 
   if (!libafl_cmplog_enabled) return;
 
