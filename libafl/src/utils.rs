@@ -12,6 +12,7 @@ use crate::{
 use alloc::{string::String, vec::Vec};
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::net::SocketAddr;
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(unix)]
@@ -586,6 +587,7 @@ mod tests {
 }
 
 /// utility function which spawns a broker and n clients and binds each client to a cpu core
+/// Connects to a b2b broker.
 #[cfg(all(unix, feature = "std"))]
 #[allow(clippy::similar_names, clippy::type_complexity)]
 pub fn launcher<I, S, SP, ST>(
@@ -599,6 +601,7 @@ pub fn launcher<I, S, SP, ST>(
     broker_port: u16,
     cores: &[usize],
     stdout_file: Option<&str>,
+    b2b_addr: Option<SocketAddr>,
 ) -> Result<(), Error>
 where
     I: Input,
@@ -652,7 +655,23 @@ where
     #[cfg(feature = "std")]
     println!("I am broker!!.");
 
-    setup_restarting_mgr::<I, S, SP, ST>(shmem_provider, stats, broker_port, ManagerKind::Broker)?;
+    if let Some(b2b_addr) = b2b_addr {
+        setup_restarting_mgr::<I, S, SP, ST>(
+            shmem_provider,
+            stats,
+            broker_port,
+            ManagerKind::ConnectedBroker {
+                connect_to: b2b_addr,
+            },
+        )?;
+    } else {
+        setup_restarting_mgr::<I, S, SP, ST>(
+            shmem_provider,
+            stats,
+            broker_port,
+            ManagerKind::Broker,
+        )?;
+    }
 
     //broker exited. kill all clients.
     for handle in &handles {
