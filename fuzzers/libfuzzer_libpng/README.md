@@ -6,6 +6,8 @@ In contrast to other fuzzer examples, this setup uses `fuzz_loop_for`, to occasi
 While this costs performance, it can be useful for targets with memory leaks or other instabilities.
 If your target is really instable, however, consider exchanging the `InProcessExecutor` for a `ForkserverExecutor` instead.
 
+It also uses the `introspection` feature, printing fuzzer stats during execution.
+
 To show off crash detection, we added a `ud2` instruction to the harness, edit harness.cc if you want a non-crashing example.
 It has been tested on Linux.
 
@@ -51,7 +53,7 @@ This allows you to run multiple different builds of the same fuzzer alongside, f
 
 ## Run
 
-The first time you run the binary, the broker will open a tcp port (currently on port `1337`), waiting for fuzzer clients to connect. This port is local and only used for the initial handshake. All further communication happens via shared map, to be independent of the kernel. Currently you must run the clients from the libfuzzer_libpng directory for them to be able to access the PNG corpus.
+The first time you run the binary, the broker will open a tcp port (currently on port `1337`), waiting for fuzzer clients to connect. This port is local and only used for the initial handshake. All further communication happens via shared map, to be independent of the kernel. Currently, you must run the clients from the libfuzzer_libpng directory for them to be able to access the PNG corpus.
 
 ```
 ./fuzzer_libpng

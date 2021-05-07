@@ -106,6 +106,19 @@ where
                 stats.display(event.name().to_string());
                 Ok(BrokerEventResult::Handled)
             }
+            #[cfg(feature = "introspection")]
+            Event::UpdatePerfStats {
+                time,
+                executions,
+                introspection_stats,
+                phantom: _,
+            } => {
+                // TODO: The stats buffer should be added on client add.
+                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
+                stats.client_stats_mut()[0].update_introspection_stats(**introspection_stats);
+                stats.display(event.name().to_string());
+                Ok(BrokerEventResult::Handled)
+            }
             Event::Objective { objective_size } => {
                 stats
                     .client_stats_mut_for(0)

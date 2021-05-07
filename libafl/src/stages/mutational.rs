@@ -5,13 +5,18 @@ use crate::{
     events::EventManager,
     executors::{Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
+    mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
     stages::Stage,
-    state::{Evaluator, HasCorpus, HasRand},
+    start_timer,
+    state::{Evaluator, HasClientPerfStats, HasCorpus, HasRand},
     utils::Rand,
     Error,
 };
+
+#[cfg(feature = "introspection")]
+use crate::stats::PerfFeature;
 
 // TODO multi mutators stage
 
@@ -22,7 +27,7 @@ pub trait MutationalStage<C, CS, E, EM, I, M, OT, S>: Stage<CS, E, EM, I, S>
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I>,
+    S: HasCorpus<C, I> + Evaluator<I> + HasClientPerfStats,
     C: Corpus<I>,
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
@@ -49,17 +54,27 @@ where
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let num = self.iterations(state);
+
         for i in 0..num {
+            start_timer!(state);
             let mut input_mut = state
                 .corpus()
                 .get(corpus_idx)?
                 .borrow_mut()
                 .load_input()?
                 .clone();
+            mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+
+            start_timer!(state);
             self.mutator_mut().mutate(state, &mut input_mut, i as i32)?;
+            mark_feature_time!(state, PerfFeature::Mutate);
+
+            // Time is measured directly the `evaluate_input` function
             let (_, corpus_idx) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
 
+            start_timer!(state);
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+            mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
         Ok(())
     }
@@ -93,7 +108,7 @@ impl<C, CS, E, EM, I, M, OT, R, S> MutationalStage<C, CS, E, EM, I, M, OT, S>
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R> + HasClientPerfStats,
     C: Corpus<I>,
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
@@ -124,7 +139,7 @@ impl<C, CS, E, EM, I, M, OT, R, S> Stage<CS, E, EM, I, S>
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R> + HasClientPerfStats,
     C: Corpus<I>,
     EM: EventManager<I, S>,
     E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,

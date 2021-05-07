@@ -249,7 +249,7 @@ where
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string() + " #" + &sender_id.to_string());
+                // stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Forward)
             }
             Event::UpdateStats {
@@ -260,7 +260,35 @@ where
                 // TODO: The stats buffer should be added on client add.
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string() + " #" + &sender_id.to_string());
+                if sender_id == 1 {
+                    stats.display(event.name().to_string() + " #" + &sender_id.to_string());
+                }
+                Ok(BrokerEventResult::Handled)
+            }
+            #[cfg(feature = "introspection")]
+            Event::UpdatePerfStats {
+                time,
+                executions,
+                introspection_stats,
+                phantom: _,
+            } => {
+                // TODO: The stats buffer should be added on client add.
+
+                // Get the client for the sender ID
+                let client = stats.client_stats_mut_for(sender_id);
+
+                // Update the normal stats for this client
+                client.update_executions(*executions as u64, *time);
+
+                // Update the performance stats for this client
+                client.update_introspection_stats(**introspection_stats);
+
+                // Display the stats via `.display` only on core #1
+                if sender_id == 1 {
+                    stats.display(event.name().to_string() + " #" + &sender_id.to_string());
+                }
+
+                // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {

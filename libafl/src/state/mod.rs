@@ -18,10 +18,16 @@ use crate::{
     feedbacks::Feedback,
     generators::Generator,
     inputs::Input,
+    mark_feature_time,
     observers::ObserversTuple,
+    start_timer,
+    stats::ClientPerfStats,
     utils::Rand,
     Error,
 };
+
+#[cfg(feature = "introspection")]
+use crate::stats::PerfFeature;
 
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
@@ -70,6 +76,15 @@ where
     fn rand(&self) -> &R;
     /// The rand instance (mut)
     fn rand_mut(&mut self) -> &mut R;
+}
+
+/// Trait for offering a [`ClientPerfStats`]
+pub trait HasClientPerfStats {
+    /// [`ClientPerfStats`] itself
+    fn introspection_stats(&self) -> &ClientPerfStats;
+
+    /// Mutatable ref to [`ClientPerfStats`]
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats;
 }
 
 /// Trait for elements offering metadata
@@ -222,6 +237,10 @@ where
     metadata: SerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
+
+    /// Performance statistics for this fuzzer
+    #[cfg(feature = "introspection")]
+    introspection_stats: ClientPerfStats,
 
     phantom: PhantomData<I>,
 }
@@ -646,23 +665,65 @@ where
         C: Corpus<I>,
         EM: EventManager<I, Self>,
     {
+        start_timer!(self);
         executor.pre_exec_observers(self, event_mgr, input)?;
+        mark_feature_time!(self, PerfFeature::PreExecObservers);
 
+        start_timer!(self);
         executor.pre_exec(self, event_mgr, input)?;
+        mark_feature_time!(self, PerfFeature::PreExec);
+
+        start_timer!(self);
         let exit_kind = executor.run_target(input)?;
+        mark_feature_time!(self, PerfFeature::TargetExecution);
+
+        start_timer!(self);
         executor.post_exec(self, event_mgr, input)?;
+        mark_feature_time!(self, PerfFeature::PostExec);
 
         *self.executions_mut() += 1;
+
+        start_timer!(self);
         executor.post_exec_observers(self, event_mgr, input)?;
+        mark_feature_time!(self, PerfFeature::PostExecObservers);
 
         let observers = executor.observers();
+        #[cfg(not(feature = "introspection"))]
         let is_interesting = self
             .feedback_mut()
             .is_interesting(&input, observers, &exit_kind)?;
 
+        #[cfg(feature = "introspection")]
+        let is_interesting = {
+            // Init temporary feedback stats here. We can't use the typical pattern above
+            // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
+            // new `mut self` to `is_interesting_with_perf`. We use this stack
+            // variable to get the stats and then update the feedbacks directly
+            let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
+            let feedback_index = 0;
+            let is_interesting = self.feedback_mut().is_interesting_with_perf(
+                &input,
+                observers,
+                &exit_kind,
+                &mut feedback_stats,
+                feedback_index,
+            )?;
+
+            // Update the feedback stats
+            self.introspection_stats_mut()
+                .update_feedbacks(feedback_stats);
+
+            // Return the total fitness
+            is_interesting
+        };
+
+        start_timer!(self);
         let is_solution = self
             .objective_mut()
             .is_interesting(&input, observers, &exit_kind)?;
+
+        mark_feature_time!(self, PerfFeature::GetObjectivesInterestingAll);
+
         Ok((is_interesting, is_solution))
     }
 
@@ -718,7 +779,47 @@ where
             solutions,
             objective,
             max_size: DEFAULT_MAX_SIZE,
+            #[cfg(feature = "introspection")]
+            introspection_stats: ClientPerfStats::new(),
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(feature = "introspection")]
+impl<C, F, I, OF, R, SC> HasClientPerfStats for State<C, F, I, OF, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    F: Feedback<I>,
+    SC: Corpus<I>,
+    OF: Feedback<I>,
+{
+    fn introspection_stats(&self) -> &ClientPerfStats {
+        &self.introspection_stats
+    }
+
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
+        &mut self.introspection_stats
+    }
+}
+
+#[cfg(not(feature = "introspection"))]
+impl<C, F, I, OF, R, SC> HasClientPerfStats for State<C, F, I, OF, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    F: Feedback<I>,
+    SC: Corpus<I>,
+    OF: Feedback<I>,
+{
+    fn introspection_stats(&self) -> &ClientPerfStats {
+        unimplemented!()
+    }
+
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
+        unimplemented!()
     }
 }

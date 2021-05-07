@@ -16,6 +16,9 @@ use crate::{
     Error,
 };
 
+#[cfg(feature = "introspection")]
+use crate::stats::NUM_FEEDBACKS;
+
 use core::{marker::PhantomData, time::Duration};
 
 /// Feedbacks evaluate the observers.
@@ -34,6 +37,35 @@ where
     ) -> Result<bool, Error>
     where
         OT: ObserversTuple;
+
+    #[cfg(feature = "introspection")]
+    fn is_interesting_with_perf<OT>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        // Start a timer for this feedback
+        let start_time = crate::cpu::read_time_counter();
+
+        // Execute this feedback
+        let ret = self.is_interesting(input, observers, &exit_kind);
+
+        // Get the elapsed time for checking this feedback
+        let elapsed = crate::cpu::read_time_counter() - start_time;
+
+        // TODO: A more meaningful way to get perf for each feedback
+
+        // Add this stat to the feedback metrics
+        feedback_stats[feedback_index] = elapsed;
+
+        ret
+    }
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
@@ -81,6 +113,36 @@ where
     {
         let a = self.first.is_interesting(input, observers, exit_kind)?;
         let b = self.second.is_interesting(input, observers, exit_kind)?;
+        Ok(a && b)
+    }
+
+    #[cfg(feature = "introspection")]
+    fn is_interesting_with_perf<OT>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        // Execute this feedback
+        let a = self.first.is_interesting_with_perf(
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index,
+        )?;
+        let b = self.second.is_interesting_with_perf(
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index + 1,
+        )?;
         Ok(a && b)
     }
 
@@ -159,6 +221,36 @@ where
     {
         let a = self.first.is_interesting(input, observers, exit_kind)?;
         let b = self.second.is_interesting(input, observers, exit_kind)?;
+        Ok(a || b)
+    }
+
+    #[cfg(feature = "introspection")]
+    fn is_interesting_with_perf<OT>(
+        &mut self,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        // Execute this feedback
+        let a = self.first.is_interesting_with_perf(
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index,
+        )?;
+        let b = self.second.is_interesting_with_perf(
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index + 1,
+        )?;
         Ok(a || b)
     }
 
