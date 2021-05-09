@@ -356,6 +356,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         }
 
                         if helper.options().cmplog_enabled() {
+                            #[cfg(not(target_arch = "aarch64"))]
+                            todo!("Implement cmplog for non-aarch64 targets");
+                            #[cfg(target_arch = "aarch64")]
                             // check if this instruction is a compare instruction and if so save the registers values
                             if let Ok((op1, op2)) =
                                 helper.is_interesting_cmplog_instruction(address, instr)
