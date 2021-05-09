@@ -37,7 +37,14 @@ use std::path::PathBuf;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
-use crate::{asan_rt::AsanRuntime, FridaOptions};
+use crate::{asan_rt::AsanRuntime, cmplog_rt::CmpLogRuntime, FridaOptions};
+
+enum CmplogOperandType {
+    Regid(capstone::RegId),
+    Imm(u64),
+    Cimm(u64),
+    Mem(capstone::RegId, capstone::RegId, i32, u32),
+}
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
 pub trait FridaHelper<'a> {
@@ -76,7 +83,8 @@ pub struct FridaInstrumentationHelper<'a> {
     transformer: Option<Transformer<'a>>,
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
-    asan_runtime: AsanRuntime,
+    asan_runtime: Rc<RefCell<AsanRuntime>>,
+    cmplog_runtime: CmpLogRuntime,
     ranges: RangeMap<usize, (u16, &'a str)>,
     options: &'a FridaOptions,
     drcov_basic_blocks: Vec<DrCovBasicBlock>,
@@ -261,6 +269,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .build()
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(options.clone()),
+            cmplog_runtime: CmpLogRuntime::new(),
             ranges: RangeMap::new(),
             options,
             drcov_basic_blocks: vec![],
@@ -331,7 +340,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             todo!("Implement ASAN for non-aarch64 targets");
                             #[cfg(target_arch = "aarch64")]
                             if let Ok((basereg, indexreg, displacement, width, shift, extender)) =
-                                helper.is_interesting_instruction(address, instr)
+                                helper.is_interesting_asan_instruction(address, instr)
                             {
                                 helper.emit_shadow_check(
                                     address,
@@ -345,6 +354,18 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                 );
                             }
                         }
+
+                        if helper.options().cmplog_enabled() {
+                            // check if this instruction is a compare instruction and if so save the registers values
+                            if let Ok((op1, op2)) =
+                                helper.is_interesting_cmplog_instruction(address, instr)
+                            {
+                                println!("emmiting at {} => {}", address, instr);
+                                //emit code that saves the relevant data in runtime(passes it to x0, x1)
+                                helper.emit_comparison_handling(address, &output, op1, op2);
+                            }
+                        }
+
                         if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                             helper.asan_runtime.add_stalked_address(
                                 output.writer().pc() as usize - 4,
@@ -359,6 +380,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.init(gum, modules_to_instrument);
             }
+            if helper.options.cmplog_enabled() {
+                helper.cmplog_runtime.init();
+            }
         }
         helper
     }
@@ -372,6 +396,311 @@ impl<'a> FridaInstrumentationHelper<'a> {
     fn writer_register(&self, reg: capstone::RegId) -> Aarch64Register {
         let regint: u16 = reg.0;
         Aarch64Register::from_u32(regint as u32).unwrap()
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[inline]
+    fn emit_comparison_handling(
+        &self,
+        _address: u64,
+        output: &StalkerOutput,
+        op1: CmplogOperandType,
+        op2: CmplogOperandType,
+    ) {
+        let writer = output.writer();
+
+        // Preserve x0, x1:
+        writer.put_stp_reg_reg_reg_offset(
+            Aarch64Register::X0,
+            Aarch64Register::X1,
+            Aarch64Register::Sp,
+            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+            IndexMode::PreAdjust,
+        );
+
+        // make sure operand1 value is saved into x0
+        match op1 {
+            CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
+                writer.put_ldr_reg_u64(Aarch64Register::X0, value);
+            }
+            CmplogOperandType::Regid(reg) => {
+                let reg = self.get_writer_register(reg);
+                match reg {
+                    Aarch64Register::X0 | Aarch64Register::W0 => {}
+                    Aarch64Register::X1 | Aarch64Register::W1 => {
+                        writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
+                    }
+                    _ => {
+                        if !writer.put_mov_reg_reg(Aarch64Register::X0, reg) {
+                            writer.put_mov_reg_reg(Aarch64Register::W0, reg);
+                        }
+                    }
+                }
+            }
+            CmplogOperandType::Mem(basereg, indexreg, displacement, width) => {
+                let basereg = self.get_writer_register(basereg);
+                let indexreg = if indexreg.0 != 0 {
+                    Some(self.get_writer_register(indexreg))
+                } else {
+                    None
+                };
+
+                // calculate base+index+displacment into x0
+                let displacement = displacement
+                    + if basereg == Aarch64Register::Sp {
+                        16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+                    } else {
+                        0
+                    };
+
+                if indexreg.is_some() {
+                    if let Some(indexreg) = indexreg {
+                        writer.put_add_reg_reg_reg(Aarch64Register::X0, basereg, indexreg);
+                    }
+                } else {
+                    match basereg {
+                        Aarch64Register::X0 | Aarch64Register::W0 => {}
+                        Aarch64Register::X1 | Aarch64Register::W1 => {
+                            writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
+                        }
+                        _ => {
+                            if !writer.put_mov_reg_reg(Aarch64Register::X0, basereg) {
+                                writer.put_mov_reg_reg(Aarch64Register::W0, basereg);
+                            }
+                        }
+                    }
+                }
+
+                //add displacement
+                writer.put_add_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement as u64,
+                );
+
+                //deref into x0 to get the real value
+                writer.put_ldr_reg_reg_offset(Aarch64Register::X0, Aarch64Register::X0, 0u64);
+            }
+        }
+
+        // make sure operand2 value is saved into x1
+        match op2 {
+            CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
+                writer.put_ldr_reg_u64(Aarch64Register::X1, value);
+            }
+            CmplogOperandType::Regid(reg) => {
+                let reg = self.get_writer_register(reg);
+                match reg {
+                    Aarch64Register::X1 | Aarch64Register::W1 => {}
+                    Aarch64Register::X0 | Aarch64Register::W0 => {
+                        writer.put_ldr_reg_reg_offset(
+                            Aarch64Register::X1,
+                            Aarch64Register::Sp,
+                            0u64,
+                        );
+                    }
+                    _ => {
+                        if !writer.put_mov_reg_reg(Aarch64Register::X1, reg) {
+                            writer.put_mov_reg_reg(Aarch64Register::W1, reg);
+                        }
+                    }
+                }
+            }
+            CmplogOperandType::Mem(basereg, indexreg, displacement, width) => {
+                let basereg = self.get_writer_register(basereg);
+                let indexreg = if indexreg.0 != 0 {
+                    Some(self.get_writer_register(indexreg))
+                } else {
+                    None
+                };
+
+                // calculate base+index+displacment into x1
+                let displacement = displacement
+                    + if basereg == Aarch64Register::Sp {
+                        16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+                    } else {
+                        0
+                    };
+
+                if indexreg.is_some() {
+                    if let Some(indexreg) = indexreg {
+                        match indexreg {
+                            Aarch64Register::X0 | Aarch64Register::W0 => {
+                                match basereg {
+                                    Aarch64Register::X1 | Aarch64Register::W1 => {
+                                        // x0 is overwrittern indexreg by op1 value.
+                                        // x1 is basereg
+
+                                        // Preserve x2, x3:
+                                        writer.put_stp_reg_reg_reg_offset(
+                                            Aarch64Register::X2,
+                                            Aarch64Register::X3,
+                                            Aarch64Register::Sp,
+                                            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                                            IndexMode::PreAdjust,
+                                        );
+
+                                        //reload indexreg to x2
+                                        writer.put_ldr_reg_reg_offset(
+                                            Aarch64Register::X2,
+                                            Aarch64Register::Sp,
+                                            0u64,
+                                        );
+                                        //add them into basereg==x1
+                                        writer.put_add_reg_reg_reg(
+                                            basereg,
+                                            basereg,
+                                            Aarch64Register::X2,
+                                        );
+
+                                        // Restore x2, x3
+                                        assert!(writer.put_ldp_reg_reg_reg_offset(
+                                            Aarch64Register::X2,
+                                            Aarch64Register::X3,
+                                            Aarch64Register::Sp,
+                                            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                                            IndexMode::PostAdjust,
+                                        ));
+                                    }
+                                    _ => {
+                                        // x0 is overwrittern indexreg by op1 value.
+                                        // basereg is not x1 nor x0
+
+                                        //reload indexreg to x1
+                                        writer.put_ldr_reg_reg_offset(
+                                            Aarch64Register::X1,
+                                            Aarch64Register::Sp,
+                                            0u64,
+                                        );
+                                        //add basereg into indexreg==x1
+                                        writer.put_add_reg_reg_reg(
+                                            Aarch64Register::X1,
+                                            basereg,
+                                            Aarch64Register::X1,
+                                        );
+                                    }
+                                }
+                            }
+                            Aarch64Register::X1 | Aarch64Register::W1 => {
+                                match basereg {
+                                    Aarch64Register::X0 | Aarch64Register::W0 => {
+                                        // x0 is overwrittern basereg by op1 value.
+                                        // x1 is indexreg
+
+                                        // Preserve x2, x3:
+                                        writer.put_stp_reg_reg_reg_offset(
+                                            Aarch64Register::X2,
+                                            Aarch64Register::X3,
+                                            Aarch64Register::Sp,
+                                            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                                            IndexMode::PreAdjust,
+                                        );
+
+                                        //reload basereg to x2
+                                        writer.put_ldr_reg_reg_offset(
+                                            Aarch64Register::X2,
+                                            Aarch64Register::Sp,
+                                            0u64,
+                                        );
+                                        //add basereg into indexreg==x1
+                                        writer.put_add_reg_reg_reg(
+                                            indexreg,
+                                            Aarch64Register::X2,
+                                            indexreg,
+                                        );
+
+                                        // Restore x2, x3
+                                        assert!(writer.put_ldp_reg_reg_reg_offset(
+                                            Aarch64Register::X2,
+                                            Aarch64Register::X3,
+                                            Aarch64Register::Sp,
+                                            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                                            IndexMode::PostAdjust,
+                                        ));
+                                    }
+                                    _ => {
+                                        // indexreg is x1
+                                        // basereg is not x0 and not x1
+
+                                        //add them into x1
+                                        writer.put_add_reg_reg_reg(indexreg, basereg, indexreg);
+                                    }
+                                }
+                            }
+                            _ => {
+                                match basereg {
+                                    Aarch64Register::X0 | Aarch64Register::W0 => {
+                                        //basereg is overwrittern by op1 value
+                                        //index reg is not x0 nor x1
+
+                                        //reload basereg to x1
+                                        writer.put_ldr_reg_reg_offset(
+                                            Aarch64Register::X1,
+                                            Aarch64Register::Sp,
+                                            0u64,
+                                        );
+                                        //add indexreg to basereg==x1
+                                        writer.put_add_reg_reg_reg(
+                                            Aarch64Register::X1,
+                                            Aarch64Register::X1,
+                                            indexreg,
+                                        );
+                                    }
+                                    _ => {
+                                        //basereg is not x0, can be x1
+                                        //index reg is not x0 nor x1
+
+                                        //add them into x1
+                                        writer.put_add_reg_reg_reg(
+                                            Aarch64Register::X1,
+                                            basereg,
+                                            indexreg,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    match basereg {
+                        Aarch64Register::X1 | Aarch64Register::W1 => {}
+                        Aarch64Register::X0 | Aarch64Register::W0 => {
+                            // x0 is overwrittern basereg by op1 value.
+                            //reload basereg to x1
+                            writer.put_ldr_reg_reg_offset(
+                                Aarch64Register::X1,
+                                Aarch64Register::Sp,
+                                0u64,
+                            );
+                        }
+                        _ => {
+                            writer.put_mov_reg_reg(Aarch64Register::W1, basereg);
+                        }
+                    }
+                }
+
+                // add displacement
+                writer.put_add_reg_reg_imm(
+                    Aarch64Register::X1,
+                    Aarch64Register::X1,
+                    displacement as u64,
+                );
+                //deref into x1 to get the real value
+                writer.put_ldr_reg_reg_offset(Aarch64Register::X1, Aarch64Register::X1, 0u64);
+            }
+        }
+
+        //call cmplog runtime to populate the values map
+        writer.put_bytes(&self.cmplog_runtime.ops_save_register_and_blr_to_populate());
+
+        // Restore x0, x1
+        assert!(writer.put_ldp_reg_reg_reg_offset(
+            Aarch64Register::X0,
+            Aarch64Register::X1,
+            Aarch64Register::Sp,
+            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+            IndexMode::PostAdjust,
+        ));
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -651,7 +980,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
     #[cfg(target_arch = "aarch64")]
     #[inline]
-    fn is_interesting_instruction(
+    fn is_interesting_asan_instruction(
         &self,
         _address: u64,
         instr: &Insn,
@@ -699,6 +1028,68 @@ impl<'a> FridaInstrumentationHelper<'a> {
         }
 
         Err(())
+    }
+
+    #[inline]
+    fn is_interesting_cmplog_instruction(
+        &self,
+        _address: u64,
+        instr: &Insn,
+    ) -> Result<(CmplogOperandType, CmplogOperandType), ()> {
+        // We only care for compare instrunctions - aka instructions which set the flags
+        match instr.mnemonic().unwrap() {
+            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls" => (),
+            _ => return Err(()),
+        }
+        let operands = self
+            .capstone
+            .insn_detail(instr)
+            .unwrap()
+            .arch_detail()
+            .operands();
+        if operands.len() != 2 {
+            return Err(());
+        }
+
+        let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
+            match arm64operand.op_type {
+                Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
+                Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
+                Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
+                    opmem.base(),
+                    opmem.index(),
+                    opmem.disp(),
+                    self.get_instruction_width(instr, &operands),
+                )),
+                Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
+                _ => return Err(()),
+            }
+        } else {
+            None
+        };
+
+        let operand2 = if let Arm64Operand(arm64operand2) = operands.last().unwrap() {
+            match arm64operand2.op_type {
+                Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
+                Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
+                Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
+                    opmem.base(),
+                    opmem.index(),
+                    opmem.disp(),
+                    self.get_instruction_width(instr, &operands),
+                )),
+                Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
+                _ => return Err(()),
+            }
+        } else {
+            None
+        };
+
+        if operand1.is_some() && operand2.is_some() {
+            Ok((operand1.unwrap(), operand2.unwrap()))
+        } else {
+            Err(())
+        }
     }
 
     #[inline]
