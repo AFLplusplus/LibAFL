@@ -655,7 +655,7 @@ where
                         self.shmem_provider.post_fork();
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_secs(id as u64));
+                        std::thread::sleep(std::time::Duration::from_secs((id + 1) as u64));
 
                         #[cfg(feature = "std")]
                         if file.is_some() {
