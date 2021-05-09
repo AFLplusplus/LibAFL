@@ -12,14 +12,13 @@ members = [
     "libafl_targets",
     "libafl_frida",
     "libafl_tests",
+    "fuzzers/frida_libpng",         
 ]
 default-members = [
     "libafl",
     "libafl_derive",
     "libafl_cc",
     "libafl_targets",
-    "libafl_tests",
 ]
 exclude = [
-    "fuzzers",
 ]

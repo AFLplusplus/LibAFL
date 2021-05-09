@@ -101,14 +101,27 @@ void func2() {
 }
 __attribute__((noinline))
 void func1() {
-  //printf("func1\n");
+    //printf("func1\n");
   func2();
 }
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  if (size < kPngHeaderSize) {
+
+   if(data[10] == 0xAB &&
+       data[11] == 0xCD &&
+       data[12] == 0xEF &&
+       data[13] == 0xAA &&
+       data[14] == 0xBB ) {
+        printf("passed the test!");
+    } else {
+        printf("x");
+        return 0;
+    }
+
+
+    if (size < kPngHeaderSize) {
     return 0;
   }
 
