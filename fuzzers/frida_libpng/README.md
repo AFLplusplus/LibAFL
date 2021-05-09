@@ -11,6 +11,15 @@ This will call (the build.rs)[./build.rs], which in turn downloads a libpng arch
 Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the C++ harness)[./harness.cc] and the instrumented `libpng`.
 Afterwards, the fuzzer will be ready to run, from `../../target/examples/libfuzzer_libpng`.
 
+### Build For Android
+When building for android using a cross-compiler, make sure you have a _standalone toolchain_, and then add the following:
+1. In the ~/.cargo/config file add a target with the correct cross-compiler toolchain name (in this case aarch64-linux-android, but names may vary)
+`[target.aarch64-linux-android]`
+`linker="aarch64-linux-android-clang"`
+2. add path to installed toolchain to PATH env variable.
+3. define CLANG_PATH and add target to the build command line:
+`CLANG_PATH=<path to installed toolchain>/bin/aarch64-linux-android-clang cargo -v build --release --target=aarch64-linux-android`
+
 ## Run
 
 The first time you run the binary, the broker will open a tcp port (currently on port `1337`), waiting for fuzzer clients to connect. This port is local and only used for the initial handshake. All further communication happens via shared map, to be independent of the kernel.
