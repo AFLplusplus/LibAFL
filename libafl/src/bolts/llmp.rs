@@ -68,12 +68,12 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
-use std::io::ErrorKind;
+
 #[cfg(feature = "std")]
 use std::{
     convert::TryInto,
     env,
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
     sync::mpsc::channel,
     thread,

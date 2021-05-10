@@ -4,6 +4,8 @@ use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use core_affinity::CoreId;
 use serde::{de::DeserializeOwned, Serialize};
+
+#[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
 #[cfg(feature = "std")]
@@ -46,6 +48,7 @@ use crate::utils::{fork, ForkResult};
 #[cfg(all(feature = "std", target_os = "android"))]
 use crate::bolts::os::ashmem_server::AshmemService;
 
+#[cfg(feature = "std")]
 use derive_builder::Builder;
 
 /// Forward this to the client
@@ -171,6 +174,7 @@ where
         matches!(self.llmp, llmp::LlmpConnection::IsBroker { broker: _ })
     }
 
+    #[cfg(feature = "std")]
     pub fn connect_b2b<A>(&mut self, addr: A) -> Result<(), Error>
     where
         A: ToSocketAddrs,
@@ -550,6 +554,7 @@ pub enum ManagerKind {
     Client { cpu_core: Option<CoreId> },
     /// A [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
+    #[cfg(feature = "std")]
     /// A [`LlmpBroker`] that establishes a Broker 2 Broker communication before starting up.
     ConnectedBroker { connect_to: SocketAddr },
 }
@@ -590,6 +595,7 @@ where
 /// Provides a builder which can be used to build a restarting manager, which is a combination of a
 /// restarter and runner, that can be used on systems both with and without `fork` support. The
 /// restarter will start a nre process each time the child crashes or timesout.
+#[cfg(feature = "std")]
 #[derive(Builder, Debug)]
 #[builder(pattern = "owned")]
 pub struct RestartingMgr<I, S, SP, ST>
@@ -614,6 +620,7 @@ where
     _phantom: PhantomData<(I, S)>,
 }
 
+#[cfg(feature = "std")]
 impl<I, S, SP, ST> RestartingMgr<I, S, SP, ST>
 where
     I: Input,

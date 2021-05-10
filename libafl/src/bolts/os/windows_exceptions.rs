@@ -1,8 +1,9 @@
 //! Exception handling for Windows
 
-pub use crate::bolts::bindings::windows::win32::debug::EXCEPTION_POINTERS;
-
-use crate::{bolts::bindings::windows::win32::debug::SetUnhandledExceptionFilter, Error};
+pub use crate::bolts::bindings::windows::win32::debug::{
+    Error, SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
+};
+use std::os::raw::{c_long, c_void};
 
 use alloc::vec::Vec;
 use core::{
@@ -13,7 +14,6 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
-use std::os::raw::{c_long, c_void};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 

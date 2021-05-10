@@ -1,19 +1,21 @@
 //! Utility functions for AFL
 
-#[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
-    events::llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgrBuilder},
+    events::llmp::{LlmpRestartingEventManager, ManagerKind},
     inputs::Input,
     state::IfInteresting,
     stats::Stats,
+    Error,
 };
 
 use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::process::Stdio;
 use xxhash_rust::xxh3::xxh3_64_with_seed;
+
+#[cfg(feature = "std")]
+use crate::events::llmp::RestartingMgrBuilder;
 
 #[cfg(unix)]
 use libc::pid_t;
@@ -21,18 +23,18 @@ use libc::pid_t;
 use std::{
     env,
     net::SocketAddr,
-    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 #[cfg(all(unix, feature = "std"))]
 use std::{ffi::CString, fs::File, os::unix::io::AsRawFd};
 
-#[cfg(any(unix, feature = "std"))]
-use crate::Error;
-
 #[cfg(all(windows, feature = "std"))]
 use core_affinity::CoreId;
 
+#[cfg(all(windows, feature = "std"))]
+use std::process::Stdio;
+
+#[cfg(feature = "std")]
 use derive_builder::Builder;
 
 /// Can be converted to a slice
@@ -592,6 +594,7 @@ mod tests {
 }
 
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
+#[cfg(feature = "std")]
 #[derive(Builder)]
 #[builder(pattern = "owned")]
 pub struct Launcher<'a, I, S, SP, ST>
@@ -624,6 +627,7 @@ where
     b2b_addr: Option<SocketAddr>,
 }
 
+#[cfg(feature = "std")]
 impl<'a, I, S, SP, ST> Launcher<'a, I, S, SP, ST>
 where
     I: Input,
