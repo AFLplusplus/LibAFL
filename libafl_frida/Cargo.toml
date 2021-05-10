@@ -25,6 +25,7 @@ frida-gum = { version = "0.4.0", git = "https://github.com/s1341/frida-rust", fe
 frida-gum-sys = { version = "0.2.4", git = "https://github.com/s1341/frida-rust", features = [ "auto-download", "event-sink", "invocation-listener"] }
 #frida-gum = { version = "0.4.0",  path = "../../frida-rust/frida-gum", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
 #frida-gum-sys = { version = "0.2.4", path = "../../frida-rust/frida-gum-sys", features = [ "auto-download", "event-sink", "invocation-listener"] }
+core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs" }
 regex = "1.4"
 dynasmrt = "1.0.1"
 capstone = "0.8.0"
