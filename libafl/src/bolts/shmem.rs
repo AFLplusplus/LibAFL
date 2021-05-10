@@ -364,7 +364,7 @@ where
         match pipe {
             Some(pipe) => {
                 let ok = [0u8; 4];
-                let mut ret = ok.clone();
+                let mut ret = ok;
                 pipe.read_exact(&mut ret)?;
                 if ret == ok {
                     Ok(())

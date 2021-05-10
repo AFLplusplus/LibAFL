@@ -596,6 +596,7 @@ where
 /// restarter and runner, that can be used on systems both with and without `fork` support. The
 /// restarter will start a nre process each time the child crashes or timesout.
 #[cfg(feature = "std")]
+#[allow(clippy::default_trait_access)]
 #[derive(Builder, Debug)]
 #[builder(pattern = "owned")]
 pub struct RestartingMgr<I, S, SP, ST>
@@ -621,6 +622,8 @@ where
 }
 
 #[cfg(feature = "std")]
+#[allow(clippy::type_complexity)]
+#[allow(clippy::too_many_lines)]
 impl<I, S, SP, ST> RestartingMgr<I, S, SP, ST>
 where
     I: Input,

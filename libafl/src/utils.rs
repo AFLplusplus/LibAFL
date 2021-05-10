@@ -600,6 +600,7 @@ mod tests {
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
 #[derive(Builder)]
+#[allow(clippy::type_complexity)]
 #[builder(pattern = "owned")]
 pub struct Launcher<'a, I, S, SP, ST>
 where
@@ -641,6 +642,7 @@ where
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std"))]
+    #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
         let core_ids = core_affinity::get_core_ids().unwrap();
         let num_cores = core_ids.len();
