@@ -5,7 +5,7 @@ pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
 pub mod forkserver;
-pub use forkserver::{Forkserver, OutFile};
+pub use forkserver::{ForkserverExecutor,Forkserver, OutFile};
 
 
 use core::marker::PhantomData;
