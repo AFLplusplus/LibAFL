@@ -4,9 +4,12 @@
 use core::{
     ffi::c_void,
     marker::PhantomData,
-    ptr::{self, write_volatile},
+    ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+
+#[cfg(unix)]
+use core::ptr;
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;

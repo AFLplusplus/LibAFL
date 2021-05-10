@@ -34,7 +34,7 @@ pub type StdShMem = OsShMem;
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::{env, sync::Mutex};
+use std::env;
 
 use alloc::{rc::Rc, string::ToString};
 use core::cell::RefCell;
@@ -209,7 +209,7 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
 #[derive(Debug, Clone)]
 pub struct RcShMem<T: ShMemProvider> {
     internal: ManuallyDrop<T::Mem>,
-    provider: Rc<Mutex<RefCell<T>>>,
+    provider: Rc<RefCell<T>>,
 }
 
 impl<T> ShMem for RcShMem<T>
@@ -235,11 +235,7 @@ where
 
 impl<T: ShMemProvider> Drop for RcShMem<T> {
     fn drop(&mut self) {
-        self.provider
-            .lock()
-            .unwrap()
-            .borrow_mut()
-            .release_map(&mut self.internal)
+        self.provider.borrow_mut().release_map(&mut self.internal)
     }
 }
 
@@ -248,7 +244,7 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 pub struct RcShMemProvider<T: ShMemProvider> {
-    internal: Rc<Mutex<RefCell<T>>>,
+    internal: Rc<RefCell<T>>,
 }
 
 unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
@@ -261,59 +257,37 @@ where
 
     fn new() -> Result<Self, Error> {
         Ok(Self {
-            internal: Rc::new(Mutex::new(RefCell::new(T::new()?))),
+            internal: Rc::new(RefCell::new(T::new()?)),
         })
     }
 
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
         Ok(Self::Mem {
-            internal: ManuallyDrop::new(
-                self.internal
-                    .lock()
-                    .unwrap()
-                    .borrow_mut()
-                    .new_map(map_size)?,
-            ),
+            internal: ManuallyDrop::new(self.internal.borrow_mut().new_map(map_size)?),
             provider: self.internal.clone(),
         })
     }
 
     fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
         Ok(Self::Mem {
-            internal: ManuallyDrop::new(
-                self.internal
-                    .lock()
-                    .unwrap()
-                    .borrow_mut()
-                    .from_id_and_size(id, size)?,
-            ),
+            internal: ManuallyDrop::new(self.internal.borrow_mut().from_id_and_size(id, size)?),
             provider: self.internal.clone(),
         })
     }
 
     fn release_map(&mut self, map: &mut Self::Mem) {
-        self.internal
-            .lock()
-            .unwrap()
-            .borrow_mut()
-            .release_map(&mut map.internal)
+        self.internal.borrow_mut().release_map(&mut map.internal)
     }
 
     fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
         Ok(Self::Mem {
-            internal: ManuallyDrop::new(
-                self.internal
-                    .lock()
-                    .unwrap()
-                    .borrow_mut()
-                    .clone_ref(&mapping.internal)?,
-            ),
+            internal: ManuallyDrop::new(self.internal.borrow_mut().clone_ref(&mapping.internal)?),
             provider: self.internal.clone(),
         })
     }
 
     fn post_fork(&mut self) {
-        self.internal.lock().unwrap().borrow_mut().post_fork()
+        self.internal.borrow_mut().post_fork()
     }
 }
 

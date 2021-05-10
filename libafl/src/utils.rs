@@ -11,20 +11,24 @@ use crate::{
 
 use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::events::llmp::RestartingMgrBuilder;
 
 #[cfg(unix)]
 use libc::pid_t;
+
 #[cfg(feature = "std")]
 use std::{
     env,
     net::SocketAddr,
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
+
 #[cfg(all(unix, feature = "std"))]
 use std::{ffi::CString, fs::File, os::unix::io::AsRawFd};
 

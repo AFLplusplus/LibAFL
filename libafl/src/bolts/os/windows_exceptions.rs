@@ -1,8 +1,9 @@
 //! Exception handling for Windows
 
 pub use crate::bolts::bindings::windows::win32::debug::{
-    Error, SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
+    SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
 };
+use crate::Error;
 use std::os::raw::{c_long, c_void};
 
 use alloc::vec::Vec;
