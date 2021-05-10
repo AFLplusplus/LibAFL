@@ -17,6 +17,8 @@ pub type OsShMemProvider = Win32ShMemProvider;
 #[cfg(all(windows, feature = "std"))]
 pub type OsShMem = Win32ShMem;
 
+use crate::Error;
+
 #[cfg(all(target_os = "android", feature = "std"))]
 use crate::bolts::os::ashmem_server::ServedShMemProvider;
 #[cfg(all(target_os = "android", feature = "std"))]
@@ -39,7 +41,7 @@ use alloc::{rc::Rc, string::ToString};
 use core::{cell::RefCell, fmt::Debug, mem::ManuallyDrop};
 
 #[cfg(all(unix, feature = "std"))]
-use crate::{bolts::os::pipes::Pipe, Error};
+use crate::bolts::os::pipes::Pipe;
 #[cfg(all(unix, feature = "std"))]
 use std::io::{Read, Write};
 
@@ -252,7 +254,7 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 pub struct RcShMemProvider<T: ShMemProvider> {
     /// The wrapped [`ShMemProvider`].
     internal: Rc<RefCell<T>>,
@@ -266,10 +268,10 @@ pub struct RcShMemProvider<T: ShMemProvider> {
     parent_child_pipe: Option<Pipe>,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 impl<T> ShMemProvider for RcShMemProvider<T>
 where
     T: ShMemProvider + alloc::fmt::Debug,
@@ -339,7 +341,7 @@ where
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 impl<T> RcShMemProvider<T>
 where
     T: ShMemProvider,
@@ -402,7 +404,7 @@ where
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 impl<T> Default for RcShMemProvider<T>
 where
     T: ShMemProvider + alloc::fmt::Debug,

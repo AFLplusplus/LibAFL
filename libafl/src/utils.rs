@@ -1,12 +1,14 @@
 //! Utility functions for AFL
 
+use crate::Error;
+
+#[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
     events::llmp::{LlmpRestartingEventManager, ManagerKind},
     inputs::Input,
     state::IfInteresting,
     stats::Stats,
-    Error,
 };
 
 use alloc::vec::Vec;
