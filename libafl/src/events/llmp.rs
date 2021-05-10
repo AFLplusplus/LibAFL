@@ -554,9 +554,6 @@ pub enum ManagerKind {
     Client { cpu_core: Option<CoreId> },
     /// A [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
-    #[cfg(feature = "std")]
-    /// A [`LlmpBroker`] that establishes a Broker 2 Broker communication before starting up.
-    ConnectedBroker { connect_to: SocketAddr },
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
@@ -614,6 +611,9 @@ where
     /// The broker port to use
     #[builder(default = "1337")]
     broker_port: u16,
+    /// The address to connect to
+    #[builder(default = "Option::None")]
+    remote_broker_addr: Option<SocketAddr>,
     /// The type of manager to build
     #[builder(default = "ManagerKind::Any")]
     kind: ManagerKind,
@@ -654,17 +654,15 @@ where
                         println!(
                             "Doing broker things. Run this tool again to start fuzzing in a client."
                         );
-                        mgr.broker_loop()?;
-                        return Err(Error::ShuttingDown);
-                    }
-                    ManagerKind::ConnectedBroker { connect_to } => {
-                        // Yep, broker. Just loop here.
-                        // But first, connect to another broker :)
-                        println!("Connecting to remote broker at {:?}...", connect_to);
-                        mgr.connect_b2b(connect_to)?;
-                        println!(
-                            "Doing broker things. Run this tool again to start fuzzing in a client."
-                        );
+
+                        match self.remote_broker_addr {
+                            Some(remote_broker_addr) => {
+                                println!("B2b: Connecting to {:?}", &remote_broker_addr);
+                                mgr.connect_b2b(remote_broker_addr)?;
+                            }
+                            None => (),
+                        };
+
                         mgr.broker_loop()?;
                         return Err(Error::ShuttingDown);
                     }
@@ -676,7 +674,7 @@ where
                 }
             } else {
                 match self.kind {
-                    ManagerKind::Broker | ManagerKind::ConnectedBroker { connect_to: _ } => {
+                    ManagerKind::Broker => {
                         return Err(Error::IllegalState(
                             "Tried to start a broker, but got a client".to_string(),
                         ));

@@ -426,7 +426,7 @@ unsafe fn fuzz(
         .run_client(&mut run_client)
         .cores(cores)
         .stdout_file(stdout_file)
-        .b2b_addr(broker_addr)
+        .remote_broker_addr(broker_addr)
         .build()
         .unwrap()
         .launch()

@@ -631,7 +631,7 @@ where
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     #[builder(default = "None")]
-    b2b_addr: Option<SocketAddr>,
+    remote_broker_addr: Option<SocketAddr>,
 }
 
 #[cfg(feature = "std")]
@@ -698,13 +698,13 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        if let Some(b2b_addr) = self.b2b_addr {
+        if let Some(remote_broker_addr) = self.remote_broker_addr {
             RestartingMgrBuilder::<I, S, SP, ST>::default()
                 .shmem_provider(self.shmem_provider.clone())
                 .stats(self.stats.clone())
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::ConnectedBroker {
-                    connect_to: b2b_addr,
+                    connect_to: remote_broker_addr,
                 })
                 .build()
                 .unwrap()
@@ -800,27 +800,15 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        if let Some(b2b_addr) = self.b2b_addr {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .kind(ManagerKind::ConnectedBroker {
-                    connect_to: b2b_addr,
-                })
-                .build()
-                .unwrap()
-                .launch()?;
-        } else {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .kind(ManagerKind::Broker)
-                .build()
-                .unwrap()
-                .launch()?;
-        }
+        RestartingMgrBuilder::<I, S, SP, ST>::default()
+            .shmem_provider(self.shmem_provider.clone())
+            .stats(self.stats.clone())
+            .broker_port(self.broker_port)
+            .kind(ManagerKind::Broker)
+            .remote_broker_addr(self.remote_broker_addr)
+            .build()
+            .unwrap()
+            .launch()?;
 
         //broker exited. kill all clients.
         for handle in &mut handles {
