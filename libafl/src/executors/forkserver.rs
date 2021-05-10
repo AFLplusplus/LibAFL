@@ -340,11 +340,9 @@ where
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, input: &I) -> Result<(), Error>{
         //write to test case
-        if !self.use_stdin {
-            let mut out_file = OutFile::new(&self.out_file);
-            out_file.write_buf(&input.target_bytes().as_slice().to_vec());
-            //outfile gets automatically closed.
-        }
+        let mut out_file = OutFile::new(&self.out_file);
+        out_file.write_buf(&input.target_bytes().as_slice().to_vec());
+        //outfile gets automatically closed.
         Ok(())
     }
 
