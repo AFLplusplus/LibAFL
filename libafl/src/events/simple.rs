@@ -6,15 +6,15 @@ use crate::{
     corpus::CorpusScheduler,
     events::{BrokerEventResult, Event, EventManager},
     executors::{Executor, HasObservers},
-    inputs::Input,
+    inputs::Input,fuzzer::HasCorpusScheduler,
     observers::ObserversTuple,
-    stats::Stats,
+    stats::Stats,state::State,
     Error,
 };
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
-pub struct SimpleEventManager<I, S, ST>
+pub struct SimpleEventManager<I, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -23,24 +23,20 @@ where
     stats: ST,
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
-    phantom: PhantomData<S>,
 }
 
-impl<I, S, ST> EventManager<I, S> for SimpleEventManager<I, S, ST>
+impl<E, I, S, ST, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, ST>
 where
-    I: Input,
+    E: Executor<I>,
+    I: Input,S: State,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process<CS, E, OT>(
+    fn process(
         &mut self,
+        fuzzer: &mut Z,
         state: &mut S,
-        _executor: &mut E,
-        _scheduler: &CS,
+        executor: &mut E,
     ) -> Result<usize, Error>
-    where
-        CS: CorpusScheduler<I, S>,
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
     {
         let count = self.events.len();
         while !self.events.is_empty() {
@@ -59,7 +55,7 @@ where
     }
 }
 
-impl<I, S, ST> SimpleEventManager<I, S, ST>
+impl<I, ST> SimpleEventManager<I, ST>
 where
     I: Input,
     ST: Stats, //TODO CE: CustomEvent,
@@ -69,7 +65,6 @@ where
         Self {
             stats,
             events: vec![],
-            phantom: PhantomData,
         }
     }
 
@@ -141,7 +136,7 @@ where
 
     // Handle arriving events in the client
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
-    fn handle_in_client(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn handle_in_client<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         Err(Error::Unknown(format!(
             "Received illegal message that message should not have arrived: {:?}.",
             event

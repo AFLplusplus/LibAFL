@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::CorpusScheduler,
     executors::{Executor, HasObservers},
-    inputs::Input,
+    inputs::Input,state::State,
+    fuzzer::HasCorpusScheduler,
     observers::ObserversTuple,
     Error,
 };
@@ -177,25 +178,21 @@ where
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<I, S>
+pub trait EventManager<E, I, S, Z>
 where
-    I: Input,
+    I: Input,S: State,E: Executor<I>
 {
     /// Fire an Event
     //fn fire<'a>(&mut self, event: Event<I>) -> Result<(), Error>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<CS, E, OT>(
+    fn process(
         &mut self,
+        fuzzer: &mut Z,
         state: &mut S,
         executor: &mut E,
-        scheduler: &CS,
-    ) -> Result<usize, Error>
-    where
-        CS: CorpusScheduler<I, S>,
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple;
+    ) -> Result<usize, Error>;
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
@@ -229,23 +226,19 @@ where
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
-pub struct NopEventManager<I, S> {
-    phantom: PhantomData<(I, S)>,
+pub struct NopEventManager {
 }
-impl<I, S> EventManager<I, S> for NopEventManager<I, S>
+
+impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager
 where
-    I: Input,
+    I: Input,S: State,E: Executor<I>
 {
-    fn process<CS, E, OT>(
+    fn process(
         &mut self,
-        _state: &mut S,
-        _executor: &mut E,
-        _scheduler: &CS,
+        fuzzer: &mut Z,
+        state: &mut S,
+        executor: &mut E,
     ) -> Result<usize, Error>
-    where
-        CS: CorpusScheduler<I, S>,
-        E: Executor<I> + HasObservers<OT>,
-        OT: ObserversTuple,
     {
         Ok(0)
     }

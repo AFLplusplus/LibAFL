@@ -19,10 +19,10 @@ use crate::{
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::Feedback,
+    feedbacks::FeedbackStatesTuple,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::{HasObjective, HasSolutions},
+    state::HasSolutions,
     Error,
 };
 
@@ -34,7 +34,7 @@ where
     OT: ObserversTuple,
 {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a mut H,
+    harness_fn: &'a H,
     /// The observers, observing each run
     observers: OT,
     phantom: PhantomData<(EM, I, S)>,
@@ -47,7 +47,7 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+    fn run_target(&self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(bytes.as_slice());
         Ok(ret)
@@ -158,7 +158,7 @@ where
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<OC, OF>(
+    pub fn new<OC, OFT>(
         harness_fn: &'a mut H,
         observers: OT,
         _state: &mut S,
@@ -167,19 +167,19 @@ where
     where
         EM: EventManager<I, S>,
         OC: Corpus<I>,
-        OF: Feedback<I>,
-        S: HasObjective<OF, I> + HasSolutions<OC, I>,
+        OFT: FeedbackStatesTuple<I>,
+        S: HasSolutions<OC, I>,
     {
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S>,
+                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
             );
             write_volatile(
                 &mut data.timeout_handler,
-                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S>,
+                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
             );
 
             setup_signal_handler(data)?;
@@ -190,11 +190,11 @@ where
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S>,
+                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
             );
             //write_volatile(
             //    &mut data.timeout_handler,
-            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S>,
+            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
             //);
 
             setup_exception_handler(data)?;
@@ -234,10 +234,10 @@ mod unix_signal_handler {
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
         executors::ExitKind,
-        feedbacks::Feedback,
+        feedbacks::FeedbackStatesTuple,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::{HasObjective, HasSolutions},
+        state::HasSolutions,
     };
 
     // TODO merge GLOBAL_STATE with the Windows one
@@ -308,7 +308,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<EM, I, OC, OF, OT, S>(
+    pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -317,8 +317,8 @@ mod unix_signal_handler {
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OF: Feedback<I>,
-        S: HasObjective<OF, I> + HasSolutions<OC, I>,
+        OFT: FeedbackStatesTuple<I>,
+        S: HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
@@ -379,7 +379,7 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -388,8 +388,8 @@ mod unix_signal_handler {
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OF: Feedback<I>,
-        S: HasObjective<OF, I> + HasSolutions<OC, I>,
+        OFT: FeedbackStatesTuple<I>,
+        S: HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
@@ -538,7 +538,7 @@ mod windows_exception_handler {
         corpus::{Corpus, Testcase},
         events::{Event, EventManager},
         executors::ExitKind,
-        feedbacks::Feedback,
+        feedbacks::FeedbackStatesTuple,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
         state::{HasObjective, HasSolutions},
@@ -592,7 +592,7 @@ mod windows_exception_handler {
         }
     }
 
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
         code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
@@ -600,8 +600,8 @@ mod windows_exception_handler {
         EM: EventManager<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OF: Feedback<I>,
-        S: HasObjective<OF, I> + HasSolutions<OC, I>,
+        OFT: FeedbackStatesTuple<I>,
+        S: HasObjectiveStates<OFT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
         #[cfg(feature = "std")]

@@ -5,96 +5,98 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
 /// Mutational stage is the normal fuzzing stage,
-pub mod mutational;
+//pub mod mutational;
 
-pub use mutational::{MutationalStage, StdMutationalStage};
+//pub use mutational::{MutationalStage, StdMutationalStage};
 
 //pub mod power;
 //pub use power::PowerMutationalStage;
-
 use crate::{
     bolts::tuples::TupleList, events::EventManager, executors::Executor, inputs::Input,
-    state::HasClientPerfStats, Error,
+    state::State, Error,
 };
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<CS, E, EM, I, S>
+pub trait Stage<E, EM, I, S, Z>
 where
-    EM: EventManager<I, S>,
     E: Executor<I>,
+    EM: EventManager<E, I, S, Z>,
     I: Input,
+    S: State,
 {
     /// Run the stage
     fn perform(
         &mut self,
-        state: &mut S,
+        fuzzer: &mut Z,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
-pub trait StagesTuple<CS, E, EM, I, S>
+pub trait StagesTuple<E, EM, I, S, Z>
 where
-    EM: EventManager<I, S>,
     E: Executor<I>,
+    EM: EventManager<E, I, S, Z>,
     I: Input,
+    S: State,
 {
     /// Performs all `Stages` in this tuple
     fn perform_all(
         &mut self,
-        state: &mut S,
+        fuzzer: &mut Z,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
 
-impl<CS, E, EM, I, S> StagesTuple<CS, E, EM, I, S> for ()
+impl<E, EM, I, S, Z> StagesTuple<E, EM, I, S, Z> for ()
 where
-    EM: EventManager<I, S>,
     E: Executor<I>,
+    EM: EventManager<E, I, S, Z>,
     I: Input,
+    S: State,
 {
     fn perform_all(
         &mut self,
-        _: &mut S,
+        _: &mut Z,
         _: &mut E,
+        _: &mut S,
         _: &mut EM,
-        _: &CS,
         _: usize,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<Head, Tail, CS, E, EM, I, S> StagesTuple<CS, E, EM, I, S> for (Head, Tail)
+impl<Head, Tail, E, EM, I, S, Z> StagesTuple<E, EM, I, S, Z> for (Head, Tail)
 where
-    Head: Stage<CS, E, EM, I, S>,
-    Tail: StagesTuple<CS, E, EM, I, S> + TupleList,
-    EM: EventManager<I, S>,
+    Head: Stage<E, EM, I, S, Z>,
+    Tail: StagesTuple<E, EM, I, S, Z> + TupleList,
     E: Executor<I>,
+    EM: EventManager<E, I, S, Z>,
     I: Input,
-    S: HasClientPerfStats,
+    S: State,
 {
     fn perform_all(
         &mut self,
-        state: &mut S,
+        fuzzer: &mut Z,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         // Perform the current stage
         self.0
-            .perform(state, executor, manager, scheduler, corpus_idx)?;
+            .perform(fuzzer, executor, state, manager, corpus_idx)?;
 
         // Execute the remaining stages
         self.1
-            .perform_all(state, executor, manager, scheduler, corpus_idx)
+            .perform_all(fuzzer, executor, state, manager, corpus_idx)
     }
 }

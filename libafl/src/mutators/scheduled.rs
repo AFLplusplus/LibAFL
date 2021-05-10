@@ -396,7 +396,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    /*use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{BytesInput, HasBytesVec},
         mutators::{
@@ -465,5 +465,5 @@ mod tests {
             };
             assert_ne!(equal_in_a_row, 5);
         }
-    }
+    }*/
 }
