@@ -203,18 +203,6 @@ impl Forkserver {
             libc::close(st_pipe.write_end);
         }
 
-        unsafe {
-            let rlen = libc::read(
-                st_pipe.read_end,
-                (&mut status) as *mut libc::c_int as *mut libc::c_void,
-                4,
-            );
-            println!("{}", rlen);
-            if rlen == 4 {
-                println!("Forkserver up!");
-            }
-        };
-
         Self {
             st_pipe,
             ctl_pipe,
@@ -241,6 +229,29 @@ impl Forkserver {
 
     pub fn status(&self) -> i32{
         self.status
+    }
+
+    pub fn read_st(&self) -> (isize, i32){
+        unsafe{
+            let mut status : i32 = 0;
+            let rlen = libc::read(
+                self.st_pipe.read_end,
+                (&mut status) as *mut libc::c_int as *mut libc::c_void,
+                4,
+            );
+            (rlen, status)
+        }
+    }
+
+    pub fn write_ctl(&self, mut val: i32) -> isize{
+        unsafe{
+            let slen = libc::write(
+                self.ctl_pipe.write_end,
+                (&mut val) as *mut libc::c_int as *mut libc::c_void,
+                4,
+            );
+            slen
+        }
     }
 }
 
@@ -282,7 +293,7 @@ where
         
         for item in argv{
             if item == "@@" && use_stdin {
-                use_stdin = false;
+                use_stdin = false; //only 1 @@ allowed.
                 args.push(out_file.clone());
             }
             else{
@@ -298,6 +309,11 @@ where
 
         //forkserver
         let forkserver = Forkserver::new(target.clone(), args.clone(), out_file.clone(), use_stdin, 0);
+        let (rlen, _) = forkserver.read_st();//initial handshake
+        if rlen == 4{
+            println!("Forkserver up!!");
+        }
+
         Ok(Self {
             target,
             args,
@@ -320,6 +336,7 @@ where
     pub fn forkserver(&self) -> &Forkserver{
         &self.forkserver
     }
+
 }
 impl<EM, I, OT, S> Executor<I> for ForkserverExecutor<EM, I, OT, S>
 where
@@ -328,6 +345,8 @@ where
 {
     #[inline]
     fn run_target(&mut self, _input: &I) -> Result<ExitKind, Error> {
+
+
         Ok(ExitKind::Ok)
     }
 }
