@@ -4,16 +4,13 @@
 use core::{
     ffi::c_void,
     marker::PhantomData,
-    ptr::write_volatile,
+    ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 
 #[cfg(unix)]
-use core::ptr;
-
-#[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(windows)]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
 use crate::{
@@ -112,7 +109,7 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(all(windows, features = "std"))]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             write_volatile(
                 &mut windows_exception_handler::GLOBAL_STATE.current_input_ptr,
@@ -188,7 +185,7 @@ where
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(all(windows, features = "std"))]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(

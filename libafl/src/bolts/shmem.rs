@@ -191,9 +191,15 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
         ))
     }
 
-    /// This method should be called after a fork or after cloning/a thread creation event, allowing the [`ShMem`] to
+    /// This method should be called before a fork or a thread creation event, allowing the [`ShMemProvider`] to
+    /// get ready for a potential reset of thread specific info, and for potential reconnects.
+    fn pre_fork(&mut self) {
+        // do nothing
+    }
+
+    /// This method should be called after a fork or after cloning/a thread creation event, allowing the [`ShMemProvider`] to
     /// reset thread specific info, and potentially reconnect.
-    fn post_fork(&mut self) {
+    fn post_fork(&mut self, _is_child: bool) {
         // do nothing
     }
 
@@ -243,12 +249,15 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
+#[cfg(unix)]
 pub struct RcShMemProvider<T: ShMemProvider> {
     internal: Rc<RefCell<T>>,
 }
 
+#[cfg(unix)]
 unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
 
+#[cfg(unix)]
 impl<T> ShMemProvider for RcShMemProvider<T>
 where
     T: ShMemProvider + alloc::fmt::Debug,
@@ -286,11 +295,29 @@ where
         })
     }
 
-    fn post_fork(&mut self) {
-        self.internal.borrow_mut().post_fork()
+    /// This method should be called before a fork or a thread creation event, allowing the [`ShMemProvider`] to
+    /// get ready for a potential reset of thread specific info, and for potential reconnects.
+    fn pre_fork(&mut self) {
+        self.internal.borrow_mut().pre_fork()
+    }
+
+    fn post_fork(&mut self, is_child: bool) {
+        if is_child {
+            self.await_parent_done();
+            let child_shmem = self.internal.borrow_mut().clone();
+            self.internal = Rc::new(RefCell::new(child_shmem));
+        }
+        self.internal.borrow_mut().post_fork(is_child);
+        if is_child {
+            self.set_child_done();
+        } else {
+            self.set_parent_done();
+            self.await_child_done();
+        }
     }
 }
 
+#[cfg(unix)]
 impl<T> Default for RcShMemProvider<T>
 where
     T: ShMemProvider + alloc::fmt::Debug,

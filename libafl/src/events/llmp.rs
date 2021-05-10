@@ -740,7 +740,7 @@ where
         } else {
             // We are the newly started fuzzing instance, first, connect to our own restore map.
             // A sender and a receiver for single communication
-            self.shmem_provider.post_fork();
+            self.shmem_provider.post_fork(true);
             (
                 LlmpSender::on_existing_from_env(self.shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
                 LlmpReceiver::on_existing_from_env(
@@ -752,7 +752,7 @@ where
             )
         };
 
-        new_shmem_provider.post_fork();
+        new_shmem_provider.post_fork(false);
 
         if let Some(core_id) = core_id {
             core_affinity::set_for_current(core_id);

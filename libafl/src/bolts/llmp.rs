@@ -1871,7 +1871,7 @@ where
         // (For now) the thread remote broker 2 broker just acts like a "normal" llmp client, except it proxies all messages to the attached socket, in both directions.
         thread::spawn(move || {
             // as always, call post_fork to potentially reconnect the provider (for threaded/forked use)
-            shmem_provider_clone.post_fork();
+            shmem_provider_clone.post_fork(true);
 
             #[cfg(fature = "llmp_debug")]
             println!("B2b: Spawned proxy thread");
@@ -2062,9 +2062,9 @@ where
 
         let mut shmem_provider_clone = self.shmem_provider.clone();
 
-        Ok(thread::spawn(move || {
+        let ret = thread::spawn(move || {
             // Call `post_fork` (even though this is not forked) so we get a new connection to the cloned `ShMemServer` if we are using a `ServedShMemProvider`
-            shmem_provider_clone.post_fork();
+            shmem_provider_clone.post_fork(true);
 
             let mut current_client_id = llmp_tcp_id + 1;
 
@@ -2125,7 +2125,10 @@ where
                     }
                 };
             }
-        }))
+        });
+
+        self.shmem_provider.post_fork(false);
+        Ok(ret)
     }
 
     /// broker broadcast to its own page for all others to read */
