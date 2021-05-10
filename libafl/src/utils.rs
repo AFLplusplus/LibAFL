@@ -12,6 +12,7 @@ use crate::{
 use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::process::Stdio;
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(unix)]
@@ -728,16 +729,19 @@ where
 
                 // the actual client. do the fuzzing
                 let stats = (self.client_init_stats)()?;
-                let (state, mgr) = setup_restarting_mgr(
-                    self.shmem_provider,
-                    self.stats,
-                    self.broker_port,
-                    ManagerKind::Client {
+                let (state, mgr) = RestartingMgrBuilder::<I, S, SP, ST>::default()
+                    .shmem_provider(self.shmem_provider.clone())
+                    .stats(stats)
+                    .broker_port(self.broker_port)
+                    .kind(ManagerKind::Client {
                         cpu_core: Some(CoreId {
                             id: core_conf.parse()?,
                         }),
-                    },
-                )?;
+                    })
+                    .build()
+                    .unwrap()
+                    .launch()?;
+
                 (self.run_client)(state, mgr)?;
 
                 unreachable!("Fuzzer client code should never get here!");
@@ -746,7 +750,7 @@ where
                 // I am a broker
                 // before going to the broker loop, spawn n clients
 
-                if stdout_file.is_some() {
+                if self.stdout_file.is_some() {
                     println!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
                 }
 
@@ -760,13 +764,13 @@ where
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                     if self.cores.iter().any(|&x| x == id) {
                         for id in 0..num_cores {
-                            let stdio = if stdout_file.is_some() {
+                            let stdio = if self.stdout_file.is_some() {
                                 Stdio::inherit()
                             } else {
                                 Stdio::null()
                             };
 
-                            if cores.iter().any(|&x| x == id) {
+                            if self.cores.iter().any(|&x| x == id) {
                                 std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
                                 let child = startable_self()?.stdout(stdio).spawn()?;
                                 handles.push(child);
@@ -784,21 +788,25 @@ where
         println!("I am broker!!.");
 
         if let Some(b2b_addr) = self.b2b_addr {
-            setup_restarting_mgr::<I, S, SP, ST>(
-                self.shmem_provider,
-                self.stats,
-                self.broker_port,
-                ManagerKind::ConnectedBroker {
+            RestartingMgrBuilder::<I, S, SP, ST>::default()
+                .shmem_provider(self.shmem_provider.clone())
+                .stats(self.stats.clone())
+                .broker_port(self.broker_port)
+                .kind(ManagerKind::ConnectedBroker {
                     connect_to: b2b_addr,
-                },
-            )?;
+                })
+                .build()
+                .unwrap()
+                .launch()?;
         } else {
-            setup_restarting_mgr::<I, S, SP, ST>(
-                self.shmem_provider,
-                self.stats,
-                self.broker_port,
-                ManagerKind::Broker,
-            )?;
+            RestartingMgrBuilder::<I, S, SP, ST>::default()
+                .shmem_provider(self.shmem_provider.clone())
+                .stats(self.stats.clone())
+                .broker_port(self.broker_port)
+                .kind(ManagerKind::Broker)
+                .build()
+                .unwrap()
+                .launch()?;
         }
 
         //broker exited. kill all clients.
@@ -811,32 +819,6 @@ where
 }
 
 const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
-
-/// utility function which spawns a broker and n clients and binds each client to a cpu core
-/// Connects to a b2b broker.
-#[cfg(all(windows, feature = "std"))]
-#[allow(clippy::similar_names, clippy::type_complexity)]
-#[allow(unused_mut)]
-pub fn launcher<I, S, SP, ST>(
-    mut shmem_provider: SP,
-    stats: ST,
-    client_init_stats: &mut dyn FnMut() -> Result<ST, Error>,
-    run_client: &mut dyn FnMut(
-        Option<S>,
-        LlmpRestartingEventManager<I, S, SP, ST>,
-    ) -> Result<(), Error>,
-    broker_port: u16,
-    cores: &[usize],
-    stdout_file: Option<&str>,
-    b2b_addr: Option<SocketAddr>,
-) -> Result<(), Error>
-where
-    I: Input,
-    ST: Stats,
-    SP: ShMemProvider + 'static,
-    S: DeserializeOwned + IfInteresting<I>,
-{
-}
 
 /// "Safe" wrapper around dup2
 #[cfg(all(unix, feature = "std"))]
