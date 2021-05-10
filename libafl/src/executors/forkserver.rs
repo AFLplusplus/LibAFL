@@ -70,7 +70,7 @@ impl ConfigTarget for Command {
                 if ret < 0 {
                     panic!("dup2() failed");
                 }
-                unsafe { libc::close(fd.unwrap()) };
+                unsafe { libc::close(fd.unwrap()) }; //fd gets automatically closed?
                 Ok(())
             };
             unsafe { self.pre_exec(func) }
@@ -165,14 +165,20 @@ pub struct Forkserver {
 }
 
 impl Forkserver {
-    pub fn new(target: String, args: Vec<String>, fd: Option<RawFd>, memlimit: u64) -> Self {
+    pub fn new(target: String, args: Vec<String>, out_file: String, use_stdin: bool, memlimit: u64) -> Self {
         //check if we'll use stdin
+
+        let mut fd = None;
+        if use_stdin{
+            fd = Some(OutFile::new(&out_file).as_raw_fd());
+        }
 
         let mut status = 0;
 
         //create 2 pipes
         let st_pipe: Pipe = Pipe::new();
         let ctl_pipe: Pipe = Pipe::new();
+
         //setsid, setrlimit, direct stdin, set pipe, and finally fork.
         match Command::new(target)
             .args(args)
@@ -191,7 +197,6 @@ impl Forkserver {
                 panic!("Command::new() failed");
             }
         };
-        println!("barrier");
         //we'll close unneeded endpoints
         unsafe {
             libc::close(ctl_pipe.read_end);
@@ -233,6 +238,10 @@ impl Forkserver {
     10. execve
     4':close ctl[0], st[1]
     */
+
+    pub fn status(&self) -> i32{
+        self.status
+    }
 }
 
 impl Drop for Forkserver{
@@ -253,6 +262,8 @@ where
 {
     target: String,
     args: Vec<String>,
+    use_stdin: bool,
+    out_file: String,
     forkserver: Forkserver,
     observers: OT,
     phantom: PhantomData<(EM, I, S)>,
@@ -263,29 +274,51 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    fn new(target: &'static str, args: Vec<&'static str>, observers: OT) -> Result<Self, Error> {
-        let target = target.to_string();
-        let fd = match args[0] {
-            "@@" => None,
-            _ => Some(OutFile::new(args[0]).as_raw_fd()),
-        };
+    pub fn new(bin: &'static str, argv: Vec<&'static str>, observers: OT) -> Result<Self, Error> {
+        let target = bin.to_string();
+        let mut args = Vec::<String>::new();
+        let mut use_stdin = true;
+        let out_file = format!("out-{}", 123456789); //TODO: replace it with a random number
+        
+        for item in argv{
+            if item == "@@" && use_stdin {
+                use_stdin = false;
+                args.push(out_file.clone());
+            }
+            else{
+                args.push(item.to_string());
+            }
+        }
+
         let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
 
         //shmem_set_up
         let shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE as usize).unwrap();
         shmem.write_to_env("__AFL_SHM_ID")?;
 
-        //write_to_test_case
-
         //forkserver
-        let forkserver = Forkserver::new(target.clone(), args.clone(), fd, 0);
+        let forkserver = Forkserver::new(target.clone(), args.clone(), out_file.clone(), use_stdin, 0);
         Ok(Self {
             target,
             args,
+            use_stdin,
+            out_file,
             forkserver,
             observers,
             phantom: PhantomData,
         })
+    }
+
+    pub fn target(&self) -> &String {
+        &self.target
+    }
+
+    pub fn args(&self) -> &Vec<String>{
+        &self.args
+    }
+
+    pub fn forkserver(&self) -> &Forkserver{
+        &self.forkserver
     }
 }
 impl<EM, I, OT, S> Executor<I> for ForkserverExecutor<EM, I, OT, S>
@@ -305,7 +338,13 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>{
+    fn pre_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, input: &I) -> Result<(), Error>{
+        //write to test case
+        if !self.use_stdin {
+            let mut out_file = OutFile::new(&self.out_file);
+            out_file.write_buf(&input.target_bytes().as_slice().to_vec());
+            //outfile gets automatically closed.
+        }
         Ok(())
     }
 
@@ -339,8 +378,8 @@ mod tests {
     fn test_forkserver() {
         let command = "/home/toka/work/aflsimple/test";
         let args = vec!["@@"];
-        let fd = OutFile::new("input_file");
+        //let fd = OutFile::new("input_file");
         //let forkserver = Forkserver::new(command.to_string(), args.iter().map(|s| s.to_string()).collect(), Some(fd.as_raw_fd()), 0);
-        let executors = ForkserverExecutor::<(), NopInput, (), ()>::new(command ,args, ());
+        let _executors = ForkserverExecutor::<(), NopInput, (), ()>::new(command ,args, ());
     }
 }
