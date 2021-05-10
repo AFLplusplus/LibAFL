@@ -161,7 +161,8 @@ impl Pipe {
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
-    status: i32,
+    pid: u32,
+    last_run_timed_out: i32,
 }
 
 impl Forkserver {
@@ -173,8 +174,7 @@ impl Forkserver {
             fd = Some(OutFile::new(&out_file).as_raw_fd());
         }
 
-        let mut status = 0;
-
+        let mut pid = 0;
         //create 2 pipes
         let st_pipe: Pipe = Pipe::new();
         let ctl_pipe: Pipe = Pipe::new();
@@ -192,7 +192,9 @@ impl Forkserver {
             .setpipe(st_pipe.clone(), ctl_pipe.clone())
             .spawn()
         {
-            Ok(_) => (),
+            Ok(child) => {
+                pid = child.id();
+            },
             Err(_) => {
                 panic!("Command::new() failed");
             }
@@ -204,9 +206,10 @@ impl Forkserver {
         }
 
         Self {
-            st_pipe,
-            ctl_pipe,
-            status,
+            st_pipe:st_pipe,
+            ctl_pipe:ctl_pipe,
+            pid: pid,
+            last_run_timed_out:0,
         }
     }
 
@@ -227,8 +230,12 @@ impl Forkserver {
     4':close ctl[0], st[1]
     */
 
-    pub fn status(&self) -> i32{
-        self.status
+    pub fn last_run_timed_out(&self) -> i32{
+        self.last_run_timed_out
+    }
+
+    pub fn pid(&self) -> u32{
+        self.pid
     }
 
     pub fn read_st(&self) -> (isize, i32){
@@ -346,6 +353,16 @@ where
     #[inline]
     fn run_target(&mut self, _input: &I) -> Result<ExitKind, Error> {
 
+        let slen = self.forkserver.write_ctl(self.forkserver().last_run_timed_out());
+        if slen != 4{
+            panic!("failed to request new process");
+        }
+
+        let (rlen, _data) = self.forkserver.read_st();
+        if rlen != 4 {
+            panic!("failed to request new process")
+        }
+
 
         Ok(ExitKind::Ok)
     }
@@ -389,7 +406,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::executors::{OutFile, ForkserverExecutor, Forkserver};
+    use crate::executors::{OutFile, ForkserverExecutor, Forkserver, Executor};
     use crate::inputs::NopInput;
     #[test]
     fn test_forkserver() {
@@ -397,6 +414,8 @@ mod tests {
         let args = vec!["@@"];
         //let fd = OutFile::new("input_file");
         //let forkserver = Forkserver::new(command.to_string(), args.iter().map(|s| s.to_string()).collect(), Some(fd.as_raw_fd()), 0);
-        let _executors = ForkserverExecutor::<(), NopInput, (), ()>::new(command ,args, ());
+        let mut executors = ForkserverExecutor::<(), NopInput, (), ()>::new(command ,args, ()).unwrap();
+        let nop = NopInput{};
+        executors.run_target(&nop);
     }
 }
