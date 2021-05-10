@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use std::{
     fs::{File, OpenOptions},
     io::{prelude::*, SeekFrom},
@@ -11,14 +13,22 @@ use std::{
     process::{Command, Stdio},
 };
 
+use crate::bolts::shmem::{ShMemProvider, StdShMemProvider, ShMem};
+use crate::{
+    executors::{Executor, ExitKind, HasObservers, HasExecHooks},
+    inputs::{HasTargetBytes, Input},
+    observers::ObserversTuple,
+    Error,
+};
 
 const FORKSRV_FD: i32 = 198;
+const MAP_SIZE: i32 = 65536;
 //configure the target. setlimit, setsid, pipe_stdin... , I borrowed the code from Angora fuzzer
 //TODO: Better error handling.
 pub trait ConfigTarget {
     fn setsid(&mut self) -> &mut Self;
     fn setlimit(&mut self, memlimit: u64) -> &mut Self;
-    fn setstdin(&mut self, fd: RawFd, is_stdin: bool) -> &mut Self;
+    fn setstdin(&mut self, fd: Option<RawFd>) -> &mut Self;
     fn setpipe(&mut self, st_pipe: Pipe, ctl_pipe: Pipe) -> &mut Self;
 }
 impl ConfigTarget for Command {
@@ -34,15 +44,15 @@ impl ConfigTarget for Command {
 
     fn setpipe(&mut self, st_pipe: Pipe, ctl_pipe: Pipe) -> &mut Self {
         let func = move || {
-            let ret = unsafe {libc::dup2(ctl_pipe.read_end, FORKSRV_FD)};
+            let ret = unsafe { libc::dup2(ctl_pipe.read_end, FORKSRV_FD) };
             if ret < 0 {
                 panic!("dup2() failed");
             }
-            let ret = unsafe{libc::dup2(st_pipe.write_end, FORKSRV_FD + 1)};
+            let ret = unsafe { libc::dup2(st_pipe.write_end, FORKSRV_FD + 1) };
             if ret < 0 {
                 panic!("dup2() failed");
             }
-            unsafe{
+            unsafe {
                 libc::close(ctl_pipe.read_end);
                 libc::close(ctl_pipe.write_end);
                 libc::close(st_pipe.read_end);
@@ -53,14 +63,14 @@ impl ConfigTarget for Command {
         unsafe { self.pre_exec(func) }
     }
 
-    fn setstdin(&mut self, fd: RawFd, is_stdin: bool) -> &mut Self {
-        if is_stdin {
+    fn setstdin(&mut self, fd: Option<RawFd>) -> &mut Self {
+        if fd.is_some() {
             let func = move || {
-                let ret = unsafe { libc::dup2(fd, libc::STDIN_FILENO) };
+                let ret = unsafe { libc::dup2(fd.unwrap(), libc::STDIN_FILENO) };
                 if ret < 0 {
                     panic!("dup2() failed");
                 }
-                unsafe { libc::close(fd) };
+                unsafe { libc::close(fd.unwrap()) };
                 Ok(())
             };
             unsafe { self.pre_exec(func) }
@@ -148,19 +158,28 @@ impl Pipe {
     }
 }
 
+/*
+impl Drop for Pipe {
+    fn drop(&mut self) {
+        println!("Dropping!");
+        unsafe {
+            libc::close(self.read_end);
+            libc::close(self.write_end);
+        }
+    }
+}
+*/
 
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
-    is_stdin: bool,
     status: i32,
 }
 
 impl Forkserver {
-    pub fn new(target: &'static str, args: Vec<&'static str>, fd: RawFd, memlimit: u64) -> Self {
+    pub fn new(target: String, args: Vec<String>, fd: Option<RawFd>, memlimit: u64) -> Self {
         //check if we'll use stdin
 
-        let is_stdin = args[0] == "@@";
         let mut status = 0;
 
         //create 2 pipes
@@ -173,10 +192,9 @@ impl Forkserver {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .env("LD_BIND_LAZY", "1")
-            .env("__AFL_SHM_ID", "FAKE") //fake, we'll take care of this thing when we have a true observer
             .setlimit(memlimit)
             .setsid()
-            .setstdin(fd, is_stdin)
+            .setstdin(fd)
             .setpipe(st_pipe.clone(), ctl_pipe.clone())
             .spawn()
         {
@@ -185,15 +203,20 @@ impl Forkserver {
                 panic!("Command::new() failed");
             }
         };
-
+        println!("barrier");
         //we'll close unneeded endpoints
-        unsafe{
+        unsafe {
             libc::close(ctl_pipe.read_end);
             libc::close(st_pipe.write_end);
         }
 
         unsafe {
-            let rlen = libc::read(st_pipe.read_end, (&mut status) as *mut libc::c_int as *mut libc::c_void, 4);
+            let rlen = libc::read(
+                st_pipe.read_end,
+                (&mut status) as *mut libc::c_int as *mut libc::c_void,
+                4,
+            );
+            println!("{}", rlen);
             if rlen == 4 {
                 println!("Forkserver up!");
             }
@@ -202,7 +225,6 @@ impl Forkserver {
         Self {
             st_pipe,
             ctl_pipe,
-            is_stdin,
             status,
         }
     }
@@ -225,15 +247,101 @@ impl Forkserver {
     */
 }
 
+pub struct ForkserverExecutor<EM, I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    target: String,
+    args: Vec<String>,
+    forkserver: Forkserver,
+    observers: OT,
+    phantom: PhantomData<(EM, I, S)>,
+}
+
+impl<EM, I, OT, S> ForkserverExecutor<EM, I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    fn new(target: &'static str, args: Vec<&'static str>, observers: OT) -> Result<Self, Error> {
+        let target = target.to_string();
+        let fd = match args[0] {
+            "@@" => None,
+            _ => Some(OutFile::new(args[0]).as_raw_fd()),
+        };
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        //shmem_set_up
+        let shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE as usize).unwrap();
+        shmem.write_to_env("__AFL_SHM_ID")?;
+
+        //write_to_test_case
+
+        //forkserver
+        let forkserver = Forkserver::new(target.clone(), args.clone(), fd, 0);
+        Ok(Self {
+            target,
+            args,
+            forkserver,
+            observers,
+            phantom: PhantomData,
+        })
+    }
+}
+impl<EM, I, OT, S> Executor<I> for ForkserverExecutor<EM, I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn run_target(&mut self, _input: &I) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+}
+
+impl<EM, I, OT, S> HasExecHooks<EM, I, S> for ForkserverExecutor<EM, I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn pre_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>{
+        Ok(())
+    }
+
+    fn post_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>{
+        Ok(())
+    }
+}
+
+impl<EM, I, OT, S> HasObservers<OT> for ForkserverExecutor<EM, I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
-    use crate::executors::{Forkserver, OutFile};
+    use crate::executors::{OutFile, ForkserverExecutor, Forkserver};
+    use crate::inputs::NopInput;
     #[test]
     fn test_forkserver() {
         let command = "/home/toka/work/aflsimple/test";
         let args = vec!["@@"];
         let fd = OutFile::new("input_file");
-        let forkserver = Forkserver::new(command, args, fd.as_raw_fd(), 0);
+        //let forkserver = Forkserver::new(command.to_string(), args.iter().map(|s| s.to_string()).collect(), Some(fd.as_raw_fd()), 0);
+        let executors = ForkserverExecutor::<(), NopInput, (), ()>::new(command ,args, ());
     }
 }
