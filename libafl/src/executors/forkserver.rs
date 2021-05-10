@@ -158,18 +158,6 @@ impl Pipe {
     }
 }
 
-/*
-impl Drop for Pipe {
-    fn drop(&mut self) {
-        println!("Dropping!");
-        unsafe {
-            libc::close(self.read_end);
-            libc::close(self.write_end);
-        }
-    }
-}
-*/
-
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
@@ -245,6 +233,17 @@ impl Forkserver {
     10. execve
     4':close ctl[0], st[1]
     */
+}
+
+impl Drop for Forkserver{
+    fn drop(&mut self){
+        unsafe {
+            libc::close(self.ctl_pipe.read_end);
+            libc::close(self.ctl_pipe.write_end);
+            libc::close(self.st_pipe.read_end);
+            libc::close(self.st_pipe.write_end);
+        }
+    }
 }
 
 pub struct ForkserverExecutor<EM, I, OT, S>
