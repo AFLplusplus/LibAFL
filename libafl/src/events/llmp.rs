@@ -45,7 +45,7 @@ use crate::utils::startable_self;
 #[cfg(all(feature = "std", unix))]
 use crate::utils::{fork, ForkResult};
 
-#[cfg(all(feature = "std", target_os = "android"))]
+#[cfg(all(target_os = "android", feature = "std"))]
 use crate::bolts::os::ashmem_server::AshmemService;
 
 #[cfg(feature = "std")]
@@ -740,7 +740,7 @@ where
         } else {
             // We are the newly started fuzzing instance, first, connect to our own restore map.
             // A sender and a receiver for single communication
-            self.shmem_provider.post_fork(true);
+            self.shmem_provider.post_fork(true)?;
             (
                 LlmpSender::on_existing_from_env(self.shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
                 LlmpReceiver::on_existing_from_env(
@@ -752,7 +752,7 @@ where
             )
         };
 
-        new_shmem_provider.post_fork(false);
+        new_shmem_provider.post_fork(false)?;
 
         if let Some(core_id) = core_id {
             core_affinity::set_for_current(core_id);

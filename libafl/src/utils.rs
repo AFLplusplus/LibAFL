@@ -656,12 +656,13 @@ where
             if self.cores.iter().any(|&x| x == id) {
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
+                        self.shmem_provider.post_fork(false)?;
                         handles.push(child.pid);
                         #[cfg(feature = "std")]
                         println!("child spawned and bound to core {}", id);
                     }
                     ForkResult::Child => {
-                        self.shmem_provider.post_fork();
+                        self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
                         std::thread::sleep(std::time::Duration::from_secs((id + 1) as u64));

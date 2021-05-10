@@ -7,7 +7,7 @@ pub mod ashmem_server;
 pub mod unix_signals;
 
 #[cfg(unix)]
-mod pipes;
+pub mod pipes;
 
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_exceptions;

@@ -17,11 +17,11 @@ pub type OsShMemProvider = Win32ShMemProvider;
 #[cfg(all(windows, feature = "std"))]
 pub type OsShMem = Win32ShMem;
 
-#[cfg(target_os = "android")]
+#[cfg(all(target_os = "android", feature = "std"))]
 use crate::bolts::os::ashmem_server::ServedShMemProvider;
-#[cfg(target_os = "android")]
+#[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider>;
-#[cfg(target_os = "android")]
+#[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMem = RcShMem<ServedShMemProvider>;
 
 /// The default [`ShMemProvider`] for this os.
@@ -31,16 +31,17 @@ pub type StdShMemProvider = OsShMemProvider;
 #[cfg(all(feature = "std", not(target_os = "android")))]
 pub type StdShMem = OsShMem;
 
-use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 
 use alloc::{rc::Rc, string::ToString};
-use core::cell::RefCell;
-use core::mem::ManuallyDrop;
+use core::{cell::RefCell, fmt::Debug, mem::ManuallyDrop};
 
-use crate::Error;
+#[cfg(all(unix, feature = "std"))]
+use crate::{bolts::os::pipes::Pipe, Error};
+#[cfg(all(unix, feature = "std"))]
+use std::io::{Read, Write};
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
@@ -193,14 +194,16 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
 
     /// This method should be called before a fork or a thread creation event, allowing the [`ShMemProvider`] to
     /// get ready for a potential reset of thread specific info, and for potential reconnects.
-    fn pre_fork(&mut self) {
+    fn pre_fork(&mut self) -> Result<(), Error> {
         // do nothing
+        Ok(())
     }
 
     /// This method should be called after a fork or after cloning/a thread creation event, allowing the [`ShMemProvider`] to
     /// reset thread specific info, and potentially reconnect.
-    fn post_fork(&mut self, _is_child: bool) {
+    fn post_fork(&mut self, _is_child: bool) -> Result<(), Error> {
         // do nothing
+        Ok(())
     }
 
     /// Release the resources associated with the given [`ShMem`]
@@ -251,7 +254,16 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 #[derive(Debug, Clone)]
 #[cfg(unix)]
 pub struct RcShMemProvider<T: ShMemProvider> {
+    /// The wrapped [`ShMemProvider`].
     internal: Rc<RefCell<T>>,
+    /// A pipe the child uses to communicate progress to the parent after fork.
+    /// This prevents a potential race condition when using the [`AshmemService`].
+    #[cfg(unix)]
+    child_parent_pipe: Option<Pipe>,
+    #[cfg(unix)]
+    /// A pipe the parent uses to communicate progress to the child after fork.
+    /// This prevents a potential race condition when using the [`AshmemService`].
+    parent_child_pipe: Option<Pipe>,
 }
 
 #[cfg(unix)]
@@ -267,6 +279,8 @@ where
     fn new() -> Result<Self, Error> {
         Ok(Self {
             internal: Rc::new(RefCell::new(T::new()?)),
+            child_parent_pipe: None,
+            parent_child_pipe: None,
         })
     }
 
@@ -297,23 +311,94 @@ where
 
     /// This method should be called before a fork or a thread creation event, allowing the [`ShMemProvider`] to
     /// get ready for a potential reset of thread specific info, and for potential reconnects.
-    fn pre_fork(&mut self) {
+    fn pre_fork(&mut self) -> Result<(), Error> {
+        // Set up the pipes to communicate progress over, later.
+        self.child_parent_pipe = Some(Pipe::new()?);
+        self.parent_child_pipe = Some(Pipe::new()?);
         self.internal.borrow_mut().pre_fork()
     }
 
-    fn post_fork(&mut self, is_child: bool) {
+    /// After fork, make sure everything gets set up correctly internally.
+    fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
         if is_child {
-            self.await_parent_done();
+            self.await_parent_done()?;
             let child_shmem = self.internal.borrow_mut().clone();
             self.internal = Rc::new(RefCell::new(child_shmem));
         }
-        self.internal.borrow_mut().post_fork(is_child);
+        self.internal.borrow_mut().post_fork(is_child)?;
         if is_child {
-            self.set_child_done();
+            self.set_child_done()?;
         } else {
-            self.set_parent_done();
-            self.await_child_done();
+            self.set_parent_done()?;
+            self.await_child_done()?;
         }
+
+        self.parent_child_pipe = None;
+        self.child_parent_pipe = None;
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
+impl<T> RcShMemProvider<T>
+where
+    T: ShMemProvider,
+{
+    /// "set" the "latch"
+    /// (we abuse `pipes` as `semaphores`, as they don't need an additional shared mem region.)
+    fn pipe_set(pipe: &mut Option<Pipe>) -> Result<(), Error> {
+        match pipe {
+            Some(pipe) => {
+                let ok = [0u8; 4];
+                pipe.write_all(&ok)?;
+                Ok(())
+            }
+            None => Err(Error::IllegalState(
+                "Unexpected `None` Pipe in RcShMemProvider!".to_string(),
+            )),
+        }
+    }
+
+    /// "await" the "latch"
+    fn pipe_await(pipe: &mut Option<Pipe>) -> Result<(), Error> {
+        match pipe {
+            Some(pipe) => {
+                let ok = [0u8; 4];
+                let mut ret = ok.clone();
+                pipe.read_exact(&mut ret)?;
+                if ret == ok {
+                    Ok(())
+                } else {
+                    Err(Error::Unknown(format!(
+                        "Wrong result read from pipe! Expected 0, got {:?}",
+                        ret
+                    )))
+                }
+            }
+            None => Err(Error::IllegalState(
+                "Unexpected `None` Pipe in RcShMemProvider!".to_string(),
+            )),
+        }
+    }
+
+    /// After fork, wait for the parent to write to our pipe :)
+    fn await_parent_done(&mut self) -> Result<(), Error> {
+        Self::pipe_await(&mut self.parent_child_pipe)
+    }
+
+    /// After fork, inform the new child we're done
+    fn set_parent_done(&mut self) -> Result<(), Error> {
+        Self::pipe_set(&mut self.parent_child_pipe)
+    }
+
+    /// After fork, wait for the child to write to our pipe :)
+    fn await_child_done(&mut self) -> Result<(), Error> {
+        Self::pipe_await(&mut self.child_parent_pipe)
+    }
+
+    /// After fork, inform the new child we're done
+    fn set_child_done(&mut self) -> Result<(), Error> {
+        Self::pipe_set(&mut self.child_parent_pipe)
     }
 }
 
