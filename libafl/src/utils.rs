@@ -703,9 +703,7 @@ where
                 .shmem_provider(self.shmem_provider.clone())
                 .stats(self.stats.clone())
                 .broker_port(self.broker_port)
-                .kind(ManagerKind::ConnectedBroker {
-                    connect_to: remote_broker_addr,
-                })
+                .remote_broker_addr(Some(remote_broker_addr))
                 .build()
                 .unwrap()
                 .launch()?;
