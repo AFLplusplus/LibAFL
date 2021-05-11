@@ -79,7 +79,7 @@ where
             write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(windows)]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
@@ -109,7 +109,7 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(windows)]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             write_volatile(
                 &mut windows_exception_handler::GLOBAL_STATE.current_input_ptr,
@@ -185,7 +185,7 @@ where
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(windows)]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
@@ -521,7 +521,7 @@ mod unix_signal_handler {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 mod windows_exception_handler {
     use alloc::vec::Vec;
     use core::{ffi::c_void, ptr};

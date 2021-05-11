@@ -1,9 +1,11 @@
 //! Utility functions for AFL
 
+use crate::Error;
+
 #[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
-    events::llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgrBuilder},
+    events::llmp::{LlmpRestartingEventManager, ManagerKind},
     inputs::Input,
     state::IfInteresting,
     stats::Stats,
@@ -11,11 +13,16 @@ use crate::{
 
 use alloc::vec::Vec;
 use core::{cell::RefCell, debug_assert, fmt::Debug, time};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use crate::events::llmp::RestartingMgr;
 
 #[cfg(unix)]
 use libc::pid_t;
+
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -23,16 +30,17 @@ use std::{
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
+
 #[cfg(all(unix, feature = "std"))]
 use std::{ffi::CString, fs::File, os::unix::io::AsRawFd};
-
-#[cfg(any(unix, feature = "std"))]
-use crate::Error;
 
 #[cfg(all(windows, feature = "std"))]
 use core_affinity::CoreId;
 
-use derive_builder::Builder;
+#[cfg(all(windows, feature = "std"))]
+use std::process::Stdio;
+
+use typed_builder::TypedBuilder;
 
 /// Can be converted to a slice
 pub trait AsSlice<T> {
@@ -591,8 +599,9 @@ mod tests {
 }
 
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
-#[derive(Builder)]
-#[builder(pattern = "owned")]
+#[cfg(feature = "std")]
+#[derive(TypedBuilder)]
+#[allow(clippy::type_complexity)]
 pub struct Launcher<'a, I, S, SP, ST>
 where
     I: Input,
@@ -610,19 +619,20 @@ where
     run_client:
         &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>) -> Result<(), Error>,
     /// The broker port to use
-    #[builder(default = "1337")]
+    #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
     cores: &'a [usize],
     /// A file name to write all client output to
-    #[builder(default = "None")]
+    #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
-    #[builder(default = "None")]
-    b2b_addr: Option<SocketAddr>,
+    #[builder(default = None)]
+    remote_broker_addr: Option<SocketAddr>,
 }
 
+#[cfg(feature = "std")]
 impl<'a, I, S, SP, ST> Launcher<'a, I, S, SP, ST>
 where
     I: Input,
@@ -632,6 +642,7 @@ where
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std"))]
+    #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
         let core_ids = core_affinity::get_core_ids().unwrap();
         let num_cores = core_ids.len();
@@ -645,14 +656,16 @@ where
         //spawn clients
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
             if self.cores.iter().any(|&x| x == id) {
+                self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
+                        self.shmem_provider.post_fork(false)?;
                         handles.push(child.pid);
                         #[cfg(feature = "std")]
                         println!("child spawned and bound to core {}", id);
                     }
                     ForkResult::Child => {
-                        self.shmem_provider.post_fork();
+                        self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
                         std::thread::sleep(std::time::Duration::from_secs((id + 1) as u64));
@@ -664,7 +677,7 @@ where
                         }
                         //fuzzer client. keeps retrying the connection to broker till the broker starts
                         let stats = (self.client_init_stats)()?;
-                        let (state, mgr) = RestartingMgrBuilder::default()
+                        let (state, mgr) = RestartingMgr::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .stats(stats)
                             .broker_port(self.broker_port)
@@ -672,7 +685,6 @@ where
                                 cpu_core: Some(*bind_to),
                             })
                             .build()
-                            .unwrap()
                             .launch()?;
 
                         (self.run_client)(state, mgr)?;
@@ -684,27 +696,14 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        if let Some(b2b_addr) = self.b2b_addr {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .kind(ManagerKind::ConnectedBroker {
-                    connect_to: b2b_addr,
-                })
-                .build()
-                .unwrap()
-                .launch()?;
-        } else {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .kind(ManagerKind::Broker)
-                .build()
-                .unwrap()
-                .launch()?;
-        }
+        RestartingMgr::<I, S, SP, ST>::builder()
+            .shmem_provider(self.shmem_provider.clone())
+            .stats(self.stats.clone())
+            .broker_port(self.broker_port)
+            .kind(ManagerKind::Broker)
+            .remote_broker_addr(self.remote_broker_addr)
+            .build()
+            .launch()?;
 
         //broker exited. kill all clients.
         for handle in &handles {
@@ -728,16 +727,19 @@ where
 
                 // the actual client. do the fuzzing
                 let stats = (self.client_init_stats)()?;
-                let (state, mgr) = setup_restarting_mgr(
-                    self.shmem_provider,
-                    self.stats,
-                    self.broker_port,
-                    ManagerKind::Client {
+                let (state, mgr) = RestartingMgr::<I, S, SP, ST>::builder()
+                    .shmem_provider(self.shmem_provider.clone())
+                    .stats(stats)
+                    .broker_port(self.broker_port)
+                    .kind(ManagerKind::Client {
                         cpu_core: Some(CoreId {
                             id: core_conf.parse()?,
                         }),
-                    },
-                )?;
+                    })
+                    .build()
+                    .unwrap()
+                    .launch()?;
+
                 (self.run_client)(state, mgr)?;
 
                 unreachable!("Fuzzer client code should never get here!");
@@ -746,7 +748,7 @@ where
                 // I am a broker
                 // before going to the broker loop, spawn n clients
 
-                if stdout_file.is_some() {
+                if self.stdout_file.is_some() {
                     println!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
                 }
 
@@ -760,13 +762,13 @@ where
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                     if self.cores.iter().any(|&x| x == id) {
                         for id in 0..num_cores {
-                            let stdio = if stdout_file.is_some() {
+                            let stdio = if self.stdout_file.is_some() {
                                 Stdio::inherit()
                             } else {
                                 Stdio::null()
                             };
 
-                            if cores.iter().any(|&x| x == id) {
+                            if self.cores.iter().any(|&x| x == id) {
                                 std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
                                 let child = startable_self()?.stdout(stdio).spawn()?;
                                 handles.push(child);
@@ -783,23 +785,15 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        if let Some(b2b_addr) = self.b2b_addr {
-            setup_restarting_mgr::<I, S, SP, ST>(
-                self.shmem_provider,
-                self.stats,
-                self.broker_port,
-                ManagerKind::ConnectedBroker {
-                    connect_to: b2b_addr,
-                },
-            )?;
-        } else {
-            setup_restarting_mgr::<I, S, SP, ST>(
-                self.shmem_provider,
-                self.stats,
-                self.broker_port,
-                ManagerKind::Broker,
-            )?;
-        }
+        RestartingMgr::<I, S, SP, ST>::builder()
+            .shmem_provider(self.shmem_provider.clone())
+            .stats(self.stats.clone())
+            .broker_port(self.broker_port)
+            .kind(ManagerKind::Broker)
+            .remote_broker_addr(self.remote_broker_addr)
+            .build()
+            .unwrap()
+            .launch()?;
 
         //broker exited. kill all clients.
         for handle in &mut handles {
@@ -811,32 +805,6 @@ where
 }
 
 const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
-
-/// utility function which spawns a broker and n clients and binds each client to a cpu core
-/// Connects to a b2b broker.
-#[cfg(all(windows, feature = "std"))]
-#[allow(clippy::similar_names, clippy::type_complexity)]
-#[allow(unused_mut)]
-pub fn launcher<I, S, SP, ST>(
-    mut shmem_provider: SP,
-    stats: ST,
-    client_init_stats: &mut dyn FnMut() -> Result<ST, Error>,
-    run_client: &mut dyn FnMut(
-        Option<S>,
-        LlmpRestartingEventManager<I, S, SP, ST>,
-    ) -> Result<(), Error>,
-    broker_port: u16,
-    cores: &[usize],
-    stdout_file: Option<&str>,
-    b2b_addr: Option<SocketAddr>,
-) -> Result<(), Error>
-where
-    I: Input,
-    ST: Stats,
-    SP: ShMemProvider + 'static,
-    S: DeserializeOwned + IfInteresting<I>,
-{
-}
 
 /// "Safe" wrapper around dup2
 #[cfg(all(unix, feature = "std"))]
