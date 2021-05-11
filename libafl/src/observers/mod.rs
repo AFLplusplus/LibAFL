@@ -65,14 +65,26 @@ impl TimeObserver {
 
 impl Observer for TimeObserver {}
 
-impl<EM, I, S> HasExecHooks<EM, I, S> for TimeObserver {
-    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
+impl<EM, I, S, Z> HasExecHooks<EM, I, S, Z> for TimeObserver {
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         self.last_runtime = Some(current_time() - self.start_time);
         Ok(())
     }

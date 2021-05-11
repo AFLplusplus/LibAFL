@@ -197,7 +197,7 @@ where
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_loop_for(
-        &self,
+        &mut self,
         stages: &mut ST,
         state: &mut S,
         executor: &mut E,
@@ -244,8 +244,11 @@ pub struct StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -305,8 +308,11 @@ impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -329,8 +335,11 @@ impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasFeedback<F, FT, I, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -353,8 +362,11 @@ impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasObjective<FT, I, OF, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -377,8 +389,11 @@ impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> IfInteresting<I, OT, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -428,8 +443,11 @@ impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -484,8 +502,11 @@ impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC, ST> Fuzzer<E, EM, I, S, ST>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -586,8 +607,11 @@ impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> StdFuzzer<C, CS, E, EM, F, FT, I, OF
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<FT, I, S>,
     FT: FeedbackStatesTuple<I>,
@@ -615,11 +639,11 @@ where
         input: &I,
     ) -> Result<(bool, bool), Error> {
         start_timer!(state);
-        executor.pre_exec_observers(state, event_mgr, input)?;
+        executor.pre_exec_observers(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        executor.pre_exec(state, event_mgr, input)?;
+        executor.pre_exec(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::PreExec);
 
         start_timer!(state);
@@ -627,13 +651,13 @@ where
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
-        executor.post_exec(state, event_mgr, input)?;
+        executor.post_exec(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::PostExec);
 
         *state.executions_mut() += 1;
 
         start_timer!(state);
-        executor.post_exec_observers(state, event_mgr, input)?;
+        executor.post_exec_observers(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         let observers = executor.observers();

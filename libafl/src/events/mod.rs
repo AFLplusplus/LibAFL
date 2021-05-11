@@ -9,14 +9,7 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    corpus::CorpusScheduler,
-    executors::{Executor, HasObservers},
-    inputs::Input,state::State,
-    fuzzer::HasCorpusScheduler,
-    observers::ObserversTuple,
-    Error,
-};
+use crate::{executors::Executor, inputs::Input, observers::ObserversTuple, state::State, Error};
 
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
@@ -176,23 +169,40 @@ where
     }
 }
 
+/// [`EventFirer`] fire an event.
+pub trait EventFirer<I, S>
+where
+    I: Input,
+    S: State,
+{
+    /// Send off an event to the broker
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+
+    /// For restarting event managers, implement a way to forward state to their next peers.
+    #[inline]
+    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Block until we are safe to exit.
+    #[inline]
+    fn await_restart_safe(&mut self) {}
+}
+
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<E, I, S, Z>
+pub trait EventManager<E, I, S, Z>: EventFirer<I, S>
 where
-    I: Input,S: State,E: Executor<I>
+    I: Input,
+    S: State,
+    E: Executor<I>,
 {
     /// Fire an Event
     //fn fire<'a>(&mut self, event: Event<I>) -> Result<(), Error>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error>;
+    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
@@ -209,42 +219,35 @@ where
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
-
-    /// For restarting event managers, implement a way to forward state to their next peers.
-    #[inline]
-    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Block until we are safe to exit.
-    #[inline]
-    fn await_restart_safe(&mut self) {}
-
-    /// Send off an event to the broker
-    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
-pub struct NopEventManager {
+pub struct NopEventManager {}
+
+impl<I, S> EventFirer<I, S> for NopEventManager
+where
+    I: Input,
+    S: State,
+{
+    fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager
 where
-    I: Input,S: State,E: Executor<I>
+    I: Input,
+    S: State,
+    E: Executor<I>,
 {
     fn process(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error>
-    {
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _executor: &mut E,
+    ) -> Result<usize, Error> {
         Ok(0)
-    }
-
-    fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
-        Ok(())
     }
 }
 

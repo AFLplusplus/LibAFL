@@ -15,53 +15,66 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
 use crate::{
     corpus::Corpus,
-    events::EventManager,
+    events::EventFirer,
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::FeedbackStatesTuple,
+    feedbacks::{Feedback, FeedbackStatesTuple},
+    fuzzer::HasObjective,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::HasSolutions,
+    state::{HasFeedbackStates, HasSolutions, State},
     Error,
 };
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InProcessExecutor<'a, EM, H, I, OT, S>
+pub struct InProcessExecutor<'a, EM, H, I, OT, S, Z>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    S: State,
+    EM: EventFirer<I, S>,
 {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a H,
+    harness_fn: &'a mut H,
     /// The observers, observing each run
     observers: OT,
-    phantom: PhantomData<(EM, I, S)>,
+    phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<'a, EM, H, I, OT, S> Executor<I> for InProcessExecutor<'a, EM, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z> Executor<I> for InProcessExecutor<'a, EM, H, I, OT, S, Z>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    S: State,
+    EM: EventFirer<I, S>,
 {
     #[inline]
-    fn run_target(&self, input: &I) -> Result<ExitKind, Error> {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let bytes = input.target_bytes();
         let ret = (self.harness_fn)(bytes.as_slice());
         Ok(ret)
     }
 }
 
-impl<'a, EM, H, I, OT, S> HasExecHooks<EM, I, S> for InProcessExecutor<'a, EM, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for InProcessExecutor<'a, EM, H, I, OT, S, Z>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    S: State,
+    EM: EventFirer<I, S>,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
@@ -75,8 +88,9 @@ where
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         #[cfg(windows)]
@@ -92,15 +106,22 @@ where
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         Ok(())
     }
 
     #[inline]
-    fn post_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -121,11 +142,13 @@ where
     }
 }
 
-impl<'a, EM, H, I, OT, S> HasObservers<OT> for InProcessExecutor<'a, EM, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z> HasObservers<OT> for InProcessExecutor<'a, EM, H, I, OT, S, Z>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    S: State,
+    EM: EventFirer<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -138,19 +161,24 @@ where
     }
 }
 
-impl<'a, EM, H, I, OT, S> HasObserversHooks<EM, I, OT, S> for InProcessExecutor<'a, EM, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
+    for InProcessExecutor<'a, EM, H, I, OT, S, Z>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+    S: State,
+    EM: EventFirer<I, S>,
 {
 }
 
-impl<'a, EM, H, I, OT, S> InProcessExecutor<'a, EM, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z> InProcessExecutor<'a, EM, H, I, OT, S, Z>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    S: State,
+    EM: EventFirer<I, S>,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -158,28 +186,30 @@ where
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<OC, OFT>(
+    pub fn new<OC, OF, FT>(
         harness_fn: &'a mut H,
         observers: OT,
         _state: &mut S,
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventManager<I, S>,
+        EM: EventFirer<I, S>,
         OC: Corpus<I>,
-        OFT: FeedbackStatesTuple<I>,
-        S: HasSolutions<OC, I>,
+        FT: FeedbackStatesTuple<I>,
+        OF: Feedback<FT, I, S>,
+        S: HasSolutions<OC, I> + HasFeedbackStates<FT, I>,
+        Z: HasObjective<FT, I, OF, S>,
     {
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+                unix_signal_handler::inproc_crash_handler::<EM, I, OC, FT, OF, OT, S, Z>,
             );
             write_volatile(
                 &mut data.timeout_handler,
-                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, FT, OF, OT, S, Z>,
             );
 
             setup_signal_handler(data)?;
@@ -190,11 +220,11 @@ where
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OFT, OT, S>,
+                windows_exception_handler::inproc_crash_handler::<EM, I, OC, FT, OF, OT, S, Z>,
             );
             //write_volatile(
             //    &mut data.timeout_handler,
-            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OFT, OT, S>,
+            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, FT, OF, OT, S, Z>,
             //);
 
             setup_exception_handler(data)?;
@@ -232,12 +262,13 @@ mod unix_signal_handler {
     use crate::{
         bolts::os::unix_signals::{Handler, Signal},
         corpus::{Corpus, Testcase},
-        events::{Event, EventManager},
+        events::{Event, EventFirer},
         executors::ExitKind,
-        feedbacks::FeedbackStatesTuple,
+        feedbacks::{Feedback, FeedbackStatesTuple},
+        fuzzer::HasObjective,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::HasSolutions,
+        state::{HasFeedbackStates, HasSolutions, State},
     };
 
     // TODO merge GLOBAL_STATE with the Windows one
@@ -248,6 +279,8 @@ mod unix_signal_handler {
         state_ptr: ptr::null_mut(),
         /// The event manager ptr for signal handling
         event_mgr_ptr: ptr::null_mut(),
+        /// The fuzzer ptr for signal handling
+        fuzzer_ptr: ptr::null_mut(),
         /// The observers ptr for signal handling
         observers_ptr: ptr::null(),
         /// The current input for signal handling
@@ -261,6 +294,7 @@ mod unix_signal_handler {
     pub struct InProcessExecutorHandlerData {
         pub state_ptr: *mut c_void,
         pub event_mgr_ptr: *mut c_void,
+        pub fuzzer_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
         pub crash_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
@@ -308,21 +342,24 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_timeout_handler<EM, I, OC, FT, OF, OT, S, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        EM: EventManager<I, S>,
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OFT: FeedbackStatesTuple<I>,
-        S: HasSolutions<OC, I>,
+        OF: Feedback<FT, I, S>,
+        FT: FeedbackStatesTuple<I>,
+        S: State + HasSolutions<OC, I> + HasFeedbackStates<FT, I>,
         I: Input + HasTargetBytes,
+        Z: HasObjective<FT, I, OF, S>,
     {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+        let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
         let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
 
         if data.current_input_ptr.is_null() {
@@ -337,15 +374,16 @@ mod unix_signal_handler {
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
 
-            let interesting = state
+            let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(&input, observers, &ExitKind::Timeout)
+                .is_interesting(state, &input, observers, &ExitKind::Timeout)
                 .expect("In timeout handler objective failure.");
+
             if interesting {
                 let mut new_testcase = Testcase::new(input.clone());
-                state
+                fuzzer
                     .objective_mut()
-                    .append_metadata(&mut new_testcase)
+                    .append_metadata(state, &mut new_testcase)
                     .expect("Failed adding metadata");
                 state
                     .solutions_mut()
@@ -379,18 +417,20 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, FT, OF, OT, S, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        EM: EventManager<I, S>,
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OFT: FeedbackStatesTuple<I>,
-        S: HasSolutions<OC, I>,
+        OF: Feedback<FT, I, S>,
+        FT: FeedbackStatesTuple<I>,
+        S: State + HasSolutions<OC, I> + HasFeedbackStates<FT, I>,
         I: Input + HasTargetBytes,
+        Z: HasObjective<FT, I, OF, S>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void
@@ -433,6 +473,7 @@ mod unix_signal_handler {
         } else {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+            let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
             let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
 
             #[cfg(feature = "std")]
@@ -483,16 +524,17 @@ mod unix_signal_handler {
             // Make sure we don't crash in the crash handler forever.
             data.current_input_ptr = ptr::null();
 
-            let interesting = state
+            let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(&input, observers, &ExitKind::Crash)
+                .is_interesting(state, &input, observers, &ExitKind::Crash)
                 .expect("In crash handler objective failure.");
+
             if interesting {
                 let new_input = input.clone();
                 let mut new_testcase = Testcase::new(new_input);
-                state
+                fuzzer
                     .objective_mut()
-                    .append_metadata(&mut new_testcase)
+                    .append_metadata(state, &mut new_testcase)
                     .expect("Failed adding metadata");
                 state
                     .solutions_mut()
@@ -536,7 +578,7 @@ mod windows_exception_handler {
             },
         },
         corpus::{Corpus, Testcase},
-        events::{Event, EventManager},
+        events::{Event, EventFirer},
         executors::ExitKind,
         feedbacks::FeedbackStatesTuple,
         inputs::{HasTargetBytes, Input},
@@ -550,6 +592,8 @@ mod windows_exception_handler {
         state_ptr: ptr::null_mut(),
         /// The event manager ptr for signal handling
         event_mgr_ptr: ptr::null_mut(),
+        /// The fuzzer ptr for signal handling
+        fuzzer_ptr: ptr::null_mut(),
         /// The observers ptr for signal handling
         observers_ptr: ptr::null(),
         /// The current input for signal handling
@@ -563,6 +607,7 @@ mod windows_exception_handler {
     pub struct InProcessExecutorHandlerData {
         pub state_ptr: *mut c_void,
         pub event_mgr_ptr: *mut c_void,
+        pub fuzzer_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
         pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
@@ -592,16 +637,16 @@ mod windows_exception_handler {
         }
     }
 
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OFT, OT, S>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, FT, OF, OT, S, Z>(
         code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        EM: EventManager<I, S>,
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OFT: FeedbackStatesTuple<I>,
-        S: HasObjectiveStates<OFT, I> + HasSolutions<OC, I>,
+        FT: FeedbackStatesTuple<I>,
+        S: HasObjectiveStates<FT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {
         #[cfg(feature = "std")]
@@ -688,7 +733,7 @@ mod windows_exception_handler {
 
 #[cfg(test)]
 mod tests {
-
+    /*
     use core::marker::PhantomData;
 
     use crate::{
@@ -701,12 +746,12 @@ mod tests {
     fn test_inmem_exec() {
         let mut harness = |_buf: &[u8]| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<(), _, NopInput, (), ()> {
+        let mut in_process_executor = InProcessExecutor::<(), _, NopInput, (), (), ()> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
             phantom: PhantomData,
         };
         let input = NopInput {};
         assert!(in_process_executor.run_target(&input).is_ok());
-    }
+    }*/
 }

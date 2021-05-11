@@ -10,18 +10,9 @@ use std::{
 
 use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
-    corpus::{Corpus, CorpusScheduler, Testcase},
-    events::{Event, EventManager, LogSeverity},
-    executors::{
-        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
-    },
-    feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
-    fuzzer::{HasCorpusScheduler, HasFeedback},
-    generators::Generator,
+    corpus::Corpus,
+    feedbacks::FeedbackStatesTuple,
     inputs::Input,
-    mark_feature_time,
-    observers::ObserversTuple,
-    start_timer,
     stats::ClientPerfStats,
     utils::Rand,
     Error,

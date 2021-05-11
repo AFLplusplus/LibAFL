@@ -1,14 +1,12 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 use alloc::{string::ToString, vec::Vec};
-use core::marker::PhantomData;
 
 use crate::{
-    corpus::CorpusScheduler,
-    events::{BrokerEventResult, Event, EventManager},
-    executors::{Executor, HasObservers},
-    inputs::Input,fuzzer::HasCorpusScheduler,
-    observers::ObserversTuple,
-    stats::Stats,state::State,
+    events::{BrokerEventResult, Event, EventFirer, EventManager},
+    executors::Executor,
+    inputs::Input,
+    state::State,
+    stats::Stats,
     Error,
 };
 
@@ -25,33 +23,40 @@ where
     events: Vec<Event<I>>,
 }
 
-impl<E, I, S, ST, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, ST>
+impl<I, S, ST> EventFirer<I, S> for SimpleEventManager<I, ST>
 where
-    E: Executor<I>,
-    I: Input,S: State,
+    I: Input,
+    S: State,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error>
-    {
-        let count = self.events.len();
-        while !self.events.is_empty() {
-            let event = self.events.pop().unwrap();
-            self.handle_in_client(state, event)?;
-        }
-        Ok(count)
-    }
-
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.stats, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
         };
         Ok(())
+    }
+}
+
+impl<E, I, S, ST, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, ST>
+where
+    E: Executor<I>,
+    I: Input,
+    S: State,
+    ST: Stats, //CE: CustomEvent<I, OT>,
+{
+    fn process(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut S,
+        _executor: &mut E,
+    ) -> Result<usize, Error> {
+        let count = self.events.len();
+        while !self.events.is_empty() {
+            let event = self.events.pop().unwrap();
+            self.handle_in_client(state, event)?;
+        }
+        Ok(count)
     }
 }
 

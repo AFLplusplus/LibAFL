@@ -261,7 +261,7 @@ where
 
         let map_state = state
             .feedback_states_mut()
-            .match_name::<MapFeedbackState<T>>(&self.name)
+            .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
         if map_state.indexes.is_none() && map_state.novelties.is_none() {
@@ -324,7 +324,7 @@ where
     fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
         let map_state = state
             .feedback_states_mut()
-            .match_name::<MapFeedbackState<T>>(&self.name)
+            .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
         if let Some(v) = map_state.indexes.as_mut() {
@@ -342,7 +342,7 @@ where
     fn discard_metadata(&mut self, state: &mut S, _input: &I) -> Result<(), Error> {
         let map_state = state
             .feedback_states_mut()
-            .match_name::<MapFeedbackState<T>>(&self.name)
+            .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
         if let Some(v) = map_state.indexes.as_mut() {
