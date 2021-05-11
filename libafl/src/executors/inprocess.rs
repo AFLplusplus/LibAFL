@@ -19,11 +19,11 @@ use crate::{
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::{Feedback, FeedbackStatesTuple},
+    feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::{HasFeedbackStates, HasSolutions, State},
+    state::{HasSolutions, State},
     Error,
 };
 
@@ -186,7 +186,7 @@ where
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<OC, OF, FT>(
+    pub fn new<OC, OF>(
         harness_fn: &'a mut H,
         observers: OT,
         _state: &mut S,
@@ -195,21 +195,20 @@ where
     where
         EM: EventFirer<I, S>,
         OC: Corpus<I>,
-        FT: FeedbackStatesTuple<I>,
-        OF: Feedback<FT, I, S>,
-        S: HasSolutions<OC, I> + HasFeedbackStates<FT, I>,
-        Z: HasObjective<FT, I, OF, S>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<OC, I>,
+        Z: HasObjective<I, OF, S>,
     {
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                unix_signal_handler::inproc_crash_handler::<EM, I, OC, FT, OF, OT, S, Z>,
+                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S, Z>,
             );
             write_volatile(
                 &mut data.timeout_handler,
-                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, FT, OF, OT, S, Z>,
+                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S, Z>,
             );
 
             setup_signal_handler(data)?;
@@ -264,11 +263,11 @@ mod unix_signal_handler {
         corpus::{Corpus, Testcase},
         events::{Event, EventFirer},
         executors::ExitKind,
-        feedbacks::{Feedback, FeedbackStatesTuple},
+        feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::{HasFeedbackStates, HasSolutions, State},
+        state::{HasSolutions, State},
     };
 
     // TODO merge GLOBAL_STATE with the Windows one
@@ -342,7 +341,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<EM, I, OC, FT, OF, OT, S, Z>(
+    pub unsafe fn inproc_timeout_handler<EM, I, OC, OF, OT, S, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -351,11 +350,10 @@ mod unix_signal_handler {
         EM: EventFirer<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OF: Feedback<FT, I, S>,
-        FT: FeedbackStatesTuple<I>,
-        S: State + HasSolutions<OC, I> + HasFeedbackStates<FT, I>,
+        OF: Feedback<I, S>,
+        S: State + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
-        Z: HasObjective<FT, I, OF, S>,
+        Z: HasObjective<I, OF, S>,
     {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
@@ -417,7 +415,7 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<EM, I, OC, FT, OF, OT, S, Z>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -426,11 +424,10 @@ mod unix_signal_handler {
         EM: EventFirer<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        OF: Feedback<FT, I, S>,
-        FT: FeedbackStatesTuple<I>,
-        S: State + HasSolutions<OC, I> + HasFeedbackStates<FT, I>,
+        OF: Feedback<I, S>,
+        S: State + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
-        Z: HasObjective<FT, I, OF, S>,
+        Z: HasObjective<I, OF, S>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void
@@ -645,7 +642,7 @@ mod windows_exception_handler {
         EM: EventFirer<I, S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        FT: FeedbackStatesTuple<I>,
+        FT: FeedbackStatesTuple,
         S: HasObjectiveStates<FT, I> + HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
     {

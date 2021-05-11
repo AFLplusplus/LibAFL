@@ -24,43 +24,11 @@ use core::{marker::PhantomData, time::Duration};
 /// Send a stats update all 3 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(3 * 1000);
 
-/*
-/// Holds a set of stages
-pub trait HasStages<EM, I, S, ST>: Sized
-where
-    ST: StagesTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
-    I: Input,
-    S: State + HasExecutions + HasCorpus<C, I>,
-{
-    /// The stages
-    fn stages(&self) -> &ST;
-
-    /// The stages (mut)
-    fn stages_mut(&mut self) -> &mut ST;
-}
-
-/// Holds an executor
-pub trait HasExecutor<E, I, S>
-where
-    E: Executor<I>,
-    I: Input,
-    S: State + HasExecutions + HasCorpus<C, I>,
-{
-    /// The executor
-    fn executor(&self) -> &E;
-
-    /// The executor (mut)
-    fn executor_mut(&mut self) -> &mut E;
-}
-*/
-
 /// Holds a scheduler
 pub trait HasCorpusScheduler<CS, I, S>
 where
     CS: CorpusScheduler<I, S>,
     I: Input,
-    S: State,
 {
     /// The scheduler
     fn scheduler(&self) -> &CS;
@@ -70,12 +38,10 @@ where
 }
 
 /// Holds an feedback
-pub trait HasFeedback<F, FT, I, S>
+pub trait HasFeedback<F, I, S>
 where
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
     I: Input,
-    S: State + HasFeedbackStates<FT, I>,
 {
     /// The feedback
     fn feedback(&self) -> &F;
@@ -85,12 +51,10 @@ where
 }
 
 /// Holds an objective feedback
-pub trait HasObjective<FT, I, OF, S>
+pub trait HasObjective<I, OF, S>
 where
-    OF: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    OF: Feedback<I, S>,
     I: Input,
-    S: State + HasFeedbackStates<FT, I>,
 {
     /// The objective feedback
     fn objective(&self) -> &OF;
@@ -99,20 +63,9 @@ where
     fn objective_mut(&mut self) -> &mut OF;
 }
 
-/// Trait for the starting time
-pub trait HasStartTime {
-    /// The starting time
-    fn start_time(&self) -> &Duration;
-
-    /// The starting time (mut)
-    fn start_time_mut(&mut self) -> &mut Duration;
-}
-
 /// Add to the state if interesting
-pub trait IfInteresting<I, OT, S>: Sized
+pub trait IfInteresting<I, OT, S>
 where
-    I: Input,
-    S: State,
     OT: ObserversTuple,
 {
     /// Evaluate if a set of observation channels has an interesting state
@@ -134,13 +87,7 @@ where
 }
 
 /// Evaluate an input modyfing the state of the fuzzer
-pub trait Evaluator<E, EM, I, S>: Sized
-where
-    E: Executor<I>,
-    EM: EventManager<E, I, S, Self>,
-    I: Input,
-    S: State,
-{
+pub trait Evaluator<E, EM, I, S> {
     /// Runs the input and triggers observers and feedback
     fn evaluate_input(
         &mut self,
@@ -152,14 +99,7 @@ where
 }
 
 /// The main fuzzer trait.
-pub trait Fuzzer<E, EM, I, S, ST>: Sized
-where
-    E: Executor<I>,
-    EM: EventManager<E, I, S, Self>,
-    I: Input,
-    S: State,
-    ST: StagesTuple<E, EM, I, S, Self>,
-{
+pub trait Fuzzer<E, EM, I, S, ST> {
     /// Fuzz for a single iteration
     /// Returns the index of the last fuzzed corpus item
     ///
@@ -250,11 +190,11 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
 {
     scheduler: CS,
@@ -262,46 +202,6 @@ where
     objective: OF,
     phantom: PhantomData<(C, E, EM, FT, I, OT, S, SC)>,
 }
-
-/*
-impl<CS, E, EM, F, I, OF, S, ST> HasStages<EM, I, S, ST> for StdFuzzer<CS, E, EM, F, I, OF, S, ST>
-where
-    CS: CorpusScheduler<I, S>,
-    E: Executor<I>,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I>,
-    ST: StagesTuple<EM, I, S, Self>,
-{
-    fn stages(&self) -> &ST {
-        &self.stages
-    }
-
-    fn stages_mut(&mut self) -> &mut ST {
-        &mut self.stages
-    }
-}
-
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasExecutor<E, I, S> for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
-where
-    CS: CorpusScheduler<I, S>,
-    E: Executor<I>,
-    F: Feedback<FT, I, S>,
-    I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I>,
-{
-    fn executor(&self) -> &E {
-        &self.executor
-    }
-
-    fn executor_mut(&mut self) -> &mut E {
-        &mut self.executor
-    }
-}
-*/
 
 impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
     for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
@@ -314,11 +214,11 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
 {
     fn scheduler(&self) -> &CS {
@@ -330,7 +230,7 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasFeedback<F, FT, I, S>
+impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasFeedback<F, I, S>
     for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
 where
     C: Corpus<I>,
@@ -341,11 +241,11 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
 {
     fn feedback(&self) -> &F {
@@ -357,7 +257,7 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasObjective<FT, I, OF, S>
+impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasObjective<I, OF, S>
     for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
 where
     C: Corpus<I>,
@@ -368,11 +268,11 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
 {
     fn objective(&self) -> &OF {
@@ -395,11 +295,11 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
 {
     /// Evaluate if a set of observation channels has an interesting state
@@ -449,11 +349,11 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -508,13 +408,13 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
-    ST: StagesTuple<E, EM, I, S, Self>,
+    ST: StagesTuple<E, EM, S, Self>,
 {
     #[inline]
     fn maybe_report_stats(
@@ -613,11 +513,11 @@ where
         + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
-    F: Feedback<FT, I, S>,
-    FT: FeedbackStatesTuple<I>,
+    F: Feedback<I, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    OF: Feedback<FT, I, S>,
-    S: State + HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT, I>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
     SC: Corpus<I>,
 {
     /// Create a new `StdFuzzer` with standard behavior.

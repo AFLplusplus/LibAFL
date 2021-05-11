@@ -17,7 +17,7 @@ use crate::{
         llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
-    events::{BrokerEventResult, Event, EventFirer, EventManager},
+    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor},
     executors::Executor,
     executors::ExitKind,
     fuzzer::IfInteresting,
@@ -392,7 +392,7 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z> for LlmpEventManager<E, I, OT, S, SP, ST, Z>
+impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z> for LlmpEventManager<E, I, OT, S, SP, ST, Z>
 where
     E: Executor<I>,
     I: Input,
@@ -438,6 +438,19 @@ where
         })?;
         Ok(count)
     }
+}
+
+impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z> for LlmpEventManager<E, I, OT, S, SP, ST, Z>
+where
+    E: Executor<I>,
+    I: Input,
+    S: State,
+    Z: IfInteresting<I, OT, S>,
+    OT: ObserversTuple,
+    SP: ShMemProvider,
+    ST: Stats,
+    //CE: CustomEvent<I>,
+{
 }
 
 /// Serialize the current state and corpus during an executiont to bytes.
@@ -533,7 +546,7 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z>
+impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z>
     for LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
 where
     E: Executor<I>,
@@ -548,6 +561,20 @@ where
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.llmp_mgr.process(fuzzer, state, executor)
     }
+}
+
+impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z>
+    for LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
+where
+    E: Executor<I>,
+    I: Input,
+    S: State,
+    Z: IfInteresting<I, OT, S>,
+    OT: ObserversTuple,
+    SP: ShMemProvider + 'static,
+    ST: Stats,
+    //CE: CustomEvent<I>,
+{
 }
 
 /// The llmp connection from the actual fuzzer to the process supervising it

@@ -2,10 +2,8 @@
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    events::{BrokerEventResult, Event, EventFirer, EventManager},
-    executors::Executor,
+    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor},
     inputs::Input,
-    state::State,
     stats::Stats,
     Error,
 };
@@ -26,7 +24,6 @@ where
 impl<I, S, ST> EventFirer<I, S> for SimpleEventManager<I, ST>
 where
     I: Input,
-    S: State,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
@@ -38,11 +35,9 @@ where
     }
 }
 
-impl<E, I, S, ST, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, ST>
+impl<E, I, S, ST, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, ST>
 where
-    E: Executor<I>,
     I: Input,
-    S: State,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
     fn process(
@@ -58,6 +53,13 @@ where
         }
         Ok(count)
     }
+}
+
+impl<E, I, S, ST, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, ST>
+where
+    I: Input,
+    ST: Stats, //CE: CustomEvent<I, OT>,
+{
 }
 
 impl<I, ST> SimpleEventManager<I, ST>

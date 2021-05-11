@@ -9,7 +9,7 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
-use crate::{executors::Executor, inputs::Input, observers::ObserversTuple, state::State, Error};
+use crate::{inputs::Input, observers::ObserversTuple, Error};
 
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
@@ -173,7 +173,6 @@ where
 pub trait EventFirer<I, S>
 where
     I: Input,
-    S: State,
 {
     /// Send off an event to the broker
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
@@ -189,17 +188,8 @@ where
     fn await_restart_safe(&mut self) {}
 }
 
-/// [`EventManager`] is the main communications hub.
-/// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<E, I, S, Z>: EventFirer<I, S>
-where
-    I: Input,
-    S: State,
-    E: Executor<I>,
-{
-    /// Fire an Event
-    //fn fire<'a>(&mut self, event: Event<I>) -> Result<(), Error>;
-
+/// [`EventProcessor`] process all the incoming messages
+pub trait EventProcessor<E, S, Z> {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
@@ -221,6 +211,14 @@ where
     }
 }
 
+/// [`EventManager`] is the main communications hub.
+/// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
+pub trait EventManager<E, I, S, Z>: EventFirer<I, S> + EventProcessor<E, S, Z>
+where
+    I: Input,
+{
+}
+
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
 pub struct NopEventManager {}
@@ -228,19 +226,13 @@ pub struct NopEventManager {}
 impl<I, S> EventFirer<I, S> for NopEventManager
 where
     I: Input,
-    S: State,
 {
     fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager
-where
-    I: Input,
-    S: State,
-    E: Executor<I>,
-{
+impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
     fn process(
         &mut self,
         _fuzzer: &mut Z,
@@ -250,6 +242,8 @@ where
         Ok(0)
     }
 }
+
+impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
 
 #[cfg(test)]
 mod tests {

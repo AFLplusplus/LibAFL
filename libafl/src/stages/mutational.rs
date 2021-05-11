@@ -1,16 +1,14 @@
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusScheduler},
-    events::EventManager,
-    executors::{Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    corpus::{Corpus},
+    fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
     mutators::Mutator,
-    observers::ObserversTuple,
     stages::Stage,
     start_timer,
-    state::{Evaluator, HasClientPerfStats, HasCorpus, HasRand},
+    state::{HasClientPerfStats, HasCorpus, HasRand},
     utils::Rand,
     Error,
 };
@@ -23,16 +21,13 @@ use crate::stats::PerfFeature;
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<C, CS, E, EM, I, M, OT, S>: Stage<CS, E, EM, I, S>
+pub trait MutationalStage<C, E, EM, I, M, S, Z>: Stage<E, EM, S, Z>
 where
+    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasClientPerfStats,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
-    CS: CorpusScheduler<I, S>,
+    S: HasClientPerfStats + HasCorpus<C, I>,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -47,17 +42,17 @@ where
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
-        state: &mut S,
+        fuzzer: &mut Z,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let num = self.iterations(state);
 
         for i in 0..num {
             start_timer!(state);
-            let mut input_mut = state
+            let mut input = state
                 .corpus()
                 .get(corpus_idx)?
                 .borrow_mut()
@@ -66,11 +61,11 @@ where
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
             start_timer!(state);
-            self.mutator_mut().mutate(state, &mut input_mut, i as i32)?;
+            self.mutator_mut().mutate(state, &mut input, i as i32)?;
             mark_feature_time!(state, PerfFeature::Mutate);
 
             // Time is measured directly the `evaluate_input` function
-            let (_, corpus_idx) = state.evaluate_input(input_mut, executor, manager, scheduler)?;
+            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
@@ -86,35 +81,29 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+pub struct StdMutationalStage<C, E, EM, I, M, R, S, Z>
 where
+    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
-    CS: CorpusScheduler<I, S>,
     R: Rand,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, CS, E, EM, I, OT, R, S)>,
+    phantom: PhantomData<(C, E, EM, I, R, S, Z)>,
 }
 
-impl<C, CS, E, EM, I, M, OT, R, S> MutationalStage<C, CS, E, EM, I, M, OT, S>
-    for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+impl<C, E, EM, I, M, R, S, Z> MutationalStage<C, E, EM, I, M, S, Z>
+    for StdMutationalStage<C, E, EM, I, M, R, S, Z>
 where
+    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R> + HasClientPerfStats,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
-    CS: CorpusScheduler<I, S>,
     R: Rand,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -134,43 +123,36 @@ where
     }
 }
 
-impl<C, CS, E, EM, I, M, OT, R, S> Stage<CS, E, EM, I, S>
-    for StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+impl<C, E, EM, I, M, R, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<C, E, EM, I, M, R, S, Z>
 where
+    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R> + HasClientPerfStats,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
-    CS: CorpusScheduler<I, S>,
     R: Rand,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
     fn perform(
         &mut self,
-        state: &mut S,
+        fuzzer: &mut Z,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.perform_mutational(state, executor, manager, scheduler, corpus_idx)
+        self.perform_mutational(fuzzer, executor, state, manager, corpus_idx)
     }
 }
 
-impl<C, CS, E, EM, I, M, OT, R, S> StdMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+impl<C, E, EM, I, M, R, S, Z> StdMutationalStage<C, E, EM, I, M, R, S, Z>
 where
+    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT> + HasExecHooks<EM, I, S> + HasObserversHooks<EM, I, OT, S>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
-    CS: CorpusScheduler<I, S>,
     R: Rand,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {

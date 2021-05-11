@@ -5,26 +5,17 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
 /// Mutational stage is the normal fuzzing stage,
-//pub mod mutational;
+pub mod mutational;
 
 //pub use mutational::{MutationalStage, StdMutationalStage};
 
 //pub mod power;
 //pub use power::PowerMutationalStage;
-use crate::{
-    bolts::tuples::TupleList, events::EventManager, executors::Executor, inputs::Input,
-    state::State, Error,
-};
+use crate::Error;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<E, EM, I, S, Z>
-where
-    E: Executor<I>,
-    EM: EventManager<E, I, S, Z>,
-    I: Input,
-    S: State,
-{
+pub trait Stage<E, EM, S, Z> {
     /// Run the stage
     fn perform(
         &mut self,
@@ -37,13 +28,7 @@ where
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
-pub trait StagesTuple<E, EM, I, S, Z>
-where
-    E: Executor<I>,
-    EM: EventManager<E, I, S, Z>,
-    I: Input,
-    S: State,
-{
+pub trait StagesTuple<E, EM, S, Z> {
     /// Performs all `Stages` in this tuple
     fn perform_all(
         &mut self,
@@ -55,13 +40,7 @@ where
     ) -> Result<(), Error>;
 }
 
-impl<E, EM, I, S, Z> StagesTuple<E, EM, I, S, Z> for ()
-where
-    E: Executor<I>,
-    EM: EventManager<E, I, S, Z>,
-    I: Input,
-    S: State,
-{
+impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for () {
     fn perform_all(
         &mut self,
         _: &mut Z,
@@ -74,14 +53,10 @@ where
     }
 }
 
-impl<Head, Tail, E, EM, I, S, Z> StagesTuple<E, EM, I, S, Z> for (Head, Tail)
+impl<Head, Tail, E, EM, S, Z> StagesTuple<E, EM, S, Z> for (Head, Tail)
 where
-    Head: Stage<E, EM, I, S, Z>,
-    Tail: StagesTuple<E, EM, I, S, Z> + TupleList,
-    E: Executor<I>,
-    EM: EventManager<E, I, S, Z>,
-    I: Input,
-    S: State,
+    Head: Stage<E, EM, S, Z>,
+    Tail: StagesTuple<E, EM, S, Z>,
 {
     fn perform_all(
         &mut self,

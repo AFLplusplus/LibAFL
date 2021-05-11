@@ -108,10 +108,9 @@ pub trait HasMetadata {
 }
 
 /// Trait for elements offering a feedback
-pub trait HasFeedbackStates<FT, I>: Sized
+pub trait HasFeedbackStates<FT>
 where
-    FT: FeedbackStatesTuple<I>,
-    I: Input,
+    FT: FeedbackStatesTuple,
 {
     /// The feedback states
     fn feedback_states(&self) -> &FT;
@@ -146,7 +145,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// RNG instance
@@ -178,7 +177,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
 }
@@ -188,7 +187,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The rand instance
@@ -209,7 +208,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// Returns the corpus
@@ -230,7 +229,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// Returns the solutions corpus
@@ -251,7 +250,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
@@ -267,12 +266,12 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasFeedbackStates<FT, I> for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasFeedbackStates<FT> for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The feedback states
@@ -293,7 +292,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The executions counter
@@ -314,7 +313,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn max_size(&self) -> usize {
@@ -331,7 +330,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The starting time
@@ -447,7 +446,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /*
@@ -514,7 +513,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn introspection_stats(&self) -> &ClientPerfStats {
@@ -532,7 +531,7 @@ where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple<I>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn introspection_stats(&self) -> &ClientPerfStats {

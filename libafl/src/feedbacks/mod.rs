@@ -13,7 +13,6 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     observers::{ObserversTuple, TimeObserver},
-    state::HasFeedbackStates,
     Error,
 };
 
@@ -25,11 +24,9 @@ use core::{marker::PhantomData, time::Duration};
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<FT, I, S>: Named
+pub trait Feedback<I, S>: Named
 where
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     /// `is_interesting ` return if an input is worth the addition to the corpus
     fn is_interesting<OT>(
@@ -91,53 +88,41 @@ where
 
 /// FeedbackState is the data associated with a Feedback that must persist as part
 /// of the fuzzer State
-pub trait FeedbackState<I>: Named + serde::Serialize + serde::de::DeserializeOwned
-where
-    I: Input,
-{
-}
+pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {}
 
 /// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple<I>:
-    MatchName + serde::Serialize + serde::de::DeserializeOwned
-where
-    I: Input,
-{
-}
+pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {}
 
-impl<I> FeedbackStatesTuple<I> for () where I: Input {}
+impl FeedbackStatesTuple for () {}
 
-impl<Head, Tail, I> FeedbackStatesTuple<I> for (Head, Tail)
+impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
 where
-    Head: FeedbackState<I>,
-    Tail: FeedbackStatesTuple<I>,
-    I: Input,
+    Head: FeedbackState,
+    Tail: FeedbackStatesTuple,
 {
 }
 
 /// Compose [`Feedback`]`s` with an `AND` operation
-pub struct AndFeedback<A, B, FT, I, S>
+pub struct AndFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     /// The first [`Feedback`] to `AND`.
     pub first: A,
     /// The second [`Feedback`] to `AND`.
     pub second: B,
-    phantom: PhantomData<(FT, I, S)>,
+    /// The name
+    name: String,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<A, B, FT, I, S> Feedback<FT, I, S> for AndFeedback<A, B, FT, I, S>
+impl<A, B, I, S> Feedback<I, S> for AndFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     fn is_interesting<OT>(
         &mut self,
@@ -202,62 +187,57 @@ where
     }
 }
 
-impl<A, B, FT, I, S> Named for AndFeedback<A, B, FT, I, S>
+impl<A, B, I, S> Named for AndFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     #[inline]
     fn name(&self) -> &str {
-        //format!("And({}, {})", self.first.name(), self.second.name())
-        "AndFeedback"
+        &self.name
     }
 }
 
-impl<A, B, FT, I, S> AndFeedback<A, B, FT, I, S>
+impl<A, B, I, S> AndFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     /// Creates a new [`AndFeedback`], resulting in the `AND` of two feedbacks.
     pub fn new(first: A, second: B) -> Self {
+        let name = format!("And({}, {})", first.name(), second.name());
         Self {
             first,
             second,
+            name,
             phantom: PhantomData,
         }
     }
 }
 
 /// Compose feedbacks with an OR operation
-pub struct OrFeedback<A, B, FT, I, S>
+pub struct OrFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     /// The first [`Feedback`]
     pub first: A,
     /// The second [`Feedback`], `OR`ed with the first.
     pub second: B,
-    phantom: PhantomData<(FT, I, S)>,
+    /// The name
+    name: String,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<A, B, FT, I, S> Feedback<FT, I, S> for OrFeedback<A, B, FT, I, S>
+impl<A, B, I, S> Feedback<I, S> for OrFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     fn is_interesting<OT>(
         &mut self,
@@ -322,58 +302,53 @@ where
     }
 }
 
-impl<A, B, FT, I, S> Named for OrFeedback<A, B, FT, I, S>
+impl<A, B, I, S> Named for OrFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     #[inline]
     fn name(&self) -> &str {
-        //format!("Or({}, {})", self.first.name(), self.second.name())
-        "OrFeedback"
+        &self.name
     }
 }
 
-impl<A, B, FT, I, S> OrFeedback<A, B, FT, I, S>
+impl<A, B, I, S> OrFeedback<A, B, I, S>
 where
-    A: Feedback<FT, I, S>,
-    B: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     /// Creates a new [`OrFeedback`] for two feedbacks.
     pub fn new(first: A, second: B) -> Self {
+        let name = format!("Or({}, {})", first.name(), second.name());
         Self {
             first,
             second,
+            name,
             phantom: PhantomData,
         }
     }
 }
 
 /// Compose feedbacks with an OR operation
-pub struct NotFeedback<A, FT, I, S>
+pub struct NotFeedback<A, I, S>
 where
-    A: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     /// The feedback to invert
     pub first: A,
-    phantom: PhantomData<(FT, I, S)>,
+    /// The name
+    name: String,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<A, FT, I, S> Feedback<FT, I, S> for NotFeedback<A, FT, I, S>
+impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>
 where
-    A: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     fn is_interesting<OT>(
         &mut self,
@@ -401,31 +376,28 @@ where
     }
 }
 
-impl<A, FT, I, S> Named for NotFeedback<A, FT, I, S>
+impl<A, I, S> Named for NotFeedback<A, I, S>
 where
-    A: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     #[inline]
     fn name(&self) -> &str {
-        //format!("Not({})", self.first.name())
-        "NotFeedback"
+        &self.name
     }
 }
 
-impl<A, FT, I, S> NotFeedback<A, FT, I, S>
+impl<A, I, S> NotFeedback<A, I, S>
 where
-    A: Feedback<FT, I, S>,
+    A: Feedback<I, S>,
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
+        let name = format!("Not({})", first.name());
         Self {
             first,
+            name,
             phantom: PhantomData,
         }
     }
@@ -462,11 +434,9 @@ macro_rules! feedback_not {
 }
 
 /// Hack to use () as empty Feedback
-impl<FT, I, S> Feedback<FT, I, S> for ()
+impl<I, S> Feedback<I, S> for ()
 where
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     fn is_interesting<OT>(
         &mut self,
@@ -493,11 +463,9 @@ impl Named for () {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {}
 
-impl<FT, I, S> Feedback<FT, I, S> for CrashFeedback
+impl<I, S> Feedback<I, S> for CrashFeedback
 where
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     fn is_interesting<OT>(
         &mut self,
@@ -542,11 +510,9 @@ impl Default for CrashFeedback {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {}
 
-impl<FT, I, S> Feedback<FT, I, S> for TimeoutFeedback
+impl<I, S> Feedback<I, S> for TimeoutFeedback
 where
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     fn is_interesting<OT>(
         &mut self,
@@ -596,15 +562,13 @@ pub struct TimeFeedback {
     name: String,
 }
 
-impl<FT, I, S> Feedback<FT, I, S> for TimeFeedback
+impl<I, S> Feedback<I, S> for TimeFeedback
 where
     I: Input,
-    S: HasFeedbackStates<FT, I>,
-    FT: FeedbackStatesTuple<I>,
 {
     fn is_interesting<OT>(
         &mut self,
-        state: &mut S,
+        _state: &mut S,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
