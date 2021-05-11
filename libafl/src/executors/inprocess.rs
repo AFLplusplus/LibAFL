@@ -23,33 +23,29 @@ use crate::{
     fuzzer::HasObjective,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::{HasSolutions, State},
+    state::HasSolutions,
     Error,
 };
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct InProcessExecutor<'a, EM, H, I, OT, S, Z>
+pub struct InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
-    S: State,
-    EM: EventFirer<I, S>,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: &'a mut H,
     /// The observers, observing each run
     observers: OT,
-    phantom: PhantomData<(EM, I, S, Z)>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<'a, EM, H, I, OT, S, Z> Executor<I> for InProcessExecutor<'a, EM, H, I, OT, S, Z>
+impl<'a, H, I, OT, S> Executor<I> for InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
-    S: State,
-    EM: EventFirer<I, S>,
 {
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
@@ -59,13 +55,11 @@ where
     }
 }
 
-impl<'a, EM, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for InProcessExecutor<'a, EM, H, I, OT, S, Z>
+impl<'a, EM, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
-    S: State,
-    EM: EventFirer<I, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
     #[inline]
     fn pre_exec(
@@ -142,13 +136,11 @@ where
     }
 }
 
-impl<'a, EM, H, I, OT, S, Z> HasObservers<OT> for InProcessExecutor<'a, EM, H, I, OT, S, Z>
+impl<'a, H, I, OT, S> HasObservers<OT> for InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
-    S: State,
-    EM: EventFirer<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -162,23 +154,19 @@ where
 }
 
 impl<'a, EM, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
-    for InProcessExecutor<'a, EM, H, I, OT, S, Z>
+    for InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
-    S: State,
-    EM: EventFirer<I, S>,
 {
 }
 
-impl<'a, EM, H, I, OT, S, Z> InProcessExecutor<'a, EM, H, I, OT, S, Z>
+impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
-    S: State,
-    EM: EventFirer<I, S>,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -186,9 +174,10 @@ where
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<OC, OF>(
+    pub fn new<EM, OC, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
+        _fuzzer: &mut Z,
         _state: &mut S,
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
@@ -267,7 +256,7 @@ mod unix_signal_handler {
         fuzzer::HasObjective,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::{HasSolutions, State},
+        state::HasSolutions,
     };
 
     // TODO merge GLOBAL_STATE with the Windows one
@@ -351,7 +340,7 @@ mod unix_signal_handler {
         OT: ObserversTuple,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: State + HasSolutions<OC, I>,
+        S: HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
         Z: HasObjective<I, OF, S>,
     {
@@ -425,7 +414,7 @@ mod unix_signal_handler {
         OT: ObserversTuple,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: State + HasSolutions<OC, I>,
+        S: HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
         Z: HasObjective<I, OF, S>,
     {

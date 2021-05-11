@@ -3,6 +3,8 @@
 use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 
+use serde::{de::DeserializeOwned, Serialize};
+
 #[cfg(feature = "std")]
 use core::ptr::{addr_of, read_volatile};
 
@@ -23,7 +25,6 @@ use crate::{
     fuzzer::IfInteresting,
     inputs::Input,
     observers::ObserversTuple,
-    state::State,
     stats::Stats,
     Error,
 };
@@ -60,7 +61,7 @@ pub struct LlmpEventManager<E, I, OT, S, SP, ST, Z>
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
@@ -83,7 +84,6 @@ impl<E, I, OT, S, SP, ST, Z> Drop for LlmpEventManager<E, I, OT, S, SP, ST, Z>
 where
     E: Executor<I>,
     I: Input,
-    S: State,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -99,7 +99,6 @@ impl<E, I, OT, S, SP, ST, Z> LlmpEventManager<E, I, OT, S, SP, ST, Z>
 where
     E: Executor<I>,
     I: Input,
-    S: State,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -348,7 +347,6 @@ impl<E, I, OT, S, SP, ST, Z> EventFirer<I, S> for LlmpEventManager<E, I, OT, S, 
 where
     E: Executor<I>,
     I: Input,
-    S: State,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -396,7 +394,6 @@ impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z> for LlmpEventManager<E, I, 
 where
     E: Executor<I>,
     I: Input,
-    S: State,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -444,7 +441,7 @@ impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z> for LlmpEventManager<E, I,
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -463,7 +460,7 @@ pub fn serialize_state_mgr<E, I, OT, S, SP, ST, Z>(
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+    S: Serialize,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -481,7 +478,7 @@ pub fn deserialize_state_mgr<E, I, OT, S, SP, ST, Z>(
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+    S: DeserializeOwned,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -500,7 +497,7 @@ pub struct LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
@@ -517,7 +514,7 @@ impl<E, I, OT, S, SP, ST, Z> EventFirer<I, S> for LlmpRestartingEventManager<E, 
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+    S: Serialize,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider,
@@ -551,7 +548,7 @@ impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z>
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
@@ -568,7 +565,7 @@ impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z>
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+    S: Serialize,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
@@ -587,7 +584,7 @@ impl<E, I, OT, S, SP, ST, Z> LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
@@ -628,7 +625,7 @@ pub fn setup_restarting_mgr_std<E, I, OT, S, ST, Z>(
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+    S: DeserializeOwned,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     ST: Stats,
@@ -662,7 +659,7 @@ pub fn setup_restarting_mgr<E, I, OT, S, SP, ST, Z>(
 where
     E: Executor<I>,
     I: Input,
-    S: State,
+    S: DeserializeOwned,
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,

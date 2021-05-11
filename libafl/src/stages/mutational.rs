@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus},
+    corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
