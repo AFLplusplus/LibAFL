@@ -37,7 +37,7 @@ harness = false
 
 [features]
 default = ["std", "anymap_debug", "derive", "llmp_compression"]
-std = ["derive_builder"] # print, sharedmap, ... support
+std = [] # print, env, launcher ... support
 anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 llmp_small_maps = [] # reduces initial map size for llmp
@@ -66,7 +66,7 @@ compression = { version = "0.1.5" }
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs" }
 num_enum = "0.5.1"
 hostname = "^0.3" # Is there really no gethostname in the stdlib?
-derive_builder = { version="0.10", optional = true }
+typed-builder = "0.9.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug

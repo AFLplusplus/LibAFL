@@ -48,8 +48,7 @@ use crate::utils::{fork, ForkResult};
 #[cfg(all(target_os = "android", feature = "std"))]
 use crate::bolts::os::ashmem_server::AshmemService;
 
-#[cfg(feature = "std")]
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
@@ -580,12 +579,11 @@ where
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Error starting Ashmem Service");
 
-    RestartingMgrBuilder::default()
+    RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
         .stats(stats)
         .broker_port(broker_port)
         .build()
-        .unwrap()
         .launch()
 }
 
@@ -594,8 +592,7 @@ where
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-#[derive(Builder, Debug)]
-#[builder(pattern = "owned")]
+#[derive(TypedBuilder, Debug)]
 pub struct RestartingMgr<I, S, SP, ST>
 where
     I: Input,
@@ -609,15 +606,15 @@ where
     /// The stats to use
     stats: ST,
     /// The broker port to use
-    #[builder(default = "1337")]
+    #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The address to connect to
-    #[builder(default = "Option::None")]
+    #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     /// The type of manager to build
-    #[builder(default = "ManagerKind::Any")]
+    #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
-    #[builder(setter(skip))]
+    #[builder(setter(skip), default = PhantomData {})]
     _phantom: PhantomData<(I, S)>,
 }
 
