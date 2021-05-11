@@ -100,7 +100,7 @@ impl FridaOptions {
                     }
                 }
             } // end of for loop
-            if options.enable_asan && asan_cores != None {
+            if options.enable_asan && asan_cores.is_some() {
                 let core_ids = core_affinity::get_core_ids().unwrap();
                 assert_eq!(
                     core_ids.len(),
