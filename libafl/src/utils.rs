@@ -737,7 +737,6 @@ where
                         }),
                     })
                     .build()
-                    .unwrap()
                     .launch()?;
 
                 (self.run_client)(state, mgr)?;
@@ -792,7 +791,6 @@ where
             .kind(ManagerKind::Broker)
             .remote_broker_addr(self.remote_broker_addr)
             .build()
-            .unwrap()
             .launch()?;
 
         //broker exited. kill all clients.
