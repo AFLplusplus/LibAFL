@@ -658,6 +658,7 @@ where
         //spawn clients
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
             if self.cores.iter().any(|&x| x == id) {
+                self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
                         self.shmem_provider.post_fork(false)?;
@@ -698,27 +699,15 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        if let Some(remote_broker_addr) = self.remote_broker_addr {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .kind(ManagerKind::ConnectedBroker {
-                    connect_to: remote_broker_addr,
-                })
-                .build()
-                .unwrap()
-                .launch()?;
-        } else {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .kind(ManagerKind::Broker)
-                .build()
-                .unwrap()
-                .launch()?;
-        }
+        RestartingMgrBuilder::<I, S, SP, ST>::default()
+            .shmem_provider(self.shmem_provider.clone())
+            .stats(self.stats.clone())
+            .broker_port(self.broker_port)
+            .kind(ManagerKind::Broker)
+            .remote_broker_addr(self.remote_broker_addr)
+            .build()
+            .unwrap()
+            .launch()?;
 
         //broker exited. kill all clients.
         for handle in &handles {
