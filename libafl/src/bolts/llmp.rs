@@ -1707,7 +1707,7 @@ where
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
             stream,
-            &self.shmem_provider,
+            &mut self.shmem_provider,
             self.llmp_clients.len() as ClientId,
             &self.llmp_out.out_maps.first().unwrap().shmem.description(),
         )?;
@@ -1858,11 +1858,13 @@ where
     #[allow(clippy::let_and_return)]
     fn b2b_thread_on(
         mut stream: TcpStream,
-        shmem_provider: &SP,
+        shmem_provider: &mut SP,
         b2b_client_id: ClientId,
         broker_map_description: &ShMemDescription,
     ) -> Result<ShMemDescription, Error> {
         let broker_map_description = *broker_map_description;
+
+        shmem_provider.pre_fork()?;
         let mut shmem_provider_clone = shmem_provider.clone();
 
         // A channel to get the new "client's" sharedmap id from
@@ -1963,6 +1965,8 @@ where
             }
         });
 
+        shmem_provider.post_fork(false)?;
+
         let ret = recv.recv().map_err(|_| {
             Error::Unknown("Error launching background thread for b2b communcation".to_string())
         });
@@ -1980,7 +1984,7 @@ where
         request: &TcpRequest,
         current_client_id: &mut u32,
         sender: &mut LlmpSender<SP>,
-        shmem_provider: &SP,
+        shmem_provider: &mut SP,
         broker_map_description: &ShMemDescription,
     ) {
         match request {
@@ -2060,6 +2064,7 @@ where
         let tcp_out_map_description = tcp_out_map.shmem.description();
         self.register_client(tcp_out_map);
 
+        self.shmem_provider.pre_fork()?;
         let mut shmem_provider_clone = self.shmem_provider.clone();
 
         let ret = thread::spawn(move || {
@@ -2116,7 +2121,7 @@ where
                             &req,
                             &mut current_client_id,
                             &mut tcp_incoming_sender,
-                            &shmem_provider_clone,
+                            &mut shmem_provider_clone,
                             &broker_map_description,
                         );
                     }

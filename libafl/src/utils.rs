@@ -18,7 +18,7 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use crate::events::llmp::RestartingMgrBuilder;
+use crate::events::llmp::RestartingMgr;
 
 #[cfg(unix)]
 use libc::pid_t;
@@ -40,8 +40,7 @@ use core_affinity::CoreId;
 #[cfg(all(windows, feature = "std"))]
 use std::process::Stdio;
 
-#[cfg(feature = "std")]
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 
 /// Can be converted to a slice
 pub trait AsSlice<T> {
@@ -601,9 +600,8 @@ mod tests {
 
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
-#[derive(Builder)]
+#[derive(TypedBuilder)]
 #[allow(clippy::type_complexity)]
-#[builder(pattern = "owned")]
 pub struct Launcher<'a, I, S, SP, ST>
 where
     I: Input,
@@ -621,16 +619,16 @@ where
     run_client:
         &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>) -> Result<(), Error>,
     /// The broker port to use
-    #[builder(default = "1337")]
+    #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
     cores: &'a [usize],
     /// A file name to write all client output to
-    #[builder(default = "None")]
+    #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
-    #[builder(default = "None")]
+    #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
 }
 
@@ -658,6 +656,7 @@ where
         //spawn clients
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
             if self.cores.iter().any(|&x| x == id) {
+                self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
                         self.shmem_provider.post_fork(false)?;
@@ -678,7 +677,7 @@ where
                         }
                         //fuzzer client. keeps retrying the connection to broker till the broker starts
                         let stats = (self.client_init_stats)()?;
-                        let (state, mgr) = RestartingMgrBuilder::default()
+                        let (state, mgr) = RestartingMgr::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .stats(stats)
                             .broker_port(self.broker_port)
@@ -686,7 +685,6 @@ where
                                 cpu_core: Some(*bind_to),
                             })
                             .build()
-                            .unwrap()
                             .launch()?;
 
                         (self.run_client)(state, mgr)?;
@@ -698,25 +696,14 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        if let Some(remote_broker_addr) = self.remote_broker_addr {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .remote_broker_addr(Some(remote_broker_addr))
-                .build()
-                .unwrap()
-                .launch()?;
-        } else {
-            RestartingMgrBuilder::<I, S, SP, ST>::default()
-                .shmem_provider(self.shmem_provider.clone())
-                .stats(self.stats.clone())
-                .broker_port(self.broker_port)
-                .kind(ManagerKind::Broker)
-                .build()
-                .unwrap()
-                .launch()?;
-        }
+        RestartingMgr::<I, S, SP, ST>::builder()
+            .shmem_provider(self.shmem_provider.clone())
+            .stats(self.stats.clone())
+            .broker_port(self.broker_port)
+            .kind(ManagerKind::Broker)
+            .remote_broker_addr(self.remote_broker_addr)
+            .build()
+            .launch()?;
 
         //broker exited. kill all clients.
         for handle in &handles {
@@ -740,7 +727,7 @@ where
 
                 // the actual client. do the fuzzing
                 let stats = (self.client_init_stats)()?;
-                let (state, mgr) = RestartingMgrBuilder::<I, S, SP, ST>::default()
+                let (state, mgr) = RestartingMgr::<I, S, SP, ST>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .stats(stats)
                     .broker_port(self.broker_port)
@@ -798,7 +785,7 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        RestartingMgrBuilder::<I, S, SP, ST>::default()
+        RestartingMgr::<I, S, SP, ST>::builder()
             .shmem_provider(self.shmem_provider.clone())
             .stats(self.stats.clone())
             .broker_port(self.broker_port)

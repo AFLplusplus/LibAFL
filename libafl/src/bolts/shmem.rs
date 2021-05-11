@@ -196,6 +196,7 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
 
     /// This method should be called before a fork or a thread creation event, allowing the [`ShMemProvider`] to
     /// get ready for a potential reset of thread specific info, and for potential reconnects.
+    /// Make sure to call [`Self::post_fork()`] after threading!
     fn pre_fork(&mut self) -> Result<(), Error> {
         // do nothing
         Ok(())
@@ -203,6 +204,7 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
 
     /// This method should be called after a fork or after cloning/a thread creation event, allowing the [`ShMemProvider`] to
     /// reset thread specific info, and potentially reconnect.
+    /// Make sure to call [`Self::pre_fork()`] before threading!
     fn post_fork(&mut self, _is_child: bool) -> Result<(), Error> {
         // do nothing
         Ok(())
@@ -356,7 +358,7 @@ where
                 Ok(())
             }
             None => Err(Error::IllegalState(
-                "Unexpected `None` Pipe in RcShMemProvider!".to_string(),
+                "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
             )),
         }
     }
@@ -378,7 +380,7 @@ where
                 }
             }
             None => Err(Error::IllegalState(
-                "Unexpected `None` Pipe in RcShMemProvider!".to_string(),
+                "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
             )),
         }
     }

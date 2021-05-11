@@ -48,8 +48,7 @@ use crate::utils::{fork, ForkResult};
 #[cfg(all(target_os = "android", feature = "std"))]
 use crate::bolts::os::ashmem_server::AshmemService;
 
-#[cfg(feature = "std")]
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
@@ -580,22 +579,20 @@ where
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Error starting Ashmem Service");
 
-    RestartingMgrBuilder::default()
+    RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
         .stats(stats)
         .broker_port(broker_port)
         .build()
-        .unwrap()
         .launch()
 }
 
-/// Provides a builder which can be used to build a restarting manager, which is a combination of a
-/// restarter and runner, that can be used on systems both with and without `fork` support. The
-/// restarter will start a nre process each time the child crashes or timesout.
+/// Provides a `builder` which can be used to build a [`RestartingMgr`], which is a combination of a
+/// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
+/// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-#[derive(Builder, Debug)]
-#[builder(pattern = "owned")]
+#[derive(TypedBuilder, Debug)]
 pub struct RestartingMgr<I, S, SP, ST>
 where
     I: Input,
@@ -609,15 +606,15 @@ where
     /// The stats to use
     stats: ST,
     /// The broker port to use
-    #[builder(default = "1337")]
+    #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The address to connect to
-    #[builder(default = "Option::None")]
+    #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     /// The type of manager to build
-    #[builder(default = "ManagerKind::Any")]
+    #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
-    #[builder(setter(skip))]
+    #[builder(setter(skip), default = PhantomData {})]
     _phantom: PhantomData<(I, S)>,
 }
 
@@ -642,11 +639,12 @@ where
         )?;
 
         // We start ourself as child process to actually fuzz
-        let (sender, mut receiver, mut new_shmem_provider, core_id) = if std::env::var(
+        let (sender, mut receiver, new_shmem_provider, core_id) = if std::env::var(
             _ENV_FUZZER_SENDER,
         )
         .is_err()
         {
+            // We get here if we are on Unix, or we are a broker on Windows.
             let core_id = if mgr.is_broker() {
                 match self.kind {
                     ManagerKind::Broker | ManagerKind::Any => {
@@ -709,12 +707,19 @@ where
             loop {
                 dbg!("Spawning next client (id {})", ctr);
 
-                // On Unix, we fork (todo: measure if that is actually faster.)
+                // On Unix, we fork
                 #[cfg(unix)]
-                let child_status = match unsafe { fork() }? {
-                    ForkResult::Parent(handle) => handle.status(),
-                    ForkResult::Child => {
-                        break (sender, receiver, self.shmem_provider.clone(), core_id)
+                let child_status = {
+                    self.shmem_provider.pre_fork()?;
+                    match unsafe { fork() }? {
+                        ForkResult::Parent(handle) => {
+                            self.shmem_provider.post_fork(false)?;
+                            handle.status()
+                        }
+                        ForkResult::Child => {
+                            self.shmem_provider.post_fork(true)?;
+                            break (sender, receiver, self.shmem_provider.clone(), core_id);
+                        }
                     }
                 };
 
@@ -739,9 +744,9 @@ where
                 ctr = ctr.wrapping_add(1);
             }
         } else {
-            // We are the newly started fuzzing instance, first, connect to our own restore map.
+            // We are the newly started fuzzing instance (i.e. on Windows), first, connect to our own restore map.
+            // We get here *only on Windows*, if we were started by a restarting fuzzer.
             // A sender and a receiver for single communication
-            self.shmem_provider.post_fork(true)?;
             (
                 LlmpSender::on_existing_from_env(self.shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
                 LlmpReceiver::on_existing_from_env(
@@ -752,8 +757,6 @@ where
                 None,
             )
         };
-
-        new_shmem_provider.post_fork(false)?;
 
         if let Some(core_id) = core_id {
             core_affinity::set_for_current(core_id);
