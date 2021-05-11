@@ -2,7 +2,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor},
+    events::{BrokerEventResult, Event, EventFirer, EventManager, EventRestarter, EventProcessor},
     inputs::Input,
     stats::Stats,
     Error,
@@ -33,6 +33,13 @@ where
         };
         Ok(())
     }
+}
+
+impl<I, S, ST> EventRestarter<S> for SimpleEventManager<I, ST>
+where
+    I: Input,
+    ST: Stats, //CE: CustomEvent<I, OT>,
+{
 }
 
 impl<E, I, S, ST, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, ST>

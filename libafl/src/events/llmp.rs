@@ -19,7 +19,7 @@ use crate::{
         llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor},
+    events::{BrokerEventResult, Event, EventFirer, EventManager,EventRestarter, EventProcessor},
     executors::Executor,
     executors::ExitKind,
     fuzzer::IfInteresting,
@@ -57,12 +57,9 @@ const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, [`crate::bolts::llmp`].
 #[derive(Debug)]
-pub struct LlmpEventManager<E, I, OT, S, SP, ST, Z>
+pub struct LlmpEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
     I: Input,
-
-    Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
     ST: Stats,
@@ -73,21 +70,18 @@ where
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
 
-    phantom: PhantomData<(E, I, OT, S, Z)>,
+    phantom: PhantomData<(I, OT, S)>,
 }
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(feature = "llmp_compression")]
 const COMPRESS_THRESHOLD: usize = 1024;
 
-impl<E, I, OT, S, SP, ST, Z> Drop for LlmpEventManager<E, I, OT, S, SP, ST, Z>
+impl<I, OT, S, SP, ST> Drop for LlmpEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
-    I: Input,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
-    SP: ShMemProvider,
-    ST: Stats,
+I: Input,OT: ObserversTuple,
+SP: ShMemProvider + 'static,
+ST: Stats,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -95,14 +89,11 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, ST, Z> LlmpEventManager<E, I, OT, S, SP, ST, Z>
+impl<I, OT, S, SP, ST> LlmpEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
-    I: Input,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
-    SP: ShMemProvider,
-    ST: Stats,
+I: Input,OT: ObserversTuple,
+SP: ShMemProvider + 'static,
+ST: Stats,
 {
     /// Create llmp on a port
     /// If the port is not yet bound, it will act as broker
@@ -175,7 +166,8 @@ where
     }
 
     /// Run forever in the broker
-    pub fn broker_loop(&mut self) -> Result<(), Error> {
+    pub fn broker_loop(&mut self) -> Result<(), Error> 
+    {
         match &mut self.llmp {
             llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = self.stats.as_mut().unwrap();
@@ -224,7 +216,8 @@ where
         stats: &mut ST,
         sender_id: u32,
         event: &Event<I>,
-    ) -> Result<BrokerEventResult, Error> {
+    ) -> Result<BrokerEventResult, Error> 
+    {
         match &event {
             Event::NewTestcase {
                 input: _,
@@ -300,14 +293,17 @@ where
 
     // Handle arriving events in the client
     #[allow(clippy::unused_self)]
-    fn handle_in_client(
+    fn handle_in_client<E, Z>(
         &mut self,
         fuzzer: &mut Z,
         _executor: &mut E,
         state: &mut S,
         _sender_id: u32,
         event: Event<I>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+    Z: IfInteresting<I, OT, S>
+    {
         match event {
             Event::NewTestcase {
                 input,
@@ -343,12 +339,9 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, ST, Z> EventFirer<I, S> for LlmpEventManager<E, I, OT, S, SP, ST, Z>
+impl<I, OT, S, SP, ST> EventFirer<I, S> for LlmpEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
-    I: Input,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
+    I: Input,OT: ObserversTuple,
     SP: ShMemProvider,
     ST: Stats,
     //CE: CustomEvent<I>,
@@ -379,7 +372,15 @@ where
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
     }
+}
 
+impl<I, OT, S, SP, ST> EventRestarter<S> for LlmpEventManager<I, OT, S, SP, ST>
+where
+I: Input,OT: ObserversTuple,
+    SP: ShMemProvider,
+    ST: Stats,
+    //CE: CustomEvent<I>,
+{
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     fn await_restart_safe(&mut self) {
@@ -390,14 +391,14 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z> for LlmpEventManager<E, I, OT, S, SP, ST, Z>
+impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z> for LlmpEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
-    I: Input,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
     SP: ShMemProvider,
     ST: Stats,
+    E: Executor<I>,
+    I: Input,
+    OT: ObserversTuple,
+    Z: IfInteresting<I, OT, S>
     //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
@@ -437,15 +438,14 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z> for LlmpEventManager<E, I, OT, S, SP, ST, Z>
+impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP, ST>
 where
+SP: ShMemProvider,
+    ST: Stats,
     E: Executor<I>,
     I: Input,
-
-    Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
-    SP: ShMemProvider,
-    ST: Stats,
+    Z: IfInteresting<I, OT, S>
     //CE: CustomEvent<I>,
 {
 }
@@ -453,16 +453,13 @@ where
 /// Serialize the current state and corpus during an executiont to bytes.
 /// On top, add the current llmp event manager instance to be restored
 /// This method is needed when the fuzzer run crashes and has to restart.
-pub fn serialize_state_mgr<E, I, OT, S, SP, ST, Z>(
+pub fn serialize_state_mgr<I, OT, S, SP, ST>(
     state: &S,
-    mgr: &LlmpEventManager<E, I, OT, S, SP, ST, Z>,
+    mgr: &LlmpEventManager<I, OT, S, SP, ST>,
 ) -> Result<Vec<u8>, Error>
 where
-    E: Executor<I>,
-    I: Input,
+I: Input,OT: ObserversTuple,
     S: Serialize,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
     SP: ShMemProvider,
     ST: Stats,
 {
@@ -471,16 +468,13 @@ where
 
 /// Deserialize the state and corpus tuple, previously serialized with `serialize_state_corpus(...)`
 #[allow(clippy::type_complexity)]
-pub fn deserialize_state_mgr<E, I, OT, S, SP, ST, Z>(
+pub fn deserialize_state_mgr<I, OT, S, SP, ST>(
     shmem_provider: SP,
     state_corpus_serialized: &[u8],
-) -> Result<(S, LlmpEventManager<E, I, OT, S, SP, ST, Z>), Error>
+) -> Result<(S, LlmpEventManager<I, OT, S, SP, ST>), Error>
 where
-    E: Executor<I>,
-    I: Input,
+I: Input,OT: ObserversTuple,
     S: DeserializeOwned,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
     SP: ShMemProvider,
     ST: Stats,
 {
@@ -493,30 +487,23 @@ where
 
 /// A manager that can restart on the fly, storing states in-between (in `on_resatrt`)
 #[derive(Debug)]
-pub struct LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
+pub struct LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
-    I: Input,
-
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
+I: Input,OT: ObserversTuple,
     SP: ShMemProvider + 'static,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
     /// The embedded llmp event manager
-    llmp_mgr: LlmpEventManager<E, I, OT, S, SP, ST, Z>,
+    llmp_mgr: LlmpEventManager<I, OT, S, SP, ST>,
     /// The sender to serialize the state for the next runner
     sender: LlmpSender<SP>,
 }
 
-impl<E, I, OT, S, SP, ST, Z> EventFirer<I, S> for LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
+impl<I, OT, S, SP, ST> EventFirer<I, S> for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
-    I: Input,
+    I: Input,OT: ObserversTuple,
     S: Serialize,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
     SP: ShMemProvider,
     ST: Stats,
     //CE: CustomEvent<I>,
@@ -525,12 +512,21 @@ where
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)
     }
+}
 
+impl<I, OT, S, SP, ST> EventRestarter<S> for LlmpRestartingEventManager<I, OT, S, SP, ST>
+where
+I: Input,OT: ObserversTuple,
+    S: Serialize,
+    SP: ShMemProvider,
+    ST: Stats,
+    //CE: CustomEvent<I>,
+{
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
-    /// Otherwise, the OS may already have removed the shared maps,
+    /// Otherwise, the OS mfay already have removed the shared maps,
     #[inline]
     fn await_restart_safe(&mut self) {
-        self.llmp_mgr.await_restart_safe();
+        self.llmp_mgr.await_restart_safe()
     }
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
@@ -543,12 +539,12 @@ where
     }
 }
 
+
 impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z>
-    for LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
+    for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
     E: Executor<I>,
     I: Input,
-
     Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
@@ -561,7 +557,7 @@ where
 }
 
 impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z>
-    for LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
+    for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
     E: Executor<I>,
     I: Input,
@@ -580,19 +576,16 @@ const _ENV_FUZZER_RECEIVER: &str = &"_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
 
-impl<E, I, OT, S, SP, ST, Z> LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>
+impl<I, OT, S, SP, ST> LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
     I: Input,
-
-    Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
-    pub fn new(llmp_mgr: LlmpEventManager<E, I, OT, S, SP, ST, Z>, sender: LlmpSender<SP>) -> Self {
+    pub fn new(llmp_mgr: LlmpEventManager<I, OT, S, SP, ST>, sender: LlmpSender<SP>) -> Self {
         Self { llmp_mgr, sender }
     }
 
@@ -612,28 +605,25 @@ where
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<E, I, OT, S, ST, Z>(
+pub fn setup_restarting_mgr_std<I, OT, S, ST>(
     stats: ST,
     broker_port: u16,
 ) -> Result<
     (
         Option<S>,
-        LlmpRestartingEventManager<E, I, OT, S, StdShMemProvider, ST, Z>,
+        LlmpRestartingEventManager<I, OT, S, StdShMemProvider, ST>,
     ),
     Error,
 >
 where
-    E: Executor<I>,
-    I: Input,
+I: Input,OT: ObserversTuple,
     S: DeserializeOwned,
-    Z: IfInteresting<I, OT, S>,
-    OT: ObserversTuple,
     ST: Stats,
 {
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Error starting Ashmem Service");
 
-    setup_restarting_mgr(StdShMemProvider::new()?, stats, broker_port)
+    setup_restarting_mgr::<I, OT, S, _, ST>(StdShMemProvider::new()?, stats, broker_port)
 }
 
 /// A restarting state is a combination of restarter and runner, that can be used on systems with and without `fork` support.
@@ -644,29 +634,27 @@ where
     clippy::type_complexity,
     clippy::similar_names
 )] // for { mgr = LlmpEventManager... }
-pub fn setup_restarting_mgr<E, I, OT, S, SP, ST, Z>(
+pub fn setup_restarting_mgr<I, OT, S, SP, ST>(
     mut shmem_provider: SP,
-    //mgr: &mut LlmpEventManager<I, S, SH, ST>,
+    //mgr: &mut LlmpEventManager<I, OT, S, SH, ST>,
     stats: ST,
     broker_port: u16,
 ) -> Result<
     (
         Option<S>,
-        LlmpRestartingEventManager<E, I, OT, S, SP, ST, Z>,
+        LlmpRestartingEventManager<I, OT, S, SP, ST>,
     ),
     Error,
 >
 where
-    E: Executor<I>,
     I: Input,
     S: DeserializeOwned,
-    Z: IfInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
     ST: Stats,
     //CE: CustomEvent<I>,
 {
-    let mut mgr = LlmpEventManager::<E, I, OT, S, SP, ST, Z>::new_on_port(
+    let mut mgr = LlmpEventManager::<I, OT, S, SP, ST>::new_on_port(
         shmem_provider.clone(),
         stats,
         broker_port,
@@ -753,7 +741,7 @@ where
         None => {
             println!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
-            let client_mgr = LlmpEventManager::<E, I, OT, S, SP, ST, Z>::existing_client_from_env(
+            let client_mgr = LlmpEventManager::<I, OT, S, SP, ST>::existing_client_from_env(
                 new_shmem_provider,
                 _ENV_FUZZER_BROKER_CLIENT_INITIAL,
             )?;
@@ -763,7 +751,7 @@ where
         // Restoring from a previous run, deserialize state and corpus.
         Some((_sender, _tag, msg)) => {
             println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-            let (state, mgr): (S, LlmpEventManager<E, I, OT, S, SP, ST, Z>) =
+            let (state, mgr): (S, LlmpEventManager<I, OT, S, SP, ST>) =
                 deserialize_state_mgr(new_shmem_provider, &msg)?;
 
             (Some(state), LlmpRestartingEventManager::new(mgr, sender))

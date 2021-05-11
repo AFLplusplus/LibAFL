@@ -396,7 +396,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    /*use crate::{
+    use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{BytesInput, HasBytesVec},
         mutators::{
@@ -404,7 +404,7 @@ mod tests {
             scheduled::{havoc_mutations, StdScheduledMutator},
             Mutator,
         },
-        state::State,
+        state::StdState,
         utils::{Rand, StdRand, XkcdRand},
     };
 
@@ -419,7 +419,7 @@ mod tests {
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
-        let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
+        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
 
         rand.set_seed(5);
 
@@ -446,7 +446,7 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
+        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
 
         let mut havoc = StdScheduledMutator::new(havoc_mutations());
 
@@ -465,5 +465,5 @@ mod tests {
             };
             assert_ne!(equal_in_a_row, 5);
         }
-    }*/
+    }
 }

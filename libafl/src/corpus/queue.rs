@@ -76,13 +76,13 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
-    /*
+
     use std::{fs, path::PathBuf};
 
     use crate::{
         corpus::{Corpus, CorpusScheduler, OnDiskCorpus, QueueCorpusScheduler, Testcase},
         inputs::bytes::BytesInput,
-        state::{HasCorpus, State},
+        state::{HasCorpus, StdState},
         utils::StdRand,
     };
 
@@ -103,7 +103,7 @@ mod tests {
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
                 .unwrap();
 
-        let mut state = State::new(rand, q, (), objective_q, ());
+        let mut state = StdState::new(rand, q, objective_q, ());
 
         let next_idx = scheduler.next(&mut state).unwrap();
         let filename = state
@@ -119,5 +119,5 @@ mod tests {
         assert_eq!(filename, "target/.test/fancy/path/fancyfile");
 
         fs::remove_dir_all("target/.test/fancy").unwrap();
-    }*/
+    }
 }

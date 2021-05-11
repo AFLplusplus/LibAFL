@@ -176,7 +176,9 @@ where
 {
     /// Send off an event to the broker
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+}
 
+pub trait EventRestarter<S> {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
     fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
@@ -213,7 +215,7 @@ pub trait EventProcessor<E, S, Z> {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<E, I, S, Z>: EventFirer<I, S> + EventProcessor<E, S, Z>
+pub trait EventManager<E, I, S, Z>: EventFirer<I, S> + EventProcessor<E, S, Z> + EventRestarter<S>
 where
     I: Input,
 {
@@ -230,6 +232,10 @@ where
     fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
         Ok(())
     }
+}
+
+impl<S> EventRestarter<S> for NopEventManager
+{
 }
 
 impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {

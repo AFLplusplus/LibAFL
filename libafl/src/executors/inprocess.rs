@@ -15,7 +15,7 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
 use crate::{
     corpus::Corpus,
-    events::EventFirer,
+    events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
@@ -182,7 +182,7 @@ where
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I>,
@@ -250,7 +250,7 @@ mod unix_signal_handler {
     use crate::{
         bolts::os::unix_signals::{Handler, Signal},
         corpus::{Corpus, Testcase},
-        events::{Event, EventFirer},
+        events::{Event, EventFirer, EventRestarter},
         executors::ExitKind,
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -336,7 +336,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
@@ -410,7 +410,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
@@ -719,7 +719,6 @@ mod windows_exception_handler {
 
 #[cfg(test)]
 mod tests {
-    /*
     use core::marker::PhantomData;
 
     use crate::{
@@ -732,12 +731,12 @@ mod tests {
     fn test_inmem_exec() {
         let mut harness = |_buf: &[u8]| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<(), _, NopInput, (), (), ()> {
+        let mut in_process_executor = InProcessExecutor::< _, NopInput, (), ()> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
             phantom: PhantomData,
         };
         let input = NopInput {};
         assert!(in_process_executor.run_target(&input).is_ok());
-    }*/
+    }
 }
