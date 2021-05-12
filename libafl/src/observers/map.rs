@@ -75,13 +75,19 @@ impl<'a, T> Observer for StdMapObserver<'a, T> where
 {
 }
 
-impl<'a, EM, I, S, T> HasExecHooks<EM, I, S> for StdMapObserver<'a, T>
+impl<'a, EM, I, S, T, Z> HasExecHooks<EM, I, S, Z> for StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -185,12 +191,18 @@ impl<'a, T> Observer for VariableMapObserver<'a, T> where
 {
 }
 
-impl<'a, EM, I, S, T> HasExecHooks<EM, I, S> for VariableMapObserver<'a, T>
+impl<'a, EM, I, S, T, Z> HasExecHooks<EM, I, S, Z> for VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -302,21 +314,33 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 
 impl<M> Observer for HitcountsMapObserver<M> where M: MapObserver<u8> {}
 
-impl<EM, I, S, M> HasExecHooks<EM, I, S> for HitcountsMapObserver<M>
+impl<EM, I, S, M, Z> HasExecHooks<EM, I, S, Z> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8> + HasExecHooks<EM, I, S>,
+    M: MapObserver<u8> + HasExecHooks<EM, I, S, Z>,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
-        self.base.pre_exec(state, mgr, input)
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
+        self.base.pre_exec(fuzzer, state, mgr, input)
     }
 
     #[inline]
-    fn post_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         for x in self.map_mut().iter_mut() {
             *x = COUNT_CLASS_LOOKUP[*x as usize];
         }
-        self.base.post_exec(state, mgr, input)
+        self.base.post_exec(fuzzer, state, mgr, input)
     }
 }
 
