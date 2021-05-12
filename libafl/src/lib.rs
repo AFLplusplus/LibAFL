@@ -159,7 +159,7 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
-        executors::{ExitKind, HasExecHooks, HasObserversHooks, InProcessExecutor},
+        executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,

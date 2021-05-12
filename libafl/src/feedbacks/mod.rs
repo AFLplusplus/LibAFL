@@ -86,7 +86,7 @@ where
     }
 }
 
-/// FeedbackState is the data associated with a Feedback that must persist as part
+/// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
 /// of the fuzzer State
 pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {}
 

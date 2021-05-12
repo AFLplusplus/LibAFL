@@ -118,7 +118,7 @@ impl MapNoveltiesMetadata {
     }
 }
 
-/// The state of MapFeedback
+/// The state of [`MapFeedback`]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedbackState<T>
