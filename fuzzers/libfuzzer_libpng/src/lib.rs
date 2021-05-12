@@ -65,7 +65,6 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     };
 
     // Create an observation channel using the coverage map
-    // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 

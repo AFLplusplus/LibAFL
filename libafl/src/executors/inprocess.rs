@@ -59,7 +59,7 @@ impl<'a, EM, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for InProcessExecutor<'a,
 where
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+    OT: ObserversTuple,
 {
     #[inline]
     fn pre_exec(
