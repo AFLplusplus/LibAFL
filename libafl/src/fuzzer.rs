@@ -6,7 +6,7 @@ use crate::{
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::{Feedback},
+    feedbacks::Feedback,
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
@@ -62,8 +62,8 @@ where
     fn objective_mut(&mut self) -> &mut OF;
 }
 
-/// Add to the state if interesting
-pub trait IfInteresting<I, OT, S>
+/// Evaluate if an input is interesting using the feedback
+pub trait IsInteresting<I, OT, S>
 where
     OT: ObserversTuple,
 {
@@ -75,7 +75,10 @@ where
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>;
+}
 
+/// Add to the state if interesting
+pub trait IfInteresting<I, S> {
     /// Adds this input to the corpus, if it's intersting, and return the index
     fn add_if_interesting(
         &mut self,
@@ -87,7 +90,8 @@ where
 
 /// Evaluate an input modyfing the state of the fuzzer
 pub trait Evaluator<E, EM, I, S> {
-    /// Runs the input and triggers observers and feedback
+    /// Runs the input and triggers observers and feedback,
+    /// returns if is interesting an (option) the index of the new testcase in the corpus
     fn evaluate_input(
         &mut self,
         state: &mut S,
@@ -189,7 +193,7 @@ where
     scheduler: CS,
     feedback: F,
     objective: OF,
-    phantom: PhantomData<(C, I, OT, S, SC)>
+    phantom: PhantomData<(C, I, OT, S, SC)>,
 }
 
 impl<C, CS, F, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
@@ -209,13 +213,12 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasFeedback<F, I, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> HasFeedback<F, I, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-CS: CorpusScheduler<I, S>,
-F: Feedback<I, S>,
-I: Input,
-OF: Feedback<I, S>,
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
 {
     fn feedback(&self) -> &F {
         &self.feedback
@@ -226,13 +229,12 @@ OF: Feedback<I, S>,
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasObjective<I, OF, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> HasObjective<I, OF, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-CS: CorpusScheduler<I, S>,
-F: Feedback<I, S>,
-I: Input,
-OF: Feedback<I, S>,
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
 {
     fn objective(&self) -> &OF {
         &self.objective
@@ -243,16 +245,15 @@ OF: Feedback<I, S>,
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> IfInteresting<I, OT, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> IsInteresting<I, OT, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-C: Corpus<I>,
-CS: CorpusScheduler<I, S>,
-F: Feedback<I, S>,
-I: Input,
-OF: Feedback<I, S>,
-OT: ObserversTuple,
-S: HasCorpus<C, I>
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+    OT: ObserversTuple,
+    S: HasCorpus<C, I>,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn is_interesting(
@@ -268,7 +269,18 @@ S: HasCorpus<C, I>
         self.feedback_mut()
             .is_interesting(state, input, observers, exit_kind)
     }
+}
 
+impl<C, CS, F, I, OF, OT, S, SC> IfInteresting<I, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+    OT: ObserversTuple,
+    S: HasCorpus<C, I>,
+{
     /// Adds this input to the corpus, if it's intersting, and return the index
     #[inline]
     fn add_if_interesting(
@@ -452,7 +464,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions
+    S: HasExecutions,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {

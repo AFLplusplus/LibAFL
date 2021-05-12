@@ -11,7 +11,10 @@ use std::{
 use crate::{
     bolts::serdeany::{SerdeAny, SerdeAnyMap},
     corpus::Corpus,
+    events::{Event, EventManager, LogSeverity},
     feedbacks::FeedbackStatesTuple,
+    fuzzer::Evaluator,
+    generators::Generator,
     inputs::Input,
     stats::ClientPerfStats,
     utils::Rand,
@@ -346,32 +349,24 @@ where
     }
 }
 
-/*
 #[cfg(feature = "std")]
-impl<C, F, OF, R, SC> StdState<C, F, BytesInput, OF, R, SC>
+impl<C, FT, R, SC> StdState<C, FT, BytesInput, R, SC>
 where
     C: Corpus<BytesInput>,
     R: Rand,
-    F: Feedback<BytesInput>,
+    FT: FeedbackStatesTuple,
     SC: Corpus<BytesInput>,
-    OF: Feedback<BytesInput>,
 {
     /// loads inputs from a directory
-    fn load_from_directory<CS, E, OT, EM>(
+    fn load_from_directory<E, EM, Z>(
         &mut self,
+        fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
-        scheduler: &CS,
         in_dir: &Path,
     ) -> Result<(), Error>
     where
-        E: Executor<BytesInput>
-            + HasObservers<OT>
-            + HasExecHooks<EM, BytesInput, Self>
-            + HasObserversHooks<EM, BytesInput, OT, Self>,
-        OT: ObserversTuple + HasExecHooksTuple<EM, BytesInput, Self>,
-        EM: EventManager<BytesInput, Self>,
-        CS: CorpusScheduler<BytesInput, Self>,
+        Z: Evaluator<E, EM, BytesInput, Self>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -388,19 +383,12 @@ where
                 println!("Loading file {:?} ...", &path);
                 let bytes = fs::read(&path)?;
                 let input = BytesInput::new(bytes);
-                let (is_interesting, is_solution) =
-                    self.execute_input(&input, executor, manager)?;
-                if self
-                    .add_if_interesting(&input, is_interesting, scheduler)?
-                    .is_none()
-                {
+                let (is_interesting, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                if !is_interesting {
                     println!("File {:?} was not interesting, skipped.", &path);
                 }
-                if is_solution {
-                    println!("File {:?} is a solution, however will be not considered as it is an initial testcase.", &path);
-                }
             } else if attr.is_dir() {
-                self.load_from_directory(executor, manager, scheduler, &path)?;
+                self.load_from_directory(fuzzer, executor, manager, &path)?;
             }
         }
 
@@ -408,24 +396,19 @@ where
     }
 
     /// Loads initial inputs from the passed-in `in_dirs`.
-    pub fn load_initial_inputs<CS, E, OT, EM>(
+    pub fn load_initial_inputs<E, EM, Z>(
         &mut self,
+        fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
-        scheduler: &CS,
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: Executor<BytesInput>
-            + HasObservers<OT>
-            + HasExecHooks<EM, BytesInput, Self>
-            + HasObserversHooks<EM, BytesInput, OT, Self>,
-        OT: ObserversTuple + HasExecHooksTuple<EM, BytesInput, Self>,
-        EM: EventManager<BytesInput, Self>,
-        CS: CorpusScheduler<BytesInput, Self>,
+        Z: Evaluator<E, EM, BytesInput, Self>,
+        EM: EventManager<E, BytesInput, Self, Z>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(executor, manager, scheduler, in_dir)?;
+            self.load_from_directory(fuzzer, executor, manager, in_dir)?;
         }
         manager.fire(
             self,
@@ -435,11 +418,10 @@ where
                 phantom: PhantomData,
             },
         )?;
-        manager.process(self, executor, scheduler)?;
+        manager.process(fuzzer, self, executor)?;
         Ok(())
     }
 }
-*/
 
 impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
 where
@@ -449,10 +431,10 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    /*
     /// Generate `num` initial inputs, using the passed-in generator.
-    pub fn generate_initial_inputs<CS, G, E, OT, EM>(
+    pub fn generate_initial_inputs<G, E, EM, Z>(
         &mut self,
+        fuzzer: &mut Z,
         executor: &mut E,
         generator: &mut G,
         manager: &mut EM,
@@ -460,19 +442,13 @@ where
     ) -> Result<(), Error>
     where
         G: Generator<I, R>,
-        C: Corpus<I>,
-        E: Executor<I>
-            + HasObservers<OT>
-            + HasExecHooks<EM, I, Self>
-            + HasObserversHooks<EM, I, OT, Self>,
-        OT: ObserversTuple + HasExecHooksTuple<EM, I, Self>,
-        EM: EventManager<I, Self>,
-        CS: CorpusScheduler<I, Self>,
+        Z: Evaluator<E, EM, I, Self>,
+        EM: EventManager<E, I, Self, Z>,
     {
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let (is_interesting, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
+            let (is_interesting, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
             if is_interesting {
                 added += 1;
             }
@@ -485,9 +461,9 @@ where
                 phantom: PhantomData,
             },
         )?;
-        manager.process(self, executor, scheduler)?;
+        manager.process(fuzzer, self, executor)?;
         Ok(())
-    }*/
+    }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
     pub fn new(rand: R, corpus: C, solutions: SC, feedback_states: FT) -> Self {

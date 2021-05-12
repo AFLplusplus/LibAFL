@@ -215,7 +215,8 @@ pub trait EventProcessor<E, S, Z> {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
-pub trait EventManager<E, I, S, Z>: EventFirer<I, S> + EventProcessor<E, S, Z> + EventRestarter<S>
+pub trait EventManager<E, I, S, Z>:
+    EventFirer<I, S> + EventProcessor<E, S, Z> + EventRestarter<S>
 where
     I: Input,
 {
@@ -234,9 +235,7 @@ where
     }
 }
 
-impl<S> EventRestarter<S> for NopEventManager
-{
-}
+impl<S> EventRestarter<S> for NopEventManager {}
 
 impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
     fn process(

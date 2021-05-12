@@ -731,7 +731,7 @@ mod tests {
     fn test_inmem_exec() {
         let mut harness = |_buf: &[u8]| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::< _, NopInput, (), ()> {
+        let mut in_process_executor = InProcessExecutor::<_, NopInput, (), ()> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
             phantom: PhantomData,

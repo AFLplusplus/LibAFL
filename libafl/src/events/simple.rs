@@ -2,7 +2,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventRestarter, EventProcessor},
+    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
     inputs::Input,
     stats::Stats,
     Error,

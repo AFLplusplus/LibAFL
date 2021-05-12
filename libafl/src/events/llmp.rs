@@ -19,10 +19,10 @@ use crate::{
         llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
-    events::{BrokerEventResult, Event, EventFirer, EventManager,EventRestarter, EventProcessor},
+    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
     executors::Executor,
     executors::ExitKind,
-    fuzzer::IfInteresting,
+    fuzzer::{IfInteresting, IsInteresting},
     inputs::Input,
     observers::ObserversTuple,
     stats::Stats,
@@ -79,9 +79,10 @@ const COMPRESS_THRESHOLD: usize = 1024;
 
 impl<I, OT, S, SP, ST> Drop for LlmpEventManager<I, OT, S, SP, ST>
 where
-I: Input,OT: ObserversTuple,
-SP: ShMemProvider + 'static,
-ST: Stats,
+    I: Input,
+    OT: ObserversTuple,
+    SP: ShMemProvider + 'static,
+    ST: Stats,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -91,9 +92,10 @@ ST: Stats,
 
 impl<I, OT, S, SP, ST> LlmpEventManager<I, OT, S, SP, ST>
 where
-I: Input,OT: ObserversTuple,
-SP: ShMemProvider + 'static,
-ST: Stats,
+    I: Input,
+    OT: ObserversTuple,
+    SP: ShMemProvider + 'static,
+    ST: Stats,
 {
     /// Create llmp on a port
     /// If the port is not yet bound, it will act as broker
@@ -166,8 +168,7 @@ ST: Stats,
     }
 
     /// Run forever in the broker
-    pub fn broker_loop(&mut self) -> Result<(), Error> 
-    {
+    pub fn broker_loop(&mut self) -> Result<(), Error> {
         match &mut self.llmp {
             llmp::LlmpConnection::IsBroker { broker } => {
                 let stats = self.stats.as_mut().unwrap();
@@ -216,8 +217,7 @@ ST: Stats,
         stats: &mut ST,
         sender_id: u32,
         event: &Event<I>,
-    ) -> Result<BrokerEventResult, Error> 
-    {
+    ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase {
                 input: _,
@@ -302,7 +302,7 @@ ST: Stats,
         event: Event<I>,
     ) -> Result<(), Error>
     where
-    Z: IfInteresting<I, OT, S>
+        Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
     {
         match event {
             Event::NewTestcase {
@@ -341,7 +341,8 @@ ST: Stats,
 
 impl<I, OT, S, SP, ST> EventFirer<I, S> for LlmpEventManager<I, OT, S, SP, ST>
 where
-    I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     SP: ShMemProvider,
     ST: Stats,
     //CE: CustomEvent<I>,
@@ -376,7 +377,8 @@ where
 
 impl<I, OT, S, SP, ST> EventRestarter<S> for LlmpEventManager<I, OT, S, SP, ST>
 where
-I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     SP: ShMemProvider,
     ST: Stats,
     //CE: CustomEvent<I>,
@@ -398,8 +400,7 @@ where
     E: Executor<I>,
     I: Input,
     OT: ObserversTuple,
-    Z: IfInteresting<I, OT, S>
-    //CE: CustomEvent<I>,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -440,13 +441,12 @@ where
 
 impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP, ST>
 where
-SP: ShMemProvider,
+    SP: ShMemProvider,
     ST: Stats,
     E: Executor<I>,
     I: Input,
     OT: ObserversTuple,
-    Z: IfInteresting<I, OT, S>
-    //CE: CustomEvent<I>,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>, //CE: CustomEvent<I>,
 {
 }
 
@@ -458,7 +458,8 @@ pub fn serialize_state_mgr<I, OT, S, SP, ST>(
     mgr: &LlmpEventManager<I, OT, S, SP, ST>,
 ) -> Result<Vec<u8>, Error>
 where
-I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     S: Serialize,
     SP: ShMemProvider,
     ST: Stats,
@@ -473,7 +474,8 @@ pub fn deserialize_state_mgr<I, OT, S, SP, ST>(
     state_corpus_serialized: &[u8],
 ) -> Result<(S, LlmpEventManager<I, OT, S, SP, ST>), Error>
 where
-I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     S: DeserializeOwned,
     SP: ShMemProvider,
     ST: Stats,
@@ -489,7 +491,8 @@ I: Input,OT: ObserversTuple,
 #[derive(Debug)]
 pub struct LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     SP: ShMemProvider + 'static,
     ST: Stats,
     //CE: CustomEvent<I>,
@@ -502,7 +505,8 @@ I: Input,OT: ObserversTuple,
 
 impl<I, OT, S, SP, ST> EventFirer<I, S> for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-    I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     S: Serialize,
     SP: ShMemProvider,
     ST: Stats,
@@ -516,7 +520,8 @@ where
 
 impl<I, OT, S, SP, ST> EventRestarter<S> for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     S: Serialize,
     SP: ShMemProvider,
     ST: Stats,
@@ -539,13 +544,12 @@ I: Input,OT: ObserversTuple,
     }
 }
 
-
 impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z>
     for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
     E: Executor<I>,
     I: Input,
-    Z: IfInteresting<I, OT, S>,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
     ST: Stats,
@@ -562,7 +566,7 @@ where
     E: Executor<I>,
     I: Input,
     S: Serialize,
-    Z: IfInteresting<I, OT, S>,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
     OT: ObserversTuple,
     SP: ShMemProvider + 'static,
     ST: Stats,
@@ -616,7 +620,8 @@ pub fn setup_restarting_mgr_std<I, OT, S, ST>(
     Error,
 >
 where
-I: Input,OT: ObserversTuple,
+    I: Input,
+    OT: ObserversTuple,
     S: DeserializeOwned,
     ST: Stats,
 {
@@ -639,13 +644,7 @@ pub fn setup_restarting_mgr<I, OT, S, SP, ST>(
     //mgr: &mut LlmpEventManager<I, OT, S, SH, ST>,
     stats: ST,
     broker_port: u16,
-) -> Result<
-    (
-        Option<S>,
-        LlmpRestartingEventManager<I, OT, S, SP, ST>,
-    ),
-    Error,
->
+) -> Result<(Option<S>, LlmpRestartingEventManager<I, OT, S, SP, ST>), Error>
 where
     I: Input,
     S: DeserializeOwned,
