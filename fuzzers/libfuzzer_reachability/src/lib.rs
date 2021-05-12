@@ -6,15 +6,15 @@ use std::{env, path::PathBuf};
 use libafl::{
     bolts::tuples::tuple_list,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
-    events::{setup_restarting_mgr_std, EventManager},
+    events::{setup_restarting_mgr_std, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{MaxMapFeedback, ReachabilityFeedback},
+    feedbacks::{MapFeedbackState, MaxMapFeedback, ReachabilityFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     utils::{current_nanos, StdRand},
     Error,
@@ -71,20 +71,28 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let reachability_observer =
         unsafe { StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
 
+    // The state of the edges feedback.
+    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+
+    // Feedback to rate the interestingness of an input
+    let feedback = MaxMapFeedback::new(&feedback_state, &edges_observer);
+
+    // A feedback to choose if an input is a solution or not
+    let objective = ReachabilityFeedback::new(&reachability_observer);
+
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
-        State::new(
+        StdState::new(
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
-            // Feedbacks to rate the interestingness of an input
-            MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
-            // Feedbacks to recognize an input as solution
-            ReachabilityFeedback::new_with_observer(&reachability_observer),
+            // States of the feedbacks.
+            // They are the data related to the feedbacks that you want to persist in the State.
+            tuple_list!(feedback_state),
         )
     });
 
@@ -103,13 +111,13 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Setup a basic mutator with a mutational stage
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let stage = StdMutationalStage::new(mutator);
-
-    // A fuzzer with just one stage
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // A random policy to get testcasess from the corpus
     let scheduler = RandCorpusScheduler::new();
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |buf: &[u8]| {
@@ -120,7 +128,8 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(edges_observer, reachability_observer,),
+        tuple_list!(edges_observer, reachability_observer),
+        &mut fuzzer,
         &mut state,
         &mut restarting_mgr,
     )?;
@@ -135,7 +144,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut restarting_mgr,
+                &corpus_dirs,
+            )
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
@@ -149,10 +163,10 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // However, you will lose a lot of performance that way.
     let iters = 1_000_000;
     fuzzer.fuzz_loop_for(
+        &mut stages,
         &mut state,
         &mut executor,
         &mut restarting_mgr,
-        &scheduler,
         iters,
     )?;
 

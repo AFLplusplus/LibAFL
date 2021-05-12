@@ -528,7 +528,7 @@ where
     //CE: CustomEvent<I>,
 {
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
-    /// Otherwise, the OS mfay already have removed the shared maps,
+    /// Otherwise, the OS may already have removed the shared maps,
     #[inline]
     fn await_restart_safe(&mut self) {
         self.llmp_mgr.await_restart_safe()
