@@ -396,7 +396,6 @@ where
     }
 }
 
-/*
 /// A [`ReachabilityFeedback`] reports if a target has been reached.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ReachabilityFeedback<O> {
@@ -411,7 +410,7 @@ where
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
     #[must_use]
-    pub fn new_with_observer(map_observer: &O) -> Self {
+    pub fn new(map_observer: &O) -> Self {
         Self {
             name: map_observer.name().to_string(),
             target_idx: vec![],
@@ -421,7 +420,7 @@ where
 
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`] with the given `name`.
     #[must_use]
-    pub fn new(name: &'static str) -> Self {
+    pub fn with_name(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
             target_idx: vec![],
@@ -430,17 +429,21 @@ where
     }
 }
 
-impl<I, O> Feedback<I> for ReachabilityFeedback<O>
+impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<usize>,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
+        _state: &mut S,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();
         let size = observer.usable_count();
@@ -459,7 +462,7 @@ where
         }
     }
 
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
             testcase.add_metadata(meta);
@@ -467,7 +470,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())
     }
@@ -482,4 +485,3 @@ where
         self.name.as_str()
     }
 }
-*/
