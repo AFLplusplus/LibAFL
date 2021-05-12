@@ -208,11 +208,11 @@ where
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.crash_handler,
-                windows_exception_handler::inproc_crash_handler::<EM, I, OC, FT, OF, OT, S, Z>,
+                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S, Z>,
             );
             //write_volatile(
             //    &mut data.timeout_handler,
-            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, FT, OF, OT, S, Z>,
+            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S, Z>,
             //);
 
             setup_exception_handler(data)?;
@@ -564,12 +564,13 @@ mod windows_exception_handler {
             },
         },
         corpus::{Corpus, Testcase},
-        events::{Event, EventFirer},
+        events::{Event, EventFirer, EventRestarter},
         executors::ExitKind,
-        feedbacks::FeedbackStatesTuple,
+        feedbacks::Feedback,
+        fuzzer::HasObjective,
         inputs::{HasTargetBytes, Input},
         observers::ObserversTuple,
-        state::{HasObjective, HasSolutions},
+        state::HasSolutions,
     };
 
     /// Signal handling on unix systems needs some nasty unsafe.
@@ -623,23 +624,25 @@ mod windows_exception_handler {
         }
     }
 
-    pub unsafe fn inproc_crash_handler<EM, I, OC, FT, OF, OT, S, Z>(
+    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S, Z>(
         code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple,
         OC: Corpus<I>,
-        FT: FeedbackStatesTuple,
-        S: HasObjectiveStates<FT, I> + HasSolutions<OC, I>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<OC, I>,
         I: Input + HasTargetBytes,
+        Z: HasObjective<I, OF, S>,
     {
         #[cfg(feature = "std")]
         println!("Crashed with {}", code);
         if !data.current_input_ptr.is_null() {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
+            let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
             let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
 
             #[cfg(feature = "std")]
@@ -651,16 +654,17 @@ mod windows_exception_handler {
             // Make sure we don't crash in the crash handler forever.
             data.current_input_ptr = ptr::null();
 
-            let interesting = state
+            let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(&input, observers, &ExitKind::Crash)
+                .is_interesting(state, &input, observers, &ExitKind::Crash)
                 .expect("In crash handler objective failure.");
+
             if interesting {
                 let new_input = input.clone();
                 let mut new_testcase = Testcase::new(new_input);
-                state
+                fuzzer
                     .objective_mut()
-                    .append_metadata(&mut new_testcase)
+                    .append_metadata(state, &mut new_testcase)
                     .expect("Failed adding metadata");
                 state
                     .solutions_mut()
