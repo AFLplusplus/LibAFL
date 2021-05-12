@@ -12,7 +12,7 @@ use crate::{
     observers::ObserversTuple,
     stages::StagesTuple,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasSolutions, HasClientPerfStats},
+    state::{HasClientPerfStats, HasCorpus, HasExecutions, HasSolutions},
     utils::current_time,
     Error,
 };
@@ -541,7 +541,8 @@ where
             )?;
 
             // Update the feedback stats
-            state.introspection_stats_mut()
+            state
+                .introspection_stats_mut()
                 .update_feedbacks(feedback_stats);
 
             // Return the total fitness
