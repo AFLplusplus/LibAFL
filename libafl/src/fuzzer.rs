@@ -6,14 +6,13 @@ use crate::{
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::{Feedback, FeedbackStatesTuple},
+    feedbacks::{Feedback},
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasExecutions, HasSolutions},
-    state::{HasFeedbackStates, State},
+    state::{HasCorpus, HasExecutions, HasSolutions},
     utils::current_time,
     Error,
 };
@@ -180,46 +179,26 @@ pub trait Fuzzer<E, EM, I, S, ST> {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+pub struct StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
-    SC: Corpus<I>,
 {
     scheduler: CS,
     feedback: F,
     objective: OF,
-    phantom: PhantomData<(C, E, EM, FT, I, OT, S, SC)>,
+    phantom: PhantomData<(C, I, OT, S, SC)>
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
-    for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
-    SC: Corpus<I>,
 {
     fn scheduler(&self) -> &CS {
         &self.scheduler
@@ -230,23 +209,13 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasFeedback<F, I, S>
-    for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> HasFeedback<F, I, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
-    SC: Corpus<I>,
+CS: CorpusScheduler<I, S>,
+F: Feedback<I, S>,
+I: Input,
+OF: Feedback<I, S>,
 {
     fn feedback(&self) -> &F {
         &self.feedback
@@ -257,23 +226,13 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> HasObjective<I, OF, S>
-    for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> HasObjective<I, OF, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
-    SC: Corpus<I>,
+CS: CorpusScheduler<I, S>,
+F: Feedback<I, S>,
+I: Input,
+OF: Feedback<I, S>,
 {
     fn objective(&self) -> &OF {
         &self.objective
@@ -284,23 +243,16 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> IfInteresting<I, OT, S>
-    for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> IfInteresting<I, OT, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
-    SC: Corpus<I>,
+C: Corpus<I>,
+CS: CorpusScheduler<I, S>,
+F: Feedback<I, S>,
+I: Input,
+OF: Feedback<I, S>,
+OT: ObserversTuple,
+S: HasCorpus<C, I>
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn is_interesting(
@@ -338,8 +290,8 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
-    for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+impl<C, CS, E, EM, F, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
@@ -350,10 +302,9 @@ where
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I>,
     SC: Corpus<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -397,23 +348,15 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC, ST> Fuzzer<E, EM, I, S, ST>
-    for StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+impl<C, CS, E, EM, F, I, OF, OT, S, ST, SC> Fuzzer<E, EM, I, S, ST>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
     I: Input,
+    S: HasExecutions,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
-    SC: Corpus<I>,
     ST: StagesTuple<E, EM, S, Self>,
 {
     #[inline]
@@ -503,22 +446,13 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, FT, I, OF, OT, S, SC> StdFuzzer<C, CS, E, EM, F, FT, I, OF, OT, S, SC>
+impl<C, CS, F, I, OF, OT, S, SC> StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
-    FT: FeedbackStatesTuple,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasFeedbackStates<FT>,
-    SC: Corpus<I>,
+    S: HasExecutions
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
@@ -531,13 +465,21 @@ where
     }
 
     /// Runs the input and triggers observers and feedback
-    pub fn execute_input(
+    pub fn execute_input<E, EM>(
         &mut self,
         state: &mut S,
         executor: &mut E,
         event_mgr: &mut EM,
         input: &I,
-    ) -> Result<(bool, bool), Error> {
+    ) -> Result<(bool, bool), Error>
+    where
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, S, Self>
+            + HasObserversHooks<EM, I, OT, S, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
+        EM: EventManager<E, I, S, Self>,
+    {
         start_timer!(state);
         executor.pre_exec_observers(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
