@@ -56,7 +56,7 @@ where
         let start_time = crate::cpu::read_time_counter();
 
         // Execute this feedback
-        let ret = self.is_interesting(input, observers, &exit_kind);
+        let ret = self.is_interesting(state, input, observers, &exit_kind);
 
         // Get the elapsed time for checking this feedback
         let elapsed = crate::cpu::read_time_counter() - start_time;
@@ -158,6 +158,7 @@ where
     {
         // Execute this feedback
         let a = self.first.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,
@@ -165,6 +166,7 @@ where
             feedback_index,
         )?;
         let b = self.second.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,
@@ -273,6 +275,7 @@ where
     {
         // Execute this feedback
         let a = self.first.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,
@@ -280,6 +283,7 @@ where
             feedback_index,
         )?;
         let b = self.second.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,

@@ -21,9 +21,6 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
-
 #[cfg(feature = "std")]
 use crate::inputs::bytes::BytesInput;
 

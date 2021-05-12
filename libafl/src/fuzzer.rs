@@ -12,10 +12,13 @@ use crate::{
     observers::ObserversTuple,
     stages::StagesTuple,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasCorpus, HasExecutions, HasSolutions, HasClientPerfStats},
     utils::current_time,
     Error,
 };
+
+#[cfg(feature = "introspection")]
+use crate::stats::PerfFeature;
 
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
@@ -316,7 +319,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
     SC: Corpus<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -367,7 +370,7 @@ where
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
-    S: HasExecutions,
+    S: HasExecutions + HasClientPerfStats,
     OF: Feedback<I, S>,
     ST: StagesTuple<E, EM, S, Self>,
 {
@@ -464,7 +467,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions,
+    S: HasExecutions + HasClientPerfStats,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
@@ -529,6 +532,7 @@ where
             let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
             let feedback_index = 0;
             let is_interesting = self.feedback_mut().is_interesting_with_perf(
+                state,
                 &input,
                 observers,
                 &exit_kind,
@@ -537,7 +541,7 @@ where
             )?;
 
             // Update the feedback stats
-            self.introspection_stats_mut()
+            state.introspection_stats_mut()
                 .update_feedbacks(feedback_stats);
 
             // Return the total fitness
