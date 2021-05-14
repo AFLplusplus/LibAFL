@@ -1,6 +1,12 @@
 #include "common.h"
+
+#ifdef SANCOV_VALUE_PROFILE
 #include "value_profile.h"
+#endif
+
+#ifdef SANCOV_CMPLOG
 #include "cmplog.h"
+#endif
 
 #if defined(__APPLE__)
   #pragma weak __sanitizer_cov_trace_const_cmp1 = __sanitizer_cov_trace_cmp1
