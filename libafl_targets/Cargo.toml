@@ -13,9 +13,11 @@ edition = "2018"
 [features]
 default = []
 libfuzzer = []
+sancov_pcguard_edges = []
+sancov_pcguard_hitcounts = []
 sancov_value_profile = []
 sancov_cmplog = []
-pcguard = ["pcguard_hitcounts"]
+sancov_pcguard = ["sancov_pcguard_hitcounts"]
 clippy = [] # Ignore compiler warnings during clippy
 
 [build-dependencies]
