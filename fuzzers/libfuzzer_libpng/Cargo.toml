@@ -22,7 +22,7 @@ num_cpus = "1.0"
 [dependencies]
 libafl = { path = "../../libafl/", features = ["default", "introspection"] }
 # libafl = { path = "../../libafl/", features = ["default"] }
-libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_hitcounts", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 

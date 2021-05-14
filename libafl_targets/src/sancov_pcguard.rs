@@ -1,34 +1,27 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
-#[cfg(all(feature = "pcguard_edges", feature = "pcguard_hitcounts"))]
+use crate::coverage::*;
+
+#[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
 compile_error!(
     "the libafl_targets `pcguard_edges` and `pcguard_hitcounts` features are mutually exclusive."
 );
-
-// TODO compile time flag
-/// The map size for `SanCov` edges.
-pub const EDGES_MAP_SIZE: usize = 65536;
-
-/// The map for `SanCov` edges.
-pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
-//pub static mut CMP_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
-/// The max count of edges tracked.
-pub static mut MAX_EDGES_NUM: usize = 0;
 
 /// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
 ///
 /// # Safety
 /// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
 /// Should usually not be called directly.
+#[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     let pos = *guard as usize;
-    #[cfg(feature = "pcguard_edges")]
+    #[cfg(feature = "sancov_pcguard_edges")]
     {
         *EDGES_MAP.get_unchecked_mut(pos) = 1;
     }
-    #[cfg(feature = "pcguard_hitcounts")]
+    #[cfg(feature = "sancov_pcguard_hitcounts")]
     {
         let val = (*EDGES_MAP.get_unchecked(pos) as u8).wrapping_add(1);
         *EDGES_MAP.get_unchecked_mut(pos) = val;
@@ -39,6 +32,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 ///
 /// # Safety
 /// Dereferences at `start` and writes to it.
+#[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
     if start == stop || *start != 0 {
