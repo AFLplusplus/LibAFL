@@ -97,21 +97,27 @@ where
     }
 }
 
-impl<E, EM, I, OT, S> HasObserversHooks<EM, I, OT, S> for TimeoutExecutor<E, I>
+impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<E, I>
 where
     E: Executor<I> + HasObservers<OT>,
     I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
 
-impl<E, EM, I, S> HasExecHooks<EM, I, S> for TimeoutExecutor<E, I>
+impl<E, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for TimeoutExecutor<E, I>
 where
-    E: Executor<I> + HasExecHooks<EM, I, S>,
+    E: Executor<I> + HasExecHooks<EM, I, S, Z>,
     I: Input,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             let milli_sec = self.exec_tmout.as_millis();
@@ -137,11 +143,17 @@ where
             // TODO
             let _ = self.exec_tmout.as_millis();
         }
-        self.executor.pre_exec(state, mgr, input)
+        self.executor.pre_exec(fuzzer, state, mgr, input)
     }
 
     #[inline]
-    fn post_exec(&mut self, state: &mut S, mgr: &mut EM, input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         #[cfg(unix)]
         unsafe {
             let it_value = Timeval {
@@ -165,6 +177,6 @@ where
         {
             // TODO
         }
-        self.executor.post_exec(state, mgr, input)
+        self.executor.post_exec(fuzzer, state, mgr, input)
     }
 }

@@ -12,18 +12,18 @@ use crate::{
     bolts::tuples::Named,
     corpus::Testcase,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    state::HasMetadata,
+    state::{HasFeedbackStates, HasMetadata},
     utils::AsSlice,
     Error,
 };
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<O, T> = MapFeedback<O, MaxReducer, T>;
+pub type MaxMapFeedback<FT, O, S, T> = MapFeedback<FT, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<O, T> = MapFeedback<O, MinReducer, T>;
+pub type MinMapFeedback<FT, O, S, T> = MapFeedback<FT, O, MinReducer, S, T>;
 
 /// A Reducer function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
@@ -118,36 +118,104 @@ impl MapNoveltiesMetadata {
     }
 }
 
+/// The state of [`MapFeedback`]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "T: serde::de::DeserializeOwned")]
+pub struct MapFeedbackState<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// Contains information about untouched entries
+    pub history_map: Vec<T>,
+    /// Name identifier of this instance
+    pub name: String,
+}
+
+impl<T> FeedbackState for MapFeedbackState<T> where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
+{
+}
+
+impl<T> Named for MapFeedbackState<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<T> MapFeedbackState<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// Create new `MapFeedbackState`
+    #[must_use]
+    pub fn new(name: &'static str, map_size: usize) -> Self {
+        Self {
+            history_map: vec![T::default(); map_size],
+            name: name.to_string(),
+        }
+    }
+
+    /// Create new `MapFeedbackState` for the observer type.
+    pub fn with_observer<O>(map_observer: &O) -> Self
+    where
+        O: MapObserver<T>,
+    {
+        Self {
+            history_map: vec![T::default(); map_observer.map().len()],
+            name: map_observer.name().to_string(),
+        }
+    }
+
+    /// Create new `MapFeedbackState` using a name and a map.
+    /// The map can be shared.
+    #[must_use]
+    pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
+        Self {
+            history_map,
+            name: name.to_string(),
+        }
+    }
+}
+
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<O, R, T>
+pub struct MapFeedback<FT, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
+    S: HasFeedbackStates<FT>,
+    FT: FeedbackStatesTuple,
 {
-    /// Contains information about untouched entries
-    history_map: Vec<T>,
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
     /// New indexes observed in the last observation
     novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
     name: String,
+    /// Name identifier of the observer
+    observer_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(R, O)>,
+    phantom: PhantomData<(FT, S, R, O, T)>,
 }
 
-impl<O, R, T, I> Feedback<I> for MapFeedback<O, R, T>
+impl<I, FT, O, R, S, T> Feedback<I, S> for MapFeedback<FT, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
     I: Input,
+    S: HasFeedbackStates<FT>,
+    FT: FeedbackStatesTuple,
 {
     fn is_interesting<OT>(
         &mut self,
+        state: &mut S,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
@@ -157,24 +225,29 @@ where
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
-        let observer = observers.match_name::<O>(&self.name).unwrap();
+        let observer = observers.match_name::<O>(&self.observer_name).unwrap();
         let size = observer.usable_count();
         let initial = observer.initial();
 
+        let map_state = state
+            .feedback_states_mut()
+            .match_name_mut::<MapFeedbackState<T>>(&self.name)
+            .unwrap();
+
         if self.indexes.is_none() && self.novelties.is_none() {
             for i in 0..size {
-                let history = self.history_map[i];
+                let history = map_state.history_map[i];
                 let item = observer.map()[i];
 
                 let reduced = R::reduce(history, item);
                 if history != reduced {
-                    self.history_map[i] = reduced;
+                    map_state.history_map[i] = reduced;
                     interesting = true;
                 }
             }
         } else if self.indexes.is_some() && self.novelties.is_none() {
             for i in 0..size {
-                let history = self.history_map[i];
+                let history = map_state.history_map[i];
                 let item = observer.map()[i];
                 if item != initial {
                     self.indexes.as_mut().unwrap().push(i);
@@ -182,25 +255,25 @@ where
 
                 let reduced = R::reduce(history, item);
                 if history != reduced {
-                    self.history_map[i] = reduced;
+                    map_state.history_map[i] = reduced;
                     interesting = true;
                 }
             }
         } else if self.indexes.is_none() && self.novelties.is_some() {
             for i in 0..size {
-                let history = self.history_map[i];
+                let history = map_state.history_map[i];
                 let item = observer.map()[i];
 
                 let reduced = R::reduce(history, item);
                 if history != reduced {
-                    self.history_map[i] = reduced;
+                    map_state.history_map[i] = reduced;
                     interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
         } else {
             for i in 0..size {
-                let history = self.history_map[i];
+                let history = map_state.history_map[i];
                 let item = observer.map()[i];
                 if item != initial {
                     self.indexes.as_mut().unwrap().push(i);
@@ -208,7 +281,7 @@ where
 
                 let reduced = R::reduce(history, item);
                 if history != reduced {
-                    self.history_map[i] = reduced;
+                    map_state.history_map[i] = reduced;
                     interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
                 }
@@ -218,7 +291,7 @@ where
         Ok(interesting)
     }
 
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
             testcase.add_metadata(meta);
@@ -231,7 +304,7 @@ where
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
         }
@@ -242,11 +315,13 @@ where
     }
 }
 
-impl<O, R, T> Named for MapFeedback<O, R, T>
+impl<FT, O, R, S, T> Named for MapFeedback<FT, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
+    S: HasFeedbackStates<FT>,
+    FT: FeedbackStatesTuple,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -254,83 +329,68 @@ where
     }
 }
 
-impl<O, R, T> MapFeedback<O, R, T>
+impl<FT, O, R, S, T> MapFeedback<FT, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
+    S: HasFeedbackStates<FT>,
+    FT: FeedbackStatesTuple,
 {
     /// Create new `MapFeedback`
     #[must_use]
-    pub fn new(name: &'static str, map_size: usize) -> Self {
+    pub fn new(feedback_state: &MapFeedbackState<T>, map_observer: &O) -> Self {
         Self {
-            history_map: vec![T::default(); map_size],
-            phantom: PhantomData,
             indexes: None,
             novelties: None,
-            name: name.to_string(),
+            name: feedback_state.name().to_string(),
+            observer_name: map_observer.name().to_string(),
+            phantom: PhantomData,
         }
     }
 
-    /// Create new `MapFeedback` for the observer type.
-    pub fn new_with_observer(map_observer: &O) -> Self {
-        Self {
-            history_map: vec![T::default(); map_observer.map().len()],
-            phantom: PhantomData,
-            indexes: None,
-            novelties: None,
-            name: map_observer.name().to_string(),
-        }
-    }
-
-    /// Create new `MapFeedback` specifying if it must track indexes of novelties
+    /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
     #[must_use]
     pub fn new_tracking(
-        name: &'static str,
-        map_size: usize,
-        track_indexes: bool,
-        track_novelties: bool,
-    ) -> Self {
-        Self {
-            history_map: vec![T::default(); map_size],
-            phantom: PhantomData,
-            indexes: if track_indexes { Some(vec![]) } else { None },
-            novelties: if track_novelties { Some(vec![]) } else { None },
-            name: name.to_string(),
-        }
-    }
-
-    /// Create new `MapFeedback` for the observer type if it must track indexes of novelties
-    pub fn new_tracking_with_observer(
+        feedback_state: &MapFeedbackState<T>,
         map_observer: &O,
         track_indexes: bool,
         track_novelties: bool,
     ) -> Self {
         Self {
-            history_map: vec![T::default(); map_observer.map().len()],
-            phantom: PhantomData,
             indexes: if track_indexes { Some(vec![]) } else { None },
             novelties: if track_novelties { Some(vec![]) } else { None },
-            name: map_observer.name().to_string(),
+            name: feedback_state.name().to_string(),
+            observer_name: map_observer.name().to_string(),
+            phantom: PhantomData,
         }
     }
-}
 
-impl<O, R, T> MapFeedback<O, R, T>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    R: Reducer<T>,
-    O: MapObserver<T>,
-{
-    /// Create new `MapFeedback` using a map observer, and a map.
-    /// The map can be shared.
+    /// Create new `MapFeedback`
     #[must_use]
-    pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
+    pub fn with_names(name: &'static str, observer_name: &'static str) -> Self {
         Self {
-            history_map,
-            name: name.to_string(),
             indexes: None,
             novelties: None,
+            name: name.to_string(),
+            observer_name: observer_name.to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
+    #[must_use]
+    pub fn with_names_tracking(
+        name: &'static str,
+        observer_name: &'static str,
+        track_indexes: bool,
+        track_novelties: bool,
+    ) -> Self {
+        Self {
+            indexes: if track_indexes { Some(vec![]) } else { None },
+            novelties: if track_novelties { Some(vec![]) } else { None },
+            observer_name: observer_name.to_string(),
+            name: name.to_string(),
             phantom: PhantomData,
         }
     }
@@ -350,7 +410,7 @@ where
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
     #[must_use]
-    pub fn new_with_observer(map_observer: &O) -> Self {
+    pub fn new(map_observer: &O) -> Self {
         Self {
             name: map_observer.name().to_string(),
             target_idx: vec![],
@@ -360,7 +420,7 @@ where
 
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`] with the given `name`.
     #[must_use]
-    pub fn new(name: &'static str) -> Self {
+    pub fn with_name(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
             target_idx: vec![],
@@ -369,17 +429,21 @@ where
     }
 }
 
-impl<I, O> Feedback<I> for ReachabilityFeedback<O>
+impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<usize>,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<OT>(
         &mut self,
+        _state: &mut S,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();
         let size = observer.usable_count();
@@ -398,7 +462,7 @@ where
         }
     }
 
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
             testcase.add_metadata(meta);
@@ -406,7 +470,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())
     }

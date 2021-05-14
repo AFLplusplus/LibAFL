@@ -13,14 +13,14 @@ use libafl::{
         HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
-    observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
+    observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     utils::{current_nanos, StdRand},
     Error,
@@ -39,14 +39,14 @@ use libafl_frida::{
     FridaOptions,
 };
 
-struct FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    base: TimeoutExecutor<InProcessExecutor<'a, EM, H, I, OT, S>, I>,
+    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT, S>, I>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -55,8 +55,8 @@ where
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> Executor<I>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, FH, H, I, OT, S> Executor<I>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -91,8 +91,8 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasExecHooks<EM, I, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -101,21 +101,33 @@ where
 {
     /// Called right before exexution starts
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         self.helper.pre_exec(input);
-        self.base.pre_exec(state, event_mgr, input)
+        self.base.pre_exec(fuzzer, state, event_mgr, input)
     }
 
     /// Called right after execution finished.
     #[inline]
-    fn post_exec(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         self.helper.post_exec(input);
-        self.base.post_exec(state, event_mgr, input)
+        self.base.post_exec(fuzzer, state, event_mgr, input)
     }
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasObservers<OT>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<OT>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -133,17 +145,17 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasObserversHooks<EM, I, OT, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -152,7 +164,7 @@ where
 {
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, EM, H, I, OT, S>,
+        base: InProcessExecutor<'a, H, I, OT, S>,
         helper: &'c mut FH,
         timeout: Duration,
     ) -> Self {
@@ -268,25 +280,45 @@ unsafe fn fuzz(
         MAP_SIZE,
     ));
 
+    // Create an observation channel to keep track of the execution time
+    let time_observer = TimeObserver::new("time");
+
+    // Create an observation channel for ASan violations
+    let asan_observer = AsanErrorsObserver::new(&ASAN_ERRORS);
+
+    // The state of the edges feedback.
+    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+
+    // Feedback to rate the interestingness of an input
+    // This one is composed by two Feedbacks in OR
+    let feedback = feedback_or!(
+        // New maximization map feedback linked to the edges observer and the feedback state
+        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        // Time feedback, this one does not need a feedback state
+        TimeFeedback::new_with_observer(&time_observer)
+    );
+
+    // Feedbacks to recognize an input as solution
+    let objective = feedback_or!(
+        CrashFeedback::new(),
+        TimeoutFeedback::new(),
+        AsanErrorsFeedback::new()
+    );
+
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
-        State::new(
+        StdState::new(
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
-            // Feedbacks to rate the interestingness of an input
-            MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new_save_meta(objective_dir, Some(OnDiskMetadataFormat::JsonPretty))
                 .unwrap(),
-            // Feedbacks to recognize an input as solution
-            feedback_or!(
-                CrashFeedback::new(),
-                TimeoutFeedback::new(),
-                AsanErrorsFeedback::new()
-            ),
+            // States of the feedbacks.
+            // They are the data related to the feedbacks that you want to persist in the State.
+            tuple_list!(feedback_state),
         )
     });
 
@@ -305,11 +337,13 @@ unsafe fn fuzz(
 
     // Setup a basic mutator with a mutational stage
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let stage = StdMutationalStage::new(mutator);
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-    // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
+    // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     frida_helper.register_thread();
 
@@ -318,7 +352,8 @@ unsafe fn fuzz(
         &gum,
         InProcessExecutor::new(
             &mut frida_harness,
-            tuple_list!(edges_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
+            tuple_list!(edges_observer, time_observer, asan_observer),
+            &mut fuzzer,
             &mut state,
             &mut restarting_mgr,
         )?,
@@ -338,7 +373,12 @@ unsafe fn fuzz(
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut restarting_mgr,
+                &corpus_dirs,
+            )
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
@@ -346,7 +386,7 @@ unsafe fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
 
     // Never reached
     Ok(())

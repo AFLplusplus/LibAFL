@@ -1,38 +1,30 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
 use crate::{
-    corpus::CorpusScheduler,
+    corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventManager},
-    executors::{Executor, HasObservers},
+    executors::{
+        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
+    },
+    feedbacks::Feedback,
     inputs::Input,
+    mark_feature_time,
     observers::ObserversTuple,
     stages::StagesTuple,
-    state::{HasClientPerfStats, HasExecutions},
+    start_timer,
+    state::{HasClientPerfStats, HasCorpus, HasExecutions, HasSolutions},
     utils::current_time,
     Error,
 };
+
+#[cfg(feature = "introspection")]
+use crate::stats::PerfFeature;
 
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
 /// Send a stats update all 3 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(3 * 1000);
-
-/// Holds a set of stages
-pub trait HasStages<CS, E, EM, I, S, ST>
-where
-    ST: StagesTuple<CS, E, EM, I, S>,
-    E: Executor<I>,
-    EM: EventManager<I, S>,
-    I: Input,
-    Self: Sized,
-{
-    /// The stages
-    fn stages(&self) -> &ST;
-
-    /// The stages (mut)
-    fn stages_mut(&mut self) -> &mut ST;
-}
 
 /// Holds a scheduler
 pub trait HasCorpusScheduler<CS, I, S>
@@ -47,8 +39,73 @@ where
     fn scheduler_mut(&mut self) -> &mut CS;
 }
 
+/// Holds an feedback
+pub trait HasFeedback<F, I, S>
+where
+    F: Feedback<I, S>,
+    I: Input,
+{
+    /// The feedback
+    fn feedback(&self) -> &F;
+
+    /// The feedback (mut)
+    fn feedback_mut(&mut self) -> &mut F;
+}
+
+/// Holds an objective feedback
+pub trait HasObjective<I, OF, S>
+where
+    OF: Feedback<I, S>,
+    I: Input,
+{
+    /// The objective feedback
+    fn objective(&self) -> &OF;
+
+    /// The objective feedback (mut)
+    fn objective_mut(&mut self) -> &mut OF;
+}
+
+/// Evaluate if an input is interesting using the feedback
+pub trait IsInteresting<I, OT, S>
+where
+    OT: ObserversTuple,
+{
+    /// Evaluate if a set of observation channels has an interesting state
+    fn is_interesting(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>;
+}
+
+/// Add to the state if interesting
+pub trait IfInteresting<I, S> {
+    /// Adds this input to the corpus, if it's intersting, and return the index
+    fn add_if_interesting(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        is_interesting: bool,
+    ) -> Result<Option<usize>, Error>;
+}
+
+/// Evaluate an input modyfing the state of the fuzzer
+pub trait Evaluator<E, EM, I, S> {
+    /// Runs the input and triggers observers and feedback,
+    /// returns if is interesting an (option) the index of the new testcase in the corpus
+    fn evaluate_input(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+    ) -> Result<(bool, Option<usize>), Error>;
+}
+
 /// The main fuzzer trait.
-pub trait Fuzzer<E, EM, S, CS> {
+pub trait Fuzzer<E, EM, I, S, ST> {
     /// Fuzz for a single iteration
     /// Returns the index of the last fuzzed corpus item
     ///
@@ -57,24 +114,24 @@ pub trait Fuzzer<E, EM, S, CS> {
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_one(
         &mut self,
-        state: &mut S,
+        stages: &mut ST,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
     ) -> Result<usize, Error>;
 
     /// Fuzz forever (or until stopped)
     fn fuzz_loop(
         &mut self,
-        state: &mut S,
+        stages: &mut ST,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
     ) -> Result<usize, Error> {
         let mut last = current_time();
         let stats_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
-            self.fuzz_one(state, executor, manager, scheduler)?;
+            self.fuzz_one(stages, executor, state, manager)?;
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
     }
@@ -85,18 +142,14 @@ pub trait Fuzzer<E, EM, S, CS> {
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
     /// This way, the state will be available in the next, respawned, iteration.
-    fn fuzz_loop_for<I>(
+    fn fuzz_loop_for(
         &mut self,
+        stages: &mut ST,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        scheduler: &CS,
         iters: u64,
-    ) -> Result<usize, Error>
-    where
-        EM: EventManager<I, S>,
-        I: Input,
-    {
+    ) -> Result<usize, Error> {
         if iters == 0 {
             return Err(Error::IllegalArgument(
                 "Cannot fuzz for 0 iterations!".to_string(),
@@ -108,7 +161,7 @@ pub trait Fuzzer<E, EM, S, CS> {
         let stats_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
-            ret = self.fuzz_one(state, executor, manager, scheduler)?;
+            ret = self.fuzz_one(stages, executor, state, manager)?;
             last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
         }
 
@@ -132,44 +185,27 @@ pub trait Fuzzer<E, EM, S, CS> {
 }
 
 /// Your default fuzzer instance, for everyday use.
-#[derive(Clone, Debug)]
-pub struct StdFuzzer<CS, ST, E, EM, I, OT, S>
+#[derive(Debug)]
+pub struct StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
     CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<CS, E, EM, I, S>,
-    E: Executor<I>,
-    EM: EventManager<I, S>,
+    F: Feedback<I, S>,
     I: Input,
+    OF: Feedback<I, S>,
 {
-    stages: ST,
-    phantom: PhantomData<(CS, E, EM, I, OT, S)>,
+    scheduler: CS,
+    feedback: F,
+    objective: OF,
+    phantom: PhantomData<(C, I, OT, S, SC)>,
 }
 
-impl<CS, ST, E, EM, I, OT, S> HasStages<CS, E, EM, I, S, ST> for StdFuzzer<CS, ST, E, EM, I, OT, S>
+impl<C, CS, F, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
     CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<CS, E, EM, I, S>,
-    E: Executor<I>,
-    EM: EventManager<I, S>,
+    F: Feedback<I, S>,
     I: Input,
-{
-    fn stages(&self) -> &ST {
-        &self.stages
-    }
-
-    fn stages_mut(&mut self) -> &mut ST {
-        &mut self.stages
-    }
-}
-
-/*
-impl<CS, ST, E, EM, I, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, ST, E, EM, I, OT, S>
-where
-    CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<CS, E, EM, I, S>,
-    E: Executor<I>,
-    EM: EventManager<I, S>,
-    I: Input,
+    OF: Feedback<I, S>,
 {
     fn scheduler(&self) -> &CS {
         &self.scheduler
@@ -179,17 +215,164 @@ where
         &mut self.scheduler
     }
 }
-*/
 
-impl<CS, ST, E, EM, I, OT, S> Fuzzer<E, EM, S, CS> for StdFuzzer<CS, ST, E, EM, I, OT, S>
+impl<C, CS, F, I, OF, OT, S, SC> HasFeedback<F, I, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
     CS: CorpusScheduler<I, S>,
-    S: HasExecutions + HasClientPerfStats,
-    ST: StagesTuple<CS, E, EM, I, S>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
+    F: Feedback<I, S>,
     I: Input,
+    OF: Feedback<I, S>,
+{
+    fn feedback(&self) -> &F {
+        &self.feedback
+    }
+
+    fn feedback_mut(&mut self) -> &mut F {
+        &mut self.feedback
+    }
+}
+
+impl<C, CS, F, I, OF, OT, S, SC> HasObjective<I, OF, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+{
+    fn objective(&self) -> &OF {
+        &self.objective
+    }
+
+    fn objective_mut(&mut self) -> &mut OF {
+        &mut self.objective
+    }
+}
+
+impl<C, CS, F, I, OF, OT, S, SC> IsInteresting<I, OT, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+    OT: ObserversTuple,
+    S: HasCorpus<C, I>,
+{
+    /// Evaluate if a set of observation channels has an interesting state
+    fn is_interesting(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple,
+    {
+        self.feedback_mut()
+            .is_interesting(state, input, observers, exit_kind)
+    }
+}
+
+impl<C, CS, F, I, OF, OT, S, SC> IfInteresting<I, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+    OT: ObserversTuple,
+    S: HasCorpus<C, I>,
+{
+    /// Adds this input to the corpus, if it's intersting, and return the index
+    #[inline]
+    fn add_if_interesting(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        is_interesting: bool,
+    ) -> Result<Option<usize>, Error> {
+        if is_interesting {
+            let mut testcase = Testcase::new(input.clone());
+            self.feedback_mut().append_metadata(state, &mut testcase)?;
+            let idx = state.corpus_mut().add(testcase)?;
+            self.scheduler_mut().on_add(state, idx)?;
+            Ok(Some(idx))
+        } else {
+            self.feedback_mut().discard_metadata(state, input)?;
+            Ok(None)
+        }
+    }
+}
+
+impl<C, CS, E, EM, F, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    E: Executor<I>
+        + HasObservers<OT>
+        + HasExecHooks<EM, I, S, Self>
+        + HasObserversHooks<EM, I, OT, S, Self>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
+    EM: EventManager<E, I, S, Self>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
+    SC: Corpus<I>,
+{
+    /// Process one input, adding to the respective corpuses if needed and firing the right events
+    #[inline]
+    fn evaluate_input(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+    ) -> Result<(bool, Option<usize>), Error> {
+        let (is_interesting, is_solution) = self.execute_input(state, executor, manager, &input)?;
+        let observers = executor.observers();
+
+        if is_solution {
+            // If the input is a solution, add it to the respective corpus
+            let mut testcase = Testcase::new(input.clone());
+            self.objective_mut().append_metadata(state, &mut testcase)?;
+            state.solutions_mut().add(testcase)?;
+        } else {
+            self.objective_mut().discard_metadata(state, &input)?;
+        }
+
+        let corpus_idx = self.add_if_interesting(state, &input, is_interesting)?;
+        if corpus_idx.is_some() {
+            let observers_buf = manager.serialize_observers(observers)?;
+            manager.fire(
+                state,
+                Event::NewTestcase {
+                    input,
+                    observers_buf,
+                    corpus_size: state.corpus().count(),
+                    client_config: "TODO".into(),
+                    time: crate::utils::current_time(),
+                    executions: *state.executions(),
+                },
+            )?;
+        }
+
+        Ok((is_interesting, corpus_idx))
+    }
+}
+
+impl<C, CS, E, EM, F, I, OF, OT, S, ST, SC> Fuzzer<E, EM, I, S, ST>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    CS: CorpusScheduler<I, S>,
+    EM: EventManager<E, I, S, Self>,
+    F: Feedback<I, S>,
+    I: Input,
+    S: HasExecutions + HasClientPerfStats,
+    OF: Feedback<I, S>,
+    ST: StagesTuple<E, EM, S, Self>,
 {
     #[inline]
     fn maybe_report_stats(
@@ -240,17 +423,17 @@ where
 
     fn fuzz_one(
         &mut self,
-        state: &mut S,
+        stages: &mut ST,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
     ) -> Result<usize, Error> {
         // Init timer for scheduler
         #[cfg(feature = "introspection")]
         state.introspection_stats_mut().start_timer();
 
         // Get the next index from the scheduler
-        let idx = scheduler.next(state)?;
+        let idx = self.scheduler.next(state)?;
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
@@ -261,15 +444,14 @@ where
         state.introspection_stats_mut().reset_stage_index();
 
         // Execute all stages
-        self.stages_mut()
-            .perform_all(state, executor, manager, scheduler, idx)?;
+        stages.perform_all(self, executor, state, manager, idx)?;
 
         // Init timer for manager
         #[cfg(feature = "introspection")]
         state.introspection_stats_mut().start_timer();
 
         // Execute the manager
-        manager.process(state, executor, scheduler)?;
+        manager.process(self, state, executor)?;
 
         // Mark the elapsed time for the manager
         #[cfg(feature = "introspection")]
@@ -279,19 +461,101 @@ where
     }
 }
 
-impl<CS, ST, E, EM, I, OT, S> StdFuzzer<CS, ST, E, EM, I, OT, S>
+impl<C, CS, F, I, OF, OT, S, SC> StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
     CS: CorpusScheduler<I, S>,
-    ST: StagesTuple<CS, E, EM, I, S>,
-    E: Executor<I>,
-    EM: EventManager<I, S>,
+    F: Feedback<I, S>,
     I: Input,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasClientPerfStats,
 {
     /// Create a new `StdFuzzer` with standard behavior.
-    pub fn new(stages: ST) -> Self {
+    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
         Self {
-            stages,
+            scheduler,
+            feedback,
+            objective,
             phantom: PhantomData,
         }
+    }
+
+    /// Runs the input and triggers observers and feedback
+    pub fn execute_input<E, EM>(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(bool, bool), Error>
+    where
+        E: Executor<I>
+            + HasObservers<OT>
+            + HasExecHooks<EM, I, S, Self>
+            + HasObserversHooks<EM, I, OT, S, Self>,
+        OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
+        EM: EventManager<E, I, S, Self>,
+    {
+        start_timer!(state);
+        executor.pre_exec_observers(self, state, event_mgr, input)?;
+        mark_feature_time!(state, PerfFeature::PreExecObservers);
+
+        start_timer!(state);
+        executor.pre_exec(self, state, event_mgr, input)?;
+        mark_feature_time!(state, PerfFeature::PreExec);
+
+        start_timer!(state);
+        let exit_kind = executor.run_target(input)?;
+        mark_feature_time!(state, PerfFeature::TargetExecution);
+
+        start_timer!(state);
+        executor.post_exec(self, state, event_mgr, input)?;
+        mark_feature_time!(state, PerfFeature::PostExec);
+
+        *state.executions_mut() += 1;
+
+        start_timer!(state);
+        executor.post_exec_observers(self, state, event_mgr, input)?;
+        mark_feature_time!(state, PerfFeature::PostExecObservers);
+
+        let observers = executor.observers();
+        #[cfg(not(feature = "introspection"))]
+        let is_interesting = self
+            .feedback_mut()
+            .is_interesting(state, &input, observers, &exit_kind)?;
+
+        #[cfg(feature = "introspection")]
+        let is_interesting = {
+            // Init temporary feedback stats here. We can't use the typical pattern above
+            // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
+            // new `mut self` to `is_interesting_with_perf`. We use this stack
+            // variable to get the stats and then update the feedbacks directly
+            let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
+            let feedback_index = 0;
+            let is_interesting = self.feedback_mut().is_interesting_with_perf(
+                state,
+                &input,
+                observers,
+                &exit_kind,
+                &mut feedback_stats,
+                feedback_index,
+            )?;
+
+            // Update the feedback stats
+            state
+                .introspection_stats_mut()
+                .update_feedbacks(feedback_stats);
+
+            // Return the total fitness
+            is_interesting
+        };
+
+        start_timer!(state);
+        let is_solution = self
+            .objective_mut()
+            .is_interesting(state, &input, observers, &exit_kind)?;
+
+        mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
+
+        Ok((is_interesting, is_solution))
     }
 }
