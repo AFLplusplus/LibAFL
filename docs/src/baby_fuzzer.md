@@ -156,13 +156,13 @@ Now you can prepend the following `use` directives to your main.rs and compile i
 ```rust 
 use std::path::PathBuf;
 use libafl::{
+    bolts::{current_nanos, rands::StdRand},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     generators::RandPrintablesGenerator,
     state::State,
     stats::SimpleStats,
-    utils::{current_nanos, StdRand},
 };
 ```
 

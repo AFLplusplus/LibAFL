@@ -261,11 +261,13 @@ mod tests {
     use tuple_list::tuple_list_type;
 
     use crate::{
-        bolts::tuples::{tuple_list, Named},
+        bolts::{
+            current_time,
+            tuples::{tuple_list, Named},
+        },
         events::Event,
         inputs::bytes::BytesInput,
         observers::StdMapObserver,
-        utils::current_time,
     };
 
     static mut MAP: [u32; 4] = [0; 4];

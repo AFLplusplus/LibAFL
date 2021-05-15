@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
+    bolts::rands::Rand,
     corpus::{Corpus, CorpusScheduler},
     events::EventManager,
     executors::{Executor, HasObservers},
@@ -9,7 +10,6 @@ use crate::{
     observers::ObserversTuple,
     stages::{Stage, MutationalStage},
     state::{Evaluator, HasCorpus, HasRand},
-    utils::Rand,
     Error,
 };
 

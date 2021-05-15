@@ -4,7 +4,6 @@
 use clap::{App, Arg};
 
 use libafl::{
-    bolts::tuples::tuple_list,
     corpus::{
         ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
         IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
@@ -23,11 +22,12 @@ use libafl::{
     bolts::{
         os::ashmem_server::AshmemService,
         shmem::{StdShMemProvider, ShMemProvider},
+        tuples::tuple_list,
+        current_nanos, launcher::Launcher, os::parse_core_bind_arg, rands::StdRand
     },
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    utils::{current_nanos, Launcher, parse_core_bind_arg, StdRand},
     Error,
 };
 

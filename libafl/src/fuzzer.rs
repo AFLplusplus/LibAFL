@@ -1,6 +1,7 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
 use crate::{
+    bolts::current_time,
     corpus::CorpusScheduler,
     events::{Event, EventManager},
     executors::{Executor, HasObservers},
@@ -8,7 +9,6 @@ use crate::{
     observers::ObserversTuple,
     stages::StagesTuple,
     state::{HasClientPerfStats, HasExecutions},
-    utils::current_time,
     Error,
 };
 

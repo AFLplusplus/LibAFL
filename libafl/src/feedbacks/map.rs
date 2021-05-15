@@ -9,14 +9,13 @@ use num::Integer;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::Named,
+    bolts::{tuples::Named, AsSlice},
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::Feedback,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     state::HasMetadata,
-    utils::AsSlice,
     Error,
 };
 

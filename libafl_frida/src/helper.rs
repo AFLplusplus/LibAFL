@@ -4,7 +4,7 @@ use std::hash::Hasher;
 use libafl::inputs::{HasTargetBytes, Input};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use libafl::utils::find_mapping_for_path;
+use libafl::bolts::os::find_mapping_for_path;
 
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 

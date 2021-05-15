@@ -442,10 +442,10 @@ pub mod unix_shmem {
         use core::{ptr, slice};
         use libc::{c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
 
-        use crate::Error;
-
-        use super::super::{ShMem, ShMemId, ShMemProvider};
-
+        use crate::{
+            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            Error,
+        };
         #[cfg(unix)]
         #[derive(Copy, Clone)]
         #[repr(C)]
@@ -607,9 +607,10 @@ pub mod unix_shmem {
         };
         use std::ffi::CString;
 
-        use crate::Error;
-
-        use super::super::{ShMem, ShMemId, ShMemProvider};
+        use crate::{
+            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            Error,
+        };
 
         extern "C" {
             fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
@@ -818,14 +819,16 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
-    use super::{ShMem, ShMemId, ShMemProvider};
     use crate::{
-        bolts::bindings::{
-            windows::win32::system_services::{
-                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+        bolts::{
+            bindings::{
+                windows::win32::system_services::{
+                    CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+                },
+                windows::win32::system_services::{BOOL, HANDLE, PAGE_TYPE, PSTR},
+                windows::win32::windows_programming::CloseHandle,
             },
-            windows::win32::system_services::{BOOL, HANDLE, PAGE_TYPE, PSTR},
-            windows::win32::windows_programming::CloseHandle,
+            shmem::{ShMem, ShMemId, ShMemProvider},
         },
         Error,
     };

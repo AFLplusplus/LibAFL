@@ -8,7 +8,7 @@ pub mod asan_rt;
 /// The `LibAFL` frida helper
 pub mod helper;
 // for parsing asan cores
-use libafl::utils::parse_core_bind_arg;
+use libafl::bolts::os::parse_core_bind_arg;
 // for getting current core_id
 use core_affinity;
 

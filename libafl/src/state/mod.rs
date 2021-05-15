@@ -9,7 +9,11 @@ use std::{
 };
 
 use crate::{
-    bolts::serdeany::{SerdeAny, SerdeAnyMap},
+    bolts::{
+        current_time,
+        rands::Rand,
+        serdeany::{SerdeAny, SerdeAnyMap},
+    },
     corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventManager, LogSeverity},
     executors::{
@@ -22,7 +26,6 @@ use crate::{
     observers::ObserversTuple,
     start_timer,
     stats::ClientPerfStats,
-    utils::Rand,
     Error,
 };
 
@@ -537,7 +540,7 @@ where
                     observers_buf,
                     corpus_size: self.corpus().count() + 1,
                     client_config: "TODO".into(),
-                    time: crate::utils::current_time(),
+                    time: current_time(),
                     executions: *self.executions(),
                 },
             )?;

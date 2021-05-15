@@ -14,10 +14,10 @@ use std::{
 };
 
 use crate::{
+    bolts::rands::Rand,
     inputs::{HasBytesVec, Input},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     state::{HasMaxSize, HasMetadata, HasRand},
-    utils::Rand,
     Error,
 };
 

@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 use core::{cmp::min, marker::PhantomData};
 
 use crate::{
+    bolts::rands::Rand,
     inputs::{bytes::BytesInput, Input},
-    utils::Rand,
     Error,
 };
 

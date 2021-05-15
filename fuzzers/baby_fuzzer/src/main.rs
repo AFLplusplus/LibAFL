@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use libafl::{
-    bolts::tuples::tuple_list,
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -13,7 +13,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::State,
     stats::SimpleStats,
-    utils::{current_nanos, StdRand},
 };
 
 // Coverage map with explicit assignments due to the lack of instrumentation

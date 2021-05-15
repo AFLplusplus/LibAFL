@@ -1,7 +1,7 @@
 //! Architecture agnostic processor features
 
 #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-use crate::utils::current_nanos;
+use crate::bolts::current_nanos;
 
 // TODO: Add more architectures, using C code, see
 // https://github.com/google/benchmark/blob/master/src/cycleclock.h

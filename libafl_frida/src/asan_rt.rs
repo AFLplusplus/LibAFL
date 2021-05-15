@@ -8,14 +8,17 @@ this helps finding mem errors early.
 
 use hashbrown::HashMap;
 use libafl::{
-    bolts::{ownedref::OwnedPtr, tuples::Named},
+    bolts::{
+        os::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
+        ownedref::OwnedPtr,
+        tuples::Named,
+    },
     corpus::Testcase,
     executors::{CustomExitKind, ExitKind, HasExecHooks},
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
     state::HasMetadata,
-    utils::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
     Error, SerdeAny,
 };
 use nix::{

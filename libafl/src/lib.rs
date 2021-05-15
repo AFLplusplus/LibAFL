@@ -36,7 +36,6 @@ pub mod observers;
 pub mod stages;
 pub mod state;
 pub mod stats;
-pub mod utils;
 
 pub mod fuzzer;
 pub use fuzzer::*;
@@ -165,7 +164,7 @@ impl From<ParseIntError> for Error {
 mod tests {
 
     use crate::{
-        bolts::tuples::tuple_list,
+        bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
@@ -173,7 +172,6 @@ mod tests {
         stages::StdMutationalStage,
         state::{HasCorpus, State},
         stats::SimpleStats,
-        utils::StdRand,
         Fuzzer, StdFuzzer,
     };
 

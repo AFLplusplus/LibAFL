@@ -1,12 +1,11 @@
 //! A wide variety of mutations used during fuzzing.
 
 use crate::{
-    bolts::tuples::Named,
+    bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
-    utils::Rand,
     Error,
 };
 
@@ -1832,13 +1831,14 @@ mod tests {
 
     use super::*;
     use crate::{
-        bolts::tuples::tuple_list,
-        bolts::tuples::HasLen,
+        bolts::{
+            rands::StdRand,
+            tuples::{tuple_list, HasLen},
+        },
         corpus::{Corpus, InMemoryCorpus},
         inputs::BytesInput,
         mutators::MutatorsTuple,
         state::{HasMetadata, State},
-        utils::StdRand,
     };
 
     fn test_mutations<C, I, R, S>() -> impl MutatorsTuple<I, S>

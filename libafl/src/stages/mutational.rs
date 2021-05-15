@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
+    bolts::rands::Rand,
     corpus::{Corpus, CorpusScheduler},
     events::EventManager,
     executors::{Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks},
@@ -11,7 +12,6 @@ use crate::{
     stages::Stage,
     start_timer,
     state::{Evaluator, HasClientPerfStats, HasCorpus, HasRand},
-    utils::Rand,
     Error,
 };
 

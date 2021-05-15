@@ -8,7 +8,10 @@ use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{shmem::StdShMem, tuples::tuple_list},
+    bolts::{
+        current_nanos, launchers::Launcher, os::parse_core_bind_arg, rands::StdRand,
+        shmem::StdShMem, tuples::tuple_list,
+    },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
@@ -23,7 +26,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    utils::{current_nanos, launcher, parse_core_bind_arg, StdRand},
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 

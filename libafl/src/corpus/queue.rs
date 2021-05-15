@@ -80,10 +80,10 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use crate::{
+        bolts::rands::StdRand,
         corpus::{Corpus, CorpusScheduler, OnDiskCorpus, QueueCorpusScheduler, Testcase},
         inputs::bytes::BytesInput,
         state::{HasCorpus, State},
-        utils::StdRand,
     };
 
     #[test]

@@ -1,16 +1,18 @@
 //! The [`InProcessExecutor`] is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
+use core::marker::PhantomData;
+
+#[cfg(feature = "std")]
 use core::{
     ffi::c_void,
-    marker::PhantomData,
     ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
 use crate::{
@@ -444,7 +446,7 @@ mod unix_signal_handler {
                 target_arch = "aarch64"
             ))]
             {
-                use crate::utils::find_mapping_for_address;
+                use crate::bolts::os::find_mapping_for_address;
                 println!("{:━^100}", " CRASH ");
                 println!(
                     "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
