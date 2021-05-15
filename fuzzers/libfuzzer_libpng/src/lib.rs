@@ -21,7 +21,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, State},
     stats::SimpleStats,
-    botls::{current_nanos, rands::StdRand},
+    bolts::{current_nanos, rands::StdRand},
     Error,
 };
 
