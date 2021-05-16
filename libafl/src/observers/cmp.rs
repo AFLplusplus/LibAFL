@@ -6,6 +6,7 @@ use alloc::{
 };
 use core::slice::from_raw_parts_mut;
 use serde::{Deserialize, Serialize};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     bolts::{
@@ -17,7 +18,7 @@ use crate::{
     Error,
 };
 
-/// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
+/// A [`CmpObserver`] observes the traced comparisons during the current execution
 pub trait CmpObserver<T>: Observer
 {
     /// Get the number of usable cmps (all by default)
@@ -28,8 +29,6 @@ pub trait CmpObserver<T>: Observer
 
     fn executions_for(idx: usize) -> usize;
     
-    fn kind_for(idx: usize) -> CmpKind;
-
     fn bytes_for(idx: usize) -> usize;
 
     fn values_of(idx: usize, execution: usize) -> (T, T);
@@ -37,5 +36,3 @@ pub trait CmpObserver<T>: Observer
     /// Reset the state
     fn reset(&mut self) -> Result<(), Error>;
 }
-
-
