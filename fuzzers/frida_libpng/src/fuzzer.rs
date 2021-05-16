@@ -13,11 +13,10 @@ use libafl::{
         HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::{scheduled::{havoc_mutations, StdScheduledMutator}, token_mutations::Tokens},
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
     bolts::{
         os::ashmem_server::AshmemService,
@@ -25,8 +24,9 @@ use libafl::{
         tuples::tuple_list,
         current_nanos, launcher::Launcher, os::parse_core_bind_arg, rands::StdRand
     },
+    observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     Error,
 };
@@ -44,14 +44,14 @@ use libafl_frida::{
     FridaOptions,
 };
 
-struct FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    base: TimeoutExecutor<InProcessExecutor<'a, EM, H, I, OT, S>, I>,
+    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT, S>, I>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -60,8 +60,8 @@ where
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> Executor<I>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, FH, H, I, OT, S> Executor<I>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -99,8 +99,8 @@ if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() }
     }
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasExecHooks<EM, I, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -109,21 +109,33 @@ where
 {
     /// Called right before exexution starts
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         self.helper.pre_exec(input);
-        self.base.pre_exec(state, event_mgr, input)
+        self.base.pre_exec(fuzzer, state, event_mgr, input)
     }
 
     /// Called right after execution finished.
     #[inline]
-    fn post_exec(&mut self, state: &mut S, event_mgr: &mut EM, input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         self.helper.post_exec(input);
-        self.base.post_exec(state, event_mgr, input)
+        self.base.post_exec(fuzzer, state, event_mgr, input)
     }
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasObservers<OT>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<OT>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -141,17 +153,17 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> HasObserversHooks<EM, I, OT, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S>,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, EM, FH, H, I, OT, S>
+impl<'a, 'b, 'c, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&[u8]) -> ExitKind,
@@ -160,7 +172,7 @@ where
 {
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, EM, H, I, OT, S>,
+        base: InProcessExecutor<'a, H, I, OT, S>,
         helper: &'c mut FH,
         timeout: Duration,
     ) -> Self {

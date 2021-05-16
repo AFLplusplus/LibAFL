@@ -162,7 +162,6 @@ impl From<ParseIntError> for Error {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
@@ -170,7 +169,7 @@ mod tests {
         inputs::BytesInput,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,
-        state::{HasCorpus, State},
+        state::{HasCorpus, StdState},
         stats::SimpleStats,
         Fuzzer, StdFuzzer,
     };
@@ -187,10 +186,9 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]);
         corpus.add(testcase).unwrap();
 
-        let mut state = State::new(
+        let mut state = StdState::new(
             rand,
             corpus,
-            tuple_list!(),
             InMemoryCorpus::<BytesInput>::new(),
             tuple_list!(),
         );
@@ -200,33 +198,33 @@ mod tests {
         });
         let mut event_manager = SimpleEventManager::new(stats);
 
+        let scheduler = RandCorpusScheduler::new();
+        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+
         let mut harness = |_buf: &[u8]| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
             &mut harness,
             tuple_list!(),
-            //Box::new(|_, _, _, _, _| ()),
+            &mut fuzzer,
             &mut state,
             &mut event_manager,
         )
         .unwrap();
 
         let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-        let stage = StdMutationalStage::new(mutator);
-        let scheduler = RandCorpusScheduler::new();
-        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut state, &mut executor, &mut event_manager, &scheduler)
+                .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
                 .unwrap_or_else(|_| panic!("Error in iter {}", i));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
-        let state_deserialized: State<
+        let state_deserialized: StdState<
             InMemoryCorpus<BytesInput>,
             (),
             BytesInput,
-            (),
             StdRand,
             InMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();

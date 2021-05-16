@@ -9,13 +9,13 @@ use libafl::{
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     Error,
 };
@@ -67,24 +67,42 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // Create an observation channel using the allocations map
     let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
 
+    // The state of the edges feedback.
+    let edges_feedback_state = MapFeedbackState::with_observer(&edges_observer);
+
+    // The state of the cmps feedback.
+    let cmps_feedback_state = MapFeedbackState::with_observer(&cmps_observer);
+
+    // The state of the allocs feedback.
+    let allocs_feedback_state = MapFeedbackState::with_observer(&allocs_observer);
+
+    // Feedback to rate the interestingness of an input
+    let feedback = feedback_or!(
+        MaxMapFeedback::new(&edges_feedback_state, &edges_observer),
+        MaxMapFeedback::new(&cmps_feedback_state, &cmps_observer),
+        MaxMapFeedback::new(&allocs_feedback_state, &allocs_observer)
+    );
+
+    // A feedback to choose if an input is a solution or not
+    let objective = CrashFeedback::new();
+
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
-        State::new(
+        StdState::new(
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
-            // Feedbacks to rate the interestingness of an input
-            feedback_or!(
-                MaxMapFeedback::new_with_observer(&edges_observer),
-                MaxMapFeedback::new_with_observer(&cmps_observer),
-                MaxMapFeedback::new_with_observer(&allocs_observer)
-            ),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
-            // Feedbacks to recognize an input as solution
-            CrashFeedback::new(),
+            // States of the feedbacks.
+            // They are the data related to the feedbacks that you want to persist in the State.
+            tuple_list!(
+                edges_feedback_state,
+                cmps_feedback_state,
+                allocs_feedback_state
+            ),
         )
     });
 
@@ -97,12 +115,13 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
 
     // Setup a basic mutator with a mutational stage
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let stage = StdMutationalStage::new(mutator);
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // A random policy to get testcasess from the corpus
     let scheduler = RandCorpusScheduler::new();
-    // A fuzzer with just one stage
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |buf: &[u8]| {
@@ -114,6 +133,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(edges_observer, cmps_observer, allocs_observer),
+        &mut fuzzer,
         &mut state,
         &mut restarting_mgr,
     )?;
@@ -128,7 +148,12 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut executor, &mut restarting_mgr, &scheduler, &corpus_dirs)
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut restarting_mgr,
+                &corpus_dirs,
+            )
             .expect(&format!(
                 "Failed to load initial corpus at {:?}",
                 &corpus_dirs
@@ -136,7 +161,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
+    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
 
     // Never reached
     Ok(())

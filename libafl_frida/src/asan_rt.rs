@@ -1707,8 +1707,14 @@ pub struct AsanErrorsObserver {
 
 impl Observer for AsanErrorsObserver {}
 
-impl<EM, I, S> HasExecHooks<EM, I, S> for AsanErrorsObserver {
-    fn pre_exec(&mut self, _state: &mut S, _mgr: &mut EM, _input: &I) -> Result<(), Error> {
+impl<EM, I, S, Z> HasExecHooks<EM, I, S, Z> for AsanErrorsObserver {
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
@@ -1767,12 +1773,13 @@ pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,
 }
 
-impl<I> Feedback<I> for AsanErrorsFeedback
+impl<I, S> Feedback<I, S> for AsanErrorsFeedback
 where
     I: Input + HasTargetBytes,
 {
     fn is_interesting<OT: ObserversTuple>(
         &mut self,
+        _state: &mut S,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
@@ -1793,7 +1800,7 @@ where
         }
     }
 
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }
@@ -1801,7 +1808,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }

@@ -8,7 +8,7 @@ use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::Named,
+    bolts::tuples::{MatchName, Named},
     corpus::Testcase,
     executors::ExitKind,
     inputs::Input,
@@ -24,13 +24,14 @@ use core::{marker::PhantomData, time::Duration};
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I>: Named + serde::Serialize + serde::de::DeserializeOwned
+pub trait Feedback<I, S>: Named
 where
     I: Input,
 {
-    /// `is_interesting ` should return the "Interestingness" from 0 to 255 (percent times 2.55)
+    /// `is_interesting ` return if an input is worth the addition to the corpus
     fn is_interesting<OT>(
         &mut self,
+        state: &mut S,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -41,6 +42,7 @@ where
     #[cfg(feature = "introspection")]
     fn is_interesting_with_perf<OT>(
         &mut self,
+        state: &mut S,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -54,7 +56,7 @@ where
         let start_time = crate::cpu::read_time_counter();
 
         // Execute this feedback
-        let ret = self.is_interesting(input, observers, &exit_kind);
+        let ret = self.is_interesting(state, input, observers, &exit_kind);
 
         // Get the elapsed time for checking this feedback
         let elapsed = crate::cpu::read_time_counter() - start_time;
@@ -69,41 +71,62 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata(&mut self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 }
 
-/// Compose [`Feedback`]`s` with an `AND` operation
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct AndFeedback<A, B, I>
+/// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
+/// of the fuzzer State
+pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {}
+
+/// A haskell-style tuple of feedback states
+pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {}
+
+impl FeedbackStatesTuple for () {}
+
+impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    Head: FeedbackState,
+    Tail: FeedbackStatesTuple,
+{
+}
+
+/// Compose [`Feedback`]`s` with an `AND` operation
+pub struct AndFeedback<A, B, I, S>
+where
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     /// The first [`Feedback`] to `AND`.
     pub first: A,
     /// The second [`Feedback`] to `AND`.
     pub second: B,
-    phantom: PhantomData<I>,
+    /// The name
+    name: String,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<A, B, I> Feedback<I> for AndFeedback<A, B, I>
+impl<A, B, I, S> Feedback<I, S> for AndFeedback<A, B, I, S>
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     fn is_interesting<OT>(
         &mut self,
+        state: &mut S,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -111,14 +134,19 @@ where
     where
         OT: ObserversTuple,
     {
-        let a = self.first.is_interesting(input, observers, exit_kind)?;
-        let b = self.second.is_interesting(input, observers, exit_kind)?;
+        let a = self
+            .first
+            .is_interesting(state, input, observers, exit_kind)?;
+        let b = self
+            .second
+            .is_interesting(state, input, observers, exit_kind)?;
         Ok(a && b)
     }
 
     #[cfg(feature = "introspection")]
     fn is_interesting_with_perf<OT>(
         &mut self,
+        state: &mut S,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -130,6 +158,7 @@ where
     {
         // Execute this feedback
         let a = self.first.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,
@@ -137,6 +166,7 @@ where
             feedback_index,
         )?;
         let b = self.second.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,
@@ -147,71 +177,73 @@ where
     }
 
     #[inline]
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.first.append_metadata(testcase)?;
-        self.second.append_metadata(testcase)
+    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        self.first.append_metadata(state, testcase)?;
+        self.second.append_metadata(state, testcase)
     }
 
     #[inline]
-    fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(input)?;
-        self.second.discard_metadata(input)
+    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.first.discard_metadata(state, input)?;
+        self.second.discard_metadata(state, input)
     }
 }
 
-impl<A, B, I> Named for AndFeedback<A, B, I>
+impl<A, B, I, S> Named for AndFeedback<A, B, I, S>
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     #[inline]
     fn name(&self) -> &str {
-        //format!("And({}, {})", self.first.name(), self.second.name())
-        "AndFeedback"
+        &self.name
     }
 }
 
-impl<A, B, I> AndFeedback<A, B, I>
+impl<A, B, I, S> AndFeedback<A, B, I, S>
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     /// Creates a new [`AndFeedback`], resulting in the `AND` of two feedbacks.
     pub fn new(first: A, second: B) -> Self {
+        let name = format!("And({}, {})", first.name(), second.name());
         Self {
             first,
             second,
+            name,
             phantom: PhantomData,
         }
     }
 }
 
 /// Compose feedbacks with an OR operation
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OrFeedback<A, B, I>
+pub struct OrFeedback<A, B, I, S>
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     /// The first [`Feedback`]
     pub first: A,
     /// The second [`Feedback`], `OR`ed with the first.
     pub second: B,
-    phantom: PhantomData<I>,
+    /// The name
+    name: String,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<A, B, I> Feedback<I> for OrFeedback<A, B, I>
+impl<A, B, I, S> Feedback<I, S> for OrFeedback<A, B, I, S>
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     fn is_interesting<OT>(
         &mut self,
+        state: &mut S,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -219,14 +251,19 @@ where
     where
         OT: ObserversTuple,
     {
-        let a = self.first.is_interesting(input, observers, exit_kind)?;
-        let b = self.second.is_interesting(input, observers, exit_kind)?;
+        let a = self
+            .first
+            .is_interesting(state, input, observers, exit_kind)?;
+        let b = self
+            .second
+            .is_interesting(state, input, observers, exit_kind)?;
         Ok(a || b)
     }
 
     #[cfg(feature = "introspection")]
     fn is_interesting_with_perf<OT>(
         &mut self,
+        state: &mut S,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -238,6 +275,7 @@ where
     {
         // Execute this feedback
         let a = self.first.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,
@@ -245,6 +283,7 @@ where
             feedback_index,
         )?;
         let b = self.second.is_interesting_with_perf(
+            state,
             input,
             observers,
             &exit_kind,
@@ -255,67 +294,69 @@ where
     }
 
     #[inline]
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.first.append_metadata(testcase)?;
-        self.second.append_metadata(testcase)
+    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        self.first.append_metadata(state, testcase)?;
+        self.second.append_metadata(state, testcase)
     }
 
     #[inline]
-    fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(input)?;
-        self.second.discard_metadata(input)
+    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.first.discard_metadata(state, input)?;
+        self.second.discard_metadata(state, input)
     }
 }
 
-impl<A, B, I> Named for OrFeedback<A, B, I>
+impl<A, B, I, S> Named for OrFeedback<A, B, I, S>
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     #[inline]
     fn name(&self) -> &str {
-        //format!("Or({}, {})", self.first.name(), self.second.name())
-        "OrFeedback"
+        &self.name
     }
 }
 
-impl<A, B, I> OrFeedback<A, B, I>
+impl<A, B, I, S> OrFeedback<A, B, I, S>
 where
-    A: Feedback<I>,
-    B: Feedback<I>,
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
     I: Input,
 {
     /// Creates a new [`OrFeedback`] for two feedbacks.
     pub fn new(first: A, second: B) -> Self {
+        let name = format!("Or({}, {})", first.name(), second.name());
         Self {
             first,
             second,
+            name,
             phantom: PhantomData,
         }
     }
 }
 
 /// Compose feedbacks with an OR operation
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct NotFeedback<A, I>
+pub struct NotFeedback<A, I, S>
 where
-    A: Feedback<I>,
+    A: Feedback<I, S>,
     I: Input,
 {
     /// The feedback to invert
     pub first: A,
-    phantom: PhantomData<I>,
+    /// The name
+    name: String,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<A, I> Feedback<I> for NotFeedback<A, I>
+impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>
 where
-    A: Feedback<I>,
+    A: Feedback<I, S>,
     I: Input,
 {
     fn is_interesting<OT>(
         &mut self,
+        state: &mut S,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -323,41 +364,44 @@ where
     where
         OT: ObserversTuple,
     {
-        Ok(!self.first.is_interesting(input, observers, exit_kind)?)
+        Ok(!self
+            .first
+            .is_interesting(state, input, observers, exit_kind)?)
     }
 
     #[inline]
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.first.append_metadata(testcase)
+    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        self.first.append_metadata(state, testcase)
     }
 
     #[inline]
-    fn discard_metadata(&mut self, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(input)
+    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.first.discard_metadata(state, input)
     }
 }
 
-impl<A, I> Named for NotFeedback<A, I>
+impl<A, I, S> Named for NotFeedback<A, I, S>
 where
-    A: Feedback<I>,
+    A: Feedback<I, S>,
     I: Input,
 {
     #[inline]
     fn name(&self) -> &str {
-        //format!("Not({})", self.first.name())
-        "NotFeedback"
+        &self.name
     }
 }
 
-impl<A, I> NotFeedback<A, I>
+impl<A, I, S> NotFeedback<A, I, S>
 where
-    A: Feedback<I>,
+    A: Feedback<I, S>,
     I: Input,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
+        let name = format!("Not({})", first.name());
         Self {
             first,
+            name,
             phantom: PhantomData,
         }
     }
@@ -394,12 +438,13 @@ macro_rules! feedback_not {
 }
 
 /// Hack to use () as empty Feedback
-impl<I> Feedback<I> for ()
+impl<I, S> Feedback<I, S> for ()
 where
     I: Input,
 {
     fn is_interesting<OT>(
         &mut self,
+        _state: &mut S,
         _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
@@ -422,12 +467,13 @@ impl Named for () {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {}
 
-impl<I> Feedback<I> for CrashFeedback
+impl<I, S> Feedback<I, S> for CrashFeedback
 where
     I: Input,
 {
     fn is_interesting<OT>(
         &mut self,
+        _state: &mut S,
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
@@ -468,12 +514,13 @@ impl Default for CrashFeedback {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {}
 
-impl<I> Feedback<I> for TimeoutFeedback
+impl<I, S> Feedback<I, S> for TimeoutFeedback
 where
     I: Input,
 {
     fn is_interesting<OT>(
         &mut self,
+        _state: &mut S,
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
@@ -519,12 +566,13 @@ pub struct TimeFeedback {
     name: String,
 }
 
-impl<I> Feedback<I> for TimeFeedback
+impl<I, S> Feedback<I, S> for TimeFeedback
 where
     I: Input,
 {
     fn is_interesting<OT>(
         &mut self,
+        _state: &mut S,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
@@ -540,7 +588,7 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
         *testcase.exec_time_mut() = self.exec_time;
         self.exec_time = None;
         Ok(())
@@ -548,7 +596,7 @@ where
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.exec_time = None;
         Ok(())
     }

@@ -5,13 +5,13 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
-    state::State,
+    state::StdState,
     stats::SimpleStats,
 };
 
@@ -41,19 +41,27 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
+    // The state of the edges feedback.
+    let feedback_state = MapFeedbackState::with_observer(&observer);
+
+    // Feedback to rate the interestingness of an input
+    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+
+    // A feedback to choose if an input is a solution or not
+    let objective = CrashFeedback::new();
+
     // create a State from scratch
-    let mut state = State::new(
+    let mut state = StdState::new(
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
-        // Feedback to rate the interestingness of an input
-        MaxMapFeedback::new_with_observer(&observer),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        // Feedbacks to recognize an input as solution
-        CrashFeedback::new(),
+        // States of the feedbacks.
+        // They are the data related to the feedbacks that you want to persist in the State.
+        tuple_list!(feedback_state),
     );
 
     // The Stats trait define how the fuzzer stats are reported to the user
@@ -66,27 +74,32 @@ pub fn main() {
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();
 
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
     // Create the executor for an in-process function with just one observer
-    let mut executor =
-        InProcessExecutor::new(&mut harness, tuple_list!(observer), &mut state, &mut mgr)
-            .expect("Failed to create the Executor".into());
+    let mut executor = InProcessExecutor::new(
+        &mut harness,
+        tuple_list!(observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )
+    .expect("Failed to create the Executor".into());
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
 
     // Generate 8 initial inputs
     state
-        .generate_initial_inputs(&mut executor, &mut generator, &mut mgr, &scheduler, 8)
+        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus".into());
 
-    // Setup a basic mutator with a mutational stage
+    // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let stage = StdMutationalStage::new(mutator);
-
-    // A fuzzer with just one stage
-    let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
-        .fuzz_loop(&mut state, &mut executor, &mut mgr, &scheduler)
+        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop".into());
 }

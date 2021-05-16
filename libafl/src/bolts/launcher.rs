@@ -7,10 +7,10 @@ use crate::{
     bolts::shmem::ShMemProvider,
     events::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
-    state::IfInteresting,
     stats::Stats,
     Error,
 };
+use crate::{observers::ObserversTuple, IfInteresting};
 
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
@@ -27,12 +27,13 @@ use typed_builder::TypedBuilder;
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity)]
-pub struct Launcher<'a, I, S, SP, ST>
+pub struct Launcher<'a, I, OT, S, SP, ST>
 where
     I: Input,
     ST: Stats,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + IfInteresting<I>,
+    OT: ObserversTuple,
+    S: DeserializeOwned,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -41,8 +42,10 @@ where
     /// A closure or function which generates stats instances for newly spawned clients
     client_init_stats: &'a mut dyn FnMut() -> Result<ST, Error>,
     /// The 'main' function to run for each client forked. This probably shouldn't return
-    run_client:
-        &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, S, SP, ST>) -> Result<(), Error>,
+    run_client: &'a mut dyn FnMut(
+        Option<S>,
+        LlmpRestartingEventManager<I, OT, S, SP, ST>,
+    ) -> Result<(), Error>,
     /// The broker port to use
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -58,12 +61,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, I, S, SP, ST> Launcher<'a, I, S, SP, ST>
+impl<'a, I, OT, S, SP, ST> Launcher<'a, I, OT, S, SP, ST>
 where
     I: Input,
+    OT: ObserversTuple,
     ST: Stats + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + IfInteresting<I>,
+    S: DeserializeOwned + IfInteresting<I, S>,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std"))]
@@ -152,7 +156,7 @@ where
 
                 // the actual client. do the fuzzing
                 let stats = (self.client_init_stats)()?;
-                let (state, mgr) = RestartingMgr::<I, S, SP, ST>::builder()
+                let (state, mgr) = RestartingMgr::<I, OT, S, SP, ST>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .stats(stats)
                     .broker_port(self.broker_port)
@@ -209,7 +213,7 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        RestartingMgr::<I, S, SP, ST>::builder()
+        RestartingMgr::<I, OT, S, SP, ST>::builder()
             .shmem_provider(self.shmem_provider.clone())
             .stats(self.stats.clone())
             .broker_port(self.broker_port)

@@ -83,7 +83,7 @@ mod tests {
         bolts::rands::StdRand,
         corpus::{Corpus, CorpusScheduler, OnDiskCorpus, QueueCorpusScheduler, Testcase},
         inputs::bytes::BytesInput,
-        state::{HasCorpus, State},
+        state::{HasCorpus, StdState},
     };
 
     #[test]
@@ -103,7 +103,7 @@ mod tests {
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
                 .unwrap();
 
-        let mut state = State::new(rand, q, (), objective_q, ());
+        let mut state = StdState::new(rand, q, objective_q, ());
 
         let next_idx = scheduler.next(&mut state).unwrap();
         let filename = state

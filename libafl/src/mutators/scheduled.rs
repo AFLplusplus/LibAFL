@@ -407,7 +407,7 @@ mod tests {
             scheduled::{havoc_mutations, StdScheduledMutator},
             Mutator,
         },
-        state::State,
+        state::StdState,
     };
 
     #[test]
@@ -421,7 +421,7 @@ mod tests {
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
-        let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
+        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
 
         rand.set_seed(5);
 
@@ -448,7 +448,7 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let mut state = State::new(rand, corpus, (), InMemoryCorpus::new(), ());
+        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
 
         let mut havoc = StdScheduledMutator::new(havoc_mutations());
 
