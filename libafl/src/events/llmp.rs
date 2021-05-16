@@ -4,7 +4,6 @@ use alloc::{string::ToString, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use core_affinity::CoreId;
 use serde::{de::DeserializeOwned, Serialize};
-use std::net::SocketAddr;
 
 #[cfg(feature = "std")]
 use core::ptr::{addr_of, read_volatile};
@@ -16,7 +15,7 @@ use crate::bolts::{
 };
 
 #[cfg(feature = "std")]
-use std::net::ToSocketAddrs;
+use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::{
     bolts::{

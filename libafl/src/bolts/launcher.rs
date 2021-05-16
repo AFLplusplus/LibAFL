@@ -3,14 +3,13 @@ use serde::de::DeserializeOwned;
 
 #[cfg(feature = "std")]
 use crate::{
-    bolts::os::startable_self,
-    bolts::shmem::ShMemProvider,
+    bolts::{os::startable_self, shmem::ShMemProvider},
     events::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
+    observers::ObserversTuple,
     stats::Stats,
-    Error,
+    Error, IfInteresting,
 };
-use crate::{observers::ObserversTuple, IfInteresting};
 
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
