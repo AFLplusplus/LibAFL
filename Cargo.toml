@@ -11,7 +11,6 @@ members = [
     "libafl_cc",
     "libafl_targets",
     "libafl_frida",
-    "libafl_tests",
 ]
 default-members = [
     "libafl",
