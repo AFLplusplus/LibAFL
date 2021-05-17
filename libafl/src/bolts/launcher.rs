@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 
 #[cfg(feature = "std")]
 use crate::{
-    bolts::{os::startable_self, shmem::ShMemProvider},
+    bolts::shmem::ShMemProvider,
     events::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
     observers::ObserversTuple,
@@ -11,12 +11,21 @@ use crate::{
     Error, IfInteresting,
 };
 
+#[cfg(all(windows, feature = "std"))]
+use crate::bolts::os::startable_self;
+
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::{dup2, fork, ForkResult};
+
+#[cfg(all(unix, feature = "std"))]
+use std::{fs::File, os::unix::io::AsRawFd};
+
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(windows, feature = "std"))]
 use std::process::Stdio;
 
-#[cfg(feature = "std")]
+#[cfg(all(windows, feature = "std"))]
 use core_affinity::CoreId;
 
 #[cfg(feature = "std")]
@@ -124,7 +133,7 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
-        RestartingMgr::<I, S, SP, ST>::builder()
+        RestartingMgr::<I, OT, S, SP, ST>::builder()
             .shmem_provider(self.shmem_provider.clone())
             .stats(self.stats.clone())
             .broker_port(self.broker_port)

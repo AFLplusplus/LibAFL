@@ -17,13 +17,19 @@ pub mod unix_signals;
 #[cfg(unix)]
 pub mod pipes;
 
+#[cfg(all(unix, feature = "std"))]
+use std::{ffi::CString, fs::File};
+
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_exceptions;
+
+#[cfg(unix)]
+use libc::pid_t;
 
 /// Child Process Handle
 #[cfg(unix)]
 pub struct ChildHandle {
-    pid: pid_t,
+    pub pid: pid_t,
 }
 
 #[cfg(unix)]
@@ -152,7 +158,7 @@ pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
 
 /// "Safe" wrapper around dup2
 #[cfg(all(unix, feature = "std"))]
-fn dup2(fd: i32, device: i32) -> Result<(), Error> {
+pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
         -1 => Err(Error::File(std::io::Error::last_os_error())),
         _ => Ok(()),
