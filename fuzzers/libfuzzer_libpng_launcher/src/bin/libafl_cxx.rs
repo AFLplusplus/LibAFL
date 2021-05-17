@@ -14,7 +14,7 @@ fn main() {
             .add_arg("-fsanitize-coverage=trace-pc-guard".into())
             .unwrap()
             .add_link_arg(
-                dir.join(format!("{}libfuzzer_libpng.{}", LIB_PREFIX, LIB_EXT))
+                dir.join(format!("{}libfuzzer_libpng_launcher.{}", LIB_PREFIX, LIB_EXT))
                     .display()
                     .to_string(),
             )
