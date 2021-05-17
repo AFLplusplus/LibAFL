@@ -114,7 +114,7 @@ mod tests {
             .filename()
             .as_ref()
             .unwrap()
-            .to_owned();
+            .clone();
 
         assert_eq!(filename, "target/.test/fancy/path/fancyfile");
 

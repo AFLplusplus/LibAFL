@@ -55,7 +55,7 @@ where
             testcase.set_filename(filename_str.into());
         };
         if self.meta_format.is_some() {
-            let filename = testcase.filename().as_ref().unwrap().to_owned() + ".metadata";
+            let filename = testcase.filename().as_ref().unwrap().clone() + ".metadata";
             let mut file = File::create(filename)?;
 
             let serialized = match self.meta_format.as_ref().unwrap() {

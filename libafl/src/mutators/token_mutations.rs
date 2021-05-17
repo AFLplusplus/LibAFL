@@ -55,7 +55,7 @@ impl Tokens {
         if self.token_vec.contains(token) {
             return false;
         }
-        self.token_vec.push(token.to_vec());
+        self.token_vec.push(token.clone());
         true
     }
 
@@ -302,7 +302,7 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_read_tokens() {
-        let _ = fs::remove_file("test.tkns");
+        let _res = fs::remove_file("test.tkns");
         let data = r###"
 # comment
 token1@123="AAA"
@@ -315,6 +315,6 @@ token2="B"
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);
-        let _ = fs::remove_file("test.tkns");
+        let _res = fs::remove_file("test.tkns");
     }
 }

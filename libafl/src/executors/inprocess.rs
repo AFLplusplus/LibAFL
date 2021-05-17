@@ -358,7 +358,7 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             println!("Timeout in fuzz run.");
             #[cfg(feature = "std")]
-            let _ = stdout().flush();
+            let _res = stdout().flush();
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
@@ -506,7 +506,7 @@ mod unix_signal_handler {
             }
 
             #[cfg(feature = "std")]
-            let _ = stdout().flush();
+            let _res = stdout().flush();
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             // Make sure we don't crash in the crash handler forever.
