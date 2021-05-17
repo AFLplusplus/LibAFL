@@ -736,12 +736,9 @@ where
                             "Doing broker things. Run this tool again to start fuzzing in a client."
                         );
 
-                        match self.remote_broker_addr {
-                            Some(remote_broker_addr) => {
-                                println!("B2b: Connecting to {:?}", &remote_broker_addr);
-                                mgr.connect_b2b(remote_broker_addr)?;
-                            }
-                            None => (),
+                        if let Some(remote_broker_addr) = self.remote_broker_addr {
+                            println!("B2b: Connecting to {:?}", &remote_broker_addr);
+                            mgr.connect_b2b(remote_broker_addr)?;
                         };
 
                         mgr.broker_loop()?;

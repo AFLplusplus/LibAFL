@@ -3,7 +3,7 @@
 
 use core::marker::PhantomData;
 
-#[cfg(feature = "std")]
+#[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ffi::c_void,
     ptr::{self, write_volatile},

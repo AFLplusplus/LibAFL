@@ -10,7 +10,7 @@ pub mod helper;
 // for parsing asan cores
 use libafl::bolts::os::parse_core_bind_arg;
 // for getting current core_id
-use core_affinity;
+use core_affinity::get_core_ids;
 
 /// A representation of the various Frida options
 #[derive(Clone, Debug)]
@@ -100,15 +100,15 @@ impl FridaOptions {
                     }
                 }
             } // end of for loop
-            if options.enable_asan && asan_cores.is_some() {
-                let core_ids = core_affinity::get_core_ids().unwrap();
+            if let Some(asan_cores) = asan_cores && options.enable_asan {
+                let core_ids = get_core_ids().unwrap();
                 assert_eq!(
                     core_ids.len(),
                     1,
                     "Client should only be enabled on one core"
                 );
                 let core_id = core_ids[0].id;
-                options.enable_asan = asan_cores.unwrap().contains(&core_id);
+                options.enable_asan = asan_cores.contains(&core_id);
             }
         }
 

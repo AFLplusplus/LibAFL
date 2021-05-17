@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-#[cfg(feature = "std")]
+#[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
 
 #[cfg(feature = "std")]
