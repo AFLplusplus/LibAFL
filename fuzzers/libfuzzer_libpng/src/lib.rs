@@ -6,6 +6,7 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::tuples::tuple_list,
+    bolts::{current_nanos, rands::StdRand},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
@@ -21,7 +22,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
-    bolts::{current_nanos, rands::StdRand},
     Error,
 };
 

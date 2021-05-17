@@ -1,6 +1,10 @@
 #!/bin/sh
 # Clippy checks
-cargo clean -p libafl
+if [ "$1" != "--no-clean" ]; then
+   # Usually, we want to clean, since clippy won't work otherwise.
+   echo "[+] Cleaning up previous builds..."
+   cargo clean -p libafl
+fi
 RUST_BACKTRACE=full cargo clippy --all --all-features --tests -- \
    -D clippy::pedantic \
    -W clippy::similar-names \

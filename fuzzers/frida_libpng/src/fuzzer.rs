@@ -4,6 +4,15 @@
 use clap::{App, Arg};
 
 use libafl::{
+    bolts::{
+        current_nanos,
+        launcher::Launcher,
+        os::ashmem_server::AshmemService,
+        os::parse_core_bind_arg,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+    },
     corpus::{
         ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
         IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
@@ -16,17 +25,13 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
-    mutators::{scheduled::{havoc_mutations, StdScheduledMutator}, token_mutations::Tokens},
-    observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver},
-    bolts::{
-        os::ashmem_server::AshmemService,
-        shmem::{StdShMemProvider, ShMemProvider},
-        tuples::tuple_list,
-        current_nanos, launcher::Launcher, os::parse_core_bind_arg, rands::StdRand
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, HasMetadata, State, StdState},
     stats::SimpleStats,
     Error,
 };
@@ -86,7 +91,7 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
-if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
+        if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
             println!("Crashing target as it had ASAN errors");
             unsafe {
                 libc::raise(libc::SIGABRT);
@@ -206,38 +211,36 @@ pub fn main() {
 
     let matches = App::new("libafl_frida")
         .version("0.1.0")
-        .arg(Arg::with_name("cores")
-            .short("c")
-            .long("cores")
-            .value_name("CORES")
-            .required(true)
-            .takes_value(true)
+        .arg(
+            Arg::with_name("cores")
+                .short("c")
+                .long("cores")
+                .value_name("CORES")
+                .required(true)
+                .takes_value(true),
         )
-        .arg(Arg::with_name("harness")
-            .required(true)
-            .index(1)
+        .arg(Arg::with_name("harness").required(true).index(1))
+        .arg(Arg::with_name("symbol").required(true).index(2))
+        .arg(
+            Arg::with_name("modules_to_instrument")
+                .required(true)
+                .index(3),
         )
-        .arg(Arg::with_name("symbol")
-            .required(true)
-            .index(2)
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .value_name("OUTPUT")
+                .required(false)
+                .takes_value(true),
         )
-        .arg(Arg::with_name("modules_to_instrument")
-            .required(true)
-            .index(3)
-        )
-        .arg(Arg::with_name("output")
-            .short("o")
-            .long("output")
-            .value_name("OUTPUT")
-            .required(false)
-            .takes_value(true)
-        )
-        .arg(Arg::with_name("b2baddr")
-            .short("B")
-            .long("b2baddr")
-            .value_name("B2BADDR")
-            .required(false)
-            .takes_value(true)
+        .arg(
+            Arg::with_name("b2baddr")
+                .short("B")
+                .long("b2baddr")
+                .value_name("B2BADDR")
+                .required(false)
+                .takes_value(true),
         )
         .get_matches();
 
@@ -260,7 +263,8 @@ pub fn main() {
         fuzz(
             matches.value_of("harness").unwrap(),
             matches.value_of("symbol").unwrap(),
-            matches.value_of("modules_to_instrument")
+            matches
+                .value_of("modules_to_instrument")
                 .unwrap()
                 .split(':')
                 .map(|module_name| std::fs::canonicalize(module_name).unwrap())
@@ -304,27 +308,23 @@ unsafe fn fuzz(
     stdout_file: Option<&str>,
     broker_addr: Option<SocketAddr>,
 ) -> Result<(), Error> {
-    let stats_closure = |s| {
-        println!("{}", s)
-    };
+    let stats_closure = |s| println!("{}", s);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(stats_closure);
-
 
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Failed to start Ashmem service");
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut client_init_stats = || {
-        Ok(SimpleStats::new(stats_closure))
-    };
+    let mut client_init_stats = || Ok(SimpleStats::new(stats_closure));
 
-    let mut run_client = |state: Option<State<_, _, _, _, _, _>>, mut mgr| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>, mut mgr| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         let lib = libloading::Library::new(module_name).unwrap();
-        let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
-            lib.get(symbol_name.as_bytes()).unwrap();
+        let target_func: libloading::Symbol<
+            unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
+        > = lib.get(symbol_name.as_bytes()).unwrap();
 
         let mut frida_harness = move |buf: &[u8]| {
             (target_func)(buf.as_ptr(), buf.len());
@@ -355,11 +355,14 @@ unsafe fn fuzz(
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryCorpus::new(),
                 // Feedbacks to rate the interestingness of an input
-                MaxMapFeedback::new_tracking_with_observer(&edges_observer, true, false),
+                MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
-                OnDiskCorpus::new_save_meta(objective_dir.clone(), Some(OnDiskMetadataFormat::JsonPretty))
-                    .unwrap(),
+                OnDiskCorpus::new_save_meta(
+                    objective_dir.clone(),
+                    Some(OnDiskMetadataFormat::JsonPretty),
+                )
+                .unwrap(),
                 // Feedbacks to recognize an input as solution
                 feedback_or!(
                     CrashFeedback::new(),
@@ -416,11 +419,8 @@ unsafe fn fuzz(
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
             state
-                .load_initial_inputs(&mut executor, &mut mgr, &scheduler, &corpus_dirs)
-                .unwrap_or_else(|_| panic!(
-                    "Failed to load initial corpus at {:?}",
-                    &corpus_dirs
-                ));
+                .load_initial_inputs(&mut executor, &mut mgr, &mut scheduler, &corpus_dirs)
+                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 

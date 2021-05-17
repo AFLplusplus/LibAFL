@@ -80,7 +80,7 @@ pub fn main() {
 
         // The state of the edges feedback.
         let feedback_state = MapFeedbackState::with_observer(&edges_observer);
- 
+
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
         let feedback = feedback_or!(

@@ -26,11 +26,11 @@ pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |buf: &[u8]| {
         signals_set(0);
-        if buf.len() > 0 && buf[0] == 'a' as u8 {
+        if buf.len() > 0 && buf[0] == b'a' {
             signals_set(1);
-            if buf.len() > 1 && buf[1] == 'b' as u8 {
+            if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
-                if buf.len() > 2 && buf[2] == 'c' as u8 {
+                if buf.len() > 2 && buf[2] == b'c' {
                     panic!("=)");
                 }
             }
@@ -85,7 +85,7 @@ pub fn main() {
         &mut state,
         &mut mgr,
     )
-    .expect("Failed to create the Executor".into());
+    .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
@@ -93,7 +93,7 @@ pub fn main() {
     // Generate 8 initial inputs
     state
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-        .expect("Failed to generate the initial corpus".into());
+        .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
@@ -101,5 +101,5 @@ pub fn main() {
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-        .expect("Error in the fuzzing loop".into());
+        .expect("Error in the fuzzing loop");
 }
