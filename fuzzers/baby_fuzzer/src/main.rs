@@ -15,18 +15,20 @@ use libafl::{
     stats::SimpleStats,
 };
 
-// Coverage map with explicit assignments due to the lack of instrumentation
+/// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
 
+/// Assign a signal to the signals map
 fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
+#[allow(clippy::similar_names)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |buf: &[u8]| {
         signals_set(0);
-        if buf.len() > 0 && buf[0] == b'a' {
+        if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);

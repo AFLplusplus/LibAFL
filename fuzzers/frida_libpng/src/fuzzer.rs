@@ -77,14 +77,14 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         if self.helper.stalker_enabled() {
-            if !self.followed {
-                self.followed = true;
-                self.stalker
-                    .follow_me::<NoneEventSink>(self.helper.transformer(), None);
-            } else {
+            if self.followed {
                 self.stalker.activate(NativePointer(
                     self.base.inner().harness_mut() as *mut _ as *mut c_void
                 ))
+            } else {
+                self.followed = true;
+                self.stalker
+                    .follow_me::<NoneEventSink>(self.helper.transformer(), None);
             }
         }
         let res = self.base.run_target(input);
@@ -318,7 +318,7 @@ unsafe fn fuzz(
 
     let mut client_init_stats = || Ok(SimpleStats::new(stats_closure));
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>, mut mgr| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         let lib = libloading::Library::new(module_name).unwrap();
@@ -347,15 +347,24 @@ unsafe fn fuzz(
             MAP_SIZE,
         ));
 
+        let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+        // Feedbacks to rate the interestingness of an input
+        let feedback = MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false);
+
+        // Feedbacks to recognize an input as solution
+        let objective = feedback_or!(
+            CrashFeedback::new(),
+            TimeoutFeedback::new(),
+            AsanErrorsFeedback::new()
+        );
+
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
-            State::new(
+            StdState::new(
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryCorpus::new(),
-                // Feedbacks to rate the interestingness of an input
-                MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new_save_meta(
@@ -363,12 +372,7 @@ unsafe fn fuzz(
                     Some(OnDiskMetadataFormat::JsonPretty),
                 )
                 .unwrap(),
-                // Feedbacks to recognize an input as solution
-                feedback_or!(
-                    CrashFeedback::new(),
-                    TimeoutFeedback::new(),
-                    AsanErrorsFeedback::new()
-                ),
+                feedback_state,
             )
         });
 
@@ -391,7 +395,7 @@ unsafe fn fuzz(
 
         // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
         let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
-        let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         frida_helper.register_thread();
         // Create the executor for an in-process function with just one observer for edge coverage
@@ -424,7 +428,7 @@ unsafe fn fuzz(
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop(&mut state, &mut executor, &mut mgr, &scheduler)?;
+        fuzzer.fuzz_loop(&mut state, &mut executor, &mut mgr, &mut scheduler)?;
 
         // Never reached
 
