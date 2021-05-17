@@ -651,7 +651,7 @@ pub fn setup_restarting_mgr_std<I, OT, S, ST>(
 >
 where
     I: Input,
-    S: DeserializeOwned + IfInteresting<I, S>,
+    S: DeserializeOwned,
     ST: Stats + Clone,
     OT: ObserversTuple,
     S: DeserializeOwned,
@@ -707,7 +707,7 @@ impl<I, OT, S, SP, ST> RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,
     OT: ObserversTuple,
-    S: DeserializeOwned + IfInteresting<I, S>,
+    S: DeserializeOwned,
     SP: ShMemProvider,
     ST: Stats + Clone,
 {
