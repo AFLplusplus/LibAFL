@@ -100,15 +100,18 @@ impl FridaOptions {
                     }
                 }
             } // end of for loop
-            if let Some(asan_cores) = asan_cores && options.enable_asan {
-                let core_ids = get_core_ids().unwrap();
-                assert_eq!(
-                    core_ids.len(),
-                    1,
-                    "Client should only be enabled on one core"
-                );
-                let core_id = core_ids[0].id;
-                options.enable_asan = asan_cores.contains(&core_id);
+
+            if options.enable_asan {
+                if let Some(asan_cores) = asan_cores {
+                    let core_ids = get_core_ids().unwrap();
+                    assert_eq!(
+                        core_ids.len(),
+                        1,
+                        "Client should only be enabled on one core"
+                    );
+                    let core_id = core_ids[0].id;
+                    options.enable_asan = asan_cores.contains(&core_id);
+                }
             }
         }
 

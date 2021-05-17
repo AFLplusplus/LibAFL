@@ -60,6 +60,8 @@ jobs:
       run: cargo test --all-features --doc
     - name: Run clippy
       run: ./clippy.sh
+    - name: Build fuzzers
+      run: ./build_all_fuzzers.sh
   windows:
     runs-on: windows-latest
     steps:
