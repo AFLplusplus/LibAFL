@@ -24,6 +24,8 @@ pub struct ClientStats {
     pub executions: u64,
     /// The size of the objectives corpus for this client
     pub objective_size: u64,
+    /// The total number of distinct feedbacks for this client
+    pub feedbacks: u64,
     /// The last reported executions for this client
     pub last_window_executions: u64,
     /// The last time we got this information
@@ -48,6 +50,11 @@ impl ClientStats {
             self.last_window_executions = self.executions;
         }
         self.executions = executions;
+    }
+
+    /// We got new information about feedbacks for this client, insert them
+    pub fn update_feedbacks(&mut self, feedbacks: u64) {
+        self.feedbacks = feedbacks;
     }
 
     /// We got a new information about corpus size for this client, insert them.
@@ -142,6 +149,16 @@ pub trait Stats {
             .fold(0_u64, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
+    #[inline]
+    fn total_feedbacks(&self) -> Vec<u64> {
+        let mut feedbacks: Vec<u64> = Vec::new();
+        for feedback_count in self.client_stats().iter().map(|stats| stats.feedbacks) {
+            feedbacks.push(feedback_count);
+        }
+
+        return feedbacks;
+    }
+
     /// The client stats for a specific id, creating new if it doesn't exist
     fn client_stats_mut_for(&mut self, client_id: u32) -> &mut ClientStats {
         let client_stat_count = self.client_stats().len();
@@ -187,14 +204,16 @@ where
     }
 
     fn display(&mut self, event_msg: String) {
+
         let fmt = format!(
-            "[{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {} feedback: {:?}",
             event_msg,
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec(),
+            self.total_feedbacks(),
         );
         (self.print_fn)(fmt);
 

@@ -272,6 +272,11 @@ where
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
+            Event::FeedbackStats { feedbacks } => {
+                let client = stats.client_stats_mut_for(sender_id);
+                client.update_feedbacks(*feedbacks as u64);
+                Ok(BrokerEventResult::Handled)
+            }
             Event::Objective { objective_size } => {
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_objective_size(*objective_size as u64);

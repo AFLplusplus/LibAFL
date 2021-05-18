@@ -95,18 +95,20 @@ where
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
+    FeedbackStats {
+        /// The number of distinct feedbacks for this client
+        feedbacks: usize,
+    },
     /// New stats with performance stats.
     #[cfg(feature = "introspection")]
     UpdatePerfStats {
         /// The time of generation of the event
         time: Duration,
-
         /// The executions of this client
         executions: usize,
-
         /// Current performance statistics
         introspection_stats: Box<ClientPerfStats>,
-
+        /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
     /// A new objective was found
@@ -156,6 +158,9 @@ where
                 introspection_stats: _,
                 phantom: _,
             } => "PerfStats",
+            Event::FeedbackStats {
+                feedbacks: _,
+            } => "FeedbackStats",
             Event::Objective { objective_size: _ } => "Objective",
             Event::Log {
                 severity_level: _,
