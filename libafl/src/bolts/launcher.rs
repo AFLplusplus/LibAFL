@@ -8,7 +8,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     stats::Stats,
-    Error, IfInteresting,
+    Error,
 };
 
 #[cfg(all(windows, feature = "std"))]
@@ -75,7 +75,7 @@ where
     OT: ObserversTuple,
     ST: Stats + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + IfInteresting<I, S>,
+    S: DeserializeOwned,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std"))]

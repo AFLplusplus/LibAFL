@@ -9,14 +9,17 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{
-        current_nanos, launcher::Launcher, os::parse_core_bind_arg, rands::StdRand,
-        shmem::StdShMem, tuples::tuple_list,
+        current_nanos,
+        launcher::Launcher,
+        os::parse_core_bind_arg,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
     },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::{setup_restarting_mgr_std, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -27,7 +30,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
-    Error,
 };
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
@@ -50,26 +52,13 @@ pub fn main() {
     );
 
     let broker_port = 1337;
-    let stats = SimpleStats::new(|s| println!("{}", s));
+    let stats_closure = |s| println!("{}", s);
+    let stats = SimpleStats::new(stats_closure.clone());
+    let mut init_stats = || Ok(SimpleStats::new(stats_closure.clone()));
 
-    launcher(stats, broker_port, &cores, || {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
         let corpus_dirs = vec![PathBuf::from("./corpus")];
         let objective_dir = PathBuf::from("./crashes");
-
-        let stats = SimpleStats::new(|s| println!("{}", s));
-
-        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-        let (state, mut restarting_mgr) = match setup_restarting_mgr_std(stats, broker_port) {
-            Ok(res) => res,
-            Err(err) => match err {
-                Error::ShuttingDown => {
-                    return Ok(());
-                }
-                _ => {
-                    panic!("Failed to setup the restarter: {}", err);
-                }
-            },
-        };
 
         // Create an observation channel using the coverage map
         let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
@@ -174,8 +163,18 @@ pub fn main() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        //fuzzer.fuzz_loop(&mut state, &mut executor, &mut restarting_mgr, &scheduler)?;
-        Ok((fuzzer, executor, restarting_mgr, state, scheduler))
-    })
-    .unwrap();
+        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+        Ok(())
+    };
+
+    let mut launcher = Launcher::builder()
+        .client_init_stats(&mut init_stats)
+        .stats(stats)
+        .broker_port(broker_port)
+        .shmem_provider(StdShMemProvider::new().unwrap())
+        .cores(&cores)
+        .run_client(&mut run_client)
+        .build();
+
+    launcher.launch().expect("Launcher failed");
 }

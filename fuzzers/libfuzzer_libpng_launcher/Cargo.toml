@@ -1,5 +1,5 @@
 [package]
-name = "libfuzzer_libpng"
+name = "libfuzzer_libpng_launcher"
 version = "0.1.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
