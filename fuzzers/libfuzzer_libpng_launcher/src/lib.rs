@@ -42,6 +42,8 @@ pub fn main() {
     //RegistryBuilder::register::<Tokens>();
     let yaml = load_yaml!("clap-config.yaml");
     let matches = App::from(yaml).get_matches();
+    
+    let broker_port = 1337;
 
     let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
@@ -51,10 +53,13 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let broker_port = 1337;
+    #[cfg(target_os = "android")]
+    AshmemService::start().expect("Failed to start Ashmem service");
+    let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+
     let stats_closure = |s| println!("{}", s);
-    let stats = SimpleStats::new(stats_closure.clone());
-    let mut init_stats = || Ok(SimpleStats::new(stats_closure.clone()));
+    let stats = SimpleStats::new(stats_closure);
+    let mut client_init_stats = || Ok(SimpleStats::new(stats_closure));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
         let corpus_dirs = vec![PathBuf::from("./corpus")];
@@ -167,14 +172,15 @@ pub fn main() {
         Ok(())
     };
 
-    let mut launcher = Launcher::builder()
-        .client_init_stats(&mut init_stats)
+    Launcher::builder()
+        .shmem_provider(shmem_provider)
         .stats(stats)
-        .broker_port(broker_port)
-        .shmem_provider(StdShMemProvider::new().unwrap())
-        .cores(&cores)
+        .client_init_stats(&mut client_init_stats)
         .run_client(&mut run_client)
-        .build();
-
-    launcher.launch().expect("Launcher failed");
+        .cores(&cores)
+        .broker_port(broker_port)
+        .stdout_file(Some("/dev/null"))
+        .build()
+        .launch()
+        .expect("Launcher failed");
 }

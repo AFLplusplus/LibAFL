@@ -3,11 +3,13 @@
 
 use clap::{App, Arg};
 
+#[cfg(target_os = "android")]
+use libafl::bolts::os::ashmem_server::AshmemService;
+
 use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::ashmem_server::AshmemService,
         os::parse_core_bind_arg,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
@@ -31,7 +33,7 @@ use libafl::{
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, State, StdState},
+    state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     Error,
 };
@@ -347,9 +349,18 @@ unsafe fn fuzz(
             MAP_SIZE,
         ));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+
         let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-        // Feedbacks to rate the interestingness of an input
-        let feedback = MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false);
+        // Feedback to rate the interestingness of an input
+        // This one is composed by two Feedbacks in OR
+        let feedback = feedback_or!(
+            // New maximization map feedback linked to the edges observer and the feedback state
+            MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+            // Time feedback, this one does not need a feedback state
+            TimeFeedback::new_with_observer(&time_observer)
+        );
 
         // Feedbacks to recognize an input as solution
         let objective = feedback_or!(
@@ -372,7 +383,9 @@ unsafe fn fuzz(
                     Some(OnDiskMetadataFormat::JsonPretty),
                 )
                 .unwrap(),
-                feedback_state,
+                // States of the feedbacks.
+                // They are the data related to the feedbacks that you want to persist in the State.
+                tuple_list!(feedback_state),
             )
         });
 
@@ -391,10 +404,12 @@ unsafe fn fuzz(
 
         // Setup a basic mutator with a mutational stage
         let mutator = StdScheduledMutator::new(havoc_mutations());
-        let stage = StdMutationalStage::new(mutator);
+        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-        // A fuzzer with just one stage and a minimization+queue policy to get testcasess from the corpus
+        // A minimization+queue policy to get testcasess from the corpus
         let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+
+        // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         frida_helper.register_thread();
@@ -403,7 +418,12 @@ unsafe fn fuzz(
             &gum,
             InProcessExecutor::new(
                 &mut frida_harness,
-                tuple_list!(edges_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
+                tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                ),
+                &mut fuzzer,
                 &mut state,
                 &mut mgr,
             )?,
@@ -423,15 +443,15 @@ unsafe fn fuzz(
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
             state
-                .load_initial_inputs(&mut executor, &mut mgr, &mut scheduler, &corpus_dirs)
-                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
+                .expect(&format!(
+                    "Failed to load initial corpus at {:?}",
+                    &corpus_dirs
+                ));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop(&mut state, &mut executor, &mut mgr, &mut scheduler)?;
-
-        // Never reached
-
+        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
         Ok(())
     };
 
@@ -441,6 +461,7 @@ unsafe fn fuzz(
         .client_init_stats(&mut client_init_stats)
         .run_client(&mut run_client)
         .cores(cores)
+        .broker_port(broker_port)
         .stdout_file(stdout_file)
         .remote_broker_addr(broker_addr)
         .build()
