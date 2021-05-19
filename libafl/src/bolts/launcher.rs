@@ -32,6 +32,7 @@ use core_affinity::CoreId;
 use typed_builder::TypedBuilder;
 
 /// The Launcher client callback type reference
+#[cfg(feature = "std")]
 pub type LauncherClientFnRef<'a, I, OT, S, SP, ST> =
     &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP, ST>) -> Result<(), Error>;
 
