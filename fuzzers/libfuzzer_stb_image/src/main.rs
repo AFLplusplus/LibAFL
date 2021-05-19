@@ -1,5 +1,5 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
-//! The example harness is built for stb_image.
+//! The example harness is built for `stb_image`.
 
 use std::{env, path::PathBuf};
 
