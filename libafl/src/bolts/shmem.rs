@@ -17,11 +17,13 @@ pub type OsShMemProvider = Win32ShMemProvider;
 #[cfg(all(windows, feature = "std"))]
 pub type OsShMem = Win32ShMem;
 
-#[cfg(target_os = "android")]
+use crate::Error;
+
+#[cfg(all(target_os = "android", feature = "std"))]
 use crate::bolts::os::ashmem_server::ServedShMemProvider;
-#[cfg(target_os = "android")]
+#[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider>;
-#[cfg(target_os = "android")]
+#[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMem = RcShMem<ServedShMemProvider>;
 
 /// The default [`ShMemProvider`] for this os.
@@ -31,16 +33,17 @@ pub type StdShMemProvider = OsShMemProvider;
 #[cfg(all(feature = "std", not(target_os = "android")))]
 pub type StdShMem = OsShMem;
 
-use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 
 use alloc::{rc::Rc, string::ToString};
-use core::cell::RefCell;
-use core::mem::ManuallyDrop;
+use core::{cell::RefCell, fmt::Debug, mem::ManuallyDrop};
 
-use crate::Error;
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::pipes::Pipe;
+#[cfg(all(unix, feature = "std"))]
+use std::io::{Read, Write};
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
@@ -191,10 +194,20 @@ pub trait ShMemProvider: Send + Clone + Default + Debug {
         ))
     }
 
-    /// This method should be called after a fork or after cloning/a thread creation event, allowing the [`ShMem`] to
-    /// reset thread specific info, and potentially reconnect.
-    fn post_fork(&mut self) {
+    /// This method should be called before a fork or a thread creation event, allowing the [`ShMemProvider`] to
+    /// get ready for a potential reset of thread specific info, and for potential reconnects.
+    /// Make sure to call [`Self::post_fork()`] after threading!
+    fn pre_fork(&mut self) -> Result<(), Error> {
         // do nothing
+        Ok(())
+    }
+
+    /// This method should be called after a fork or after cloning/a thread creation event, allowing the [`ShMemProvider`] to
+    /// reset thread specific info, and potentially reconnect.
+    /// Make sure to call [`Self::pre_fork()`] before threading!
+    fn post_fork(&mut self, _is_child: bool) -> Result<(), Error> {
+        // do nothing
+        Ok(())
     }
 
     /// Release the resources associated with the given [`ShMem`]
@@ -243,12 +256,24 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
+#[cfg(all(unix, feature = "std"))]
 pub struct RcShMemProvider<T: ShMemProvider> {
+    /// The wrapped [`ShMemProvider`].
     internal: Rc<RefCell<T>>,
+    /// A pipe the child uses to communicate progress to the parent after fork.
+    /// This prevents a potential race condition when using the [`AshmemService`].
+    #[cfg(unix)]
+    child_parent_pipe: Option<Pipe>,
+    #[cfg(unix)]
+    /// A pipe the parent uses to communicate progress to the child after fork.
+    /// This prevents a potential race condition when using the [`AshmemService`].
+    parent_child_pipe: Option<Pipe>,
 }
 
+#[cfg(all(unix, feature = "std"))]
 unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
 
+#[cfg(all(unix, feature = "std"))]
 impl<T> ShMemProvider for RcShMemProvider<T>
 where
     T: ShMemProvider + alloc::fmt::Debug,
@@ -258,6 +283,8 @@ where
     fn new() -> Result<Self, Error> {
         Ok(Self {
             internal: Rc::new(RefCell::new(T::new()?)),
+            child_parent_pipe: None,
+            parent_child_pipe: None,
         })
     }
 
@@ -286,11 +313,100 @@ where
         })
     }
 
-    fn post_fork(&mut self) {
-        self.internal.borrow_mut().post_fork()
+    /// This method should be called before a fork or a thread creation event, allowing the [`ShMemProvider`] to
+    /// get ready for a potential reset of thread specific info, and for potential reconnects.
+    fn pre_fork(&mut self) -> Result<(), Error> {
+        // Set up the pipes to communicate progress over, later.
+        self.child_parent_pipe = Some(Pipe::new()?);
+        self.parent_child_pipe = Some(Pipe::new()?);
+        self.internal.borrow_mut().pre_fork()
+    }
+
+    /// After fork, make sure everything gets set up correctly internally.
+    fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
+        if is_child {
+            self.await_parent_done()?;
+            let child_shmem = self.internal.borrow_mut().clone();
+            self.internal = Rc::new(RefCell::new(child_shmem));
+        }
+        self.internal.borrow_mut().post_fork(is_child)?;
+        if is_child {
+            self.set_child_done()?;
+        } else {
+            self.set_parent_done()?;
+            self.await_child_done()?;
+        }
+
+        self.parent_child_pipe = None;
+        self.child_parent_pipe = None;
+        Ok(())
     }
 }
 
+#[cfg(all(unix, feature = "std"))]
+impl<T> RcShMemProvider<T>
+where
+    T: ShMemProvider,
+{
+    /// "set" the "latch"
+    /// (we abuse `pipes` as `semaphores`, as they don't need an additional shared mem region.)
+    fn pipe_set(pipe: &mut Option<Pipe>) -> Result<(), Error> {
+        match pipe {
+            Some(pipe) => {
+                let ok = [0u8; 4];
+                pipe.write_all(&ok)?;
+                Ok(())
+            }
+            None => Err(Error::IllegalState(
+                "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
+            )),
+        }
+    }
+
+    /// "await" the "latch"
+    fn pipe_await(pipe: &mut Option<Pipe>) -> Result<(), Error> {
+        match pipe {
+            Some(pipe) => {
+                let ok = [0u8; 4];
+                let mut ret = ok;
+                pipe.read_exact(&mut ret)?;
+                if ret == ok {
+                    Ok(())
+                } else {
+                    Err(Error::Unknown(format!(
+                        "Wrong result read from pipe! Expected 0, got {:?}",
+                        ret
+                    )))
+                }
+            }
+            None => Err(Error::IllegalState(
+                "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
+            )),
+        }
+    }
+
+    /// After fork, wait for the parent to write to our pipe :)
+    fn await_parent_done(&mut self) -> Result<(), Error> {
+        Self::pipe_await(&mut self.parent_child_pipe)
+    }
+
+    /// After fork, inform the new child we're done
+    fn set_parent_done(&mut self) -> Result<(), Error> {
+        Self::pipe_set(&mut self.parent_child_pipe)
+    }
+
+    /// After fork, wait for the child to write to our pipe :)
+    fn await_child_done(&mut self) -> Result<(), Error> {
+        Self::pipe_await(&mut self.child_parent_pipe)
+    }
+
+    /// After fork, inform the new child we're done
+    fn set_child_done(&mut self) -> Result<(), Error> {
+        Self::pipe_set(&mut self.child_parent_pipe)
+    }
+}
+
+#[cfg(all(unix, feature = "std"))]
 impl<T> Default for RcShMemProvider<T>
 where
     T: ShMemProvider + alloc::fmt::Debug,
@@ -326,10 +442,10 @@ pub mod unix_shmem {
         use core::{ptr, slice};
         use libc::{c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
 
-        use crate::Error;
-
-        use super::super::{ShMem, ShMemId, ShMemProvider};
-
+        use crate::{
+            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            Error,
+        };
         #[cfg(unix)]
         #[derive(Copy, Clone)]
         #[repr(C)]
@@ -491,9 +607,10 @@ pub mod unix_shmem {
         };
         use std::ffi::CString;
 
-        use crate::Error;
-
-        use super::super::{ShMem, ShMemId, ShMemProvider};
+        use crate::{
+            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            Error,
+        };
 
         extern "C" {
             fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
@@ -702,14 +819,16 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
-    use super::{ShMem, ShMemId, ShMemProvider};
     use crate::{
-        bolts::bindings::{
-            windows::win32::system_services::{
-                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+        bolts::{
+            bindings::{
+                windows::win32::system_services::{
+                    CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+                },
+                windows::win32::system_services::{BOOL, HANDLE, PAGE_TYPE, PSTR},
+                windows::win32::windows_programming::CloseHandle,
             },
-            windows::win32::system_services::{BOOL, HANDLE, PAGE_TYPE, PSTR},
-            windows::win32::windows_programming::CloseHandle,
+            shmem::{ShMem, ShMemId, ShMemProvider},
         },
         Error,
     };
@@ -752,7 +871,7 @@ pub mod win32_shmem {
                     )));
                 }
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
-                if map == ptr::null_mut() {
+                if map.is_null() {
                     return Err(Error::Unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)

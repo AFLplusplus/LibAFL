@@ -8,9 +8,11 @@ use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchName, Named},
+    bolts::{
+        current_time,
+        tuples::{MatchName, Named},
+    },
     executors::HasExecHooks,
-    utils::current_time,
     Error,
 };
 

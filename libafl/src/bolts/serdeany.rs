@@ -256,6 +256,12 @@ macro_rules! create_serde_registry_for_trait {
                     self.map.len()
                 }
 
+                /// Returns `true` if this map is empty.
+                #[must_use]
+                pub fn is_empty(&self) -> bool {
+                    self.map.is_empty()
+                }
+
                 /// Returns if the map contains the given type.
                 #[must_use]
                 #[inline]
@@ -482,6 +488,12 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn len(&self) -> usize {
                     self.map.len()
+                }
+
+                /// Returns `true` if this map is empty.
+                #[must_use]
+                pub fn is_empty(&self) -> bool {
+                    self.map.is_empty()
                 }
 
                 /// Returns if the element with a given type is contained in this map.

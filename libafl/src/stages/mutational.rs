@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
+    bolts::rands::Rand,
     corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
@@ -9,7 +10,6 @@ use crate::{
     stages::Stage,
     start_timer,
     state::{HasClientPerfStats, HasCorpus, HasRand},
-    utils::Rand,
     Error,
 };
 

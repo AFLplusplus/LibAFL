@@ -1,16 +1,18 @@
 //! The [`InProcessExecutor`] is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
+use core::marker::PhantomData;
+
+#[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ffi::c_void,
-    marker::PhantomData,
     ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
 use crate::{
@@ -64,9 +66,9 @@ where
     #[inline]
     fn pre_exec(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error> {
         #[cfg(unix)]
@@ -82,12 +84,12 @@ where
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, event_mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(windows)]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
@@ -100,9 +102,9 @@ where
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, event_mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         Ok(())
@@ -124,7 +126,7 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(windows)]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             write_volatile(
                 &mut windows_exception_handler::GLOBAL_STATE.current_input_ptr,
@@ -203,7 +205,7 @@ where
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(windows)]
+        #[cfg(all(windows, feature = "std"))]
         unsafe {
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
@@ -229,7 +231,7 @@ where
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
-        self.harness_fn
+        &self.harness_fn
     }
 
     /// Retrieve the harness function for a mutable reference.
@@ -356,7 +358,7 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             println!("Timeout in fuzz run.");
             #[cfg(feature = "std")]
-            let _ = stdout().flush();
+            let _res = stdout().flush();
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
@@ -471,7 +473,7 @@ mod unix_signal_handler {
                 target_arch = "aarch64"
             ))]
             {
-                use crate::utils::find_mapping_for_address;
+                use crate::bolts::os::find_mapping_for_address;
                 println!("{:━^100}", " CRASH ");
                 println!(
                     "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
@@ -504,7 +506,7 @@ mod unix_signal_handler {
             }
 
             #[cfg(feature = "std")]
-            let _ = stdout().flush();
+            let _res = stdout().flush();
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             // Make sure we don't crash in the crash handler forever.
@@ -549,7 +551,7 @@ mod unix_signal_handler {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 mod windows_exception_handler {
     use alloc::vec::Vec;
     use core::{ffi::c_void, ptr};

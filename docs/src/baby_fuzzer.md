@@ -91,12 +91,11 @@ In our main so we create a basic State instance like the following:
 
 ```rust
 // create a State from scratch
-let mut state = State::new(
+let mut state = StdState::new(
     // RNG
     StdRand::with_seed(current_nanos()),
     // Corpus that will be evolved, we keep it in memory for performance
     InMemoryCorpus::new(),
-    (),
     // Corpus in which we store solutions (crashes in this example),
     // on disk so the user can get them after stopping the fuzzer
     OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
@@ -108,7 +107,7 @@ It takes a random number generator, that is part of the fuzzer state, in this ca
 
 As the second parameter, it takes an instance of something implementing the Corpus trait, InMemoryCorpus in this case. The corpus is the container of the testcases evolved by the fuzzer, in this case, we keep it all in memory.
 
-We will discuss later the third and fifth parameters. The fourth is another corpus, in this case, to store the testcases that are considered as "solutions" for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory so we can inspect it.
+We will discuss later the last parameter. The third is another corpus, in this case, to store the testcases that are considered as "solutions" for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory so we can inspect it.
 
 Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a Stats instance.
 
@@ -121,27 +120,39 @@ let stats = SimpleStats::new(|s| println!("{}", s));
 let mut mgr = SimpleEventManager::new(stats);
 ```
 
-Last but not least, we need an Executor that is the entity responsible to run our program under test. In this example, we want to run the harness function in process, and so we use the InProcessExecutor.
-
-```rust
-// Create the executor for an in-process function
-let mut executor =
-    InProcessExecutor::new(&mut harness, (), &mut state, &mut mgr)
-        .expect("Failed to create the Executor".into());
-```
-
-It takes a reference to the harness, the state, and the event manager. We will discuss the second parameter later.
-As the executor expects that the harness returns an ExitKind object, we add `ExitKind::Ok` to our harness function.
-
-Now we have the 3 major entities ready for running our tests, but we still cannot generate testcases.
-
-For this purpose, we use a Generator, RandPrintablesGenerator that generates a string of printable bytes.
-The State's method used to generate and run tests needs a scheduling policy for the corpus. We create it as QueueCorpusScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
+In addition, we have the Fuzzer, an entity that contains some actions that alter the State. On of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
+We create it as QueueCorpusScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
 ```rust
 // A queue policy to get testcasess from the corpus
 let scheduler = QueueCorpusScheduler::new();
 
+// A fuzzer with feedbacks and a corpus scheduler
+let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+```
+
+Last but not least, we need an Executor that is the entity responsible to run our program under test. In this example, we want to run the harness function in process, and so we use the InProcessExecutor.
+
+```rust
+// Create the executor for an in-process function
+let mut executor = InProcessExecutor::new(
+    &mut harness,
+    (),
+    &mut fuzzer,
+    &mut state,
+    &mut mgr,
+)
+.expect("Failed to create the Executor");
+```
+
+It takes a reference to the harness, the state, and the event manager. We will discuss the second parameter later.
+As the executor expects that the harness returns an ExitKind object, we add `ExitKind::Ok` to our harness function.
+
+Now we have the 4 major entities ready for running our tests, but we still cannot generate testcases.
+
+For this purpose, we use a Generator, RandPrintablesGenerator that generates a string of printable bytes.
+
+```rust
 // Generator of printable bytearrays of max size 32
 let mut generator = RandPrintablesGenerator::new(32);
 
@@ -156,13 +167,13 @@ Now you can prepend the following `use` directives to your main.rs and compile i
 ```rust 
 use std::path::PathBuf;
 use libafl::{
+    bolts::{current_nanos, rands::StdRand},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     generators::RandPrintablesGenerator,
-    state::State,
+    state::StdState,
     stats::SimpleStats,
-    utils::{current_nanos, StdRand},
 };
 ```
 
@@ -229,50 +240,60 @@ let mut executor =
         .expect("Failed to create the Executor".into());
 ```
 
-Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback. The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far, in our case it maintains the set of conditions satisfied in the previous runs.
+Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback. The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a so-called FeedbackState instance, in our case it maintains the set of conditions satisfied in the previous runs.
 
 We use MaxMapFeedback, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
 
 Feedbacks are used also to decide if an input is a "solution". The feedback that does that is called the Objective Feedback and when it rates an input as interested it is not saved to the corpus but to the solutions, written in the `crashes` folder in our case. We use the CrashFeedback to tell the fuzzer that if an input causes the program to crash it is a solution for us.
 
-We need to update our State creation including these feedbacks:
+We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
 ```rust
+// The state of the edges feedback.
+let feedback_state = MapFeedbackState::with_observer(&observer);
+
+// Feedback to rate the interestingness of an input
+let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+
+// A feedback to choose if an input is a solution or not
+let objective = CrashFeedback::new();
+
 // create a State from scratch
-let mut state = State::new(
+let mut state = StdState::new(
     // RNG
     StdRand::with_seed(current_nanos()),
     // Corpus that will be evolved, we keep it in memory for performance
     InMemoryCorpus::new(),
-    // Feedback to rate the interestingness of an input
-    MaxMapFeedback::new_with_observer(&observer),
     // Corpus in which we store solutions (crashes in this example),
     // on disk so the user can get them after stopping the fuzzer
     OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-    // Feedbacks to recognize an input as solution
-    CrashFeedback::new(),
+    // States of the feedbacks.
+    // They are the data related to the feedbacks that you want to persist in the State.
+    tuple_list!(feedback_state),
 );
+
+// ...
+
+// A fuzzer with feedbacks and a corpus scheduler
+let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 ```
 
 ## The actual fuzzing
 
 Now, after including the correct `use`, we can run the program, but the outcome is not so different from the previous one as the random generator does not take into account what we save as interesting in the corpus. To do that, we need to plug a Mutator.
 
-Another central component of LibAFL is the Fuzzer, an entity that holds a set of Stages that are actions done on individual inputs taken from the corpus. The MutationalStage mutates the input and executes it several times for instance.
+Another central component of LibAFL are the Stages, that are actions done on individual inputs taken from the corpus. The MutationalStage mutates the input and executes it several times for instance.
 
-As the last step, to have a proper fuzzer, we create a Fuzzer with a single MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
+As the last step, we create a MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
 
 ```rust
-// Setup a basic mutator with a mutational stage
+// Setup a mutational stage with a basic bytes mutator
 let mutator = StdScheduledMutator::new(havoc_mutations());
-let stage = StdMutationalStage::new(mutator);
-
-// A fuzzer with just one stage
-let mut fuzzer = StdFuzzer::new(tuple_list!(stage));
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
 fuzzer
-    .fuzz_loop(&mut state, &mut executor, &mut mgr, &scheduler)
-    .expect("Error in the fuzzing loop".into());
+    .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+    .expect("Error in the fuzzing loop");
 ```
 
 `fuzz_loop` will request a testcase for each iteration to the fuzzer using the scheduler and then it will invoke the stage.

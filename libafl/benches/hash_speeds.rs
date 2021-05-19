@@ -7,7 +7,7 @@ use xxhash_rust::const_xxh3;
 use xxhash_rust::xxh3;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use libafl::utils::{Rand, StdRand};
+use libafl::bolts::rands::{Rand, StdRand};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rand = StdRand::with_seed(0);

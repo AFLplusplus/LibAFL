@@ -3,6 +3,9 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -11,16 +14,12 @@ use std::{
 };
 
 use crate::{
+    bolts::rands::Rand,
     inputs::{HasBytesVec, Input},
-    mutators::{buffer_self_copy, mutations, MutationResult, Mutator, Named},
+    mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     state::{HasMaxSize, HasMetadata, HasRand},
-    utils::Rand,
     Error,
 };
-use mutations::buffer_copy;
-
-#[cfg(feature = "std")]
-use crate::mutators::str_decode;
 
 /// A state metadata holding a list of tokens
 #[derive(Serialize, Deserialize)]
@@ -56,7 +55,7 @@ impl Tokens {
         if self.token_vec.contains(token) {
             return false;
         }
-        self.token_vec.push(token.to_vec());
+        self.token_vec.push(token.clone());
         true
     }
 
@@ -303,7 +302,7 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_read_tokens() {
-        let _ = fs::remove_file("test.tkns");
+        let _res = fs::remove_file("test.tkns");
         let data = r###"
 # comment
 token1@123="AAA"
@@ -316,6 +315,6 @@ token2="B"
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);
-        let _ = fs::remove_file("test.tkns");
+        let _res = fs::remove_file("test.tkns");
     }
 }

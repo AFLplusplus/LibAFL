@@ -70,11 +70,12 @@ use core::{
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "std")]
 use std::{
     convert::TryInto,
     env,
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
     sync::mpsc::channel,
     thread,
@@ -91,6 +92,10 @@ use crate::{
 };
 #[cfg(unix)]
 use libc::ucontext_t;
+#[cfg(all(unix, feature = "std"))]
+use nix::sys::socket::{self, sockopt::ReusePort};
+#[cfg(all(unix, feature = "std"))]
+use std::os::unix::io::AsRawFd;
 
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
@@ -321,6 +326,19 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
     } else {
         Some(msg_offset_str.parse()?)
     })
+}
+
+/// Bind to a tcp port on the [`_LLMP_BIND_ADDR`] (local, or global)
+/// on a given `port`.
+/// Will set `SO_REUSEPORT` on unix.
+#[cfg(feature = "std")]
+fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
+    let listener = TcpListener::bind((_LLMP_BIND_ADDR, port))?;
+
+    #[cfg(unix)]
+    socket::setsockopt(listener.as_raw_fd(), ReusePort, &true)?;
+
+    Ok(listener)
 }
 
 /// Send one message as `u32` len and `[u8;len]` bytes
@@ -560,28 +578,48 @@ where
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
     pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        match TcpListener::bind(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+        match tcp_bind(port) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
                 dbg!("We're the broker");
+
                 let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
-            Err(e) => {
-                println!("error: {:?}", e);
-                match e.kind() {
-                    std::io::ErrorKind::AddrInUse => {
-                        // We are the client :)
-                        dbg!("We're the client", e);
-                        Ok(LlmpConnection::IsClient {
-                            client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
-                        })
-                    }
-                    _ => Err(Error::File(e)),
-                }
+            Err(Error::File(e)) if e.kind() == ErrorKind::AddrInUse => {
+                // We are the client :)
+                println!(
+                    "We're the client (internal port already bound by broker, {:#?})",
+                    e
+                );
+                Ok(LlmpConnection::IsClient {
+                    client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+                })
             }
+            Err(e) => Err(dbg!(e)),
         }
+    }
+
+    /// Creates a new broker on the given port
+    #[cfg(feature = "std")]
+    pub fn broker_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        match tcp_bind(port) {
+            Ok(listener) => {
+                let mut broker = LlmpBroker::new(shmem_provider)?;
+                let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
+                Ok(LlmpConnection::IsBroker { broker })
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Creates a new client on the given port
+    #[cfg(feature = "std")]
+    pub fn client_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        Ok(LlmpConnection::IsClient {
+            client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+        })
     }
 
     /// Describe this in a reproducable fashion, if it's a client
@@ -1671,7 +1709,7 @@ where
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
             stream,
-            &self.shmem_provider,
+            &mut self.shmem_provider,
             self.llmp_clients.len() as ClientId,
             &self.llmp_out.out_maps.first().unwrap().shmem.description(),
         )?;
@@ -1787,7 +1825,7 @@ where
     /// Does so on the given port.
     #[cfg(feature = "std")]
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
-        let listener = TcpListener::bind(format!("{}:{}", _LLMP_BIND_ADDR, port))?;
+        let listener = tcp_bind(port)?;
         // accept connections and process them, spawning a new thread for each one
         println!("Server listening on port {}", port);
         self.launch_listener(Listener::Tcp(listener))
@@ -1822,11 +1860,13 @@ where
     #[allow(clippy::let_and_return)]
     fn b2b_thread_on(
         mut stream: TcpStream,
-        shmem_provider: &SP,
+        shmem_provider: &mut SP,
         b2b_client_id: ClientId,
         broker_map_description: &ShMemDescription,
     ) -> Result<ShMemDescription, Error> {
         let broker_map_description = *broker_map_description;
+
+        shmem_provider.pre_fork()?;
         let mut shmem_provider_clone = shmem_provider.clone();
 
         // A channel to get the new "client's" sharedmap id from
@@ -1835,7 +1875,7 @@ where
         // (For now) the thread remote broker 2 broker just acts like a "normal" llmp client, except it proxies all messages to the attached socket, in both directions.
         thread::spawn(move || {
             // as always, call post_fork to potentially reconnect the provider (for threaded/forked use)
-            shmem_provider_clone.post_fork();
+            shmem_provider_clone.post_fork(true).unwrap();
 
             #[cfg(fature = "llmp_debug")]
             println!("B2b: Spawned proxy thread");
@@ -1927,6 +1967,8 @@ where
             }
         });
 
+        shmem_provider.post_fork(false)?;
+
         let ret = recv.recv().map_err(|_| {
             Error::Unknown("Error launching background thread for b2b communcation".to_string())
         });
@@ -1944,7 +1986,7 @@ where
         request: &TcpRequest,
         current_client_id: &mut u32,
         sender: &mut LlmpSender<SP>,
-        shmem_provider: &SP,
+        shmem_provider: &mut SP,
         broker_map_description: &ShMemDescription,
     ) {
         match request {
@@ -2024,11 +2066,12 @@ where
         let tcp_out_map_description = tcp_out_map.shmem.description();
         self.register_client(tcp_out_map);
 
+        self.shmem_provider.pre_fork()?;
         let mut shmem_provider_clone = self.shmem_provider.clone();
 
-        Ok(thread::spawn(move || {
+        let ret = thread::spawn(move || {
             // Call `post_fork` (even though this is not forked) so we get a new connection to the cloned `ShMemServer` if we are using a `ServedShMemProvider`
-            shmem_provider_clone.post_fork();
+            shmem_provider_clone.post_fork(true).unwrap();
 
             let mut current_client_id = llmp_tcp_id + 1;
 
@@ -2080,7 +2123,7 @@ where
                             &req,
                             &mut current_client_id,
                             &mut tcp_incoming_sender,
-                            &shmem_provider_clone,
+                            &mut shmem_provider_clone,
                             &broker_map_description,
                         );
                     }
@@ -2089,7 +2132,10 @@ where
                     }
                 };
             }
-        }))
+        });
+
+        self.shmem_provider.post_fork(false)?;
+        Ok(ret)
     }
 
     /// broker broadcast to its own page for all others to read */
@@ -2411,7 +2457,25 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        let mut stream = TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port))?;
+        let mut stream = match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+            Ok(stream) => stream,
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::ConnectionRefused => {
+                        //connection refused. loop till the broker is up
+                        loop {
+                            match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+                                Ok(stream) => break stream,
+                                Err(_) => {
+                                    dbg!("Connection Refused.. Retrying");
+                                }
+                            }
+                        }
+                    }
+                    _ => return Err(Error::IllegalState(e.to_string())),
+                }
+            }
+        };
         println!("Connected to port {}", port);
 
         let broker_map_description = if let TcpResponse::BrokerConnectHello {

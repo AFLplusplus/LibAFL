@@ -9,7 +9,10 @@ use std::{
 };
 
 use crate::{
-    bolts::serdeany::{SerdeAny, SerdeAnyMap},
+    bolts::{
+        rands::Rand,
+        serdeany::{SerdeAny, SerdeAnyMap},
+    },
     corpus::Corpus,
     events::{Event, EventManager, LogSeverity},
     feedbacks::FeedbackStatesTuple,
@@ -17,7 +20,6 @@ use crate::{
     generators::Generator,
     inputs::Input,
     stats::ClientPerfStats,
-    utils::Rand,
     Error,
 };
 

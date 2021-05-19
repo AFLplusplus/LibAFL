@@ -1,7 +1,6 @@
 //! The `ScheduledMutator` schedules multiple mutations internally.
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -9,12 +8,15 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{tuple_list, NamedTuple},
+    bolts::{
+        rands::Rand,
+        tuples::{tuple_list, NamedTuple},
+        AsSlice,
+    },
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
-    utils::{AsSlice, Rand},
     Error,
 };
 
@@ -397,6 +399,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
+        bolts::rands::{Rand, StdRand, XkcdRand},
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{BytesInput, HasBytesVec},
         mutators::{
@@ -405,7 +408,6 @@ mod tests {
             Mutator,
         },
         state::StdState,
-        utils::{Rand, StdRand, XkcdRand},
     };
 
     #[test]

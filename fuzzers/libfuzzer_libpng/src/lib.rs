@@ -6,6 +6,7 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::tuples::tuple_list,
+    bolts::{current_nanos, rands::StdRand},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
@@ -21,13 +22,12 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
-    utils::{current_nanos, StdRand},
     Error,
 };
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
-/// The main fn, no_mangle as it is a C main
+/// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -39,7 +39,7 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
     fuzz(
-        vec![PathBuf::from("./corpus")],
+        &[PathBuf::from("./corpus")],
         PathBuf::from("./crashes"),
         1337,
     )
@@ -47,7 +47,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
+fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
@@ -160,10 +160,7 @@ fn fuzz(corpus_dirs: Vec<PathBuf>, objective_dir: PathBuf, broker_port: u16) -> 
                 &mut restarting_mgr,
                 &corpus_dirs,
             )
-            .expect(&format!(
-                "Failed to load initial corpus at {:?}",
-                &corpus_dirs
-            ));
+            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

@@ -2,8 +2,10 @@
 
 use rustc_version::{version_meta, Channel};
 
+#[allow(clippy::ptr_arg, clippy::upper_case_acronyms)]
 fn main() {
     #[cfg(target_os = "windows")]
+    #[allow(clippy::ptr_arg, clippy::upper_case_acronyms)]
     windows::build!(
         windows::win32::system_services::{HANDLE, BOOL, PAGE_TYPE, PSTR, ExitProcess},
         windows::win32::windows_programming::CloseHandle,

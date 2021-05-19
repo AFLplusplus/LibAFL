@@ -80,10 +80,10 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use crate::{
+        bolts::rands::StdRand,
         corpus::{Corpus, CorpusScheduler, OnDiskCorpus, QueueCorpusScheduler, Testcase},
         inputs::bytes::BytesInput,
         state::{HasCorpus, StdState},
-        utils::StdRand,
     };
 
     #[test]
@@ -114,7 +114,7 @@ mod tests {
             .filename()
             .as_ref()
             .unwrap()
-            .to_owned();
+            .clone();
 
         assert_eq!(filename, "target/.test/fancy/path/fancyfile");
 

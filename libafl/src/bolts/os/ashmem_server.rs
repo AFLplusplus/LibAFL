@@ -76,8 +76,8 @@ impl ShMem for ServedShMem {
 impl ServedShMemProvider {
     /// Send a request to the server, and wait for a response
     #[allow(clippy::similar_names)] // id and fd
-    fn send_receive(&mut self, request: AshmemRequest) -> (i32, i32) {
-        let body = postcard::to_allocvec(&request).unwrap();
+    fn send_receive(&mut self, request: AshmemRequest) -> Result<(i32, i32), Error> {
+        let body = postcard::to_allocvec(&request)?;
 
         let header = (body.len() as u32).to_be_bytes();
         let mut message = header.to_vec();
@@ -95,8 +95,8 @@ impl ServedShMemProvider {
 
         let server_id = ShMemId::from_slice(&shm_slice);
         let server_id_str = server_id.to_string();
-        let server_fd: i32 = server_id_str.parse().unwrap();
-        (server_fd, fd_buf[0])
+        let server_fd: i32 = server_id_str.parse()?;
+        Ok((server_fd, fd_buf[0]))
     }
 }
 
@@ -118,18 +118,16 @@ impl ShMemProvider for ServedShMemProvider {
     /// Connect to the server and return a new [`ServedShMemProvider`]
     fn new() -> Result<Self, Error> {
         let mut res = Self {
-            stream: UnixStream::connect_to_unix_addr(
-                &UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap(),
-            )?,
+            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(ASHMEM_SERVER_NAME)?)?,
             inner: AshmemShMemProvider::new()?,
             id: -1,
         };
-        let (id, _) = res.send_receive(AshmemRequest::Hello(None));
+        let (id, _) = res.send_receive(AshmemRequest::Hello(None))?;
         res.id = id;
         Ok(res)
     }
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, crate::Error> {
-        let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size));
+        let (server_fd, client_fd) = self.send_receive(AshmemRequest::NewMap(map_size))?;
 
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
@@ -145,7 +143,7 @@ impl ShMemProvider for ServedShMemProvider {
         let server_id_str = parts.get(0).unwrap();
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
-        ));
+        ))?;
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
                 self.inner
@@ -155,16 +153,21 @@ impl ShMemProvider for ServedShMemProvider {
         })
     }
 
-    fn post_fork(&mut self) {
-        self.stream =
-            UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(ASHMEM_SERVER_NAME).unwrap())
-                .expect("Unable to reconnect to the ashmem service");
-        let (id, _) = self.send_receive(AshmemRequest::Hello(Some(self.id)));
-        self.id = id;
+    fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
+        if is_child {
+            // After fork, the child needs to reconnect as to not share the fds with the parent.
+            self.stream =
+                UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(ASHMEM_SERVER_NAME)?)?;
+            let (id, _) = self.send_receive(AshmemRequest::Hello(Some(self.id)))?;
+            self.id = id;
+        }
+        Ok(())
     }
 
     fn release_map(&mut self, map: &mut Self::Mem) {
-        let (refcount, _) = self.send_receive(AshmemRequest::Deregister(map.server_fd));
+        let (refcount, _) = self
+            .send_receive(AshmemRequest::Deregister(map.server_fd))
+            .expect("Could not communicate to AshMem server!");
         if refcount == 0 {
             unsafe {
                 ManuallyDrop::drop(&mut map.inner);
