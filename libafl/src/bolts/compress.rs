@@ -19,7 +19,7 @@ impl GzipCompressor {
     /// When given a `threshold` of `0`, the `GzipCompressor` will always compress.
     #[must_use]
     pub fn new(threshold: usize) -> Self {
-        GzipCompressor { threshold }
+        Self { threshold }
     }
 }
 

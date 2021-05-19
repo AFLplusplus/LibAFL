@@ -25,9 +25,9 @@ use alloc::borrow::ToOwned;
 use core::{cell::RefCell, marker::PhantomData};
 
 use crate::{
+    bolts::rands::Rand,
     inputs::Input,
     state::{HasCorpus, HasRand},
-    utils::Rand,
     Error,
 };
 

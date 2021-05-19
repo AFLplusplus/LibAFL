@@ -1,6 +1,6 @@
 [package]
 name = "libafl_derive"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Derive proc-macro crate for LibAFL"
 documentation = "https://docs.rs/libafl_derive"

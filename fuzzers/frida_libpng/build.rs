@@ -12,15 +12,14 @@ const LIBPNG_URL: &str =
     "https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz";
 
 fn build_dep_check(tools: &[&str]) {
-    for tool in tools.into_iter() {
+    for tool in tools {
         println!("Checking for build tool {}...", tool);
 
-        match which(tool) {
-            Ok(path) => println!("Found build tool {}", path.to_str().unwrap()),
-            Err(_) => {
-                println!("ERROR: missing build tool {}", tool);
-                exit(1);
-            }
+        if let Ok(path) = which(tool) {
+            println!("Found build tool {}", path.to_str().unwrap())
+        } else {
+            println!("ERROR: missing build tool {}", tool);
+            exit(1);
         };
     }
 }
@@ -35,7 +34,7 @@ fn main() {
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
-    std::fs::create_dir_all(&out_dir).expect(&format!("Failed to create {}", &out_dir));
+    std::fs::create_dir_all(&out_dir).unwrap_or_else(|_| panic!("Failed to create {}", &out_dir));
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);

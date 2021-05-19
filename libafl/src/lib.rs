@@ -36,7 +36,6 @@ pub mod observers;
 pub mod stages;
 pub mod state;
 pub mod stats;
-pub mod utils;
 
 pub mod fuzzer;
 pub use fuzzer::*;
@@ -123,6 +122,13 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+#[cfg(unix)]
+impl From<nix::Error> for Error {
+    fn from(err: nix::Error) -> Self {
+        Self::Unknown(format!("{:?}", err))
+    }
+}
+
 /// Create an AFL Error from io Error
 #[cfg(feature = "std")]
 impl From<io::Error> for Error {
@@ -157,7 +163,7 @@ impl From<ParseIntError> for Error {
 #[cfg(test)]
 mod tests {
     use crate::{
-        bolts::tuples::tuple_list,
+        bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
@@ -165,7 +171,6 @@ mod tests {
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
         stats::SimpleStats,
-        utils::StdRand,
         Fuzzer, StdFuzzer,
     };
 

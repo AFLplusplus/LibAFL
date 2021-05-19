@@ -1,28 +1,11 @@
-//! Utility functions for AFL
-
-use core::{cell::RefCell, debug_assert, fmt::Debug, time};
+use core::{cell::RefCell, debug_assert, fmt::Debug};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-#[cfg(unix)]
-use libc::pid_t;
-#[cfg(all(unix, feature = "std"))]
-use std::ffi::CString;
 #[cfg(feature = "std")]
-use std::{
-    env,
-    process::Command,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use crate::bolts::current_nanos;
 
-#[cfg(any(unix, feature = "std"))]
-use crate::Error;
-
-/// Can be converted to a slice
-pub trait AsSlice<T> {
-    /// Convert to a slice
-    fn as_slice(&self) -> &[T];
-}
+const HASH_CONST: u64 = 0xa5b35705;
 
 /// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
@@ -146,39 +129,6 @@ impl_randomseed!(XorShift64Rand);
 impl_randomseed!(Lehmer64Rand);
 impl_randomseed!(RomuTrioRand);
 impl_randomseed!(RomuDuoJrRand);
-
-const HASH_CONST: u64 = 0xa5b35705;
-
-/// Current time
-#[cfg(feature = "std")]
-#[must_use]
-#[inline]
-pub fn current_time() -> time::Duration {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-}
-
-/// Current time (fixed fallback for no_std)
-#[cfg(not(feature = "std"))]
-#[inline]
-pub fn current_time() -> time::Duration {
-    // We may not have a rt clock available.
-    // TODO: Make it somehow plugin-able
-    time::Duration::from_millis(1)
-}
-
-/// Gets current nanoseconds since [`UNIX_EPOCH`]
-#[must_use]
-#[inline]
-pub fn current_nanos() -> u64 {
-    current_time().as_nanos() as u64
-}
-
-/// Gets current milliseconds since [`UNIX_EPOCH`]
-#[must_use]
-#[inline]
-pub fn current_milliseconds() -> u64 {
-    current_time().as_millis() as u64
-}
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -404,142 +354,11 @@ impl XkcdRand {
     }
 }
 
-/// Child Process Handle
-#[cfg(unix)]
-pub struct ChildHandle {
-    pid: pid_t,
-}
-
-#[cfg(unix)]
-impl ChildHandle {
-    /// Block until the child exited and the status code becomes available
-    #[must_use]
-    pub fn status(&self) -> i32 {
-        let mut status = -1;
-        unsafe {
-            libc::waitpid(self.pid, &mut status, 0);
-        }
-        status
-    }
-}
-
-/// The `ForkResult` (result of a fork)
-#[cfg(unix)]
-pub enum ForkResult {
-    /// The fork finished, we are the parent process.
-    /// The child has the handle `ChildHandle`.
-    Parent(ChildHandle),
-    /// The fork finished, we are the child process.
-    Child,
-}
-
-/// Unix has forks.
-/// # Safety
-/// A Normal fork. Runs on in two processes. Should be memory safe in general.
-#[cfg(unix)]
-pub unsafe fn fork() -> Result<ForkResult, Error> {
-    match libc::fork() {
-        pid if pid > 0 => Ok(ForkResult::Parent(ChildHandle { pid })),
-        pid if pid < 0 => {
-            // Getting errno from rust is hard, we'll just let the libc print to stderr for now.
-            // In any case, this should usually not happen.
-            #[cfg(feature = "std")]
-            {
-                let err_str = CString::new("Fork failed").unwrap();
-                libc::perror(err_str.as_ptr());
-            }
-            Err(Error::Unknown(format!("Fork failed ({})", pid)))
-        }
-        _ => Ok(ForkResult::Child),
-    }
-}
-
-/// Executes the current process from the beginning, as subprocess.
-/// use `start_self.status()?` to wait for the child
-#[cfg(feature = "std")]
-pub fn startable_self() -> Result<Command, Error> {
-    let mut startable = Command::new(env::current_exe()?);
-    startable.current_dir(env::current_dir()?).args(env::args());
-    Ok(startable)
-}
-
-/// Allows one to walk the mappings in /proc/self/maps, caling a callback function for each
-/// mapping.
-/// If the callback returns true, we stop the walk.
-#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
-pub fn walk_self_maps(visitor: &mut dyn FnMut(usize, usize, String, String) -> bool) {
-    use regex::Regex;
-    use std::{
-        fs::File,
-        io::{BufRead, BufReader},
-    };
-    let re = Regex::new(r"^(?P<start>[0-9a-f]{8,16})-(?P<end>[0-9a-f]{8,16}) (?P<perm>[-rwxp]{4}) (?P<offset>[0-9a-f]{8}) [0-9a-f]+:[0-9a-f]+ [0-9]+\s+(?P<path>.*)$")
-        .unwrap();
-
-    let mapsfile = File::open("/proc/self/maps").expect("Unable to open /proc/self/maps");
-
-    for line in BufReader::new(mapsfile).lines() {
-        let line = line.unwrap();
-        if let Some(caps) = re.captures(&line) {
-            if visitor(
-                usize::from_str_radix(caps.name("start").unwrap().as_str(), 16).unwrap(),
-                usize::from_str_radix(caps.name("end").unwrap().as_str(), 16).unwrap(),
-                caps.name("perm").unwrap().as_str().to_string(),
-                caps.name("path").unwrap().as_str().to_string(),
-            ) {
-                break;
-            };
-        }
-    }
-}
-
-/// Get the start and end address, permissions and path of the mapping containing a particular address
-#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
-pub fn find_mapping_for_address(address: usize) -> Result<(usize, usize, String, String), Error> {
-    let mut result = (0, 0, "".to_string(), "".to_string());
-    walk_self_maps(&mut |start, end, permissions, path| {
-        if start <= address && address < end {
-            result = (start, end, permissions, path);
-            true
-        } else {
-            false
-        }
-    });
-
-    if result.0 == 0 {
-        Err(Error::Unknown(
-            "Couldn't find a mapping for this address".to_string(),
-        ))
-    } else {
-        Ok(result)
-    }
-}
-
-/// Get the start and end address of the mapping containing with a particular path
-#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
-#[must_use]
-pub fn find_mapping_for_path(libpath: &str) -> (usize, usize) {
-    let mut libstart = 0;
-    let mut libend = 0;
-    walk_self_maps(&mut |start, end, _permissions, path| {
-        if libpath == path {
-            if libstart == 0 {
-                libstart = start;
-            }
-
-            libend = end;
-        }
-        false
-    });
-
-    (libstart, libend)
-}
-
 #[cfg(test)]
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::utils::{
+    use crate::bolts::rands::{
         Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand, Xoshiro256StarRand,
     };
 
@@ -564,7 +383,7 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_random_seed() {
-        use crate::utils::RandomSeed;
+        use crate::bolts::rands::RandomSeed;
 
         let mut rand_fixed = StdRand::with_seed(0);
         let mut rand = StdRand::new();

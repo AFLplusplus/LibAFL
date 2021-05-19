@@ -8,14 +8,17 @@ this helps finding mem errors early.
 
 use hashbrown::HashMap;
 use libafl::{
-    bolts::{ownedref::OwnedPtr, tuples::Named},
+    bolts::{
+        os::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
+        ownedref::OwnedPtr,
+        tuples::Named,
+    },
     corpus::Testcase,
     executors::{CustomExitKind, ExitKind, HasExecHooks},
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
     state::HasMetadata,
-    utils::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
     Error, SerdeAny,
 };
 use nix::{
@@ -308,7 +311,6 @@ impl Allocator {
         let mut offset_to_closest = i64::max_value();
         let mut closest = None;
         for metadata in metadatas {
-            println!("{:#x}", metadata.address);
             let new_offset = if hint_base == metadata.address {
                 (ptr as i64 - metadata.address as i64).abs()
             } else {
@@ -866,8 +868,6 @@ impl AsanRuntime {
             rlim_max: 0,
         };
         assert!(unsafe { getrlimit64(3, &mut stack_rlimit as *mut rlimit64) } == 0);
-
-        println!("stack_rlimit: {:?}", stack_rlimit);
 
         let max_start = end - stack_rlimit.rlim_cur as usize;
 

@@ -105,7 +105,7 @@ impl BytesInput {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{Rand, StdRand};
+    use crate::bolts::rands::{Rand, StdRand};
 
     #[test]
     fn test_input() {

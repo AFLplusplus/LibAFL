@@ -1,6 +1,7 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
 use crate::{
+    bolts::current_time,
     corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventManager},
     executors::{
@@ -13,7 +14,6 @@ use crate::{
     stages::StagesTuple,
     start_timer,
     state::{HasClientPerfStats, HasCorpus, HasExecutions, HasSolutions},
-    utils::current_time,
     Error,
 };
 
@@ -353,7 +353,7 @@ where
                     observers_buf,
                     corpus_size: state.corpus().count(),
                     client_config: "TODO".into(),
-                    time: crate::utils::current_time(),
+                    time: current_time(),
                     executions: *state.executions(),
                 },
             )?;

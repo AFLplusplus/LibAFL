@@ -4,15 +4,18 @@ use std::hash::Hasher;
 use libafl::inputs::{HasTargetBytes, Input};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use libafl::utils::find_mapping_for_path;
+use libafl::bolts::os::find_mapping_for_path;
 
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
-use capstone::arch::{
-    arch::{self, BuildsCapstone},
-    arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
-    ArchOperand::Arm64Operand,
+use capstone::{
+    arch::{
+        self,
+        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        ArchOperand::Arm64Operand,
+        BuildsCapstone,
+    },
     Capstone, Insn,
 };
 
@@ -359,6 +362,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         shift: Arm64Shift,
         extender: Arm64Extender,
     ) {
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
         let basereg = self.writer_register(basereg);

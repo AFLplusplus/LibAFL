@@ -1,6 +1,6 @@
 [package]
 name = "libafl_frida"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["s1341 <github@shmarya.net>"]
 description = "Frida backend library for LibAFL"
 documentation = "https://docs.rs/libafl_frida"
@@ -14,17 +14,18 @@ edition = "2018"
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.2.1", features = ["std", "libafl_derive"] }
-libafl_targets = { path = "../libafl_targets", version = "0.2.1" }
+libafl = { path = "../libafl", version = "0.3.0", features = ["std", "libafl_derive"] }
+libafl_targets = { path = "../libafl_targets", version = "0.3.0" }
 nix = "0.20.0"
 libc = "0.2.92"
 hashbrown = "0.11"
 libloading = "0.7.0"
 rangemap = "0.1.10"
-frida-gum = { version = "0.4.0", git = "https://github.com/s1341/frida-rust", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
-frida-gum-sys = { version = "0.2.4", git = "https://github.com/s1341/frida-rust", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.4.1", git = "https://github.com/frida/frida-rust", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
+frida-gum-sys = { version = "0.2.4", git = "https://github.com/frida/frida-rust", features = [ "auto-download", "event-sink", "invocation-listener"] }
 #frida-gum = { version = "0.4.0",  path = "../../frida-rust/frida-gum", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
 #frida-gum-sys = { version = "0.2.4", path = "../../frida-rust/frida-gum-sys", features = [ "auto-download", "event-sink", "invocation-listener"] }
+core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs" }
 regex = "1.4"
 dynasmrt = "1.0.1"
 capstone = "0.8.0"

@@ -10,7 +10,7 @@ use alloc::string::ToString;
 #[cfg(feature = "introspection")]
 use core::convert::TryInto;
 
-use crate::utils::current_time;
+use crate::bolts::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
