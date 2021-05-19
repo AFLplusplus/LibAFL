@@ -2,13 +2,9 @@
 //! The values will then be used in subsequent mutations.
 
 use libafl::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named},
-    executors::HasExecHooks,
-    observers::{CmpMap, CmpObserver, CmpValues, Observer},
-    state::HasMetadata,
+    observers::{CmpMap, CmpValues},
     Error,
 };
-
 use serde::{Deserialize, Serialize};
 
 // TODO compile time flag
