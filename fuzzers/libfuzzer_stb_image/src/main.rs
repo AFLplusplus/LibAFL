@@ -12,11 +12,11 @@ use libafl::{
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CmpFeedback, CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::I2SRandReplace,
+    mutators::token_mutations::{I2SRandReplace, Tokens},
     observers::{StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
@@ -71,6 +71,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
+
+    let cmplog = unsafe { &mut CMPLOG_MAP };
+    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog);
 
     let cmplog = unsafe { &mut CMPLOG_MAP };
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);

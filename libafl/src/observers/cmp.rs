@@ -115,7 +115,7 @@ impl<'a, CM> StdCmpObserver<'a, CM>
 where
     CM: CmpMap,
 {
-    /// Creates a new [`CmpObserver`] with the given name.
+    /// Creates a new [`StdCmpObserver`] with the given name.
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut CM) -> Self {
         Self {

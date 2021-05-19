@@ -2,9 +2,12 @@
 //! The values will then be used in subsequent mutations.
 
 use libafl::{
-    observers::{CmpMap, CmpValues},
+    bolts::{ownedref::OwnedRefMut, tuples::Named},
+    executors::HasExecHooks,
+    observers::{CmpMap, CmpObserver, CmpValues, Observer},
     Error,
 };
+
 use serde::{Deserialize, Serialize};
 
 // TODO compile time flag
@@ -140,12 +143,11 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
-/// A [`CmpObserver`] observer for `CmpLog`
+/// A [`CmpObserver`] observer for CmpLog
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
-    add_meta: bool,
     name: String,
 }
 
@@ -169,10 +171,7 @@ impl<'a> CmpObserver<CmpLogMap> for CmpLogObserver<'a> {
 
 impl<'a> Observer for CmpLogObserver<'a> {}
 
-impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a>
-where
-    S: HasMetadata,
-{
+impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a> {
     fn pre_exec(
         &mut self,
         _fuzzer: &mut Z,
@@ -190,15 +189,12 @@ where
     fn post_exec(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut S,
+        _state: &mut S,
         _mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
-        }
-        if self.add_meta {
-            self.add_cmpvalues_meta(state);
         }
         Ok(())
     }
@@ -213,11 +209,11 @@ impl<'a> Named for CmpLogObserver<'a> {
 impl<'a> CmpLogObserver<'a> {
     /// Creates a new [`CmpLogObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut CmpLogMap, add_meta: bool) -> Self {
+    pub fn new(name: &'static str, map: &'a mut CmpLogMap) -> Self {
         Self {
             name: name.to_string(),
             size: None,
-            add_meta,
+
             map: OwnedRefMut::Ref(map),
         }
     }
