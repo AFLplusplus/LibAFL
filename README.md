@@ -27,7 +27,7 @@ It offers a main crate that provide building blocks for custom fuzzers, [libafl]
 LibAFL offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
 
 + SanitizerCoverage, in [libafl_targets](./libafl_targets)
-+ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net> (Windows support is broken atm, it relies on [this upstream issue](https://github.com/meme/frida-rust/issues/9) to be fixed.)
++ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net>
 + More to come (QEMU-mode, ...)
 
 ## Getting started
