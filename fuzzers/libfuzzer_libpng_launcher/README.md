@@ -4,7 +4,7 @@ This folder contains an example fuzzer for libpng, using LLMP for fast multi-pro
 To show off crash detection, we added a `ud2` instruction to the harness, edit harness.cc if you want a non-crashing example.
 It has been tested on Linux.
 
-In contrast to the normal libfuzzer libpng example, this uses the `launcher` feature, that automatically spawns n child processes, and sets their affinity.
+In contrast to the normal libfuzzer libpng example, this uses the `launcher` feature, that automatically spawns `n` child processes, and binds them to a free core.
 
 ## Build
 
@@ -44,29 +44,4 @@ Afterwards, the fuzzer will be ready to run.
 
 ## Run
 
-The first time you run the binary, the broker will open a tcp port (currently on port `1337`), waiting for fuzzer clients to connect. This port is local and only used for the initial handshake. All further communication happens via shared map, to be independent of the kernel. Currently you must run the clients from the libfuzzer_libpng directory for them to be able to access the PNG corpus.
-
-```
-./fuzzer_libpng
-
-[libafl/src/bolts/llmp.rs:407] "We're the broker" = "We\'re the broker"
-Doing broker things. Run this tool again to start fuzzing in a client.
-```
-
-And after running the above again in a separate terminal:
-
-```
-[libafl/src/bolts/llmp.rs:1464] "New connection" = "New connection"
-[libafl/src/bolts/llmp.rs:1464] addr = 127.0.0.1:33500
-[libafl/src/bolts/llmp.rs:1464] stream.peer_addr().unwrap() = 127.0.0.1:33500
-[LOG Debug]: Loaded 4 initial testcases.
-[New Testcase #2] clients: 3, corpus: 6, objectives: 0, executions: 5, exec/sec: 0
-< fuzzing stats >
-```
-
-As this example uses in-process fuzzing, we added a Restarting Event Manager (`setup_restarting_mgr`).
-This means each client will start itself again to listen for crashes and timeouts.
-By restarting the actual fuzzer, it can recover from these exit conditions.
-
-In any real-world scenario, you should use `taskset` to pin each client to an empty CPU core, the lib does not pick an empty core automatically (yet).
-
+Just run once, the launcher feature should do the rest.
