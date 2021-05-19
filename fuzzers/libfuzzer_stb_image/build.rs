@@ -14,7 +14,7 @@ fn main() {
 
     cc::Build::new()
         // Use sanitizer coverage to track the edges in the PUT
-        .flag("-fsanitize-coverage=trace-pc-guard")
+        .flag("-fsanitize-coverage=trace-pc-guard,trace-cmp")
         // Take advantage of LTO (needs lld-link set in your cargo config)
         //.flag("-flto=thin")
         .flag("-Wno-sign-compare")

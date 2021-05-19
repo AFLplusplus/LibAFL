@@ -365,6 +365,47 @@ where
     }
 }
 
+/// Merge two `TupeList`
+pub trait Merge<T>: TupleList
+where
+    T: TupleList,
+{
+    /// The Resulting [`TupleList`], of an [`Merge::merge()`] call
+    type MergeResult: TupleList;
+
+    /// Merge and return the merged tuple
+    #[must_use]
+    fn merge(self, value: T) -> Self::MergeResult;
+}
+
+/// Implement merge for an empty tuple list.
+impl<T> Merge<T> for ()
+where
+    T: TupleList,
+{
+    type MergeResult = T;
+
+    fn merge(self, value: T) -> Self::MergeResult {
+        value
+    }
+}
+
+/// Implement merge for non-empty tuple list.
+impl<Head, Tail, T> Merge<T> for (Head, Tail)
+where
+    T: TupleList,
+    Self: TupleList,
+    Tail: Merge<T>,
+    (Head, Tail::MergeResult): TupleList,
+{
+    type MergeResult = (Head, Tail::MergeResult);
+
+    fn merge(self, value: T) -> Self::MergeResult {
+        let (head, tail) = self;
+        (head, tail.merge(value))
+    }
+}
+
 /// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
 macro_rules! tuple_for_each {

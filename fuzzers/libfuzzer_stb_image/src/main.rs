@@ -12,10 +12,10 @@ use libafl::{
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, CmpFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::token_mutations::{Tokens, I2SRandReplace},
     observers::{StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
@@ -23,7 +23,7 @@ use libafl::{
     Error,
 };
 
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM, CmpLogObserver, CMPLOG_MAP};
 
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -67,6 +67,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
+    
+    let cmplog = unsafe { &mut CMPLOG_MAP };
+    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog);
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);

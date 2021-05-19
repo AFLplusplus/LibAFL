@@ -2,9 +2,12 @@
 //! The values will then be used in subsequent mutations.
 
 use libafl::{
-    observers::{CmpMap, CmpValues},
+    bolts::{ownedref::OwnedRefMut, tuples::Named},
+    executors::HasExecHooks,
+    observers::{CmpMap, CmpObserver, CmpValues, Observer},
     Error,
 };
+
 use serde::{Deserialize, Serialize};
 
 // TODO compile time flag
@@ -139,3 +142,76 @@ pub use libafl_cmplog_map as CMPLOG_MAP;
 pub static mut libafl_cmplog_enabled: u8 = 0;
 
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
+
+/// A [`CmpObserver`] observer for CmpLog
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CmpLogObserver<'a> {
+    map: OwnedRefMut<'a, CmpLogMap>,
+    size: Option<OwnedRefMut<'a, usize>>,
+    name: String,
+}
+
+impl<'a> CmpObserver<CmpLogMap> for CmpLogObserver<'a> {
+    /// Get the number of usable cmps (all by default)
+    fn usable_count(&self) -> usize {
+        match &self.size {
+            None => self.map().len(),
+            Some(o) => *o.as_ref(),
+        }
+    }
+
+    fn map(&self) -> &CmpLogMap {
+        self.map.as_ref()
+    }
+
+    fn map_mut(&mut self) -> &mut CmpLogMap {
+        self.map.as_mut()
+    }
+}
+
+impl<'a> Observer for CmpLogObserver<'a> {}
+
+impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a> {
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
+        self.map.as_mut().reset()?;
+        unsafe { CMPLOG_ENABLED = 1; }
+        Ok(())
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
+        unsafe { CMPLOG_ENABLED = 0; }
+        Ok(())
+    }
+}
+
+impl<'a> Named for CmpLogObserver<'a> {
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl<'a> CmpLogObserver<'a> {
+    /// Creates a new [`CmpLogObserver`] with the given name.
+    #[must_use]
+    pub fn new(name: &'static str, map: &'a mut CmpLogMap) -> Self {
+        Self {
+            name: name.to_string(),
+            size: None,
+            map: OwnedRefMut::Ref(map),
+        }
+    }
+
+    // TODO with_size
+}
