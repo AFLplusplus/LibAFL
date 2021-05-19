@@ -42,7 +42,7 @@ pub fn main() {
     //RegistryBuilder::register::<Tokens>();
     let yaml = load_yaml!("clap-config.yaml");
     let matches = App::from(yaml).get_matches();
-    
+
     let broker_port = 1337;
 
     let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap())
@@ -62,7 +62,7 @@ pub fn main() {
     let mut client_init_stats = || Ok(SimpleStats::new(stats_closure));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
-        let corpus_dirs = vec![PathBuf::from("./corpus")];
+        let corpus_dirs = &[PathBuf::from("./corpus")];
         let objective_dir = PathBuf::from("./crashes");
 
         // Create an observation channel using the coverage map
@@ -161,10 +161,7 @@ pub fn main() {
                     &mut restarting_mgr,
                     &corpus_dirs,
                 )
-                .expect(&format!(
-                    "Failed to load initial corpus at {:?}",
-                    &corpus_dirs
-                ));
+                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 

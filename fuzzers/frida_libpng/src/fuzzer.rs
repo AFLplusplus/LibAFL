@@ -262,22 +262,21 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let broker_addr = if let Some(addrstr) = matches.value_of("b2baddr") {
-        Some(addrstr.parse().unwrap())
-    } else {
-        None
-    };
+    let broker_addr = matches
+        .value_of("b2baddr")
+        .map(|addrstr| addrstr.parse().unwrap());
 
     unsafe {
         fuzz(
             matches.value_of("harness").unwrap(),
             matches.value_of("symbol").unwrap(),
-            matches
+            &matches
                 .value_of("modules_to_instrument")
                 .unwrap()
                 .split(':')
                 .map(|module_name| std::fs::canonicalize(module_name).unwrap())
-                .collect(),
+                .collect::<Vec<_>>(),
+            //modules_to_instrument,
             &[PathBuf::from("./corpus")],
             &PathBuf::from("./crashes"),
             1337,
@@ -296,7 +295,7 @@ fn fuzz(
     _module_name: &str,
     _symbol_name: &str,
     _corpus_dirs: &[PathBuf],
-    _objective_dir: PathBuf,
+    _objective_dir: &Path,
     _broker_port: u16,
     _cores: &[usize],
     _stdout_file: Option<&str>,
@@ -307,11 +306,11 @@ fn fuzz(
 
 /// The actual fuzzer
 #[cfg(unix)]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines, clippy::clippy::too_many_arguments)]
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
-    modules_to_instrument: Vec<PathBuf>,
+    modules_to_instrument: &[PathBuf],
     corpus_dirs: &[PathBuf],
     objective_dir: &Path,
     broker_port: u16,
@@ -388,7 +387,7 @@ unsafe fn fuzz(
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new_save_meta(
-                    objective_dir.into(),
+                    objective_dir.to_path_buf(),
                     Some(OnDiskMetadataFormat::JsonPretty),
                 )
                 .unwrap(),
