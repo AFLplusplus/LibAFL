@@ -1,5 +1,8 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
 
+#[macro_use]
+extern crate serde_big_array;
+
 #[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 pub mod sancov_pcguard;
 #[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
