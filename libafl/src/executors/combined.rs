@@ -1,6 +1,6 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 
-use core::{marker::PhantomData};
+use core::marker::PhantomData;
 
 use crate::{
     executors::{
@@ -20,7 +20,6 @@ where
 {
     primary: A,
     secondary: B,
-    exec_tmout: Duration,
     phantom: PhantomData<I>,
 }
 
@@ -43,7 +42,7 @@ where
     pub fn primary(&mut self) -> &mut A {
         &mut self.primary
     }
-    
+
     /// Retrieve the secondary `Executor` that is wrapped by this `CombinedExecutor`.
     pub fn secondary(&mut self) -> &mut B {
         &mut self.secondary
@@ -79,7 +78,7 @@ where
     }
 }
 
-impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<A, B, I>
+impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for CombinedExecutor<A, B, I>
 where
     A: Executor<I> + HasObservers<OT>,
     B: Executor<I>,
@@ -88,9 +87,9 @@ where
 {
 }
 
-impl<A, B, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for TimeoutExecutor<A, B, I>
+impl<A, B, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CombinedExecutor<A, B, I>
 where
-    A: Executor<I> + HasObservers<OT>,
+    A: Executor<I> + HasExecHooks<EM, I, S, Z>,
     B: Executor<I>,
     I: Input,
 {

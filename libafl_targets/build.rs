@@ -24,7 +24,9 @@ fn main() {
         #[cfg(feature = "sancov_cmplog")]
         sancov_cmp.define("SANCOV_CMPLOG", "1");
 
-        sancov_cmp.file(_src_dir.join("sancov_cmp.c")).compile("sancov_cmp");
+        sancov_cmp
+            .file(_src_dir.join("sancov_cmp.c"))
+            .compile("sancov_cmp");
     }
 
     #[cfg(feature = "libfuzzer")]
