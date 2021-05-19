@@ -4,6 +4,9 @@
 pub mod map;
 pub use map::*;
 
+pub mod cmp;
+pub use cmp::*;
+
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 

@@ -21,7 +21,6 @@ where
 {
     primary: A,
     secondary: B,
-    exec_tmout: Duration,
     phantom: PhantomData<I>,
 }
 
@@ -80,7 +79,7 @@ where
     }
 }
 
-impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<A, B, I>
+impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for CombinedExecutor<A, B, I>
 where
     A: Executor<I> + HasObservers<OT>,
     B: Executor<I>,
@@ -89,9 +88,9 @@ where
 {
 }
 
-impl<A, B, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for TimeoutExecutor<A, B, I>
+impl<A, B, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CombinedExecutor<A, B, I>
 where
-    A: Executor<I> + HasObservers<OT>,
+    A: Executor<I> + HasExecHooks<EM, I, S, Z>,
     B: Executor<I>,
     I: Input,
 {
