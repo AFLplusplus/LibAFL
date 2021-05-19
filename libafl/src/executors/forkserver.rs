@@ -388,20 +388,20 @@ where
     }
 }
 
-impl<EM, I, OT, S> HasExecHooks<EM, I, S> for ForkserverExecutor<EM, I, OT, S>
+impl<EM, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<EM, I, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, input: &I) -> Result<(), Error>{
+    fn pre_exec(&mut self, _fuzzer:&mut Z, _state: &mut S, _event_mgr: &mut EM, input: &I) -> Result<(), Error>{
         //write to test case
         self.out_file.write_buf(&input.target_bytes().as_slice().to_vec());
         //outfile gets automatically closed.
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>{
+    fn post_exec(&mut self, _fuzzer:&mut Z, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>{
 
         if !libc::WIFSTOPPED(self.forkserver.status()) {
             self.forkserver.child_pid = 0;
