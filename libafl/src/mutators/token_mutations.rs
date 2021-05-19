@@ -15,9 +15,10 @@ use std::{
 
 use crate::{
     bolts::rands::Rand,
+    feedbacks::cmp::CmpValuesMetadata,
     inputs::{HasBytesVec, Input},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
-    observers::cmp::{CmpValues, CmpValuesMetadata},
+    observers::cmp::CmpValues,
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
@@ -310,7 +311,6 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
-    #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
@@ -344,13 +344,13 @@ where
         let mut result = MutationResult::Skipped;
         match cmp_values {
             CmpValues::U8(v) => {
-                for byte in bytes.iter_mut().take(len).skip(off) {
-                    if *byte == v.0 {
-                        *byte = v.1;
+                for i in off..len {
+                    if bytes[i] == v.0 {
+                        bytes[i] = v.1;
                         result = MutationResult::Mutated;
                         break;
-                    } else if *byte == v.1 {
-                        *byte = v.0;
+                    } else if bytes[i] == v.1 {
+                        bytes[i] = v.0;
                         result = MutationResult::Mutated;
                         break;
                     }
@@ -448,8 +448,6 @@ where
                 // buffer_copy(input.bytes_mut(), token, 0, off, len);
             }
         }
-
-        //println!("{:?}", result);
 
         Ok(result)
     }
