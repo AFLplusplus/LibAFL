@@ -12,7 +12,7 @@ RUST_BACKTRACE=full cargo clippy --all --all-features --tests -- \
    -W clippy::option_if_let_else \
    -W clippy::must-use-candidate \
    -W clippy::if-not-else \
-   -A clippy::similar-names \
+   -W clippy::similar-names \
    -A clippy::type_repetition_in_bounds \
    -A clippy::missing-errors-doc \
    -A clippy::cast-possible-truncation \
