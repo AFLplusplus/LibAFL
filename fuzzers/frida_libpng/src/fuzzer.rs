@@ -43,7 +43,14 @@ use frida_gum::{
     Gum, NativePointer,
 };
 
-use std::{env, ffi::c_void, marker::PhantomData, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    env,
+    ffi::c_void,
+    marker::PhantomData,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use libafl_frida::{
     asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
@@ -271,7 +278,7 @@ pub fn main() {
                 .split(':')
                 .map(|module_name| std::fs::canonicalize(module_name).unwrap())
                 .collect(),
-            &vec![PathBuf::from("./corpus")],
+            &[PathBuf::from("./corpus")],
             &PathBuf::from("./crashes"),
             1337,
             &cores,
@@ -284,10 +291,11 @@ pub fn main() {
 
 /// Not supported on windows right now
 #[cfg(windows)]
+#[allow(clippy::too_many_arguments)]
 fn fuzz(
     _module_name: &str,
     _symbol_name: &str,
-    _corpus_dirs: Vec<PathBuf>,
+    _corpus_dirs: &[PathBuf],
     _objective_dir: PathBuf,
     _broker_port: u16,
     _cores: &[usize],
@@ -299,12 +307,13 @@ fn fuzz(
 
 /// The actual fuzzer
 #[cfg(unix)]
+#[allow(clippy::too_many_arguments)]
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
     modules_to_instrument: Vec<PathBuf>,
-    corpus_dirs: &Vec<PathBuf>,
-    objective_dir: &PathBuf,
+    corpus_dirs: &[PathBuf],
+    objective_dir: &Path,
     broker_port: u16,
     cores: &[usize],
     stdout_file: Option<&str>,
@@ -379,7 +388,7 @@ unsafe fn fuzz(
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new_save_meta(
-                    objective_dir.clone(),
+                    objective_dir.into(),
                     Some(OnDiskMetadataFormat::JsonPretty),
                 )
                 .unwrap(),
@@ -444,10 +453,7 @@ unsafe fn fuzz(
         if state.corpus().count() < 1 {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
-                .expect(&format!(
-                    "Failed to load initial corpus at {:?}",
-                    &corpus_dirs
-                ));
+                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
@@ -456,7 +462,7 @@ unsafe fn fuzz(
     };
 
     Launcher::builder()
-        .shmem_provider(shmem_provider.clone())
+        .shmem_provider(shmem_provider)
         .stats(stats)
         .client_init_stats(&mut client_init_stats)
         .run_client(&mut run_client)

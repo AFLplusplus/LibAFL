@@ -31,6 +31,10 @@ use core_affinity::CoreId;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+/// The Launcher client callback type reference
+pub type LauncherClientFnRef<'a, I, OT, S, SP, ST> =
+    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP, ST>) -> Result<(), Error>;
+
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
@@ -50,10 +54,7 @@ where
     /// A closure or function which generates stats instances for newly spawned clients
     client_init_stats: &'a mut dyn FnMut() -> Result<ST, Error>,
     /// The 'main' function to run for each client forked. This probably shouldn't return
-    run_client: &'a mut dyn FnMut(
-        Option<S>,
-        LlmpRestartingEventManager<I, OT, S, SP, ST>,
-    ) -> Result<(), Error>,
+    run_client: LauncherClientFnRef<'a, I, OT, S, SP, ST>,
     /// The broker port to use
     #[builder(default = 1337_u16)]
     broker_port: u16,
