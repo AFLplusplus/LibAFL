@@ -27,7 +27,7 @@ use libafl::{
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
-/// The main fn, no_mangle as it is a C main
+/// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer

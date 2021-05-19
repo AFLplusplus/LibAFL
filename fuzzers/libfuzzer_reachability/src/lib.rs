@@ -26,7 +26,7 @@ extern "C" {
     static __libafl_target_list: *mut usize;
 }
 
-/// The main fn, no_mangle as it is a C main
+/// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer
