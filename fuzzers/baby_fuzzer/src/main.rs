@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use libafl::inputs::{BytesInput, HasTargetBytes};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
@@ -14,7 +15,6 @@ use libafl::{
     state::StdState,
     stats::SimpleStats,
 };
-use libafl::inputs::{BytesInput, HasBytesVec};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -28,7 +28,8 @@ fn signals_set(idx: usize) {
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
-        let buf = input.bytes();
+        let target = input.target_bytes();
+        let buf = target.as_slice();
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);

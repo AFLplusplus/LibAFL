@@ -10,6 +10,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{MapFeedbackState, MaxMapFeedback, ReachabilityFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
+    inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
@@ -18,7 +19,6 @@ use libafl::{
     Error,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
-use libafl::inputs::{BytesInput, HasBytesVec};
 
 const TARGET_SIZE: usize = 4;
 
@@ -109,7 +109,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
-        let buf = input.bytes();
+        let target = input.target_bytes();
+        let buf = target.as_slice();
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
