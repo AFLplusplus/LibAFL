@@ -538,6 +538,7 @@ where
             let feedback_index = 0;
             let is_interesting = self.feedback_mut().is_interesting_with_perf(
                 state,
+                event_mgr,
                 &input,
                 observers,
                 &exit_kind,
