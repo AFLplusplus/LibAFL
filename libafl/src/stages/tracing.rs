@@ -2,11 +2,9 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::Corpus,
+    executors::{Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
     mark_feature_time,
-     executors::{
-        Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
-    },
     observers::ObserversTuple,
     stages::Stage,
     start_timer,
@@ -63,13 +61,15 @@ where
             .load_input()?
             .clone();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-        
+
         start_timer!(state);
-        self.tracer_executor.pre_exec_observers(fuzzer, state, manager, &input)?;
+        self.tracer_executor
+            .pre_exec_observers(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        self.tracer_executor.pre_exec(fuzzer, state, manager, &input)?;
+        self.tracer_executor
+            .pre_exec(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::PreExec);
 
         start_timer!(state);
@@ -77,15 +77,17 @@ where
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
-        self.tracer_executor.post_exec(fuzzer, state, manager, &input)?;
+        self.tracer_executor
+            .post_exec(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::PostExec);
 
         *state.executions_mut() += 1;
 
         start_timer!(state);
-        self.tracer_executor.post_exec_observers(fuzzer, state, manager, &input)?;
+        self.tracer_executor
+            .post_exec_observers(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
-        
+
         Ok(())
     }
 }

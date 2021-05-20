@@ -308,10 +308,10 @@ where
 }
 
 /// Allows prepending of values to a tuple
-pub trait Prepend<T>: TupleList {
+pub trait Prepend<T> {
     /// The Resulting [`TupleList`], of an [`Prepend::prepend()`] call,
     /// including the prepended entry.
-    type PreprendResult: TupleList;
+    type PreprendResult;
 
     /// Prepend a value to this tuple, returning a new tuple with prepended value.
     #[must_use]
@@ -319,10 +319,7 @@ pub trait Prepend<T>: TupleList {
 }
 
 /// Implement prepend for tuple list.
-impl<Tail, T> Prepend<T> for Tail
-where
-    Tail: TupleList,
-{
+impl<Tail, T> Prepend<T> for Tail {
     type PreprendResult = Self;
 
     fn prepend(self, value: T) -> (T, Self::PreprendResult) {
@@ -330,11 +327,11 @@ where
     }
 }
 
-/// Append to a `TupeList`
-pub trait Append<T>: TupleList {
+/// Append to a tuple
+pub trait Append<T> {
     /// The Resulting [`TupleList`], of an [`Append::append()`] call,
     /// including the appended entry.
-    type AppendResult: TupleList;
+    type AppendResult;
 
     /// Append Value and return the tuple
     #[must_use]
@@ -353,9 +350,7 @@ impl<T> Append<T> for () {
 /// Implement append for non-empty tuple list.
 impl<Head, Tail, T> Append<T> for (Head, Tail)
 where
-    Self: TupleList,
     Tail: Append<T>,
-    (Head, Tail::AppendResult): TupleList,
 {
     type AppendResult = (Head, Tail::AppendResult);
 
@@ -366,12 +361,9 @@ where
 }
 
 /// Merge two `TupeList`
-pub trait Merge<T>: TupleList
-where
-    T: TupleList,
-{
+pub trait Merge<T> {
     /// The Resulting [`TupleList`], of an [`Merge::merge()`] call
-    type MergeResult: TupleList;
+    type MergeResult;
 
     /// Merge and return the merged tuple
     #[must_use]
@@ -379,10 +371,7 @@ where
 }
 
 /// Implement merge for an empty tuple list.
-impl<T> Merge<T> for ()
-where
-    T: TupleList,
-{
+impl<T> Merge<T> for () {
     type MergeResult = T;
 
     fn merge(self, value: T) -> Self::MergeResult {
@@ -393,10 +382,7 @@ where
 /// Implement merge for non-empty tuple list.
 impl<Head, Tail, T> Merge<T> for (Head, Tail)
 where
-    T: TupleList,
-    Self: TupleList,
     Tail: Merge<T>,
-    (Head, Tail::MergeResult): TupleList,
 {
     type MergeResult = (Head, Tail::MergeResult);
 
