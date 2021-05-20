@@ -29,7 +29,7 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
+    stats::MultiStats,
 };
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
@@ -58,8 +58,8 @@ pub fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats_closure = |s| println!("{}", s);
-    let stats = SimpleStats::new(stats_closure);
-    let mut client_init_stats = || Ok(SimpleStats::new(stats_closure));
+    let stats = MultiStats::new(stats_closure);
+    let mut client_init_stats = || Ok(MultiStats::new(stats_closure));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
         let corpus_dirs = &[PathBuf::from("./corpus")];

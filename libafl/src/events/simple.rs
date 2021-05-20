@@ -115,6 +115,17 @@ where
                 stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
+            Event::UpdateUserStats {
+                name,
+                value,
+                phantom: _,
+            } => {
+                stats
+                    .client_stats_mut_for(0)
+                    .update_user_stats(name.clone(), value.clone());
+                stats.display(event.name().to_string(), 0);
+                Ok(BrokerEventResult::Handled)
+            }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfStats {
                 time,

@@ -20,7 +20,7 @@ use crate::bolts::current_time;
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
 /// User-defined stats types
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
     Number(u64),
     String(String),

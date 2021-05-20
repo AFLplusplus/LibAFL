@@ -3,7 +3,7 @@
 use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusScheduler, Testcase},
-    events::{Event, EventManager},
+    events::{Event, EventFirer, EventManager},
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
@@ -69,15 +69,19 @@ where
 pub trait IsInteresting<I, OT, S>
 where
     OT: ObserversTuple,
+    I: Input,
 {
     /// Evaluate if a set of observation channels has an interesting state
-    fn is_interesting(
+    fn is_interesting<EM>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>;
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>;
 }
 
 /// Add to the state if interesting
@@ -259,18 +263,19 @@ where
     S: HasCorpus<C, I>,
 {
     /// Evaluate if a set of observation channels has an interesting state
-    fn is_interesting(
+    fn is_interesting<EM>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        OT: ObserversTuple,
+        EM: EventFirer<I, S>,
     {
         self.feedback_mut()
-            .is_interesting(state, input, observers, exit_kind)
+            .is_interesting(state, manager, input, observers, exit_kind)
     }
 }
 
@@ -521,7 +526,7 @@ where
         #[cfg(not(feature = "introspection"))]
         let is_interesting = self
             .feedback_mut()
-            .is_interesting(state, &input, observers, &exit_kind)?;
+            .is_interesting(state, event_mgr, &input, observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
         let is_interesting = {
@@ -552,7 +557,7 @@ where
         start_timer!(state);
         let is_solution = self
             .objective_mut()
-            .is_interesting(state, &input, observers, &exit_kind)?;
+            .is_interesting(state, event_mgr, &input, observers, &exit_kind)?;
 
         mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
 

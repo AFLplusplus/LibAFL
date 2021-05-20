@@ -263,6 +263,16 @@ where
                 stats.display(event.name().to_string(), sender_id);
                 Ok(BrokerEventResult::Handled)
             }
+            Event::UpdateUserStats {
+                name,
+                value,
+                phantom: _,
+            } => {
+                let client = stats.client_stats_mut_for(sender_id);
+                client.update_user_stats(name.clone(), value.clone());
+                stats.display(event.name().to_string(), sender_id);
+                Ok(BrokerEventResult::Handled)
+            }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfStats {
                 time,
@@ -337,7 +347,7 @@ where
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
                 let is_interesting =
-                    fuzzer.is_interesting(state, &input, &observers, &ExitKind::Ok)?;
+                    fuzzer.is_interesting(state, self, &input, &observers, &ExitKind::Ok)?;
                 if fuzzer
                     .add_if_interesting(state, &input, is_interesting)?
                     .is_some()

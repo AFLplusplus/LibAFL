@@ -45,8 +45,8 @@ where
     }
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
-        let pad = if event_msg.len() < 12 {
-            " ".repeat(12 - event_msg.len())
+        let pad = if event_msg.len() < 9 {
+            " ".repeat(9 - event_msg.len())
         } else {
             "".to_string()
         };
