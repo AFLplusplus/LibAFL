@@ -12,15 +12,15 @@ use libafl::{
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CmpFeedback, CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
+    mutators::token_mutations::I2SRandReplace,
     observers::{StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
-    stats::MultiStats,
+    stats::SimpleStats,
     Error,
 };
 
@@ -73,7 +73,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let time_observer = TimeObserver::new("time");
 
     let cmplog = unsafe { &mut CMPLOG_MAP };
-    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog);
+    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
     let cmplog = unsafe { &mut CMPLOG_MAP };
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
@@ -155,9 +155,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Secondary harness due to mut ownership
-    let mut harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
+    let mut harness = |buf: &[u8]| {
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
@@ -172,14 +170,16 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     )?);
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+    //let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a basic mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mutational = StdMutationalStage::new(mutator);
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(tracing, i2s, mutational);
+
+    let mut stages = tuple_list!(tracing, mutational);
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
 

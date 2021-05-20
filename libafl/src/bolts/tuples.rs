@@ -361,12 +361,9 @@ where
 }
 
 /// Merge two `TupeList`
-pub trait Merge<T>: TupleList
-where
-    T: TupleList,
-{
+pub trait Merge<T> {
     /// The Resulting [`TupleList`], of an [`Merge::merge()`] call
-    type MergeResult: TupleList;
+    type MergeResult;
 
     /// Merge and return the merged tuple
     #[must_use]
@@ -374,10 +371,7 @@ where
 }
 
 /// Implement merge for an empty tuple list.
-impl<T> Merge<T> for ()
-where
-    T: TupleList,
-{
+impl<T> Merge<T> for () {
     type MergeResult = T;
 
     fn merge(self, value: T) -> Self::MergeResult {
@@ -388,10 +382,7 @@ where
 /// Implement merge for non-empty tuple list.
 impl<Head, Tail, T> Merge<T> for (Head, Tail)
 where
-    T: TupleList,
-    Self: TupleList,
     Tail: Merge<T>,
-    (Head, Tail::MergeResult): TupleList,
 {
     type MergeResult = (Head, Tail::MergeResult);
 

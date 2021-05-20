@@ -15,10 +15,9 @@ use std::{
 
 use crate::{
     bolts::rands::Rand,
-    feedbacks::cmp::CmpValuesMetadata,
     inputs::{HasBytesVec, Input},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
-    observers::cmp::CmpValues,
+    observers::cmp::{CmpValues, CmpValuesMetadata},
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
@@ -448,6 +447,8 @@ where
                 // buffer_copy(input.bytes_mut(), token, 0, off, len);
             }
         }
+
+        //println!("{:?}", result);
 
         Ok(result)
     }

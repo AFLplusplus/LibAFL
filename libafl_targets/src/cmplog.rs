@@ -5,6 +5,7 @@ use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::HasExecHooks,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
+    state::HasMetadata,
     Error,
 };
 
@@ -148,6 +149,7 @@ pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
+    add_meta: bool,
     name: String,
 }
 
@@ -171,7 +173,10 @@ impl<'a> CmpObserver<CmpLogMap> for CmpLogObserver<'a> {
 
 impl<'a> Observer for CmpLogObserver<'a> {}
 
-impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a> {
+impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a>
+where
+    S: HasMetadata,
+{
     fn pre_exec(
         &mut self,
         _fuzzer: &mut Z,
@@ -189,12 +194,16 @@ impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a> {
     fn post_exec(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        state: &mut S,
         _mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
+        }
+
+        if self.add_meta {
+            self.add_cmpvalues_meta(state);
         }
         Ok(())
     }
@@ -209,11 +218,12 @@ impl<'a> Named for CmpLogObserver<'a> {
 impl<'a> CmpLogObserver<'a> {
     /// Creates a new [`CmpLogObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut CmpLogMap) -> Self {
+    pub fn new(name: &'static str, map: &'a mut CmpLogMap, add_meta: bool) -> Self {
         Self {
             name: name.to_string(),
             size: None,
 
+            add_meta,
             map: OwnedRefMut::Ref(map),
         }
     }

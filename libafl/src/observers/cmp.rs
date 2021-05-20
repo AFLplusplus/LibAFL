@@ -8,19 +8,67 @@ use alloc::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named},
+    bolts::{ownedref::OwnedRefMut, tuples::Named, AsSlice},
     executors::HasExecHooks,
     observers::Observer,
+    state::HasMetadata,
     Error,
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum CmpValues {
     U8((u8, u8)),
     U16((u16, u16)),
     U32((u32, u32)),
     U64((u64, u64)),
     Bytes((Vec<u8>, Vec<u8>)),
+}
+
+impl CmpValues {
+    pub fn is_numeric(&self) -> bool {
+        match self {
+            CmpValues::U8(_) => true,
+            CmpValues::U16(_) => true,
+            CmpValues::U32(_) => true,
+            CmpValues::U64(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn to_u64_tuple(&self) -> Option<(u64, u64)> {
+        match self {
+            CmpValues::U8(t) => Some((t.0 as u64, t.1 as u64)),
+            CmpValues::U16(t) => Some((t.0 as u64, t.1 as u64)),
+            CmpValues::U32(t) => Some((t.0 as u64, t.1 as u64)),
+            CmpValues::U64(t) => Some((t.0 as u64, t.1 as u64)),
+            _ => None,
+        }
+    }
+}
+
+/// A state metadata holding a list of values logged from comparisons
+#[derive(Serialize, Deserialize)]
+pub struct CmpValuesMetadata {
+    /// A `list` of values.
+    pub list: Vec<CmpValues>,
+}
+
+crate::impl_serdeany!(CmpValuesMetadata);
+
+impl AsSlice<CmpValues> for CmpValuesMetadata {
+    /// Convert to a slice
+    #[must_use]
+    fn as_slice(&self) -> &[CmpValues] {
+        self.list.as_slice()
+    }
+}
+
+impl CmpValuesMetadata {
+    /// Creates a new [`struct@CmpValuesMetadata`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self { list: vec![] }
+    }
 }
 
 /// A [`CmpMap`] traces comparisons during the current execution
@@ -49,6 +97,64 @@ where
     fn map(&self) -> &CM;
 
     fn map_mut(&mut self) -> &mut CM;
+
+    fn add_cmpvalues_meta<S>(&mut self, state: &mut S)
+    where
+        S: HasMetadata,
+    {
+        if state.metadata().get::<CmpValuesMetadata>().is_none() {
+            state.add_metadata(CmpValuesMetadata::new());
+        }
+        let meta = state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap();
+        meta.list.clear();
+        let count = self.usable_count();
+        for i in 0..count {
+            let execs = self.map().usable_executions_for(i);
+            if execs > 0 {
+                // Recongize loops and discard if needed
+                if execs > 4 {
+                    let mut increasing_v0 = 0;
+                    let mut increasing_v1 = 0;
+                    let mut decreasing_v0 = 0;
+                    let mut decreasing_v1 = 0;
+
+                    let mut last: Option<CmpValues> = None;
+                    for j in 0..execs {
+                        let val = self.map().values_of(i, j);
+                        if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
+                            if let Some(v) = val.to_u64_tuple() {
+                                if l.0.wrapping_add(1) == v.0 {
+                                    increasing_v0 += 1;
+                                }
+                                if l.1.wrapping_add(1) == v.1 {
+                                    increasing_v1 += 1;
+                                }
+                                if l.0.wrapping_sub(1) == v.0 {
+                                    decreasing_v0 += 1;
+                                }
+                                if l.1.wrapping_sub(1) == v.1 {
+                                    decreasing_v1 += 1;
+                                }
+                            }
+                        }
+                        last = Some(val);
+                    }
+                    // We check for execs-2 because the logged execs may wrap and have something like
+                    // 8 9 10 3 4 5 6 7
+                    if increasing_v0 >= execs - 2
+                        || increasing_v1 >= execs - 2
+                        || decreasing_v0 >= execs - 2
+                        || decreasing_v1 >= execs - 2
+                    {
+                        continue;
+                    }
+                }
+                for j in 0..execs {
+                    meta.list.push(self.map().values_of(i, j));
+                }
+            }
+        }
+    }
 }
 
 /// A standard [`CmpObserver`] observer
