@@ -1,4 +1,4 @@
-use core::marker::PhantomData;
+use core::{marker::PhantomData, mem::drop};
 
 use crate::{
     bolts::rands::Rand,
@@ -141,7 +141,42 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.perform_mutational(fuzzer, executor, state, manager, corpus_idx)
+        start_timer!(state);
+        let input = state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .load_input()?
+            .clone();
+        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+
+        start_timer!(state);
+        self.tracer_executor
+            .pre_exec_observers(fuzzer, state, manager, &input)?;
+        mark_feature_time!(state, PerfFeature::PreExecObservers);
+
+        start_timer!(state);
+        self.tracer_executor
+            .pre_exec(fuzzer, state, manager, &input)?;
+        mark_feature_time!(state, PerfFeature::PreExec);
+
+        start_timer!(state);
+        drop(self.tracer_executor.run_target(&input)?);
+        mark_feature_time!(state, PerfFeature::TargetExecution);
+
+        start_timer!(state);
+        self.tracer_executor
+            .post_exec(fuzzer, state, manager, &input)?;
+        mark_feature_time!(state, PerfFeature::PostExec);
+
+        *state.executions_mut() += 1;
+
+        start_timer!(state);
+        self.tracer_executor
+            .post_exec_observers(fuzzer, state, manager, &input)?;
+        mark_feature_time!(state, PerfFeature::PostExecObservers);
+
+        Ok(())
     }
 }
 
