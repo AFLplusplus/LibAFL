@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use libafl::inputs::{BytesInput, HasTargetBytes};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
@@ -26,7 +27,9 @@ fn signals_set(idx: usize) {
 #[allow(clippy::similar_names)]
 pub fn main() {
     // The closure that we want to fuzz
-    let mut harness = |buf: &[u8]| {
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let buf = target.as_slice();
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);

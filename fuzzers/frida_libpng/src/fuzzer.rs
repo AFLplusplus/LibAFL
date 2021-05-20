@@ -26,7 +26,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
@@ -61,7 +61,7 @@ use libafl_frida::{
 struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -78,7 +78,7 @@ impl<'a, 'b, 'c, FH, H, I, OT, S> Executor<I>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -117,7 +117,7 @@ impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -152,7 +152,7 @@ impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<OT>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -171,7 +171,7 @@ impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
@@ -180,7 +180,7 @@ where
 impl<'a, 'b, 'c, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -336,7 +336,9 @@ unsafe fn fuzz(
             unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
         > = lib.get(symbol_name.as_bytes()).unwrap();
 
-        let mut frida_harness = move |buf: &[u8]| {
+        let mut frida_harness = move |input: &BytesInput| {
+            let target = input.target_bytes();
+            let buf = target.as_slice();
             (target_func)(buf.as_ptr(), buf.len());
             ExitKind::Ok
         };

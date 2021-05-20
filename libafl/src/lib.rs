@@ -201,7 +201,7 @@ mod tests {
         let scheduler = RandCorpusScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 
-        let mut harness = |_buf: &[u8]| ExitKind::Ok;
+        let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
             &mut harness,
             tuple_list!(),
