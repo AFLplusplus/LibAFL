@@ -658,7 +658,7 @@ mod windows_exception_handler {
 
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, &input, observers, &ExitKind::Crash)
+                .is_interesting(state, event_mgr, &input, observers, &ExitKind::Crash)
                 .expect("In crash handler objective failure.");
 
             if interesting {
