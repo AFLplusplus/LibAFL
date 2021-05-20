@@ -100,7 +100,7 @@ where
                 stats
                     .client_stats_mut_for(0)
                     .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string());
+                stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateStats {
@@ -112,7 +112,7 @@ where
                 stats
                     .client_stats_mut_for(0)
                     .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string());
+                stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -125,14 +125,14 @@ where
                 // TODO: The stats buffer should be added on client add.
                 stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
                 stats.client_stats_mut()[0].update_introspection_stats(**introspection_stats);
-                stats.display(event.name().to_string());
+                stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
                 stats
                     .client_stats_mut_for(0)
                     .update_objective_size(*objective_size as u64);
-                stats.display(event.name().to_string());
+                stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {

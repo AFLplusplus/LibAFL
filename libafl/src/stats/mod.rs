@@ -1,9 +1,14 @@
 //! Keep stats, and dispaly them to the user. Usually used in a broker, or main node, of some sort.
 
+pub mod multi;
+pub use multi::MultiStats;
+
 use serde::{Deserialize, Serialize};
 
 use alloc::{string::String, vec::Vec};
-use core::{time, time::Duration};
+use core::{fmt, time, time::Duration};
+
+use hashbrown::HashMap;
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
@@ -13,6 +18,30 @@ use core::convert::TryInto;
 use crate::bolts::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
+
+/// User-defined stats types
+#[derive(Debug, Clone)]
+pub enum UserStats {
+    Number(u64),
+    String(String),
+    Ratio(u64, u64),
+}
+
+impl fmt::Display for UserStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UserStats::Number(n) => write!(f, "{}", n),
+            UserStats::String(s) => write!(f, "{}", s),
+            UserStats::Ratio(a, b) => {
+                if *b == 0 {
+                    write!(f, "{}/{}", a, b)
+                } else {
+                    write!(f, "{}/{} ({}%)", a, b, a * 100 / b)
+                }
+            }
+        }
+    }
+}
 
 /// A simple struct to keep track of client stats
 #[derive(Debug, Clone, Default)]
@@ -30,6 +59,8 @@ pub struct ClientStats {
     pub last_window_time: time::Duration,
     /// The last executions per sec
     pub last_execs_per_sec: f32,
+    /// User-defined stats
+    pub user_stats: HashMap<String, UserStats>,
 
     /// Client performance statistics
     #[cfg(feature = "introspection")]
@@ -90,6 +121,16 @@ impl ClientStats {
         self.last_execs_per_sec as u64
     }
 
+    /// Update the user-defined stat with name and value
+    pub fn update_user_stats(&mut self, name: String, value: UserStats) {
+        self.user_stats.insert(name, value);
+    }
+
+    /// Get a user-defined stat using the name
+    pub fn get_user_stats(&mut self, name: &str) -> Option<&UserStats> {
+        self.user_stats.get(name)
+    }
+
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     #[cfg(feature = "introspection")]
     pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
@@ -109,7 +150,7 @@ pub trait Stats {
     fn start_time(&mut self) -> time::Duration;
 
     /// show the stats to the user
-    fn display(&mut self, event_msg: String);
+    fn display(&mut self, event_msg: String, sender_id: u32);
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
@@ -186,10 +227,11 @@ where
         self.start_time
     }
 
-    fn display(&mut self, event_msg: String) {
+    fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{} #{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
+            sender_id,
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
