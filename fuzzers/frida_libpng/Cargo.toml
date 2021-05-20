@@ -24,8 +24,7 @@ which = "4.1"
 libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public" ] } #,  "llmp_small_maps", "llmp_debug"]}
 libafl_frida = { path = "../../libafl_frida" }
 capstone = "0.8.0"
-frida-gum = { version = "0.5.0", git = "https://github.com/frida/frida-rust", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"], rev = "69f5b8236ab4b66296507803b4b7bfec79700e84" }
-#frida-gum = { version = "0.5.0", path = "../../../frida-rust/frida-gum", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.5.1", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
 lazy_static = "1.4.0"
 libc = "0.2"
 libloading = "0.7.0"

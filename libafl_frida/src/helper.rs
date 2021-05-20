@@ -358,7 +358,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
             });
             helper.transformer = Some(transformer);
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
-                helper.asan_runtime.borrow_mut().init(modules_to_instrument);
+                helper
+                    .asan_runtime
+                    .borrow_mut()
+                    .init(gum, modules_to_instrument);
             }
         }
         helper

@@ -6,6 +6,7 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
+use frida_gum::NativePointer;
 use hashbrown::HashMap;
 use libafl::{
     bolts::{
@@ -34,8 +35,8 @@ use capstone::{
 };
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use frida_gum::{interceptor::Interceptor, Gum, ModuleMap};
 #[cfg(unix)]
-use gothook::GotHookLibrary;
 use libc::{getrlimit64, rlimit64, sysconf, _SC_PAGESIZE};
 use rangemap::RangeMap;
 use rangemap::RangeSet;
@@ -433,186 +434,6 @@ impl Allocator {
     }
 }
 
-/// Hook for malloc.
-#[must_use]
-pub extern "C" fn asan_malloc(size: usize) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, 0x8) }
-}
-
-/// Hook for new.
-#[must_use]
-pub extern "C" fn asan_new(size: usize) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, 0x8) }
-}
-
-/// Hook for new.
-#[must_use]
-pub extern "C" fn asan_new_nothrow(size: usize, _nothrow: *const c_void) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, 0x8) }
-}
-
-/// Hook for new with alignment.
-#[must_use]
-pub extern "C" fn asan_new_aligned(size: usize, alignment: usize) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, alignment) }
-}
-
-/// Hook for new with alignment.
-#[must_use]
-pub extern "C" fn asan_new_aligned_nothrow(
-    size: usize,
-    alignment: usize,
-    _nothrow: *const c_void,
-) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, alignment) }
-}
-
-/// Hook for pvalloc
-#[must_use]
-pub extern "C" fn asan_pvalloc(size: usize) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, 0x8) }
-}
-
-/// Hook for valloc
-#[must_use]
-pub extern "C" fn asan_valloc(size: usize) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, 0x8) }
-}
-
-/// Hook for calloc
-#[must_use]
-pub extern "C" fn asan_calloc(nmemb: usize, size: usize) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size * nmemb, 0x8) }
-}
-
-/// Hook for realloc
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-#[must_use]
-pub unsafe extern "C" fn asan_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
-    let mut allocator = Allocator::get();
-    let ret = allocator.alloc(size, 0x8);
-    if ptr != std::ptr::null_mut() {
-        memmove(ret, ptr, allocator.get_usable_size(ptr));
-    }
-    allocator.release(ptr);
-    ret
-}
-
-/// Hook for free
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_free(ptr: *mut c_void) {
-    if ptr != std::ptr::null_mut() {
-        Allocator::get().release(ptr);
-    }
-}
-
-/// Hook for delete
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete(ptr: *mut c_void) {
-    if ptr != std::ptr::null_mut() {
-        Allocator::get().release(ptr);
-    }
-}
-
-/// Hook for delete
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_ulong(ptr: *mut c_void, _ulong: u64) {
-    if ptr != std::ptr::null_mut() {
-        Allocator::get().release(ptr);
-    }
-}
-
-/// Hook for delete
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_ulong_aligned(
-    ptr: *mut c_void,
-    _ulong: u64,
-    _nothrow: *const c_void,
-) {
-    if ptr != std::ptr::null_mut() {
-        Allocator::get().release(ptr);
-    }
-}
-
-/// Hook for delete
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_aligned(ptr: *mut c_void, _alignment: usize) {
-    if ptr != std::ptr::null_mut() {
-        Allocator::get().release(ptr);
-    }
-}
-
-/// Hook for delete
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_nothrow(ptr: *mut c_void, _nothrow: *const c_void) {
-    if ptr != std::ptr::null_mut() {
-        Allocator::get().release(ptr);
-    }
-}
-
-/// Hook for `delete`
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-pub unsafe extern "C" fn asan_delete_aligned_nothrow(
-    ptr: *mut c_void,
-    _alignment: usize,
-    _nothrow: *const c_void,
-) {
-    if ptr != std::ptr::null_mut() {
-        Allocator::get().release(ptr);
-    }
-}
-
-/// Hook for `malloc_usable_size`
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-#[must_use]
-pub unsafe extern "C" fn asan_malloc_usable_size(ptr: *mut c_void) -> usize {
-    Allocator::get().get_usable_size(ptr)
-}
-
-/// Hook for `memalign`
-#[must_use]
-pub extern "C" fn asan_memalign(size: usize, alignment: usize) -> *mut c_void {
-    unsafe { Allocator::get().alloc(size, alignment) }
-}
-
-/// Hook for `posix_memalign`
-///
-/// # Safety
-/// This function is inherently unsafe, as it takes a raw pointer
-#[must_use]
-pub unsafe extern "C" fn asan_posix_memalign(
-    pptr: *mut *mut c_void,
-    size: usize,
-    alignment: usize,
-) -> i32 {
-    *pptr = Allocator::get().alloc(size, alignment);
-    0
-}
-
-/// Hook for mallinfo
-#[must_use]
-pub extern "C" fn asan_mallinfo() -> *mut c_void {
-    std::ptr::null_mut()
-}
-
 /// Get the current thread's TLS address
 extern "C" {
     fn tls_ptr() -> *const c_void;
@@ -641,6 +462,7 @@ pub struct AsanRuntime {
     stalked_addresses: HashMap<usize, usize>,
     options: FridaOptions,
     instrumented_ranges: RangeMap<usize, String>,
+    module_map: Option<ModuleMap>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -737,6 +559,7 @@ impl AsanRuntime {
             stalked_addresses: HashMap::new(),
             options,
             instrumented_ranges: RangeMap::new(),
+            module_map: None,
         }));
         Allocator::init(res.clone());
         res
@@ -744,7 +567,7 @@ impl AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, modules_to_instrument: &[PathBuf]) {
+    pub fn init(&mut self, gum: &Gum, modules_to_instrument: &[PathBuf]) {
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new());
         }
@@ -755,9 +578,15 @@ impl AsanRuntime {
             let (start, end) = find_mapping_for_path(module_name.to_str().unwrap());
             self.instrumented_ranges
                 .insert(start..end, module_name.to_str().unwrap().to_string());
-            #[cfg(unix)]
-            self.hook_library(module_name.to_str().unwrap());
+            //#[cfg(unix)]
+            //self.hook_library(module_name.to_str().unwrap());
         }
+        let module_names: Vec<&str> = modules_to_instrument
+            .iter()
+            .map(|modname| modname.to_str().unwrap())
+            .collect();
+        self.module_map = Some(ModuleMap::new_from_names(&module_names));
+        self.hook_functions(gum);
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -878,77 +707,360 @@ impl AsanRuntime {
         (start, end)
     }
 
-    /// Locate the target library and hook it's memory allocation functions
-    #[cfg(unix)]
-    #[allow(clippy::unused_self)]
-    fn hook_library(&mut self, path: &str) {
-        let target_lib = GotHookLibrary::new(path, false);
+    #[inline]
+    fn hook_malloc(&mut self, size: usize) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, 8) }
+    }
 
-        // shadow the library itself, allowing all accesses
-        Allocator::get().map_shadow_for_region(target_lib.start(), target_lib.end(), true);
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__Znam(&mut self, size: usize) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, 8) }
+    }
 
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZnamRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, 8) }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZnamSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, alignment) }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZnamSt11align_val_tRKSt9nothrow_t(
+        &mut self,
+        size: usize,
+        alignment: usize,
+        _nothrow: *const c_void,
+    ) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, alignment) }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__Znwm(&mut self, size: usize) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, 8) }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZnwmRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, 8) }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZnwmSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, alignment) }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZnwmSt11align_val_tRKSt9nothrow_t(
+        &mut self,
+        size: usize,
+        alignment: usize,
+        _nothrow: *const c_void,
+    ) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, alignment) }
+    }
+
+    #[inline]
+    fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
+        let ret = unsafe { Allocator::get().alloc(size * nmemb, 8) };
         unsafe {
-            // Hook all the memory allocator functions
-            target_lib.hook_function("malloc", asan_malloc as *const c_void);
-            target_lib.hook_function("_Znam", asan_new as *const c_void);
-            target_lib.hook_function("_ZnamRKSt9nothrow_t", asan_new_nothrow as *const c_void);
-            target_lib.hook_function("_ZnamSt11align_val_t", asan_new_aligned as *const c_void);
-            target_lib.hook_function(
-                "_ZnamSt11align_val_tRKSt9nothrow_t",
-                asan_new_aligned_nothrow as *const c_void,
-            );
-            target_lib.hook_function("_Znwm", asan_new as *const c_void);
-            target_lib.hook_function("_ZnwmRKSt9nothrow_t", asan_new_nothrow as *const c_void);
-            target_lib.hook_function("_ZnwmSt11align_val_t", asan_new_aligned as *const c_void);
-            target_lib.hook_function(
-                "_ZnwmSt11align_val_tRKSt9nothrow_t",
-                asan_new_aligned_nothrow as *const c_void,
-            );
-
-            target_lib.hook_function("_ZdaPv", asan_delete as *const c_void);
-            target_lib.hook_function("_ZdaPvm", asan_delete_ulong as *const c_void);
-            target_lib.hook_function(
-                "_ZdaPvmSt11align_val_t",
-                asan_delete_ulong_aligned as *const c_void,
-            );
-            target_lib.hook_function("_ZdaPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
-            target_lib.hook_function(
-                "_ZdaPvSt11align_val_t",
-                asan_delete_aligned as *const c_void,
-            );
-            target_lib.hook_function(
-                "_ZdaPvSt11align_val_tRKSt9nothrow_t",
-                asan_delete_aligned_nothrow as *const c_void,
-            );
-
-            target_lib.hook_function("_ZdlPv", asan_delete as *const c_void);
-            target_lib.hook_function("_ZdlPvm", asan_delete_ulong as *const c_void);
-            target_lib.hook_function(
-                "_ZdlPvmSt11align_val_t",
-                asan_delete_ulong_aligned as *const c_void,
-            );
-            target_lib.hook_function("_ZdlPvRKSt9nothrow_t", asan_delete_nothrow as *const c_void);
-            target_lib.hook_function(
-                "_ZdlPvSt11align_val_t",
-                asan_delete_aligned as *const c_void,
-            );
-            target_lib.hook_function(
-                "_ZdlPvSt11align_val_tRKSt9nothrow_t",
-                asan_delete_aligned_nothrow as *const c_void,
-            );
-
-            target_lib.hook_function("calloc", asan_calloc as *const c_void);
-            target_lib.hook_function("pvalloc", asan_pvalloc as *const c_void);
-            target_lib.hook_function("valloc", asan_valloc as *const c_void);
-            target_lib.hook_function("realloc", asan_realloc as *const c_void);
-            target_lib.hook_function("free", asan_free as *const c_void);
-            target_lib.hook_function("memalign", asan_memalign as *const c_void);
-            target_lib.hook_function("posix_memalign", asan_posix_memalign as *const c_void);
-            target_lib.hook_function(
-                "malloc_usable_size",
-                asan_malloc_usable_size as *const c_void,
-            );
+            memset(ret, 0, size * nmemb);
         }
+        ret
+    }
+
+    #[inline]
+    fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
+        unsafe {
+            let mut allocator = Allocator::get();
+            let ret = allocator.alloc(size, 0x8);
+            if ptr != std::ptr::null_mut() {
+                memmove(ret, ptr, allocator.get_usable_size(ptr));
+            }
+            allocator.release(ptr);
+            ret
+        }
+    }
+
+    #[inline]
+    fn hook_free(&mut self, ptr: *mut c_void) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[inline]
+    fn hook_memalign(&mut self, size: usize, alignment: usize) -> *mut c_void {
+        unsafe { Allocator::get().alloc(size, alignment) }
+    }
+
+    #[inline]
+    fn hook_posix_memalign(
+        &mut self,
+        pptr: *mut *mut c_void,
+        size: usize,
+        alignment: usize,
+    ) -> i32 {
+        unsafe {
+            *pptr = Allocator::get().alloc(size, alignment);
+        }
+        0
+    }
+
+    #[inline]
+    fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
+        Allocator::get().get_usable_size(ptr)
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdaPv(&mut self, ptr: *mut c_void) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdaPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdaPvSt11align_val_tRKSt9nothrow_t(
+        &mut self,
+        ptr: *mut c_void,
+        _alignment: usize,
+        _nothrow: *const c_void,
+    ) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdlPv(&mut self, ptr: *mut c_void) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdlPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdlPvSt11align_val_tRKSt9nothrow_t(
+        &mut self,
+        ptr: *mut c_void,
+        _alignment: usize,
+        _nothrow: *const c_void,
+    ) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
+        if ptr != std::ptr::null_mut() {
+            unsafe { Allocator::get().release(ptr) }
+        }
+    }
+
+    /// Hook all functions required for ASAN to function, replacing them with our own
+    /// implementations.
+    fn hook_functions(&mut self, gum: &Gum) {
+        let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
+
+        macro_rules! hook_func {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                paste::paste! {
+                    extern "C" {
+                        fn $name($($param: $param_type),*) -> $return_type;
+                    }
+                    #[allow(non_snake_case)]
+                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let mut invocation = Interceptor::current_invocation();
+                        let this = &mut *(invocation.replacement_data() as *mut AsanRuntime);
+                        if this.module_map.as_ref().unwrap().find(invocation.return_addr() as u64).is_some() {
+                            this.[<hook_ $name>]($($param),*)
+                        } else {
+                            $name($($param),*)
+                        }
+                    }
+                    interceptor.replace(
+                        frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
+                        NativePointer([<replacement_ $name>] as *mut c_void),
+                        NativePointer(self as *mut _ as *mut c_void)
+                    ).ok();
+                }
+            }
+        }
+
+        // Hook the memory allocator functions
+        hook_func!(None, malloc, (size: usize), *mut c_void);
+        hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
+        hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+        hook_func!(None, free, (ptr: *mut c_void), ());
+        hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
+        hook_func!(
+            None,
+            posix_memalign,
+            (pptr: *mut *mut c_void, size: usize, alignment: usize),
+            i32
+        );
+        hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
+        hook_func!(None, _Znam, (size: usize), *mut c_void);
+        hook_func!(
+            None,
+            _ZnamRKSt9nothrow_t,
+            (size: usize, _nothrow: *const c_void),
+            *mut c_void
+        );
+        hook_func!(
+            None,
+            _ZnamSt11align_val_t,
+            (size: usize, alignment: usize),
+            *mut c_void
+        );
+        hook_func!(
+            None,
+            _ZnamSt11align_val_tRKSt9nothrow_t,
+            (size: usize, alignment: usize, _nothrow: *const c_void),
+            *mut c_void
+        );
+        hook_func!(None, _Znwm, (size: usize), *mut c_void);
+        hook_func!(
+            None,
+            _ZnwmRKSt9nothrow_t,
+            (size: usize, _nothrow: *const c_void),
+            *mut c_void
+        );
+        hook_func!(
+            None,
+            _ZnwmSt11align_val_t,
+            (size: usize, alignment: usize),
+            *mut c_void
+        );
+        hook_func!(
+            None,
+            _ZnwmSt11align_val_tRKSt9nothrow_t,
+            (size: usize, alignment: usize, _nothrow: *const c_void),
+            *mut c_void
+        );
+        hook_func!(None, _ZdaPv, (ptr: *mut c_void), ());
+        hook_func!(None, _ZdaPvm, (ptr: *mut c_void, _ulong: u64), ());
+        hook_func!(
+            None,
+            _ZdaPvmSt11align_val_t,
+            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
+            ()
+        );
+        hook_func!(
+            None,
+            _ZdaPvRKSt9nothrow_t,
+            (ptr: *mut c_void, _nothrow: *const c_void),
+            ()
+        );
+        hook_func!(
+            None,
+            _ZdaPvSt11align_val_t,
+            (ptr: *mut c_void, _alignment: usize),
+            ()
+        );
+        hook_func!(
+            None,
+            _ZdaPvSt11align_val_tRKSt9nothrow_t,
+            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
+            ()
+        );
+        hook_func!(None, _ZdlPv, (ptr: *mut c_void), ());
+        hook_func!(None, _ZdlPvm, (ptr: *mut c_void, _ulong: u64), ());
+        hook_func!(
+            None,
+            _ZdlPvmSt11align_val_t,
+            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
+            ()
+        );
+        hook_func!(
+            None,
+            _ZdlPvRKSt9nothrow_t,
+            (ptr: *mut c_void, _nothrow: *const c_void),
+            ()
+        );
+        hook_func!(
+            None,
+            _ZdlPvSt11align_val_t,
+            (ptr: *mut c_void, _alignment: usize),
+            ()
+        );
+        hook_func!(
+            None,
+            _ZdlPvSt11align_val_tRKSt9nothrow_t,
+            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
+            ()
+        );
     }
 
     #[allow(clippy::cast_sign_loss)] // for displacement
