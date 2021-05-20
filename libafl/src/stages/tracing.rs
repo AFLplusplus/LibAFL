@@ -1,4 +1,4 @@
-use core::marker::PhantomData;
+use core::{marker::PhantomData, mem::drop};
 
 use crate::{
     corpus::Corpus,
@@ -73,7 +73,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExec);
 
         start_timer!(state);
-        let _ = self.tracer_executor.run_target(&input)?;
+        drop(self.tracer_executor.run_target(&input)?);
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
