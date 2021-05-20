@@ -11,11 +11,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{tuples::Named, AsSlice},
     corpus::Testcase,
+    events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     state::{HasFeedbackStates, HasMetadata},
+    stats::UserStats,
     Error,
 };
 
@@ -212,14 +214,16 @@ where
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         let mut interesting = false;
@@ -248,6 +252,7 @@ where
             for i in 0..size {
                 let history = map_state.history_map[i];
                 let item = observer.map()[i];
+                // TODO maybe walk again the histroy map only when it is interesting is more efficient
                 if item != initial {
                     self.indexes.as_mut().unwrap().push(i);
                 }
@@ -285,6 +290,23 @@ where
                     self.novelties.as_mut().unwrap().push(i);
                 }
             }
+        }
+
+        if interesting {
+            let mut filled = 0;
+            for i in 0..size {
+                if map_state.history_map[i] != initial {
+                    filled += 1;
+                }
+            }
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: self.name.to_string(),
+                    value: UserStats::Ratio(filled, size as u64),
+                    phantom: PhantomData,
+                },
+            )?;
         }
 
         Ok(interesting)
@@ -433,14 +455,16 @@ where
     I: Input,
     O: MapObserver<usize>,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         // TODO Replace with match_name_type when stable

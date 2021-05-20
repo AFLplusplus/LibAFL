@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::tuples::{MatchName, Named},
     corpus::Testcase,
+    events::EventFirer,
     executors::ExitKind,
     inputs::Input,
     observers::{ObserversTuple, TimeObserver},
@@ -29,20 +30,24 @@ where
     I: Input,
 {
     /// `is_interesting ` return if an input is worth the addition to the corpus
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple;
 
     #[cfg(feature = "introspection")]
-    fn is_interesting_with_perf<OT>(
+    #[allow(clippy::too_many_arguments)]
+    fn is_interesting_with_perf<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -50,13 +55,14 @@ where
         feedback_index: usize,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         // Start a timer for this feedback
         let start_time = crate::cpu::read_time_counter();
 
         // Execute this feedback
-        let ret = self.is_interesting(state, input, observers, &exit_kind);
+        let ret = self.is_interesting(state, manager, input, observers, &exit_kind);
 
         // Get the elapsed time for checking this feedback
         let elapsed = crate::cpu::read_time_counter() - start_time;
@@ -124,29 +130,32 @@ where
     B: Feedback<I, S>,
     I: Input,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         let a = self
             .first
-            .is_interesting(state, input, observers, exit_kind)?;
+            .is_interesting(state, manager, input, observers, exit_kind)?;
         let b = self
             .second
-            .is_interesting(state, input, observers, exit_kind)?;
+            .is_interesting(state, manager, input, observers, exit_kind)?;
         Ok(a && b)
     }
 
     #[cfg(feature = "introspection")]
-    fn is_interesting_with_perf<OT>(
+    fn is_interesting_with_perf<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -154,11 +163,13 @@ where
         feedback_index: usize,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         // Execute this feedback
         let a = self.first.is_interesting_with_perf(
             state,
+            manager,
             input,
             observers,
             &exit_kind,
@@ -167,6 +178,7 @@ where
         )?;
         let b = self.second.is_interesting_with_perf(
             state,
+            manager,
             input,
             observers,
             &exit_kind,
@@ -241,29 +253,32 @@ where
     B: Feedback<I, S>,
     I: Input,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         let a = self
             .first
-            .is_interesting(state, input, observers, exit_kind)?;
+            .is_interesting(state, manager, input, observers, exit_kind)?;
         let b = self
             .second
-            .is_interesting(state, input, observers, exit_kind)?;
+            .is_interesting(state, manager, input, observers, exit_kind)?;
         Ok(a || b)
     }
 
     #[cfg(feature = "introspection")]
-    fn is_interesting_with_perf<OT>(
+    fn is_interesting_with_perf<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -271,11 +286,13 @@ where
         feedback_index: usize,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         // Execute this feedback
         let a = self.first.is_interesting_with_perf(
             state,
+            manager,
             input,
             observers,
             &exit_kind,
@@ -284,6 +301,7 @@ where
         )?;
         let b = self.second.is_interesting_with_perf(
             state,
+            manager,
             input,
             observers,
             &exit_kind,
@@ -354,19 +372,21 @@ where
     A: Feedback<I, S>,
     I: Input,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         Ok(!self
             .first
-            .is_interesting(state, input, observers, exit_kind)?)
+            .is_interesting(state, manager, input, observers, exit_kind)?)
     }
 
     #[inline]
@@ -442,14 +462,16 @@ impl<I, S> Feedback<I, S> for ()
 where
     I: Input,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         Ok(false)
@@ -471,14 +493,16 @@ impl<I, S> Feedback<I, S> for CrashFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         if let ExitKind::Crash = exit_kind {
@@ -518,14 +542,16 @@ impl<I, S> Feedback<I, S> for TimeoutFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         if let ExitKind::Timeout = exit_kind {
@@ -570,14 +596,16 @@ impl<I, S> Feedback<I, S> for TimeFeedback
 where
     I: Input,
 {
-    fn is_interesting<OT>(
+    fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
+        EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
         // TODO Replace with match_name_type when stable
