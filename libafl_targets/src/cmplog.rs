@@ -144,7 +144,7 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
-/// A [`CmpObserver`] observer for CmpLog
+/// A [`CmpObserver`] observer for `CmpLog`
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,

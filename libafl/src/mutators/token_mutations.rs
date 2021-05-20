@@ -310,6 +310,7 @@ where
     S: HasMetadata + HasRand<R> + HasMaxSize,
     R: Rand,
 {
+    #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
@@ -343,13 +344,13 @@ where
         let mut result = MutationResult::Skipped;
         match cmp_values {
             CmpValues::U8(v) => {
-                for i in off..len {
-                    if bytes[i] == v.0 {
-                        bytes[i] = v.1;
+                for byte in bytes.iter_mut().take(len).skip(off) {
+                    if *byte == v.0 {
+                        *byte = v.1;
                         result = MutationResult::Mutated;
                         break;
-                    } else if bytes[i] == v.1 {
-                        bytes[i] = v.0;
+                    } else if *byte == v.1 {
+                        *byte = v.0;
                         result = MutationResult::Mutated;
                         break;
                     }
