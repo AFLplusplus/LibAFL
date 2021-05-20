@@ -24,7 +24,6 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
