@@ -87,7 +87,7 @@ extern "C" int afl_libfuzzer_init() {
 static char * allocation = NULL;
 __attribute__((noinline))
 void func3( char * alloc) {
-  printf("func3\n");
+  //printf("func3\n");
   if (random() == 0) {
     alloc[0x1ff] = 0xde;
     printf("alloc[0x200]: %d\n", alloc[0x200]);
@@ -96,12 +96,12 @@ void func3( char * alloc) {
 __attribute__((noinline))
 void func2() {
   allocation = (char*)malloc(0xff);
-  printf("func2\n");
+  //printf("func2\n");
   func3(allocation);
 }
 __attribute__((noinline))
 void func1() {
-  printf("func1\n");
+  //printf("func1\n");
   func2();
 }
 // Entry point for LibFuzzer.
