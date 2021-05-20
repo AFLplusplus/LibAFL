@@ -46,7 +46,7 @@ where
         let pad = if event_msg.len() < 9 {
             " ".repeat(9 - event_msg.len())
         } else {
-            "".to_string()
+            String::new()
         };
         let head = format!("{}{} #{}", event_msg, pad, sender_id);
         let global_fmt = format!(
