@@ -286,8 +286,14 @@ impl AshmemService {
             }
             AshmemRequest::Deregister(map_id) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                let map = client.maps.entry(map_id).or_default().pop().unwrap();
-                Ok(AshmemResponse::RefCount(Rc::strong_count(&map) as u32))
+                let maps = client.maps.entry(map_id).or_default();
+                if maps.is_empty() {
+                    Ok(AshmemResponse::RefCount(0u32))
+                } else {
+                    Ok(AshmemResponse::RefCount(
+                        Rc::strong_count(&maps.pop().unwrap()) as u32,
+                    ))
+                }
             }
         };
         //println!("send ashmem client: {}, response: {:?}", client_id, &response);
