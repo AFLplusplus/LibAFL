@@ -13,8 +13,6 @@
 #define LIBFUZZER_MSVC 0
 #endif  // _MSC_VER
 
-#define EXPORT_FN __declspec(dllexport)
-
 // From Libfuzzer
 // Intermediate macro to ensure the parameter is expanded before stringified.
 #define STRINGIFY_(A) #A

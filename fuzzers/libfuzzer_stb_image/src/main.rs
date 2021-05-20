@@ -15,15 +15,18 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::token_mutations::I2SRandReplace,
     observers::{StdMapObserver, TimeObserver},
-    stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    stages::{StdMutationalStage, TracingStage},
+    state::{HasCorpus, StdState},
     stats::SimpleStats,
     Error,
 };
 
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{
+    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
+    MAX_EDGES_NUM,
+};
 
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -68,6 +71,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
+    let cmplog = unsafe { &mut CMPLOG_MAP };
+    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
@@ -100,21 +106,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     });
 
     println!("We're a client, let's fuzz :)");
-
-    // Create a PNG dictionary if not existing
-    if state.metadata().get::<Tokens>().is_none() {
-        state.add_metadata(Tokens::new(vec![
-            vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
-            "IHDR".as_bytes().to_vec(),
-            "IDAT".as_bytes().to_vec(),
-            "PLTE".as_bytes().to_vec(),
-            "IEND".as_bytes().to_vec(),
-        ]));
-    }
-
-    // Setup a basic mutator with a mutational stage
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
@@ -156,6 +147,31 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
+
+    // Secondary harness due to mut ownership
+    let mut harness = |buf: &[u8]| {
+        libfuzzer_test_one_input(buf);
+        ExitKind::Ok
+    };
+
+    // Setup a tracing stage in which we log comparisons
+    let tracing = TracingStage::new(InProcessExecutor::new(
+        &mut harness,
+        tuple_list!(cmplog_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut restarting_mgr,
+    )?);
+
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+    // Setup a basic mutator
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutational = StdMutationalStage::new(mutator);
+
+    // The order of the stages matter!
+    let mut stages = tuple_list!(tracing, i2s, mutational);
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
 

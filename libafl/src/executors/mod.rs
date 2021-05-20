@@ -4,6 +4,8 @@ pub mod inprocess;
 pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
+pub mod combined;
+pub use combined::CombinedExecutor;
 
 use core::marker::PhantomData;
 

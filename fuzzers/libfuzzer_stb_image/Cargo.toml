@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_stb_image"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
 build = "build.rs"
@@ -17,7 +17,7 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_edges", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{
         rands::Rand,
-        tuples::{tuple_list, NamedTuple},
+        tuples::{tuple_list, tuple_list_type, NamedTuple},
         AsSlice,
     },
     corpus::Corpus,
@@ -198,7 +198,34 @@ where
 
 /// Get the mutations that compose the Havoc mutator
 #[must_use]
-pub fn havoc_mutations<C, I, R, S>() -> impl MutatorsTuple<I, S>
+pub fn havoc_mutations<C, I, R, S>() -> tuple_list_type!(
+       BitFlipMutator<I, R, S>,
+       ByteFlipMutator<I, R, S>,
+       ByteIncMutator<I, R, S>,
+       ByteDecMutator<I, R, S>,
+       ByteNegMutator<I, R, S>,
+       ByteRandMutator<I, R, S>,
+       ByteAddMutator<I, R, S>,
+       WordAddMutator<I, R, S>,
+       DwordAddMutator<I, R, S>,
+       QwordAddMutator<I, R, S>,
+       ByteInterestingMutator<I, R, S>,
+       WordInterestingMutator<I, R, S>,
+       DwordInterestingMutator<I, R, S>,
+       BytesDeleteMutator<I, R, S>,
+       BytesDeleteMutator<I, R, S>,
+       BytesDeleteMutator<I, R, S>,
+       BytesDeleteMutator<I, R, S>,
+       BytesExpandMutator<I, R, S>,
+       BytesInsertMutator<I, R, S>,
+       BytesRandInsertMutator<I, R, S>,
+       BytesSetMutator<I, R, S>,
+       BytesRandSetMutator<I, R, S>,
+       BytesCopyMutator<I, R, S>,
+       BytesSwapMutator<I, R, S>,
+       CrossoverInsertMutator<C, I, R, S>,
+       CrossoverReplaceMutator<C, I, R, S>,
+   )
 where
     I: Input + HasBytesVec,
     S: HasRand<R> + HasCorpus<C, I> + HasMetadata + HasMaxSize,
@@ -230,11 +257,22 @@ where
         BytesRandSetMutator::new(),
         BytesCopyMutator::new(),
         BytesSwapMutator::new(),
-        TokenInsert::new(),
-        TokenReplace::new(),
         CrossoverInsertMutator::new(),
         CrossoverReplaceMutator::new(),
     )
+}
+
+/// Get the mutations that uses the Tokens metadata
+#[must_use]
+pub fn tokens_mutations<C, I, R, S>(
+) -> tuple_list_type!(TokenInsert<I, R, S>, TokenReplace<I, R, S>)
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasCorpus<C, I> + HasMetadata + HasMaxSize,
+    C: Corpus<I>,
+    R: Rand,
+{
+    tuple_list!(TokenInsert::new(), TokenReplace::new(),)
 }
 
 /// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].

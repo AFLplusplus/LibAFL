@@ -6,10 +6,9 @@ cd fuzzers
 
 for fuzzer in *;
 do
-    echo "[+] Checking fmt, clippy, and building $fuzzer"
+    echo "[+] Checking fmt and building $fuzzer"
     cd $fuzzer \
         && cargo fmt --all -- --check \
-        && ../../clippy.sh --no-clean \
         && cargo build \
         && cd .. \
     || exit 1

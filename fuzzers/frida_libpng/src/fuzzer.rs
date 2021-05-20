@@ -13,7 +13,7 @@ use libafl::{
         os::parse_core_bind_arg,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
+        tuples::{tuple_list, Merge},
     },
     corpus::{
         ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
@@ -28,7 +28,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{HasTargetBytes, Input},
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
@@ -411,7 +411,7 @@ unsafe fn fuzz(
         }
 
         // Setup a basic mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus

@@ -4,14 +4,18 @@
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    bolts::{
+        current_nanos,
+        rands::StdRand,
+        tuples::{tuple_list, Merge},
+    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
@@ -114,7 +118,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Setup a basic mutator with a mutational stage
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // A random policy to get testcasess from the corpus
