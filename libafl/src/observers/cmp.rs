@@ -25,29 +25,28 @@ pub enum CmpValues {
 }
 
 impl CmpValues {
+    #[must_use]
     pub fn is_numeric(&self) -> bool {
-        match self {
-            CmpValues::U8(_) => true,
-            CmpValues::U16(_) => true,
-            CmpValues::U32(_) => true,
-            CmpValues::U64(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            CmpValues::U8(_) | CmpValues::U16(_) | CmpValues::U32(_) | CmpValues::U64(_)
+        )
     }
 
+    #[must_use]
     pub fn to_u64_tuple(&self) -> Option<(u64, u64)> {
         match self {
             CmpValues::U8(t) => Some((u64::from(t.0), u64::from(t.1))),
             CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1))),
             CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1))),
-            CmpValues::U64(t) => Some((u64::from(t.0), u64::from(t.1))),
+            CmpValues::U64(t) => Some(*t),
             _ => None,
         }
     }
 }
 
 /// A state metadata holding a list of values logged from comparisons
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct CmpValuesMetadata {
     /// A `list` of values.
     pub list: Vec<CmpValues>,
@@ -76,10 +75,19 @@ pub trait CmpMap: Serialize + DeserializeOwned {
     /// Get the number of cmps
     fn len(&self) -> usize;
 
+    /// Get if it is empty
+    #[must_use]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    // Get the number of executions for a cmp
     fn executions_for(&self, idx: usize) -> usize;
 
+    // Get the number of logged executions for a cmp
     fn usable_executions_for(&self, idx: usize) -> usize;
 
+    // Get the logged values for a cmp
     fn values_of(&self, idx: usize, execution: usize) -> CmpValues;
 
     /// Reset the state
@@ -94,10 +102,14 @@ where
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize;
 
+    /// Get the `CmpMap`
     fn map(&self) -> &CM;
 
+    /// Get the `CmpMap` (mut)
     fn map_mut(&mut self) -> &mut CM;
 
+    /// Add [`CmpValuesMetadata`] to the State including the logged values.
+    /// This routine does a basic loop filtering because loop index cmps are not interesting.
     fn add_cmpvalues_meta<S>(&mut self, state: &mut S)
     where
         S: HasMetadata,
@@ -221,7 +233,7 @@ impl<'a, CM> StdCmpObserver<'a, CM>
 where
     CM: CmpMap,
 {
-    /// Creates a new [`StdCmpObserver`] with the given name.
+    /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut CM) -> Self {
         Self {
@@ -231,5 +243,13 @@ where
         }
     }
 
-    // TODO with_size
+    /// Creates a new [`StdCmpObserver`] with the given name, map and reference to variable size.
+    #[must_use]
+    pub fn with_size(name: &'static str, map: &'a mut CM, size: &'a mut usize) -> Self {
+        Self {
+            name: name.to_string(),
+            size: Some(OwnedRefMut::Ref(size)),
+            map: OwnedRefMut::Ref(map),
+        }
+    }
 }
