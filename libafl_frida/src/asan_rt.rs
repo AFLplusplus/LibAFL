@@ -1442,7 +1442,7 @@ impl AsanRuntime {
     }
 
     #[allow(clippy::unused_self)]
-    fn generate_shadow_check_exact_blob(&mut self, val: u32) -> Box<[u8]> {
+    fn generate_shadow_check_exact_blob(&mut self, val: u64) -> Box<[u8]> {
         let shadow_bit = Allocator::get().shadow_bit as u32;
         macro_rules! shadow_check_exact {
             ($ops:ident, $val:expr) => {dynasm!($ops
@@ -1459,9 +1459,11 @@ impl AsanRuntime {
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
                 ; .dword -717536768 // 0xd53b4200 //mrs x0, NZCV
-                ; and x1, x1, #$val as u64
-                ; cmp x1, #$val
-                ; b.eq >done
+                ; stp x2, x3, [sp, #-0x10]!
+                ; mov x2, $val
+                ; ands x1, x1, x2
+                ; ldp x2, x3, [sp], 0x10
+                ; b.ne >done
 
                 ; adr x1, >done
                 ; nop // will be replaced by b to report
