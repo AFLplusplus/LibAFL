@@ -36,10 +36,10 @@ impl CmpValues {
 
     pub fn to_u64_tuple(&self) -> Option<(u64, u64)> {
         match self {
-            CmpValues::U8(t) => Some((t.0 as u64, t.1 as u64)),
-            CmpValues::U16(t) => Some((t.0 as u64, t.1 as u64)),
-            CmpValues::U32(t) => Some((t.0 as u64, t.1 as u64)),
-            CmpValues::U64(t) => Some((t.0 as u64, t.1 as u64)),
+            CmpValues::U8(t) => Some((u64::from(t.0), u64::from(t.1))),
+            CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1))),
+            CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1))),
+            CmpValues::U64(t) => Some((u64::from(t.0), u64::from(t.1))),
             _ => None,
         }
     }
