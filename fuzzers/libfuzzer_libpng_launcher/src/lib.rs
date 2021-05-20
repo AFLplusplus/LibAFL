@@ -33,6 +33,7 @@ use libafl::{
 };
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl::inputs::{BytesInput, HasBytesVec};
 
 /// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
@@ -127,7 +128,8 @@ pub fn main() {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |buf: &[u8]| {
+        let mut harness = |input: &BytesInput| {
+            let buf = input.bytes();
             libfuzzer_test_one_input(buf);
             ExitKind::Ok
         };

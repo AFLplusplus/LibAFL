@@ -27,6 +27,7 @@ use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
 };
+use libafl::inputs::{BytesInput, HasBytesVec};
 
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -149,7 +150,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Secondary harness due to mut ownership
-    let mut harness = |buf: &[u8]| {
+    let mut harness = |input: &BytesInput| {
+        let buf = input.bytes();
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };

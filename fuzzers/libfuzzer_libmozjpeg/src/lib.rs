@@ -27,6 +27,7 @@ use libafl::{
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CMP_MAP, EDGES_MAP, MAX_EDGES_NUM,
 };
+use libafl::inputs::{BytesInput, HasBytesVec};
 
 const ALLOC_MAP_SIZE: usize = 16 * 1024;
 extern "C" {
@@ -128,7 +129,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |buf: &[u8]| {
+    let mut harness = |input: &BytesInput| {
+        let buf = input.bytes();
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };

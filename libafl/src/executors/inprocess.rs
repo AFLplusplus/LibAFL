@@ -23,7 +23,7 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::{HasTargetBytes, Input},
+    inputs::Input,
     observers::ObserversTuple,
     state::HasSolutions,
     Error,
@@ -32,8 +32,8 @@ use crate::{
 /// The inmem executor simply calls a target function, then returns afterwards.
 pub struct InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&[u8]) -> ExitKind,
-    I: Input + HasTargetBytes,
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
     OT: ObserversTuple,
 {
     /// The harness function, being executed for each fuzzing loop execution
@@ -45,22 +45,21 @@ where
 
 impl<'a, H, I, OT, S> Executor<I> for InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&[u8]) -> ExitKind,
-    I: Input + HasTargetBytes,
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
     OT: ObserversTuple,
 {
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        let bytes = input.target_bytes();
-        let ret = (self.harness_fn)(bytes.as_slice());
+        let ret = (self.harness_fn)(input);
         Ok(ret)
     }
 }
 
 impl<'a, EM, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&[u8]) -> ExitKind,
-    I: Input + HasTargetBytes,
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
     OT: ObserversTuple,
 {
     #[inline]
@@ -140,8 +139,8 @@ where
 
 impl<'a, H, I, OT, S> HasObservers<OT> for InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&[u8]) -> ExitKind,
-    I: Input + HasTargetBytes,
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
     OT: ObserversTuple,
 {
     #[inline]
@@ -158,16 +157,16 @@ where
 impl<'a, EM, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
     for InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&[u8]) -> ExitKind,
-    I: Input + HasTargetBytes,
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
 
 impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&[u8]) -> ExitKind,
-    I: Input + HasTargetBytes,
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
     OT: ObserversTuple,
 {
     /// Create a new in mem executor.
@@ -256,7 +255,7 @@ mod unix_signal_handler {
         executors::ExitKind,
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{HasTargetBytes, Input},
+        inputs::Input,
         observers::ObserversTuple,
         state::HasSolutions,
     };
@@ -343,7 +342,7 @@ mod unix_signal_handler {
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I>,
-        I: Input + HasTargetBytes,
+        I: Input,
         Z: HasObjective<I, OF, S>,
     {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
@@ -417,7 +416,7 @@ mod unix_signal_handler {
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I>,
-        I: Input + HasTargetBytes,
+        I: Input,
         Z: HasObjective<I, OF, S>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
@@ -570,7 +569,7 @@ mod windows_exception_handler {
         executors::ExitKind,
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{HasTargetBytes, Input},
+        inputs::Input,
         observers::ObserversTuple,
         state::HasSolutions,
     };
@@ -636,7 +635,7 @@ mod windows_exception_handler {
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I>,
-        I: Input + HasTargetBytes,
+        I: Input,
         Z: HasObjective<I, OF, S>,
     {
         #[cfg(feature = "std")]
@@ -735,7 +734,7 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut harness = |_buf: &[u8]| ExitKind::Ok;
+        let mut harness = |_buf: &NopInput| ExitKind::Ok;
 
         let mut in_process_executor = InProcessExecutor::<_, NopInput, (), ()> {
             harness_fn: &mut harness,
