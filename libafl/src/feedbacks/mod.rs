@@ -43,6 +43,7 @@ where
         OT: ObserversTuple;
 
     #[cfg(feature = "introspection")]
+    #[allow(clippy::too_many_arguments)]
     fn is_interesting_with_perf<EM, OT>(
         &mut self,
         state: &mut S,

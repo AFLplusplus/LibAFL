@@ -157,8 +157,8 @@ where
                 time: _,
                 executions: _,
                 phantom: _,
-            } => "Stats",
-            Event::UpdateUserStats {
+            }
+            | Event::UpdateUserStats {
                 name: _,
                 value: _,
                 phantom: _,
