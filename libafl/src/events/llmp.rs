@@ -260,9 +260,7 @@ where
                 // TODO: The stats buffer should be added on client add.
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_executions(*executions as u64, *time);
-                if sender_id == 1 {
-                    stats.display(event.name().to_string() + " #" + &sender_id.to_string());
-                }
+                stats.display(event.name().to_string() + " #" + &sender_id.to_string());
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
