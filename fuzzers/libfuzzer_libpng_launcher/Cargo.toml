@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_libpng_launcher"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
 
@@ -21,7 +21,7 @@ num_cpus = "1.0"
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_hitcounts", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 clap = { version = "3.0.0-beta.2", features = ["yaml"] }

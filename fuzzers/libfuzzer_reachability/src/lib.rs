@@ -11,10 +11,9 @@ use libafl::{
     feedbacks::{MapFeedbackState, MaxMapFeedback, ReachabilityFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     stats::SimpleStats,
     Error,
 };
@@ -96,17 +95,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     });
 
     println!("We're a client, let's fuzz :)");
-
-    // Create a PNG dictionary if not existing
-    if state.metadata().get::<Tokens>().is_none() {
-        state.add_metadata(Tokens::new(vec![
-            vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
-            "IHDR".as_bytes().to_vec(),
-            "IDAT".as_bytes().to_vec(),
-            "PLTE".as_bytes().to_vec(),
-            "IEND".as_bytes().to_vec(),
-        ]));
-    }
 
     // Setup a basic mutator with a mutational stage
     let mutator = StdScheduledMutator::new(havoc_mutations());

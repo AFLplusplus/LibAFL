@@ -14,7 +14,7 @@ use libafl::{
         os::parse_core_bind_arg,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
+        tuples::{tuple_list, Merge},
     },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
@@ -24,7 +24,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
@@ -117,7 +117,7 @@ pub fn main() {
         }
 
         // Setup a basic mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus

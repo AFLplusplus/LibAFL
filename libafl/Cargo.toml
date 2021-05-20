@@ -1,6 +1,6 @@
 [package]
 name = "libafl"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
@@ -52,7 +52,7 @@ path = "./examples/llmp_test/main.rs"
 required-features = ["std"]
 
 [dependencies]
-libafl_derive = { optional = true, path = "../libafl_derive", version = "0.3.0" }
+libafl_derive = { optional = true, path = "../libafl_derive", version = "0.3.1" }
 tuple_list = "0.1.2"
 hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
 num = "0.4.0"
