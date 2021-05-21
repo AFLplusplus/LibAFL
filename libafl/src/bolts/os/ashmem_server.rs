@@ -256,7 +256,8 @@ impl AshmemService {
                 let new_map = self.provider.new_map(map_size)?;
                 let description = new_map.description();
                 let new_rc = Rc::new(RefCell::new(new_map));
-                self.all_maps.insert(description.id.to_int(), Rc::downgrade(&new_rc));
+                self.all_maps
+                    .insert(description.id.to_int(), Rc::downgrade(&new_rc));
                 Ok(AshmemResponse::Mapping(new_rc))
             }
             AshmemRequest::ExistingMap(description) => {
@@ -290,7 +291,9 @@ impl AshmemService {
                 if maps.is_empty() {
                     Ok(AshmemResponse::RefCount(0u32))
                 } else {
-                    Ok(AshmemResponse::RefCount(Rc::strong_count(&maps.pop().unwrap()) as u32))
+                    Ok(AshmemResponse::RefCount(
+                        Rc::strong_count(&maps.pop().unwrap()) as u32,
+                    ))
                 }
             }
         };
