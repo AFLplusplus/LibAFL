@@ -36,6 +36,8 @@ use num_traits::cast::FromPrimitive;
 use rangemap::RangeMap;
 use std::{path::PathBuf, rc::Rc};
 
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
@@ -216,6 +218,30 @@ impl<'a> FridaInstrumentationHelper<'a> {
         _harness_module_name: &str,
         modules_to_instrument: &'a [PathBuf],
     ) -> Self {
+        // workaround frida's frida-gum-allocate-near bug:
+        unsafe {
+            for _ in 0..512 {
+                mmap(
+                    std::ptr::null_mut(),
+                    128 * 1024,
+                    ProtFlags::PROT_NONE,
+                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    -1,
+                    0,
+                )
+                .expect("Failed to map dummy regions for frida workaround");
+                mmap(
+                    std::ptr::null_mut(),
+                    4 * 1024 * 1024,
+                    ProtFlags::PROT_NONE,
+                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    -1,
+                    0,
+                )
+                .expect("Failed to map dummy regions for frida workaround");
+            }
+        }
+
         let mut helper = Self {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],

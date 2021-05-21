@@ -744,30 +744,6 @@ impl AsanRuntime {
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
     pub fn init(&mut self, modules_to_instrument: &[PathBuf]) {
-        // workaround frida's frida-gum-allocate-near bug:
-        unsafe {
-            for _ in 0..512 {
-                mmap(
-                    std::ptr::null_mut(),
-                    128 * 1024,
-                    ProtFlags::PROT_NONE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
-                    -1,
-                    0,
-                )
-                .expect("Failed to map dummy regions for frida workaround");
-                mmap(
-                    std::ptr::null_mut(),
-                    4 * 1024 * 1024,
-                    ProtFlags::PROT_NONE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
-                    -1,
-                    0,
-                )
-                .expect("Failed to map dummy regions for frida workaround");
-            }
-        }
-
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new());
         }
