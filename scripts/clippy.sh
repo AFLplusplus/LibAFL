@@ -1,4 +1,7 @@
-#!/bin/sh
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR/.."
+
 # Clippy checks
 if [ "$1" != "--no-clean" ]; then
    # Usually, we want to clean, since clippy won't work otherwise.

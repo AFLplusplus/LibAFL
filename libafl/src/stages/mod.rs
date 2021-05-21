@@ -6,8 +6,10 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 
 /// Mutational stage is the normal fuzzing stage,
 pub mod mutational;
-
 pub use mutational::{MutationalStage, StdMutationalStage};
+
+pub mod tracing;
+pub use tracing::TracingStage;
 
 //pub mod power;
 //pub use power::PowerMutationalStage;

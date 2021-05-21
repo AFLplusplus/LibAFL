@@ -1,6 +1,6 @@
 [package]
 name = "libafl_targets"
-version = "0.3.0"
+version = "0.3.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Common code for target instrumentation that can be used combined with LibAFL"
 documentation = "https://docs.rs/libafl_targets"
@@ -12,12 +12,12 @@ edition = "2018"
 
 [features]
 default = []
-pcguard_edges = []
-pcguard_hitcounts = []
 libfuzzer = []
-value_profile = []
-cmplog = []
-pcguard = ["pcguard_hitcounts"]
+sancov_pcguard_edges = []
+sancov_pcguard_hitcounts = []
+sancov_value_profile = []
+sancov_cmplog = []
+sancov_pcguard = ["sancov_pcguard_hitcounts"]
 clippy = [] # Ignore compiler warnings during clippy
 
 [build-dependencies]
@@ -25,3 +25,6 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 rangemap = "0.1.10"
+libafl = { path = "../libafl", version = "0.3.2", features = [] }
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+serde-big-array = "0.3.2"

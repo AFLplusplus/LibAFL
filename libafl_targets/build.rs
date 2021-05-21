@@ -12,6 +12,23 @@ fn main() {
     //std::env::set_var("CC", "clang");
     //std::env::set_var("CXX", "clang++");
 
+    #[cfg(any(feature = "sancov_value_profile", feature = "sancov_cmplog"))]
+    {
+        println!("cargo:rerun-if-changed=src/sancov_cmp.c");
+
+        let mut sancov_cmp = cc::Build::new();
+
+        #[cfg(feature = "sancov_value_profile")]
+        sancov_cmp.define("SANCOV_VALUE_PROFILE", "1");
+
+        #[cfg(feature = "sancov_cmplog")]
+        sancov_cmp.define("SANCOV_CMPLOG", "1");
+
+        sancov_cmp
+            .file(_src_dir.join("sancov_cmp.c"))
+            .compile("sancov_cmp");
+    }
+
     #[cfg(feature = "libfuzzer")]
     {
         println!("cargo:rerun-if-changed=src/libfuzzer_compatibility.c");
@@ -19,24 +36,6 @@ fn main() {
         cc::Build::new()
             .file(_src_dir.join("libfuzzer_compatibility.c"))
             .compile("libfuzzer_compatibility");
-    }
-
-    #[cfg(feature = "value_profile")]
-    {
-        println!("cargo:rerun-if-changed=src/value_profile.c");
-
-        cc::Build::new()
-            .file(_src_dir.join("value_profile.c"))
-            .compile("value_profile");
-    }
-
-    #[cfg(feature = "cmplog")]
-    {
-        println!("cargo:rerun-if-changed=src/cmplog.c");
-
-        cc::Build::new()
-            .file(_src_dir.join("cmplog.c"))
-            .compile("cmplog");
     }
 
     println!("cargo:rustc-link-search=native={}", &out_dir);

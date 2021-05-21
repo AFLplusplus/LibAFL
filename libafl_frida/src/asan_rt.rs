@@ -14,6 +14,7 @@ use libafl::{
         tuples::Named,
     },
     corpus::Testcase,
+    events::EventFirer,
     executors::{CustomExitKind, ExitKind, HasExecHooks},
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
@@ -1777,13 +1778,18 @@ impl<I, S> Feedback<I, S> for AsanErrorsFeedback
 where
     I: Input + HasTargetBytes,
 {
-    fn is_interesting<OT: ObserversTuple>(
+    fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple,
+    {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");

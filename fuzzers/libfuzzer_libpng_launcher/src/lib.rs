@@ -14,7 +14,7 @@ use libafl::{
         os::parse_core_bind_arg,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
+        tuples::{tuple_list, Merge},
     },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
@@ -24,12 +24,13 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    inputs::{BytesInput, HasTargetBytes},
+    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
+    stats::MultiStats,
 };
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
@@ -58,8 +59,8 @@ pub fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats_closure = |s| println!("{}", s);
-    let stats = SimpleStats::new(stats_closure);
-    let mut client_init_stats = || Ok(SimpleStats::new(stats_closure));
+    let stats = MultiStats::new(stats_closure);
+    let mut client_init_stats = || Ok(MultiStats::new(stats_closure));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
         let corpus_dirs = &[PathBuf::from("./corpus")];
@@ -117,7 +118,7 @@ pub fn main() {
         }
 
         // Setup a basic mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
@@ -127,7 +128,9 @@ pub fn main() {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |buf: &[u8]| {
+        let mut harness = |input: &BytesInput| {
+            let target = input.target_bytes();
+            let buf = target.as_slice();
             libfuzzer_test_one_input(buf);
             ExitKind::Ok
         };

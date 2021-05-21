@@ -9,7 +9,7 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::Input, observers::ObserversTuple, Error};
+use crate::{inputs::Input, observers::ObserversTuple, stats::UserStats, Error};
 
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
@@ -95,6 +95,15 @@ where
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
+    /// New stats.
+    UpdateUserStats {
+        /// Custom user stats name
+        name: String,
+        /// Custom user stats value
+        value: UserStats,
+        /// [`PhantomData`]
+        phantom: PhantomData<I>,
+    },
     /// New stats with performance stats.
     #[cfg(feature = "introspection")]
     UpdatePerfStats {
@@ -143,10 +152,15 @@ where
                 observers_buf: _,
                 time: _,
                 executions: _,
-            } => "New Testcase",
+            } => "Testcase",
             Event::UpdateStats {
                 time: _,
                 executions: _,
+                phantom: _,
+            }
+            | Event::UpdateUserStats {
+                name: _,
+                value: _,
                 phantom: _,
             } => "Stats",
             #[cfg(feature = "introspection")]

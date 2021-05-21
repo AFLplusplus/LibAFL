@@ -13,7 +13,7 @@ use libafl::{
         os::parse_core_bind_arg,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
+        tuples::{tuple_list, Merge},
     },
     corpus::{
         ondisk::OnDiskMetadataFormat, Corpus, InMemoryCorpus,
@@ -26,15 +26,15 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
+    stats::MultiStats,
     Error,
 };
 
@@ -61,7 +61,7 @@ use libafl_frida::{
 struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -78,7 +78,7 @@ impl<'a, 'b, 'c, FH, H, I, OT, S> Executor<I>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -117,7 +117,7 @@ impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -152,7 +152,7 @@ impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<OT>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -171,7 +171,7 @@ impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
@@ -180,7 +180,7 @@ where
 impl<'a, 'b, 'c, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
-    H: FnMut(&[u8]) -> ExitKind,
+    H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
@@ -320,13 +320,13 @@ unsafe fn fuzz(
 ) -> Result<(), Error> {
     let stats_closure = |s| println!("{}", s);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = SimpleStats::new(stats_closure);
+    let stats = MultiStats::new(stats_closure);
 
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Failed to start Ashmem service");
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut client_init_stats = || Ok(SimpleStats::new(stats_closure));
+    let mut client_init_stats = || Ok(MultiStats::new(stats_closure));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -336,7 +336,9 @@ unsafe fn fuzz(
             unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
         > = lib.get(symbol_name.as_bytes()).unwrap();
 
-        let mut frida_harness = move |buf: &[u8]| {
+        let mut frida_harness = move |input: &BytesInput| {
+            let target = input.target_bytes();
+            let buf = target.as_slice();
             (target_func)(buf.as_ptr(), buf.len());
             ExitKind::Ok
         };
@@ -411,7 +413,7 @@ unsafe fn fuzz(
         }
 
         // Setup a basic mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus

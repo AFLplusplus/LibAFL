@@ -7,6 +7,8 @@ pub use timeout::TimeoutExecutor;
 pub mod forkserver;
 pub use forkserver::{ForkserverExecutor,Forkserver, OutFile};
 
+pub mod combined;
+pub use combined::CombinedExecutor;
 
 use core::marker::PhantomData;
 

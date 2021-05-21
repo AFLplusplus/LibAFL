@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_libmozjpeg"
-version = "0.3.0"
+version = "0.3.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
 
@@ -16,7 +16,7 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["pcguard_edges", "value_profile", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_value_profile", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 

@@ -249,7 +249,7 @@ where
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
-                // stats.display(event.name().to_string() + " #" + &sender_id.to_string());
+                stats.display(event.name().to_string(), sender_id);
                 Ok(BrokerEventResult::Forward)
             }
             Event::UpdateStats {
@@ -260,9 +260,17 @@ where
                 // TODO: The stats buffer should be added on client add.
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_executions(*executions as u64, *time);
-                if sender_id == 1 {
-                    stats.display(event.name().to_string() + " #" + &sender_id.to_string());
-                }
+                stats.display(event.name().to_string(), sender_id);
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::UpdateUserStats {
+                name,
+                value,
+                phantom: _,
+            } => {
+                let client = stats.client_stats_mut_for(sender_id);
+                client.update_user_stats(name.clone(), value.clone());
+                stats.display(event.name().to_string(), sender_id);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -284,9 +292,7 @@ where
                 client.update_introspection_stats(**introspection_stats);
 
                 // Display the stats via `.display` only on core #1
-                if sender_id == 1 {
-                    stats.display(event.name().to_string() + " #" + &sender_id.to_string());
-                }
+                stats.display(event.name().to_string(), sender_id);
 
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
@@ -294,7 +300,7 @@ where
             Event::Objective { objective_size } => {
                 let client = stats.client_stats_mut_for(sender_id);
                 client.update_objective_size(*objective_size as u64);
-                stats.display(event.name().to_string() + " #" + &sender_id.to_string());
+                stats.display(event.name().to_string(), sender_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -303,6 +309,7 @@ where
                 phantom: _,
             } => {
                 let (_, _) = (severity_level, message);
+                // TODO rely on Stats
                 #[cfg(feature = "std")]
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
@@ -340,7 +347,7 @@ where
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
                 let is_interesting =
-                    fuzzer.is_interesting(state, &input, &observers, &ExitKind::Ok)?;
+                    fuzzer.is_interesting(state, self, &input, &observers, &ExitKind::Ok)?;
                 if fuzzer
                     .add_if_interesting(state, &input, is_interesting)?
                     .is_some()
