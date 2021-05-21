@@ -656,7 +656,12 @@ pub mod unix_shmem {
                         if let Ok(boot_id) =
                             std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
                         {
-                            format!("{}{}", "/dev/ashmem", boot_id).trim().to_string()
+                            let path_str = format!("{}{}", "/dev/ashmem", boot_id).trim().to_string();
+                            if std::path::Path::new(&path_str).exists() {
+                                path_str
+                            } else {
+                                "/dev/ashmem".to_string()
+                            }
                         } else {
                             "/dev/ashmem".to_string()
                         },
