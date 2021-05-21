@@ -187,7 +187,7 @@ where
 }
 
 impl<'a, T, const N: usize> Observer for ConstMapObserver<'a, T, N> where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
 {
 }
 
