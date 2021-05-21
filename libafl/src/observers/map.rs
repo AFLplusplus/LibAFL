@@ -172,6 +172,129 @@ where
     }
 }
 
+/// Use a const size to speedup Feedback::is_interesting when the user can
+/// know the size of the map at compile time.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
+pub struct ConstMapObserver<'a, T, const N: usize>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    map: OwnedSliceMut<'a, T>,
+    initial: T,
+    name: String,
+}
+
+impl<'a, T, const N: usize> Observer for ConstMapObserver<'a, T, N> where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+}
+
+impl<'a, EM, I, S, T, Z, const N: usize> HasExecHooks<EM, I, S, Z> for ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    Self: MapObserver<T>,
+{
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) -> Result<(), Error> {
+        self.reset_map()
+    }
+}
+
+impl<'a, T, const N: usize> Named for ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<'a, T, const N: usize> MapObserver<T> for ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn usable_count(&self) -> usize {
+        N
+    }
+
+    #[inline]
+    fn map(&self) -> &[T] {
+        self.map.as_slice()
+    }
+
+    #[inline]
+    fn map_mut(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
+    }
+
+    #[inline]
+    fn initial(&self) -> T {
+        self.initial
+    }
+
+    #[inline]
+    fn initial_mut(&mut self) -> &mut T {
+        &mut self.initial
+    }
+
+    #[inline]
+    fn set_initial(&mut self, initial: T) {
+        self.initial = initial
+    }
+}
+
+impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`MapObserver`]
+    #[must_use]
+    pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
+        assert!(map.len() >= N);
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: OwnedSliceMut::Ref(map),
+            name: name.to_string(),
+            initial,
+        }
+    }
+
+    /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
+    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+        assert!(map.len() >= N);
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: OwnedSliceMut::Owned(map),
+            name: name.to_string(),
+            initial,
+        }
+    }
+
+    /// Creates a new [`MapObserver`] from a raw pointer
+    ///
+    /// # Safety
+    /// Will dereference the `map_ptr` with up to len elements.
+    pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T) -> Self {
+        let initial = if N > 0 { *map_ptr } else { T::default() };
+        ConstMapObserver {
+            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, N)),
+            name: name.to_string(),
+            initial,
+        }
+    }
+}
+
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
