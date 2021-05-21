@@ -1,10 +1,8 @@
 use core::marker::PhantomData;
-use std::sync::Arc;
 use std::{
     fs::{File, OpenOptions},
-    io::{prelude::*, SeekFrom},
+    io::{prelude::*, SeekFrom, self},
     os::{
-        raw::c_int,
         unix::{
             io::{AsRawFd, RawFd},
             process::CommandExt,
@@ -13,7 +11,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::bolts::shmem::{ShMemProvider, StdShMemProvider, ShMem};
+use crate::bolts::{shmem::{ShMemProvider, StdShMemProvider, ShMem}, os::pipes::Pipe, os::dup2};
 use crate::{
     executors::{Executor, ExitKind, HasObservers, HasExecHooks},
     inputs::{HasTargetBytes, Input},
@@ -29,7 +27,7 @@ pub trait ConfigTarget {
     fn setsid(&mut self) -> &mut Self;
     fn setlimit(&mut self, memlimit: u64) -> &mut Self;
     fn setstdin(&mut self, fd: RawFd, use_stdin:bool) -> &mut Self;
-    fn setpipe(&mut self, st_pipe: Arc<Pipe>, ctl_pipe: Arc<Pipe>) -> &mut Self;
+    fn setpipe(&mut self, st_read: RawFd, st_write: RawFd, ctl_read: RawFd, ctl_write: RawFd) -> &mut Self;
 }
 impl ConfigTarget for Command {
     fn setsid(&mut self) -> &mut Self {
@@ -42,22 +40,29 @@ impl ConfigTarget for Command {
         unsafe { self.pre_exec(func) }
     }
 
-    fn setpipe(&mut self, st_pipe: Arc<Pipe>, ctl_pipe: Arc<Pipe>) -> &mut Self {
+    fn setpipe(&mut self, st_read: RawFd, st_write: RawFd, ctl_read: RawFd, ctl_write: RawFd) -> &mut Self {
         let func = move || {
-            let ret = unsafe { libc::dup2(ctl_pipe.read_end, FORKSRV_FD) };
-            if ret < 0 {
-                panic!("dup2() failed");
+
+            match dup2(ctl_read, FORKSRV_FD){
+                Ok(_) => (),
+                _ => {
+                    panic!("dup2 failed\n");
+                }
             }
-            let ret = unsafe { libc::dup2(st_pipe.write_end, FORKSRV_FD + 1) };
-            if ret < 0 {
-                panic!("dup2() failed");
+
+            match dup2(st_write, FORKSRV_FD + 1){
+                Ok(_) => (),
+                _ => {
+                    panic!("dup2 failed\n");
+                }
             }
-            unsafe {
-                libc::close(ctl_pipe.read_end);
-                libc::close(ctl_pipe.write_end);
-                libc::close(st_pipe.read_end);
-                libc::close(st_pipe.write_end);
+            unsafe{
+                libc::close(st_read);
+                libc::close(st_write);
+                libc::close(ctl_read);
+                libc::close(ctl_write);
             }
+
             Ok(())
         };
         unsafe { self.pre_exec(func) }
@@ -138,41 +143,10 @@ impl OutFile {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Pipe {
-    read_end: RawFd,
-    write_end: RawFd,
-}
-
-impl Pipe {
-    fn new() -> Self {
-        let mut fds = [-1 as c_int, -1 as c_int];
-        let ret = unsafe { libc::pipe(fds.as_mut_ptr()) };
-        if ret < 0 {
-            panic!("pipe() failed");
-        }
-        Self {
-            read_end: fds[0],
-            write_end: fds[1],
-        }
-    }
-}
-
-impl Drop for Pipe{
-    fn drop(&mut self){
-        unsafe {
-            libc::close(self.read_end);
-            libc::close(self.write_end);
-            libc::close(self.read_end);
-            libc::close(self.write_end);
-        }
-    }
-}
-
 
 pub struct Forkserver {
-    st_pipe: Arc<Pipe>,
-    ctl_pipe: Arc<Pipe>,
+    st_pipe: Pipe,
+    ctl_pipe: Pipe,
     pid: u32, //forkserver pid
     child_pid: u32, //fuzzed program pid
     status: i32,
@@ -187,8 +161,8 @@ impl Forkserver {
 
         let mut pid = 0;
         //create 2 pipes
-        let st_pipe = Arc::new(Pipe::new());
-        let ctl_pipe = Arc::new(Pipe::new());
+        let mut st_pipe = Pipe::new().unwrap();
+        let mut ctl_pipe = Pipe::new().unwrap();
 
         //setsid, setrlimit, direct stdin, set pipe, and finally fork.
         match Command::new(target)
@@ -200,7 +174,7 @@ impl Forkserver {
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
-            .setpipe(st_pipe.clone(), ctl_pipe.clone())
+            .setpipe(st_pipe.read_end().unwrap(), st_pipe.write_end().unwrap(), ctl_pipe.read_end().unwrap(), ctl_pipe.write_end().unwrap())
             .spawn()
         {
             Ok(child) => {
@@ -210,11 +184,11 @@ impl Forkserver {
                 panic!("Command::new() failed");
             }
         };
+
+
         //parent: we'll close unneeded endpoints
-        unsafe {
-            libc::close(ctl_pipe.read_end);
-            libc::close(st_pipe.write_end);
-        }
+        ctl_pipe.close_read_end();
+        st_pipe.close_write_end();
 
         Self {
             st_pipe:st_pipe,
@@ -259,27 +233,20 @@ impl Forkserver {
         self.child_pid
     }
 
-    pub fn read_st(&self) -> (isize, i32){
-        unsafe{
-            let mut status : i32 = 0;
-            let rlen = libc::read(
-                self.st_pipe.read_end,
-                (&mut status) as *mut libc::c_int as *mut libc::c_void,
-                4,
-            );
-            (rlen, status)
-        }
+    pub fn read_st(&mut self) -> Result<(usize, i32), io::Error>{
+        let mut buf : [u8; 4] = [0u8; 4];
+
+        let rlen = self.st_pipe.read(&mut buf)?;
+        let val : i32 = i32::from_ne_bytes(buf);
+
+        Ok((rlen, val))
     }
 
-    pub fn write_ctl(&self, mut val: i32) -> isize{
-        unsafe{
-            let slen = libc::write(
-                self.ctl_pipe.write_end,
-                (&mut val) as *mut libc::c_int as *mut libc::c_void,
-                4,
-            );
-            slen
-        }
+    pub fn write_ctl(&mut self, val: i32) -> Result<usize, io::Error>{
+        let buf = val.to_ne_bytes();
+        let slen = self.ctl_pipe.write(&buf)?;
+
+        Ok(slen)
     }
 }
 
@@ -325,12 +292,12 @@ where
         let shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE as usize).unwrap();
         shmem.write_to_env("__AFL_SHM_ID")?;
 
-        let mut out_file = OutFile::new(&out_filename);
-
+        let out_file = OutFile::new(&out_filename);
 
         //forkserver
-        let forkserver = Forkserver::new(target.clone(), args.clone(), out_file.as_raw_fd(), use_stdin, 0);
-        let (rlen, _) = forkserver.read_st();//initial handshake
+        let mut forkserver = Forkserver::new(target.clone(), args.clone(), out_file.as_raw_fd(), use_stdin, 0);
+        let (rlen, _) = forkserver.read_st()?;//initial handshake
+
         if rlen == 4{
             println!("Forkserver up!!");
         }
@@ -367,21 +334,23 @@ where
     #[inline]
     fn run_target(&mut self, _input: &I) -> Result<ExitKind, Error> {
 
-        let slen = self.forkserver.write_ctl(self.forkserver().last_run_timed_out());
+        let slen = self.forkserver.write_ctl(self.forkserver().last_run_timed_out())?;
         if slen != 4{
             panic!("failed to request new process");
         }
 
-        let (rlen, pid) = self.forkserver.read_st();
+
+        let (rlen, pid) = self.forkserver.read_st()?;
         if rlen != 4 {
             panic!("failed to request new process")
         }
         if pid <= 0 {
             panic!("forkserver is misbehaving");
         }
+        println!("pid: {:#?}",pid);
 
         //child running
-        let (_, status) = self.forkserver.read_st();
+        let (_, status) = self.forkserver.read_st()?;
         self.forkserver.status = status;
 
         Ok(ExitKind::Ok)
