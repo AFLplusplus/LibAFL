@@ -49,7 +49,7 @@ where
         } else {
             String::new()
         };
-        let head = format!("{}{} {}", event_msg, pad, sender_id);
+        let head = format!("{}{} {}", event_msg, pad, sender);
         let global_fmt = format!(
             "[{}]  (GLOBAL) clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
