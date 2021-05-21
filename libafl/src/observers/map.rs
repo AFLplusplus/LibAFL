@@ -172,7 +172,7 @@ where
     }
 }
 
-/// Use a const size to speedup Feedback::is_interesting when the user can
+/// Use a const size to speedup `Feedback::is_interesting` when the user can
 /// know the size of the map at compile time.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
