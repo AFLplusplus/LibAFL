@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
     io::{Read, Write},
-    rc::Rc,
+    rc::{Rc, Weak},
     sync::{Arc, Condvar, Mutex},
 };
 
@@ -167,8 +167,8 @@ impl ShMemProvider for ServedShMemProvider {
     fn release_map(&mut self, map: &mut Self::Mem) {
         let (refcount, _) = self
             .send_receive(AshmemRequest::Deregister(map.server_fd))
-            .expect("Could not communicate to AshMem server!");
-        if refcount == 0 {
+            .expect("Could not communicate with AshMem server!");
+        if refcount == 1 {
             unsafe {
                 ManuallyDrop::drop(&mut map.inner);
             }
@@ -211,7 +211,7 @@ impl AshmemClient {
 pub struct AshmemService {
     provider: AshmemShMemProvider,
     clients: HashMap<RawFd, AshmemClient>,
-    all_maps: HashMap<i32, Rc<RefCell<AshmemShMem>>>,
+    all_maps: HashMap<i32, Weak<RefCell<AshmemShMem>>>,
 }
 
 #[derive(Debug)]
@@ -252,9 +252,13 @@ impl AshmemService {
                 };
                 Ok(AshmemResponse::Id(client_id))
             }
-            AshmemRequest::NewMap(map_size) => Ok(AshmemResponse::Mapping(Rc::new(RefCell::new(
-                self.provider.new_map(map_size)?,
-            )))),
+            AshmemRequest::NewMap(map_size) => {
+                let new_map = self.provider.new_map(map_size)?;
+                let description = new_map.description();
+                let new_rc = Rc::new(RefCell::new(new_map));
+                self.all_maps.insert(description.id.to_int(), Rc::downgrade(&new_rc));
+                Ok(AshmemResponse::Mapping(new_rc))
+            }
             AshmemRequest::ExistingMap(description) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 if client.maps.contains_key(&description.id.to_int()) {
@@ -269,19 +273,15 @@ impl AshmemService {
                             .unwrap()
                             .clone(),
                     ))
-                } else if self.all_maps.contains_key(&description.id.to_int()) {
+                } else {
                     Ok(AshmemResponse::Mapping(
                         self.all_maps
                             .get_mut(&description.id.to_int())
                             .unwrap()
-                            .clone(),
+                            .clone()
+                            .upgrade()
+                            .unwrap(),
                     ))
-                } else {
-                    let new_rc =
-                        Rc::new(RefCell::new(self.provider.from_description(description)?));
-                    self.all_maps
-                        .insert(description.id.to_int(), new_rc.clone());
-                    Ok(AshmemResponse::Mapping(new_rc))
                 }
             }
             AshmemRequest::Deregister(map_id) => {
@@ -290,9 +290,7 @@ impl AshmemService {
                 if maps.is_empty() {
                     Ok(AshmemResponse::RefCount(0u32))
                 } else {
-                    Ok(AshmemResponse::RefCount(
-                        Rc::strong_count(&maps.pop().unwrap()) as u32,
-                    ))
+                    Ok(AshmemResponse::RefCount(Rc::strong_count(&maps.pop().unwrap()) as u32))
                 }
             }
         };
