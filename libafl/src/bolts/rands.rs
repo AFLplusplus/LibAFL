@@ -49,6 +49,29 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
         lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
     }
+
+    /// Choose an item at random from the given iterator, sampling uniformly.
+    ///
+    /// Note: the runtime cost is bound by the iterator's [`nth`][`Iterator::nth`] implementation
+    ///  * For `Vec`, slice, array, this is O(1)
+    ///  * For `HashMap`, `HashSet`, this is O(n)
+    fn choose<I, E, T>(&mut self, from: I) -> T
+    where
+        I: IntoIterator<Item = T, IntoIter = E>,
+        E: ExactSizeIterator + Iterator<Item = T>,
+    {
+        // create iterator
+        let mut iter = from.into_iter();
+
+        // make sure there is something to choose from
+        debug_assert!(iter.len() > 0, "choosing from an empty iterator");
+
+        // pick a random, valid index
+        let index = self.below(iter.len() as u64) as usize;
+
+        // return the item chosen
+        iter.nth(index).unwrap()
+    }
 }
 
 /// Has a Rand field, that can be used to get random values
