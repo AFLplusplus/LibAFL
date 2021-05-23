@@ -14,10 +14,12 @@ use crate::bolts::{
     os::{dup2, pipes::Pipe},
 };
 use crate::{
-    events::{EventFirer, EventRestarter},
+    events::{Event, EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
+    corpus::{Corpus, Testcase},
+    state::HasSolutions,
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::{HasTargetBytes, Input},
@@ -262,9 +264,10 @@ impl Forkserver {
     }
 }
 
-pub struct ForkserverExecutor<I, OF, OT, S>
+pub struct ForkserverExecutor<I, OC, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OC: Corpus<I>,
     OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
@@ -273,12 +276,13 @@ where
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
-    phantom: PhantomData<(OF, I, S)>,
+    phantom: PhantomData<(OC, OF, I, S)>,
 }
 
-impl<I, OF, OT, S> ForkserverExecutor<I, OF, OT, S>
+impl<I, OC, OF, OT, S> ForkserverExecutor<I, OC, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OC: Corpus<I>,
     OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
@@ -337,9 +341,10 @@ where
     }
 }
 
-impl<I, OF, OT, S> Executor<I> for ForkserverExecutor<I, OF, OT, S>
+impl<I, OC, OF, OT, S> Executor<I> for ForkserverExecutor<I, OC, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OC: Corpus<I>,
     OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
@@ -355,7 +360,7 @@ where
         //let t2 = current_time();
         //println!("fn compress with compression {} nano sec", (t2 - t1).as_nanos());
 
-        let t1 = current_time();
+        //let t1 = current_time();
         let (rlen, pid) = self.forkserver.read_st()?;
         if rlen != 4 {
             panic!("failed to request new process")
@@ -381,12 +386,14 @@ where
     }
 }
 
-impl<EM, I, OF, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<I, OF, OT, S>
+impl<EM, I, OC, OF, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<I, OC, OF, OT, S>
 where
     EM: EventFirer<I, S> + EventRestarter<S>,
     I: Input + HasTargetBytes,
+    OC: Corpus<I>,
     OF: Feedback<I, S>,
     OT: ObserversTuple,
+    S: HasSolutions<OC, I>,
     Z: HasObjective<I, OF, S>,
 {
     #[inline]
@@ -420,7 +427,27 @@ where
                 .objective_mut()
                 .is_interesting(state, event_mgr, &input, self.observers(), &ExitKind::Crash)
                 .expect("Forkserver post_exec failure");
-            //println!("CRASH");
+
+            if interesting {
+                let mut new_testcase = Testcase::new(input.clone());
+                fuzzer
+                    .objective_mut()
+                    .append_metadata(state, &mut new_testcase)
+                    .expect("Failed adding metadata");
+                state
+                    .solutions_mut()
+                    .add(new_testcase)
+                    .expect("Forkserver post_exec failure");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Forkserver post_exec failure");
+                println!("CRASH");
+            }
         }
 
         //move the head back
@@ -431,9 +458,10 @@ where
     }
 }
 
-impl<I, OF, OT, S> HasObservers<OT> for ForkserverExecutor<I, OF, OT, S>
+impl<I, OC, OF, OT, S> HasObservers<OT> for ForkserverExecutor<I, OC, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OC: Corpus<I>,
     OT: ObserversTuple,
     OF: Feedback<I, S>,
 {
@@ -448,46 +476,11 @@ where
     }
 }
 
-impl<EM, I, OF, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for ForkserverExecutor<I, OF, OT, S>
+impl<EM, I, OC, OF, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for ForkserverExecutor<I, OC, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OC: Corpus<I>,
     OF: Feedback<I, S>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
-}
-
-#[cfg(test)]
-mod tests {
-
-    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
-    use crate::executors::{Executor, ForkserverExecutor};
-    use crate::inputs::NopInput;
-    use std::env;
-    #[test]
-
-    fn test_forkserver() {
-        const MAP_SIZE: i32 = 65536;
-        let out_dir = env::var_os("OUT_DIR")
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-        println!("{}", out_dir);
-        let bin = format!(
-            "{}/../../../../../libafl_tests/src/forkserver_test.o",
-            out_dir
-        );
-        let args = vec![String::from("@@")];
-
-        let shmem = StdShMemProvider::new()
-            .unwrap()
-            .new_map(MAP_SIZE as usize)
-            .unwrap();
-        shmem.write_to_env("__AFL_SHM_ID").unwrap();
-
-        //let fd = OutFile::new("input_file");
-        //let forkserver = Forkserver::new(command.to_string(), args.iter().map(|s| s.to_string()).collect(), Some(fd.as_raw_fd()), 0);
-        let mut executors = ForkserverExecutor::<NopInput, (), (), ()>::new(bin, args, ()).unwrap();
-        let nop = NopInput {};
-        let _ = executors.run_target(&nop);
-    }
 }

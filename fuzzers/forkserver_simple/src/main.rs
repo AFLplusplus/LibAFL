@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use libafl::inputs::{BytesInput, HasTargetBytes};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, shmem::{ShMemProvider, StdShMemProvider, ShMem}},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
@@ -28,7 +27,7 @@ pub fn main() {
     let mut shmem_map = shmem.map_mut();
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut shmem_map });
+    let observer = StdMapObserver::new("shared_mem", &mut shmem_map );
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
