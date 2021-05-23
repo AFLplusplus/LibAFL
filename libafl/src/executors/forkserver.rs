@@ -411,7 +411,7 @@ mod tests {
     fn test_forkserver() {
         let out_dir = env::var_os("OUT_DIR").unwrap().to_string_lossy().to_string();
         println!("{}", out_dir);
-        let bin = format!("{}/../../../../../libafl_tests/src/forkserver_test", out_dir);
+        let bin = format!("{}/../../../../../libafl_tests/src/forkserver_test.o", out_dir);
         let args = vec![String::from("@@")];
         //let fd = OutFile::new("input_file");
         //let forkserver = Forkserver::new(command.to_string(), args.iter().map(|s| s.to_string()).collect(), Some(fd.as_raw_fd()), 0);
