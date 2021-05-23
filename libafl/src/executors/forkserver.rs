@@ -11,7 +11,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::bolts::{shmem::{ShMemProvider, StdShMemProvider, ShMem}, os::pipes::Pipe, os::dup2};
+use crate::bolts::{shmem::{ShMemProvider, StdShMemProvider, ShMem}, os::{pipes::Pipe, dup2}};
 use crate::{
     executors::{Executor, ExitKind, HasObservers, HasExecHooks},
     inputs::{HasTargetBytes, Input},
@@ -156,15 +156,13 @@ pub struct Forkserver {
 
 impl Forkserver {
     pub fn new(target: String, args: Vec<String>, out_filefd: RawFd, use_stdin: bool, memlimit: u64) -> Self {
-        //check if we'll use stdin
-
-
         let mut pid = 0;
         //create 2 pipes
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
         //setsid, setrlimit, direct stdin, set pipe, and finally fork.
+        println!("{}", target);
         match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
@@ -270,8 +268,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(bin: &'static str, argv: Vec<&'static str>, observers: OT) -> Result<Self, Error> {
-        let target = bin.to_string();
+    pub fn new(target: String, argv: Vec<String>, observers: OT) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = format!("out-{}", 123456789); //TODO: replace it with a random number
@@ -408,13 +405,17 @@ mod tests {
 
     use crate::executors::{OutFile, ForkserverExecutor, Forkserver, Executor};
     use crate::inputs::NopInput;
+    use std::env;
+
     #[test]
     fn test_forkserver() {
-        let command = "/home/toka/work/aflsimple/test";
-        let args = vec!["@@"];
+        let out_dir = env::var_os("OUT_DIR").unwrap().to_string_lossy().to_string();
+        println!("{}", out_dir);
+        let bin = format!("{}/../../../../../libafl_tests/src/forkserver_test", out_dir);
+        let args = vec![String::from("@@")];
         //let fd = OutFile::new("input_file");
         //let forkserver = Forkserver::new(command.to_string(), args.iter().map(|s| s.to_string()).collect(), Some(fd.as_raw_fd()), 0);
-        let mut executors = ForkserverExecutor::<(), NopInput, (), ()>::new(command ,args, ()).unwrap();
+        let mut executors = ForkserverExecutor::<(), NopInput, (), ()>::new(bin , args, ()).unwrap();
         let nop = NopInput{};
         executors.run_target(&nop);
     }
