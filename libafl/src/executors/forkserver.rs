@@ -218,22 +218,6 @@ impl Forkserver {
         }
     }
 
-    /*
-    1. Check if @@ exists
-    2. Open /dev/null
-    3. pipe st_pipe and pipe ctl_pipe
-    4. fork()
-    5. setsid
-    6. if outfile (file tu fuzz )exists,
-        then stdin is dev/null
-        else direct outfile to stdin
-        and immediately close it
-    7. stdout, stderr to dev/null
-    8. ctl[0] to FORKSRV_FD, st[1] to FORKSRV_FD+1
-    9. close ctl,st on child
-    10. execve
-    4':close ctl[0], st[1]
-    */
 
     pub fn last_run_timed_out(&self) -> i32 {
         self.last_run_timed_out
@@ -350,23 +334,18 @@ where
 {
     #[inline]
     fn run_target(&mut self, _input: &I) -> Result<ExitKind, Error> {
-        //let t1 = current_time();
+        let t1 = current_time();
         let slen = self
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
         if slen != 4 {
             panic!("failed to request new process");
         }
-        //let t2 = current_time();
-        //println!("fn compress with compression {} nano sec", (t2 - t1).as_nanos());
 
-        //let t1 = current_time();
         let (rlen, pid) = self.forkserver.read_st()?;
         if rlen != 4 {
             panic!("failed to request new process")
         }
-        //let t2 = current_time();
-        //println!("fn compress with compression {} nano sec", (t2 - t1).as_nanos());
 
         if pid <= 0 {
             panic!("forkserver is misbehaving");
@@ -374,13 +353,12 @@ where
         //println!("pid: {:#?}",pid);
 
         //child running
-        //let t1 = current_time();
 
         let (_, status) = self.forkserver.read_st()?;
         self.forkserver.status = status;
 
-        //let t2 = current_time();
-        //println!("fn compress with compression {} nano sec", (t2 - t1).as_nanos());
+        let t2 = current_time();
+        println!("Exec time {} ns", (t2 - t1).as_nanos());
 
         Ok(ExitKind::Ok)
     }
