@@ -59,6 +59,8 @@ pub trait FridaHelper<'a> {
 
     /// pointer to the frida coverage map
     fn map_ptr(&mut self) -> *mut u8;
+
+    fn ranges(&self) -> &RangeMap<usize, (u16, &str)>;
 }
 
 /// (Default) map size for frida coverage reporting
@@ -123,6 +125,10 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 
     fn map_ptr(&mut self) -> *mut u8 {
         self.map.as_mut_ptr()
+    }
+
+    fn ranges(&self) -> &RangeMap<usize, (u16, &str)> {
+        &self.ranges
     }
 }
 
