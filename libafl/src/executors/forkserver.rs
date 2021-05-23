@@ -1,19 +1,25 @@
 use core::marker::PhantomData;
 use std::{
     fs::{File, OpenOptions},
-    io::{prelude::*, SeekFrom, self},
-    os::{
-        unix::{
-            io::{AsRawFd, RawFd},
-            process::CommandExt,
-        },
+    io::{self, prelude::*, SeekFrom},
+    os::unix::{
+        io::{AsRawFd, RawFd},
+        process::CommandExt,
     },
     process::{Command, Stdio},
 };
 
-use crate::bolts::{shmem::{ShMemProvider, StdShMemProvider, ShMem}, os::{pipes::Pipe, dup2}};
+use crate::bolts::{
+    current_time,
+    os::{dup2, pipes::Pipe},
+};
 use crate::{
-    executors::{Executor, ExitKind, HasObservers, HasExecHooks, HasObserversHooks, HasExecHooksTuple},
+    events::{EventFirer, EventRestarter},
+    executors::{
+        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
+    },
+    feedbacks::Feedback,
+    fuzzer::HasObjective,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
@@ -25,8 +31,14 @@ const FORKSRV_FD: i32 = 198;
 pub trait ConfigTarget {
     fn setsid(&mut self) -> &mut Self;
     fn setlimit(&mut self, memlimit: u64) -> &mut Self;
-    fn setstdin(&mut self, fd: RawFd, use_stdin:bool) -> &mut Self;
-    fn setpipe(&mut self, st_read: RawFd, st_write: RawFd, ctl_read: RawFd, ctl_write: RawFd) -> &mut Self;
+    fn setstdin(&mut self, fd: RawFd, use_stdin: bool) -> &mut Self;
+    fn setpipe(
+        &mut self,
+        st_read: RawFd,
+        st_write: RawFd,
+        ctl_read: RawFd,
+        ctl_write: RawFd,
+    ) -> &mut Self;
 }
 impl ConfigTarget for Command {
     fn setsid(&mut self) -> &mut Self {
@@ -39,23 +51,28 @@ impl ConfigTarget for Command {
         unsafe { self.pre_exec(func) }
     }
 
-    fn setpipe(&mut self, st_read: RawFd, st_write: RawFd, ctl_read: RawFd, ctl_write: RawFd) -> &mut Self {
+    fn setpipe(
+        &mut self,
+        st_read: RawFd,
+        st_write: RawFd,
+        ctl_read: RawFd,
+        ctl_write: RawFd,
+    ) -> &mut Self {
         let func = move || {
-
-            match dup2(ctl_read, FORKSRV_FD){
+            match dup2(ctl_read, FORKSRV_FD) {
                 Ok(_) => (),
                 _ => {
                     panic!("dup2 failed\n");
                 }
             }
 
-            match dup2(st_write, FORKSRV_FD + 1){
+            match dup2(st_write, FORKSRV_FD + 1) {
                 Ok(_) => (),
                 _ => {
                     panic!("dup2 failed\n");
                 }
             }
-            unsafe{
+            unsafe {
                 libc::close(st_read);
                 libc::close(st_write);
                 libc::close(ctl_read);
@@ -142,20 +159,22 @@ impl OutFile {
     }
 }
 
-
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
-    pid: u32, //forkserver pid
     child_pid: u32, //fuzzed program pid
     status: i32,
     last_run_timed_out: i32,
 }
 
-
 impl Forkserver {
-    pub fn new(target: String, args: Vec<String>, out_filefd: RawFd, use_stdin: bool, memlimit: u64) -> Self {
-        let mut pid = 0;
+    pub fn new(
+        target: String,
+        args: Vec<String>,
+        out_filefd: RawFd,
+        use_stdin: bool,
+        memlimit: u64,
+    ) -> Self {
         //create 2 pipes
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
@@ -170,29 +189,30 @@ impl Forkserver {
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
-            .setpipe(st_pipe.read_end().unwrap(), st_pipe.write_end().unwrap(), ctl_pipe.read_end().unwrap(), ctl_pipe.write_end().unwrap())
+            .setpipe(
+                st_pipe.read_end().unwrap(),
+                st_pipe.write_end().unwrap(),
+                ctl_pipe.read_end().unwrap(),
+                ctl_pipe.write_end().unwrap(),
+            )
             .spawn()
         {
-            Ok(child) => {
-                pid = child.id();
-            },
+            Ok(_) => {}
             Err(_) => {
                 panic!("Command::new() failed");
             }
         };
-
 
         //parent: we'll close unneeded endpoints
         ctl_pipe.close_read_end();
         st_pipe.close_write_end();
 
         Self {
-            st_pipe:st_pipe,
-            ctl_pipe:ctl_pipe,
-            pid: pid,
+            st_pipe: st_pipe,
+            ctl_pipe: ctl_pipe,
             child_pid: 0,
             status: 0,
-            last_run_timed_out:0,
+            last_run_timed_out: 0,
         }
     }
 
@@ -213,32 +233,28 @@ impl Forkserver {
     4':close ctl[0], st[1]
     */
 
-    pub fn last_run_timed_out(&self) -> i32{
+    pub fn last_run_timed_out(&self) -> i32 {
         self.last_run_timed_out
     }
 
-    pub fn pid(&self) -> u32{
-        self.pid
-    }
-
-    pub fn status(&self) -> i32{
+    pub fn status(&self) -> i32 {
         self.status
     }
 
-    pub fn child_pid(&self) -> u32{
+    pub fn child_pid(&self) -> u32 {
         self.child_pid
     }
 
-    pub fn read_st(&mut self) -> Result<(usize, i32), io::Error>{
-        let mut buf : [u8; 4] = [0u8; 4];
+    pub fn read_st(&mut self) -> Result<(usize, i32), io::Error> {
+        let mut buf: [u8; 4] = [0u8; 4];
 
         let rlen = self.st_pipe.read(&mut buf)?;
-        let val : i32 = i32::from_ne_bytes(buf);
+        let val: i32 = i32::from_ne_bytes(buf);
 
         Ok((rlen, val))
     }
 
-    pub fn write_ctl(&mut self, val: i32) -> Result<usize, io::Error>{
+    pub fn write_ctl(&mut self, val: i32) -> Result<usize, io::Error> {
         let buf = val.to_ne_bytes();
         let slen = self.ctl_pipe.write(&buf)?;
 
@@ -246,58 +262,61 @@ impl Forkserver {
     }
 }
 
-
-pub struct ForkserverExecutor<EM, I, OT, S>
+pub struct ForkserverExecutor<I, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
     target: String,
     args: Vec<String>,
-    use_stdin: bool,
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
-    phantom: PhantomData<(EM, I, S)>,
+    phantom: PhantomData<(OF, I, S)>,
 }
 
-impl<EM, I, OT, S> ForkserverExecutor<EM, I, OT, S>
+impl<I, OF, OT, S> ForkserverExecutor<I, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
     pub fn new(target: String, argv: Vec<String>, observers: OT) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = format!("out-{}", 123456789); //TODO: replace it with a random number
-        
-        for item in argv{
+
+        for item in argv {
             if item == "@@" && use_stdin {
                 use_stdin = false; //only 1 '@@' allowed.
                 args.push(out_filename.clone());
-            }
-            else{
+            } else {
                 args.push(item.to_string());
             }
         }
 
         let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
 
-
         let out_file = OutFile::new(&out_filename);
 
         //forkserver
-        let mut forkserver = Forkserver::new(target.clone(), args.clone(), out_file.as_raw_fd(), use_stdin, 0);
-        let (rlen, _) = forkserver.read_st()?;//initial handshake
+        let mut forkserver = Forkserver::new(
+            target.clone(),
+            args.clone(),
+            out_file.as_raw_fd(),
+            use_stdin,
+            0,
+        );
+        let (rlen, _) = forkserver.read_st()?; //initial handshake
 
-        if rlen == 4{
+        if rlen == 4 {
             println!("Forkserver up!!");
         }
 
         Ok(Self {
             target,
             args,
-            use_stdin,
             out_file,
             forkserver,
             observers,
@@ -309,80 +328,114 @@ where
         &self.target
     }
 
-    pub fn args(&self) -> &Vec<String>{
+    pub fn args(&self) -> &Vec<String> {
         &self.args
     }
 
-    pub fn forkserver(&self) -> &Forkserver{
+    pub fn forkserver(&self) -> &Forkserver {
         &self.forkserver
     }
-
 }
-impl<EM, I, OT, S> Executor<I> for ForkserverExecutor<EM, I, OT, S>
+
+impl<I, OF, OT, S> Executor<I> for ForkserverExecutor<I, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
     #[inline]
     fn run_target(&mut self, _input: &I) -> Result<ExitKind, Error> {
-
-        let slen = self.forkserver.write_ctl(self.forkserver().last_run_timed_out())?;
-        if slen != 4{
+        //let t1 = current_time();
+        let slen = self
+            .forkserver
+            .write_ctl(self.forkserver().last_run_timed_out())?;
+        if slen != 4 {
             panic!("failed to request new process");
         }
+        //let t2 = current_time();
+        //println!("fn compress with compression {} nano sec", (t2 - t1).as_nanos());
 
-
+        let t1 = current_time();
         let (rlen, pid) = self.forkserver.read_st()?;
         if rlen != 4 {
             panic!("failed to request new process")
         }
+        //let t2 = current_time();
+        //println!("fn compress with compression {} nano sec", (t2 - t1).as_nanos());
+
         if pid <= 0 {
             panic!("forkserver is misbehaving");
         }
-        println!("pid: {:#?}",pid);
+        //println!("pid: {:#?}",pid);
 
         //child running
+        //let t1 = current_time();
+
         let (_, status) = self.forkserver.read_st()?;
         self.forkserver.status = status;
+
+        //let t2 = current_time();
+        //println!("fn compress with compression {} nano sec", (t2 - t1).as_nanos());
 
         Ok(ExitKind::Ok)
     }
 }
 
-impl<EM, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<EM, I, OT, S>
+impl<EM, I, OF, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<I, OF, OT, S>
 where
+    EM: EventFirer<I, S> + EventRestarter<S>,
     I: Input + HasTargetBytes,
+    OF: Feedback<I, S>,
     OT: ObserversTuple,
+    Z: HasObjective<I, OF, S>,
 {
     #[inline]
-    fn pre_exec(&mut self, _fuzzer:&mut Z, _state: &mut S, _event_mgr: &mut EM, input: &I) -> Result<(), Error>{
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         //write to test case
-        self.out_file.write_buf(&input.target_bytes().as_slice().to_vec());
+        self.out_file
+            .write_buf(&input.target_bytes().as_slice().to_vec());
         //outfile gets automatically closed.
         Ok(())
     }
 
-    fn post_exec(&mut self, _fuzzer:&mut Z, _state: &mut S, _event_mgr: &mut EM, _input: &I) -> Result<(), Error>{
-
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<(), Error> {
         if !libc::WIFSTOPPED(self.forkserver.status()) {
             self.forkserver.child_pid = 0;
+        }
+
+        if libc::WIFSIGNALED(self.forkserver.status()) {
+            let interesting = fuzzer
+                .objective_mut()
+                .is_interesting(state, event_mgr, &input, self.observers(), &ExitKind::Crash)
+                .expect("Forkserver post_exec failure");
+            //println!("CRASH");
         }
 
         //move the head back
         self.out_file.rewind();
 
-        if(libc::WIFSIGNALED(self.forkserver.status())){
-            println!("CRASH");
-        }
-        println!("OK");
+        //println!("OK");
         Ok(())
     }
 }
 
-impl<EM, I, OT, S> HasObservers<OT> for ForkserverExecutor<EM, I, OT, S>
+impl<I, OF, OT, S> HasObservers<OT> for ForkserverExecutor<I, OF, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
+    OF: Feedback<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -395,10 +448,10 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
-    for ForkserverExecutor<EM, I, OT, S>
+impl<EM, I, OF, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for ForkserverExecutor<I, OF, OT, S>
 where
     I: Input + HasTargetBytes,
+    OF: Feedback<I, S>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
@@ -406,20 +459,35 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::executors::{OutFile, ForkserverExecutor, Forkserver, Executor};
+    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
+    use crate::executors::{Executor, ForkserverExecutor};
     use crate::inputs::NopInput;
     use std::env;
-
     #[test]
+
     fn test_forkserver() {
-        let out_dir = env::var_os("OUT_DIR").unwrap().to_string_lossy().to_string();
+        const MAP_SIZE: i32 = 65536;
+        let out_dir = env::var_os("OUT_DIR")
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
         println!("{}", out_dir);
-        let bin = format!("{}/../../../../../libafl_tests/src/forkserver_test.o", out_dir);
+        let bin = format!(
+            "{}/../../../../../libafl_tests/src/forkserver_test.o",
+            out_dir
+        );
         let args = vec![String::from("@@")];
+
+        let shmem = StdShMemProvider::new()
+            .unwrap()
+            .new_map(MAP_SIZE as usize)
+            .unwrap();
+        shmem.write_to_env("__AFL_SHM_ID").unwrap();
+
         //let fd = OutFile::new("input_file");
         //let forkserver = Forkserver::new(command.to_string(), args.iter().map(|s| s.to_string()).collect(), Some(fd.as_raw_fd()), 0);
-        let mut executors = ForkserverExecutor::<(), NopInput, (), ()>::new(bin , args, ()).unwrap();
-        let nop = NopInput{};
-        executors.run_target(&nop);
+        let mut executors = ForkserverExecutor::<NopInput, (), (), ()>::new(bin, args, ()).unwrap();
+        let nop = NopInput {};
+        let _ = executors.run_target(&nop);
     }
 }
