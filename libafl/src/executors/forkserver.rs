@@ -13,14 +13,13 @@ use std::{
 
 use crate::bolts::{shmem::{ShMemProvider, StdShMemProvider, ShMem}, os::{pipes::Pipe, dup2}};
 use crate::{
-    executors::{Executor, ExitKind, HasObservers, HasExecHooks},
+    executors::{Executor, ExitKind, HasObservers, HasExecHooks, HasObserversHooks, HasExecHooksTuple},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
 
 const FORKSRV_FD: i32 = 198;
-const MAP_SIZE: i32 = 65536;
 //configure the target. setlimit, setsid, pipe_stdin... , I borrowed the code from Angora fuzzer
 //TODO: Better error handling.
 pub trait ConfigTarget {
@@ -162,7 +161,6 @@ impl Forkserver {
         let mut ctl_pipe = Pipe::new().unwrap();
 
         //setsid, setrlimit, direct stdin, set pipe, and finally fork.
-        println!("{}", target);
         match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
@@ -275,7 +273,7 @@ where
         
         for item in argv{
             if item == "@@" && use_stdin {
-                use_stdin = false; //only 1 @@ allowed.
+                use_stdin = false; //only 1 '@@' allowed.
                 args.push(out_filename.clone());
             }
             else{
@@ -285,9 +283,6 @@ where
 
         let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
 
-        //shmem_set_up
-        let shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE as usize).unwrap();
-        shmem.write_to_env("__AFL_SHM_ID")?;
 
         let out_file = OutFile::new(&out_filename);
 
@@ -398,6 +393,14 @@ where
     fn observers_mut(&mut self) -> &mut OT {
         &mut self.observers
     }
+}
+
+impl<EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
+    for ForkserverExecutor<EM, I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+{
 }
 
 #[cfg(test)]

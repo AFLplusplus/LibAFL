@@ -1,0 +1,21 @@
+[package]
+name = "forkserver_simple"
+version = "0.1.0"
+authors = ["tokatoka <tokazerkje@outlook.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../libafl/" }
+libafl_tests = { path = "../../libafl_tests/"}

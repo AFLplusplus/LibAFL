@@ -2,17 +2,14 @@
 #include <stdlib.h>
 int main(int argc, char **argv){
 
-    if(argc != 2){
-        printf("Give me one input!\n");
-        exit(0);
-    }
 
-    if(argv[1][0] == 'v'){
-        if(argv[1][1] == 'u'){
-            if(argv[1][2] == 'l'){
-                if(argv[1][3] == 'n'){
-                    abort();
-                }
+    sleep(0.1);
+    char buf[16];
+    fgets(buf, 16, stdin);
+    if(buf[0] == 'b'){
+        if(buf[1] == 'a'){
+            if(buf[2] == 'd'){
+                abort();
             }
         }
     }
