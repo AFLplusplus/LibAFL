@@ -21,4 +21,5 @@ default-members = [
     "libafl_targets",
 ]
 exclude = [
+#    "fuzzers"
 ]
