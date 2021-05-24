@@ -145,10 +145,11 @@ where
         let a = self
             .first
             .is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = self
-            .second
-            .is_interesting(state, manager, input, observers, exit_kind)?;
-        Ok(a && b)
+        let b = a
+            && self
+                .second
+                .is_interesting(state, manager, input, observers, exit_kind)?;
+        Ok(b)
     }
 
     #[cfg(feature = "introspection")]
@@ -176,16 +177,17 @@ where
             feedback_stats,
             feedback_index,
         )?;
-        let b = self.second.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            &exit_kind,
-            feedback_stats,
-            feedback_index + 1,
-        )?;
-        Ok(a && b)
+        let b = a
+            && self.second.is_interesting_with_perf(
+                state,
+                manager,
+                input,
+                observers,
+                &exit_kind,
+                feedback_stats,
+                feedback_index + 1,
+            )?;
+        Ok(b)
     }
 
     #[inline]
@@ -268,10 +270,11 @@ where
         let a = self
             .first
             .is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = self
-            .second
-            .is_interesting(state, manager, input, observers, exit_kind)?;
-        Ok(a || b)
+        let b = a
+            || self
+                .second
+                .is_interesting(state, manager, input, observers, exit_kind)?;
+        Ok(b)
     }
 
     #[cfg(feature = "introspection")]
@@ -299,16 +302,17 @@ where
             feedback_stats,
             feedback_index,
         )?;
-        let b = self.second.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            &exit_kind,
-            feedback_stats,
-            feedback_index + 1,
-        )?;
-        Ok(a || b)
+        let b = a
+            || self.second.is_interesting_with_perf(
+                state,
+                manager,
+                input,
+                observers,
+                &exit_kind,
+                feedback_stats,
+                feedback_index + 1,
+            )?;
+        Ok(b)
     }
 
     #[inline]

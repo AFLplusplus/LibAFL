@@ -188,6 +188,12 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     ) -> Result<Duration, Error>;
 }
 
+pub enum ExecuteInputResult {
+    None,
+    Interesting,
+    Solution,
+}
+
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
 pub struct StdFuzzer<C, CS, F, I, OF, OT, S, SC>
@@ -336,35 +342,57 @@ where
         manager: &mut EM,
         input: I,
     ) -> Result<(bool, Option<usize>), Error> {
-        let (is_interesting, is_solution) = self.execute_input(state, executor, manager, &input)?;
+        let result = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
 
-        if is_solution {
-            // If the input is a solution, add it to the respective corpus
-            let mut testcase = Testcase::new(input.clone());
-            self.objective_mut().append_metadata(state, &mut testcase)?;
-            state.solutions_mut().add(testcase)?;
-        } else {
-            self.objective_mut().discard_metadata(state, &input)?;
-        }
+        match result {
+            ExecuteInputResult::None => {
+                self.feedback_mut().discard_metadata(state, &input)?;
+                self.objective_mut().discard_metadata(state, &input)?;
+                Ok((false, None))
+            }
+            ExecuteInputResult::Interesting => {
+                // Not a solution
+                self.objective_mut().discard_metadata(state, &input)?;
 
-        let corpus_idx = self.add_if_interesting(state, &input, is_interesting)?;
-        if corpus_idx.is_some() {
-            let observers_buf = manager.serialize_observers(observers)?;
-            manager.fire(
-                state,
-                Event::NewTestcase {
-                    input,
-                    observers_buf,
-                    corpus_size: state.corpus().count(),
-                    client_config: "TODO".into(),
-                    time: current_time(),
-                    executions: *state.executions(),
-                },
-            )?;
-        }
+                // Add the input to the main corpus
+                let mut testcase = Testcase::new(input.clone());
+                self.feedback_mut().append_metadata(state, &mut testcase)?;
+                let idx = state.corpus_mut().add(testcase)?;
+                self.scheduler_mut().on_add(state, idx)?;
 
-        Ok((is_interesting, corpus_idx))
+                let observers_buf = manager.serialize_observers(observers)?;
+                manager.fire(
+                    state,
+                    Event::NewTestcase {
+                        input,
+                        observers_buf,
+                        corpus_size: state.corpus().count(),
+                        client_config: "TODO".into(),
+                        time: current_time(),
+                        executions: *state.executions(),
+                    },
+                )?;
+                Ok((true, Some(idx)))
+            }
+            ExecuteInputResult::Solution => {
+                // Not interesting
+                self.feedback_mut().discard_metadata(state, &input)?;
+
+                // The input is a solution, add it to the respective corpus
+                let mut testcase = Testcase::new(input.clone());
+                self.objective_mut().append_metadata(state, &mut testcase)?;
+                state.solutions_mut().add(testcase)?;
+                manager.fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.solutions().count(),
+                    },
+                )?;
+
+                Ok((false, None))
+            }
+        }
     }
 }
 
@@ -491,7 +519,7 @@ where
         executor: &mut E,
         event_mgr: &mut EM,
         input: &I,
-    ) -> Result<(bool, bool), Error>
+    ) -> Result<ExecuteInputResult, Error>
     where
         E: Executor<I>
             + HasObservers<OT>
@@ -522,12 +550,18 @@ where
         executor.post_exec_observers(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
-        match exit_kind {
-            ExitKind::Crash => { println!("CRASH") },
-            _ => {}
-        };
-
         let observers = executor.observers();
+
+        start_timer!(state);
+        let is_solution = self
+            .objective_mut()
+            .is_interesting(state, event_mgr, &input, observers, &exit_kind)?;
+        mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
+
+        if is_solution {
+            return Ok(ExecuteInputResult::Solution);
+        }
+
         #[cfg(not(feature = "introspection"))]
         let is_interesting = self
             .feedback_mut()
@@ -560,13 +594,10 @@ where
             is_interesting
         };
 
-        start_timer!(state);
-        let is_solution = self
-            .objective_mut()
-            .is_interesting(state, event_mgr, &input, observers, &exit_kind)?;
-
-        mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
-
-        Ok((is_interesting, is_solution))
+        if is_interesting {
+            Ok(ExecuteInputResult::Interesting)
+        } else {
+            Ok(ExecuteInputResult::None)
+        }
     }
 }

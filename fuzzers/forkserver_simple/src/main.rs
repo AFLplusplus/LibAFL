@@ -1,21 +1,26 @@
 use std::path::PathBuf;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, shmem::{ShMemProvider, StdShMemProvider, ShMem}},
+    bolts::{
+        current_nanos,
+        rands::StdRand,
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+    },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
     events::SimpleEventManager,
-    inputs::BytesInput,
-    executors::{forkserver::ForkserverExecutor},
+    executors::forkserver::ForkserverExecutor,
+    feedback_and, feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
+    inputs::BytesInput,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{HitcountsMapObserver, ConstMapObserver, TimeObserver},
+    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    feedback_or,
     stats::SimpleStats,
 };
 
@@ -31,13 +36,19 @@ pub fn main() {
     let mut shmem_map = shmem.map_mut();
 
     // Create an observation channel using the signals map
-    let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new("shared_mem", &mut shmem_map ));
+    let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
+        "shared_mem",
+        &mut shmem_map,
+    ));
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+
+    // The state of the edges feedback for crashes.
+    let objective_state = MapFeedbackState::new("crash_edges", MAP_SIZE);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -49,7 +60,12 @@ pub fn main() {
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let objective = feedback_and!(
+        // Must be a crash
+        CrashFeedback::new(),
+        // Take it onlt if trigger new coverage over crashes
+        MaxMapFeedback::new(&objective_state, &edges_observer)
+    );
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -62,7 +78,7 @@ pub fn main() {
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
+        tuple_list!(feedback_state, objective_state),
     );
 
     // The Stats trait define how the fuzzer stats are reported to the user
@@ -89,12 +105,7 @@ pub fn main() {
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut fuzzer,
-                &mut executor,
-                &mut mgr,
-                &corpus_dirs,
-            )
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
