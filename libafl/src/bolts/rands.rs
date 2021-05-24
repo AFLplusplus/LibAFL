@@ -1,4 +1,4 @@
-use core::{cell::RefCell, debug_assert, fmt::Debug};
+use core::{debug_assert, fmt::Debug};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
@@ -71,31 +71,6 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
 
         // return the item chosen
         iter.nth(index).unwrap()
-    }
-}
-
-/// Has a Rand field, that can be used to get random values
-pub trait HasRand<R>
-where
-    R: Rand,
-{
-    /// Get the hold [`RefCell`] Rand instance
-    fn rand(&self) -> &RefCell<R>;
-
-    /// Gets the next 64 bit value
-    fn rand_next(&mut self) -> u64 {
-        self.rand().borrow_mut().next()
-    }
-    /// Gets a value below the given 64 bit val (inclusive)
-    fn rand_below(&mut self, upper_bound_excl: u64) -> u64 {
-        self.rand().borrow_mut().below(upper_bound_excl)
-    }
-
-    /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
-    fn rand_between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
-        self.rand()
-            .borrow_mut()
-            .between(lower_bound_incl, upper_bound_incl)
     }
 }
 
