@@ -23,7 +23,7 @@ use libafl::{
     state::HasMetadata,
     Error, SerdeAny,
 };
-use nix::{libc::{memmove, memset}, sys::mman::{MapFlags, ProtFlags, mmap, mprotect}};
+use nix::{libc::{memmove, memset}, sys::mman::{MapFlags, ProtFlags, mmap}};
 
 use backtrace::Backtrace;
 use capstone::{
@@ -240,14 +240,14 @@ impl Allocator {
                 ..AllocationMetadata::default()
             };
 
-            //if self
-                //.runtime
-                //.borrow()
-                //.options
-                //.enable_asan_allocation_backtraces
-            //{
-                //metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
-            //}
+            if self
+                .runtime
+                .borrow()
+                .options
+                .enable_asan_allocation_backtraces
+            {
+                metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
+            }
 
             metadata
         };
@@ -375,7 +375,7 @@ impl Allocator {
         }
     }
 
-    fn poison(start: usize, size: usize) {
+    pub fn poison(start: usize, size: usize) {
         //println!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             //println!("memset: {:?}", start as *mut c_void);
@@ -460,7 +460,6 @@ pub struct AsanRuntime {
     options: FridaOptions,
     instrumented_ranges: RangeMap<usize, String>,
     module_map: Option<ModuleMap>,
-    shadow_check_func_blob: Option<Box<[u8]>>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
 }
 
@@ -563,7 +562,6 @@ impl AsanRuntime {
             options,
             instrumented_ranges: RangeMap::new(),
             module_map: None,
-            shadow_check_func_blob: None,
             shadow_check_func: None,
         }));
         Allocator::init(res.clone());
@@ -636,7 +634,7 @@ impl AsanRuntime {
     }
 
     /// Add a stalked address to real address mapping.
-    //#[inline]
+    #[inline]
     pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
         self.stalked_addresses.insert(stalked, real);
     }
@@ -945,6 +943,29 @@ impl AsanRuntime {
         if ptr != std::ptr::null_mut() {
             unsafe { Allocator::get().release(ptr) }
         }
+    }
+
+    fn hook_mmap(&mut self, addr: *const c_void, length: usize, prot: i32, flags: i32, fd: i32, offset: usize) -> *mut c_void {
+        extern "C" {
+            fn mmap(addr: *const c_void, length: usize, prot: i32, flags: i32, fd: i32, offset: usize) -> *mut c_void;
+        }
+        let res = unsafe { mmap(addr, length, prot, flags, fd, offset) };
+        if res != (-1isize as *mut c_void) {
+            Allocator::get().map_shadow_for_region(res as usize, res as usize + length, true);
+        }
+        res
+    }
+
+    fn hook_munmap(&mut self, addr: *const c_void, length: usize) -> i32 {
+        extern "C" {
+            fn munmap(addr: *const c_void, length: usize) -> i32;
+        }
+        let res = unsafe { munmap(addr, length) };
+        if res != -1 {
+            let allocator = Allocator::get();
+            Allocator::poison(map_to_shadow!(allocator, addr as usize), length);
+        }
+        res
     }
 
     #[inline]
@@ -1605,6 +1626,20 @@ impl AsanRuntime {
             ()
         );
 
+
+        hook_func!(
+            None,
+            mmap,
+            (addr: *const c_void, length: usize, prot: i32, flags: i32, fd: i32, offset: usize),
+            *mut c_void
+        );
+        hook_func!(
+            None,
+            munmap,
+            (addr: *const c_void, length: usize),
+            i32
+        );
+
         // Hook libc functions which may access allocated memory
         hook_func!(
             None,
@@ -2119,7 +2154,7 @@ impl AsanRuntime {
                 }
             }
             AsanError::BadFuncArgRead((name, address, size, backtrace)) | AsanError::BadFuncArgWrite((name, address, size, backtrace)) => {
-                writeln!(output, " in call to {}, argument {:#016x}", name, address).unwrap();
+                writeln!(output, " in call to {}, argument {:#016x}, size: {:#x}", name, address, size).unwrap();
                 let invocation = Interceptor::current_invocation();
                 let cpu_context = invocation.cpu_context();
 
@@ -2146,13 +2181,6 @@ impl AsanRuntime {
                 write!(output, "sp : 0x{:016x} ", cpu_context.sp()).unwrap();
                 write!(output, "lr : 0x{:016x} ", cpu_context.lr()).unwrap();
                 writeln!(output, "pc : 0x{:016x} ", cpu_context.pc()).unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " SHADOW ").unwrap();
-                let shadow_start = (address >> 3) | (1 << 36) ;
-                writeln!(output, "shadow_start: {:#016x}", shadow_start);
-                let shadow = unsafe { std::slice::from_raw_parts(shadow_start as *const u8, (size / 8) + 1) };
-                writeln!(output, "{:02x?}", shadow);
 
                 backtrace_printer
                     .print_trace(&backtrace, output)
@@ -2403,9 +2431,12 @@ impl AsanRuntime {
             ; ret
         );
 
-        let mut blob = ops.finalize().unwrap();
-        self.shadow_check_func = Some(unsafe { std::mem::transmute(blob.as_ptr()) });
-        self.shadow_check_func_blob = Some(blob.into_boxed_slice());
+        let blob = ops.finalize().unwrap();
+        unsafe {
+            let mapping = mmap(std::ptr::null_mut(), 0x1000, ProtFlags::all(), MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE, -1, 0).unwrap();
+            blob.as_ptr().copy_to_nonoverlapping(mapping as *mut u8, blob.len());
+            self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
+        }
     }
 
     #[allow(clippy::unused_self)]
