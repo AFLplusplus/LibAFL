@@ -21,7 +21,7 @@ libc = "0.2.92"
 hashbrown = "0.11"
 libloading = "0.7.0"
 rangemap = "0.1.10"
-frida-gum = { version = "0.5.0", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.5.1", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
 frida-gum-sys = { version = "0.3.0", features = [ "auto-download", "event-sink", "invocation-listener"] }
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs" }
 regex = "1.4"
