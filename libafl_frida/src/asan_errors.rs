@@ -65,6 +65,7 @@ impl AsanError {
 }
 
 /// A struct holding errors that occurred during frida address sanitizer runs
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     options: FridaOptions,
