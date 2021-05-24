@@ -333,7 +333,14 @@ where
     OT: ObserversTuple,
 {
     #[inline]
-    fn run_target(&mut self, _input: &I) -> Result<ExitKind, Error> {
+    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+        let mut exit_kind = ExitKind::Ok;
+        
+        // Write to test case
+        self.out_file
+            .write_buf(&input.target_bytes().as_slice().to_vec());
+        // outfile gets automatically closed.
+    
         let t1 = current_time();
         let slen = self
             .forkserver
@@ -358,9 +365,20 @@ where
         self.forkserver.status = status;
 
         let t2 = current_time();
-        println!("Exec time {} ns", (t2 - t1).as_nanos());
+        // println!("Exec time {} ns", (t2 - t1).as_nanos());
+        
+        if !libc::WIFSTOPPED(self.forkserver.status()) {
+            self.forkserver.child_pid = 0;
+        }
 
-        Ok(ExitKind::Ok)
+        if libc::WIFSIGNALED(self.forkserver.status()) {
+            exit_kind = ExitKind::Crash;
+        }
+
+        //move the head back
+        self.out_file.rewind();
+
+        Ok(exit_kind)
     }
 }
 
@@ -374,66 +392,6 @@ where
     S: HasSolutions<OC, I>,
     Z: HasObjective<I, OF, S>,
 {
-    #[inline]
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
-        //write to test case
-        self.out_file
-            .write_buf(&input.target_bytes().as_slice().to_vec());
-        //outfile gets automatically closed.
-        Ok(())
-    }
-
-    fn post_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
-        if !libc::WIFSTOPPED(self.forkserver.status()) {
-            self.forkserver.child_pid = 0;
-        }
-
-        if libc::WIFSIGNALED(self.forkserver.status()) {
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(state, event_mgr, &input, self.observers(), &ExitKind::Crash)
-                .expect("Forkserver post_exec failure");
-
-            if interesting {
-                let mut new_testcase = Testcase::new(input.clone());
-                fuzzer
-                    .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("Forkserver post_exec failure");
-                event_mgr
-                    .fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
-                    )
-                    .expect("Forkserver post_exec failure");
-                println!("CRASH");
-            }
-        }
-
-        //move the head back
-        self.out_file.rewind();
-
-        //println!("OK");
-        Ok(())
-    }
 }
 
 impl<I, OC, OF, OT, S> HasObservers<OT> for ForkserverExecutor<I, OC, OF, OT, S>
