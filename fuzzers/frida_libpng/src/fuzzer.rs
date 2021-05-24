@@ -53,7 +53,7 @@ use std::{
 };
 
 use libafl_frida::{
-    asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+    asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
     helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     FridaOptions,
 };

@@ -47,388 +47,10 @@ use std::{
 };
 use termcolor::{Color, ColorSpec, WriteColor};
 
-use crate::FridaOptions;
+use crate::{alloc::Allocator, asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS}, FridaOptions};
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
-}
-
-static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
-
-struct Allocator {
-    runtime: Rc<RefCell<AsanRuntime>>,
-    page_size: usize,
-    shadow_offset: usize,
-    shadow_bit: usize,
-    pre_allocated_shadow: bool,
-    allocations: HashMap<usize, AllocationMetadata>,
-    shadow_pages: RangeSet<usize>,
-    allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
-    largest_allocation: usize,
-}
-
-macro_rules! map_to_shadow {
-    ($self:expr, $address:expr) => {
-        (($address >> 3) + $self.shadow_offset) & ((1 << ($self.shadow_bit + 1)) - 1)
-    };
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-struct AllocationMetadata {
-    address: usize,
-    size: usize,
-    actual_size: usize,
-    allocation_site_backtrace: Option<Backtrace>,
-    release_site_backtrace: Option<Backtrace>,
-    freed: bool,
-    is_malloc_zero: bool,
-}
-
-impl Allocator {
-    fn setup(runtime: Rc<RefCell<AsanRuntime>>) {
-        let ret = unsafe { sysconf(_SC_PAGESIZE) };
-        if ret < 0 {
-            panic!("Failed to read pagesize {:?}", io::Error::last_os_error());
-        }
-        #[allow(clippy::cast_sign_loss)]
-        let page_size = ret as usize;
-        // probe to find a usable shadow bit:
-        let mut shadow_bit: usize = 0;
-        for try_shadow_bit in &[46usize, 36usize] {
-            let addr: usize = 1 << try_shadow_bit;
-            if unsafe {
-                mmap(
-                    addr as *mut c_void,
-                    page_size,
-                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_PRIVATE
-                        | MapFlags::MAP_ANONYMOUS
-                        | MapFlags::MAP_FIXED
-                        | MapFlags::MAP_NORESERVE,
-                    -1,
-                    0,
-                )
-            }
-            .is_ok()
-            {
-                shadow_bit = *try_shadow_bit;
-                break;
-            }
-        }
-        assert!(shadow_bit != 0);
-
-        // attempt to pre-map the entire shadow-memory space
-        let addr: usize = 1 << shadow_bit;
-        let pre_allocated_shadow = unsafe {
-            mmap(
-                addr as *mut c_void,
-                addr + addr,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS
-                    | MapFlags::MAP_FIXED
-                    | MapFlags::MAP_PRIVATE
-                    | MapFlags::MAP_NORESERVE,
-                -1,
-                0,
-            )
-        }
-        .is_ok();
-
-        let allocator = Self {
-            runtime,
-            page_size,
-            pre_allocated_shadow,
-            shadow_offset: 1 << shadow_bit,
-            shadow_bit,
-            allocations: HashMap::new(),
-            shadow_pages: RangeSet::new(),
-            allocation_queue: HashMap::new(),
-            largest_allocation: 0,
-        };
-        unsafe {
-            ALLOCATOR_SINGLETON = Some(RefCell::new(allocator));
-        }
-    }
-
-    pub fn get() -> RefMut<'static, Allocator> {
-        unsafe {
-            ALLOCATOR_SINGLETON
-                .as_mut()
-                .unwrap()
-                .try_borrow_mut()
-                .unwrap()
-        }
-    }
-
-    pub fn init(runtime: Rc<RefCell<AsanRuntime>>) {
-        Self::setup(runtime);
-    }
-
-    #[inline]
-    fn round_up_to_page(&self, size: usize) -> usize {
-        ((size + self.page_size) / self.page_size) * self.page_size
-    }
-
-    #[inline]
-    fn round_down_to_page(&self, value: usize) -> usize {
-        (value / self.page_size) * self.page_size
-    }
-
-    fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
-        let mut current_size = size;
-        while current_size <= self.largest_allocation {
-            if self.allocation_queue.contains_key(&current_size) {
-                if let Some(metadata) = self.allocation_queue.entry(current_size).or_default().pop()
-                {
-                    return Some(metadata);
-                }
-            }
-            current_size *= 2;
-        }
-        None
-    }
-
-    pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
-        let mut is_malloc_zero = false;
-        let size = if size == 0 {
-            println!("zero-sized allocation!");
-            is_malloc_zero = true;
-            16
-        } else {
-            size
-        };
-        if size > (1 << 30) {
-            panic!("Allocation is too large: 0x{:x}", size);
-        }
-        let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
-
-        let metadata = if let Some(mut metadata) = self.find_smallest_fit(rounded_up_size) {
-            //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
-            metadata.is_malloc_zero = is_malloc_zero;
-            metadata.size = size;
-            if self
-                .runtime
-                .borrow()
-                .options
-                .enable_asan_allocation_backtraces
-            {
-                metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
-            }
-            metadata
-        } else {
-            let mapping = match mmap(
-                std::ptr::null_mut(),
-                rounded_up_size,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
-                -1,
-                0,
-            ) {
-                Ok(mapping) => mapping as usize,
-                Err(err) => {
-                    println!("An error occurred while mapping memory: {:?}", err);
-                    return std::ptr::null_mut();
-                }
-            };
-
-            self.map_shadow_for_region(mapping, mapping + rounded_up_size, false);
-
-            let mut metadata = AllocationMetadata {
-                address: mapping,
-                size,
-                actual_size: rounded_up_size,
-                ..AllocationMetadata::default()
-            };
-
-            if self
-                .runtime
-                .borrow()
-                .options
-                .enable_asan_allocation_backtraces
-            {
-                metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
-            }
-
-            metadata
-        };
-
-        self.largest_allocation = std::cmp::max(self.largest_allocation, metadata.actual_size);
-        // unpoison the shadow memory for the allocation itself
-        Self::unpoison(map_to_shadow!(self, metadata.address + self.page_size), size);
-        let address = (metadata.address + self.page_size) as *mut c_void;
-
-        self.allocations.insert(metadata.address + self.page_size, metadata);
-        //println!("serving address: {:?}, size: {:x}", address, size);
-        address
-    }
-
-    pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
-            metadata
-        } else {
-            if !ptr.is_null() {
-                // TODO: report this as an observer
-                self.runtime
-                    .borrow_mut()
-                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
-            }
-            return;
-        };
-
-        if metadata.freed {
-            self.runtime
-                .borrow_mut()
-                .report_error(AsanError::DoubleFree((
-                    ptr as usize,
-                    metadata.clone(),
-                    Backtrace::new(),
-                )));
-        }
-        let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
-
-        metadata.freed = true;
-        if self
-            .runtime
-            .borrow()
-            .options
-            .enable_asan_allocation_backtraces
-        {
-            metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
-        }
-
-        // poison the shadow memory for the allocation
-        Self::poison(shadow_mapping_start, metadata.size);
-    }
-
-    pub fn find_metadata(
-        &mut self,
-        ptr: usize,
-        hint_base: usize,
-    ) -> Option<&mut AllocationMetadata> {
-        let mut metadatas: Vec<&mut AllocationMetadata> = self.allocations.values_mut().collect();
-        metadatas.sort_by(|a, b| a.address.cmp(&b.address));
-        let mut offset_to_closest = i64::max_value();
-        let mut closest = None;
-        for metadata in metadatas {
-            let new_offset = if hint_base == metadata.address {
-                (ptr as i64 - metadata.address as i64).abs()
-            } else {
-                std::cmp::min(
-                    offset_to_closest,
-                    (ptr as i64 - metadata.address as i64).abs(),
-                )
-            };
-            if new_offset < offset_to_closest {
-                offset_to_closest = new_offset;
-                closest = Some(metadata);
-            }
-        }
-        closest
-    }
-
-    pub fn reset(&mut self) {
-        for (address, mut allocation) in self.allocations.drain() {
-            // First poison the memory.
-            Self::poison(map_to_shadow!(self, address), allocation.size);
-
-            // Reset the allocaiton metadata object
-            allocation.size = 0;
-            allocation.freed = false;
-            allocation.allocation_site_backtrace = None;
-            allocation.release_site_backtrace = None;
-
-            // Move the allocation from the allocations to the to-be-allocated queues
-            self.allocation_queue
-                .entry(allocation.actual_size)
-                .or_default()
-                .push(allocation);
-        }
-    }
-
-    pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
-        match self.allocations.get(&(ptr as usize)) {
-            Some(metadata) => metadata.size,
-            None => {
-                panic!(
-                    "Attempted to get_usable_size on a pointer ({:?}) which was not allocated!",
-                    ptr
-                );
-            }
-        }
-    }
-
-    fn unpoison(start: usize, size: usize) {
-        //println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
-        unsafe {
-            //println!("memset: {:?}", start as *mut c_void);
-            memset(start as *mut c_void, 0xff, size / 8);
-
-            let remainder = size % 8;
-            if remainder > 0 {
-                //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
-                memset(
-                    (start + size / 8) as *mut c_void,
-                    (0xff << (8 - remainder)) & 0xff,
-                    1,
-                );
-            }
-        }
-    }
-
-    pub fn poison(start: usize, size: usize) {
-        //println!("poisoning {:x} for {:x}", start, size / 8 + 1);
-        unsafe {
-            //println!("memset: {:?}", start as *mut c_void);
-            memset(start as *mut c_void, 0x00, size / 8);
-
-            let remainder = size % 8;
-            if remainder > 0 {
-                //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
-                memset((start + size / 8) as *mut c_void, 0x00, 1);
-            }
-        }
-    }
-
-    /// Map shadow memory for a region, and optionally unpoison it
-    pub fn map_shadow_for_region(
-        &mut self,
-        start: usize,
-        end: usize,
-        unpoison: bool,
-    ) -> (usize, usize) {
-        //println!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
-
-        let shadow_mapping_start = map_to_shadow!(self, start);
-
-        if !self.pre_allocated_shadow {
-            let shadow_start = self.round_down_to_page(shadow_mapping_start);
-            let shadow_end =
-                self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
-            for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                //println!("range: {:x}-{:x}, pagesize: {}", range.start, range.end, self.page_size);
-                unsafe {
-                    mmap(
-                        range.start as *mut c_void,
-                        range.end - range.start,
-                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                        MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
-                        -1,
-                        0,
-                    )
-                    .expect("An error occurred while mapping shadow memory");
-                }
-            }
-
-            self.shadow_pages.insert(shadow_start..shadow_end);
-        }
-
-        //println!("shadow_mapping_start: {:x}, shadow_size: {:x}", shadow_mapping_start, (end - start) / 8);
-        if unpoison {
-            Self::unpoison(shadow_mapping_start, end - start);
-        }
-
-        (shadow_mapping_start, (end - start) / 8)
-    }
 }
 
 /// Get the current thread's TLS address
@@ -442,6 +64,7 @@ extern "C" {
 /// even if the target would not have crashed under normal conditions.
 /// this helps finding mem errors early.
 pub struct AsanRuntime {
+    allocator: Allocator,
     regs: [usize; 32],
     blob_report: Option<Box<[u8]>>,
     blob_check_mem_byte: Option<Box<[u8]>>,
@@ -463,87 +86,12 @@ pub struct AsanRuntime {
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct AsanReadWriteError {
-    registers: [usize; 32],
-    pc: usize,
-    fault: (u16, u16, usize, usize),
-    metadata: AllocationMetadata,
-    backtrace: Backtrace,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
-enum AsanError {
-    OobRead(AsanReadWriteError),
-    OobWrite(AsanReadWriteError),
-    ReadAfterFree(AsanReadWriteError),
-    WriteAfterFree(AsanReadWriteError),
-    DoubleFree((usize, AllocationMetadata, Backtrace)),
-    UnallocatedFree((usize, Backtrace)),
-    Unknown(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
-    Leak((usize, AllocationMetadata)),
-    StackOobRead(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
-    StackOobWrite(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
-    BadFuncArgRead((String, usize, usize, Backtrace)),
-    BadFuncArgWrite((String, usize, usize, Backtrace)),
-}
-
-impl AsanError {
-    fn description(&self) -> &str {
-        match self {
-            AsanError::OobRead(_) => "heap out-of-bounds read",
-            AsanError::OobWrite(_) => "heap out-of-bounds write",
-            AsanError::DoubleFree(_) => "double-free",
-            AsanError::UnallocatedFree(_) => "unallocated-free",
-            AsanError::WriteAfterFree(_) => "heap use-after-free write",
-            AsanError::ReadAfterFree(_) => "heap use-after-free read",
-            AsanError::Unknown(_) => "heap unknown",
-            AsanError::Leak(_) => "memory-leak",
-            AsanError::StackOobRead(_) => "stack out-of-bounds read",
-            AsanError::StackOobWrite(_) => "stack out-of-bounds write",
-            AsanError::BadFuncArgRead(_) => "function arg resulting in bad read",
-            AsanError::BadFuncArgWrite(_) => "function arg resulting in bad write",
-        }
-    }
-}
-
-/// A struct holding errors that occurred during frida address sanitizer runs
-#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
-pub struct AsanErrors {
-    errors: Vec<AsanError>,
-}
-
-impl AsanErrors {
-    /// Creates a new `AsanErrors` struct
-    #[must_use]
-    fn new() -> Self {
-        Self { errors: Vec::new() }
-    }
-
-    /// Clears this `AsanErrors` struct
-    pub fn clear(&mut self) {
-        self.errors.clear()
-    }
-
-    /// Gets the amount of `AsanErrors` in this struct
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.errors.len()
-    }
-
-    /// Returns `true` if no errors occurred
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.errors.is_empty()
-    }
-}
-impl CustomExitKind for AsanErrors {}
-
 impl AsanRuntime {
     /// Create a new `AsanRuntime`
     #[must_use]
-    pub fn new(options: FridaOptions) -> Rc<RefCell<AsanRuntime>> {
-        let res = Rc::new(RefCell::new(Self {
+    pub fn new(options: FridaOptions) -> AsanRuntime {
+        Self {
+            allocator: Allocator::new(options.clone()),
             regs: [0; 32],
             blob_report: None,
             blob_check_mem_byte: None,
@@ -563,16 +111,14 @@ impl AsanRuntime {
             instrumented_ranges: RangeMap::new(),
             module_map: None,
             shadow_check_func: None,
-        }));
-        Allocator::init(res.clone());
-        res
+        }
     }
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
     pub fn init(&mut self, gum: &Gum, modules_to_instrument: &[PathBuf]) {
         unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new());
+            ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
 
         self.generate_instrumentation_blobs();
@@ -591,7 +137,7 @@ impl AsanRuntime {
         self.module_map = Some(ModuleMap::new_from_names(&module_names));
         self.hook_functions(gum);
         //unsafe {
-            //let mem = Allocator::get().alloc(0xac + 2, 8);
+            //let mem = self.allocator.alloc(0xac + 2, 8);
 
             //unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
             //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0xac));
@@ -608,17 +154,13 @@ impl AsanRuntime {
 
     /// Reset all allocations so that they can be reused for new allocation requests.
     #[allow(clippy::unused_self)]
-    pub fn reset_allocations(&self) {
-        Allocator::get().reset();
+    pub fn reset_allocations(&mut self) {
+        self.allocator.reset();
     }
 
     /// Check if the test leaked any memory and report it if so.
     pub fn check_for_leaks(&mut self) {
-        for metadata in Allocator::get().allocations.values_mut() {
-            if !metadata.freed {
-                self.report_error(AsanError::Leak((metadata.address, metadata.clone())));
-            }
-        }
+        self.allocator.check_for_leaks()
     }
 
     /// Returns the `AsanErrors` from the recent run
@@ -629,8 +171,8 @@ impl AsanRuntime {
 
     /// Make sure the specified memory is unpoisoned
     #[allow(clippy::unused_self)]
-    pub fn unpoison(&self, address: usize, size: usize) {
-        Allocator::get().map_shadow_for_region(address, address + size, true);
+    pub fn unpoison(&mut self, address: usize, size: usize) {
+        self.allocator.map_shadow_for_region(address, address + size, true);
     }
 
     /// Add a stalked address to real address mapping.
@@ -647,29 +189,19 @@ impl AsanRuntime {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     #[allow(clippy::unused_self)]
-    fn unpoison_all_existing_memory(&self) {
-        let mut allocator = Allocator::get();
-        walk_self_maps(&mut |start, end, permissions, _path| {
-            if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
-                if allocator.pre_allocated_shadow && start == 1 << allocator.shadow_bit {
-                    return false;
-                }
-                allocator.map_shadow_for_region(start, end, true);
-            }
-            false
-        });
+    fn unpoison_all_existing_memory(&mut self) {
+        self.allocator.unpoison_all_existing_memory()
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
     #[allow(clippy::unused_self)]
-    pub fn register_thread(&self) {
-        let mut allocator = Allocator::get();
+    pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
-        allocator.map_shadow_for_region(stack_start, stack_end, true);
+        self.allocator.map_shadow_for_region(stack_start, stack_end, true);
 
         let (tls_start, tls_end) = Self::current_tls();
-        allocator.map_shadow_for_region(tls_start, tls_end, true);
+        self.allocator.map_shadow_for_region(tls_start, tls_end, true);
         println!(
             "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
             stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
@@ -726,25 +258,25 @@ impl AsanRuntime {
 
     #[inline]
     fn hook_malloc(&mut self, size: usize) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, 8) }
+        unsafe { self.allocator.alloc(size, 8) }
     }
 
     #[allow(non_snake_case)]
     #[inline]
     fn hook__Znam(&mut self, size: usize) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, 8) }
+        unsafe { self.allocator.alloc(size, 8) }
     }
 
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, 8) }
+        unsafe { self.allocator.alloc(size, 8) }
     }
 
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, alignment) }
+        unsafe { self.allocator.alloc(size, alignment) }
     }
 
     #[allow(non_snake_case)]
@@ -755,25 +287,25 @@ impl AsanRuntime {
         alignment: usize,
         _nothrow: *const c_void,
     ) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, alignment) }
+        unsafe { self.allocator.alloc(size, alignment) }
     }
 
     #[allow(non_snake_case)]
     #[inline]
     fn hook__Znwm(&mut self, size: usize) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, 8) }
+        unsafe { self.allocator.alloc(size, 8) }
     }
 
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, 8) }
+        unsafe { self.allocator.alloc(size, 8) }
     }
 
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, alignment) }
+        unsafe { self.allocator.alloc(size, alignment) }
     }
 
     #[allow(non_snake_case)]
@@ -784,12 +316,12 @@ impl AsanRuntime {
         alignment: usize,
         _nothrow: *const c_void,
     ) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, alignment) }
+        unsafe { self.allocator.alloc(size, alignment) }
     }
 
     #[inline]
     fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
-        let ret = unsafe { Allocator::get().alloc(size * nmemb, 8) };
+        let ret = unsafe { self.allocator.alloc(size * nmemb, 8) };
         unsafe {
             memset(ret, 0, size * nmemb);
         }
@@ -799,12 +331,11 @@ impl AsanRuntime {
     #[inline]
     fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
         unsafe {
-            let mut allocator = Allocator::get();
-            let ret = allocator.alloc(size, 0x8);
+            let ret = self.allocator.alloc(size, 0x8);
             if ptr != std::ptr::null_mut() {
-                memmove(ret, ptr, allocator.get_usable_size(ptr));
+                memmove(ret, ptr, self.allocator.get_usable_size(ptr));
             }
-            allocator.release(ptr);
+            self.allocator.release(ptr);
             ret
         }
     }
@@ -812,13 +343,13 @@ impl AsanRuntime {
     #[inline]
     fn hook_free(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
     #[inline]
     fn hook_memalign(&mut self, size: usize, alignment: usize) -> *mut c_void {
-        unsafe { Allocator::get().alloc(size, alignment) }
+        unsafe { self.allocator.alloc(size, alignment) }
     }
 
     #[inline]
@@ -829,21 +360,21 @@ impl AsanRuntime {
         alignment: usize,
     ) -> i32 {
         unsafe {
-            *pptr = Allocator::get().alloc(size, alignment);
+            *pptr = self.allocator.alloc(size, alignment);
         }
         0
     }
 
     #[inline]
     fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
-        Allocator::get().get_usable_size(ptr)
+        self.allocator.get_usable_size(ptr)
     }
 
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZdaPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -851,7 +382,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -859,7 +390,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdaPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -867,7 +398,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -880,7 +411,7 @@ impl AsanRuntime {
         _nothrow: *const c_void,
     ) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -888,7 +419,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -896,7 +427,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdlPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -904,7 +435,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -912,7 +443,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdlPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -920,7 +451,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -933,7 +464,7 @@ impl AsanRuntime {
         _nothrow: *const c_void,
     ) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -941,7 +472,7 @@ impl AsanRuntime {
     #[inline]
     fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
-            unsafe { Allocator::get().release(ptr) }
+            unsafe { self.allocator.release(ptr) }
         }
     }
 
@@ -951,7 +482,7 @@ impl AsanRuntime {
         }
         let res = unsafe { mmap(addr, length, prot, flags, fd, offset) };
         if res != (-1isize as *mut c_void) {
-            Allocator::get().map_shadow_for_region(res as usize, res as usize + length, true);
+            self.allocator.map_shadow_for_region(res as usize, res as usize + length, true);
         }
         res
     }
@@ -962,8 +493,7 @@ impl AsanRuntime {
         }
         let res = unsafe { munmap(addr, length) };
         if res != -1 {
-            let allocator = Allocator::get();
-            Allocator::poison(map_to_shadow!(allocator, addr as usize), length);
+            Allocator::poison(self.allocator.map_to_shadow(addr as usize), length);
         }
         res
     }
@@ -974,7 +504,7 @@ impl AsanRuntime {
             fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(buf, count) {
-            self.report_error(AsanError::BadFuncArgWrite(("write".to_string(), buf as usize, count, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("write".to_string(), buf as usize, count, Backtrace::new())), None);
         }
         unsafe {
             write(fd, buf, count)
@@ -987,7 +517,7 @@ impl AsanRuntime {
             fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(buf, count) {
-            self.report_error(AsanError::BadFuncArgRead(("read".to_string(), buf as usize, count, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("read".to_string(), buf as usize, count, Backtrace::new())), None);
         }
         unsafe {
             read(fd, buf, count)
@@ -1000,7 +530,7 @@ impl AsanRuntime {
             fn fgets(s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, size as usize) {
-            self.report_error(AsanError::BadFuncArgRead(("fgets".to_string(), s as usize, size as usize, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("fgets".to_string(), s as usize, size as usize, Backtrace::new())), None);
         }
         unsafe {
             fgets(s, size, stream)
@@ -1013,10 +543,10 @@ impl AsanRuntime {
             fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1, n) {
-            self.report_error(AsanError::BadFuncArgRead(("memcmp".to_string(), s1 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memcmp".to_string(), s1 as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2, n) {
-            self.report_error(AsanError::BadFuncArgRead(("memcmp".to_string(), s2 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memcmp".to_string(), s2 as usize, n, Backtrace::new())), None);
         }
         unsafe {
             memcmp(s1, s2, n)
@@ -1029,10 +559,10 @@ impl AsanRuntime {
             fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            self.report_error(AsanError::BadFuncArgWrite(("memcpy".to_string(), dest as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("memcpy".to_string(), dest as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
-            self.report_error(AsanError::BadFuncArgRead(("memcpy".to_string(), src as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memcpy".to_string(), src as usize, n, Backtrace::new())), None);
         }
         unsafe {
             memcpy(dest, src, n)
@@ -1045,10 +575,10 @@ impl AsanRuntime {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            self.report_error(AsanError::BadFuncArgWrite(("mempcpy".to_string(), dest as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("mempcpy".to_string(), dest as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
-            self.report_error(AsanError::BadFuncArgRead(("mempcpy".to_string(), src as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("mempcpy".to_string(), src as usize, n, Backtrace::new())), None);
         }
         unsafe {
             mempcpy(dest, src, n)
@@ -1061,10 +591,10 @@ impl AsanRuntime {
             fn memmove(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            self.report_error(AsanError::BadFuncArgWrite(("memmove".to_string(), dest as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("memmove".to_string(), dest as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
-            self.report_error(AsanError::BadFuncArgRead(("memmove".to_string(), src as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memmove".to_string(), src as usize, n, Backtrace::new())), None);
         }
         unsafe {
             memmove(dest, src, n)
@@ -1077,7 +607,7 @@ impl AsanRuntime {
             fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            self.report_error(AsanError::BadFuncArgWrite(("memset".to_string(), dest as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("memset".to_string(), dest as usize, n, Backtrace::new())), None);
         }
         unsafe {
             memset(dest, c, n)
@@ -1090,7 +620,7 @@ impl AsanRuntime {
             fn memchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            self.report_error(AsanError::BadFuncArgRead(("memchr".to_string(), s as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memchr".to_string(), s as usize, n, Backtrace::new())), None);
         }
         unsafe {
             memchr(s, c, n)
@@ -1103,7 +633,7 @@ impl AsanRuntime {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            self.report_error(AsanError::BadFuncArgRead(("memrchr".to_string(), s as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memrchr".to_string(), s as usize, n, Backtrace::new())), None);
         }
         unsafe {
             memrchr(s, c, n)
@@ -1116,10 +646,10 @@ impl AsanRuntime {
             fn memmem(haystack: *const c_void, haystacklen: usize, needle: *const c_void, needlelen: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(haystack, haystacklen) {
-            self.report_error(AsanError::BadFuncArgRead(("memmem".to_string(), haystack as usize, haystacklen, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memmem".to_string(), haystack as usize, haystacklen, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(needle, needlelen) {
-            self.report_error(AsanError::BadFuncArgRead(("memmem".to_string(), needle as usize, needlelen, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memmem".to_string(), needle as usize, needlelen, Backtrace::new())), None);
         }
         unsafe {
             memmem(haystack, haystacklen, needle, needlelen)
@@ -1133,7 +663,7 @@ impl AsanRuntime {
             fn bzero(s: *mut c_void, n: usize);
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            self.report_error(AsanError::BadFuncArgWrite(("bzero".to_string(), s as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("bzero".to_string(), s as usize, n, Backtrace::new())), None);
         }
         unsafe {
             bzero(s, n)
@@ -1147,7 +677,7 @@ impl AsanRuntime {
             fn explicit_bzero(s: *mut c_void, n: usize);
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            self.report_error(AsanError::BadFuncArgWrite(("explicit_bzero".to_string(), s as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("explicit_bzero".to_string(), s as usize, n, Backtrace::new())), None);
         }
         unsafe {
             explicit_bzero(s, n)
@@ -1161,10 +691,10 @@ impl AsanRuntime {
             fn bcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1, n) {
-            self.report_error(AsanError::BadFuncArgRead(("bcmp".to_string(), s1 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("bcmp".to_string(), s1 as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2, n) {
-            self.report_error(AsanError::BadFuncArgRead(("bcmp".to_string(), s2 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("bcmp".to_string(), s2 as usize, n, Backtrace::new())), None);
         }
         unsafe {
             bcmp(s1, s2, n)
@@ -1178,7 +708,7 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strchr".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strchr".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())), None);
         }
         unsafe {
             strchr(s, c)
@@ -1192,7 +722,7 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strrchr".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strrchr".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())), None);
         }
         unsafe {
             strrchr(s, c)
@@ -1206,10 +736,10 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcasecmp".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasecmp".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcasecmp".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasecmp".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())), None);
         }
         unsafe {
             strcasecmp(s1, s2)
@@ -1222,10 +752,10 @@ impl AsanRuntime {
             fn strncasecmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
-            self.report_error(AsanError::BadFuncArgRead(("strncasecmp".to_string(), s1 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncasecmp".to_string(), s1 as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
-            self.report_error(AsanError::BadFuncArgRead(("strncasecmp".to_string(), s2 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncasecmp".to_string(), s2 as usize, n, Backtrace::new())), None);
         }
         unsafe {
             strncasecmp(s1, s2, n)
@@ -1239,10 +769,10 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcat".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcat".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcat".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcat".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())), None);
         }
         unsafe {
             strcat(s1, s2)
@@ -1256,10 +786,10 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcmp".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcmp".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcmp".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcmp".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())), None);
         }
         unsafe {
             strcmp(s1, s2)
@@ -1272,10 +802,10 @@ impl AsanRuntime {
             fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
-            self.report_error(AsanError::BadFuncArgRead(("strncmp".to_string(), s1 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncmp".to_string(), s1 as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
-            self.report_error(AsanError::BadFuncArgRead(("strncmp".to_string(), s2 as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncmp".to_string(), s2 as usize, n, Backtrace::new())), None);
         }
         unsafe {
             strncmp(s1, s2, n)
@@ -1289,10 +819,10 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
-            self.report_error(AsanError::BadFuncArgWrite(("strcpy".to_string(), dest as usize, unsafe { strlen(src) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("strcpy".to_string(), dest as usize, unsafe { strlen(src) }, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcpy".to_string(), src as usize, unsafe { strlen(src) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcpy".to_string(), src as usize, unsafe { strlen(src) }, Backtrace::new())), None);
         }
         unsafe {
             strcpy(dest, src)
@@ -1305,10 +835,10 @@ impl AsanRuntime {
             fn strncpy(dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, n) {
-            self.report_error(AsanError::BadFuncArgWrite(("strncpy".to_string(), dest as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("strncpy".to_string(), dest as usize, n, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, n) {
-            self.report_error(AsanError::BadFuncArgRead(("strncpy".to_string(), src as usize, n, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncpy".to_string(), src as usize, n, Backtrace::new())), None);
         }
         unsafe {
             strncpy(dest, src, n)
@@ -1322,10 +852,10 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
-            self.report_error(AsanError::BadFuncArgWrite(("stpcpy".to_string(), dest as usize, unsafe { strlen(src) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("stpcpy".to_string(), dest as usize, unsafe { strlen(src) }, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
-            self.report_error(AsanError::BadFuncArgRead(("stpcpy".to_string(), src as usize, unsafe { strlen(src) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("stpcpy".to_string(), src as usize, unsafe { strlen(src) }, Backtrace::new())), None);
         }
         unsafe {
             stpcpy(dest, src)
@@ -1339,7 +869,7 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strdup".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strdup".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())), None);
         }
         unsafe {
             strdup(s)
@@ -1353,7 +883,7 @@ impl AsanRuntime {
         }
         let size = unsafe { strlen(s) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
-            self.report_error(AsanError::BadFuncArgRead(("strlen".to_string(), s as usize, size, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strlen".to_string(), s as usize, size, Backtrace::new())), None);
         }
         size
     }
@@ -1365,7 +895,7 @@ impl AsanRuntime {
         }
         let size = unsafe { strnlen(s, n) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
-            self.report_error(AsanError::BadFuncArgRead(("strnlen".to_string(), s as usize, size, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strnlen".to_string(), s as usize, size, Backtrace::new())), None);
         }
         size
     }
@@ -1377,10 +907,10 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe { strlen(haystack) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strstr".to_string(), haystack as usize, unsafe { strlen(haystack) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strstr".to_string(), haystack as usize, unsafe { strlen(haystack) }, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strstr".to_string(), needle as usize, unsafe { strlen(needle) }, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strstr".to_string(), needle as usize, unsafe { strlen(needle) }, Backtrace::new())), None);
         }
         unsafe {
             strstr(haystack, needle)
@@ -1394,10 +924,10 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe { strlen(haystack) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcasestr".to_string(), haystack as usize, unsafe {strlen(haystack)}, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasestr".to_string(), haystack as usize, unsafe {strlen(haystack)}, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
-            self.report_error(AsanError::BadFuncArgRead(("strcasestr".to_string(), needle as usize, unsafe {strlen(needle)}, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasestr".to_string(), needle as usize, unsafe {strlen(needle)}, Backtrace::new())), None);
         }
         unsafe {
             strcasestr(haystack, needle)
@@ -1411,7 +941,7 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            self.report_error(AsanError::BadFuncArgRead(("atoi".to_string(), s as usize, unsafe {strlen(s)}, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("atoi".to_string(), s as usize, unsafe {strlen(s)}, Backtrace::new())), None);
         }
         unsafe {
             atoi(s)
@@ -1425,7 +955,7 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            self.report_error(AsanError::BadFuncArgRead(("atol".to_string(), s as usize,unsafe {strlen(s)},  Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("atol".to_string(), s as usize,unsafe {strlen(s)},  Backtrace::new())), None);
         }
         unsafe {
             atol(s)
@@ -1439,7 +969,7 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            self.report_error(AsanError::BadFuncArgRead(("atoll".to_string(), s as usize, unsafe {strlen(s)}, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("atoll".to_string(), s as usize, unsafe {strlen(s)}, Backtrace::new())), None);
         }
         unsafe {
             atoll(s)
@@ -1453,7 +983,7 @@ impl AsanRuntime {
         }
         let size = unsafe { wcslen(s) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, (size + 1) * 2) {
-            self.report_error(AsanError::BadFuncArgRead(("wcslen".to_string(), s as usize, (size + 1) * 2, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcslen".to_string(), s as usize, (size + 1) * 2, Backtrace::new())), None);
         }
         size
     }
@@ -1465,10 +995,10 @@ impl AsanRuntime {
             fn wcslen(s: *const wchar_t) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { (wcslen(src) + 1) * 2 }) {
-            self.report_error(AsanError::BadFuncArgWrite(("wcscpy".to_string(), dest as usize,(unsafe {wcslen(src)} + 1) * 2, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("wcscpy".to_string(), dest as usize,(unsafe {wcslen(src)} + 1) * 2, Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { (wcslen(src) + 1) * 2 }) {
-            self.report_error(AsanError::BadFuncArgRead(("wcscpy".to_string(), src as usize, (unsafe {wcslen(src)} + 1) * 2, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcscpy".to_string(), src as usize, (unsafe {wcslen(src)} + 1) * 2, Backtrace::new())), None);
         }
         unsafe {
             wcscpy(dest, src)
@@ -1482,10 +1012,10 @@ impl AsanRuntime {
             fn wcslen(s: *const wchar_t) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { (wcslen(s1) + 1) * 2 }) {
-            self.report_error(AsanError::BadFuncArgRead(("wcscmp".to_string(), s1 as usize, (unsafe {wcslen(s1)} +1) * 2,  Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcscmp".to_string(), s1 as usize, (unsafe {wcslen(s1)} +1) * 2,  Backtrace::new())), None);
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { (wcslen(s2) + 1) * 2 }) {
-            self.report_error(AsanError::BadFuncArgRead(("wcscmp".to_string(), s2 as usize, (unsafe {wcslen(s2)} + 1) * 2, Backtrace::new())));
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcscmp".to_string(), s2 as usize, (unsafe {wcslen(s2)} + 1) * 2, Backtrace::new())), None);
         }
         unsafe {
             wcscmp(s1, s2)
@@ -1977,10 +1507,9 @@ impl AsanRuntime {
                 ))
             }
         } else {
-            let mut allocator = Allocator::get();
             #[allow(clippy::option_if_let_else)]
             if let Some(metadata) =
-                allocator.find_metadata(fault_address, self.regs[base_reg as usize])
+                self.allocator.find_metadata(fault_address, self.regs[base_reg as usize])
             {
                 let asan_readwrite_error = AsanReadWriteError {
                     registers: self.regs,
@@ -2009,327 +1538,12 @@ impl AsanRuntime {
                 ))
             }
         };
-        self.report_error(error);
-    }
-
-    #[allow(clippy::too_many_lines)]
-    fn report_error(&mut self, error: AsanError) {
-        unsafe {
-            ASAN_ERRORS.as_mut().unwrap().errors.push(error.clone());
-        }
-
-        let mut out_stream = default_output_stream();
-        let output = out_stream.as_mut();
-
-        let backtrace_printer = BacktracePrinter::new()
-            .clear_frame_filters()
-            .print_addresses(true)
-            .verbosity(Verbosity::Full)
-            .add_frame_filter(Box::new(|frames| {
-                frames.retain(
-                    |x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")),
-                )
-            }));
-
-        #[allow(clippy::non_ascii_literal)]
-        writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
-        output
-            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-            .unwrap();
-        write!(output, "{}", error.description()).unwrap();
-        match error {
-            AsanError::OobRead(mut error)
-            | AsanError::OobWrite(mut error)
-            | AsanError::ReadAfterFree(mut error)
-            | AsanError::WriteAfterFree(mut error) => {
-                let (basereg, indexreg, _displacement, fault_address) = error.fault;
-
-                if let Some((range, path)) = self.instrumented_ranges.get_key_value(&error.pc) {
-                    writeln!(
-                        output,
-                        " at 0x{:x} ({}@0x{:04x}), faulting address 0x{:x}",
-                        error.pc,
-                        path,
-                        error.pc - range.start,
-                        fault_address
-                    )
-                    .unwrap();
-                } else {
-                    writeln!(
-                        output,
-                        " at 0x{:x}, faulting address 0x{:x}",
-                        error.pc, fault_address
-                    )
-                    .unwrap();
-                }
-                output.reset().unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
-                for reg in 0..=30 {
-                    if reg == basereg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                    } else if reg == indexreg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
-                            .unwrap();
-                    }
-                    write!(
-                        output,
-                        "x{:02}: 0x{:016x} ",
-                        reg, error.registers[reg as usize]
-                    )
-                    .unwrap();
-                    output.reset().unwrap();
-                    if reg % 4 == 3 {
-                        writeln!(output).unwrap();
-                    }
-                }
-                writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " CODE ").unwrap();
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
-                cs.set_skipdata(true).expect("failed to set skipdata");
-
-                let start_pc = error.pc - 4 * 5;
-                for insn in cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                    .iter()
-                {
-                    if insn.address() as usize == error.pc {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
-                        output.reset().unwrap();
-                    } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
-                    }
-                }
-                backtrace_printer
-                    .print_trace(&error.backtrace, output)
-                    .unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
-                let offset: i64 = fault_address as i64 - error.metadata.address as i64;
-                let direction = if offset > 0 { "right" } else { "left" };
-                writeln!(
-                    output,
-                    "access is {} to the {} of the 0x{:x} byte allocation at 0x{:x}",
-                    offset, direction, error.metadata.size, error.metadata.address
-                )
-                .unwrap();
-
-                if error.metadata.is_malloc_zero {
-                    writeln!(output, "allocation was zero-sized").unwrap();
-                }
-
-                if let Some(backtrace) = error.metadata.allocation_site_backtrace.as_mut() {
-                    writeln!(output, "allocation site backtrace:").unwrap();
-                    backtrace.resolve();
-                    backtrace_printer.print_trace(backtrace, output).unwrap();
-                }
-
-                if error.metadata.freed {
-                    #[allow(clippy::non_ascii_literal)]
-                    writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
-                    if let Some(backtrace) = error.metadata.release_site_backtrace.as_mut() {
-                        writeln!(output, "free site backtrace:").unwrap();
-                        backtrace.resolve();
-                        backtrace_printer.print_trace(backtrace, output).unwrap();
-                    }
-                }
-            }
-            AsanError::BadFuncArgRead((name, address, size, backtrace)) | AsanError::BadFuncArgWrite((name, address, size, backtrace)) => {
-                writeln!(output, " in call to {}, argument {:#016x}, size: {:#x}", name, address, size).unwrap();
-                let invocation = Interceptor::current_invocation();
-                let cpu_context = invocation.cpu_context();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
-                for reg in 0..29 {
-                    let val = cpu_context.reg(reg);
-                    if val as usize == address {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                    }
-                    write!(
-                        output,
-                        "x{:02}: 0x{:016x} ",
-                        reg, val
-                    )
-                    .unwrap();
-                    output.reset().unwrap();
-                    if reg % 4 == 3 {
-                        writeln!(output).unwrap();
-                    }
-                }
-                write!(output, "sp : 0x{:016x} ", cpu_context.sp()).unwrap();
-                write!(output, "lr : 0x{:016x} ", cpu_context.lr()).unwrap();
-                writeln!(output, "pc : 0x{:016x} ", cpu_context.pc()).unwrap();
-
-                backtrace_printer
-                    .print_trace(&backtrace, output)
-                    .unwrap();
-
-            }
-            AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
-                writeln!(output, " of {:?}", ptr).unwrap();
-                output.reset().unwrap();
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
-                writeln!(
-                    output,
-                    "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address, metadata.size
-                )
-                .unwrap();
-                if metadata.is_malloc_zero {
-                    writeln!(output, "allocation was zero-sized").unwrap();
-                }
-
-                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
-                    writeln!(output, "allocation site backtrace:").unwrap();
-                    backtrace.resolve();
-                    backtrace_printer.print_trace(backtrace, output).unwrap();
-                }
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
-                if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
-                    writeln!(output, "previous free site backtrace:").unwrap();
-                    backtrace.resolve();
-                    backtrace_printer.print_trace(backtrace, output).unwrap();
-                }
-            }
-            AsanError::UnallocatedFree((ptr, backtrace)) => {
-                writeln!(output, " of {:#016x}", ptr).unwrap();
-                output.reset().unwrap();
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
-            }
-            AsanError::Leak((ptr, mut metadata)) => {
-                writeln!(output, " of {:#016x}", ptr).unwrap();
-                output.reset().unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
-                writeln!(
-                    output,
-                    "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address, metadata.size
-                )
-                .unwrap();
-                if metadata.is_malloc_zero {
-                    writeln!(output, "allocation was zero-sized").unwrap();
-                }
-
-                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
-                    writeln!(output, "allocation site backtrace:").unwrap();
-                    backtrace.resolve();
-                    backtrace_printer.print_trace(backtrace, output).unwrap();
-                }
-            }
-            AsanError::Unknown((registers, pc, fault, backtrace))
-            | AsanError::StackOobRead((registers, pc, fault, backtrace))
-            | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
-                let (basereg, indexreg, _displacement, fault_address) = fault;
-
-                if let Ok((start, _, _, path)) = find_mapping_for_address(pc) {
-                    writeln!(
-                        output,
-                        " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
-                        pc,
-                        path,
-                        pc - start,
-                        fault_address
-                    )
-                    .unwrap();
-                } else {
-                    writeln!(
-                        output,
-                        " at 0x{:x}, faulting address 0x{:x}",
-                        pc, fault_address
-                    )
-                    .unwrap();
-                }
-                output.reset().unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
-                for reg in 0..=30 {
-                    if reg == basereg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                    } else if reg == indexreg {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
-                            .unwrap();
-                    }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
-                    output.reset().unwrap();
-                    if reg % 4 == 3 {
-                        writeln!(output).unwrap();
-                    }
-                }
-                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " CODE ").unwrap();
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
-                cs.set_skipdata(true).expect("failed to set skipdata");
-
-                let start_pc = pc - 4 * 5;
-                for insn in cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                    .iter()
-                {
-                    if insn.address() as usize == pc {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
-                        output.reset().unwrap();
-                    } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
-                    }
-                }
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
-            }
-        };
-
-        if !self.options.asan_continue_after_error() {
-            panic!("Crashing target!");
-        }
+        AsanErrors::get_mut().report_error(error, Some(&self.instrumented_ranges));
     }
 
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_function(&mut self) {
-        let shadow_bit = Allocator::get().shadow_bit as u32;
+        let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
             ; .arch aarch64
@@ -2441,7 +1655,7 @@ impl AsanRuntime {
 
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
-        let shadow_bit = Allocator::get().shadow_bit as u32;
+        let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check {
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch aarch64
@@ -2472,7 +1686,7 @@ impl AsanRuntime {
 
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_exact_blob(&mut self, val: u64) -> Box<[u8]> {
-        let shadow_bit = Allocator::get().shadow_bit as u32;
+        let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check_exact {
             ($ops:ident, $val:expr) => {dynasm!($ops
                 ; .arch aarch64
@@ -2723,150 +1937,5 @@ impl AsanRuntime {
     #[inline]
     pub fn blob_check_mem_64bytes(&self) -> &[u8] {
         self.blob_check_mem_64bytes.as_ref().unwrap()
-    }
-}
-
-/// static field for `AsanErrors` for a run
-pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
-
-/// An observer for frida address sanitizer `AsanError`s for a frida executor run
-#[derive(Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)]
-pub struct AsanErrorsObserver {
-    errors: OwnedPtr<Option<AsanErrors>>,
-}
-
-impl Observer for AsanErrorsObserver {}
-
-impl<EM, I, S, Z> HasExecHooks<EM, I, S, Z> for AsanErrorsObserver {
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
-        unsafe {
-            if ASAN_ERRORS.is_some() {
-                ASAN_ERRORS.as_mut().unwrap().clear();
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl Named for AsanErrorsObserver {
-    #[inline]
-    fn name(&self) -> &str {
-        "AsanErrors"
-    }
-}
-
-impl AsanErrorsObserver {
-    /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
-    #[must_use]
-    pub fn new(errors: &'static Option<AsanErrors>) -> Self {
-        Self {
-            errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>),
-        }
-    }
-
-    /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
-    #[must_use]
-    pub fn new_owned(errors: Option<AsanErrors>) -> Self {
-        Self {
-            errors: OwnedPtr::Owned(Box::new(errors)),
-        }
-    }
-
-    /// Creates a new `AsanErrorsObserver` from a raw ptr
-    #[must_use]
-    pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
-        Self {
-            errors: OwnedPtr::Ptr(errors),
-        }
-    }
-
-    /// gets the [`AsanErrors`] from the previous run
-    #[must_use]
-    pub fn errors(&self) -> Option<&AsanErrors> {
-        match &self.errors {
-            OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
-            OwnedPtr::Owned(b) => b.as_ref().as_ref(),
-        }
-    }
-}
-
-/// A feedback reporting potential [`AsanErrors`] from an `AsanErrorsObserver`
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AsanErrorsFeedback {
-    errors: Option<AsanErrors>,
-}
-
-impl<I, S> Feedback<I, S> for AsanErrorsFeedback
-where
-    I: Input + HasTargetBytes,
-{
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<I, S>,
-        OT: ObserversTuple,
-    {
-        let observer = observers
-            .match_name::<AsanErrorsObserver>("AsanErrors")
-            .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
-        match observer.errors() {
-            None => Ok(false),
-            Some(errors) => {
-                if errors.errors.is_empty() {
-                    Ok(false)
-                } else {
-                    self.errors = Some(errors.clone());
-                    Ok(true)
-                }
-            }
-        }
-    }
-
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        if let Some(errors) = &self.errors {
-            testcase.add_metadata(errors.clone());
-        }
-
-        Ok(())
-    }
-
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.errors = None;
-        Ok(())
-    }
-}
-
-impl Named for AsanErrorsFeedback {
-    #[inline]
-    fn name(&self) -> &str {
-        "AsanErrors"
-    }
-}
-
-impl AsanErrorsFeedback {
-    /// Create a new `AsanErrorsFeedback`
-    #[must_use]
-    pub fn new() -> Self {
-        Self { errors: None }
-    }
-}
-
-impl Default for AsanErrorsFeedback {
-    fn default() -> Self {
-        Self::new()
     }
 }

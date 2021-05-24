@@ -46,7 +46,7 @@ pub trait FridaHelper<'a> {
     fn transformer(&self) -> &Transformer<'a>;
 
     /// Register a new thread with this `FridaHelper`
-    fn register_thread(&self);
+    fn register_thread(&mut self);
 
     /// Called prior to execution of an input
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
@@ -77,7 +77,7 @@ pub struct FridaInstrumentationHelper<'a> {
     transformer: Option<Transformer<'a>>,
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
-    asan_runtime: Rc<RefCell<AsanRuntime>>,
+    asan_runtime: AsanRuntime,
     ranges: RangeMap<usize, (u16, &'a str)>,
     options: &'a FridaOptions,
     drcov_basic_blocks: Vec<DrCovBasicBlock>,
@@ -89,8 +89,8 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     }
 
     /// Register the current thread with the [`FridaInstrumentationHelper`]
-    fn register_thread(&self) {
-        self.asan_runtime.borrow().register_thread();
+    fn register_thread(&mut self) {
+        self.asan_runtime.register_thread();
     }
 
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
@@ -98,7 +98,6 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:02x?}", slice);
         self.asan_runtime
-            .borrow()
             .unpoison(slice.as_ptr() as usize, slice.len());
     }
 
@@ -113,9 +112,9 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
-                self.asan_runtime.borrow_mut().check_for_leaks();
+                self.asan_runtime.check_for_leaks();
             }
-            self.asan_runtime.borrow_mut().reset_allocations();
+            self.asan_runtime.reset_allocations();
         }
     }
 
@@ -318,7 +317,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                 instruction.put_callout(|context| {
                                     let real_address = match helper
                                         .asan_runtime
-                                        .borrow()
                                         .real_address_for_stalked(pc(&context))
                                     {
                                         Some(address) => *address,
@@ -353,7 +351,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             }
                         }
                         if helper.options().asan_enabled() || helper.options().drcov_enabled() {
-                            helper.asan_runtime.borrow_mut().add_stalked_address(
+                            helper.asan_runtime.add_stalked_address(
                                 output.writer().pc() as usize - 4,
                                 address as usize,
                             );
@@ -366,7 +364,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper
                     .asan_runtime
-                    .borrow_mut()
                     .init(gum, modules_to_instrument);
             }
         }
@@ -419,7 +416,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             writer.put_b_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
-            writer.put_bytes(self.asan_runtime.borrow().blob_report());
+            writer.put_bytes(self.asan_runtime.blob_report());
 
             writer.put_label(after_report_impl);
         }
@@ -556,18 +553,18 @@ impl<'a> FridaInstrumentationHelper<'a> {
         }
         // Insert the check_shadow_mem code blob
         match width {
-            1 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_byte()),
-            2 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_halfword()),
-            3 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_3bytes()),
-            4 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_dword()),
-            6 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_6bytes()),
-            8 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_qword()),
-            12 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_12bytes()),
-            16 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_16bytes()),
-            24 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_24bytes()),
-            32 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_32bytes()),
-            48 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_48bytes()),
-            64 => writer.put_bytes(&self.asan_runtime.borrow().blob_check_mem_64bytes()),
+            1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
+            2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
+            3 => writer.put_bytes(&self.asan_runtime.blob_check_mem_3bytes()),
+            4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
+            6 => writer.put_bytes(&self.asan_runtime.blob_check_mem_6bytes()),
+            8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
+            12 => writer.put_bytes(&self.asan_runtime.blob_check_mem_12bytes()),
+            16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
+            24 => writer.put_bytes(&self.asan_runtime.blob_check_mem_24bytes()),
+            32 => writer.put_bytes(&self.asan_runtime.blob_check_mem_32bytes()),
+            48 => writer.put_bytes(&self.asan_runtime.blob_check_mem_48bytes()),
+            64 => writer.put_bytes(&self.asan_runtime.blob_check_mem_64bytes()),
             _ => false,
         };
 
