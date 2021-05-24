@@ -1378,13 +1378,13 @@ impl AsanRuntime {
 
     /// Hook all functions required for ASAN to function, replacing them with our own
     /// implementations.
+    #[allow(clippy::items_after_statements)]
     fn hook_functions(&mut self, gum: &Gum) {
         let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
 
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    #[allow(clippy::items_after_statements)]
                     extern "C" {
                         fn $name($($param: $param_type),*) -> $return_type;
                     }
