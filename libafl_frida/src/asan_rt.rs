@@ -1384,6 +1384,7 @@ impl AsanRuntime {
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
+                    #[allow(clippy::items_after_statements)]
                     extern "C" {
                         fn $name($($param: $param_type),*) -> $return_type;
                     }

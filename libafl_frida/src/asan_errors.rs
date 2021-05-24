@@ -257,25 +257,27 @@ impl AsanErrors {
                 .unwrap();
                 let invocation = Interceptor::current_invocation();
                 let cpu_context = invocation.cpu_context();
-
-                #[allow(clippy::non_ascii_literal)]
-                writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
-                for reg in 0..29 {
-                    let val = cpu_context.reg(reg);
-                    if val as usize == address {
-                        output
-                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
-                            .unwrap();
+                #[cfg(target_arch = "aarch64")]
+                {
+                    #[allow(clippy::non_ascii_literal)]
+                    writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
+                    for reg in 0..29 {
+                        let val = cpu_context.reg(reg);
+                        if val as usize == address {
+                            output
+                                .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                                .unwrap();
+                        }
+                        write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
+                        output.reset().unwrap();
+                        if reg % 4 == 3 {
+                            writeln!(output).unwrap();
+                        }
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
-                    output.reset().unwrap();
-                    if reg % 4 == 3 {
-                        writeln!(output).unwrap();
-                    }
+                    write!(output, "sp : 0x{:016x} ", cpu_context.sp()).unwrap();
+                    write!(output, "lr : 0x{:016x} ", cpu_context.lr()).unwrap();
+                    writeln!(output, "pc : 0x{:016x} ", cpu_context.pc()).unwrap();
                 }
-                write!(output, "sp : 0x{:016x} ", cpu_context.sp()).unwrap();
-                write!(output, "lr : 0x{:016x} ", cpu_context.lr()).unwrap();
-                writeln!(output, "pc : 0x{:016x} ", cpu_context.pc()).unwrap();
 
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
