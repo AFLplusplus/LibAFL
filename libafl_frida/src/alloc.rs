@@ -1,47 +1,15 @@
-use frida_gum::NativePointer;
 use hashbrown::HashMap;
-use libafl::{
-    bolts::{
-        os::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
-        ownedref::OwnedPtr,
-        tuples::Named,
-    },
-    corpus::Testcase,
-    events::EventFirer,
-    executors::{CustomExitKind, ExitKind, HasExecHooks},
-    feedbacks::Feedback,
-    inputs::{HasTargetBytes, Input},
-    observers::{Observer, ObserversTuple},
-    state::HasMetadata,
-    Error, SerdeAny,
-};
-use nix::{libc::{memmove, memset}, sys::mman::{MapFlags, ProtFlags, mmap}};
+use libafl::bolts::os::walk_self_maps;
+use nix::{libc::memset, sys::mman::{MapFlags, ProtFlags, mmap}};
 
 use backtrace::Backtrace;
-use capstone::{
-    arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
-    Capstone, Insn,
-};
-use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use frida_gum::{interceptor::Interceptor, Gum, ModuleMap};
 #[cfg(unix)]
-use libc::{c_char, getrlimit64, rlimit64, sysconf, wchar_t, _SC_PAGESIZE};
-use rangemap::RangeMap;
+use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
-use std::{
-    cell::{RefCell, RefMut},
-    ffi::c_void,
-    io::{self, Write},
-    path::PathBuf,
-    rc::Rc,
-};
-use termcolor::{Color, ColorSpec, WriteColor};
+use std::{io, ffi::c_void};
 
 use crate::{FridaOptions, asan_errors::{AsanError, AsanErrors}};
-
-static mut ALLOCATOR_SINGLETON: Option<RefCell<Allocator>> = None;
 
 pub(crate) struct Allocator {
     options: FridaOptions,
@@ -53,6 +21,8 @@ pub(crate) struct Allocator {
     shadow_pages: RangeSet<usize>,
     allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
     largest_allocation: usize,
+    base_mapping_addr: usize,
+    current_mapping_addr: usize,
 }
 
 macro_rules! map_to_shadow {
@@ -132,6 +102,8 @@ impl Allocator {
             shadow_pages: RangeSet::new(),
             allocation_queue: HashMap::new(),
             largest_allocation: 0,
+            base_mapping_addr: addr + addr + addr,
+            current_mapping_addr: addr + addr + addr,
         }
     }
 
@@ -191,10 +163,10 @@ impl Allocator {
             metadata
         } else {
             let mapping = match mmap(
-                std::ptr::null_mut(),
+                self.current_mapping_addr as *mut c_void,
                 rounded_up_size,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE | MapFlags::MAP_FIXED | MapFlags::MAP_NORESERVE,
                 -1,
                 0,
             ) {
@@ -204,6 +176,7 @@ impl Allocator {
                     return std::ptr::null_mut();
                 }
             };
+            self.current_mapping_addr += rounded_up_size;
 
             self.map_shadow_for_region(mapping, mapping + rounded_up_size, false);
 
@@ -398,6 +371,12 @@ impl Allocator {
 
     pub fn map_to_shadow(&self, start: usize) -> usize {
         map_to_shadow!(self, start)
+    }
+
+    #[inline]
+    pub fn is_managed(&self, ptr: *mut c_void) -> bool {
+        //self.allocations.contains_key(&(ptr as usize))
+        self.base_mapping_addr <= ptr as usize && (ptr as usize) < self.current_mapping_addr
     }
 
     pub fn check_for_leaks(&self) {

@@ -1,42 +1,28 @@
-use frida_gum::NativePointer;
-use hashbrown::HashMap;
 use libafl::{
     bolts::{
-        os::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
+        os::find_mapping_for_address,
         ownedref::OwnedPtr,
         tuples::Named,
     },
     corpus::Testcase,
     events::EventFirer,
-    executors::{CustomExitKind, ExitKind, HasExecHooks},
+    executors::{ExitKind, HasExecHooks},
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
     state::HasMetadata,
     Error, SerdeAny,
 };
-use nix::{libc::{memmove, memset}, sys::mman::{MapFlags, ProtFlags, mmap}};
-
 use backtrace::Backtrace;
 use capstone::{
-    arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
-    Capstone, Insn,
+    arch::BuildsCapstone,
+    Capstone,
 };
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use frida_gum::{interceptor::Interceptor, Gum, ModuleMap};
-#[cfg(unix)]
-use libc::{c_char, getrlimit64, rlimit64, sysconf, wchar_t, _SC_PAGESIZE};
+use frida_gum::interceptor::Interceptor;
 use rangemap::RangeMap;
-use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
-use std::{
-    cell::{RefCell, RefMut},
-    ffi::c_void,
-    io::{self, Write},
-    path::PathBuf,
-    rc::Rc,
-};
+use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
 use crate::{FridaOptions, alloc::AllocationMetadata};

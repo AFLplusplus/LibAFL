@@ -8,44 +8,24 @@ this helps finding mem errors early.
 
 use frida_gum::NativePointer;
 use hashbrown::HashMap;
-use libafl::{
-    bolts::{
-        os::{find_mapping_for_address, find_mapping_for_path, walk_self_maps},
-        ownedref::OwnedPtr,
-        tuples::Named,
-    },
-    corpus::Testcase,
-    events::EventFirer,
-    executors::{CustomExitKind, ExitKind, HasExecHooks},
-    feedbacks::Feedback,
-    inputs::{HasTargetBytes, Input},
-    observers::{Observer, ObserversTuple},
-    state::HasMetadata,
-    Error, SerdeAny,
-};
-use nix::{libc::{memmove, memset}, sys::mman::{MapFlags, ProtFlags, mmap}};
+use libafl::bolts::os::{find_mapping_for_address, find_mapping_for_path};
+
+use nix::{libc::memset, sys::mman::{MapFlags, ProtFlags, mmap}};
 
 use backtrace::Backtrace;
 use capstone::{
     arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
-use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use frida_gum::{interceptor::Interceptor, Gum, ModuleMap};
 #[cfg(unix)]
-use libc::{c_char, getrlimit64, rlimit64, sysconf, wchar_t, _SC_PAGESIZE};
+use libc::{c_char, getrlimit64, rlimit64, wchar_t};
 use rangemap::RangeMap;
-use rangemap::RangeSet;
-use serde::{Deserialize, Serialize};
 use std::{
-    cell::{RefCell, RefMut},
     ffi::c_void,
-    io::{self, Write},
     path::PathBuf,
-    rc::Rc,
 };
-use termcolor::{Color, ColorSpec, WriteColor};
 
 use crate::{alloc::Allocator, asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS}, FridaOptions};
 
@@ -333,11 +313,16 @@ impl AsanRuntime {
         unsafe {
             let ret = self.allocator.alloc(size, 0x8);
             if ptr != std::ptr::null_mut() {
-                memmove(ret, ptr, self.allocator.get_usable_size(ptr));
+                (ptr as *mut u8).copy_to(ret as *mut u8, self.allocator.get_usable_size(ptr));
             }
             self.allocator.release(ptr);
             ret
         }
+    }
+
+    #[inline]
+    fn hook_check_free(&mut self, ptr: *mut c_void) -> bool {
+        self.allocator.is_managed(ptr)
     }
 
     #[inline]
@@ -1052,11 +1037,36 @@ impl AsanRuntime {
             }
         }
 
+        macro_rules! hook_func_with_check {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                paste::paste! {
+                    extern "C" {
+                        fn $name($($param: $param_type),*) -> $return_type;
+                    }
+                    #[allow(non_snake_case)]
+                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let mut invocation = Interceptor::current_invocation();
+                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        if this.[<hook_check_ $name>]($($param),*) {
+                            this.[<hook_ $name>]($($param),*)
+                        } else {
+                            $name($($param),*)
+                        }
+                    }
+                    interceptor.replace(
+                        frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
+                        NativePointer([<replacement_ $name>] as *mut c_void),
+                        NativePointer(self as *mut _ as *mut c_void)
+                    ).ok();
+                }
+            }
+        }
+
         // Hook the memory allocator functions
         hook_func!(None, malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
-        hook_func!(None, free, (ptr: *mut c_void), ());
+        hook_func_with_check!(None, free, (ptr: *mut c_void), ());
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
         hook_func!(
             None,
@@ -1155,7 +1165,6 @@ impl AsanRuntime {
             (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
             ()
         );
-
 
         hook_func!(
             None,
