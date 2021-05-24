@@ -522,6 +522,11 @@ where
         executor.post_exec_observers(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
+        match exit_kind {
+            ExitKind::Crash => { println!("CRASH") },
+            _ => {}
+        };
+
         let observers = executor.observers();
         #[cfg(not(feature = "introspection"))]
         let is_interesting = self

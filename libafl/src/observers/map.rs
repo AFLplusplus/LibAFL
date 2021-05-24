@@ -48,8 +48,8 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        for i in self.map_mut()[0..cnt].iter_mut() {
-            *i = initial;
+        for x in self.map_mut()[0..cnt].iter_mut() {
+            *x = initial;
         }
         Ok(())
     }
@@ -460,7 +460,8 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<(), Error> {
-        for x in self.map_mut().iter_mut() {
+        let cnt = self.usable_count();
+        for x in self.map_mut()[0..cnt].iter_mut() {
             *x = COUNT_CLASS_LOOKUP[*x as usize];
         }
         self.base.post_exec(fuzzer, state, mgr, input)
