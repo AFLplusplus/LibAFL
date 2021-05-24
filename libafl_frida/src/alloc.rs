@@ -1,15 +1,21 @@
 use hashbrown::HashMap;
 use libafl::bolts::os::walk_self_maps;
-use nix::{libc::memset, sys::mman::{MapFlags, ProtFlags, mmap}};
+use nix::{
+    libc::memset,
+    sys::mman::{mmap, MapFlags, ProtFlags},
+};
 
 use backtrace::Backtrace;
 #[cfg(unix)]
 use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
-use std::{io, ffi::c_void};
+use std::{ffi::c_void, io};
 
-use crate::{FridaOptions, asan_errors::{AsanError, AsanErrors}};
+use crate::{
+    asan_errors::{AsanError, AsanErrors},
+    FridaOptions,
+};
 
 pub(crate) struct Allocator {
     options: FridaOptions,
@@ -154,10 +160,7 @@ impl Allocator {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
-            if self
-                .options
-                .enable_asan_allocation_backtraces
-            {
+            if self.options.enable_asan_allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
             metadata
@@ -166,7 +169,10 @@ impl Allocator {
                 self.current_mapping_addr as *mut c_void,
                 rounded_up_size,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE | MapFlags::MAP_FIXED | MapFlags::MAP_NORESERVE,
+                MapFlags::MAP_ANONYMOUS
+                    | MapFlags::MAP_PRIVATE
+                    | MapFlags::MAP_FIXED
+                    | MapFlags::MAP_NORESERVE,
                 -1,
                 0,
             ) {
@@ -187,10 +193,7 @@ impl Allocator {
                 ..AllocationMetadata::default()
             };
 
-            if self
-                .options
-                .enable_asan_allocation_backtraces
-            {
+            if self.options.enable_asan_allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
 
@@ -199,10 +202,14 @@ impl Allocator {
 
         self.largest_allocation = std::cmp::max(self.largest_allocation, metadata.actual_size);
         // unpoison the shadow memory for the allocation itself
-        Self::unpoison(map_to_shadow!(self, metadata.address + self.page_size), size);
+        Self::unpoison(
+            map_to_shadow!(self, metadata.address + self.page_size),
+            size,
+        );
         let address = (metadata.address + self.page_size) as *mut c_void;
 
-        self.allocations.insert(metadata.address + self.page_size, metadata);
+        self.allocations
+            .insert(metadata.address + self.page_size, metadata);
         //println!("serving address: {:?}, size: {:x}", address, size);
         address
     }
@@ -212,26 +219,24 @@ impl Allocator {
             metadata
         } else {
             if !ptr.is_null() {
-                AsanErrors::get_mut().report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())), None);
+                AsanErrors::get_mut().report_error(
+                    AsanError::UnallocatedFree((ptr as usize, Backtrace::new())),
+                    None,
+                );
             }
             return;
         };
 
         if metadata.freed {
-            AsanErrors::get_mut()
-                .report_error(AsanError::DoubleFree((
-                    ptr as usize,
-                    metadata.clone(),
-                    Backtrace::new(),
-                )), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::DoubleFree((ptr as usize, metadata.clone(), Backtrace::new())),
+                None,
+            );
         }
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
-        if self
-            .options
-            .enable_asan_allocation_backtraces
-        {
+        if self.options.enable_asan_allocation_backtraces {
             metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
         }
 
@@ -382,7 +387,8 @@ impl Allocator {
     pub fn check_for_leaks(&self) {
         for metadata in self.allocations.values() {
             if !metadata.freed {
-                AsanErrors::get_mut().report_error(AsanError::Leak((metadata.address, metadata.clone())), None);
+                AsanErrors::get_mut()
+                    .report_error(AsanError::Leak((metadata.address, metadata.clone())), None);
             }
         }
     }

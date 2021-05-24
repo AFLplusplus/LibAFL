@@ -1,9 +1,9 @@
+use backtrace::Backtrace;
+use capstone::{arch::BuildsCapstone, Capstone};
+use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
+use frida_gum::interceptor::Interceptor;
 use libafl::{
-    bolts::{
-        os::find_mapping_for_address,
-        ownedref::OwnedPtr,
-        tuples::Named,
-    },
+    bolts::{os::find_mapping_for_address, ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
     events::EventFirer,
     executors::{ExitKind, HasExecHooks},
@@ -13,19 +13,12 @@ use libafl::{
     state::HasMetadata,
     Error, SerdeAny,
 };
-use backtrace::Backtrace;
-use capstone::{
-    arch::BuildsCapstone,
-    Capstone,
-};
-use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
-use frida_gum::interceptor::Interceptor;
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
-use crate::{FridaOptions, alloc::AllocationMetadata};
+use crate::{alloc::AllocationMetadata, FridaOptions};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -82,7 +75,10 @@ impl AsanErrors {
     /// Creates a new `AsanErrors` struct
     #[must_use]
     pub fn new(options: FridaOptions) -> Self {
-        Self { options, errors: Vec::new() }
+        Self {
+            options,
+            errors: Vec::new(),
+        }
     }
 
     /// Clears this `AsanErrors` struct
@@ -104,14 +100,16 @@ impl AsanErrors {
 
     /// Get a mutable reference to the global [`AsanErrors`] object
     pub fn get_mut<'a>() -> &'a mut Self {
-        unsafe {
-            ASAN_ERRORS.as_mut().unwrap()
-        }
+        unsafe { ASAN_ERRORS.as_mut().unwrap() }
     }
 
     #[allow(clippy::too_many_lines)]
     /// Report an error
-    pub(crate) fn report_error(&mut self, error: AsanError, instrumented_ranges: Option<&RangeMap<usize, String>>) {
+    pub(crate) fn report_error(
+        &mut self,
+        error: AsanError,
+        instrumented_ranges: Option<&RangeMap<usize, String>>,
+    ) {
         self.errors.push(error.clone());
 
         let mut out_stream = default_output_stream();
@@ -249,8 +247,14 @@ impl AsanErrors {
                     }
                 }
             }
-            AsanError::BadFuncArgRead((name, address, size, backtrace)) | AsanError::BadFuncArgWrite((name, address, size, backtrace)) => {
-                writeln!(output, " in call to {}, argument {:#016x}, size: {:#x}", name, address, size).unwrap();
+            AsanError::BadFuncArgRead((name, address, size, backtrace))
+            | AsanError::BadFuncArgWrite((name, address, size, backtrace)) => {
+                writeln!(
+                    output,
+                    " in call to {}, argument {:#016x}, size: {:#x}",
+                    name, address, size
+                )
+                .unwrap();
                 let invocation = Interceptor::current_invocation();
                 let cpu_context = invocation.cpu_context();
 
@@ -263,12 +267,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
                     }
-                    write!(
-                        output,
-                        "x{:02}: 0x{:016x} ",
-                        reg, val
-                    )
-                    .unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -278,10 +277,7 @@ impl AsanErrors {
                 write!(output, "lr : 0x{:016x} ", cpu_context.lr()).unwrap();
                 writeln!(output, "pc : 0x{:016x} ", cpu_context.pc()).unwrap();
 
-                backtrace_printer
-                    .print_trace(&backtrace, output)
-                    .unwrap();
-
+                backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
                 writeln!(output, " of {:?}", ptr).unwrap();

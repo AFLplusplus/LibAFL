@@ -3,14 +3,14 @@ The frida executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architecutres, even reports memory access errors.
 */
 
-/// The frida address sanitizer runtime
-pub mod asan_rt;
-/// The `LibAFL` frida helper
-pub mod helper;
 /// The frida-asan allocator
 pub mod alloc;
 /// Handling of ASAN errors
 pub mod asan_errors;
+/// The frida address sanitizer runtime
+pub mod asan_rt;
+/// The `LibAFL` frida helper
+pub mod helper;
 
 // for parsing asan cores
 use libafl::bolts::os::parse_core_bind_arg;

@@ -361,9 +361,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             });
             helper.transformer = Some(transformer);
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
-                helper
-                    .asan_runtime
-                    .init(gum, modules_to_instrument);
+                helper.asan_runtime.init(gum, modules_to_instrument);
             }
         }
         helper

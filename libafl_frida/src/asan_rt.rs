@@ -10,7 +10,10 @@ use frida_gum::NativePointer;
 use hashbrown::HashMap;
 use libafl::bolts::os::{find_mapping_for_address, find_mapping_for_path};
 
-use nix::{libc::memset, sys::mman::{MapFlags, ProtFlags, mmap}};
+use nix::{
+    libc::memset,
+    sys::mman::{mmap, MapFlags, ProtFlags},
+};
 
 use backtrace::Backtrace;
 use capstone::{
@@ -22,12 +25,13 @@ use frida_gum::{interceptor::Interceptor, Gum, ModuleMap};
 #[cfg(unix)]
 use libc::{c_char, getrlimit64, rlimit64, wchar_t};
 use rangemap::RangeMap;
-use std::{
-    ffi::c_void,
-    path::PathBuf,
-};
+use std::{ffi::c_void, path::PathBuf};
 
-use crate::{alloc::Allocator, asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS}, FridaOptions};
+use crate::{
+    alloc::Allocator,
+    asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    FridaOptions,
+};
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -117,18 +121,18 @@ impl AsanRuntime {
         self.module_map = Some(ModuleMap::new_from_names(&module_names));
         self.hook_functions(gum);
         //unsafe {
-            //let mem = self.allocator.alloc(0xac + 2, 8);
+        //let mem = self.allocator.alloc(0xac + 2, 8);
 
-            //unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
-            //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0xac));
-            //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2) as *const c_void, 0xac));
-            //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 3) as *const c_void, 0xac));
-            //assert!(!(self.shadow_check_func.unwrap())(((mem as isize) + -1) as *const c_void, 0xac));
-            //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa4) as *const c_void, 8));
-            //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa6) as *const c_void, 6));
-            //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 6));
-            //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 0xac));
-            //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
+        //unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
+        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0xac));
+        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2) as *const c_void, 0xac));
+        //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 3) as *const c_void, 0xac));
+        //assert!(!(self.shadow_check_func.unwrap())(((mem as isize) + -1) as *const c_void, 0xac));
+        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa4) as *const c_void, 8));
+        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa6) as *const c_void, 6));
+        //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 6));
+        //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 0xac));
+        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
         //}
     }
 
@@ -152,7 +156,8 @@ impl AsanRuntime {
     /// Make sure the specified memory is unpoisoned
     #[allow(clippy::unused_self)]
     pub fn unpoison(&mut self, address: usize, size: usize) {
-        self.allocator.map_shadow_for_region(address, address + size, true);
+        self.allocator
+            .map_shadow_for_region(address, address + size, true);
     }
 
     /// Add a stalked address to real address mapping.
@@ -178,10 +183,12 @@ impl AsanRuntime {
     #[allow(clippy::unused_self)]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
-        self.allocator.map_shadow_for_region(stack_start, stack_end, true);
+        self.allocator
+            .map_shadow_for_region(stack_start, stack_end, true);
 
         let (tls_start, tls_end) = Self::current_tls();
-        self.allocator.map_shadow_for_region(tls_start, tls_end, true);
+        self.allocator
+            .map_shadow_for_region(tls_start, tls_end, true);
         println!(
             "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
             stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
@@ -461,13 +468,29 @@ impl AsanRuntime {
         }
     }
 
-    fn hook_mmap(&mut self, addr: *const c_void, length: usize, prot: i32, flags: i32, fd: i32, offset: usize) -> *mut c_void {
+    fn hook_mmap(
+        &mut self,
+        addr: *const c_void,
+        length: usize,
+        prot: i32,
+        flags: i32,
+        fd: i32,
+        offset: usize,
+    ) -> *mut c_void {
         extern "C" {
-            fn mmap(addr: *const c_void, length: usize, prot: i32, flags: i32, fd: i32, offset: usize) -> *mut c_void;
+            fn mmap(
+                addr: *const c_void,
+                length: usize,
+                prot: i32,
+                flags: i32,
+                fd: i32,
+                offset: usize,
+            ) -> *mut c_void;
         }
         let res = unsafe { mmap(addr, length, prot, flags, fd, offset) };
         if res != (-1isize as *mut c_void) {
-            self.allocator.map_shadow_for_region(res as usize, res as usize + length, true);
+            self.allocator
+                .map_shadow_for_region(res as usize, res as usize + length, true);
         }
         res
     }
@@ -489,11 +512,17 @@ impl AsanRuntime {
             fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(buf, count) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("write".to_string(), buf as usize, count, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "write".to_string(),
+                    buf as usize,
+                    count,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            write(fd, buf, count)
-        }
+        unsafe { write(fd, buf, count) }
     }
 
     #[inline]
@@ -502,11 +531,17 @@ impl AsanRuntime {
             fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(buf, count) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("read".to_string(), buf as usize, count, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "read".to_string(),
+                    buf as usize,
+                    count,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            read(fd, buf, count)
-        }
+        unsafe { read(fd, buf, count) }
     }
 
     #[inline]
@@ -515,11 +550,17 @@ impl AsanRuntime {
             fn fgets(s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, size as usize) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("fgets".to_string(), s as usize, size as usize, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "fgets".to_string(),
+                    s as usize,
+                    size as usize,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            fgets(s, size, stream)
-        }
+        unsafe { fgets(s, size, stream) }
     }
 
     #[inline]
@@ -528,14 +569,18 @@ impl AsanRuntime {
             fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memcmp".to_string(), s1 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead(("memcmp".to_string(), s1 as usize, n, Backtrace::new())),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(s2, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memcmp".to_string(), s2 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead(("memcmp".to_string(), s2 as usize, n, Backtrace::new())),
+                None,
+            );
         }
-        unsafe {
-            memcmp(s1, s2, n)
-        }
+        unsafe { memcmp(s1, s2, n) }
     }
 
     #[inline]
@@ -544,14 +589,28 @@ impl AsanRuntime {
             fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("memcpy".to_string(), dest as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "memcpy".to_string(),
+                    dest as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memcpy".to_string(), src as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "memcpy".to_string(),
+                    src as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            memcpy(dest, src, n)
-        }
+        unsafe { memcpy(dest, src, n) }
     }
 
     #[inline]
@@ -560,14 +619,28 @@ impl AsanRuntime {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("mempcpy".to_string(), dest as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "mempcpy".to_string(),
+                    dest as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("mempcpy".to_string(), src as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "mempcpy".to_string(),
+                    src as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            mempcpy(dest, src, n)
-        }
+        unsafe { mempcpy(dest, src, n) }
     }
 
     #[inline]
@@ -576,14 +649,28 @@ impl AsanRuntime {
             fn memmove(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("memmove".to_string(), dest as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "memmove".to_string(),
+                    dest as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memmove".to_string(), src as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "memmove".to_string(),
+                    src as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            memmove(dest, src, n)
-        }
+        unsafe { memmove(dest, src, n) }
     }
 
     #[inline]
@@ -592,11 +679,17 @@ impl AsanRuntime {
             fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("memset".to_string(), dest as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "memset".to_string(),
+                    dest as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            memset(dest, c, n)
-        }
+        unsafe { memset(dest, c, n) }
     }
 
     #[inline]
@@ -605,11 +698,12 @@ impl AsanRuntime {
             fn memchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memchr".to_string(), s as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead(("memchr".to_string(), s as usize, n, Backtrace::new())),
+                None,
+            );
         }
-        unsafe {
-            memchr(s, c, n)
-        }
+        unsafe { memchr(s, c, n) }
     }
 
     #[inline]
@@ -618,27 +712,53 @@ impl AsanRuntime {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memrchr".to_string(), s as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead(("memrchr".to_string(), s as usize, n, Backtrace::new())),
+                None,
+            );
         }
-        unsafe {
-            memrchr(s, c, n)
-        }
+        unsafe { memrchr(s, c, n) }
     }
 
     #[inline]
-    fn hook_memmem(&mut self, haystack: *const c_void, haystacklen: usize, needle: *const c_void, needlelen: usize) -> *mut c_void {
+    fn hook_memmem(
+        &mut self,
+        haystack: *const c_void,
+        haystacklen: usize,
+        needle: *const c_void,
+        needlelen: usize,
+    ) -> *mut c_void {
         extern "C" {
-            fn memmem(haystack: *const c_void, haystacklen: usize, needle: *const c_void, needlelen: usize) -> *mut c_void;
+            fn memmem(
+                haystack: *const c_void,
+                haystacklen: usize,
+                needle: *const c_void,
+                needlelen: usize,
+            ) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(haystack, haystacklen) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memmem".to_string(), haystack as usize, haystacklen, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "memmem".to_string(),
+                    haystack as usize,
+                    haystacklen,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(needle, needlelen) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("memmem".to_string(), needle as usize, needlelen, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "memmem".to_string(),
+                    needle as usize,
+                    needlelen,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            memmem(haystack, haystacklen, needle, needlelen)
-        }
+        unsafe { memmem(haystack, haystacklen, needle, needlelen) }
     }
 
     #[cfg(not(target_os = "android"))]
@@ -648,11 +768,12 @@ impl AsanRuntime {
             fn bzero(s: *mut c_void, n: usize);
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("bzero".to_string(), s as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite(("bzero".to_string(), s as usize, n, Backtrace::new())),
+                None,
+            );
         }
-        unsafe {
-            bzero(s, n)
-        }
+        unsafe { bzero(s, n) }
     }
 
     #[cfg(not(target_os = "android"))]
@@ -662,11 +783,17 @@ impl AsanRuntime {
             fn explicit_bzero(s: *mut c_void, n: usize);
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("explicit_bzero".to_string(), s as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "explicit_bzero".to_string(),
+                    s as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            explicit_bzero(s, n)
-        }
+        unsafe { explicit_bzero(s, n) }
     }
 
     #[cfg(not(target_os = "android"))]
@@ -676,14 +803,18 @@ impl AsanRuntime {
             fn bcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("bcmp".to_string(), s1 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead(("bcmp".to_string(), s1 as usize, n, Backtrace::new())),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(s2, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("bcmp".to_string(), s2 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead(("bcmp".to_string(), s2 as usize, n, Backtrace::new())),
+                None,
+            );
         }
-        unsafe {
-            bcmp(s1, s2, n)
-        }
+        unsafe { bcmp(s1, s2, n) }
     }
 
     #[inline]
@@ -693,11 +824,17 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strchr".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strchr".to_string(),
+                    s as usize,
+                    unsafe { strlen(s) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strchr(s, c)
-        }
+        unsafe { strchr(s, c) }
     }
 
     #[inline]
@@ -707,11 +844,17 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strrchr".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strrchr".to_string(),
+                    s as usize,
+                    unsafe { strlen(s) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strrchr(s, c)
-        }
+        unsafe { strrchr(s, c) }
     }
 
     #[inline]
@@ -721,14 +864,28 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasecmp".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcasecmp".to_string(),
+                    s1 as usize,
+                    unsafe { strlen(s1) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasecmp".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcasecmp".to_string(),
+                    s2 as usize,
+                    unsafe { strlen(s2) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strcasecmp(s1, s2)
-        }
+        unsafe { strcasecmp(s1, s2) }
     }
 
     #[inline]
@@ -737,14 +894,28 @@ impl AsanRuntime {
             fn strncasecmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncasecmp".to_string(), s1 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strncasecmp".to_string(),
+                    s1 as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncasecmp".to_string(), s2 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strncasecmp".to_string(),
+                    s2 as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strncasecmp(s1, s2, n)
-        }
+        unsafe { strncasecmp(s1, s2, n) }
     }
 
     #[inline]
@@ -754,14 +925,28 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcat".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcat".to_string(),
+                    s1 as usize,
+                    unsafe { strlen(s1) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcat".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcat".to_string(),
+                    s2 as usize,
+                    unsafe { strlen(s2) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strcat(s1, s2)
-        }
+        unsafe { strcat(s1, s2) }
     }
 
     #[inline]
@@ -771,14 +956,28 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcmp".to_string(), s1 as usize, unsafe { strlen(s1) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcmp".to_string(),
+                    s1 as usize,
+                    unsafe { strlen(s1) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcmp".to_string(), s2 as usize, unsafe { strlen(s2) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcmp".to_string(),
+                    s2 as usize,
+                    unsafe { strlen(s2) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strcmp(s1, s2)
-        }
+        unsafe { strcmp(s1, s2) }
     }
 
     #[inline]
@@ -787,14 +986,28 @@ impl AsanRuntime {
             fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncmp".to_string(), s1 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strncmp".to_string(),
+                    s1 as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncmp".to_string(), s2 as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strncmp".to_string(),
+                    s2 as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strncmp(s1, s2, n)
-        }
+        unsafe { strncmp(s1, s2, n) }
     }
 
     #[inline]
@@ -804,14 +1017,28 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("strcpy".to_string(), dest as usize, unsafe { strlen(src) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "strcpy".to_string(),
+                    dest as usize,
+                    unsafe { strlen(src) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcpy".to_string(), src as usize, unsafe { strlen(src) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcpy".to_string(),
+                    src as usize,
+                    unsafe { strlen(src) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strcpy(dest, src)
-        }
+        unsafe { strcpy(dest, src) }
     }
 
     #[inline]
@@ -820,14 +1047,28 @@ impl AsanRuntime {
             fn strncpy(dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("strncpy".to_string(), dest as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "strncpy".to_string(),
+                    dest as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strncpy".to_string(), src as usize, n, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strncpy".to_string(),
+                    src as usize,
+                    n,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strncpy(dest, src, n)
-        }
+        unsafe { strncpy(dest, src, n) }
     }
 
     #[inline]
@@ -837,14 +1078,28 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("stpcpy".to_string(), dest as usize, unsafe { strlen(src) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "stpcpy".to_string(),
+                    dest as usize,
+                    unsafe { strlen(src) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("stpcpy".to_string(), src as usize, unsafe { strlen(src) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "stpcpy".to_string(),
+                    src as usize,
+                    unsafe { strlen(src) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            stpcpy(dest, src)
-        }
+        unsafe { stpcpy(dest, src) }
     }
 
     #[inline]
@@ -854,11 +1109,17 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strdup".to_string(), s as usize, unsafe { strlen(s) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strdup".to_string(),
+                    s as usize,
+                    unsafe { strlen(s) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strdup(s)
-        }
+        unsafe { strdup(s) }
     }
 
     #[inline]
@@ -868,7 +1129,15 @@ impl AsanRuntime {
         }
         let size = unsafe { strlen(s) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strlen".to_string(), s as usize, size, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strlen".to_string(),
+                    s as usize,
+                    size,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         size
     }
@@ -880,7 +1149,15 @@ impl AsanRuntime {
         }
         let size = unsafe { strnlen(s, n) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strnlen".to_string(), s as usize, size, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strnlen".to_string(),
+                    s as usize,
+                    size,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         size
     }
@@ -891,15 +1168,31 @@ impl AsanRuntime {
             fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe { strlen(haystack) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strstr".to_string(), haystack as usize, unsafe { strlen(haystack) }, Backtrace::new())), None);
+        if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe {
+            strlen(haystack)
+        }) {
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strstr".to_string(),
+                    haystack as usize,
+                    unsafe { strlen(haystack) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strstr".to_string(), needle as usize, unsafe { strlen(needle) }, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strstr".to_string(),
+                    needle as usize,
+                    unsafe { strlen(needle) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strstr(haystack, needle)
-        }
+        unsafe { strstr(haystack, needle) }
     }
 
     #[inline]
@@ -908,15 +1201,31 @@ impl AsanRuntime {
             fn strcasestr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe { strlen(haystack) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasestr".to_string(), haystack as usize, unsafe {strlen(haystack)}, Backtrace::new())), None);
+        if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe {
+            strlen(haystack)
+        }) {
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcasestr".to_string(),
+                    haystack as usize,
+                    unsafe { strlen(haystack) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("strcasestr".to_string(), needle as usize, unsafe {strlen(needle)}, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "strcasestr".to_string(),
+                    needle as usize,
+                    unsafe { strlen(needle) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            strcasestr(haystack, needle)
-        }
+        unsafe { strcasestr(haystack, needle) }
     }
 
     #[inline]
@@ -926,11 +1235,17 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("atoi".to_string(), s as usize, unsafe {strlen(s)}, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "atoi".to_string(),
+                    s as usize,
+                    unsafe { strlen(s) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            atoi(s)
-        }
+        unsafe { atoi(s) }
     }
 
     #[inline]
@@ -940,11 +1255,17 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("atol".to_string(), s as usize,unsafe {strlen(s)},  Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "atol".to_string(),
+                    s as usize,
+                    unsafe { strlen(s) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            atol(s)
-        }
+        unsafe { atol(s) }
     }
 
     #[inline]
@@ -954,11 +1275,17 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("atoll".to_string(), s as usize, unsafe {strlen(s)}, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "atoll".to_string(),
+                    s as usize,
+                    unsafe { strlen(s) },
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            atoll(s)
-        }
+        unsafe { atoll(s) }
     }
 
     #[inline]
@@ -968,7 +1295,15 @@ impl AsanRuntime {
         }
         let size = unsafe { wcslen(s) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, (size + 1) * 2) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcslen".to_string(), s as usize, (size + 1) * 2, Backtrace::new())), None);
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "wcslen".to_string(),
+                    s as usize,
+                    (size + 1) * 2,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
         size
     }
@@ -979,15 +1314,33 @@ impl AsanRuntime {
             fn wcscpy(dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t;
             fn wcslen(s: *const wchar_t) -> usize;
         }
-        if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { (wcslen(src) + 1) * 2 }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite(("wcscpy".to_string(), dest as usize,(unsafe {wcslen(src)} + 1) * 2, Backtrace::new())), None);
+        if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe {
+            (wcslen(src) + 1) * 2
+        }) {
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgWrite((
+                    "wcscpy".to_string(),
+                    dest as usize,
+                    (unsafe { wcslen(src) } + 1) * 2,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { (wcslen(src) + 1) * 2 }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcscpy".to_string(), src as usize, (unsafe {wcslen(src)} + 1) * 2, Backtrace::new())), None);
+        if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe {
+            (wcslen(src) + 1) * 2
+        }) {
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "wcscpy".to_string(),
+                    src as usize,
+                    (unsafe { wcslen(src) } + 1) * 2,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            wcscpy(dest, src)
-        }
+        unsafe { wcscpy(dest, src) }
     }
 
     #[inline]
@@ -996,15 +1349,31 @@ impl AsanRuntime {
             fn wcscmp(s1: *const wchar_t, s2: *const wchar_t) -> i32;
             fn wcslen(s: *const wchar_t) -> usize;
         }
-        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { (wcslen(s1) + 1) * 2 }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcscmp".to_string(), s1 as usize, (unsafe {wcslen(s1)} +1) * 2,  Backtrace::new())), None);
+        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { (wcslen(s1) + 1) * 2 })
+        {
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "wcscmp".to_string(),
+                    s1 as usize,
+                    (unsafe { wcslen(s1) } + 1) * 2,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { (wcslen(s2) + 1) * 2 }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead(("wcscmp".to_string(), s2 as usize, (unsafe {wcslen(s2)} + 1) * 2, Backtrace::new())), None);
+        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { (wcslen(s2) + 1) * 2 })
+        {
+            AsanErrors::get_mut().report_error(
+                AsanError::BadFuncArgRead((
+                    "wcscmp".to_string(),
+                    s2 as usize,
+                    (unsafe { wcslen(s2) } + 1) * 2,
+                    Backtrace::new(),
+                )),
+                None,
+            );
         }
-        unsafe {
-            wcscmp(s1, s2)
-        }
+        unsafe { wcscmp(s1, s2) }
     }
 
     /// Hook all functions required for ASAN to function, replacing them with our own
@@ -1169,15 +1538,17 @@ impl AsanRuntime {
         hook_func!(
             None,
             mmap,
-            (addr: *const c_void, length: usize, prot: i32, flags: i32, fd: i32, offset: usize),
+            (
+                addr: *const c_void,
+                length: usize,
+                prot: i32,
+                flags: i32,
+                fd: i32,
+                offset: usize
+            ),
             *mut c_void
         );
-        hook_func!(
-            None,
-            munmap,
-            (addr: *const c_void, length: usize),
-            i32
-        );
+        hook_func!(None, munmap, (addr: *const c_void, length: usize), i32);
 
         // Hook libc functions which may access allocated memory
         hook_func!(
@@ -1186,12 +1557,7 @@ impl AsanRuntime {
             (fd: i32, buf: *const c_void, count: usize),
             usize
         );
-        hook_func!(
-            None,
-            read,
-            (fd: i32, buf: *mut c_void, count: usize),
-            usize
-        );
+        hook_func!(None, read, (fd: i32, buf: *mut c_void, count: usize), usize);
         hook_func!(
             None,
             fgets,
@@ -1243,23 +1609,18 @@ impl AsanRuntime {
         hook_func!(
             None,
             memmem,
-            (haystack: *const c_void, haystacklen: usize, needle: *const c_void, needlelen: usize),
+            (
+                haystack: *const c_void,
+                haystacklen: usize,
+                needle: *const c_void,
+                needlelen: usize
+            ),
             *mut c_void
         );
         #[cfg(not(target_os = "android"))]
-        hook_func!(
-            None,
-            bzero,
-            (s: *mut c_void, n: usize),
-            ()
-        );
+        hook_func!(None, bzero, (s: *mut c_void, n: usize), ());
         #[cfg(not(target_os = "android"))]
-        hook_func!(
-            None,
-            explicit_bzero,
-            (s: *mut c_void, n: usize),
-            ()
-        );
+        hook_func!(None, explicit_bzero, (s: *mut c_void, n: usize), ());
         #[cfg(not(target_os = "android"))]
         hook_func!(
             None,
@@ -1267,18 +1628,8 @@ impl AsanRuntime {
             (s1: *const c_void, s2: *const c_void, n: usize),
             i32
         );
-        hook_func!(
-            None,
-            strchr,
-            (s: *mut c_char, c: i32),
-            *mut c_char
-        );
-        hook_func!(
-            None,
-            strrchr,
-            (s: *mut c_char, c: i32),
-            *mut c_char
-        );
+        hook_func!(None, strchr, (s: *mut c_char, c: i32), *mut c_char);
+        hook_func!(None, strrchr, (s: *mut c_char, c: i32), *mut c_char);
         hook_func!(
             None,
             strcasecmp,
@@ -1297,12 +1648,7 @@ impl AsanRuntime {
             (dest: *mut c_char, src: *const c_char),
             *mut c_char
         );
-        hook_func!(
-            None,
-            strcmp,
-            (s1: *const c_char, s2: *const c_char),
-            i32
-        );
+        hook_func!(None, strcmp, (s1: *const c_char, s2: *const c_char), i32);
         hook_func!(
             None,
             strncmp,
@@ -1327,24 +1673,9 @@ impl AsanRuntime {
             (dest: *mut c_char, src: *const c_char),
             *mut c_char
         );
-        hook_func!(
-            None,
-            strdup,
-            (s: *const c_char),
-            *mut c_char
-        );
-        hook_func!(
-            None,
-            strlen,
-            (s: *const c_char),
-            usize
-        );
-        hook_func!(
-            None,
-            strnlen,
-            (s: *const c_char, n: usize),
-            usize
-        );
+        hook_func!(None, strdup, (s: *const c_char), *mut c_char);
+        hook_func!(None, strlen, (s: *const c_char), usize);
+        hook_func!(None, strnlen, (s: *const c_char, n: usize), usize);
         hook_func!(
             None,
             strstr,
@@ -1357,43 +1688,17 @@ impl AsanRuntime {
             (haystack: *const c_char, needle: *const c_char),
             *mut c_char
         );
-        hook_func!(
-            None,
-            atoi,
-            (nptr: *const c_char),
-            i32
-        );
-        hook_func!(
-            None,
-            atol,
-            (nptr: *const c_char),
-            i32
-        );
-        hook_func!(
-            None,
-            atoll,
-            (nptr: *const c_char),
-            i64
-        );
-        hook_func!(
-            None,
-            wcslen,
-            (s: *const wchar_t),
-            usize
-        );
+        hook_func!(None, atoi, (nptr: *const c_char), i32);
+        hook_func!(None, atol, (nptr: *const c_char), i32);
+        hook_func!(None, atoll, (nptr: *const c_char), i64);
+        hook_func!(None, wcslen, (s: *const wchar_t), usize);
         hook_func!(
             None,
             wcscpy,
             (dest: *mut wchar_t, src: *const wchar_t),
             *mut wchar_t
         );
-        hook_func!(
-            None,
-            wcscmp,
-            (s1: *const wchar_t, s2: *const wchar_t),
-            i32
-        );
-
+        hook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
     }
 
     #[allow(clippy::cast_sign_loss)] // for displacement
@@ -1517,8 +1822,9 @@ impl AsanRuntime {
             }
         } else {
             #[allow(clippy::option_if_let_else)]
-            if let Some(metadata) =
-                self.allocator.find_metadata(fault_address, self.regs[base_reg as usize])
+            if let Some(metadata) = self
+                .allocator
+                .find_metadata(fault_address, self.regs[base_reg as usize])
             {
                 let asan_readwrite_error = AsanReadWriteError {
                     registers: self.regs,
@@ -1656,8 +1962,17 @@ impl AsanRuntime {
 
         let blob = ops.finalize().unwrap();
         unsafe {
-            let mapping = mmap(std::ptr::null_mut(), 0x1000, ProtFlags::all(), MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE, -1, 0).unwrap();
-            blob.as_ptr().copy_to_nonoverlapping(mapping as *mut u8, blob.len());
+            let mapping = mmap(
+                std::ptr::null_mut(),
+                0x1000,
+                ProtFlags::all(),
+                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
+                -1,
+                0,
+            )
+            .unwrap();
+            blob.as_ptr()
+                .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
         }
     }
