@@ -147,10 +147,12 @@ impl OutFile {
     }
 
     pub fn write_buf(&mut self, buf: &[u8]) {
-        self.file.seek(SeekFrom::Start(0)).unwrap();
-        self.file.write(buf).unwrap();
+        self.rewind();
+        self.file.write_all(buf).unwrap();
         self.file.set_len(buf.len() as u64).unwrap();
         self.file.flush().unwrap();
+        // Rewind again otherwise the target will not read stdin from the beginning
+        self.rewind();
     }
 
     pub fn rewind(&mut self) {
@@ -312,7 +314,7 @@ where
         &self.target
     }
 
-    pub fn args(&self) -> &Vec<String> {
+    pub fn args(&self) -> &[String] {
         &self.args
     }
 
@@ -369,9 +371,6 @@ where
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
         }
-
-        //move the head back
-        self.out_file.rewind();
 
         Ok(exit_kind)
     }

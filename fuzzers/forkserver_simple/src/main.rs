@@ -60,7 +60,7 @@ pub fn main() {
     );
 
     // A feedback to choose if an input is a solution or not
-    // We want to do the same crash deduplication that AFL do
+    // We want to do the same crash deduplication that AFL does
     let objective = feedback_and!(
         // Must be a crash
         CrashFeedback::new(),
