@@ -9,21 +9,18 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::bolts::{
-    current_time,
-    os::{dup2, pipes::Pipe},
-};
+use crate::bolts::os::{dup2, pipes::Pipe};
 use crate::{
-    events::{Event, EventFirer, EventRestarter},
+    corpus::Corpus,
+    events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    corpus::{Corpus, Testcase},
-    state::HasSolutions,
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
+    state::HasSolutions,
     Error,
 };
 
@@ -149,7 +146,7 @@ impl OutFile {
         self.file.as_raw_fd()
     }
 
-    pub fn write_buf(&mut self, buf: &Vec<u8>) {
+    pub fn write_buf(&mut self, buf: &[u8]) {
         self.file.seek(SeekFrom::Start(0)).unwrap();
         self.file.write(buf).unwrap();
         self.file.set_len(buf.len() as u64).unwrap();
@@ -217,7 +214,6 @@ impl Forkserver {
             last_run_timed_out: 0,
         }
     }
-
 
     pub fn last_run_timed_out(&self) -> i32 {
         self.last_run_timed_out
@@ -335,13 +331,12 @@ where
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
-        
+
         // Write to test case
-        self.out_file
-            .write_buf(&input.target_bytes().as_slice().to_vec());
+        self.out_file.write_buf(&input.target_bytes().as_slice());
         // outfile gets automatically closed.
-    
-        let t1 = current_time();
+
+        // let t1 = crate::bolts::os::current_time();
         let slen = self
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
@@ -364,9 +359,9 @@ where
         let (_, status) = self.forkserver.read_st()?;
         self.forkserver.status = status;
 
-        let t2 = current_time();
+        // let t2 = crate::bolts::os::current_time();
         // println!("Exec time {} ns", (t2 - t1).as_nanos());
-        
+
         if !libc::WIFSTOPPED(self.forkserver.status()) {
             self.forkserver.child_pid = 0;
         }
@@ -412,7 +407,8 @@ where
     }
 }
 
-impl<EM, I, OC, OF, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for ForkserverExecutor<I, OC, OF, OT, S>
+impl<EM, I, OC, OF, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
+    for ForkserverExecutor<I, OC, OF, OT, S>
 where
     I: Input + HasTargetBytes,
     OC: Corpus<I>,

@@ -5,7 +5,7 @@ pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
 pub mod forkserver;
-pub use forkserver::{ForkserverExecutor,Forkserver, OutFile};
+pub use forkserver::{Forkserver, ForkserverExecutor, OutFile};
 
 pub mod combined;
 pub use combined::CombinedExecutor;
