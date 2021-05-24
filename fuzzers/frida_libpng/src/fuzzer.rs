@@ -194,7 +194,10 @@ where
 
         for range in helper.ranges().gaps(&(0..0xffffffffffffffff)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
-            stalker.exclude(&MemoryRange::new(NativePointer(range.start as *mut c_void), range.end - range.start));
+            stalker.exclude(&MemoryRange::new(
+                NativePointer(range.start as *mut c_void),
+                range.end - range.start,
+            ));
         }
 
         Self {
