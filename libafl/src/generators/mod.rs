@@ -86,9 +86,7 @@ where
             size = 1;
         }
         let printables = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz \t\n!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".as_bytes();
-        let random_bytes: Vec<u8> = (0..size)
-            .map(|_| printables[rand.below(printables.len() as u64) as usize])
-            .collect();
+        let random_bytes: Vec<u8> = (0..size).map(|_| *rand.choose(printables)).collect();
         Ok(BytesInput::new(random_bytes))
     }
 

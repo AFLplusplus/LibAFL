@@ -237,6 +237,9 @@ where
             .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
+        assert!(size <= map_state.history_map.len());
+        assert!(size <= observer.map().len());
+
         if self.indexes.is_none() && self.novelties.is_none() {
             for i in 0..size {
                 let history = map_state.history_map[i];

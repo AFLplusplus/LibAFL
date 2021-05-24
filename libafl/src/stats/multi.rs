@@ -43,12 +43,13 @@ where
     }
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
-        let pad = if event_msg.len() < 9 {
-            " ".repeat(9 - event_msg.len())
+        let sender = format!("#{}", sender_id);
+        let pad = if event_msg.len() + sender.len() < 13 {
+            " ".repeat(13 - event_msg.len() - sender.len())
         } else {
             String::new()
         };
-        let head = format!("{}{} #{}", event_msg, pad, sender_id);
+        let head = format!("{}{} {}", event_msg, pad, sender);
         let global_fmt = format!(
             "[{}]  (GLOBAL) clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,

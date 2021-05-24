@@ -23,9 +23,6 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "std")]
-use crate::inputs::bytes::BytesInput;
-
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
@@ -349,12 +346,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, FT, R, SC> StdState<C, FT, BytesInput, R, SC>
+impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
 where
-    C: Corpus<BytesInput>,
+    C: Corpus<I>,
+    I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<BytesInput>,
+    SC: Corpus<I>,
 {
     /// loads inputs from a directory
     fn load_from_directory<E, EM, Z>(
@@ -365,7 +363,7 @@ where
         in_dir: &Path,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, BytesInput, Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -380,8 +378,7 @@ where
 
             if attr.is_file() && attr.len() > 0 {
                 println!("Loading file {:?} ...", &path);
-                let bytes = fs::read(&path)?;
-                let input = BytesInput::new(bytes);
+                let input = I::from_file(&path)?;
                 let (is_interesting, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
                 if !is_interesting {
                     println!("File {:?} was not interesting, skipped.", &path);
@@ -403,8 +400,8 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, BytesInput, Self>,
-        EM: EventManager<E, BytesInput, Self, Z>,
+        Z: Evaluator<E, EM, I, Self>,
+        EM: EventManager<E, I, Self, Z>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(fuzzer, executor, manager, in_dir)?;
