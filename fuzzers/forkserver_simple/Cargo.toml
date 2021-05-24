@@ -16,5 +16,5 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-libafl = { path = "../../libafl/", featires = ["default", "introspection"]}
+libafl = { path = "../../libafl/" }
 libafl_tests = { path = "../../libafl_tests/"}
