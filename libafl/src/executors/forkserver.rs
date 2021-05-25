@@ -11,16 +11,11 @@ use std::{
 
 use crate::bolts::os::{dup2, pipes::Pipe};
 use crate::{
-    corpus::Corpus,
-    events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
-    feedbacks::Feedback,
-    fuzzer::HasObjective,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    state::HasSolutions,
     Error,
 };
 
@@ -245,11 +240,9 @@ impl Forkserver {
     }
 }
 
-pub struct ForkserverExecutor<I, OC, OF, OT, S>
+pub struct ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OC: Corpus<I>,
-    OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
     target: String,
@@ -257,14 +250,12 @@ where
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
-    phantom: PhantomData<(OC, OF, I, S)>,
+    phantom: PhantomData<I>,
 }
 
-impl<I, OC, OF, OT, S> ForkserverExecutor<I, OC, OF, OT, S>
+impl<I, OT> ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OC: Corpus<I>,
-    OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
     pub fn new(target: String, argv: Vec<String>, observers: OT) -> Result<Self, Error> {
@@ -322,11 +313,9 @@ where
     }
 }
 
-impl<I, OC, OF, OT, S> Executor<I> for ForkserverExecutor<I, OC, OF, OT, S>
+impl<I, OT> Executor<I> for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OC: Corpus<I>,
-    OF: Feedback<I, S>,
     OT: ObserversTuple,
 {
     #[inline]
@@ -372,24 +361,17 @@ where
     }
 }
 
-impl<EM, I, OC, OF, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<I, OC, OF, OT, S>
+impl<EM, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<I, OT>
 where
-    EM: EventFirer<I, S> + EventRestarter<S>,
     I: Input + HasTargetBytes,
-    OC: Corpus<I>,
-    OF: Feedback<I, S>,
     OT: ObserversTuple,
-    S: HasSolutions<OC, I>,
-    Z: HasObjective<I, OF, S>,
 {
 }
 
-impl<I, OC, OF, OT, S> HasObservers<OT> for ForkserverExecutor<I, OC, OF, OT, S>
+impl<I, OT> HasObservers<OT> for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OC: Corpus<I>,
     OT: ObserversTuple,
-    OF: Feedback<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -402,12 +384,52 @@ where
     }
 }
 
-impl<EM, I, OC, OF, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
-    for ForkserverExecutor<I, OC, OF, OT, S>
+impl<EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
+    for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OC: Corpus<I>,
-    OF: Feedback<I, S>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
+    use crate::executors::{Executor, ForkserverExecutor};
+    use crate::observers::{HitcountsMapObserver, ConstMapObserver};
+    use crate::inputs::NopInput;
+    use crate::bolts::tuples::tuple_list;
+    use std::env;
+    #[test]
+
+    fn test_forkserver() {
+        const MAP_SIZE: usize = 65536;
+        let out_dir = env::var_os("OUT_DIR")
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        println!("{}", out_dir);
+        let bin = format!(
+            "{}/../../../../../libafl_tests/src/forkserver_test.o",
+            out_dir
+        );
+        let args = vec![String::from("@@")];
+
+        let mut shmem = StdShMemProvider::new()
+            .unwrap()
+            .new_map(MAP_SIZE as usize)
+            .unwrap();
+        shmem.write_to_env("__AFL_SHM_ID").unwrap();
+        let mut shmem_map = shmem.map_mut();
+
+        let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
+            "shared_mem",
+            &mut shmem_map,
+        ));
+
+        let mut executors = ForkserverExecutor::new(bin, args, tuple_list!(edges_observer)).unwrap();
+        let nop = NopInput {};
+        let _ = executors.run_target(&nop);
+    }
 }
