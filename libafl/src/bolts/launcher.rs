@@ -220,7 +220,7 @@ where
 
         RestartingMgr::<I, OT, S, SP, ST>::builder()
             .shmem_provider(self.shmem_provider.clone())
-            .stats(self.stats.clone())
+            .stats(Some(self.stats.clone()))
             .broker_port(self.broker_port)
             .kind(ManagerKind::Broker)
             .remote_broker_addr(self.remote_broker_addr)
