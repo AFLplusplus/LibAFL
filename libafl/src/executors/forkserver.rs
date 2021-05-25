@@ -194,7 +194,9 @@ impl Forkserver {
         {
             Ok(_) => {}
             Err(_) => {
-                return Err(Error::Forkserver("Could not spawn a forkserver!".to_string()));
+                return Err(Error::Forkserver(
+                    "Could not spawn a forkserver!".to_string(),
+                ));
             }
         };
 
@@ -274,7 +276,6 @@ where
             }
         }
 
-
         let out_file = OutFile::new(&out_filename)?;
 
         let mut forkserver = Forkserver::new(
@@ -293,8 +294,8 @@ where
             }
             _ => {
                 return Err(Error::Forkserver(
-                    "Unable to request new process from fork server (OOM?)"
-                .to_string()))
+                    "Unable to request new process from fork server (OOM?)".to_string(),
+                ))
             }
         }
 
@@ -338,21 +339,21 @@ where
             .write_ctl(self.forkserver().last_run_timed_out())?;
         if send_len != 4 {
             return Err(Error::Forkserver(
-                "Unable to request new process from fork server (OOM?)"
-            .to_string()));
+                "Unable to request new process from fork server (OOM?)".to_string(),
+            ));
         }
 
         let (recv_len, pid) = self.forkserver.read_st()?;
         if recv_len != 4 {
             return Err(Error::Forkserver(
-                "Unable to request new process from fork server (OOM?)"
-            .to_string()));
+                "Unable to request new process from fork server (OOM?)".to_string(),
+            ));
         }
 
         if pid <= 0 {
             return Err(Error::Forkserver(
-                "Fork server is misbehaving (OOM?)"
-            .to_string()));
+                "Fork server is misbehaving (OOM?)".to_string(),
+            ));
         }
 
         let (_, status) = self.forkserver.read_st()?;
