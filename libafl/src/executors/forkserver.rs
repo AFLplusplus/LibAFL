@@ -443,6 +443,6 @@ mod tests {
         let mut executors =
             ForkserverExecutor::new(bin, args, tuple_list!(edges_observer)).unwrap();
         let nop = NopInput {};
-        let _ = executors.run_target(&nop);
+        drop(executors.run_target(&nop));
     }
 }
