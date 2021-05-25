@@ -1,3 +1,5 @@
+//! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
+
 use core::marker::PhantomData;
 use std::{
     fs::{File, OpenOptions},
@@ -20,6 +22,7 @@ use crate::{
 };
 
 const FORKSRV_FD: i32 = 198;
+
 // Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
 pub trait ConfigTarget {
     fn setsid(&mut self) -> &mut Self;
@@ -156,6 +159,8 @@ impl OutFile {
     }
 }
 
+/// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
+/// The communication happens via pipe.
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
@@ -244,6 +249,7 @@ impl Forkserver {
     }
 }
 
+/// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
 pub struct ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
