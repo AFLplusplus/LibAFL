@@ -17,4 +17,4 @@ opt-level = 3
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_tests = { path = "../../libafl_tests/"}
+libafl_tests = { path = "../../libafl_tests/", features = ["forkserver_test"] }
