@@ -21,3 +21,4 @@ test.dict
 
 # Ignore all built fuzzers
 fuzzer_*
+AFLplusplus
