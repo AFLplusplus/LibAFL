@@ -4,7 +4,10 @@ pub mod inprocess;
 pub use inprocess::InProcessExecutor;
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
+
+#[cfg(all(feature = "std", unix))]
 pub mod forkserver;
+#[cfg(all(feature = "std", unix))]
 pub use forkserver::{Forkserver, ForkserverExecutor, OutFile};
 
 pub mod combined;
