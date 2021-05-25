@@ -330,7 +330,6 @@ where
         // Write to testcase
         self.out_file.write_buf(&input.target_bytes().as_slice());
 
-        // let t1 = crate::bolts::os::current_time();
         let slen = self
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
@@ -346,13 +345,10 @@ where
         if pid <= 0 {
             return Err(Error::Forkserver(format!("Fork server is misbehaving (OOM?)")))
         }
-        //println!("pid: {:#?}",pid);
 
         let (_, status) = self.forkserver.read_st()?;
         self.forkserver.status = status;
 
-        // let t2 = crate::bolts::os::current_time();
-        // println!("Exec time {} ns", (t2 - t1).as_nanos());
 
         if !libc::WIFSTOPPED(self.forkserver.status()) {
             self.forkserver.child_pid = 0;
