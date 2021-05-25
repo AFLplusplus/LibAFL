@@ -1,6 +1,6 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
-use core::{marker::PhantomData, time::Duration};
+use core::time::Duration;
 
 use crate::{
     executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
@@ -37,28 +37,18 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout excutor is a wrapper that set a timeout before each run
-pub struct TimeoutExecutor<E, EM, I, S, Z>
-where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
-{
+pub struct TimeoutExecutor<E> {
     executor: E,
     exec_tmout: Duration,
-    phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<E, EM, I, S, Z> TimeoutExecutor<E, EM, I, S, Z>
-where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
-{
+impl<E> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         Self {
             executor,
             exec_tmout,
-            phantom: PhantomData,
         }
     }
 
@@ -68,7 +58,7 @@ where
     }
 }
 
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E, EM, I, S, Z>
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z>,
     I: Input,
@@ -136,10 +126,9 @@ where
     }
 }
 
-impl<E, EM, I, OT, S, Z> HasObservers<OT> for TimeoutExecutor<E, EM, I, S, Z>
+impl<E, OT> HasObservers<OT> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<OT>,
-    I: Input,
+    E: HasObservers<OT>,
     OT: ObserversTuple,
 {
     #[inline]
@@ -153,9 +142,9 @@ where
     }
 }
 
-impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<E, EM, I, S, Z>
+impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<OT>,
+    E: HasObservers<OT>,
     I: Input,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {

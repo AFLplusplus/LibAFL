@@ -65,7 +65,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT, S>, I>,
+    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT, S>>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -84,7 +84,13 @@ where
 {
     /// Instruct the target about the input and run
     #[inline]
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
         self.helper.pre_exec(input);
         if self.helper.stalker_enabled() {
             if self.followed {
@@ -97,7 +103,7 @@ where
                     .follow_me::<NoneEventSink>(self.helper.transformer(), None);
             }
         }
-        let res = self.base.run_target(input);
+        let res = self.base.run_target(fuzzer, state, mgr, input);
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }

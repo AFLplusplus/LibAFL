@@ -1,7 +1,5 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 
-use core::marker::PhantomData;
-
 use crate::{
     executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
@@ -10,30 +8,15 @@ use crate::{
 };
 
 /// A [`CombinedExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
-pub struct CombinedExecutor<A, B, EM, I, S, Z>
-where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
-    I: Input,
-{
+pub struct CombinedExecutor<A, B> {
     primary: A,
     secondary: B,
-    phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<A, B, EM, I, S, Z> CombinedExecutor<A, B, EM, I, S, Z>
-where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
-    I: Input,
-{
+impl<A, B> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
-    pub fn new(primary: A, secondary: B) -> Self {
-        Self {
-            primary,
-            secondary,
-            phantom: PhantomData,
-        }
+    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self {
+        Self { primary, secondary }
     }
 
     /// Retrieve the primary `Executor` that is wrapped by this `CombinedExecutor`.
@@ -47,7 +30,7 @@ where
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for CombinedExecutor<A, B, EM, I, S, Z>
+impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for CombinedExecutor<A, B>
 where
     A: Executor<EM, I, S, Z>,
     B: Executor<EM, I, S, Z>,
@@ -64,11 +47,9 @@ where
     }
 }
 
-impl<A, B, EM, I, OT, S, Z> HasObservers<OT> for CombinedExecutor<A, B, EM, I, S, Z>
+impl<A, B, OT> HasObservers<OT> for CombinedExecutor<A, B>
 where
-    A: Executor<EM, I, S, Z> + HasObservers<OT>,
-    B: Executor<EM, I, S, Z>,
-    I: Input,
+    A: HasObservers<OT>,
     OT: ObserversTuple,
 {
     #[inline]
@@ -82,11 +63,9 @@ where
     }
 }
 
-impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
-    for CombinedExecutor<A, B, EM, I, S, Z>
+impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for CombinedExecutor<A, B>
 where
-    A: Executor<EM, I, S, Z> + HasObservers<OT>,
-    B: Executor<EM, I, S, Z>,
+    A: HasObservers<OT>,
     I: Input,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
