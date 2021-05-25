@@ -286,8 +286,13 @@ where
 
         let (rlen, _) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
-        if rlen == 4 {
-            println!("Forkserver up!!");
+        match rlen{
+            4 => {
+                println!("All right - fork server is up.");
+            },
+            _ => {
+                return Err(Error::Forkserver(format!("Unable to request new process from fork server (OOM?)")))
+            }
         }
 
         Ok(Self {
@@ -409,7 +414,6 @@ mod tests {
             .unwrap()
             .to_string_lossy()
             .to_string();
-        println!("{}", out_dir);
         let bin = format!(
             "{}/../../../../../libafl_tests/src/forkserver_test.o",
             out_dir
