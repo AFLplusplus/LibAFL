@@ -25,8 +25,7 @@ use crate::{
 };
 
 const FORKSRV_FD: i32 = 198;
-//configure the target. setlimit, setsid, pipe_stdin... , I borrowed the code from Angora fuzzer
-//TODO: Better error handling.
+// Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
 pub trait ConfigTarget {
     fn setsid(&mut self) -> &mut Self;
     fn setlimit(&mut self, memlimit: u64) -> &mut Self;
@@ -39,6 +38,7 @@ pub trait ConfigTarget {
         ctl_write: RawFd,
     ) -> &mut Self;
 }
+
 impl ConfigTarget for Command {
     fn setsid(&mut self) -> &mut Self {
         let func = move || {
@@ -49,7 +49,7 @@ impl ConfigTarget for Command {
         };
         unsafe { self.pre_exec(func) }
     }
-
+    
     fn setpipe(
         &mut self,
         st_read: RawFd,
@@ -60,15 +60,15 @@ impl ConfigTarget for Command {
         let func = move || {
             match dup2(ctl_read, FORKSRV_FD) {
                 Ok(_) => (),
-                _ => {
-                    panic!("dup2 failed\n");
+                Err(_) => {
+                    return Err(io::Error::last_os_error());
                 }
             }
 
             match dup2(st_write, FORKSRV_FD + 1) {
                 Ok(_) => (),
-                _ => {
-                    panic!("dup2 failed\n");
+                Err(_) => {
+                    return Err(io::Error::last_os_error());
                 }
             }
             unsafe {
@@ -77,7 +77,6 @@ impl ConfigTarget for Command {
                 libc::close(ctl_read);
                 libc::close(ctl_write);
             }
-
             Ok(())
         };
         unsafe { self.pre_exec(func) }
@@ -86,11 +85,12 @@ impl ConfigTarget for Command {
     fn setstdin(&mut self, fd: RawFd, use_stdin: bool) -> &mut Self {
         if use_stdin {
             let func = move || {
-                let ret = unsafe { libc::dup2(fd, libc::STDIN_FILENO) };
-                if ret < 0 {
-                    panic!("dup2() failed");
+                match dup2(fd, libc::STDIN_FILENO){
+                    Ok(_) => (),
+                    Err(_) => {
+                        return Err(io::Error::last_os_error());
+                    }
                 }
-                unsafe { libc::close(fd) }; //fd gets automatically closed?
                 Ok(())
             };
             unsafe { self.pre_exec(func) }
@@ -116,16 +116,17 @@ impl ConfigTarget for Command {
 
             let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
             if ret < 0 {
-                panic!("setrlimit() failed");
+                return Err(io::Error::last_os_error());
             }
             let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
             if ret < 0 {
-                panic!("setrlimit() failed");
+                return Err(io::Error::last_os_error());
             }
             Ok(())
         };
         unsafe { self.pre_exec(func) }
     }
+    
 }
 
 pub struct OutFile {
@@ -163,7 +164,7 @@ impl OutFile {
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
-    child_pid: u32, //fuzzed program pid
+    child_pid: u32,
     status: i32,
     last_run_timed_out: i32,
 }
@@ -175,12 +176,10 @@ impl Forkserver {
         out_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
-    ) -> Self {
-        //create 2 pipes
+    ) -> Result<Self, Error> {
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
-        //setsid, setrlimit, direct stdin, set pipe, and finally fork.
         match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
@@ -199,22 +198,22 @@ impl Forkserver {
             .spawn()
         {
             Ok(_) => {}
-            Err(_) => {
-                panic!("Command::new() failed");
+            _ => {
+                return Err(Error::Forkserver(format!("Could not spawn a forkserver!")));
             }
         };
 
-        //parent: we'll close unneeded endpoints
+        // Ctl_pipe.read_end and st_pipe.write_end are unnecessary for the parent, so we'll close them
         ctl_pipe.close_read_end();
         st_pipe.close_write_end();
 
-        Self {
+        Ok(Self {
             st_pipe: st_pipe,
             ctl_pipe: ctl_pipe,
             child_pid: 0,
             status: 0,
             last_run_timed_out: 0,
-        }
+        })
     }
 
     pub fn last_run_timed_out(&self) -> i32 {
@@ -271,11 +270,11 @@ where
     pub fn new(target: String, argv: Vec<String>, observers: OT) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
-        let out_filename = format!("out-{}", 123456789); //TODO: replace it with a random number
+        let out_filename = format!("out-{}", 123456789); // TODO: replace it with a random number
 
         for item in argv {
             if item == "@@" && use_stdin {
-                use_stdin = false; //only 1 '@@' allowed.
+                use_stdin = false;
                 args.push(out_filename.clone());
             } else {
                 args.push(item.to_string());
@@ -286,15 +285,15 @@ where
 
         let out_file = OutFile::new(&out_filename);
 
-        //forkserver
         let mut forkserver = Forkserver::new(
             target.clone(),
             args.clone(),
             out_file.as_raw_fd(),
             use_stdin,
             0,
-        );
-        let (rlen, _) = forkserver.read_st()?; //initial handshake
+        )?;
+
+        let (rlen, _) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
         if rlen == 4 {
             println!("Forkserver up!!");
@@ -334,29 +333,26 @@ where
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
-        // Write to test case
+        // Write to testcase
         self.out_file.write_buf(&input.target_bytes().as_slice());
-        // outfile gets automatically closed.
 
         // let t1 = crate::bolts::os::current_time();
         let slen = self
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
         if slen != 4 {
-            panic!("failed to request new process");
+            return Err(Error::Forkserver(format!("Unable to request new process from fork server (OOM?)")))
         }
 
         let (rlen, pid) = self.forkserver.read_st()?;
         if rlen != 4 {
-            panic!("failed to request new process")
+            return Err(Error::Forkserver(format!("Unable to request new process from fork server (OOM?)")))
         }
 
         if pid <= 0 {
-            panic!("forkserver is misbehaving");
+            return Err(Error::Forkserver(format!("Fork server is misbehaving (OOM?)")))
         }
         //println!("pid: {:#?}",pid);
-
-        //child running
 
         let (_, status) = self.forkserver.read_st()?;
         self.forkserver.status = status;
