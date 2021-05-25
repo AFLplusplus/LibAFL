@@ -2,7 +2,7 @@ use core::{marker::PhantomData, mem::drop};
 
 use crate::{
     corpus::Corpus,
-    executors::{Executor, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    executors::{Executor, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
@@ -21,10 +21,7 @@ pub struct TracingStage<C, EM, I, OT, S, TE, Z>
 where
     I: Input,
     C: Corpus<I>,
-    TE: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Z>
-        + HasObserversHooks<EM, I, OT, S, Z>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Z>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
@@ -37,10 +34,7 @@ impl<E, C, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for TracingStage<C, EM, I, OT
 where
     I: Input,
     C: Corpus<I>,
-    TE: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Z>
-        + HasObserversHooks<EM, I, OT, S, Z>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Z>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
@@ -68,18 +62,11 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        self.tracer_executor
-            .pre_exec(fuzzer, state, manager, &input)?;
-        mark_feature_time!(state, PerfFeature::PreExec);
-
-        start_timer!(state);
-        drop(self.tracer_executor.run_target(&input)?);
+        drop(
+            self.tracer_executor
+                .run_target(fuzzer, state, manager, &input)?,
+        );
         mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        start_timer!(state);
-        self.tracer_executor
-            .post_exec(fuzzer, state, manager, &input)?;
-        mark_feature_time!(state, PerfFeature::PostExec);
 
         *state.executions_mut() += 1;
 
@@ -96,10 +83,7 @@ impl<C, EM, I, OT, S, TE, Z> TracingStage<C, EM, I, OT, S, TE, Z>
 where
     I: Input,
     C: Corpus<I>,
-    TE: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Z>
-        + HasObserversHooks<EM, I, OT, S, Z>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Z>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {

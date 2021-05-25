@@ -1,41 +1,22 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 
-use core::marker::PhantomData;
-
 use crate::{
-    executors::{
-        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
-    },
+    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
     observers::ObserversTuple,
     Error,
 };
 
 /// A [`CombinedExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
-pub struct CombinedExecutor<A, B, I>
-where
-    A: Executor<I>,
-    B: Executor<I>,
-    I: Input,
-{
+pub struct CombinedExecutor<A, B> {
     primary: A,
     secondary: B,
-    phantom: PhantomData<I>,
 }
 
-impl<A, B, I> CombinedExecutor<A, B, I>
-where
-    A: Executor<I>,
-    B: Executor<I>,
-    I: Input,
-{
+impl<A, B> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
-    pub fn new(primary: A, secondary: B) -> Self {
-        Self {
-            primary,
-            secondary,
-            phantom: PhantomData,
-        }
+    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self {
+        Self { primary, secondary }
     }
 
     /// Retrieve the primary `Executor` that is wrapped by this `CombinedExecutor`.
@@ -49,22 +30,26 @@ where
     }
 }
 
-impl<A, B, I> Executor<I> for CombinedExecutor<A, B, I>
+impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for CombinedExecutor<A, B>
 where
-    A: Executor<I>,
-    B: Executor<I>,
+    A: Executor<EM, I, S, Z>,
+    B: Executor<EM, I, S, Z>,
     I: Input,
 {
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        self.primary.run_target(input)
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        self.primary.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<A, B, I, OT> HasObservers<OT> for CombinedExecutor<A, B, I>
+impl<A, B, OT> HasObservers<OT> for CombinedExecutor<A, B>
 where
-    A: Executor<I> + HasObservers<OT>,
-    B: Executor<I>,
-    I: Input,
+    A: HasObservers<OT>,
     OT: ObserversTuple,
 {
     #[inline]
@@ -78,40 +63,10 @@ where
     }
 }
 
-impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for CombinedExecutor<A, B, I>
+impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for CombinedExecutor<A, B>
 where
-    A: Executor<I> + HasObservers<OT>,
-    B: Executor<I>,
+    A: HasObservers<OT>,
     I: Input,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
-}
-
-impl<A, B, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CombinedExecutor<A, B, I>
-where
-    A: Executor<I> + HasExecHooks<EM, I, S, Z>,
-    B: Executor<I>,
-    I: Input,
-{
-    #[inline]
-    fn pre_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
-        self.primary.pre_exec(fuzzer, state, mgr, input)
-    }
-
-    #[inline]
-    fn post_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
-        self.primary.post_exec(fuzzer, state, mgr, input)
-    }
 }

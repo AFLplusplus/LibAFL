@@ -1,11 +1,9 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
-use core::{marker::PhantomData, time::Duration};
+use core::time::Duration;
 
 use crate::{
-    executors::{
-        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
-    },
+    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::Input,
     observers::ObserversTuple,
     Error,
@@ -39,28 +37,18 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout excutor is a wrapper that set a timeout before each run
-pub struct TimeoutExecutor<E, I>
-where
-    E: Executor<I>,
-    I: Input,
-{
+pub struct TimeoutExecutor<E> {
     executor: E,
     exec_tmout: Duration,
-    phantom: PhantomData<I>,
 }
 
-impl<E, I> TimeoutExecutor<E, I>
-where
-    E: Executor<I>,
-    I: Input,
-{
+impl<E> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         Self {
             executor,
             exec_tmout,
-            phantom: PhantomData,
         }
     }
 
@@ -70,54 +58,18 @@ where
     }
 }
 
-impl<E, I> Executor<I> for TimeoutExecutor<E, I>
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<I>,
+    E: Executor<EM, I, S, Z>,
     I: Input,
 {
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        self.executor.run_target(input)
-    }
-}
-
-impl<E, I, OT> HasObservers<OT> for TimeoutExecutor<E, I>
-where
-    E: Executor<I> + HasObservers<OT>,
-    I: Input,
-    OT: ObserversTuple,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        self.executor.observers()
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        self.executor.observers_mut()
-    }
-}
-
-impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<E, I>
-where
-    E: Executor<I> + HasObservers<OT>,
-    I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
-{
-}
-
-impl<E, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for TimeoutExecutor<E, I>
-where
-    E: Executor<I> + HasExecHooks<EM, I, S, Z>,
-    I: Input,
-{
-    #[inline]
-    fn pre_exec(
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
-    ) -> Result<(), Error> {
+    ) -> Result<ExitKind, Error> {
         #[cfg(unix)]
         unsafe {
             let milli_sec = self.exec_tmout.as_millis();
@@ -143,17 +95,9 @@ where
             // TODO
             let _ = self.exec_tmout.as_millis();
         }
-        self.executor.pre_exec(fuzzer, state, mgr, input)
-    }
 
-    #[inline]
-    fn post_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
+        let ret = self.executor.run_target(fuzzer, state, mgr, input);
+
         #[cfg(unix)]
         unsafe {
             let it_value = Timeval {
@@ -177,6 +121,31 @@ where
         {
             // TODO
         }
-        self.executor.post_exec(fuzzer, state, mgr, input)
+
+        ret
     }
+}
+
+impl<E, OT> HasObservers<OT> for TimeoutExecutor<E>
+where
+    E: HasObservers<OT>,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        self.executor.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.executor.observers_mut()
+    }
+}
+
+impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<E>
+where
+    E: HasObservers<OT>,
+    I: Input,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+{
 }

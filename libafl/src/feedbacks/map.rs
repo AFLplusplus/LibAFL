@@ -265,61 +265,6 @@ where
             }
         }
 
-        /*if self.indexes.is_none() && self.novelties.is_none() {
-            for i in 0..size {
-                let history = map_state.history_map[i];
-                let item = observer.map()[i];
-
-                let reduced = R::reduce(history, item);
-                if history != reduced {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
-                }
-            }
-        } else if self.indexes.is_some() && self.novelties.is_none() {
-            for i in 0..size {
-                let history = map_state.history_map[i];
-                let item = observer.map()[i];
-                // TODO maybe walk again the histroy map only when it is interesting is more efficient
-                if item != initial {
-                    self.indexes.as_mut().unwrap().push(i);
-                }
-
-                let reduced = R::reduce(history, item);
-                if history != reduced {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
-                }
-            }
-        } else if self.indexes.is_none() && self.novelties.is_some() {
-            for i in 0..size {
-                let history = map_state.history_map[i];
-                let item = observer.map()[i];
-
-                let reduced = R::reduce(history, item);
-                if history != reduced {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
-                    self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        } else {
-            for i in 0..size {
-                let history = map_state.history_map[i];
-                let item = observer.map()[i];
-                if item != initial {
-                    self.indexes.as_mut().unwrap().push(i);
-                }
-
-                let reduced = R::reduce(history, item);
-                if history != reduced {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
-                    self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        }*/
-
         if interesting {
             let mut filled = 0;
             for i in 0..size {
