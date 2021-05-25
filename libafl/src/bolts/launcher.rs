@@ -33,8 +33,8 @@ use typed_builder::TypedBuilder;
 
 /// The Launcher client callback type reference
 #[cfg(feature = "std")]
-pub type LauncherClientFnRef<'a, I, OT, S, SP, ST> =
-    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP, ST>) -> Result<(), Error>;
+pub type LauncherClientFnRef<'a, I, OT, S, SP> =
+    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>) -> Result<(), Error>;
 
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
@@ -52,10 +52,8 @@ where
     shmem_provider: SP,
     /// The stats instance to use
     stats: ST,
-    /// A closure or function which generates stats instances for newly spawned clients
-    client_init_stats: &'a mut dyn FnMut() -> Result<ST, Error>,
     /// The 'main' function to run for each client forked. This probably shouldn't return
-    run_client: LauncherClientFnRef<'a, I, OT, S, SP, ST>,
+    run_client: LauncherClientFnRef<'a, I, OT, S, SP>,
     /// The broker port to use
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -92,7 +90,7 @@ where
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
 
-        //spawn clients
+        // Spawn clients
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
             if self.cores.iter().any(|&x| x == id) {
                 self.shmem_provider.pre_fork()?;
@@ -114,11 +112,9 @@ where
                             dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDOUT_FILENO)?;
                             dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDERR_FILENO)?;
                         }
-                        //fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let stats = (self.client_init_stats)()?;
-                        let (state, mgr) = RestartingMgr::builder()
+                        // Fuzzer client. keeps retrying the connection to broker till the broker starts
+                        let (state, mgr) = RestartingMgr::<I, OT, S, SP, ST>::builder()
                             .shmem_provider(self.shmem_provider.clone())
-                            .stats(stats)
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
                                 cpu_core: Some(*bind_to),
@@ -137,7 +133,7 @@ where
 
         RestartingMgr::<I, OT, S, SP, ST>::builder()
             .shmem_provider(self.shmem_provider.clone())
-            .stats(self.stats.clone())
+            .stats(Some(self.stats.clone()))
             .broker_port(self.broker_port)
             .kind(ManagerKind::Broker)
             .remote_broker_addr(self.remote_broker_addr)
@@ -165,10 +161,8 @@ where
                 //todo: silence stdout and stderr for clients
 
                 // the actual client. do the fuzzing
-                let stats = (self.client_init_stats)()?;
                 let (state, mgr) = RestartingMgr::<I, OT, S, SP, ST>::builder()
                     .shmem_provider(self.shmem_provider.clone())
-                    .stats(stats)
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
                         cpu_core: Some(CoreId {

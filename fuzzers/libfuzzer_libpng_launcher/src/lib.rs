@@ -58,9 +58,7 @@ pub fn main() {
     AshmemService::start().expect("Failed to start Ashmem service");
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let stats_closure = |s| println!("{}", s);
-    let stats = MultiStats::new(stats_closure);
-    let mut client_init_stats = || Ok(MultiStats::new(stats_closure));
+    let stats = MultiStats::new(|s| println!("{}", s));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
         let corpus_dirs = &[PathBuf::from("./corpus")];
@@ -170,7 +168,6 @@ pub fn main() {
     Launcher::builder()
         .shmem_provider(shmem_provider)
         .stats(stats)
-        .client_init_stats(&mut client_init_stats)
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)

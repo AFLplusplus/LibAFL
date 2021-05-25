@@ -289,15 +289,12 @@ unsafe fn fuzz(
     stdout_file: Option<&str>,
     broker_addr: Option<SocketAddr>,
 ) -> Result<(), Error> {
-    let stats_closure = |s| println!("{}", s);
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = MultiStats::new(stats_closure);
+    let stats = MultiStats::new(|s| println!("{}", s));
 
     #[cfg(target_os = "android")]
     AshmemService::start().expect("Failed to start Ashmem service");
     let shmem_provider = StdShMemProvider::new()?;
-
-    let mut client_init_stats = || Ok(MultiStats::new(stats_closure));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -427,7 +424,6 @@ unsafe fn fuzz(
     Launcher::builder()
         .shmem_provider(shmem_provider)
         .stats(stats)
-        .client_init_stats(&mut client_init_stats)
         .run_client(&mut run_client)
         .cores(cores)
         .broker_port(broker_port)
