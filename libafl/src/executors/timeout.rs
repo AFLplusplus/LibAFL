@@ -112,7 +112,6 @@ where
         #[cfg(windows)]
         {
             // TODO
-            let _ = self.exec_tmout.as_millis();
         }
 
         let ret = self.executor.run_target(fuzzer, state, mgr, input);
