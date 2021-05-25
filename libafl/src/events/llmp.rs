@@ -853,10 +853,6 @@ where
 
         println!("We're a client, let's fuzz :)");
 
-        for (var, val) in std::env::vars() {
-            println!("ENV VARS: {:?}: {:?}", var, val);
-        }
-
         // If we're restarting, deserialize the old state.
         let (state, mut mgr) = match receiver.recv_buf()? {
             None => {

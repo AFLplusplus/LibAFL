@@ -408,8 +408,7 @@ mod unix_signal_handler {
             {
                 println!("Double crash\n");
                 #[cfg(target_os = "android")]
-                let si_addr =
-                    { ((_info._pad[0] as usize) | ((_info._pad[1] as usize) << 32)) as usize };
+                let si_addr = (_info._pad[0] as i64) | ((_info._pad[1] as i64) << 32);
                 #[cfg(not(target_os = "android"))]
                 let si_addr = { _info.si_addr() as usize };
 
@@ -444,6 +443,7 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             println!("Child crashed!");
 
+            #[allow(clippy::non_ascii_literal)]
             #[cfg(all(
                 feature = "std",
                 any(target_os = "linux", target_os = "android"),
