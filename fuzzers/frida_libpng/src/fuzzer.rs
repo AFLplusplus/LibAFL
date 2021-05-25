@@ -20,7 +20,7 @@ use libafl::{
         IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
     executors::{
-        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasExecHooks,
+        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind,
         HasExecHooksTuple, HasObservers, HasObserversHooks,
     },
     feedback_or,
@@ -74,7 +74,7 @@ where
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c, FH, H, I, OT, S> Executor<I>
+impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> Executor<EM, I, S, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
@@ -85,6 +85,7 @@ where
     /// Instruct the target about the input and run
     #[inline]
     fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+        self.helper.pre_exec(input);
         if self.helper.stalker_enabled() {
             if self.followed {
                 self.stalker.activate(NativePointer(
@@ -109,42 +110,8 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
-        res
-    }
-}
-
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z>
-    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
-{
-    /// Called right before exexution starts
-    #[inline]
-    fn pre_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
-        self.helper.pre_exec(input);
-        self.base.pre_exec(fuzzer, state, event_mgr, input)
-    }
-
-    /// Called right after execution finished.
-    #[inline]
-    fn post_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
         self.helper.post_exec(input);
-        self.base.post_exec(fuzzer, state, event_mgr, input)
+        res
     }
 }
 
