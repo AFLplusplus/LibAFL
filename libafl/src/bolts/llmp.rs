@@ -864,103 +864,80 @@ where
     /// Never call [`alloc_next`] without either sending or cancelling the last allocated message for this page!
     /// There can only ever be up to one message allocated per page at each given time.
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
-        let buf_len_padded;
-        let mut complete_msg_size = llmp_align(size_of::<LlmpMsg>() + buf_len);
         let map = self.out_maps.last_mut().unwrap();
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
+
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
-            "Allocating {} (>={}) bytes on page {:?} / map {:?} (last msg: {:?})",
-            complete_msg_size, buf_len, page, &map, last_msg
+            "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
+            buf_len, page, &map, last_msg
         );
-        /* DBG("XXX complete_msg_size %lu (h: %lu)\n", complete_msg_size, sizeof(llmp_message)); */
-        /* In case we don't have enough space, make sure the next page will be large
-         * enough */
-        // For future allocs, keep track of the maximum (aligned) alloc size we used
-        (*page).max_alloc_size = max((*page).max_alloc_size, complete_msg_size);
 
-        let mut ret: *mut LlmpMsg;
-        /* DBG("last_msg %p %d (%d)\n", last_msg, last_msg ? (int)last_msg->tag : -1, (int)LLMP_TAG_END_OF_PAGE_V1); */
-        if last_msg.is_null() || (*last_msg).tag == LLMP_TAG_END_OF_PAGE {
-            /* We start fresh, on a new page */
-            ret = (*page).messages.as_mut_ptr();
-            /* The initial message may not be alligned, so we at least align the end of
-            it. Technically, c_ulong can be smaller than a pointer, then who knows what
-            happens */
-            let base_addr = ret as usize;
-            buf_len_padded =
-                llmp_align(base_addr + complete_msg_size) - base_addr - size_of::<LlmpMsg>();
-            complete_msg_size = buf_len_padded + size_of::<LlmpMsg>();
-            /* Still space for the new message plus the additional "we're full" message?
-             */
+        let msg_offset = if last_msg.is_null() || (*last_msg).tag == LLMP_TAG_END_OF_PAGE {
+            // Assumption: The start of our msg is aligned.
+            if (*page).size_used != 0 {
+                panic!("Allocated new message without calling send() inbetween. Page: {:?}, buf_len: {:?}, last_msg: {:?}", page, buf_len, last_msg);
+            }
+            0_usize
+        } else {
+            (*last_msg).buf_len_padded as usize
+        };
 
+        let msg_start = (*page).messages.as_mut_ptr() as usize + msg_offset;
+
+        // Make sure the end of our msg is aligned.
+        let buf_len_padded = llmp_align(msg_start + buf_len + size_of::<LlmpMsg>())
+            - msg_start
+            - size_of::<LlmpMsg>();
+
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        dbg!(
+            page,
+            *page,
+            (*page).size_used,
+            buf_len_padded,
+            EOP_MSG_SIZE,
+            (*page).size_total
+        );
+
+        // We need enough space for the current page size_used + payload + padding
+        if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
+            > (*page).size_total
+        {
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            dbg!(
-                page,
-                *page,
-                (*page).size_used,
-                complete_msg_size,
-                EOP_MSG_SIZE,
-                (*page).size_total
-            );
-            if (*page).size_used + complete_msg_size + EOP_MSG_SIZE > (*page).size_total {
-                /* We're full. */
-                return None;
-            }
-            /* We need to start with 1 for ids, as current message id is initialized
-             * with 0... */
-            (*ret).message_id = if last_msg.is_null() {
-                1
-            } else {
-                (*last_msg).message_id + 1
-            }
-        } else if (*page).current_msg_id == (*last_msg).message_id {
-            buf_len_padded = complete_msg_size - size_of::<LlmpMsg>();
-            /* DBG("XXX ret %p id %u buf_len_padded %lu complete_msg_size %lu\n", ret, ret->message_id, buf_len_padded,
-             * complete_msg_size); */
+            println!("LLMP: Page full.");
 
-            /* Still space for the new message plus the additional "we're full" message? */
-            if (*page).size_used + complete_msg_size + EOP_MSG_SIZE > (*page).size_total {
-                /* We're full. */
-                return None;
-            }
-            ret = match llmp_next_msg_ptr_checked(map, last_msg, complete_msg_size) {
-                Ok(msg) => msg,
-                Err(e) => {
-                    #[cfg(feature = "std")]
-                    dbg!("Unexpected error allocing new msg", e);
-                    #[cfg(feature = "std")]
-                    return None;
-                    #[cfg(not(feature = "std"))]
-                    panic!("Unexpected error allocing new msg {:?}", e);
-                }
-            };
-            (*ret).message_id = (*last_msg).message_id + 1
+            /* We're full. */
+            return None;
+        }
+
+        let ret = msg_start as *mut LlmpMsg;
+
+        /* We need to start with 1 for ids, as current message id is initialized
+         * with 0... */
+        (*ret).message_id = if last_msg.is_null() {
+            1
+        } else if (*page).current_msg_id == (*last_msg).message_id {
+            (*last_msg).message_id + 1
         } else {
             /* Oops, wrong usage! */
             panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {})", ptr::addr_of!((*page).current_msg_id), (*last_msg).message_id);
-        }
+        };
 
-        /* The beginning of our message should be messages + size_used, else nobody
-         * sent the last msg! */
-        /* DBG("XXX ret %p - page->messages %p = %lu != %lu, will add %lu -> %p\n", ret, page->messages,
-        (c_ulong)((u8 *)ret - (u8 *)page->messages), page->size_used, complete_msg_size, ((u8 *)ret) + complete_msg_size);
-        */
-
-        if last_msg.is_null() && (*page).size_used != 0
-            || ((ret as usize) - (*page).messages.as_mut_ptr() as usize) != (*page).size_used
-        {
-            panic!("Allocated new message without calling send() inbetween. ret: {:?}, page: {:?}, complete_msg_size: {:?}, size_used: {:?}, last_msg: {:?}", ret, page,
-                buf_len_padded, ptr::addr_of!((*page).size_used), last_msg);
-        }
-        (*page).size_used += complete_msg_size;
-        (*ret).buf_len_padded = buf_len_padded as u64;
         (*ret).buf_len = buf_len as u64;
-        /* DBG("Returning new message at %p with len %ld, TAG was %x", ret, ret->buf_len_padded, ret->tag); */
-        /* Maybe catch some bugs... */
+        (*ret).buf_len_padded = buf_len_padded as u64;
+        (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
+
         (*_llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
         (*ret).tag = LLMP_TAG_UNINITIALIZED;
+
+        // For future allocs, keep track of the maximum (aligned) alloc size we used
+        (*page).max_alloc_size = max(
+            (*page).max_alloc_size,
+            size_of::<LlmpMsg>() + buf_len_padded,
+        );
+
         Some(ret)
     }
 
@@ -1093,6 +1070,38 @@ where
         let page = self.out_maps.last_mut().unwrap().page_mut();
         (*msg).tag = LLMP_TAG_UNSET;
         (*page).size_used -= (*msg).buf_len_padded as usize + size_of::<LlmpMsg>();
+    }
+
+    /// Shrinks the allocated [`LlmpMsg`] to a given size.
+    pub unsafe fn shrink_alloced(
+        &mut self,
+        msg: *mut LlmpMsg,
+        shrinked_len: usize,
+    ) -> Result<(), Error> {
+        let old_len_padded = (*msg).buf_len_padded;
+
+        let msg_start = msg as usize;
+        // Make sure the end of our msg is aligned.
+        let buf_len_padded = llmp_align(msg_start + shrinked_len + size_of::<LlmpMsg>())
+            - msg_start
+            - size_of::<LlmpMsg>();
+
+        if buf_len_padded > old_len_padded.try_into().unwrap() {
+            return Err(Error::IllegalArgument(format!("Cannot shrink msg of size {} (paded: {}) to requested larger size of {} (padded: {})!", (*msg).buf_len, old_len_padded, shrinked_len, buf_len_padded)));
+        }
+
+        (*msg).buf_len = shrinked_len as u64;
+        (*msg).buf_len_padded = buf_len_padded as u64;
+
+        let page = self.out_maps.last_mut().unwrap().page_mut();
+
+        // Doing this step by step will catch underflows in debug builds :)
+        (*page).size_used -= old_len_padded as usize;
+        (*page).size_used += buf_len_padded as usize;
+
+        (*_llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
+
+        Ok(())
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
