@@ -87,7 +87,7 @@ where
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
             write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
