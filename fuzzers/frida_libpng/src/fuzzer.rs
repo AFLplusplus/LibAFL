@@ -192,7 +192,7 @@ where
     ) -> Self {
         let mut stalker = Stalker::new(gum);
 
-        for range in helper.ranges().gaps(&(0..0xffffffffffffffff)) {
+        for range in helper.ranges().gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(
                 NativePointer(range.start as *mut c_void),

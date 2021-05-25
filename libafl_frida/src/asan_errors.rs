@@ -104,8 +104,8 @@ impl AsanErrors {
         unsafe { ASAN_ERRORS.as_mut().unwrap() }
     }
 
-    #[allow(clippy::too_many_lines)]
     /// Report an error
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn report_error(
         &mut self,
         error: AsanError,

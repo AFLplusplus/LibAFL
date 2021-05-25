@@ -488,7 +488,7 @@ impl AsanRuntime {
             ) -> *mut c_void;
         }
         let res = unsafe { mmap(addr, length, prot, flags, fd, offset) };
-        if res != (-1isize as *mut c_void) {
+        if res != (-1_isize as *mut c_void) {
             self.allocator
                 .map_shadow_for_region(res as usize, res as usize + length, true);
         }
