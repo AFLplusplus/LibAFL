@@ -244,7 +244,10 @@ where
         #[cfg(feature = "introspection")]
         {
             // Print the client performance stats.
-            let fmt = format!("Client {:03}: {}", sender_id, self.client_stats[sender_id as usize].introspection_stats);
+            let fmt = format!(
+                "Client {:03}: {}",
+                sender_id, self.client_stats[sender_id as usize].introspection_stats
+            );
             (self.print_fn)(fmt);
 
             // Separate the spacing just a bit

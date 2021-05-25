@@ -239,7 +239,7 @@ where
 
         assert!(size <= map_state.history_map.len());
         assert!(size <= observer.map().len());
-        
+
         if self.novelties.is_some() {
             for i in 0..size {
                 let history = map_state.history_map[i];

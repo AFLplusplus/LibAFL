@@ -44,7 +44,7 @@ impl ConfigTarget for Command {
         };
         unsafe { self.pre_exec(func) }
     }
-    
+
     fn setpipe(
         &mut self,
         st_read: RawFd,
@@ -80,7 +80,7 @@ impl ConfigTarget for Command {
     fn setstdin(&mut self, fd: RawFd, use_stdin: bool) -> &mut Self {
         if use_stdin {
             let func = move || {
-                match dup2(fd, libc::STDIN_FILENO){
+                match dup2(fd, libc::STDIN_FILENO) {
                     Ok(_) => (),
                     Err(_) => {
                         return Err(io::Error::last_os_error());
@@ -121,7 +121,6 @@ impl ConfigTarget for Command {
         };
         unsafe { self.pre_exec(func) }
     }
-    
 }
 
 pub struct OutFile {
@@ -286,12 +285,14 @@ where
 
         let (rlen, _) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
-        match rlen{
+        match rlen {
             4 => {
                 println!("All right - fork server is up.");
-            },
+            }
             _ => {
-                return Err(Error::Forkserver(format!("Unable to request new process from fork server (OOM?)")))
+                return Err(Error::Forkserver(format!(
+                    "Unable to request new process from fork server (OOM?)"
+                )))
             }
         }
 
@@ -334,21 +335,26 @@ where
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
         if slen != 4 {
-            return Err(Error::Forkserver(format!("Unable to request new process from fork server (OOM?)")))
+            return Err(Error::Forkserver(format!(
+                "Unable to request new process from fork server (OOM?)"
+            )));
         }
 
         let (rlen, pid) = self.forkserver.read_st()?;
         if rlen != 4 {
-            return Err(Error::Forkserver(format!("Unable to request new process from fork server (OOM?)")))
+            return Err(Error::Forkserver(format!(
+                "Unable to request new process from fork server (OOM?)"
+            )));
         }
 
         if pid <= 0 {
-            return Err(Error::Forkserver(format!("Fork server is misbehaving (OOM?)")))
+            return Err(Error::Forkserver(format!(
+                "Fork server is misbehaving (OOM?)"
+            )));
         }
 
         let (_, status) = self.forkserver.read_st()?;
         self.forkserver.status = status;
-
 
         if !libc::WIFSTOPPED(self.forkserver.status()) {
             self.forkserver.child_pid = 0;
@@ -385,8 +391,7 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
-    for ForkserverExecutor<I, OT>
+impl<EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
@@ -397,10 +402,10 @@ where
 mod tests {
 
     use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
-    use crate::executors::{Executor, ForkserverExecutor};
-    use crate::observers::{HitcountsMapObserver, ConstMapObserver};
-    use crate::inputs::NopInput;
     use crate::bolts::tuples::tuple_list;
+    use crate::executors::{Executor, ForkserverExecutor};
+    use crate::inputs::NopInput;
+    use crate::observers::{ConstMapObserver, HitcountsMapObserver};
     use std::env;
     #[test]
 
@@ -428,7 +433,8 @@ mod tests {
             &mut shmem_map,
         ));
 
-        let mut executors = ForkserverExecutor::new(bin, args, tuple_list!(edges_observer)).unwrap();
+        let mut executors =
+            ForkserverExecutor::new(bin, args, tuple_list!(edges_observer)).unwrap();
         let nop = NopInput {};
         let _ = executors.run_target(&nop);
     }
