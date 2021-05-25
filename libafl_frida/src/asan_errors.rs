@@ -1,6 +1,7 @@
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
+#[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use libafl::{
     bolts::{os::find_mapping_for_address, ownedref::OwnedPtr, tuples::Named},
@@ -256,10 +257,10 @@ impl AsanErrors {
                     name, address, size
                 )
                 .unwrap();
-                let invocation = Interceptor::current_invocation();
-                let cpu_context = invocation.cpu_context();
                 #[cfg(target_arch = "aarch64")]
                 {
+                    let invocation = Interceptor::current_invocation();
+                    let cpu_context = invocation.cpu_context();
                     #[allow(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                     for reg in 0..29 {
