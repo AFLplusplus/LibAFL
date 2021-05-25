@@ -401,11 +401,15 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
-    use crate::bolts::tuples::tuple_list;
-    use crate::executors::{Executor, ForkserverExecutor};
-    use crate::inputs::NopInput;
-    use crate::observers::{ConstMapObserver, HitcountsMapObserver};
+    use crate::{
+        bolts::{
+            shmem::{ShMem, ShMemProvider, StdShMemProvider},
+            tuples::tuple_list,
+        },
+        executors::{Executor, ForkserverExecutor},
+        inputs::NopInput,
+        observers::{ConstMapObserver, HitcountsMapObserver},
+    };
     use std::env;
     #[test]
 
