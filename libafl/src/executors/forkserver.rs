@@ -109,11 +109,11 @@ impl ConfigTarget for Command {
                 rlim_max: 0,
             };
 
-            let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
+            let mut ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
-            let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
+            ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
@@ -137,6 +137,8 @@ impl OutFile {
             .expect("Failed to open the input file");
         Self { file: f }
     }
+
+    #[must_use]
     pub fn as_raw_fd(&self) -> RawFd {
         self.file.as_raw_fd()
     }
@@ -192,8 +194,8 @@ impl Forkserver {
             .spawn()
         {
             Ok(_) => {}
-            _ => {
-                return Err(Error::Forkserver(format!("Could not spawn a forkserver!")));
+            Err(_) => {
+                return Err(Error::Forkserver("Could not spawn a forkserver!".to_string()));
             }
         };
 
@@ -202,22 +204,25 @@ impl Forkserver {
         st_pipe.close_write_end();
 
         Ok(Self {
-            st_pipe: st_pipe,
-            ctl_pipe: ctl_pipe,
+            st_pipe,
+            ctl_pipe,
             child_pid: 0,
             status: 0,
             last_run_timed_out: 0,
         })
     }
 
+    #[must_use]
     pub fn last_run_timed_out(&self) -> i32 {
         self.last_run_timed_out
     }
 
+    #[must_use]
     pub fn status(&self) -> i32 {
         self.status
     }
 
+    #[must_use]
     pub fn child_pid(&self) -> u32 {
         self.child_pid
     }
@@ -232,8 +237,7 @@ impl Forkserver {
     }
 
     pub fn write_ctl(&mut self, val: i32) -> Result<usize, io::Error> {
-        let buf = val.to_ne_bytes();
-        let slen = self.ctl_pipe.write(&buf)?;
+        let slen = self.ctl_pipe.write(&val.to_ne_bytes())?;
 
         Ok(slen)
     }
@@ -257,12 +261,12 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(target: String, argv: Vec<String>, observers: OT) -> Result<Self, Error> {
+    pub fn new(target: String, arguments: Vec<String>, observers: OT) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = ".cur_input".to_string();
 
-        for item in argv {
+        for item in arguments {
             if item == "@@" && use_stdin {
                 use_stdin = false;
                 args.push(out_filename.clone());
@@ -271,7 +275,6 @@ where
             }
         }
 
-        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
 
         let out_file = OutFile::new(&out_filename);
 
@@ -290,9 +293,9 @@ where
                 println!("All right - fork server is up.");
             }
             _ => {
-                return Err(Error::Forkserver(format!(
+                return Err(Error::Forkserver(
                     "Unable to request new process from fork server (OOM?)"
-                )))
+                .to_string()))
             }
         }
 
@@ -331,26 +334,26 @@ where
         // Write to testcase
         self.out_file.write_buf(&input.target_bytes().as_slice());
 
-        let slen = self
+        let send_len = self
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
-        if slen != 4 {
-            return Err(Error::Forkserver(format!(
+        if send_len != 4 {
+            return Err(Error::Forkserver(
                 "Unable to request new process from fork server (OOM?)"
-            )));
+            .to_string()));
         }
 
-        let (rlen, pid) = self.forkserver.read_st()?;
-        if rlen != 4 {
-            return Err(Error::Forkserver(format!(
+        let (recv_len, pid) = self.forkserver.read_st()?;
+        if recv_len != 4 {
+            return Err(Error::Forkserver(
                 "Unable to request new process from fork server (OOM?)"
-            )));
+            .to_string()));
         }
 
         if pid <= 0 {
-            return Err(Error::Forkserver(format!(
+            return Err(Error::Forkserver(
                 "Fork server is misbehaving (OOM?)"
-            )));
+            .to_string()));
         }
 
         let (_, status) = self.forkserver.read_st()?;
