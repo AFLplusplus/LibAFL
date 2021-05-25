@@ -328,6 +328,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
+        E: Executor<Self, I, S, Z>,
         Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
     {
         match event {
@@ -346,6 +347,7 @@ where
 
                 let observers: OT = postcard::from_bytes(&observers_buf)?;
                 // TODO include ExitKind in NewTestcase
+                // TODO check for objective too
                 let is_interesting =
                     fuzzer.is_interesting(state, self, &input, &observers, &ExitKind::Ok)?;
                 if fuzzer
@@ -423,7 +425,7 @@ impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z> for LlmpEventManager<I, OT,
 where
     SP: ShMemProvider,
     ST: Stats,
-    E: Executor<I>,
+    E: Executor<Self, I, S, Z>,
     I: Input,
     OT: ObserversTuple,
     Z: IfInteresting<I, S> + IsInteresting<I, OT, S>, //CE: CustomEvent<I>,
@@ -469,7 +471,7 @@ impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT
 where
     SP: ShMemProvider,
     ST: Stats,
-    E: Executor<I>,
+    E: Executor<Self, I, S, Z>,
     I: Input,
     OT: ObserversTuple,
     Z: IfInteresting<I, S> + IsInteresting<I, OT, S>, //CE: CustomEvent<I>,
@@ -573,7 +575,7 @@ where
 impl<E, I, OT, S, SP, ST, Z> EventProcessor<E, S, Z>
     for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
+    E: Executor<LlmpEventManager<I, OT, S, SP, ST>, I, S, Z>,
     I: Input,
     Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
     OT: ObserversTuple,
@@ -589,7 +591,7 @@ where
 impl<E, I, OT, S, SP, ST, Z> EventManager<E, I, S, Z>
     for LlmpRestartingEventManager<I, OT, S, SP, ST>
 where
-    E: Executor<I>,
+    E: Executor<LlmpEventManager<I, OT, S, SP, ST>, I, S, Z>,
     I: Input,
     S: Serialize,
     Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,

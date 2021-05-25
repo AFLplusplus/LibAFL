@@ -13,8 +13,6 @@ pub use forkserver::{Forkserver, ForkserverExecutor, OutFile};
 pub mod combined;
 pub use combined::CombinedExecutor;
 
-use core::marker::PhantomData;
-
 use crate::{
     bolts::serdeany::SerdeAny,
     inputs::{HasTargetBytes, Input},
@@ -184,25 +182,35 @@ where
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<I>
+pub trait Executor<EM, I, S, Z>
 where
     I: Input,
 {
     /// Instruct the target about the input and run
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error>;
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error>;
 }
 
 /// A simple executor that does nothing.
 /// If intput len is 0, `run_target` will return Err
-struct NopExecutor<EM, I, S> {
-    phantom: PhantomData<(EM, I, S)>,
-}
+struct NopExecutor {}
 
-impl<EM, I, S> Executor<I> for NopExecutor<EM, I, S>
+impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor
 where
     I: Input + HasTargetBytes,
 {
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::Empty("Input Empty".into()))
         } else {
@@ -211,13 +219,8 @@ where
     }
 }
 
-impl<EM, I, S, Z> HasExecHooks<EM, I, S, Z> for NopExecutor<EM, I, S> where I: Input + HasTargetBytes
-{}
-
 #[cfg(test)]
 mod test {
-    use core::marker::PhantomData;
-
     use super::{Executor, NopExecutor};
     use crate::inputs::BytesInput;
 
@@ -225,10 +228,12 @@ mod test {
     fn nop_executor() {
         let empty_input = BytesInput::new(vec![]);
         let nonempty_input = BytesInput::new(vec![1u8]);
-        let mut executor = NopExecutor::<(), _, ()> {
-            phantom: PhantomData,
-        };
-        assert!(executor.run_target(&empty_input).is_err());
-        assert!(executor.run_target(&nonempty_input).is_ok());
+        let mut executor = NopExecutor {};
+        assert!(executor
+            .run_target(&mut (), &mut (), &mut (), &empty_input)
+            .is_err());
+        assert!(executor
+            .run_target(&mut (), &mut (), &mut (), &nonempty_input)
+            .is_ok());
     }
 }

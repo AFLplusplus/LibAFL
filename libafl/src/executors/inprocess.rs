@@ -18,9 +18,7 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
-    executors::{
-        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
-    },
+    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
@@ -43,39 +41,26 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
-impl<'a, H, I, OT, S> Executor<I> for InProcessExecutor<'a, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
     OT: ObserversTuple,
 {
     #[inline]
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
-        let ret = (self.harness_fn)(input);
-        Ok(ret)
-    }
-}
-
-impl<'a, EM, H, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
-where
-    H: FnMut(&I) -> ExitKind,
-    I: Input,
-    OT: ObserversTuple,
-{
-    #[inline]
-    fn pre_exec(
+    fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                _input as *const _ as *const c_void,
+                input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.observers_ptr,
@@ -83,9 +68,9 @@ where
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         #[cfg(all(windows, feature = "std"))]
@@ -93,7 +78,7 @@ where
             let data = &mut windows_exception_handler::GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                _input as *const _ as *const c_void,
+                input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.observers_ptr,
@@ -101,22 +86,14 @@ where
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _event_mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, event_mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
-        Ok(())
-    }
 
-    #[inline]
-    fn post_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+        let ret = (self.harness_fn)(input);
+
         #[cfg(unix)]
         unsafe {
             write_volatile(
@@ -133,7 +110,8 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-        Ok(())
+
+        Ok(ret)
     }
 }
 
@@ -742,6 +720,8 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
-        assert!(in_process_executor.run_target(&input).is_ok());
+        assert!(in_process_executor
+            .run_target(&mut (), &mut (), &mut (), &input)
+            .is_ok());
     }
 }

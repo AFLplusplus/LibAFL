@@ -4,9 +4,7 @@ use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventFirer, EventManager},
-    executors::{
-        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
-    },
+    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
     feedbacks::Feedback,
     inputs::Input,
     mark_feature_time,
@@ -321,10 +319,7 @@ impl<C, CS, E, EM, F, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<I>
-        + HasObservers<OT>
-        + HasExecHooks<EM, I, S, Self>
-        + HasObserversHooks<EM, I, OT, S, Self>,
+    E: Executor<EM, I, S, Self> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Self>,
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
@@ -521,10 +516,7 @@ where
         input: &I,
     ) -> Result<ExecuteInputResult, Error>
     where
-        E: Executor<I>
-            + HasObservers<OT>
-            + HasExecHooks<EM, I, S, Self>
-            + HasObserversHooks<EM, I, OT, S, Self>,
+        E: Executor<EM, I, S, Self> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Self>,
         OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
         EM: EventManager<E, I, S, Self>,
     {
@@ -533,16 +525,8 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        executor.pre_exec(self, state, event_mgr, input)?;
-        mark_feature_time!(state, PerfFeature::PreExec);
-
-        start_timer!(state);
-        let exit_kind = executor.run_target(input)?;
+        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        start_timer!(state);
-        executor.post_exec(self, state, event_mgr, input)?;
-        mark_feature_time!(state, PerfFeature::PostExec);
 
         *state.executions_mut() += 1;
 

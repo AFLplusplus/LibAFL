@@ -13,9 +13,7 @@ use std::{
 
 use crate::bolts::os::{dup2, pipes::Pipe};
 use crate::{
-    executors::{
-        Executor, ExitKind, HasExecHooks, HasExecHooksTuple, HasObservers, HasObserversHooks,
-    },
+    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
@@ -328,13 +326,19 @@ where
     }
 }
 
-impl<I, OT> Executor<I> for ForkserverExecutor<I, OT>
+impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
     #[inline]
-    fn run_target(&mut self, input: &I) -> Result<ExitKind, Error> {
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase
@@ -375,13 +379,6 @@ where
 
         Ok(exit_kind)
     }
-}
-
-impl<EM, I, OT, S, Z> HasExecHooks<EM, I, S, Z> for ForkserverExecutor<I, OT>
-where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
-{
 }
 
 impl<I, OT> HasObservers<OT> for ForkserverExecutor<I, OT>
