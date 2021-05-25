@@ -1637,6 +1637,7 @@ where
     }
 
     /// Create a new [`LlmpBroker`] sttaching to a TCP port
+    #[cfg(feature = "std")]
     pub fn create_attach_to_tcp(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         match tcp_bind(port) {
             Ok(listener) => {

@@ -131,6 +131,7 @@ where
         #[cfg(feature = "std")]
         println!("I am broker!!.");
 
+        // TODO we don't want always a broker here, thing about using different laucher process to spawn different configurations
         RestartingMgr::<I, OT, S, SP, ST>::builder()
             .shmem_provider(self.shmem_provider.clone())
             .stats(Some(self.stats.clone()))
@@ -140,7 +141,7 @@ where
             .build()
             .launch()?;
 
-        //broker exited. kill all clients.
+        // Broker exited. kill all clients.
         for handle in &handles {
             unsafe {
                 libc::kill(*handle, libc::SIGINT);
