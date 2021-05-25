@@ -41,6 +41,16 @@ impl Pipe {
             self.write_end = None;
         }
     }
+
+    #[must_use]
+    pub fn read_end(&self) -> Option<RawFd> {
+        self.read_end
+    }
+
+    #[must_use]
+    pub fn write_end(&self) -> Option<RawFd> {
+        self.write_end
+    }
 }
 
 #[cfg(feature = "std")]

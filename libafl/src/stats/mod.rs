@@ -243,14 +243,15 @@ where
         // Only print perf stats if the feature is enabled
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance stats. Skip the Client 0 which is the broker
-            for (i, client) in self.client_stats.iter().skip(1).enumerate() {
-                let fmt = format!("Client {:03}: {}", i + 1, client.introspection_stats);
-                (self.print_fn)(fmt);
-            }
+            // Print the client performance stats.
+            let fmt = format!(
+                "Client {:03}: {}",
+                sender_id, self.client_stats[sender_id as usize].introspection_stats
+            );
+            (self.print_fn)(fmt);
 
             // Separate the spacing just a bit
-            (self.print_fn)("\n".to_string());
+            (self.print_fn)("".to_string());
         }
     }
 }
