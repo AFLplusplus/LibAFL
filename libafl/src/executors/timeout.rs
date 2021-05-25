@@ -39,17 +39,52 @@ const ITIMER_REAL: c_int = 0;
 /// The timeout excutor is a wrapper that set a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
-    exec_tmout: Duration,
+    #[cfg(unix)]
+    itimerval: Itimerval,
+    #[cfg(unix)]
+    itimerval_zero: Itimerval,
 }
 
 impl<E> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
+    #[cfg(unix)]
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value_some = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_value_zero = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let it_interval_some = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let it_interval_zero = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_value: it_value_some,
+            it_interval: it_interval_some,
+        };
+        let itimerval_zero = Itimerval {
+            it_value: it_value_zero,
+            it_interval: it_interval_zero,
+        };
         Self {
             executor,
-            exec_tmout,
+            itimerval,
+            itimerval_zero,
         }
+    }
+
+    #[cfg(windows)]
+    pub fn new(executor: E, exec_tmout: Duration) -> Self {
+        Self { executor }
     }
 
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
@@ -72,23 +107,7 @@ where
     ) -> Result<ExitKind, Error> {
         #[cfg(unix)]
         unsafe {
-            let milli_sec = self.exec_tmout.as_millis();
-            let it_value = Timeval {
-                tv_sec: (milli_sec / 1000) as i64,
-                tv_usec: (milli_sec % 1000) as i64,
-            };
-            let it_interval = Timeval {
-                tv_sec: 0,
-                tv_usec: 0,
-            };
-            setitimer(
-                ITIMER_REAL,
-                &mut Itimerval {
-                    it_interval,
-                    it_value,
-                },
-                null_mut(),
-            );
+            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
         }
         #[cfg(windows)]
         {
@@ -100,22 +119,7 @@ where
 
         #[cfg(unix)]
         unsafe {
-            let it_value = Timeval {
-                tv_sec: 0,
-                tv_usec: 0,
-            };
-            let it_interval = Timeval {
-                tv_sec: 0,
-                tv_usec: 0,
-            };
-            setitimer(
-                ITIMER_REAL,
-                &mut Itimerval {
-                    it_interval,
-                    it_value,
-                },
-                null_mut(),
-            );
+            setitimer(ITIMER_REAL, &mut self.itimerval_zero, null_mut());
         }
         #[cfg(windows)]
         {
