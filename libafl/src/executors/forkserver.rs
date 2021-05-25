@@ -270,7 +270,7 @@ where
     pub fn new(target: String, argv: Vec<String>, observers: OT) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
-        let out_filename = format!("out-{}", 123456789); // TODO: replace it with a random number
+        let out_filename = ".cur_input".to_string();
 
         for item in argv {
             if item == "@@" && use_stdin {
