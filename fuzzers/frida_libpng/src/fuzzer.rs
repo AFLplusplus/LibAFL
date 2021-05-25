@@ -40,7 +40,7 @@ use libafl::{
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
-    Gum, NativePointer,
+    Gum, MemoryRange, NativePointer,
 };
 
 use std::{
@@ -53,7 +53,7 @@ use std::{
 };
 
 use libafl_frida::{
-    asan_rt::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+    asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
     helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     FridaOptions,
 };
@@ -190,17 +190,15 @@ where
         helper: &'c mut FH,
         timeout: Duration,
     ) -> Self {
-        let stalker = Stalker::new(gum);
+        let mut stalker = Stalker::new(gum);
 
-        // Let's exclude the main module and libc.so at least:
-        //stalker.exclude(&MemoryRange::new(
-        //Module::find_base_address(&env::args().next().unwrap()),
-        //get_module_size(&env::args().next().unwrap()),
-        //));
-        //stalker.exclude(&MemoryRange::new(
-        //Module::find_base_address("libc.so"),
-        //get_module_size("libc.so"),
-        //));
+        for range in helper.ranges().gaps(&(0..usize::MAX)) {
+            println!("excluding range: {:x}-{:x}", range.start, range.end);
+            stalker.exclude(&MemoryRange::new(
+                NativePointer(range.start as *mut c_void),
+                range.end - range.start,
+            ));
+        }
 
         Self {
             base: TimeoutExecutor::new(base, timeout),
@@ -385,7 +383,8 @@ unsafe fn fuzz(
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                InMemoryCorpus::new(),
+                OnDiskCorpus::new(PathBuf::from("./corpus_discovered")).unwrap(),
+                //InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new_save_meta(
@@ -440,15 +439,6 @@ unsafe fn fuzz(
             &mut frida_helper,
             Duration::new(10, 0),
         );
-        // Let's exclude the main module and libc.so at least:
-        //executor.stalker.exclude(&MemoryRange::new(
-        //Module::find_base_address(&env::args().next().unwrap()),
-        //get_module_size(&env::args().next().unwrap()),
-        //));
-        //executor.stalker.exclude(&MemoryRange::new(
-        //Module::find_base_address("libc.so"),
-        //get_module_size("libc.so"),
-        //));
 
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
