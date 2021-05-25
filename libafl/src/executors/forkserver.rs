@@ -128,14 +128,13 @@ pub struct OutFile {
 }
 
 impl OutFile {
-    pub fn new(file_name: &str) -> Self {
+    pub fn new(file_name: &str) -> Result<Self, Error> {
         let f = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(file_name)
-            .expect("Failed to open the input file");
-        Self { file: f }
+            .open(file_name)?;
+        Ok(Self { file: f })
     }
 
     #[must_use]
@@ -276,7 +275,7 @@ where
         }
 
 
-        let out_file = OutFile::new(&out_filename);
+        let out_file = OutFile::new(&out_filename)?;
 
         let mut forkserver = Forkserver::new(
             target.clone(),
