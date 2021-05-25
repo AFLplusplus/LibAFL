@@ -294,7 +294,7 @@ where
             }
             _ => {
                 return Err(Error::Forkserver(
-                    "Unable to request new process from fork server (OOM?)".to_string(),
+                    "Failed to start a forkserver".to_string(),
                 ))
             }
         }
@@ -409,23 +409,16 @@ mod tests {
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
             tuples::tuple_list,
         },
-        executors::{Executor, ForkserverExecutor},
+        executors::{ForkserverExecutor},
         inputs::NopInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
+        Error,
     };
-    use std::env;
     #[test]
 
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
-        let out_dir = env::var_os("OUT_DIR")
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-        let bin = format!(
-            "{}/../../../../../libafl_tests/src/forkserver_test.o",
-            out_dir
-        );
+        let bin = "/usr/bin/echo".to_string();
         let args = vec![String::from("@@")];
 
         let mut shmem = StdShMemProvider::new()
@@ -440,9 +433,17 @@ mod tests {
             &mut shmem_map,
         ));
 
-        let mut executors =
-            ForkserverExecutor::new(bin, args, tuple_list!(edges_observer)).unwrap();
-        let nop = NopInput {};
-        drop(executors.run_target(&nop));
+        let executor =
+            ForkserverExecutor::<NopInput, _>::new(bin, args, tuple_list!(edges_observer));
+        let result = match executor{
+            Ok(_) => true,
+            Err(e) => {
+                match e {
+                    Error::Forkserver(_) => true,
+                    _ => false,
+                }
+            }
+        };
+        assert!(result);
     }
 }
