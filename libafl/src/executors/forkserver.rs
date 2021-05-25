@@ -409,7 +409,7 @@ mod tests {
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
             tuples::tuple_list,
         },
-        executors::{ForkserverExecutor},
+        executors::ForkserverExecutor,
         inputs::NopInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
@@ -436,14 +436,12 @@ mod tests {
         let executor =
             ForkserverExecutor::<NopInput, _>::new(bin, args, tuple_list!(edges_observer));
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
-        let result = match executor{
+        let result = match executor {
             Ok(_) => true,
-            Err(e) => {
-                match e {
-                    Error::Forkserver(s) => s == "Failed to start a forkserver",
-                    _ => false,
-                }
-            }
+            Err(e) => match e {
+                Error::Forkserver(s) => s == "Failed to start a forkserver",
+                _ => false,
+            },
         };
         assert!(result);
     }
