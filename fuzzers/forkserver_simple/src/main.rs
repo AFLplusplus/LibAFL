@@ -98,7 +98,7 @@ pub fn main() {
     // Create the executor for the forkserver
     let mut executor = ForkserverExecutor::new(
         "../../libafl_tests/src/forkserver_test.o".to_string(),
-        vec![],
+        &[],
         tuple_list!(edges_observer, time_observer),
     )
     .expect("Failed to create the Executor");

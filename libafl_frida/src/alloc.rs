@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
 use libafl::bolts::os::walk_self_maps;
 use nix::{
     libc::memset,
