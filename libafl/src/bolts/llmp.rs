@@ -604,14 +604,9 @@ where
     /// Creates a new broker on the given port
     #[cfg(feature = "std")]
     pub fn broker_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        match tcp_bind(port) {
-            Ok(listener) => {
-                let mut broker = LlmpBroker::new(shmem_provider)?;
-                let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
-                Ok(LlmpConnection::IsBroker { broker })
-            }
-            Err(e) => Err(e),
-        }
+        Ok(LlmpConnection::IsBroker {
+            broker: LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
+        })
     }
 
     /// Creates a new client on the given port
@@ -1641,6 +1636,19 @@ where
         })
     }
 
+    /// Create a new [`LlmpBroker`] sttaching to a TCP port
+    #[cfg(feature = "std")]
+    pub fn create_attach_to_tcp(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        match tcp_bind(port) {
+            Ok(listener) => {
+                let mut broker = LlmpBroker::new(shmem_provider)?;
+                let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
+                Ok(broker)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     /// Allocate the next message on the outgoing map
     unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         self.llmp_out.alloc_next(buf_len)
@@ -2302,7 +2310,7 @@ where
     }
 
     /// Describe this client in a way that it can be recreated, for example after crash
-    fn describe(&self) -> Result<LlmpClientDescription, Error> {
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(LlmpClientDescription {
             sender: self.sender.describe()?,
             receiver: self.receiver.describe()?,
@@ -2310,7 +2318,7 @@ where
     }
 
     /// Create an existing client from description
-    fn existing_client_from_description(
+    pub fn existing_client_from_description(
         shmem_provider: SP,
         description: &LlmpClientDescription,
     ) -> Result<Self, Error> {
