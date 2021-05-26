@@ -3,8 +3,12 @@ use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
+
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+use libafl::bolts::os::find_mapping_for_address;
+
 use libafl::{
-    bolts::{os::find_mapping_for_address, ownedref::OwnedPtr, tuples::Named},
+    bolts::{ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
     events::EventFirer,
     executors::{ExitKind, HasExecHooks},

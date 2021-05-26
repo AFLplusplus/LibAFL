@@ -8,6 +8,8 @@ this helps finding mem errors early.
 
 use frida_gum::NativePointer;
 use hashbrown::HashMap;
+
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
 use libafl::bolts::os::{find_mapping_for_address, find_mapping_for_path};
 
 use nix::{
