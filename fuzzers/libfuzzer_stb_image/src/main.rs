@@ -20,7 +20,7 @@ use libafl::{
     observers::{StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
-    stats::SimpleStats,
+    stats::MultiStats,
     Error,
 };
 

@@ -83,7 +83,7 @@ pub struct FridaInstrumentationHelper<'a> {
     transformer: Option<Transformer<'a>>,
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
-    asan_runtime: Rc<RefCell<AsanRuntime>>,
+    asan_runtime: AsanRuntime,
     cmplog_runtime: CmpLogRuntime,
     ranges: RangeMap<usize, (u16, &'a str)>,
     options: &'a FridaOptions,

@@ -11,6 +11,7 @@ do
     echo "[+] Checking fmt and building $fuzzer"
     cd $fuzzer \
         && cargo fmt --all -- --check \
+        && cargo clippy \
         && cargo build \
         && cd .. \
     || exit 1
