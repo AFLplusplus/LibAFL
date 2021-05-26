@@ -1,6 +1,6 @@
 //! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
 
-use core::marker::PhantomData;
+use core::{marker::PhantomData, time::Duration};
 use std::{
     fs::{File, OpenOptions},
     io::{self, prelude::*, SeekFrom},
@@ -9,6 +9,7 @@ use std::{
         process::CommandExt,
     },
     process::{Command, Stdio},
+    mem::{self, MaybeUninit},
 };
 
 use crate::bolts::os::{dup2, pipes::Pipe};
@@ -20,6 +21,19 @@ use crate::{
 };
 
 const FORKSRV_FD: i32 = 198;
+
+#[repr(C)]
+struct Timeval {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+#[repr(C)]
+struct Itimerval {
+    pub it_interval: Timeval,
+    pub it_value: Timeval,
+}
+
 
 // Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
 pub trait ConfigTarget {
@@ -245,6 +259,53 @@ impl Forkserver {
 
         Ok(slen)
     }
+
+    pub fn reat_st_timed(&mut self, tmout: Duration) -> Result<(usize, i32), io::Error> {
+        let mut buf: [u8; 4] = [0u8; 4];
+        
+        
+        let rlen = self.st_pipe.read(&mut buf)?;
+
+
+        let val: i32 = i32::from_ne_bytes(buf);
+        Ok((rlen, val))  
+    }
+}
+
+
+pub struct TimeoutForkserverExecutor<E> {
+    executor: E,
+    exec_tmout: Duration,
+    itimerval: 
+}
+   
+impl<E> TimeoutForkserverExecutor<E> {
+    pub fn new(executor: E, exec_tmout: Duration) -> Self {
+        Self {
+            executor,
+            exec_tmout,
+            itimerval,
+        }
+    }
+}
+
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E>
+where
+    I: Input + HasTargetBytes,
+    E: Executor<EM, I, S, Z>,
+{
+    #[inline]
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        let mut exit_kind = ExitKind::Ok;
+
+        Ok(exit_kind)
+    }
 }
 
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
@@ -403,6 +464,10 @@ where
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
+
+
+
+
 
 #[cfg(test)]
 mod tests {
