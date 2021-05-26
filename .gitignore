@@ -9,6 +9,9 @@ Cargo.lock
 *.bin
 *.dll
 *.exe
+*.dSYM
+
+.cur_input
 
 crashes
 

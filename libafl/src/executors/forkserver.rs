@@ -266,7 +266,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple,
 {
-    pub fn new(target: String, arguments: Vec<String>, observers: OT) -> Result<Self, Error> {
+    pub fn new(target: String, arguments: &[String], observers: OT) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = ".cur_input".to_string();
@@ -418,10 +418,9 @@ mod tests {
         Error,
     };
     #[test]
-
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
-        let bin = "/usr/bin/echo".to_string();
+        let bin = "echo";
         let args = vec![String::from("@@")];
 
         let mut shmem = StdShMemProvider::new()
@@ -436,8 +435,11 @@ mod tests {
             &mut shmem_map,
         ));
 
-        let executor =
-            ForkserverExecutor::<NopInput, _>::new(bin, args, tuple_list!(edges_observer));
+        let executor = ForkserverExecutor::<NopInput, _>::new(
+            bin.to_string(),
+            &args,
+            tuple_list!(edges_observer),
+        );
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
             Ok(_) => true,

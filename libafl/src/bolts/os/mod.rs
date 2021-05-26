@@ -18,7 +18,10 @@ pub mod unix_signals;
 pub mod pipes;
 
 #[cfg(all(unix, feature = "std"))]
-use std::{ffi::CString, fs::File};
+use std::ffi::CString;
+
+#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+use std::fs::File;
 
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_exceptions;
