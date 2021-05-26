@@ -57,6 +57,7 @@ use libafl_frida::{
     helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     FridaOptions,
 };
+use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
@@ -317,6 +318,9 @@ unsafe fn fuzz(
             &modules_to_instrument,
         );
 
+        // Create an observation channel using cmplog map
+        let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
+
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
@@ -396,6 +400,7 @@ unsafe fn fuzz(
                 tuple_list!(
                     edges_observer,
                     time_observer,
+                    cmplog_observer,
                     AsanErrorsObserver::new(&ASAN_ERRORS)
                 ),
                 &mut fuzzer,
