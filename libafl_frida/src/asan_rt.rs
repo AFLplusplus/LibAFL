@@ -321,8 +321,14 @@ impl AsanRuntime {
     fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
         unsafe {
             let ret = self.allocator.alloc(size, 0x8);
-            if ptr != std::ptr::null_mut() {
-                (ptr as *mut u8).copy_to(ret as *mut u8, self.allocator.get_usable_size(ptr));
+            if ptr != std::ptr::null_mut() && ret != std::ptr::null_mut() {
+                let old_size = self.allocator.get_usable_size(ptr);
+                let copy_size = if size < old_size {
+                    size
+                } else {
+                    old_size
+                };
+                (ptr as *mut u8).copy_to(ret as *mut u8, copy_size);
             }
             self.allocator.release(ptr);
             ret
@@ -342,7 +348,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    fn hook_memalign(&mut self, size: usize, alignment: usize) -> *mut c_void {
+    fn hook_memalign(&mut self, alignment: usize, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
@@ -350,8 +356,8 @@ impl AsanRuntime {
     fn hook_posix_memalign(
         &mut self,
         pptr: *mut *mut c_void,
-        size: usize,
         alignment: usize,
+        size: usize,
     ) -> i32 {
         unsafe {
             *pptr = self.allocator.alloc(size, alignment);
@@ -688,7 +694,7 @@ impl AsanRuntime {
                     n,
                     Backtrace::new(),
                 )),
-                None,
+                Some(&self.instrumented_ranges),
             );
         }
         unsafe { memset(dest, c, n) }
@@ -1394,7 +1400,10 @@ impl AsanRuntime {
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        if this.module_map.as_ref().unwrap().find(invocation.return_addr() as u64).is_some() {
+                        let translated_address = this.real_address_for_stalked(invocation.return_addr() as usize);
+                        if (translated_address.is_some() && this.module_map.as_ref().unwrap().find(*translated_address.unwrap() as u64).is_some()) ||
+                           this.module_map.as_ref().unwrap().find(invocation.return_addr() as u64).is_some() {
+
                             this.[<hook_ $name>]($($param),*)
                         } else {
                             $name($($param),*)
