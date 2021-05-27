@@ -4,7 +4,7 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 
-#[cfg(all(feature = "std", any(target_os = "linux", target_os = "android")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use libafl::bolts::os::find_mapping_for_address;
 
 use libafl::{
@@ -46,8 +46,8 @@ pub(crate) enum AsanError {
     Leak((usize, AllocationMetadata)),
     StackOobRead(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
     StackOobWrite(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
-    BadFuncArgRead((String, usize, usize, Backtrace)),
-    BadFuncArgWrite((String, usize, usize, Backtrace)),
+    BadFuncArgRead((String, usize, usize, usize, Backtrace)),
+    BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
 }
 
 impl AsanError {
@@ -253,18 +253,38 @@ impl AsanErrors {
                     }
                 }
             }
-            AsanError::BadFuncArgRead((name, address, size, backtrace))
-            | AsanError::BadFuncArgWrite((name, address, size, backtrace)) => {
+            AsanError::BadFuncArgRead((name, pc, address, size, backtrace))
+            | AsanError::BadFuncArgWrite((name, pc, address, size, backtrace)) => {
                 writeln!(
                     output,
                     " in call to {}, argument {:#016x}, size: {:#x}",
                     name, address, size
                 )
                 .unwrap();
+                output.reset().unwrap();
+
                 #[cfg(target_arch = "aarch64")]
                 {
                     let invocation = Interceptor::current_invocation();
                     let cpu_context = invocation.cpu_context();
+                    if let Some((range, path)) = instrumented_ranges.unwrap().get_key_value(&pc) {
+                        writeln!(
+                            output,
+                            " at 0x{:x} ({}@0x{:04x})",
+                            pc,
+                            path,
+                            pc - range.start,
+                        )
+                        .unwrap();
+                    } else {
+                        writeln!(
+                            output,
+                            " at 0x{:x}",
+                            pc,
+                        )
+                        .unwrap();
+                    }
+
                     #[allow(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                     for reg in 0..29 {
