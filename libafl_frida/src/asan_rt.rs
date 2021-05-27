@@ -121,6 +121,7 @@ impl AsanRuntime {
             .map(|modname| modname.to_str().unwrap())
             .collect();
         self.module_map = Some(ModuleMap::new_from_names(&module_names));
+        #[cfg(target_arch = "aarch64")]
         self.hook_functions(gum);
         //unsafe {
         //let mem = self.allocator.alloc(0xac + 2, 8);
@@ -518,6 +519,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_write(&mut self, fd: i32, buf: *const c_void, count: usize) -> usize {
         extern "C" {
             fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
@@ -540,6 +542,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_read(&mut self, fd: i32, buf: *mut c_void, count: usize) -> usize {
         extern "C" {
             fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
@@ -562,6 +565,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_fgets(&mut self, s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void {
         extern "C" {
             fn fgets(s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void;
@@ -584,6 +588,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_memcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
         extern "C" {
             fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
@@ -620,6 +625,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_memcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
@@ -656,6 +662,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_mempcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
@@ -692,6 +699,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_memmove(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn memmove(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
@@ -728,6 +736,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_memset(&mut self, dest: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void;
@@ -750,6 +759,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_memchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
@@ -772,6 +782,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_memrchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
@@ -794,6 +805,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_memmem(
         &mut self,
         haystack: *const c_void,
@@ -840,7 +852,7 @@ impl AsanRuntime {
         unsafe { memmem(haystack, haystacklen, needle, needlelen) }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(all(not(target_os = "android"), target_arch = "aarch64"))]
     #[inline]
     fn hook_bzero(&mut self, s: *mut c_void, n: usize) {
         extern "C" {
@@ -863,7 +875,7 @@ impl AsanRuntime {
         unsafe { bzero(s, n) }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(all(not(target_os = "android"), target_arch = "aarch64"))]
     #[inline]
     fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) {
         extern "C" {
@@ -886,7 +898,7 @@ impl AsanRuntime {
         unsafe { explicit_bzero(s, n) }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(all(not(target_os = "android"), target_arch = "aarch64"))]
     #[inline]
     fn hook_bcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
         extern "C" {
@@ -924,6 +936,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
         extern "C" {
             fn strchr(s: *mut c_char, c: i32) -> *mut c_char;
@@ -947,6 +960,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strrchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
         extern "C" {
             fn strrchr(s: *mut c_char, c: i32) -> *mut c_char;
@@ -970,6 +984,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strcasecmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
         extern "C" {
             fn strcasecmp(s1: *const c_char, s2: *const c_char) -> i32;
@@ -1007,6 +1022,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strncasecmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
         extern "C" {
             fn strncasecmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
@@ -1043,6 +1059,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strcat(&mut self, s1: *mut c_char, s2: *const c_char) -> *mut c_char {
         extern "C" {
             fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char;
@@ -1080,6 +1097,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strcmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
         extern "C" {
             fn strcmp(s1: *const c_char, s2: *const c_char) -> i32;
@@ -1117,6 +1135,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strncmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
         extern "C" {
             fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
@@ -1153,6 +1172,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
         extern "C" {
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
@@ -1190,6 +1210,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strncpy(&mut self, dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char {
         extern "C" {
             fn strncpy(dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char;
@@ -1226,6 +1247,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_stpcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
         extern "C" {
             fn stpcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
@@ -1263,6 +1285,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strdup(&mut self, s: *const c_char) -> *mut c_char {
         extern "C" {
             fn strdup(s: *const c_char) -> *mut c_char;
@@ -1286,6 +1309,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strlen(&mut self, s: *const c_char) -> usize {
         extern "C" {
             fn strlen(s: *const c_char) -> usize;
@@ -1309,6 +1333,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strnlen(&mut self, s: *const c_char, n: usize) -> usize {
         extern "C" {
             fn strnlen(s: *const c_char, n: usize) -> usize;
@@ -1332,6 +1357,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strstr(&mut self, haystack: *const c_char, needle: *const c_char) -> *mut c_char {
         extern "C" {
             fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
@@ -1371,6 +1397,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_strcasestr(&mut self, haystack: *const c_char, needle: *const c_char) -> *mut c_char {
         extern "C" {
             fn strcasestr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
@@ -1410,6 +1437,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_atoi(&mut self, s: *const c_char) -> i32 {
         extern "C" {
             fn atoi(s: *const c_char) -> i32;
@@ -1433,6 +1461,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_atol(&mut self, s: *const c_char) -> i32 {
         extern "C" {
             fn atol(s: *const c_char) -> i32;
@@ -1456,6 +1485,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_atoll(&mut self, s: *const c_char) -> i64 {
         extern "C" {
             fn atoll(s: *const c_char) -> i64;
@@ -1479,6 +1509,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_wcslen(&mut self, s: *const wchar_t) -> usize {
         extern "C" {
             fn wcslen(s: *const wchar_t) -> usize;
@@ -1502,6 +1533,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_wcscpy(&mut self, dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t {
         extern "C" {
             fn wcscpy(dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t;
@@ -1543,6 +1575,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_wcscmp(&mut self, s1: *const wchar_t, s2: *const wchar_t) -> i32 {
         extern "C" {
             fn wcscmp(s1: *const wchar_t, s2: *const wchar_t) -> i32;
@@ -1584,6 +1617,7 @@ impl AsanRuntime {
     /// Hook all functions required for ASAN to function, replacing them with our own
     /// implementations.
     #[allow(clippy::items_after_statements)]
+    #[cfg(target_arch = "aarch64")]
     fn hook_functions(&mut self, gum: &Gum) {
         let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
 
