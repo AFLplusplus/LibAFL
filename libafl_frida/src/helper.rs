@@ -315,9 +315,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             }
                             if helper.options().drcov_enabled() {
                                 instruction.put_callout(|context| {
-                                    let real_address = helper
-                                        .asan_runtime
-                                        .real_address_for_stalked(pc(&context));
+                                    let real_address =
+                                        helper.asan_runtime.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
                                     helper

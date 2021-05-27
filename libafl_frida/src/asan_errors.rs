@@ -277,12 +277,7 @@ impl AsanErrors {
                         )
                         .unwrap();
                     } else {
-                        writeln!(
-                            output,
-                            " at 0x{:x}",
-                            pc,
-                        )
-                        .unwrap();
+                        writeln!(output, " at 0x{:x}", pc,).unwrap();
                     }
 
                     #[allow(clippy::non_ascii_literal)]
