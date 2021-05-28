@@ -270,7 +270,7 @@ impl Forkserver {
         let mut buf: [u8; 4] = [0u8; 4];
         let st_read = self.st_pipe.read_end().unwrap();
         let mut readfds = FdSet::new();
-        let mut copy = timeout.clone();
+        let mut copy = *timeout;
         readfds.insert(st_read);
         // We'll pass timeout.clone() not timeout, because select updates timeout to indicate how much time was left. See select(2)
         let sret = select(
@@ -285,7 +285,7 @@ impl Forkserver {
             let val: i32 = i32::from_ne_bytes(buf);
             Ok(Some((rlen, val)))
         } else {
-            return Ok(None);
+            Ok(None)
         }
     }
 }
@@ -344,8 +344,8 @@ where
             ));
         }
 
-        let (recv_len, pid) = self.executor.forkserver_mut().read_st()?;
-        if recv_len != 4 {
+        let (recv_pid_len, pid) = self.executor.forkserver_mut().read_st()?;
+        if recv_pid_len != 4 {
             return Err(Error::Forkserver(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
@@ -361,30 +361,27 @@ where
             .forkserver_mut()
             .set_child_pid(Pid::from_raw(pid));
 
-        match self
+        if let Some((_, status)) = self
             .executor
             .forkserver_mut()
             .read_st_timed(&mut self.timeout)?
         {
-            Some((_, status)) => {
-                self.executor.forkserver_mut().set_status(status);
-                if libc::WIFSIGNALED(self.executor.forkserver().status()) {
-                    exit_kind = ExitKind::Crash;
-                }
+            self.executor.forkserver_mut().set_status(status);
+            if libc::WIFSIGNALED(self.executor.forkserver().status()) {
+                exit_kind = ExitKind::Crash;
             }
-            None => {
-                self.executor.forkserver_mut().set_last_run_timed_out(1);
+        } else {
+            self.executor.forkserver_mut().set_last_run_timed_out(1);
 
-                // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
-                kill(self.executor.forkserver().child_pid(), Signal::SIGKILL)?;
-                let (recv_len, exit_code) = self.executor.forkserver_mut().read_st()?;
-                if recv_len != 4 || exit_code != 9 {
-                    return Err(Error::Forkserver(
-                        "Could not kill timed-out child".to_string(),
-                    ));
-                }
-                exit_kind = ExitKind::Timeout;
+            // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
+            kill(self.executor.forkserver().child_pid(), Signal::SIGKILL)?;
+            let (recv_status_len, exit_code) = self.executor.forkserver_mut().read_st()?;
+            if recv_status_len != 4 || exit_code != 9 {
+                return Err(Error::Forkserver(
+                    "Could not kill timed-out child".to_string(),
+                ));
             }
+            exit_kind = ExitKind::Timeout;
         }
 
         self.executor
@@ -505,8 +502,8 @@ where
             ));
         }
 
-        let (recv_len, pid) = self.forkserver.read_st()?;
-        if recv_len != 4 {
+        let (recv_pid_len, pid) = self.forkserver.read_st()?;
+        if recv_pid_len != 4 {
             return Err(Error::Forkserver(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
@@ -520,7 +517,12 @@ where
 
         self.forkserver.set_child_pid(Pid::from_raw(pid));
 
-        let (_, status) = self.forkserver.read_st()?;
+        let (recv_status_len, status) = self.forkserver.read_st()?;
+        if recv_status_len != 4 {
+            return Err(Error::Forkserver(
+                "Unable to communicate with fork server (OOM?)".to_string(),
+            ));
+        }
 
         self.forkserver.set_status(status);
 
