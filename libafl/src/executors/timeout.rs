@@ -36,7 +36,7 @@ extern "C" {
 #[cfg(unix)]
 const ITIMER_REAL: c_int = 0;
 
-/// The timeout excutor is a wrapper that set a timeout before each run
+/// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]

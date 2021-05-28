@@ -272,7 +272,7 @@ impl Forkserver {
         let mut readfds = FdSet::new();
         let mut copy = *timeout;
         readfds.insert(st_read);
-        // We'll pass timeout.clone() not timeout, because select updates timeout to indicate how much time was left. See select(2)
+        // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
         let sret = select(
             Some(readfds.highest().unwrap() + 1),
             &mut readfds,
@@ -300,6 +300,7 @@ pub trait HasForkserver {
     fn out_file_mut(&mut self) -> &mut OutFile;
 }
 
+/// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
 pub struct TimeoutForkserverExecutor<E> {
     executor: E,
     timeout: TimeVal,
