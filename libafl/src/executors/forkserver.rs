@@ -350,6 +350,13 @@ where
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
         }
+
+        if pid <= 0 {
+            return Err(Error::Forkserver(
+                "Fork server is misbehaving (OOM?)".to_string(),
+            ));
+        }
+
         self.executor
             .forkserver_mut()
             .set_child_pid(Pid::from_raw(pid));
@@ -510,6 +517,8 @@ where
                 "Fork server is misbehaving (OOM?)".to_string(),
             ));
         }
+
+        self.forkserver.set_child_pid(Pid::from_raw(pid));
 
         let (_, status) = self.forkserver.read_st()?;
 
