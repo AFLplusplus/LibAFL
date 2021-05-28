@@ -362,11 +362,17 @@ where
             .forkserver_mut()
             .set_child_pid(Pid::from_raw(pid));
 
-        if let Some((_, status)) = self
+        if let Some((recv_status_len, status)) = self
             .executor
             .forkserver_mut()
             .read_st_timed(&mut self.timeout)?
         {
+            if recv_status_len != 4 {
+                return Err(Error::Forkserver(
+                    "Unable to communicate with fork server (OOM?)".to_string(),
+                ));
+            }
+
             self.executor.forkserver_mut().set_status(status);
             if libc::WIFSIGNALED(self.executor.forkserver().status()) {
                 exit_kind = ExitKind::Crash;
