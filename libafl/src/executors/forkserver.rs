@@ -100,7 +100,7 @@ impl ConfigTarget for Command {
             return self;
         }
         let func = move || {
-            let memlimit: libc::rlim_t = memlimit << 20;
+            let memlimit: libc::rlim_t = (memlimit as libc::rlim_t) << 20;
             let r = libc::rlimit {
                 rlim_cur: memlimit,
                 rlim_max: memlimit,
