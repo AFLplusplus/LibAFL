@@ -9,31 +9,25 @@ use std::{
         process::CommandExt,
     },
     process::{Command, Stdio},
-    mem::{self, MaybeUninit},
 };
 
-use crate::bolts::os::{dup2, pipes::Pipe};
 use crate::{
+    bolts::os::{dup2, pipes::Pipe},
     executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
+use nix::{
+    sys::{
+        select::{select, FdSet},
+        signal::{kill, Signal},
+        time::{TimeVal, TimeValLike},
+    },
+    unistd::Pid,
+};
 
 const FORKSRV_FD: i32 = 198;
-
-#[repr(C)]
-struct Timeval {
-    pub tv_sec: i64,
-    pub tv_usec: i64,
-}
-
-#[repr(C)]
-struct Itimerval {
-    pub it_interval: Timeval,
-    pub it_value: Timeval,
-}
-
 
 // Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
 pub trait ConfigTarget {
@@ -176,7 +170,7 @@ impl OutFile {
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
-    child_pid: u32,
+    child_pid: Pid,
     status: i32,
     last_run_timed_out: i32,
 }
@@ -224,7 +218,7 @@ impl Forkserver {
         Ok(Self {
             st_pipe,
             ctl_pipe,
-            child_pid: 0,
+            child_pid: Pid::from_raw(0),
             status: 0,
             last_run_timed_out: 0,
         })
@@ -235,17 +229,29 @@ impl Forkserver {
         self.last_run_timed_out
     }
 
+    pub fn set_last_run_timed_out(&mut self, last_run_timed_out: i32) {
+        self.last_run_timed_out = last_run_timed_out;
+    }
+
     #[must_use]
     pub fn status(&self) -> i32 {
         self.status
     }
 
+    pub fn set_status(&mut self, status: i32) {
+        self.status = status;
+    }
+
     #[must_use]
-    pub fn child_pid(&self) -> u32 {
+    pub fn child_pid(&self) -> Pid {
         self.child_pid
     }
 
-    pub fn read_st(&mut self) -> Result<(usize, i32), io::Error> {
+    pub fn set_child_pid(&mut self, child_pid: Pid) {
+        self.child_pid = child_pid;
+    }
+
+    pub fn read_st(&mut self) -> Result<(usize, i32), Error> {
         let mut buf: [u8; 4] = [0u8; 4];
 
         let rlen = self.st_pipe.read(&mut buf)?;
@@ -254,45 +260,63 @@ impl Forkserver {
         Ok((rlen, val))
     }
 
-    pub fn write_ctl(&mut self, val: i32) -> Result<usize, io::Error> {
+    pub fn write_ctl(&mut self, val: i32) -> Result<usize, Error> {
         let slen = self.ctl_pipe.write(&val.to_ne_bytes())?;
 
         Ok(slen)
     }
 
-    pub fn reat_st_timed(&mut self, tmout: Duration) -> Result<(usize, i32), io::Error> {
+    pub fn read_st_timed(&mut self, timeout: &mut TimeVal) -> Result<Option<(usize, i32)>, Error> {
         let mut buf: [u8; 4] = [0u8; 4];
-        
-        
-        let rlen = self.st_pipe.read(&mut buf)?;
-
-
-        let val: i32 = i32::from_ne_bytes(buf);
-        Ok((rlen, val))  
+        let st_read = self.st_pipe.read_end().unwrap();
+        let mut readfds = FdSet::new();
+        let mut copy = timeout.clone();
+        readfds.insert(st_read);
+        // We'll pass timeout.clone() not timeout, because select updates timeout to indicate how much time was left. See select(2)
+        let sret = select(
+            Some(readfds.highest().unwrap() + 1),
+            &mut readfds,
+            None,
+            None,
+            &mut copy,
+        )?;
+        if sret > 0 {
+            let rlen = self.st_pipe.read(&mut buf)?;
+            let val: i32 = i32::from_ne_bytes(buf);
+            Ok(Some((rlen, val)))
+        } else {
+            return Ok(None);
+        }
     }
 }
 
+pub trait HasForkserver {
+    fn forkserver(&self) -> &Forkserver;
+
+    fn forkserver_mut(&mut self) -> &mut Forkserver;
+
+    fn out_file(&self) -> &OutFile;
+
+    fn out_file_mut(&mut self) -> &mut OutFile;
+}
 
 pub struct TimeoutForkserverExecutor<E> {
     executor: E,
-    exec_tmout: Duration,
-    itimerval: 
+    timeout: TimeVal,
 }
-   
+
 impl<E> TimeoutForkserverExecutor<E> {
-    pub fn new(executor: E, exec_tmout: Duration) -> Self {
-        Self {
-            executor,
-            exec_tmout,
-            itimerval,
-        }
+    pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
+        let milli_sec = exec_tmout.as_millis() as i64;
+        let timeout = TimeVal::milliseconds(milli_sec);
+        Ok(Self { executor, timeout })
     }
 }
 
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E>
 where
     I: Input + HasTargetBytes,
-    E: Executor<EM, I, S, Z>,
+    E: Executor<EM, I, S, Z> + HasForkserver,
 {
     #[inline]
     fn run_target(
@@ -303,6 +327,62 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
+
+        let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
+
+        self.executor
+            .out_file_mut()
+            .write_buf(&input.target_bytes().as_slice());
+
+        let send_len = self
+            .executor
+            .forkserver_mut()
+            .write_ctl(last_run_timed_out)?;
+        if send_len != 4 {
+            return Err(Error::Forkserver(
+                "Unable to request new process from fork server (OOM?)".to_string(),
+            ));
+        }
+
+        let (recv_len, pid) = self.executor.forkserver_mut().read_st()?;
+        if recv_len != 4 {
+            return Err(Error::Forkserver(
+                "Unable to request new process from fork server (OOM?)".to_string(),
+            ));
+        }
+        self.executor
+            .forkserver_mut()
+            .set_child_pid(Pid::from_raw(pid));
+
+        match self
+            .executor
+            .forkserver_mut()
+            .read_st_timed(&mut self.timeout)?
+        {
+            Some((_, status)) => {
+                self.executor.forkserver_mut().set_status(status);
+                if libc::WIFSIGNALED(self.executor.forkserver().status()) {
+                    exit_kind = ExitKind::Crash;
+                }
+            }
+            None => {
+                self.executor.forkserver_mut().set_last_run_timed_out(1);
+
+                // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
+                kill(self.executor.forkserver().child_pid(), Signal::SIGKILL)?;
+                let (recv_len, exit_code) = self.executor.forkserver_mut().read_st()?;
+                if recv_len != 4 || exit_code != 9 {
+                    return Err(Error::Forkserver(
+                        "Could not kill timed-out child".to_string(),
+                    ));
+                }
+                exit_kind = ExitKind::Timeout;
+            }
+        }
+
+        self.executor
+            .forkserver_mut()
+            .set_child_pid(Pid::from_raw(0));
 
         Ok(exit_kind)
     }
@@ -385,6 +465,10 @@ where
     pub fn forkserver(&self) -> &Forkserver {
         &self.forkserver
     }
+
+    pub fn out_file(&self) -> &OutFile {
+        &self.out_file
+    }
 }
 
 impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT>
@@ -428,15 +512,14 @@ where
         }
 
         let (_, status) = self.forkserver.read_st()?;
-        self.forkserver.status = status;
 
-        if !libc::WIFSTOPPED(self.forkserver.status()) {
-            self.forkserver.child_pid = 0;
-        }
+        self.forkserver.set_status(status);
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
         }
+
+        self.forkserver.set_child_pid(Pid::from_raw(0));
 
         Ok(exit_kind)
     }
@@ -465,13 +548,58 @@ where
 {
 }
 
+impl<I, OT> HasForkserver for ForkserverExecutor<I, OT>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn forkserver(&self) -> &Forkserver {
+        &self.forkserver
+    }
 
+    #[inline]
+    fn forkserver_mut(&mut self) -> &mut Forkserver {
+        &mut self.forkserver
+    }
 
+    #[inline]
+    fn out_file(&self) -> &OutFile {
+        &self.out_file
+    }
 
+    #[inline]
+    fn out_file_mut(&mut self) -> &mut OutFile {
+        &mut self.out_file
+    }
+}
+
+impl<E, OT> HasObservers<OT> for TimeoutForkserverExecutor<E>
+where
+    E: HasObservers<OT>,
+    OT: ObserversTuple,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        self.executor.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.executor.observers_mut()
+    }
+}
+
+impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutForkserverExecutor<E>
+where
+    E: HasObservers<OT>,
+    I: Input,
+    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+{
+}
 
 #[cfg(test)]
 mod tests {
-
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -504,6 +632,7 @@ mod tests {
         let executor =
             ForkserverExecutor::<NopInput, _>::new(bin, args, tuple_list!(edges_observer));
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
+
         let result = match executor {
             Ok(_) => true,
             Err(e) => match e {
