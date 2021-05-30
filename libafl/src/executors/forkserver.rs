@@ -3,7 +3,7 @@
 use core::{marker::PhantomData, time::Duration};
 use std::{
     fs::{File, OpenOptions},
-    io::{self, prelude::*, SeekFrom},
+    io::{self, prelude::*, ErrorKind, SeekFrom},
     os::unix::{
         io::{AsRawFd, RawFd},
         process::CommandExt,
@@ -268,7 +268,10 @@ impl Forkserver {
 
     pub fn read_st_timed(&mut self, timeout: &mut TimeVal) -> Result<Option<(usize, i32)>, Error> {
         let mut buf: [u8; 4] = [0u8; 4];
-        let st_read = self.st_pipe.read_end().unwrap();
+        let st_read = match self.st_pipe.read_end() {
+            Some(fd) => fd,
+            None => return Err(Error::File(io::Error::new(ErrorKind::BrokenPipe,"Read pipe end was already closed")))
+        };
         let mut readfds = FdSet::new();
         let mut copy = *timeout;
         readfds.insert(st_read);
