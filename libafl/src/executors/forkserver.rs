@@ -289,14 +289,12 @@ impl Forkserver {
             &mut copy,
         )?;
         if sret > 0 {
-            match self.st_pipe.read_exact(&mut buf) {
-                Ok(_) => (),
-                Err(_) => {
-                    return Err(Error::Forkserver(
-                        "Unable to communicate with fork server (OOM?)".to_string(),
-                    ));
-                }
+            if let Err(_) = self.st_pipe.read_exact(&mut buf) {
+                return Err(Error::Forkserver(
+                    "Unable to communicate with fork server (OOM?)".to_string(),
+                ));
             }
+
             let val: i32 = i32::from_ne_bytes(buf);
             Ok(Some(val))
         } else {
