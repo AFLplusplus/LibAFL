@@ -274,7 +274,7 @@ impl Forkserver {
                 return Err(Error::File(io::Error::new(
                     ErrorKind::BrokenPipe,
                     "Read pipe end was already closed",
-                )))
+                )));
             }
         };
         let mut readfds = FdSet::new();
