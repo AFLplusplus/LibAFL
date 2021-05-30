@@ -8,7 +8,7 @@ pub use timeout::TimeoutExecutor;
 #[cfg(all(feature = "std", unix))]
 pub mod forkserver;
 #[cfg(all(feature = "std", unix))]
-pub use forkserver::{Forkserver, ForkserverExecutor, OutFile};
+pub use forkserver::{Forkserver, ForkserverExecutor, OutFile, TimeoutForkserverExecutor};
 
 pub mod combined;
 pub use combined::CombinedExecutor;
