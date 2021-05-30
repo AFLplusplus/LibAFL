@@ -266,11 +266,16 @@ impl Forkserver {
         Ok(slen)
     }
 
-    pub fn read_st_timed(&mut self, timeout: &mut TimeVal) -> Result<Option<(usize, i32)>, Error> {
+    pub fn read_st_timed(&mut self, timeout: &mut TimeVal) -> Result<Option<i32>, Error> {
         let mut buf: [u8; 4] = [0u8; 4];
         let st_read = match self.st_pipe.read_end() {
             Some(fd) => fd,
-            None => return Err(Error::File(io::Error::new(ErrorKind::BrokenPipe,"Read pipe end was already closed")))
+            None => {
+                return Err(Error::File(io::Error::new(
+                    ErrorKind::BrokenPipe,
+                    "Read pipe end was already closed",
+                )))
+            }
         };
         let mut readfds = FdSet::new();
         let mut copy = *timeout;
@@ -284,9 +289,16 @@ impl Forkserver {
             &mut copy,
         )?;
         if sret > 0 {
-            let rlen = self.st_pipe.read(&mut buf)?;
+            match self.st_pipe.read_exact(&mut buf) {
+                Ok(_) => (),
+                Err(_) => {
+                    return Err(Error::Forkserver(
+                        "Unable to communicate with fork server (OOM?)".to_string(),
+                    ));
+                }
+            }
             let val: i32 = i32::from_ne_bytes(buf);
-            Ok(Some((rlen, val)))
+            Ok(Some(val))
         } else {
             Ok(None)
         }
@@ -365,17 +377,11 @@ where
             .forkserver_mut()
             .set_child_pid(Pid::from_raw(pid));
 
-        if let Some((recv_status_len, status)) = self
+        if let Some(status) = self
             .executor
             .forkserver_mut()
             .read_st_timed(&mut self.timeout)?
         {
-            if recv_status_len != 4 {
-                return Err(Error::Forkserver(
-                    "Unable to communicate with fork server (OOM?)".to_string(),
-                ));
-            }
-
             self.executor.forkserver_mut().set_status(status);
             if libc::WIFSIGNALED(self.executor.forkserver().status()) {
                 exit_kind = ExitKind::Crash;
