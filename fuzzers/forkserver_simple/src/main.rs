@@ -103,7 +103,7 @@ pub fn main() {
             tuple_list!(edges_observer, time_observer),
         )
         .unwrap(),
-        Duration::new(10, 0),
+        Duration::from_millis(5000),
     )
     .expect("Failed to create the executor.");
 
