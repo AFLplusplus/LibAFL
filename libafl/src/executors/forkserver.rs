@@ -388,7 +388,7 @@ where
             self.executor.forkserver_mut().set_last_run_timed_out(1);
 
             // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
-            kill(self.executor.forkserver().child_pid(), Signal::SIGKILL)?;
+            kill(self.executor.forkserver().child_pid(), Signal::SIGKILL).unwrap();
             let (recv_status_len, _) = self.executor.forkserver_mut().read_st()?;
             if recv_status_len != 4 {
                 return Err(Error::Forkserver(
