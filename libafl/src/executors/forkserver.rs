@@ -389,8 +389,8 @@ where
 
             // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
             kill(self.executor.forkserver().child_pid(), Signal::SIGKILL)?;
-            let (recv_status_len, exit_code) = self.executor.forkserver_mut().read_st()?;
-            if recv_status_len != 4 || exit_code != 9 {
+            let (recv_status_len, _) = self.executor.forkserver_mut().read_st()?;
+            if recv_status_len != 4 {
                 return Err(Error::Forkserver(
                     "Could not kill timed-out child".to_string(),
                 ));
