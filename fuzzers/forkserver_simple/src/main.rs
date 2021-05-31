@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use core::time::Duration;
 use libafl::{
     bolts::{
@@ -23,6 +22,7 @@ use libafl::{
     state::{HasCorpus, StdState},
     stats::SimpleStats,
 };
+use std::path::PathBuf;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -101,9 +101,11 @@ pub fn main() {
             "../../libafl_tests/src/forkserver_test.o".to_string(),
             &[],
             tuple_list!(edges_observer, time_observer),
-        ).unwrap(),
-        Duration::new(10, 0)
-    ).expect("Failed to create the executor.");
+        )
+        .unwrap(),
+        Duration::new(10, 0),
+    )
+    .expect("Failed to create the executor.");
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
