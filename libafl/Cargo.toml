@@ -37,7 +37,7 @@ harness = false
 
 [features]
 default = ["std", "anymap_debug", "derive", "llmp_compression"]
-std = [] # print, env, launcher ... support
+std = ["serde_json"] # print, env, launcher ... support
 anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
