@@ -42,7 +42,7 @@ jobs:
       run: cargo build --verbose
     # cargo-hack tests/checks each crate in the workspace
     - name: Run tests
-      run: cargo hack test
+      run: cargo hack test --all-features
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
     - name: Check each feature
       run: cargo hack check --each-feature
