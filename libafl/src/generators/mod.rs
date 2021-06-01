@@ -1,7 +1,7 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
 use alloc::vec::Vec;
-use core::{cmp::min, marker::PhantomData};
+use core::cmp::min;
 
 use crate::{
     bolts::rands::Rand,
@@ -27,15 +27,11 @@ where
 
 #[derive(Clone, Debug)]
 /// Generates random bytes
-pub struct RandBytesGenerator<R>
-where
-    R: Rand,
-{
+pub struct RandBytesGenerator {
     max_size: usize,
-    phantom: PhantomData<R>,
 }
 
-impl<R> Generator<BytesInput, R> for RandBytesGenerator<R>
+impl<R> Generator<BytesInput, R> for RandBytesGenerator
 where
     R: Rand,
 {
@@ -55,28 +51,21 @@ where
     }
 }
 
-impl<R> RandBytesGenerator<R>
-where
-    R: Rand,
-{
+impl RandBytesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
     pub fn new(max_size: usize) -> Self {
-        Self {
-            max_size,
-            phantom: PhantomData,
-        }
+        Self { max_size }
     }
 }
 
 #[derive(Clone, Debug)]
 /// Generates random printable characters
-pub struct RandPrintablesGenerator<R> {
+pub struct RandPrintablesGenerator {
     max_size: usize,
-    phantom: PhantomData<R>,
 }
 
-impl<R> Generator<BytesInput, R> for RandPrintablesGenerator<R>
+impl<R> Generator<BytesInput, R> for RandPrintablesGenerator
 where
     R: Rand,
 {
@@ -97,16 +86,10 @@ where
     }
 }
 
-impl<R> RandPrintablesGenerator<R>
-where
-    R: Rand,
-{
+impl RandPrintablesGenerator {
     /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
     #[must_use]
     pub fn new(max_size: usize) -> Self {
-        Self {
-            max_size,
-            phantom: PhantomData,
-        }
+        Self { max_size }
     }
 }
