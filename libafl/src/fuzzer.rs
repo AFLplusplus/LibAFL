@@ -17,6 +17,8 @@ use crate::{
 
 #[cfg(feature = "introspection")]
 use crate::stats::PerfFeature;
+#[cfg(feature = "introspection")]
+use alloc::boxed::Box;
 
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
