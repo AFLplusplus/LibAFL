@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
