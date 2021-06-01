@@ -108,26 +108,54 @@ where
 {
 }
 
-/// Compose [`Feedback`]`s` with an `AND` operation
-pub struct AndFeedback<A, B, I, S>
+pub struct FeedbackTuple<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
+    FL: FeedbackLogic<A, B, I, S>,
     I: Input,
 {
-    /// The first [`Feedback`] to `AND`.
-    pub first: A,
-    /// The second [`Feedback`] to `AND`.
-    pub second: B,
-    /// The name
+    pub head: A,
+    pub tail: B,
     name: String,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<(I, S, FL)>,
 }
 
-impl<A, B, I, S> Feedback<I, S> for AndFeedback<A, B, I, S>
+impl<A, B, I, S, FL> Named for FeedbackTuple<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
+    FL: FeedbackLogic<A, B, I, S>,
+    I: Input,
+{
+    fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+}
+
+impl<A, B, I, S, FL> FeedbackTuple<A, B, I, S, FL>
+where
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
+    FL: FeedbackLogic<A, B, I, S>,
+    I: Input,
+{
+    pub fn new(head: A, tail: B) -> Self {
+        let name = format!("{} ({},{})", FL::name(), head.name(), tail.name());
+        Self {
+            head,
+            tail,
+            name,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<A, B, I, S, FL> Feedback<I, S> for FeedbackTuple<A, B, I, S, FL>
+where
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
+    FL: FeedbackLogic<A, B, I, S>,
     I: Input,
 {
     fn is_interesting<EM, OT>(
@@ -142,14 +170,15 @@ where
         EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
-        let a = self
-            .first
-            .is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = a
-            && self
-                .second
-                .is_interesting(state, manager, input, observers, exit_kind)?;
-        Ok(b)
+        FL::is_pair_interesting(
+            &mut self.head,
+            &mut self.tail,
+            state,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )
     }
 
     #[cfg(feature = "introspection")]
@@ -167,96 +196,87 @@ where
         EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
-        // Execute this feedback
-        let a = self.first.is_interesting_with_perf(
+        FL::is_pair_interesting_with_perf(
+            &mut self.head,
+            &mut self.tail,
             state,
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
-        )?;
-        let b = a
-            && self.second.is_interesting_with_perf(
-                state,
-                manager,
-                input,
-                observers,
-                &exit_kind,
-                feedback_stats,
-                feedback_index + 1,
-            )?;
-        Ok(b)
+        )
     }
 
     #[inline]
     fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.first.append_metadata(state, testcase)?;
-        self.second.append_metadata(state, testcase)
+        self.head.append_metadata(state, testcase)?;
+        self.tail.append_metadata(state, testcase)
     }
 
     #[inline]
     fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(state, input)?;
-        self.second.discard_metadata(state, input)
+        self.head.discard_metadata(state, input)?;
+        self.tail.discard_metadata(state, input)
     }
 }
 
-impl<A, B, I, S> Named for AndFeedback<A, B, I, S>
+pub trait FeedbackLogic<A, B, I, S>: 'static
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
 {
-    #[inline]
-    fn name(&self) -> &str {
-        &self.name
+    fn name() -> &'static str;
+
+    fn is_pair_interesting<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple;
+
+    #[cfg(feature = "introspection")]
+    fn is_pair_interesting_with_perf<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple;
+}
+
+pub struct LogicEagerOr {}
+pub struct LogicFastOr {}
+pub struct LogicAnd {}
+
+impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicEagerOr
+where
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
+    I: Input,
+{
+    fn name() -> &'static str {
+        "Eager OR"
     }
-}
 
-impl<A, B, I, S> AndFeedback<A, B, I, S>
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-{
-    /// Creates a new [`AndFeedback`], resulting in the `AND` of two feedbacks.
-    pub fn new(first: A, second: B) -> Self {
-        let name = format!("And({}, {})", first.name(), second.name());
-        Self {
-            first,
-            second,
-            name,
-            phantom: PhantomData,
-        }
-    }
-}
-
-/// Compose feedbacks with an OR operation
-pub struct OrFeedback<A, B, I, S>
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-{
-    /// The first [`Feedback`]
-    pub first: A,
-    /// The second [`Feedback`], `OR`ed with the first.
-    pub second: B,
-    /// The name
-    name: String,
-    phantom: PhantomData<(I, S)>,
-}
-
-impl<A, B, I, S> Feedback<I, S> for OrFeedback<A, B, I, S>
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-{
-    fn is_interesting<EM, OT>(
-        &mut self,
+    fn is_pair_interesting<EM, OT>(
+        first: &mut A,
+        second: &mut B,
         state: &mut S,
         manager: &mut EM,
         input: &I,
@@ -267,19 +287,15 @@ where
         EM: EventFirer<I, S>,
         OT: ObserversTuple,
     {
-        let a = self
-            .first
-            .is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = a
-            || self
-                .second
-                .is_interesting(state, manager, input, observers, exit_kind)?;
-        Ok(b)
+        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
+        let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
+        Ok(a || b)
     }
 
     #[cfg(feature = "introspection")]
-    fn is_interesting_with_perf<EM, OT>(
-        &mut self,
+    fn is_pair_interesting_with_perf<EM, OT>(
+        first: &mut A,
+        second: &mut B,
         state: &mut S,
         manager: &mut EM,
         input: &I,
@@ -293,7 +309,7 @@ where
         OT: ObserversTuple,
     {
         // Execute this feedback
-        let a = self.first.is_interesting_with_perf(
+        let a = first.is_interesting_with_perf(
             state,
             manager,
             input,
@@ -302,61 +318,175 @@ where
             feedback_stats,
             feedback_index,
         )?;
-        let b = a
-            || self.second.is_interesting_with_perf(
-                state,
-                manager,
-                input,
-                observers,
-                &exit_kind,
-                feedback_stats,
-                feedback_index + 1,
-            )?;
-        Ok(b)
-    }
 
-    #[inline]
-    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.first.append_metadata(state, testcase)?;
-        self.second.append_metadata(state, testcase)
-    }
-
-    #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(state, input)?;
-        self.second.discard_metadata(state, input)
+        let b = second.is_interesting_with_perf(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index + 1,
+        )?;
+        Ok(a || b)
     }
 }
 
-impl<A, B, I, S> Named for OrFeedback<A, B, I, S>
+impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicFastOr
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
 {
-    #[inline]
-    fn name(&self) -> &str {
-        &self.name
+    fn name() -> &'static str {
+        "Fast OR"
     }
-}
 
-impl<A, B, I, S> OrFeedback<A, B, I, S>
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-{
-    /// Creates a new [`OrFeedback`] for two feedbacks.
-    pub fn new(first: A, second: B) -> Self {
-        let name = format!("Or({}, {})", first.name(), second.name());
-        Self {
-            first,
-            second,
-            name,
-            phantom: PhantomData,
+    fn is_pair_interesting<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple,
+    {
+        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
+        if a {
+            return Ok(true);
         }
+
+        second.is_interesting(state, manager, input, observers, exit_kind)
+    }
+
+    #[cfg(feature = "introspection")]
+    fn is_pair_interesting_with_perf<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple,
+    {
+        // Execute this feedback
+        let a = first.is_interesting_with_perf(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index,
+        )?;
+
+        if a {
+            return Ok(true);
+        }
+
+        second.is_interesting_with_perf(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index + 1,
+        )
     }
 }
+
+impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicAnd
+where
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
+    I: Input,
+{
+    fn name() -> &'static str {
+        "AND"
+    }
+
+    fn is_pair_interesting<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple,
+    {
+        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
+        let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
+        Ok(a && b)
+    }
+
+    #[cfg(feature = "introspection")]
+    fn is_pair_interesting_with_perf<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple,
+    {
+        // Execute this feedback
+        let a = first.is_interesting_with_perf(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index,
+        )?;
+
+        let b = second.is_interesting_with_perf(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index + 1,
+        )?;
+        Ok(a && b)
+    }
+}
+
+/// Compose feedbacks with an AND operation
+pub type AndFeedback<A, B, I, S> = FeedbackTuple<A, B, I, S, LogicAnd>;
+
+/// Compose feedbacks with an Eager-OR operation
+/// Eager stands for trying to compute all feedbacks before returning
+/// This means that all feedbacks functions are called even if a result can already be concluded
+pub type EagerOrFeedback<A, B, I, S> = FeedbackTuple<A, B, I, S, LogicEagerOr>;
+
+/// Compose feedbacks with an Fast-OR operation
+/// Fast OR stops computing feedbacks after finding the first positive feedback
+/// This means any feedback that is not first might be skipped, use caution when using with
+/// `TimeFeedback`
+pub type FastOrFeedback<A, B, I, S> = FeedbackTuple<A, B, I, S, LogicFastOr>;
 
 /// Compose feedbacks with an OR operation
 pub struct NotFeedback<A, I, S>
@@ -444,12 +574,22 @@ macro_rules! feedback_and {
 
 /// Variadic macro to create a chain of OrFeedback
 #[macro_export]
-macro_rules! feedback_or {
+macro_rules! feedback_or_eager {
     ( $last:expr ) => { $last };
 
     ( $head:expr, $($tail:expr), +) => {
         // recursive call
-        $crate::feedbacks::OrFeedback::new($head , feedback_or!($($tail),+))
+        $crate::feedbacks::EagerOrFeedback::new($head , feedback_or_eager!($($tail),+))
+    };
+}
+
+#[macro_export]
+macro_rules! feedback_or_fast {
+    ( $last:expr ) => { $last };
+
+    ( $head:expr, $($tail:expr), +) => {
+        // recursive call
+        $crate::feedbacks::FastOrFeedback::new($head , feedback_or_fast!($($tail),+))
     };
 }
 
