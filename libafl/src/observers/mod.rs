@@ -90,7 +90,7 @@ impl<EM, I, S, Z> HasExecHooks<EM, I, S, Z> for TimeObserver {
         _mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error> {
-        self.last_runtime = Some(current_time() - self.start_time);
+        self.last_runtime = current_time().checked_sub(self.start_time);
         Ok(())
     }
 }

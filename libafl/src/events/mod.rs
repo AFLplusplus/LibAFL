@@ -13,6 +13,8 @@ use crate::{inputs::Input, observers::ObserversTuple, stats::UserStats, Error};
 
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
+#[cfg(feature = "introspection")]
+use alloc::boxed::Box;
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]

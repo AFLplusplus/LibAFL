@@ -304,6 +304,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 for instruction in basic_block {
                     let instr = instruction.instr();
                     let address = instr.address();
+                    //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
                     //println!("address: {:x} contains: {:?}", address, helper.ranges.contains_key(&(address as usize)));
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {
@@ -314,13 +315,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             }
                             if helper.options().drcov_enabled() {
                                 instruction.put_callout(|context| {
-                                    let real_address = match helper
-                                        .asan_runtime
-                                        .real_address_for_stalked(pc(&context))
-                                    {
-                                        Some(address) => *address,
-                                        None => pc(&context),
-                                    };
+                                    let real_address =
+                                        helper.asan_runtime.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
                                     helper
