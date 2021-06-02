@@ -19,7 +19,6 @@ use capstone::{
     Capstone, Insn,
 };
 
-
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
@@ -43,12 +42,10 @@ use crate::FridaOptions;
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 use crate::asan_rt::AsanRuntime;
 
-
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
-
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
 pub trait FridaHelper<'a> {

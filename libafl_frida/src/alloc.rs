@@ -65,7 +65,6 @@ impl Allocator {
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
 
-
         for try_shadow_bit in &[46usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {

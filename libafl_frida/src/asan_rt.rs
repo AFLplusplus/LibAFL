@@ -230,9 +230,7 @@ impl AsanRuntime {
 
         let max_start = end - stack_rlimit.rlim_cur as usize;
 
-        let flags = ANONYMOUS_FLAG
-                        | MapFlags::MAP_FIXED
-                        | MapFlags::MAP_PRIVATE;
+        let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
         let flags = flags | MapFlags::MAP_STACK;
 
