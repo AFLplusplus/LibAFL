@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -36,18 +36,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Default Build
+    - name: Install cargo-hack
+      run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
+    - name: Run a normal build
       run: cargo build --verbose
-    - name: Default Test
-      run: cargo test --verbose
-    - name: Build all features
-      run: cd libafl && cargo build --all-features --verbose
-    - name: Test all features
-      run: cd libafl && cargo test --all-features --verbose
-    - name: Build no_std
-      run: cd libafl && cargo build --no-default-features --verbose
-    - name: Test no_std
-      run: cd libafl && cargo test --no-default-features --verbose
+    # cargo-hack tests/checks each crate in the workspace
+    - name: Run tests
+      run: cargo hack test --all-features
+    # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
+    - name: Check each feature
+      run: cargo hack check --each-feature
     - name: Build examples
       run: cargo build --examples --verbose
     - uses: actions/checkout@v2

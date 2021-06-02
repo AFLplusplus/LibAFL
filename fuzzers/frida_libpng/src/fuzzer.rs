@@ -113,9 +113,6 @@ where
                 libc::raise(libc::SIGABRT);
             }
         }
-        if self.helper.stalker_enabled() {
-            self.stalker.deactivate();
-        }
         self.helper.post_exec(input);
         res
     }
