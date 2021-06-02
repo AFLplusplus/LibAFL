@@ -108,20 +108,20 @@ where
 {
 }
 
-pub struct FeedbackTuple<A, B, I, S, FL>
+pub struct CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
 {
-    pub head: A,
-    pub tail: B,
+    pub first: A,
+    pub second: B,
     name: String,
     phantom: PhantomData<(I, S, FL)>,
 }
 
-impl<A, B, I, S, FL> Named for FeedbackTuple<A, B, I, S, FL>
+impl<A, B, I, S, FL> Named for CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -133,25 +133,25 @@ where
     }
 }
 
-impl<A, B, I, S, FL> FeedbackTuple<A, B, I, S, FL>
+impl<A, B, I, S, FL> CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
 {
-    pub fn new(head: A, tail: B) -> Self {
-        let name = format!("{} ({},{})", FL::name(), head.name(), tail.name());
+    pub fn new(first: A, second: B) -> Self {
+        let name = format!("{} ({},{})", FL::name(), first.name(), second.name());
         Self {
-            head,
-            tail,
+            first,
+            second,
             name,
             phantom: PhantomData,
         }
     }
 }
 
-impl<A, B, I, S, FL> Feedback<I, S> for FeedbackTuple<A, B, I, S, FL>
+impl<A, B, I, S, FL> Feedback<I, S> for CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -171,8 +171,8 @@ where
         OT: ObserversTuple,
     {
         FL::is_pair_interesting(
-            &mut self.head,
-            &mut self.tail,
+            &mut self.first,
+            &mut self.second,
             state,
             manager,
             input,
@@ -197,8 +197,8 @@ where
         OT: ObserversTuple,
     {
         FL::is_pair_interesting_with_perf(
-            &mut self.head,
-            &mut self.tail,
+            &mut self.first,
+            &mut self.second,
             state,
             manager,
             input,
@@ -211,14 +211,14 @@ where
 
     #[inline]
     fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.head.append_metadata(state, testcase)?;
-        self.tail.append_metadata(state, testcase)
+        self.first.append_metadata(state, testcase)?;
+        self.second.append_metadata(state, testcase)
     }
 
     #[inline]
     fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.head.discard_metadata(state, input)?;
-        self.tail.discard_metadata(state, input)
+        self.first.discard_metadata(state, input)?;
+        self.second.discard_metadata(state, input)
     }
 }
 
@@ -262,7 +262,8 @@ where
 
 pub struct LogicEagerOr {}
 pub struct LogicFastOr {}
-pub struct LogicAnd {}
+pub struct LogicEagerAnd {}
+pub struct LogicFastAnd {}
 
 impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicEagerOr
 where
@@ -406,14 +407,14 @@ where
     }
 }
 
-impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicAnd
+impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicEagerAnd
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
 {
     fn name() -> &'static str {
-        "AND"
+        "Eager AND"
     }
 
     fn is_pair_interesting<EM, OT>(
@@ -474,19 +475,97 @@ where
     }
 }
 
-/// Compose feedbacks with an AND operation
-pub type AndFeedback<A, B, I, S> = FeedbackTuple<A, B, I, S, LogicAnd>;
+impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicFastAnd
+where
+    A: Feedback<I, S>,
+    B: Feedback<I, S>,
+    I: Input,
+{
+    fn name() -> &'static str {
+        "Fast AND"
+    }
 
-/// Compose feedbacks with an Eager-OR operation
-/// Eager stands for trying to compute all feedbacks before returning
-/// This means that all feedbacks functions are called even if a result can already be concluded
-pub type EagerOrFeedback<A, B, I, S> = FeedbackTuple<A, B, I, S, LogicEagerOr>;
+    fn is_pair_interesting<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple,
+    {
+        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
+        if a == false {
+            return Ok(false);
+        }
 
-/// Compose feedbacks with an Fast-OR operation
-/// Fast OR stops computing feedbacks after finding the first positive feedback
+        second.is_interesting(state, manager, input, observers, exit_kind)
+    }
+
+    #[cfg(feature = "introspection")]
+    fn is_pair_interesting_with_perf<EM, OT>(
+        first: &mut A,
+        second: &mut B,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        feedback_stats: &mut [u64; NUM_FEEDBACKS],
+        feedback_index: usize,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I, S>,
+        OT: ObserversTuple,
+    {
+        // Execute this feedback
+        let a = first.is_interesting_with_perf(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index,
+        )?;
+
+        if a == false {
+            return Ok(false);
+        }
+
+        second.is_interesting_with_perf(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            feedback_stats,
+            feedback_index + 1,
+        )
+    }
+}
+
+/// Combine two feedbacks with an eager AND operation,
+/// will call all feedbacks functions even if not necessery to conclude the result
+pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerAnd>;
+
+/// Combine two feedbacks with an fast AND operation,
+/// might skip calling feedbacks functions if not necessery to conclude the result
+pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastAnd>;
+
+/// Combine two feedbacks with an eager OR operation,
+/// will call all feedbacks functions even if not necessery to conclude the result
+pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerOr>;
+
+/// Combine two feedbacks with an fast OR operation,
+/// might skip calling feedbacks functions if not necessery to conclude the result
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
-pub type FastOrFeedback<A, B, I, S> = FeedbackTuple<A, B, I, S, LogicFastOr>;
+pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastOr>;
 
 /// Compose feedbacks with an OR operation
 pub struct NotFeedback<A, I, S>
@@ -568,18 +647,29 @@ macro_rules! feedback_and {
 
     ( $head:expr, $($tail:expr), +) => {
         // recursive call
-        $crate::feedbacks::AndFeedback::new($head , feedback_and!($($tail),+))
+        $crate::feedbacks::EagerAndFeedback::new($head , feedback_and!($($tail),+))
+    };
+}
+///
+/// Variadic macro to create a chain of (fast) AndFeedback
+#[macro_export]
+macro_rules! feedback_and_fast {
+    ( $last:expr ) => { $last };
+
+    ( $head:expr, $($tail:expr), +) => {
+        // recursive call
+        $crate::feedbacks::FastAndFeedback::new($head , feedback_and_fast!($($tail),+))
     };
 }
 
 /// Variadic macro to create a chain of OrFeedback
 #[macro_export]
-macro_rules! feedback_or_eager {
+macro_rules! feedback_or {
     ( $last:expr ) => { $last };
 
     ( $head:expr, $($tail:expr), +) => {
         // recursive call
-        $crate::feedbacks::EagerOrFeedback::new($head , feedback_or_eager!($($tail),+))
+        $crate::feedbacks::EagerOrFeedback::new($head , feedback_or!($($tail),+))
     };
 }
 
