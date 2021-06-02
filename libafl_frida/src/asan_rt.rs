@@ -6,6 +6,7 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
+#[cfg(target_arch = "aarch64")]
 use frida_gum::NativePointer;
 use hashbrown::HashMap;
 
@@ -23,8 +24,10 @@ use capstone::{
     Capstone, Insn,
 };
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use frida_gum::{interceptor::Interceptor, Gum, ModuleMap};
-#[cfg(unix)]
+#[cfg(target_arch = "aarch64")]
+use frida_gum::interceptor::Interceptor;
+use frida_gum::{Gum, ModuleMap};
+#[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
 use libc::{c_char, getrlimit64, rlimit64, wchar_t};
 use rangemap::RangeMap;
 use std::{ffi::c_void, path::PathBuf};
@@ -43,6 +46,11 @@ extern "C" {
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// The frida address sanitizer runtime, providing address sanitization.
 /// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
@@ -208,6 +216,7 @@ impl AsanRuntime {
     /// # Panics
     /// Panics, if no mapping for the `stack_address` at `0xeadbeef` could be found.
     #[must_use]
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     pub fn current_stack() -> (usize, usize) {
         let stack_var = 0xeadbeef;
         let stack_address = &stack_var as *const _ as *const c_void as usize;
@@ -221,16 +230,19 @@ impl AsanRuntime {
 
         let max_start = end - stack_rlimit.rlim_cur as usize;
 
+        let flags = ANONYMOUS_FLAG
+                        | MapFlags::MAP_FIXED
+                        | MapFlags::MAP_PRIVATE;
+        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        let flags = flags | MapFlags::MAP_STACK;
+
         if start != max_start {
             let mapping = unsafe {
                 mmap(
                     max_start as *mut c_void,
                     start - max_start,
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_ANONYMOUS
-                        | MapFlags::MAP_FIXED
-                        | MapFlags::MAP_PRIVATE
-                        | MapFlags::MAP_STACK,
+                    flags,
                     -1,
                     0,
                 )
@@ -241,6 +253,8 @@ impl AsanRuntime {
     }
 
     /// Determine the tls start, end for the currently running thread
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[must_use]
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { tls_ptr() } as usize;
 

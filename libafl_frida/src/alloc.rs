@@ -32,6 +32,11 @@ pub(crate) struct Allocator {
     current_mapping_addr: usize,
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
+
 macro_rules! map_to_shadow {
     ($self:expr, $address:expr) => {
         (($address >> 3) + $self.shadow_offset) & ((1 << ($self.shadow_bit + 1)) - 1)
@@ -59,6 +64,8 @@ impl Allocator {
         let page_size = ret as usize;
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
+
+
         for try_shadow_bit in &[46usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
@@ -67,7 +74,7 @@ impl Allocator {
                     page_size,
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                     MapFlags::MAP_PRIVATE
-                        | MapFlags::MAP_ANONYMOUS
+                        | ANONYMOUS_FLAG
                         | MapFlags::MAP_FIXED
                         | MapFlags::MAP_NORESERVE,
                     -1,
@@ -89,7 +96,7 @@ impl Allocator {
                 addr as *mut c_void,
                 addr + addr,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS
+                ANONYMOUS_FLAG
                     | MapFlags::MAP_FIXED
                     | MapFlags::MAP_PRIVATE
                     | MapFlags::MAP_NORESERVE,
@@ -170,7 +177,7 @@ impl Allocator {
                 self.current_mapping_addr as *mut c_void,
                 rounded_up_size,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS
+                ANONYMOUS_FLAG
                     | MapFlags::MAP_PRIVATE
                     | MapFlags::MAP_FIXED
                     | MapFlags::MAP_NORESERVE,
@@ -356,7 +363,7 @@ impl Allocator {
                         range.start as *mut c_void,
                         range.end - range.start,
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                        MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
+                        ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
                         -1,
                         0,
                     )
