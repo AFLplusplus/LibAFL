@@ -121,16 +121,19 @@ impl Allocator {
     }
 
     /// Retreive the shadow bit used by this allocator.
+    #[must_use]
     pub fn shadow_bit(&self) -> u32 {
         self.shadow_bit as u32
     }
 
     #[inline]
+    #[must_use]
     fn round_up_to_page(&self, size: usize) -> usize {
         ((size + self.page_size) / self.page_size) * self.page_size
     }
 
     #[inline]
+    #[must_use]
     fn round_down_to_page(&self, value: usize) -> usize {
         (value / self.page_size) * self.page_size
     }
@@ -149,6 +152,7 @@ impl Allocator {
         None
     }
 
+    #[must_use]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
         let size = if size == 0 {
