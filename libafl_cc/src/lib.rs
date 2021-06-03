@@ -136,6 +136,11 @@ impl CompilerWrapper for ClangWrapper {
         // Fuzzing define common among tools
         new_args.push("-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1".into());
 
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if linking {
+            new_args.push("-fprofile-instr-generate".into());
+        }
+
         self.base_args = new_args;
         Ok(self)
     }
