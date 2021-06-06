@@ -4,7 +4,7 @@ pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 use core::any::TypeId;
 
-use xxhash_rust::const_xxh3::xxh3_64;
+use xxhash_rust::xxh3::xxh3_64;
 
 #[cfg(feature = "RUSTC_IS_NIGHTLY")]
 /// From https://stackoverflow.com/a/60138532/7658998
