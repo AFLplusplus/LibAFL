@@ -51,13 +51,21 @@
 
 #define EXPORT_FN
 
+#if defined(__APPLE__)
+  // TODO: Find a proper way to deal with weak fns on Apple!
+  #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)           \
+  RETURN_TYPE NAME FUNC_SIG __attribute__((weak_import)) { return 0; }
+#else
 // Declare these symbols as weak to allow them to be optionally defined.
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                            \
   __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
+#endif
 
 #define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 EXT_FUNC(LLVMFuzzerInitialize, int, (int *argc, char ***argv), false);
 EXT_FUNC(LLVMFuzzerCustomMutator, size_t,
          (uint8_t *Data, size_t Size, size_t MaxSize, unsigned int Seed),
@@ -67,6 +75,7 @@ EXT_FUNC(LLVMFuzzerCustomCrossOver, size_t,
           const uint8_t *Data2, size_t Size2,
           uint8_t *Out, size_t MaxOutSize, unsigned int Seed),
          false);
+#pragma GCC diagnostic pop
 
 #undef EXT_FUNC
 
