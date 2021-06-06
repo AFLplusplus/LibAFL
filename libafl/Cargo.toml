@@ -18,7 +18,7 @@ rustc_version = "0.3.3"
 criterion = "0.3" # Benchmarking
 ahash = "0.6.1" # another hash
 fxhash = "0.2.1" # yet another hash
-xxhash-rust = { version = "0.8.0", features = ["const_xxh3", "xxh3"] } # xxh3 hashing for rust
+xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
 serde_json = "1.0.60"
 num_cpus = "1.0" # cpu count, for llmp example
 
@@ -56,7 +56,7 @@ libafl_derive = { optional = true, path = "../libafl_derive", version = "0.3.2" 
 tuple_list = "0.1.2"
 hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
 num = "0.4.0"
-xxhash-rust = { version = "0.8.0", features = ["xxh3", "const_xxh3"] } # xxh3 hashing for rust
+xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 erased-serde = "0.3.12"
 postcard = { version = "0.5.1", features = ["alloc"] } # no_std compatible serde serialization fromat

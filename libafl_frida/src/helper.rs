@@ -3,9 +3,6 @@ use std::hash::Hasher;
 
 use libafl::inputs::{HasTargetBytes, Input};
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use libafl::bolts::os::find_mapping_for_path;
-
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
@@ -26,14 +23,13 @@ use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter,
     stalker::{StalkerOutput, Transformer},
-    CpuContext,
+    CpuContext, ModuleDetails, ModuleMap,
 };
 use frida_gum::{Gum, Module, PageProtection};
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
-use std::path::PathBuf;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
@@ -59,7 +55,7 @@ pub trait FridaHelper<'a> {
     /// pointer to the frida coverage map
     fn map_ptr(&mut self) -> *mut u8;
 
-    fn ranges(&self) -> &RangeMap<usize, (u16, &str)>;
+    fn ranges(&self) -> &RangeMap<usize, (u16, String)>;
 }
 
 /// (Default) map size for frida coverage reporting
@@ -77,7 +73,8 @@ pub struct FridaInstrumentationHelper<'a> {
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
     asan_runtime: AsanRuntime,
-    ranges: RangeMap<usize, (u16, &'a str)>,
+    ranges: RangeMap<usize, (u16, String)>,
+    module_map: ModuleMap,
     options: &'a FridaOptions,
     drcov_basic_blocks: Vec<DrCovBasicBlock>,
 }
@@ -125,7 +122,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.map.as_mut_ptr()
     }
 
-    fn ranges(&self) -> &RangeMap<usize, (u16, &str)> {
+    fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
         &self.ranges
     }
 }
@@ -220,7 +217,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         gum: &'a Gum,
         options: &'a FridaOptions,
         _harness_module_name: &str,
-        modules_to_instrument: &'a [PathBuf],
+        modules_to_instrument: &'a [&str],
     ) -> Self {
         // workaround frida's frida-gum-allocate-near bug:
         unsafe {
@@ -262,31 +259,23 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(options.clone()),
             ranges: RangeMap::new(),
+            module_map: ModuleMap::new_from_names(modules_to_instrument),
             options,
             drcov_basic_blocks: vec![],
         };
 
         if helper.options().stalker_enabled() {
-            for (id, module_name) in modules_to_instrument.iter().enumerate() {
-                let (lib_start, lib_end) = find_mapping_for_path(module_name.to_str().unwrap());
-                println!(
-                    "including range {:x}-{:x} for {:?}",
-                    lib_start, lib_end, module_name
-                );
-                helper.ranges.insert(
-                    lib_start..lib_end,
-                    (id as u16, module_name.to_str().unwrap()),
-                );
+            for (i, module) in helper.module_map.values().iter().enumerate() {
+                let range = module.range();
+                let start = range.base_address().0 as usize;
+                helper
+                    .ranges
+                    .insert(start..(start + range.size()), (i as u16, module.path()));
             }
-
             if let Some(suppressed_specifiers) = helper.options().dont_instrument_locations() {
                 for (module_name, offset) in suppressed_specifiers {
-                    let (lib_start, _) = find_mapping_for_path(
-                        std::fs::canonicalize(&module_name)
-                            .unwrap()
-                            .to_str()
-                            .unwrap(),
-                    );
+                    let module_details = ModuleDetails::with_name(module_name).unwrap();
+                    let lib_start = module_details.range().base_address().0 as usize;
                     println!("removing address: {:#x}", lib_start + offset);
                     helper
                         .ranges
