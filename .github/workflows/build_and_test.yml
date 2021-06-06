@@ -81,7 +81,7 @@ jobs:
     - name: Build fuzzers
       run: ./scripts/build_all_fuzzers.sh
     - name: Increase map sizes
-      run: ./scripts/shmem_limits.sh
+      run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
     # TODO: Figure out how to properly build stuff with clang
