@@ -113,7 +113,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
        data[11] == 0xCD &&
        data[12] == 0xEF &&
        data[13] == 0xAA &&
-       data[14] == 0xBB ) {
+       data[14] == 0x8F &&
+       data[15] == 0x13 &&
+       data[16] == 0x24 &&
+       data[17] == 0xAA &&
+       data[18] == 0xBB ) {
         printf("passed the test!");
     } else {
         printf("x");
