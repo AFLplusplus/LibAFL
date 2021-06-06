@@ -242,7 +242,6 @@ pub fn main() {
                 .value_of("modules_to_instrument")
                 .unwrap()
                 .split(':')
-                .map(|module_name| std::fs::canonicalize(module_name).unwrap())
                 .collect::<Vec<_>>(),
             //modules_to_instrument,
             &[PathBuf::from("./corpus")],
@@ -278,7 +277,7 @@ fn fuzz(
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,
-    modules_to_instrument: &[PathBuf],
+    modules_to_instrument: &[&str],
     corpus_dirs: &[PathBuf],
     objective_dir: &Path,
     broker_port: u16,
