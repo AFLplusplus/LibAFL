@@ -18,6 +18,7 @@ use crate::{
 };
 
 pub(crate) struct Allocator {
+    #[allow(dead_code)]
     options: FridaOptions,
     page_size: usize,
     shadow_offset: usize,
@@ -26,8 +27,11 @@ pub(crate) struct Allocator {
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
     allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
+    #[cfg(target_arch = "aarch64")]
     largest_allocation: usize,
+    #[cfg(target_arch = "aarch64")]
     base_mapping_addr: usize,
+    #[cfg(target_arch = "aarch64")]
     current_mapping_addr: usize,
 }
 
@@ -113,8 +117,11 @@ impl Allocator {
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: HashMap::new(),
+            #[cfg(target_arch = "aarch64")]
             largest_allocation: 0,
+            #[cfg(target_arch = "aarch64")]
             base_mapping_addr: addr + addr + addr,
+            #[cfg(target_arch = "aarch64")]
             current_mapping_addr: addr + addr + addr,
         }
     }
@@ -137,6 +144,7 @@ impl Allocator {
         (value / self.page_size) * self.page_size
     }
 
+    #[cfg(target_arch = "aarch64")]
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
         let mut current_size = size;
         while current_size <= self.largest_allocation {
@@ -151,6 +159,7 @@ impl Allocator {
         None
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[must_use]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
@@ -224,6 +233,7 @@ impl Allocator {
         address
     }
 
+    #[cfg(target_arch = "aarch64")]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
             metadata
@@ -298,6 +308,7 @@ impl Allocator {
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
         match self.allocations.get(&(ptr as usize)) {
             Some(metadata) => metadata.size,
@@ -383,10 +394,12 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
+    #[cfg(target_arch = "aarch64")]
     pub fn map_to_shadow(&self, start: usize) -> usize {
         map_to_shadow!(self, start)
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))

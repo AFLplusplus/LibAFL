@@ -6,13 +6,15 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use frida_gum::{NativePointer, RangeDetails};
+#[cfg(target_arch = "aarch64")]
+use frida_gum::NativePointer;
+use frida_gum::RangeDetails;
 use hashbrown::HashMap;
 
-use nix::{
-    libc::memset,
-    sys::mman::{mmap, MapFlags, ProtFlags},
-};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+
+#[cfg(target_arch = "aarch64")]
+use nix::libc::memset;
 
 use backtrace::Backtrace;
 use capstone::{
@@ -23,9 +25,15 @@ use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, ModuleMap};
+#[cfg(unix)]
+use libc::RLIMIT_STACK;
+#[cfg(target_arch = "aarch64")]
+use libc::{c_char, wchar_t};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use libc::{getrlimit, rlimit};
 #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
-use libc::{c_char, getrlimit64, rlimit64, wchar_t};
-use std::ffi::c_void;
+use libc::{getrlimit64, rlimit64};
+use std::{ffi::c_void, ptr::write_volatile};
 
 use crate::{
     alloc::Allocator,
@@ -196,26 +204,48 @@ impl AsanRuntime {
         );
     }
 
+    /// Get the maximum stack size for the current stack
+    #[must_use]
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    fn max_stack_size() -> usize {
+        let mut stack_rlimit = rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        assert!(unsafe { getrlimit(RLIMIT_STACK, &mut stack_rlimit as *mut rlimit) } == 0);
+
+        stack_rlimit.rlim_max as usize
+    }
+
+    /// Get the maximum stack size for the current stack
+    #[must_use]
+    #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+    fn max_stack_size() -> usize {
+        let mut stack_rlimit = rlimit64 {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        assert!(unsafe { getrlimit64(RLIMIT_STACK, &mut stack_rlimit as *mut rlimit64) } == 0);
+
+        stack_rlimit.rlim_max as usize
+    }
+
     /// Determine the stack start, end for the currently running thread
     ///
     /// # Panics
     /// Panics, if no mapping for the `stack_address` at `0xeadbeef` could be found.
     #[must_use]
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     pub fn current_stack() -> (usize, usize) {
-        let stack_var = 0xeadbeef;
-        let stack_address = &stack_var as *const _ as *const c_void as usize;
+        let mut stack_var = 0xeadbeef;
+        let stack_address = &mut stack_var as *mut _ as *mut c_void as usize;
         let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
+        // Write something to (hopefully) make sure the val isn't optimized out
+        unsafe { write_volatile(&mut stack_var, 0xfadbeef) };
+
         let start = range_details.memory_range().base_address().0 as usize;
         let end = start + range_details.memory_range().size();
 
-        let mut stack_rlimit = rlimit64 {
-            rlim_cur: 0,
-            rlim_max: 0,
-        };
-        assert!(unsafe { getrlimit64(3, &mut stack_rlimit as *mut rlimit64) } == 0);
-
-        let max_start = end - stack_rlimit.rlim_cur as usize;
+        let max_start = end - Self::max_stack_size();
 
         let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
@@ -238,12 +268,12 @@ impl AsanRuntime {
     }
 
     /// Determine the tls start, end for the currently running thread
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     #[must_use]
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { tls_ptr() } as usize;
 
         #[cfg(target_os = "android")]
+        // Strip off the top byte, as scudo allocates buffers with top-byte set to 0xb4
         let tls_address = tls_address & 0xffffffffffffff;
 
         let range_details = RangeDetails::with_address(tls_address as u64).unwrap();
@@ -252,29 +282,34 @@ impl AsanRuntime {
         (start, end)
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_malloc(&mut self, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__Znam(&mut self, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamSt11align_val_tRKSt9nothrow_t(
@@ -286,24 +321,28 @@ impl AsanRuntime {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__Znwm(&mut self, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmSt11align_val_tRKSt9nothrow_t(
@@ -315,6 +354,7 @@ impl AsanRuntime {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
         let ret = unsafe { self.allocator.alloc(size * nmemb, 8) };
@@ -324,6 +364,7 @@ impl AsanRuntime {
         ret
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
         unsafe {
@@ -338,11 +379,13 @@ impl AsanRuntime {
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_check_free(&mut self, ptr: *mut c_void) -> bool {
         self.allocator.is_managed(ptr)
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_free(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
@@ -350,11 +393,13 @@ impl AsanRuntime {
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_memalign(&mut self, alignment: usize, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_posix_memalign(
         &mut self,
@@ -369,12 +414,14 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
         self.allocator.get_usable_size(ptr)
     }
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -383,6 +430,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -391,6 +439,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -399,6 +448,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -407,6 +457,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
         ptr: *mut c_void,
@@ -420,6 +471,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -428,6 +480,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -436,6 +489,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -444,6 +498,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -452,6 +507,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -460,6 +516,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
         ptr: *mut c_void,
@@ -473,6 +530,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -480,6 +538,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_mmap(
         &mut self,
         addr: *const c_void,
@@ -508,6 +567,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[cfg(target_arch = "aarch64")]
     fn hook_munmap(&mut self, addr: *const c_void, length: usize) -> i32 {
         extern "C" {
             fn munmap(addr: *const c_void, length: usize) -> i32;

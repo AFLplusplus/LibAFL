@@ -35,7 +35,6 @@ use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 use crate::FridaOptions;
 
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 use crate::asan_rt::AsanRuntime;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
