@@ -152,7 +152,8 @@ impl FridaOptions {
         self.enable_drcov
     }
 
-    /// Is CmpLog enabled?
+    /// Is `CmpLog` enabled?
+    #[must_use]
     #[inline]
     pub fn cmplog_enabled(&self) -> bool {
         self.enable_cmplog

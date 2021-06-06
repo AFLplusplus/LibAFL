@@ -55,6 +55,7 @@ pub struct CmpLogRuntime {
 }
 
 impl CmpLogRuntime {
+    #[must_use]
     pub fn new() -> CmpLogRuntime {
         Self {
             regs: [0; 3],
@@ -82,7 +83,7 @@ impl CmpLogRuntime {
         );
         let mut k = (retaddr >> 4) ^ (retaddr << 8);
 
-        k = k & ((CMPLOG_MAP_W as u64) - 1);
+        k &= (CMPLOG_MAP_W as u64) - 1;
 
         unsafe {
             libafl_targets_cmplog_wrapper(k, 8, op1, op2);
@@ -180,7 +181,14 @@ impl CmpLogRuntime {
 
     /// Get the blob which saves the context, jumps to the populate function and restores the context
     #[inline]
+    #[must_use]
     pub fn ops_save_register_and_blr_to_populate(&self) -> &[u8] {
         self.ops_save_register_and_blr_to_populate.as_ref().unwrap()
+    }
+}
+
+impl Default for CmpLogRuntime {
+    fn default() -> Self {
+        Self::new()
     }
 }

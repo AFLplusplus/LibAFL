@@ -102,6 +102,7 @@ impl AsanErrors {
     }
 
     /// Get a mutable reference to the global [`AsanErrors`] object
+    #[must_use]
     pub fn get_mut<'a>() -> &'a mut Self {
         unsafe { ASAN_ERRORS.as_mut().unwrap() }
     }
