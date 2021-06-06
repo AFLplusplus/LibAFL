@@ -3,9 +3,7 @@ use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use libafl::bolts::os::find_mapping_for_address;
+use frida_gum::ModuleDetails;
 
 use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
@@ -18,7 +16,6 @@ use libafl::{
     state::HasMetadata,
     Error, SerdeAny,
 };
-use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
@@ -111,11 +108,7 @@ impl AsanErrors {
 
     /// Report an error
     #[allow(clippy::too_many_lines)]
-    pub(crate) fn report_error(
-        &mut self,
-        error: AsanError,
-        instrumented_ranges: Option<&RangeMap<usize, String>>,
-    ) {
+    pub(crate) fn report_error(&mut self, error: AsanError) {
         self.errors.push(error.clone());
 
         let mut out_stream = default_output_stream();
@@ -144,13 +137,13 @@ impl AsanErrors {
             | AsanError::WriteAfterFree(mut error) => {
                 let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
-                if let Some((range, path)) = instrumented_ranges.unwrap().get_key_value(&error.pc) {
+                if let Some(module_details) = ModuleDetails::with_address(error.pc as u64) {
                     writeln!(
                         output,
                         " at 0x{:x} ({}@0x{:04x}), faulting address 0x{:x}",
                         error.pc,
-                        path,
-                        error.pc - range.start,
+                        module_details.path(),
+                        error.pc - module_details.range().base_address().0 as usize,
                         fault_address
                     )
                     .unwrap();
@@ -267,17 +260,17 @@ impl AsanErrors {
                 {
                     let invocation = Interceptor::current_invocation();
                     let cpu_context = invocation.cpu_context();
-                    if let Some((range, path)) = instrumented_ranges.unwrap().get_key_value(&pc) {
+                    if let Some(module_details) = ModuleDetails::with_address(pc as u64) {
                         writeln!(
                             output,
                             " at 0x{:x} ({}@0x{:04x})",
                             pc,
-                            path,
-                            pc - range.start,
+                            module_details.path(),
+                            pc - module_details.range().base_address().0 as usize,
                         )
                         .unwrap();
                     } else {
-                        writeln!(output, " at 0x{:x}", pc,).unwrap();
+                        writeln!(output, " at 0x{:x}", pc).unwrap();
                     }
 
                     #[allow(clippy::non_ascii_literal)]
@@ -364,13 +357,13 @@ impl AsanErrors {
             | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
-                if let Ok((start, _, _, path)) = find_mapping_for_address(pc) {
+                if let Some(module_details) = ModuleDetails::with_address(pc as u64) {
                     writeln!(
                         output,
                         " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
                         pc,
-                        path,
-                        pc - start,
+                        module_details.path(),
+                        pc - module_details.range().base_address().0 as usize,
                         fault_address
                     )
                     .unwrap();

@@ -1,6 +1,5 @@
+use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use libafl::bolts::os::walk_self_maps;
 use nix::{
     libc::memset,
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -230,19 +229,18 @@ impl Allocator {
             metadata
         } else {
             if !ptr.is_null() {
-                AsanErrors::get_mut().report_error(
-                    AsanError::UnallocatedFree((ptr as usize, Backtrace::new())),
-                    None,
-                );
+                AsanErrors::get_mut()
+                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
             }
             return;
         };
 
         if metadata.freed {
-            AsanErrors::get_mut().report_error(
-                AsanError::DoubleFree((ptr as usize, metadata.clone(), Backtrace::new())),
-                None,
-            );
+            AsanErrors::get_mut().report_error(AsanError::DoubleFree((
+                ptr as usize,
+                metadata.clone(),
+                Backtrace::new(),
+            )));
         }
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
@@ -399,21 +397,23 @@ impl Allocator {
         for metadata in self.allocations.values() {
             if !metadata.freed {
                 AsanErrors::get_mut()
-                    .report_error(AsanError::Leak((metadata.address, metadata.clone())), None);
+                    .report_error(AsanError::Leak((metadata.address, metadata.clone())));
             }
         }
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
-        walk_self_maps(&mut |start, end, permissions, _path| {
-            if permissions.as_bytes()[0] == b'r' || permissions.as_bytes()[1] == b'w' {
+        RangeDetails::enumerate_with_prot(PageProtection::NoAccess, &mut |range: &RangeDetails| {
+            if range.protection() as u32 & PageProtection::ReadWrite as u32 != 0 {
+                let start = range.memory_range().base_address().0 as usize;
+                let end = start + range.memory_range().size();
                 if self.pre_allocated_shadow && start == 1 << self.shadow_bit {
-                    return false;
+                    return true;
                 }
                 self.map_shadow_for_region(start, end, true);
             }
-            false
+            true
         });
     }
 }
