@@ -13,6 +13,11 @@ extern "C" {
     pub fn libafl_targets_cmplog_wrapper(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
+
 // #[repr(C)]
 // #[derive(Debug, Clone, Copy)]
 // pub struct CmpLogHeader {
@@ -153,7 +158,7 @@ impl CmpLogRuntime {
                     std::ptr::null_mut(),
                     128 * 1024,
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE,
                     -1,
                     0,
                 )
@@ -162,7 +167,7 @@ impl CmpLogRuntime {
                     std::ptr::null_mut(),
                     4 * 1024 * 1024,
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE,
                     -1,
                     0,
                 )

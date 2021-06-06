@@ -13,7 +13,7 @@ jobs:
   lint:
     strategy:
       matrix:
-          os: [ubuntu-latest, windows-latest]
+          os: [ubuntu-latest, windows-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -70,6 +70,20 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: clippy
+  macos:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: MacOS Build
+      run: cargo build --verbose
+    - name: Run clippy
+      run: ./scripts/clippy.sh
+    - name: Build fuzzers
+      run: ./scripts/build_all_fuzzers.sh
+    - name: Increase map sizes
+      run: ./scripts/shmem_limits_macos.sh
+    - name: Run Tests
+      run: cargo test
     # TODO: Figure out how to properly build stuff with clang
     #- name: Add clang path to $PATH env
     #  if: runner.os == 'Windows'

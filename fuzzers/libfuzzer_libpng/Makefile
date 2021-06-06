@@ -1,12 +1,33 @@
 PWD=`pwd`
 FUZZER_NAME="fuzzer_libpng"
 
-all:
+PHONY: all clean
+
+all: fuzzer
+
+libpng-1.6.37:
+	wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
+	tar -xvf libpng-1.6.37.tar.xz
+
+target/release/libafl_cxx: src/* src/bin/*
+	# Build the libpng libfuzzer library
+	cargo build --release
+
+libafl_cxx: target/release/libafl_cxx
+
+libafl_cc: target/release/libafl_cxx
+
+libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37 libafl_cc
+	cd libpng-1.6.37 && ./configure && cd ..
+	$(MAKE) -C libpng-1.6.37 CC=$(realpath target/release/libafl_cc) CXX=$(realpath target/release/libafl_cxx)
+	
+
+fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
 	# Build the libpng libfuzzer library
 	cargo build --release
 
     # Build the libpng harness	
-	$(PWD)/target/release/libafl_cxx \
+	target/release/libafl_cxx \
 		$(PWD)/harness.cc \
 		$(PWD)/libpng-1.6.37/.libs/libpng16.a \
 		-I$(PWD)/libpng-1.6.37/ \

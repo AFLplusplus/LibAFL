@@ -42,6 +42,11 @@ enum CmplogOperandType {
     Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
+
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
 pub trait FridaHelper<'a> {
     /// Access to the stalker `Transformer`
@@ -234,7 +239,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     std::ptr::null_mut(),
                     128 * 1024,
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                     -1,
                     0,
                 )
@@ -243,7 +248,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     std::ptr::null_mut(),
                     4 * 1024 * 1024,
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                     -1,
                     0,
                 )
