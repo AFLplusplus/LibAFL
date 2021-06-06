@@ -450,21 +450,11 @@ mod unix_signal_handler {
                 target_arch = "aarch64"
             ))]
             {
-                use crate::bolts::os::find_mapping_for_address;
                 println!("{:━^100}", " CRASH ");
                 println!(
                     "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
                     _signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
                 );
-                if let Ok((start, _, _, path)) =
-                    find_mapping_for_address(_context.uc_mcontext.pc as usize)
-                {
-                    println!(
-                        "pc is at offset 0x{:08x} in  {}",
-                        _context.uc_mcontext.pc as usize - start,
-                        path
-                    );
-                }
 
                 println!("{:━^100}", " REGISTERS ");
                 for reg in 0..31 {
