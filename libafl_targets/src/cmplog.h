@@ -33,7 +33,7 @@ extern uint8_t libafl_cmplog_enabled;
 static void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
 
 
-  if (!libafl_cmplog_enabled) return;
+    //if (!libafl_cmplog_enabled) return;
 
   uint16_t hits;
   if (libafl_cmplog_map.headers[k].kind != CMPLOG_KIND_INS) {

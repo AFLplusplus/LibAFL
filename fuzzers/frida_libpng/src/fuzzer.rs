@@ -32,7 +32,8 @@ use libafl::{
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
-    stages::mutational::StdMutationalStage,
+    //stages::mutational::StdMutationalStage,
+    stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
@@ -302,7 +303,7 @@ unsafe fn fuzz(
             unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
         > = lib.get(symbol_name.as_bytes()).unwrap();
 
-        let mut frida_harness = move |input: &BytesInput| {
+        let mut frida_harness = |input: &BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
             (target_func)(buf.as_ptr(), buf.len());
@@ -383,7 +384,6 @@ unsafe fn fuzz(
 
         // Setup a basic mutator with a mutational stage
         let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
@@ -400,7 +400,6 @@ unsafe fn fuzz(
                 tuple_list!(
                     edges_observer,
                     time_observer,
-                    cmplog_observer,
                     AsanErrorsObserver::new(&ASAN_ERRORS)
                 ),
                 &mut fuzzer,
@@ -418,6 +417,25 @@ unsafe fn fuzz(
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
+
+        // Secondary harness due to mut ownership
+        let mut frida_harness = |input: &BytesInput| {
+            let target = input.target_bytes();
+            let buf = target.as_slice();
+            (target_func)(buf.as_ptr(), buf.len());
+            ExitKind::Ok
+        };
+
+        // Setup a tracing stage in which we log comparisons
+        let tracing = TracingStage::new(InProcessExecutor::new(
+            &mut frida_harness,
+            tuple_list!(cmplog_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+        )?);
+
+        let mut stages = tuple_list!(tracing, StdMutationalStage::new(mutator));
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
         Ok(())

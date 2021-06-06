@@ -155,7 +155,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Secondary harness due to mut ownership
-    let mut harness = |buf: &[u8]| {
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let buf = target.as_slice();
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
