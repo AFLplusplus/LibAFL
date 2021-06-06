@@ -366,6 +366,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: Any,
                 {
+                    #[allow(clippy::manual_map)]
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
                         Some(h) => {
@@ -386,6 +387,7 @@ macro_rules! create_serde_registry_for_trait {
                         fn(&Box<dyn $trait_name>) -> &dyn $trait_name,
                     >,
                 > {
+                    #[allow(clippy::manual_map)]
                     match self.map.get(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => Some(h.values().map(|x| x.as_ref())),
@@ -405,6 +407,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: Any,
                 {
+                    #[allow(clippy::manual_map)]
                     match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
                         Some(h) => Some(
@@ -425,6 +428,7 @@ macro_rules! create_serde_registry_for_trait {
                         fn(&mut Box<dyn $trait_name>) -> &mut dyn $trait_name,
                     >,
                 > {
+                    #[allow(clippy::manual_map)]
                     match self.map.get_mut(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => Some(h.values_mut().map(|x| x.as_mut())),

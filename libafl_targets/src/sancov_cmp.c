@@ -9,10 +9,27 @@
 #endif
 
 #if defined(__APPLE__)
-  #pragma weak __sanitizer_cov_trace_const_cmp1 = __sanitizer_cov_trace_cmp1
-  #pragma weak __sanitizer_cov_trace_const_cmp2 = __sanitizer_cov_trace_cmp2
-  #pragma weak __sanitizer_cov_trace_const_cmp4 = __sanitizer_cov_trace_cmp4
-  #pragma weak __sanitizer_cov_trace_const_cmp8 = __sanitizer_cov_trace_cmp8
+
+void __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2);
+void __sanitizer_cov_trace_const_cmp1(uint8_t arg1, uint8_t arg2) {
+  __sanitizer_cov_trace_cmp1(arg1, arg2);
+}
+
+void __sanitizer_cov_trace_cmp2(uint16_t arg1, uint16_t arg2);
+void __sanitizer_cov_trace_const_cmp2(uint16_t arg1, uint16_t arg2) {
+  __sanitizer_cov_trace_cmp2(arg1, arg2);
+}
+
+void __sanitizer_cov_trace_cmp4(uint32_t arg1, uint32_t arg2);
+void __sanitizer_cov_trace_const_cmp4(uint32_t arg1, uint32_t arg2) {
+  __sanitizer_cov_trace_cmp4(arg1, arg2);
+}
+
+void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2);
+void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2) {
+    __sanitizer_cov_trace_cmp8(arg1, arg2);
+}
+
 #elif defined(_MSC_VER)
   #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp1=__sanitizer_cov_trace_cmp1")
   #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp2=__sanitizer_cov_trace_cmp2")
@@ -129,3 +146,4 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
   }
 
 }
+
