@@ -246,8 +246,8 @@ impl AsanErrors {
                     }
                 }
             }
-            AsanError::BadFuncArgRead((name, pc, address, size, backtrace))
-            | AsanError::BadFuncArgWrite((name, pc, address, size, backtrace)) => {
+            AsanError::BadFuncArgRead((name, _pc, address, size, backtrace))
+            | AsanError::BadFuncArgWrite((name, _pc, address, size, backtrace)) => {
                 writeln!(
                     output,
                     " in call to {}, argument {:#016x}, size: {:#x}",
@@ -260,17 +260,17 @@ impl AsanErrors {
                 {
                     let invocation = Interceptor::current_invocation();
                     let cpu_context = invocation.cpu_context();
-                    if let Some(module_details) = ModuleDetails::with_address(pc as u64) {
+                    if let Some(module_details) = ModuleDetails::with_address(_pc as u64) {
                         writeln!(
                             output,
                             " at 0x{:x} ({}@0x{:04x})",
-                            pc,
+                            _pc,
                             module_details.path(),
-                            pc - module_details.range().base_address().0 as usize,
+                            _pc - module_details.range().base_address().0 as usize,
                         )
                         .unwrap();
                     } else {
-                        writeln!(output, " at 0x{:x}", pc).unwrap();
+                        writeln!(output, " at 0x{:x}", _pc).unwrap();
                     }
 
                     #[allow(clippy::non_ascii_literal)]

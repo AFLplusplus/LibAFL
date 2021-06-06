@@ -18,6 +18,7 @@ use crate::{
 };
 
 pub(crate) struct Allocator {
+    #[allow(dead_code)]
     options: FridaOptions,
     page_size: usize,
     shadow_offset: usize,
@@ -26,10 +27,18 @@ pub(crate) struct Allocator {
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
     allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
+    #[cfg(target_arch = "aarch64")]
     largest_allocation: usize,
+    #[cfg(target_arch = "aarch64")]
     base_mapping_addr: usize,
+    #[cfg(target_arch = "aarch64")]
     current_mapping_addr: usize,
 }
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 macro_rules! map_to_shadow {
     ($self:expr, $address:expr) => {
@@ -58,6 +67,7 @@ impl Allocator {
         let page_size = ret as usize;
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
+
         for try_shadow_bit in &[46usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
@@ -66,7 +76,7 @@ impl Allocator {
                     page_size,
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                     MapFlags::MAP_PRIVATE
-                        | MapFlags::MAP_ANONYMOUS
+                        | ANONYMOUS_FLAG
                         | MapFlags::MAP_FIXED
                         | MapFlags::MAP_NORESERVE,
                     -1,
@@ -88,7 +98,7 @@ impl Allocator {
                 addr as *mut c_void,
                 addr + addr,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS
+                ANONYMOUS_FLAG
                     | MapFlags::MAP_FIXED
                     | MapFlags::MAP_PRIVATE
                     | MapFlags::MAP_NORESERVE,
@@ -107,27 +117,34 @@ impl Allocator {
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: HashMap::new(),
+            #[cfg(target_arch = "aarch64")]
             largest_allocation: 0,
+            #[cfg(target_arch = "aarch64")]
             base_mapping_addr: addr + addr + addr,
+            #[cfg(target_arch = "aarch64")]
             current_mapping_addr: addr + addr + addr,
         }
     }
 
     /// Retreive the shadow bit used by this allocator.
+    #[must_use]
     pub fn shadow_bit(&self) -> u32 {
         self.shadow_bit as u32
     }
 
     #[inline]
+    #[must_use]
     fn round_up_to_page(&self, size: usize) -> usize {
         ((size + self.page_size) / self.page_size) * self.page_size
     }
 
     #[inline]
+    #[must_use]
     fn round_down_to_page(&self, value: usize) -> usize {
         (value / self.page_size) * self.page_size
     }
 
+    #[cfg(target_arch = "aarch64")]
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
         let mut current_size = size;
         while current_size <= self.largest_allocation {
@@ -142,6 +159,8 @@ impl Allocator {
         None
     }
 
+    #[cfg(target_arch = "aarch64")]
+    #[must_use]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
         let size = if size == 0 {
@@ -169,7 +188,7 @@ impl Allocator {
                 self.current_mapping_addr as *mut c_void,
                 rounded_up_size,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                MapFlags::MAP_ANONYMOUS
+                ANONYMOUS_FLAG
                     | MapFlags::MAP_PRIVATE
                     | MapFlags::MAP_FIXED
                     | MapFlags::MAP_NORESERVE,
@@ -214,6 +233,7 @@ impl Allocator {
         address
     }
 
+    #[cfg(target_arch = "aarch64")]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
             metadata
@@ -288,6 +308,7 @@ impl Allocator {
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
         match self.allocations.get(&(ptr as usize)) {
             Some(metadata) => metadata.size,
@@ -354,7 +375,7 @@ impl Allocator {
                         range.start as *mut c_void,
                         range.end - range.start,
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                        MapFlags::MAP_ANONYMOUS | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
+                        ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
                         -1,
                         0,
                     )
@@ -373,10 +394,12 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
+    #[cfg(target_arch = "aarch64")]
     pub fn map_to_shadow(&self, start: usize) -> usize {
         map_to_shadow!(self, start)
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))
