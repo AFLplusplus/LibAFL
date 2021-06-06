@@ -53,12 +53,19 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
     fn from_file<P>(_path: P) -> Result<Self, Error> {
         Err(Error::NotImplemented("Not supprted in no_std".into()))
     }
+
+    /// Retrieve a unique name for this input
+    fn unique_name(&self) -> String;
 }
 
 /// An input for tests, mainly. There is no real use much else.
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct NopInput {}
-impl Input for NopInput {}
+impl Input for NopInput {
+    fn unique_name(&self) -> String {
+        "nop-input".to_string()
+    }
+}
 impl HasTargetBytes for NopInput {
     fn target_bytes(&self) -> OwnedSlice<u8> {
         OwnedSlice::Owned(vec![0])

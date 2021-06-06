@@ -1,6 +1,9 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
 //! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
 
+use ahash::AHasher;
+use core::hash::Hasher;
+
 use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
@@ -47,6 +50,13 @@ impl Input for BytesInput {
         let mut bytes: Vec<u8> = vec![];
         file.read_to_end(&mut bytes)?;
         Ok(BytesInput::new(bytes))
+    }
+
+    /// Retrieve a unique name for this input
+    fn unique_name(&self) -> String {
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        hasher.write(self.bytes());
+        format!("{:016x}", hasher.finish())
     }
 }
 

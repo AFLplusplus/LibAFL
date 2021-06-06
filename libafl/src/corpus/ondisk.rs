@@ -50,7 +50,9 @@ where
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
-            let filename = self.dir_path.join(format!("id_{}", &self.entries.len()));
+            let filename = self
+                .dir_path
+                .join(testcase.input().as_ref().unwrap().unique_name());
             let filename_str = filename.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into());
         };
