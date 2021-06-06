@@ -697,7 +697,7 @@ pub struct LlmpSender<SP>
 where
     SP: ShMemProvider,
 {
-    /// ID of this sender. Only used in the broker.
+    /// ID of this sender.
     pub id: u32,
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
@@ -977,6 +977,8 @@ where
         if (*msg).tag == LLMP_TAG_UNSET {
             panic!("No tag set on message with id {}", (*msg).message_id);
         }
+        // A client gets the sender id assigned to by the broker during the initial handshake.
+        (*msg).sender = self.id;
         let page = self.out_maps.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
             return Err(Error::Unknown(format!(
@@ -1034,10 +1036,11 @@ where
         println!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
 
         (*new_map).max_alloc_size = (*old_map).max_alloc_size;
+        (*new_map).sender = self.id;
+
         /* On the old map, place a last message linking to the new map for the clients
          * to consume */
-        let mut out: *mut LlmpMsg = self.alloc_eop()?;
-        (*out).sender = (*old_map).sender;
+        let out = self.alloc_eop()?;
 
         let mut end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
         (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
