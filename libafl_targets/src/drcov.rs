@@ -18,7 +18,7 @@ pub struct DrCovBasicBlock {
 /// A writer for `DrCov` files
 pub struct DrCovWriter<'a> {
     writer: BufWriter<File>,
-    module_mapping: &'a RangeMap<usize, (u16, &'a str)>,
+    module_mapping: &'a RangeMap<usize, (u16, String)>,
     basic_blocks: &'a mut Vec<DrCovBasicBlock>,
 }
 
@@ -40,7 +40,7 @@ impl<'a> DrCovWriter<'a> {
     /// Create a new [`DrCovWriter`]
     pub fn new(
         path: &str,
-        module_mapping: &'a RangeMap<usize, (u16, &str)>,
+        module_mapping: &'a RangeMap<usize, (u16, String)>,
         basic_blocks: &'a mut Vec<DrCovBasicBlock>,
     ) -> Self {
         Self {
@@ -58,7 +58,7 @@ impl<'a> DrCovWriter<'a> {
             .write_all(b"DRCOV VERSION: 2\nDRCOV FLAVOR: libafl\n")
             .unwrap();
 
-        let modules: Vec<(&std::ops::Range<usize>, &(u16, &str))> =
+        let modules: Vec<(&std::ops::Range<usize>, &(u16, String))> =
             self.module_mapping.iter().collect();
         self.writer
             .write_all(format!("Module Table: version 2, count {}\n", modules.len()).as_bytes())
