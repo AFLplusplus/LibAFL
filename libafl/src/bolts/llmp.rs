@@ -709,6 +709,9 @@ where
     /// By keeping the message history around,
     /// new clients may join at any time in the future.
     pub keep_pages_forever: bool,
+    /// True, if we allocatd a message, but didn't call [`Self::send()`] yet
+    has_unsent_message: bool,
+    /// The sharedmem provider to get new sharaed maps if we're full
     shmem_provider: SP,
 }
 
@@ -730,6 +733,7 @@ where
             )],
             // drop pages to the broker if it already read them
             keep_pages_forever,
+            has_unsent_message: false,
             shmem_provider,
         })
     }
@@ -804,6 +808,7 @@ where
             out_maps: vec![out_map],
             // drop pages to the broker if it already read them
             keep_pages_forever: false,
+            has_unsent_message: false,
             shmem_provider,
         })
     }
@@ -868,23 +873,17 @@ where
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
 
+        if self.has_unsent_message {
+            panic!("Called alloc without callind send inbetween");
+        }
+
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
             "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
             buf_len, page, &map, last_msg
         );
 
-        let msg_offset = if last_msg.is_null() || (*last_msg).tag == LLMP_TAG_END_OF_PAGE {
-            // Assumption: The start of our msg is aligned.
-            if (*page).size_used != 0 {
-                panic!("Allocated new message without calling send() inbetween. Page: {:?}, buf_len: {:?}, last_msg: {:?}", page, buf_len, last_msg);
-            }
-            0_usize
-        } else {
-            (*last_msg).buf_len_padded as usize
-        };
-
-        let msg_start = (*page).messages.as_mut_ptr() as usize + msg_offset;
+        let msg_start = (*page).messages.as_mut_ptr() as usize + (*page).size_used;
 
         // Make sure the end of our msg is aligned.
         let buf_len_padded = llmp_align(msg_start + buf_len + size_of::<LlmpMsg>())
@@ -938,6 +937,8 @@ where
             size_of::<LlmpMsg>() + buf_len_padded,
         );
 
+        self.has_unsent_message = true;
+
         Some(ret)
     }
 
@@ -966,6 +967,7 @@ where
         ptr::write_volatile(ptr::addr_of_mut!((*page).current_msg_id), (*msg).message_id);
         compiler_fence(Ordering::SeqCst);
         self.last_msg_sent = msg;
+        self.has_unsent_message = false;
         Ok(())
     }
 
@@ -1636,6 +1638,7 @@ where
                 // Broker never cleans up the pages so that new
                 // clients may join at any time
                 keep_pages_forever: true,
+                has_unsent_message: false,
                 shmem_provider: shmem_provider.clone(),
             },
             llmp_clients: vec![],
@@ -2102,6 +2105,7 @@ where
                 )],
                 // drop pages to the broker, if it already read them.
                 keep_pages_forever: false,
+                has_unsent_message: false,
                 shmem_provider: shmem_provider_clone.clone(),
             };
 
@@ -2369,6 +2373,7 @@ where
                 })],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
+                has_unsent_message: false,
                 shmem_provider: shmem_provider.clone(),
             },
 
