@@ -31,7 +31,7 @@ fn adder_loop(port: u16) -> ! {
     loop {
         let mut msg_counter = 0;
         loop {
-            let (_sender, tag, buf) = match client.recv_buf().unwrap() {
+            let (sender, tag, buf) = match client.recv_buf().unwrap() {
                 None => break,
                 Some(msg) => msg,
             };
@@ -42,8 +42,9 @@ fn adder_loop(port: u16) -> ! {
                         current_result.wrapping_add(u32::from_le_bytes(buf.try_into().unwrap()));
                 }
                 _ => println!(
-                    "Adder Client ignored unknown message {} with {} bytes",
+                    "Adder Client ignored unknown message {:#x} from client {} with {} bytes",
                     tag,
+                    sender,
                     buf.len()
                 ),
             };
