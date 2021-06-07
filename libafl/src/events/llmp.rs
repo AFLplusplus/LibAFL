@@ -10,7 +10,7 @@ use core::ptr::{addr_of, read_volatile};
 
 #[cfg(feature = "std")]
 use crate::bolts::{
-    llmp::{LlmpClient, LlmpReceiver},
+    llmp::{LlmpClient, LlmpConnection, LlmpReceiver},
     shmem::StdShMemProvider,
 };
 
@@ -19,7 +19,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::{
     bolts::{
-        llmp::{self, Flags, LlmpClientDescription, LlmpConnection, LlmpSender, Tag},
+        llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
