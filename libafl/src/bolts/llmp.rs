@@ -1085,11 +1085,24 @@ where
     }
 
     /// Shrinks the allocated [`LlmpMsg`] to a given size.
+    ///
+    /// # Safety
+    /// The msg pointer will be dereferenced, if it's not `null`.
     pub unsafe fn shrink_alloced(
         &mut self,
         msg: *mut LlmpMsg,
         shrinked_len: usize,
     ) -> Result<(), Error> {
+        if msg.is_null() {
+            return Err(Error::IllegalArgument(
+                "Null msg passed to shrink_alloced".to_string(),
+            ));
+        } else if !self.has_unsent_message {
+            return Err(Error::IllegalState(
+                "Called shrink_alloced, but the msg was not unsent".to_string(),
+            ));
+        }
+
         let old_len_padded = (*msg).buf_len_padded;
 
         let msg_start = msg as usize;
