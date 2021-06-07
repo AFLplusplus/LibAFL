@@ -57,15 +57,15 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
         Err(Error::NotImplemented("Not supprted in no_std".into()))
     }
 
-    /// Retrieve a unique name for this input
-    fn unique_name(&self) -> String;
+    /// Generate a name for this input
+    fn generate_name(&self, idx: usize) -> String;
 }
 
 /// An input for tests, mainly. There is no real use much else.
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct NopInput {}
 impl Input for NopInput {
-    fn unique_name(&self) -> String {
+    fn generate_name(&self, _idx: usize) -> String {
         "nop-input".to_string()
     }
 }
