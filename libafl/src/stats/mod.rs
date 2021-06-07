@@ -190,7 +190,7 @@ pub trait Stats {
             self.client_stats_mut().push(ClientStats {
                 last_window_time: current_time(),
                 ..ClientStats::default()
-            })
+            });
         }
         &mut self.client_stats_mut()[client_id as usize]
     }
@@ -512,7 +512,7 @@ impl ClientPerfStats {
         let elapsed = self.mark_time();
 
         // Add the time to the scheduler stat
-        self.update_scheduler(elapsed)
+        self.update_scheduler(elapsed);
     }
 
     /// Update the time spent in the scheduler with the elapsed time that we have seen

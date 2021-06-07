@@ -62,7 +62,7 @@ where
         let start_time = crate::cpu::read_time_counter();
 
         // Execute this feedback
-        let ret = self.is_interesting(state, manager, input, observers, &exit_kind);
+        let ret = self.is_interesting(state, manager, input, observers, exit_kind);
 
         // Get the elapsed time for checking this feedback
         let elapsed = crate::cpu::read_time_counter() - start_time;
@@ -315,7 +315,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
@@ -325,7 +325,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )?;
@@ -386,7 +386,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
@@ -400,7 +400,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )
@@ -457,7 +457,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
@@ -467,7 +467,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )?;
@@ -528,7 +528,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
@@ -542,7 +542,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )
