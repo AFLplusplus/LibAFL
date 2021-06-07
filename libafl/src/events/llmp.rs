@@ -707,8 +707,7 @@ where
 }
 
 #[cfg(feature = "std")]
-#[allow(clippy::type_complexity)]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::type_complexity, clippy::too_many_lines)]
 impl<I, OT, S, SP, ST> RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,

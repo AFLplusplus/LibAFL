@@ -166,7 +166,7 @@ impl From<ParseIntError> for Error {
 #[cfg(test)]
 mod tests {
     use crate::{
-        bolts::{rands::StdRand, tuples::tuple_list},
+        bolts::{rands::StdRand, shmem::StdShMemProvider, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
@@ -199,7 +199,7 @@ mod tests {
         let stats = SimpleStats::new(|s| {
             println!("{}", s);
         });
-        let mut event_manager = SimpleEventManager::new(stats);
+        let mut event_manager = SimpleEventManager::<_, _, StdShMemProvider, _>::new(stats);
 
         let scheduler = RandCorpusScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());
