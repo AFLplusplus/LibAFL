@@ -541,7 +541,7 @@ where
         start_timer!(state);
         let is_solution = self
             .objective_mut()
-            .is_interesting(state, event_mgr, &input, observers, &exit_kind)?;
+            .is_interesting(state, event_mgr, input, observers, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
 
         if is_solution {
@@ -564,7 +564,7 @@ where
             let is_interesting = self.feedback_mut().is_interesting_with_perf(
                 state,
                 event_mgr,
-                &input,
+                input,
                 observers,
                 &exit_kind,
                 &mut feedback_stats,

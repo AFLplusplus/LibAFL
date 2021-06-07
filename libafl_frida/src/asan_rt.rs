@@ -148,7 +148,7 @@ impl AsanRuntime {
 
     /// Check if the test leaked any memory and report it if so.
     pub fn check_for_leaks(&mut self) {
-        self.allocator.check_for_leaks()
+        self.allocator.check_for_leaks();
     }
 
     /// Returns the `AsanErrors` from the recent run
@@ -174,17 +174,15 @@ impl AsanRuntime {
     /// real address, the stalked address is returned.
     #[must_use]
     pub fn real_address_for_stalked(&self, stalked: usize) -> usize {
-        if let Some(addr) = self.stalked_addresses.get(&stalked) {
-            *addr
-        } else {
-            stalked
-        }
+        self.stalked_addresses
+            .get(&stalked)
+            .map_or(stalked, |addr| *addr)
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     #[allow(clippy::unused_self)]
     fn unpoison_all_existing_memory(&mut self) {
-        self.allocator.unpoison_all_existing_memory()
+        self.allocator.unpoison_all_existing_memory();
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
@@ -240,7 +238,9 @@ impl AsanRuntime {
         let stack_address = &mut stack_var as *mut _ as *mut c_void as usize;
         let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
-        unsafe { write_volatile(&mut stack_var, 0xfadbeef) };
+        unsafe {
+            write_volatile(&mut stack_var, 0xfadbeef);
+        }
 
         let start = range_details.memory_range().base_address().0 as usize;
         let end = start + range_details.memory_range().size();
@@ -1873,7 +1873,7 @@ impl AsanRuntime {
             actual_pc = insn.address() as usize;
         }
 
-        let detail = cs.insn_detail(&insn).unwrap();
+        let detail = cs.insn_detail(insn).unwrap();
         let arch_detail = detail.arch_detail();
         let (mut base_reg, mut index_reg, displacement) =
             if let Arm64Operand(arm64operand) = arch_detail.operands().last().unwrap() {
@@ -1910,12 +1910,12 @@ impl AsanRuntime {
             base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
         }
 
-        #[allow(clippy::clippy::cast_possible_wrap)]
+        #[allow(clippy::cast_possible_wrap)]
         let mut fault_address =
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
         if index_reg == 0 {
-            index_reg = 0xffff
+            index_reg = 0xffff;
         } else {
             if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
                 && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
@@ -1998,7 +1998,7 @@ impl AsanRuntime {
         AsanErrors::get_mut().report_error(error);
     }
 
-    #[allow(clippy::unused_self)]
+    #[allow(clippy::unused_self, clippy::identity_op)] // identity_op appears to be a false positive in ubfx
     fn generate_shadow_check_function(&mut self) {
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);

@@ -338,7 +338,7 @@ where
             let mut log = Vec::<String>::new();
             while let Some(idx) = self.mutation_log.pop() {
                 let name = String::from(self.scheduled.mutations().name(idx).unwrap()); // TODO maybe return an Error on None
-                log.push(name)
+                log.push(name);
             }
             let meta = LogMutationMetadata::new(log);
             testcase.add_metadata(meta);
@@ -471,7 +471,7 @@ mod tests {
 
         // The pre-seeded rand should have spliced at position 2.
         // TODO: Maybe have a fixed rand for this purpose?
-        assert_eq!(input.bytes(), &[b'a', b'b', b'f'])
+        assert_eq!(input.bytes(), &[b'a', b'b', b'f']);
     }
 
     #[test]

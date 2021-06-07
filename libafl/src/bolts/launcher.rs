@@ -236,4 +236,4 @@ where
     }
 }
 
-const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
+const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";

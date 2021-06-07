@@ -273,7 +273,7 @@ fn fuzz(
 
 /// The actual fuzzer
 #[cfg(unix)]
-#[allow(clippy::too_many_lines, clippy::clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 unsafe fn fuzz(
     module_name: &str,
     symbol_name: &str,

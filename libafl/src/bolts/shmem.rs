@@ -248,7 +248,7 @@ where
 
 impl<T: ShMemProvider> Drop for RcShMem<T> {
     fn drop(&mut self) {
-        self.provider.borrow_mut().release_map(&mut self.internal)
+        self.provider.borrow_mut().release_map(&mut self.internal);
     }
 }
 
@@ -303,7 +303,7 @@ where
     }
 
     fn release_map(&mut self, map: &mut Self::Mem) {
-        self.internal.borrow_mut().release_map(&mut map.internal)
+        self.internal.borrow_mut().release_map(&mut map.internal);
     }
 
     fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {

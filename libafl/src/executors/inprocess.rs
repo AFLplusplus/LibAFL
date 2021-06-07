@@ -208,7 +208,7 @@ where
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
-        &self.harness_fn
+        self.harness_fn
     }
 
     /// Retrieve the harness function for a mutable reference.
@@ -286,7 +286,7 @@ mod unix_signal_handler {
                 let data = &mut GLOBAL_STATE;
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
-                        (data.timeout_handler)(signal, info, context, data)
+                        (data.timeout_handler)(signal, info, context, data);
                     }
                     _ => (data.crash_handler)(signal, info, context, data),
                 }
@@ -342,7 +342,7 @@ mod unix_signal_handler {
 
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, event_mgr, &input, observers, &ExitKind::Timeout)
+                .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
                 .expect("In timeout handler objective failure.");
 
             if interesting {
@@ -433,7 +433,6 @@ mod unix_signal_handler {
             }
 
             // TODO tell the parent to not restart
-            libc::_exit(1);
         } else {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
@@ -481,7 +480,7 @@ mod unix_signal_handler {
 
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, event_mgr, &input, observers, &ExitKind::Crash)
+                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
                 .expect("In crash handler objective failure.");
 
             if interesting {
@@ -512,9 +511,9 @@ mod unix_signal_handler {
             event_mgr.await_restart_safe();
             #[cfg(feature = "std")]
             println!("Bye!");
-
-            libc::_exit(1);
         }
+
+        libc::_exit(1);
     }
 }
 

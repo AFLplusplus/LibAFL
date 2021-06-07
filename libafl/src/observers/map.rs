@@ -128,7 +128,7 @@ where
 
     #[inline]
     fn set_initial(&mut self, initial: T) {
-        self.initial = initial
+        self.initial = initial;
     }
 }
 
@@ -249,7 +249,7 @@ where
 
     #[inline]
     fn set_initial(&mut self, initial: T) {
-        self.initial = initial
+        self.initial = initial;
     }
 }
 
@@ -371,7 +371,7 @@ where
 
     #[inline]
     fn set_initial(&mut self, initial: T) {
-        self.initial = initial
+        self.initial = initial;
     }
 }
 
