@@ -1095,11 +1095,11 @@ where
     ) -> Result<(), Error> {
         if msg.is_null() {
             return Err(Error::IllegalArgument(
-                "Null msg passed to shrink_alloced".to_string(),
+                "Null msg passed to shrink_alloced".into(),
             ));
         } else if !self.has_unsent_message {
             return Err(Error::IllegalState(
-                "Called shrink_alloced, but the msg was not unsent".to_string(),
+                "Called shrink_alloced, but the msg was not unsent".into(),
             ));
         }
 
