@@ -148,7 +148,7 @@ impl AsanRuntime {
 
     /// Check if the test leaked any memory and report it if so.
     pub fn check_for_leaks(&mut self) {
-        self.allocator.check_for_leaks()
+        self.allocator.check_for_leaks();
     }
 
     /// Returns the `AsanErrors` from the recent run
@@ -1917,7 +1917,7 @@ impl AsanRuntime {
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
         if index_reg == 0 {
-            index_reg = 0xffff
+            index_reg = 0xffff;
         } else {
             if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
                 && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
