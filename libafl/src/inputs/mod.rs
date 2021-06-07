@@ -3,7 +3,7 @@
 pub mod bytes;
 pub use bytes::BytesInput;
 
-use alloc::vec::Vec;
+use alloc::{string::{String, ToString}, vec::Vec};
 use core::{clone::Clone, fmt::Debug};
 #[cfg(feature = "std")]
 use std::{
