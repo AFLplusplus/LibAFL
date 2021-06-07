@@ -244,6 +244,7 @@ where
         OT: ObserversTuple;
 
     #[cfg(feature = "introspection")]
+    #[allow(clippy::too_many_arguments)]
     fn is_pair_interesting_with_perf<EM, OT>(
         first: &mut A,
         second: &mut B,
@@ -499,7 +500,7 @@ where
         OT: ObserversTuple,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
-        if a == false {
+        if !a {
             return Ok(false);
         }
 
@@ -533,7 +534,7 @@ where
             feedback_index,
         )?;
 
-        if a == false {
+        if !a {
             return Ok(false);
         }
 

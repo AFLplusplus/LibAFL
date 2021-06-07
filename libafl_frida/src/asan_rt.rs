@@ -174,11 +174,9 @@ impl AsanRuntime {
     /// real address, the stalked address is returned.
     #[must_use]
     pub fn real_address_for_stalked(&self, stalked: usize) -> usize {
-        if let Some(addr) = self.stalked_addresses.get(&stalked) {
-            *addr
-        } else {
-            stalked
-        }
+        self.stalked_addresses
+            .get(&stalked)
+            .map_or(stalked, |addr| *addr)
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
@@ -2000,7 +1998,7 @@ impl AsanRuntime {
         AsanErrors::get_mut().report_error(error);
     }
 
-    #[allow(clippy::unused_self)]
+    #[allow(clippy::unused_self, clippy::identity_op)] // identity_op appears to be a false positive in ubfx
     fn generate_shadow_check_function(&mut self) {
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
