@@ -1,0 +1,29 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
+edition = "2018"
+
+[lib]
+# this needs to be a "dylib", *not* a "cdylib". 
+# rustc will otherwise strip the symbols exported from the linked common runtime static library
+crate-type = ["dylib"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug=true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ctor = "0.1"
+unchecked_unwrap = "3"
+
+[build-dependencies]
+cmake = "0.1"
