@@ -979,3 +979,61 @@ pub mod win32_shmem {
         }
     }
 }
+
+/// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`].
+#[cfg(feature = "std")]
+pub struct ShmemCursor<T: ShMem> {
+    inner: T,
+    pos: usize,
+}
+
+#[cfg(feature = "std")]
+impl<T: ShMem> ShmemCursor<T> {
+    pub fn from_shmem(shmem: T) -> Self {
+        Self {
+            inner: shmem,
+            pos: 0,
+        }
+    }
+
+    fn slice_mut(&mut self) -> &mut [u8] {
+        &mut (self.inner.map_mut()[self.pos..])
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: ShMem> std::io::Write for ShmemCursor<T> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self.slice_mut().write(buf) {
+            Ok(w) => {
+                self.pos += w;
+                Ok(w)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
+        match self.slice_mut().write_vectored(bufs) {
+            Ok(w) => {
+                self.pos += w;
+                Ok(w)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        match self.slice_mut().write_all(buf) {
+            Ok(w) => {
+                self.pos += buf.len();
+                Ok(w)
+            }
+            Err(e) => Err(e),
+        }
+    }
+}

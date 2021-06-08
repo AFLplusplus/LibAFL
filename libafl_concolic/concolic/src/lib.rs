@@ -561,61 +561,6 @@ impl MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
     }
 }
 
-use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
+use libafl::bolts::shmem::{ShMem, ShMemProvider, ShmemCursor, StdShMemProvider};
 
 pub type StdShMemMessageFileWriter = MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
-
-/// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`].
-pub struct ShmemCursor<T: ShMem> {
-    inner: T,
-    pos: usize,
-}
-
-impl<T: ShMem> ShmemCursor<T> {
-    pub fn from_shmem(shmem: T) -> Self {
-        Self {
-            inner: shmem,
-            pos: 0,
-        }
-    }
-
-    fn slice_mut(&mut self) -> &mut [u8] {
-        &mut (self.inner.map_mut()[self.pos..])
-    }
-}
-
-impl<T: ShMem> std::io::Write for ShmemCursor<T> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.slice_mut().write(buf) {
-            Ok(w) => {
-                self.pos += w;
-                Ok(w)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-
-    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        match self.slice_mut().write_vectored(bufs) {
-            Ok(w) => {
-                self.pos += w;
-                Ok(w)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        match self.slice_mut().write_all(buf) {
-            Ok(w) => {
-                self.pos += buf.len();
-                Ok(w)
-            }
-            Err(e) => Err(e),
-        }
-    }
-}
