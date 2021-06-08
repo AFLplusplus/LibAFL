@@ -3,7 +3,15 @@
 // MOpt global variables, currently the variable names are identical to the original MOpt implementation
 // TODO: but I have to rename it when I implement the main algorithm because I don't find these names are any suggestive of their meaning
 // Why there's so many puppets around..?
-pub struct MOpt{
+
+
+use crate::bolts::rands::Rand;
+
+pub struct MOpt<R>
+where
+    R: Rand,
+{
+    rand: R,
     limit_time_puppet: u64, //time to move onto pacemaker fuzzing mode
     origi_hit_cnt_puppet: u64,
     last_limit_time_start: u64,
@@ -48,8 +56,11 @@ pub struct MOpt{
     core_operator_cycles_puppet_v3: Vec<u64>,
 }
 
-impl MOpt{
-    pub fn new(&self, limit_time_puppet: u64, operator_num: usize, swarm_num: usize) -> Self{
+impl<R> MOpt<R>
+where
+    R: Rand,
+{
+    pub fn new(&self, limit_time_puppet: u64, rand: R, operator_num: usize, swarm_num: usize) -> Self{
         let limit_time_puppet2 = limit_time_puppet * 60 * 1000;
         let key_puppet = if limit_time_puppet == 0{
             1
@@ -58,6 +69,7 @@ impl MOpt{
             0
         };
         Self{
+            rand: rand,
             limit_time_puppet: 0,
             origi_hit_cnt_puppet: 0,
             last_limit_time_start: 0,
@@ -101,6 +113,10 @@ impl MOpt{
             core_operator_cycles_puppet_v2: vec![0; operator_num],
             core_operator_cycles_puppet_v3: vec![0; operator_num],
         }
+    }
+
+    pub fn RAND_C(&mut self) -> f64{
+        self.rand.below(1000) as f64 * 0.001
     }
 }
 
