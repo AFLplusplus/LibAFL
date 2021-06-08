@@ -12,37 +12,38 @@ where
     R: Rand,
 {
     rand: R,
-    limit_time_puppet: u64, //time to move onto pacemaker fuzzing mode
+    limit_time_puppet: u64, // Time before we move onto pacemaker fuzzing mode
     origi_hit_cnt_puppet: u64,
     last_limit_time_start: u64,
-    temp_pilot_time: u64,
-    total_pacemaker_time: u64,
+    total_pacemaker_time: u64, // Simply tmp_core_time + tmp_pilot_time
     total_puppet_find: u64,
     temp_puppet_find: u64,
-    most_time_key: u64,
-    most_time_puppet: u64,
-    old_hit_count: u64,
+    most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
+    most_time_puppet: u64, // Unneeded for LibAFL
+    old_hit_count: u64, // Unneeded variable
     SPLICE_CYCLES_puppet: i32,
-    limit_time_sig: i32, // if we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
-    key_puppet: i32, // if we are in the pacemaker fuzzing mode?
-    key_module: i32,
-    w_init: f64,
+    limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
+    key_puppet: i32, // If we are in the pacemaker fuzzing mode?
+    key_module: i32, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
+    w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
     w_end: f64,
     w_now: f64,
     g_now: i32,
     g_max: i32,
-    operator_num: usize, //operator_num, swarm_num, period_core are defined as macros in the original implementation, but I put it into the struct here so that we can tune these values
-    swarm_num: usize,
-    period_core: usize,
-    tmp_core_time: u64,
-    swarm_now: i32,
-    x_now: Vec<Vec<f64>>,
-    L_best: Vec<Vec<f64>>,
+    operator_num: usize, // Operator_num, swarm_num, period_core are defined as macros in the original implementation, but I put it into the struct here so that we can tune these values
+    swarm_num: usize, // Number of swarms
+    period_pilot : usize, // We'll generate test for period_pilot times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.2
+    period_core: usize, // We'll generate test for period_core times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.3
+    temp_pilot_time: u64, // The number of testcase generated using pilot fzzing module so far
+    tmp_core_time: u64, // The number of testcase generated using core fuzzing module so far
+    swarm_now: i32, // Current swarm
+    x_now: Vec<Vec<f64>>, // The positions of PSO algo
+    L_best: Vec<Vec<f64>>, // The local optimum
     eff_best: Vec<Vec<f64>>,
-    G_best: Vec<f64>,
-    v_now: Vec<Vec<f64>>,
+    G_best: Vec<f64>, // The global optimum
+    v_now: Vec<Vec<f64>>, // The speed
     probability_now: Vec<Vec<f64>>,
-    swarm_fitness: Vec<f64>,
+    swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
     stage_finds_puppet: Vec<Vec<u64>>,
     stage_finds_puppet_v2: Vec<Vec<u64>>,
     stage_cycles_puppet: Vec<Vec<u64>>,
@@ -91,6 +92,7 @@ where
             g_max: 5000,
             operator_num: operator_num,
             swarm_num: swarm_num,
+            period_pilot: 50000,
             period_core: 500000,
             tmp_core_time: 0,
             swarm_now: 0,
@@ -115,6 +117,7 @@ where
         }
     }
 
+    #[inline]
     pub fn RAND_C(&mut self) -> f64{
         self.rand.below(1000) as f64 * 0.001
     }
@@ -132,5 +135,4 @@ const STAGE_OverWrite75: usize = 15;
 const STAGE_OverWriteExtra: usize = 16;
 const STAGE_InsertExtra : usize = 17;
 
-const period_pilot : usize = 50000;
 const period_pilot_tmp : f64 = 5000.0;
