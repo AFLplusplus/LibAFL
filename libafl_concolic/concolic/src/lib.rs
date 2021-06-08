@@ -561,4 +561,5 @@ impl MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
 
 use libafl::bolts::shmem::{ShMem, ShMemProvider, ShmemCursor, StdShMemProvider};
 
-pub type StdShMemMessageFileWriter = MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
+pub type StdShMemMessageFileWriter =
+    MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
