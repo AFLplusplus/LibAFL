@@ -5,7 +5,7 @@
 // Why there's so many puppets around..?
 
 
-use crate::bolts::rands::Rand;
+use crate::{bolts::rands::Rand, Error};
 
 pub struct MOpt<R>
 where
@@ -14,7 +14,7 @@ where
     rand: R,
     limit_time_puppet: u64, // Time before we move onto pacemaker fuzzing mode
     origi_hit_cnt_puppet: u64,
-    last_limit_time_start: u64,
+    last_limit_time_start: u64, // Unneeded variable
     total_pacemaker_time: u64, // Simply tmp_core_time + tmp_pilot_time
     total_puppet_find: u64,
     temp_puppet_find: u64,
@@ -36,7 +36,7 @@ where
     period_core: usize, // We'll generate test for period_core times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.3
     temp_pilot_time: u64, // The number of testcase generated using pilot fzzing module so far
     tmp_core_time: u64, // The number of testcase generated using core fuzzing module so far
-    swarm_now: i32, // Current swarm
+    swarm_now: usize, // Current swarm
     x_now: Vec<Vec<f64>>, // The positions of PSO algo
     L_best: Vec<Vec<f64>>, // The local optimum
     eff_best: Vec<Vec<f64>>,
@@ -118,9 +118,48 @@ where
     }
 
     #[inline]
-    pub fn RAND_C(&mut self) -> f64{
-        self.rand.below(1000) as f64 * 0.001
+    pub fn rand_below(&mut self, size: u64) -> f64{
+        self.rand.below(size) as f64 * 0.001
     }
+
+    // The function select_algorithm() from https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397, it's more of select_mutator for libAFL
+    pub fn select_algorithm(&mut self, extras: usize) -> Result<usize, Error> {
+        let mut res = 0;
+        let mut sentry = 0;
+
+        let operator_num = if extras < 2{
+            self.operator_num - 2
+        }
+        else{
+            self.operator_num
+        };
+
+        // Fetch a random sele value
+        let sele : f64 = self.probability_now[self.swarm_now][operator_num - 1] * (self.rand_below(10000) * 0.0001);
+        
+        for i in 0..operator_num{
+            if i == 0 {
+                if sele < self.probability_now[self.swarm_now][i]{
+                    res = i;
+                    break;
+                }
+            }
+            else{
+                if sele < self.probability_now[self.swarm_now][i]{
+                    res = i;
+                    sentry = 1;
+                    break;
+                }
+            }
+        }
+
+        if (sentry == 1 && sele < self.probability_now[self.swarm_now][res - 1]) || (res + 1 < operator_num && sele > self.probability_now[self.swarm_now][res + 1]) {
+            return Err(Error::MOpt("Error in select_algorithm".to_string()));
+        }
+
+        Ok(res)
+    }
+
 }
 
 const v_max : f64 = 1.0;

@@ -73,6 +73,8 @@ pub enum Error {
     IllegalArgument(String),
     /// Forkserver related Error
     Forkserver(String),
+    /// MOpt related Error
+    MOpt(String),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -97,6 +99,7 @@ impl fmt::Display for Error {
             Self::IllegalState(s) => write!(f, "Illegal state: {0}", &s),
             Self::IllegalArgument(s) => write!(f, "Illegal argument: {0}", &s),
             Self::Forkserver(s) => write!(f, "Forkserver : {0}", &s),
+            Self::MOpt(s) => write!(f, "MOpt: {0}", &s),
             Self::ShuttingDown => write!(f, "Shutting down!"),
             Self::Unknown(s) => write!(f, "Unknown error: {0}", &s),
         }
