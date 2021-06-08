@@ -12,6 +12,7 @@ members = [
     "libafl_targets",
     "libafl_frida",
     "libafl_tests",
+    "libafl_concolic/concolic",
 ]
 default-members = [
     "libafl",
@@ -22,4 +23,5 @@ default-members = [
 ]
 exclude = [
     "fuzzers",
+    "libafl_concolic/runtime",
 ]
