@@ -105,6 +105,20 @@ pub trait Evaluator<E, EM, I, S> {
         executor: &mut E,
         manager: &mut EM,
         input: I,
+    ) -> Result<(bool, Option<usize>), Error> {
+        self.evaluate_input_events(state, executor, manager, input, true)
+    }
+
+    /// Runs the input and triggers observers and feedback,
+    /// returns if is interesting an (option) the index of the new testcase in the corpus
+    /// This version has a boolean to decide if send events to the manager.
+    fn evaluate_input_events(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+        send_events: bool
     ) -> Result<(bool, Option<usize>), Error>;
 }
 
@@ -332,12 +346,13 @@ where
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
-    fn evaluate_input(
+    fn evaluate_input_events(
         &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         input: I,
+        send_events: bool
     ) -> Result<(bool, Option<usize>), Error> {
         let result = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
@@ -358,18 +373,20 @@ where
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
-                let observers_buf = manager.serialize_observers(observers)?;
-                manager.fire(
-                    state,
-                    Event::NewTestcase {
-                        input,
-                        observers_buf,
-                        corpus_size: state.corpus().count(),
-                        client_config: "TODO".into(),
-                        time: current_time(),
-                        executions: *state.executions(),
-                    },
-                )?;
+                if send_events {
+                    let observers_buf = manager.serialize_observers(observers)?;
+                    manager.fire(
+                        state,
+                        Event::NewTestcase {
+                            input,
+                            observers_buf,
+                            corpus_size: state.corpus().count(),
+                            client_config: "TODO".into(),
+                            time: current_time(),
+                            executions: *state.executions(),
+                        },
+                    )?;
+                }
                 Ok((true, Some(idx)))
             }
             ExecuteInputResult::Solution => {
@@ -380,12 +397,15 @@ where
                 let mut testcase = Testcase::new(input);
                 self.objective_mut().append_metadata(state, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
-                manager.fire(
-                    state,
-                    Event::Objective {
-                        objective_size: state.solutions().count(),
-                    },
-                )?;
+                
+                if send_events {
+                    manager.fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )?;
+                }
 
                 Ok((false, None))
             }

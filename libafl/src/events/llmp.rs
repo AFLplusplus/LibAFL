@@ -23,11 +23,11 @@ use crate::{
         shmem::ShMemProvider,
     },
     events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
-    executors::Executor,
+    executors::{HasObserversHooks, HasObservers, HasExecHooksTuple, Executor},
     executors::ExitKind,
-    fuzzer::{IfInteresting, IsInteresting},
+    fuzzer::{IfInteresting, IsInteresting, Evaluator},
     inputs::Input,
-    observers::ObserversTuple,
+    observers::{ObserversTuple},
     stats::Stats,
     Error,
 };
@@ -252,6 +252,7 @@ where
     llmp: llmp::LlmpClient<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
+    configuration: String,
     phantom: PhantomData<(I, OT, S)>,
 }
 
@@ -274,11 +275,12 @@ where
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw llmp client
-    pub fn new(llmp: llmp::LlmpClient<SP>) -> Result<Self, Error> {
+    pub fn new(llmp: llmp::LlmpClient<SP>, configuration: String) -> Result<Self, Error> {
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            configuration,
             phantom: PhantomData,
         })
     }
@@ -287,24 +289,24 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+    pub fn new_on_port(shmem_provider: SP, port: u16, configuration: String) -> Result<Self, Error> {
         Ok(Self {
             llmp: llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            configuration,
             phantom: PhantomData,
         })
     }
 
     /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
     #[cfg(feature = "std")]
-    pub fn existing_client_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
+    pub fn existing_client_from_env(shmem_provider: SP, env_name: &str, configuration: String) -> Result<Self, Error> {
         Ok(Self {
             llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            // Inserting a nop-stats element here so rust won't complain.
-            // In any case, the client won't currently use it.
+            configuration,
             phantom: PhantomData,
         })
     }
@@ -318,13 +320,13 @@ where
     pub fn existing_client_from_description(
         shmem_provider: SP,
         description: &LlmpClientDescription,
+        configuration: String,
     ) -> Result<Self, Error> {
         Ok(Self {
             llmp: llmp::LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            // Inserting a nop-stats element here so rust won't complain.
-            // In any case, the client won't currently use it.
+            configuration,
             phantom: PhantomData,
         })
     }
@@ -340,19 +342,20 @@ where
     fn handle_in_client<E, Z>(
         &mut self,
         fuzzer: &mut Z,
-        _executor: &mut E,
+        executor: &mut E,
         state: &mut S,
         _sender_id: u32,
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, I, S, Z>,
-        Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
+        OT: ObserversTuple + HasExecHooksTuple<Self, I, S, Z>,
+        E: Executor<Self, I, S, Z> + HasObservers<OT> + HasObserversHooks<Self, I, OT, S, Z>,
+        Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, Self, I, S>,
     {
         match event {
             Event::NewTestcase {
                 input,
-                client_config: _,
+                client_config,
                 corpus_size: _,
                 observers_buf,
                 time: _,
@@ -362,18 +365,22 @@ where
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
                 println!("Received new Testcase from {}", _sender_id);
-
-                let observers: OT = postcard::from_bytes(&observers_buf)?;
-                // TODO include ExitKind in NewTestcase
-                // TODO check for objective too
-                let is_interesting =
-                    fuzzer.is_interesting(state, self, &input, &observers, &ExitKind::Ok)?;
-                if fuzzer
-                    .add_if_interesting(state, &input, is_interesting)?
-                    .is_some()
-                {
-                    #[cfg(feature = "std")]
-                    println!("Added received Testcase");
+                
+                if (client_config != self.configuration) {
+                    fuzzer.evaluate_input_events(state, executor, self, input, false)?;
+                } else {
+                    let observers: OT = postcard::from_bytes(&observers_buf)?;
+                    // TODO include ExitKind in NewTestcase
+                    // TODO check for objective too
+                    let is_interesting =
+                        fuzzer.is_interesting(state, self, &input, &observers, &ExitKind::Ok)?;
+                    if fuzzer
+                        .add_if_interesting(state, &input, is_interesting)?
+                        .is_some()
+                    {
+                        #[cfg(feature = "std")]
+                        println!("Added received Testcase");
+                    }
                 }
                 Ok(())
             }
@@ -438,10 +445,10 @@ where
 impl<E, I, OT, S, SP, Z> EventProcessor<E, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
     SP: ShMemProvider,
-    E: Executor<Self, I, S, Z>,
+    E: Executor<Self, I, S, Z> + HasObservers<OT> + HasObserversHooks<Self, I, OT, S, Z>,
     I: Input,
-    OT: ObserversTuple,
-    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>, //CE: CustomEvent<I>,
+    OT: ObserversTuple + HasExecHooksTuple<Self, I, S, Z>,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, Self, I, S>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -451,7 +458,6 @@ where
             if tag == _LLMP_TAG_EVENT_TO_BROKER {
                 panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
             }
-            println!("[{}] Message from {}", self_id, sender_id);
             if sender_id == self_id {
                 continue;
             }
@@ -480,10 +486,10 @@ where
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
     SP: ShMemProvider,
-    E: Executor<Self, I, S, Z>,
+    E: Executor<Self, I, S, Z> + HasObservers<OT> + HasObserversHooks<Self, I, OT, S, Z>,
     I: Input,
-    OT: ObserversTuple,
-    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>, //CE: CustomEvent<I>,
+    OT: ObserversTuple + HasExecHooksTuple<Self, I, S, Z>,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, Self, I, S>, //CE: CustomEvent<I>,
 {
 }
 
@@ -580,10 +586,10 @@ where
 
 impl<E, I, OT, S, SP, Z> EventProcessor<E, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
-    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
+    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<OT> + HasObserversHooks<LlmpEventManager<I, OT, S, SP>, I, OT, S, Z>,
     I: Input,
-    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
-    OT: ObserversTuple,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, LlmpEventManager<I, OT, S, SP>, I, S>,
+    OT: ObserversTuple + HasExecHooksTuple<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -594,11 +600,11 @@ where
 
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
-    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
+    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<OT> + HasObserversHooks<LlmpEventManager<I, OT, S, SP>, I, OT, S, Z>,
     I: Input,
     S: Serialize,
-    Z: IfInteresting<I, S> + IsInteresting<I, OT, S>,
-    OT: ObserversTuple,
+    Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, LlmpEventManager<I, OT, S, SP>, I, S>,
+    OT: ObserversTuple + HasExecHooksTuple<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
