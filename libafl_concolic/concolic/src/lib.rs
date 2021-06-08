@@ -330,89 +330,88 @@ impl<R: Read> MessageFileReader<R> {
     }
 
     fn transform_message(&mut self, message: &mut Message) -> SymExprRef {
-        use Message::*;
         let ret = self.current_id;
         match message {
-            GetInputByte { .. }
-            | BuildInteger { .. }
-            | BuildInteger128 { .. }
-            | BuildFloat { .. }
-            | BuildNullPointer
-            | BuildTrue
-            | BuildFalse
-            | BuildBool { .. } => {
+            Message::GetInputByte { .. }
+            | Message::BuildInteger { .. }
+            | Message::BuildInteger128 { .. }
+            | Message::BuildFloat { .. }
+            | Message::BuildNullPointer
+            | Message::BuildTrue
+            | Message::BuildFalse
+            | Message::BuildBool { .. } => {
                 self.current_id += 1;
             }
-            BuildNeg { op }
-            | BuildFloatAbs { op }
-            | BuildNot { op }
-            | BuildSext { op, .. }
-            | BuildZext { op, .. }
-            | BuildTrunc { op, .. }
-            | BuildIntToFloat { op, .. }
-            | BuildFloatToFloat { op, .. }
-            | BuildBitsToFloat { op, .. }
-            | BuildFloatToBits { op }
-            | BuildFloatToSignedInteger { op, .. }
-            | BuildFloatToUnsignedInteger { op, .. }
-            | BuildBoolToBits { op, .. }
-            | ExtractHelper { op, .. }
-            | BuildExtract { op, .. }
-            | BuildBswap { op } => {
+            Message::BuildNeg { op }
+            | Message::BuildFloatAbs { op }
+            | Message::BuildNot { op }
+            | Message::BuildSext { op, .. }
+            | Message::BuildZext { op, .. }
+            | Message::BuildTrunc { op, .. }
+            | Message::BuildIntToFloat { op, .. }
+            | Message::BuildFloatToFloat { op, .. }
+            | Message::BuildBitsToFloat { op, .. }
+            | Message::BuildFloatToBits { op }
+            | Message::BuildFloatToSignedInteger { op, .. }
+            | Message::BuildFloatToUnsignedInteger { op, .. }
+            | Message::BuildBoolToBits { op, .. }
+            | Message::ExtractHelper { op, .. }
+            | Message::BuildExtract { op, .. }
+            | Message::BuildBswap { op } => {
                 *op = self.make_absolute(*op);
                 self.current_id += 1;
             }
-            BuildAdd { a, b }
-            | BuildSub { a, b }
-            | BuildMul { a, b }
-            | BuildUnsignedDiv { a, b }
-            | BuildSignedDiv { a, b }
-            | BuildUnsignedRem { a, b }
-            | BuildSignedRem { a, b }
-            | BuildShiftLeft { a, b }
-            | BuildLogicalShiftRight { a, b }
-            | BuildArithmeticShiftRight { a, b }
-            | BuildSignedLessThan { a, b }
-            | BuildSignedLessEqual { a, b }
-            | BuildSignedGreaterThan { a, b }
-            | BuildSignedGreaterEqual { a, b }
-            | BuildUnsignedLessThan { a, b }
-            | BuildUnsignedLessEqual { a, b }
-            | BuildUnsignedGreaterThan { a, b }
-            | BuildUnsignedGreaterEqual { a, b }
-            | BuildEqual { a, b }
-            | BuildNotEqual { a, b }
-            | BuildBoolAnd { a, b }
-            | BuildBoolOr { a, b }
-            | BuildBoolXor { a, b }
-            | BuildAnd { a, b }
-            | BuildOr { a, b }
-            | BuildXor { a, b }
-            | BuildFloatOrdered { a, b }
-            | BuildFloatOrderedGreaterThan { a, b }
-            | BuildFloatOrderedGreaterEqual { a, b }
-            | BuildFloatOrderedLessThan { a, b }
-            | BuildFloatOrderedLessEqual { a, b }
-            | BuildFloatOrderedEqual { a, b }
-            | BuildFloatOrderedNotEqual { a, b }
-            | BuildFloatUnordered { a, b }
-            | BuildFloatUnorderedGreaterThan { a, b }
-            | BuildFloatUnorderedGreaterEqual { a, b }
-            | BuildFloatUnorderedLessThan { a, b }
-            | BuildFloatUnorderedLessEqual { a, b }
-            | BuildFloatUnorderedEqual { a, b }
-            | BuildFloatUnorderedNotEqual { a, b }
-            | BuildFloatAdd { a, b }
-            | BuildFloatSub { a, b }
-            | BuildFloatMul { a, b }
-            | BuildFloatDiv { a, b }
-            | BuildFloatRem { a, b }
-            | ConcatHelper { a, b } => {
+            Message::BuildAdd { a, b }
+            | Message::BuildSub { a, b }
+            | Message::BuildMul { a, b }
+            | Message::BuildUnsignedDiv { a, b }
+            | Message::BuildSignedDiv { a, b }
+            | Message::BuildUnsignedRem { a, b }
+            | Message::BuildSignedRem { a, b }
+            | Message::BuildShiftLeft { a, b }
+            | Message::BuildLogicalShiftRight { a, b }
+            | Message::BuildArithmeticShiftRight { a, b }
+            | Message::BuildSignedLessThan { a, b }
+            | Message::BuildSignedLessEqual { a, b }
+            | Message::BuildSignedGreaterThan { a, b }
+            | Message::BuildSignedGreaterEqual { a, b }
+            | Message::BuildUnsignedLessThan { a, b }
+            | Message::BuildUnsignedLessEqual { a, b }
+            | Message::BuildUnsignedGreaterThan { a, b }
+            | Message::BuildUnsignedGreaterEqual { a, b }
+            | Message::BuildEqual { a, b }
+            | Message::BuildNotEqual { a, b }
+            | Message::BuildBoolAnd { a, b }
+            | Message::BuildBoolOr { a, b }
+            | Message::BuildBoolXor { a, b }
+            | Message::BuildAnd { a, b }
+            | Message::BuildOr { a, b }
+            | Message::BuildXor { a, b }
+            | Message::BuildFloatOrdered { a, b }
+            | Message::BuildFloatOrderedGreaterThan { a, b }
+            | Message::BuildFloatOrderedGreaterEqual { a, b }
+            | Message::BuildFloatOrderedLessThan { a, b }
+            | Message::BuildFloatOrderedLessEqual { a, b }
+            | Message::BuildFloatOrderedEqual { a, b }
+            | Message::BuildFloatOrderedNotEqual { a, b }
+            | Message::BuildFloatUnordered { a, b }
+            | Message::BuildFloatUnorderedGreaterThan { a, b }
+            | Message::BuildFloatUnorderedGreaterEqual { a, b }
+            | Message::BuildFloatUnorderedLessThan { a, b }
+            | Message::BuildFloatUnorderedLessEqual { a, b }
+            | Message::BuildFloatUnorderedEqual { a, b }
+            | Message::BuildFloatUnorderedNotEqual { a, b }
+            | Message::BuildFloatAdd { a, b }
+            | Message::BuildFloatSub { a, b }
+            | Message::BuildFloatMul { a, b }
+            | Message::BuildFloatDiv { a, b }
+            | Message::BuildFloatRem { a, b }
+            | Message::ConcatHelper { a, b } => {
                 *a = self.make_absolute(*a);
                 *b = self.make_absolute(*b);
                 self.current_id += 1;
             }
-            PushPathConstraint { constraint: op, .. } => {
+            Message::PushPathConstraint { constraint: op, .. } => {
                 *op = self.make_absolute(*op);
             }
         }
@@ -451,89 +450,88 @@ impl<W: Write> MessageFileWriter<W> {
     }
 
     pub fn write_message(&mut self, mut message: Message) -> SymExprRef {
-        use Message::*;
         let current_id = self.id_counter;
         match &mut message {
-            GetInputByte { .. }
-            | BuildInteger { .. }
-            | BuildInteger128 { .. }
-            | BuildFloat { .. }
-            | BuildNullPointer
-            | BuildTrue
-            | BuildFalse
-            | BuildBool { .. } => {
+            Message::GetInputByte { .. }
+            | Message::BuildInteger { .. }
+            | Message::BuildInteger128 { .. }
+            | Message::BuildFloat { .. }
+            | Message::BuildNullPointer
+            | Message::BuildTrue
+            | Message::BuildFalse
+            | Message::BuildBool { .. } => {
                 self.id_counter += 1;
             }
-            BuildNeg { op }
-            | BuildFloatAbs { op }
-            | BuildNot { op }
-            | BuildSext { op, .. }
-            | BuildZext { op, .. }
-            | BuildTrunc { op, .. }
-            | BuildIntToFloat { op, .. }
-            | BuildFloatToFloat { op, .. }
-            | BuildBitsToFloat { op, .. }
-            | BuildFloatToBits { op }
-            | BuildFloatToSignedInteger { op, .. }
-            | BuildFloatToUnsignedInteger { op, .. }
-            | BuildBoolToBits { op, .. }
-            | ExtractHelper { op, .. }
-            | BuildExtract { op, .. }
-            | BuildBswap { op } => {
+            Message::BuildNeg { op }
+            | Message::BuildFloatAbs { op }
+            | Message::BuildNot { op }
+            | Message::BuildSext { op, .. }
+            | Message::BuildZext { op, .. }
+            | Message::BuildTrunc { op, .. }
+            | Message::BuildIntToFloat { op, .. }
+            | Message::BuildFloatToFloat { op, .. }
+            | Message::BuildBitsToFloat { op, .. }
+            | Message::BuildFloatToBits { op }
+            | Message::BuildFloatToSignedInteger { op, .. }
+            | Message::BuildFloatToUnsignedInteger { op, .. }
+            | Message::BuildBoolToBits { op, .. }
+            | Message::ExtractHelper { op, .. }
+            | Message::BuildExtract { op, .. }
+            | Message::BuildBswap { op } => {
                 *op = self.make_relative(*op);
                 self.id_counter += 1;
             }
-            BuildAdd { a, b }
-            | BuildSub { a, b }
-            | BuildMul { a, b }
-            | BuildUnsignedDiv { a, b }
-            | BuildSignedDiv { a, b }
-            | BuildUnsignedRem { a, b }
-            | BuildSignedRem { a, b }
-            | BuildShiftLeft { a, b }
-            | BuildLogicalShiftRight { a, b }
-            | BuildArithmeticShiftRight { a, b }
-            | BuildSignedLessThan { a, b }
-            | BuildSignedLessEqual { a, b }
-            | BuildSignedGreaterThan { a, b }
-            | BuildSignedGreaterEqual { a, b }
-            | BuildUnsignedLessThan { a, b }
-            | BuildUnsignedLessEqual { a, b }
-            | BuildUnsignedGreaterThan { a, b }
-            | BuildUnsignedGreaterEqual { a, b }
-            | BuildEqual { a, b }
-            | BuildNotEqual { a, b }
-            | BuildBoolAnd { a, b }
-            | BuildBoolOr { a, b }
-            | BuildBoolXor { a, b }
-            | BuildAnd { a, b }
-            | BuildOr { a, b }
-            | BuildXor { a, b }
-            | BuildFloatOrdered { a, b }
-            | BuildFloatOrderedGreaterThan { a, b }
-            | BuildFloatOrderedGreaterEqual { a, b }
-            | BuildFloatOrderedLessThan { a, b }
-            | BuildFloatOrderedLessEqual { a, b }
-            | BuildFloatOrderedEqual { a, b }
-            | BuildFloatOrderedNotEqual { a, b }
-            | BuildFloatUnordered { a, b }
-            | BuildFloatUnorderedGreaterThan { a, b }
-            | BuildFloatUnorderedGreaterEqual { a, b }
-            | BuildFloatUnorderedLessThan { a, b }
-            | BuildFloatUnorderedLessEqual { a, b }
-            | BuildFloatUnorderedEqual { a, b }
-            | BuildFloatUnorderedNotEqual { a, b }
-            | BuildFloatAdd { a, b }
-            | BuildFloatSub { a, b }
-            | BuildFloatMul { a, b }
-            | BuildFloatDiv { a, b }
-            | BuildFloatRem { a, b }
-            | ConcatHelper { a, b } => {
+            Message::BuildAdd { a, b }
+            | Message::BuildSub { a, b }
+            | Message::BuildMul { a, b }
+            | Message::BuildUnsignedDiv { a, b }
+            | Message::BuildSignedDiv { a, b }
+            | Message::BuildUnsignedRem { a, b }
+            | Message::BuildSignedRem { a, b }
+            | Message::BuildShiftLeft { a, b }
+            | Message::BuildLogicalShiftRight { a, b }
+            | Message::BuildArithmeticShiftRight { a, b }
+            | Message::BuildSignedLessThan { a, b }
+            | Message::BuildSignedLessEqual { a, b }
+            | Message::BuildSignedGreaterThan { a, b }
+            | Message::BuildSignedGreaterEqual { a, b }
+            | Message::BuildUnsignedLessThan { a, b }
+            | Message::BuildUnsignedLessEqual { a, b }
+            | Message::BuildUnsignedGreaterThan { a, b }
+            | Message::BuildUnsignedGreaterEqual { a, b }
+            | Message::BuildEqual { a, b }
+            | Message::BuildNotEqual { a, b }
+            | Message::BuildBoolAnd { a, b }
+            | Message::BuildBoolOr { a, b }
+            | Message::BuildBoolXor { a, b }
+            | Message::BuildAnd { a, b }
+            | Message::BuildOr { a, b }
+            | Message::BuildXor { a, b }
+            | Message::BuildFloatOrdered { a, b }
+            | Message::BuildFloatOrderedGreaterThan { a, b }
+            | Message::BuildFloatOrderedGreaterEqual { a, b }
+            | Message::BuildFloatOrderedLessThan { a, b }
+            | Message::BuildFloatOrderedLessEqual { a, b }
+            | Message::BuildFloatOrderedEqual { a, b }
+            | Message::BuildFloatOrderedNotEqual { a, b }
+            | Message::BuildFloatUnordered { a, b }
+            | Message::BuildFloatUnorderedGreaterThan { a, b }
+            | Message::BuildFloatUnorderedGreaterEqual { a, b }
+            | Message::BuildFloatUnorderedLessThan { a, b }
+            | Message::BuildFloatUnorderedLessEqual { a, b }
+            | Message::BuildFloatUnorderedEqual { a, b }
+            | Message::BuildFloatUnorderedNotEqual { a, b }
+            | Message::BuildFloatAdd { a, b }
+            | Message::BuildFloatSub { a, b }
+            | Message::BuildFloatMul { a, b }
+            | Message::BuildFloatDiv { a, b }
+            | Message::BuildFloatRem { a, b }
+            | Message::ConcatHelper { a, b } => {
                 *a = self.make_relative(*a);
                 *b = self.make_relative(*b);
                 self.id_counter += 1;
             }
-            PushPathConstraint { constraint: op, .. } => {
+            Message::PushPathConstraint { constraint: op, .. } => {
                 *op = self.make_relative(*op);
             }
         }
