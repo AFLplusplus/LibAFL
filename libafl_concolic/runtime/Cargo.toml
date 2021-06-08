@@ -24,6 +24,7 @@ debug=true
 [dependencies]
 ctor = "0.1"
 unchecked_unwrap = "3"
+concolic = {path = "../concolic"}
 
 [build-dependencies]
 cmake = "0.1"
