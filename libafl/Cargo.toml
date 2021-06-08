@@ -16,7 +16,7 @@ rustc_version = "0.3.3"
 
 [dev-dependencies]
 criterion = "0.3" # Benchmarking
-ahash = "0.6.1" # another hash
+ahash = "0.7" # another hash
 fxhash = "0.2.1" # yet another hash
 xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
 serde_json = "1.0.60"
@@ -68,6 +68,7 @@ core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity
 num_enum = "0.5.1"
 hostname = "^0.3" # Is there really no gethostname in the stdlib?
 typed-builder = "0.9.0"
+ahash ="0.7" 
 
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug

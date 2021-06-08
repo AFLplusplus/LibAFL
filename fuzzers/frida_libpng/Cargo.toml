@@ -30,7 +30,6 @@ libc = "0.2"
 libloading = "0.7.0"
 num-traits = "0.2.14"
 rangemap = "0.1.10"
-seahash = "4.1.0"
 clap = "2.33"
 serde = "1.0"
 

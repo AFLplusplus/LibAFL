@@ -3,7 +3,10 @@
 pub mod bytes;
 pub use bytes::BytesInput;
 
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{clone::Clone, fmt::Debug};
 #[cfg(feature = "std")]
 use std::{
@@ -53,12 +56,19 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
     fn from_file<P>(_path: P) -> Result<Self, Error> {
         Err(Error::NotImplemented("Not supprted in no_std".into()))
     }
+
+    /// Generate a name for this input
+    fn generate_name(&self, idx: usize) -> String;
 }
 
 /// An input for tests, mainly. There is no real use much else.
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct NopInput {}
-impl Input for NopInput {}
+impl Input for NopInput {
+    fn generate_name(&self, _idx: usize) -> String {
+        "nop-input".to_string()
+    }
+}
 impl HasTargetBytes for NopInput {
     fn target_bytes(&self) -> OwnedSlice<u8> {
         OwnedSlice::Owned(vec![0])
