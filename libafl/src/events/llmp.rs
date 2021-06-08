@@ -446,9 +446,14 @@ where
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let mut events = vec![];
+        let self_id = self.llmp.sender.id;
         while let Some((sender_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
             if tag == _LLMP_TAG_EVENT_TO_BROKER {
                 panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
+            }
+            println!("[{}] Message from {}", self_id, sender_id);
+            if sender_id == self_id {
+                continue;
             }
             #[cfg(not(feature = "llmp_compression"))]
             let event_bytes = msg;
