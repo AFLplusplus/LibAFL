@@ -1,6 +1,4 @@
 use ctor::{ctor, dtor};
-use std::env;
-use std::io::Cursor;
 
 use concolic::{Message, MessageFileWriter, SymExprRef, StdShMemMessageFileWriter};
 
@@ -14,7 +12,7 @@ impl State {
         Self { writer }
     }
 
-    fn log_message(&mut self, mut message: Message) -> SymExprRef {
+    fn log_message(&mut self, message: Message) -> SymExprRef {
         self.writer.write_message(message)
     }
 
