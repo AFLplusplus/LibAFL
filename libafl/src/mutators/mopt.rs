@@ -103,3 +103,18 @@ impl MOpt{
         }
     }
 }
+
+const v_max : f64 = 1.0;
+const v_min : f64 = 0.05;
+const limit_time_bound : f64 = 1.1;
+const SPLICE_CYCLES_puppet_up : usize = 25;
+const SPLICE_CYCLES_puppet_low : usize = 5;
+const STAGE_RANDOMBYTE : usize = 12;
+const STAGE_DELETEBYTE : usize = 13;
+const STAGE_Clone75 : usize = 14;
+const STAGE_OverWrite75: usize = 15;
+const STAGE_OverWriteExtra: usize = 16;
+const STAGE_InsertExtra : usize = 17;
+
+const period_pilot : usize = 50000;
+const period_pilot_tmp : f64 = 5000.0;

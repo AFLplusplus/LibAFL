@@ -6,6 +6,8 @@ pub mod mutations;
 pub use mutations::*;
 pub mod token_mutations;
 pub use token_mutations::*;
+pub mod mopt;
+pub use mopt::*;
 
 use crate::{
     bolts::tuples::{HasLen, Named},
