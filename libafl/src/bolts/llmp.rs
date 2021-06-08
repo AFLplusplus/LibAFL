@@ -280,12 +280,14 @@ impl Listener {
 
 /// Get sharedmem from a page
 #[inline]
+#[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page_mut<SHM: ShMem>(afl_shmem: &mut SHM) -> *mut LlmpPage {
     afl_shmem.map_mut().as_mut_ptr() as *mut LlmpPage
 }
 
 /// Get sharedmem from a page
 #[inline]
+#[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page<SHM: ShMem>(afl_shmem: &SHM) -> *const LlmpPage {
     afl_shmem.map().as_ptr() as *const LlmpPage
 }
@@ -459,7 +461,9 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 }
 
 /// Pointer to the message behind the last message
+/// The messages are padded, so accesses will be aligned properly.
 #[inline]
+#[allow(clippy::cast_ptr_alignment)]
 unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
     /* DBG("_llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
     (last_msg as *mut u8)
@@ -488,7 +492,7 @@ pub enum LlmpMsgHookResult {
 
 /// Message sent over the "wire"
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct LlmpMsg {
     /// A tag
     pub tag: Tag, //u32
@@ -620,7 +624,7 @@ where
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(match self {
             LlmpConnection::IsClient { client } => client.describe()?,
-            _ => todo!("Only client can be described atm."),
+            LlmpConnection::IsBroker { .. } => todo!("Only client can be described atm."),
         })
     }
 
@@ -653,7 +657,7 @@ where
 
 /// Contents of the share mem pages, used by llmp internally
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct LlmpPage {
     /// to check if this page got initialized properly
     pub magic: u64,
@@ -682,7 +686,7 @@ pub struct LlmpPage {
 /// This is an internal message!
 /// [`LLMP_TAG_END_OF_PAGE_V1`]
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 struct LlmpPayloadSharedMapInfo {
     /// The map size
     pub map_size: usize,
@@ -1023,6 +1027,7 @@ where
          * to consume */
         let out = self.alloc_eop()?;
 
+        #[allow(clippy::cast_ptr_alignment)]
         let mut end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
         (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
         (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_slice();
@@ -1080,11 +1085,24 @@ where
     }
 
     /// Shrinks the allocated [`LlmpMsg`] to a given size.
+    ///
+    /// # Safety
+    /// The msg pointer will be dereferenced, if it's not `null`.
     pub unsafe fn shrink_alloced(
         &mut self,
         msg: *mut LlmpMsg,
         shrinked_len: usize,
     ) -> Result<(), Error> {
+        if msg.is_null() {
+            return Err(Error::IllegalArgument(
+                "Null msg passed to shrink_alloced".into(),
+            ));
+        } else if !self.has_unsent_message {
+            return Err(Error::IllegalState(
+                "Called shrink_alloced, but the msg was not unsent".into(),
+            ));
+        }
+
         let old_len_padded = (*msg).buf_len_padded;
 
         let msg_start = msg as usize;
@@ -1303,6 +1321,7 @@ where
                             size_of::<LlmpPayloadSharedMapInfo>()
                         );
                     }
+                    #[allow(clippy::cast_ptr_alignment)]
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
                     /* The pageinfo points to the map we're about to unmap.
@@ -1355,7 +1374,7 @@ where
             if (*last_msg).tag == LLMP_TAG_END_OF_PAGE && !llmp_msg_in_page(page, last_msg) {
                 panic!("BUG: full page passed to await_message_blocking or reset failed");
             }
-            current_msg_id = (*last_msg).message_id
+            current_msg_id = (*last_msg).message_id;
         }
         loop {
             compiler_fence(Ordering::SeqCst);
@@ -1557,18 +1576,19 @@ where
     #[cfg(feature = "std")]
     pub unsafe fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
-            env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR)
+            env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR);
         } else {
             env::set_var(
                 &format!("{}_OFFSET", map_env_name),
                 format!("{}", self.msg_to_offset(msg)?),
-            )
-        };
+            );
+        }
         Ok(())
     }
 
     /// Gets this message from this page, at the indicated offset.
     /// Will return [`crate::Error::IllegalArgument`] error if the offset is out of bounds.
+    #[allow(clippy::cast_ptr_alignment)]
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         let offset = offset as usize;
         unsafe {
@@ -1616,7 +1636,9 @@ pub struct LlmpBrokerSignalHandler {
 #[cfg(unix)]
 impl Handler for LlmpBrokerSignalHandler {
     fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: &mut ucontext_t) {
-        unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
+        unsafe {
+            ptr::write_volatile(&mut self.shutting_down, true);
+        }
     }
 
     fn signals(&self) -> Vec<Signal> {
@@ -1762,8 +1784,8 @@ where
         (*out).buf_len_padded = actual_size;
         /* We need to replace the message ID with our own */
         if let Err(e) = self.llmp_out.send(out, false) {
-            panic!("Error sending msg: {:?}", e)
-        };
+            panic!("Error sending msg: {:?}", e);
+        }
         self.llmp_out.last_msg_sent = out;
         Ok(())
     }
@@ -1820,8 +1842,8 @@ where
 
             #[cfg(feature = "std")]
             if let Some(time) = sleep_time {
-                thread::sleep(time)
-            };
+                thread::sleep(time);
+            }
 
             #[cfg(not(feature = "std"))]
             match sleep_time {
@@ -1869,6 +1891,7 @@ where
                 .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+            #[allow(clippy::cast_ptr_alignment)]
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
             (*pageinfo).shm_str = *shmem_description.id.as_slice();
             (*pageinfo).map_size = shmem_description.size;
@@ -2051,7 +2074,7 @@ where
                     stream,
                     shmem_provider,
                     *current_client_id,
-                    &broker_map_description,
+                    broker_map_description,
                 ) {
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
                         println!("B2B: Error announcing client {:?}", shmem_description);
@@ -2166,6 +2189,7 @@ where
 
     /// broker broadcast to its own page for all others to read */
     #[inline]
+    #[allow(clippy::cast_ptr_alignment)]
     unsafe fn handle_new_msgs<F>(&mut self, client_id: u32, on_new_msg: &mut F) -> Result<(), Error>
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
@@ -2239,8 +2263,8 @@ where
                 if let LlmpMsgHookResult::Handled =
                     (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
                 {
-                    should_forward_msg = false
-                };
+                    should_forward_msg = false;
+                }
                 if should_forward_msg {
                     self.forward_msg(msg)?;
                 }
@@ -2421,6 +2445,7 @@ where
                 .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+            #[allow(clippy::cast_ptr_alignment)]
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
             (*pageinfo).shm_str = *shm_str;
             (*pageinfo).map_size = shm_id;

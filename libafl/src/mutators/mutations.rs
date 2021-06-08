@@ -25,7 +25,9 @@ pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
     debug_assert!(to + len <= data.len());
     if len != 0 && from != to {
         let ptr = data.as_mut_ptr();
-        unsafe { core::ptr::copy(ptr.add(from), ptr.add(to), len) }
+        unsafe {
+            core::ptr::copy(ptr.add(from), ptr.add(to), len);
+        }
     }
 }
 
@@ -39,7 +41,9 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
     let dst_ptr = dst.as_mut_ptr();
     let src_ptr = src.as_ptr();
     if len != 0 {
-        unsafe { core::ptr::copy(src_ptr.add(from), dst_ptr.add(to), len) }
+        unsafe {
+            core::ptr::copy(src_ptr.add(from), dst_ptr.add(to), len);
+        }
     }
 }
 
@@ -50,7 +54,7 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
 fn buffer_set(data: &mut [u8], from: usize, len: usize, val: u8) {
     debug_assert!(from + len <= data.len());
     for p in &mut data[from..(from + len)] {
-        *p = val
+        *p = val;
     }
 }
 
@@ -1406,7 +1410,7 @@ where
         let other = other_testcase.load_input()?;
         input
             .bytes_mut()
-            .splice(split_at.., other.bytes()[split_at..].iter().cloned());
+            .splice(split_at.., other.bytes()[split_at..].iter().copied());
 
         Ok(MutationResult::Mutated)
     }

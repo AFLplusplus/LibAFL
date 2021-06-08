@@ -320,7 +320,7 @@ where
     }
 
     fn set_max_size(&mut self, max_size: usize) {
-        self.max_size = max_size
+        self.max_size = max_size;
     }
 }
 

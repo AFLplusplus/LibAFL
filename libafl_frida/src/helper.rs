@@ -218,7 +218,7 @@ fn pc(context: &CpuContext) -> usize {
 /// The implementation of the [`FridaInstrumentationHelper`]
 impl<'a> FridaInstrumentationHelper<'a> {
     /// Constructor function to create a new [`FridaInstrumentationHelper`], given a `module_name`.
-    #[allow(clippy::clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn new(
         gum: &'a Gum,
@@ -318,7 +318,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                     helper
                                         .drcov_basic_blocks
                                         .push(DrCovBasicBlock::new(real_address, real_address + 4));
-                                })
+                                });
                             }
                         }
 
@@ -348,7 +348,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             );
                         }
                     }
-                    instruction.keep()
+                    instruction.keep();
                 }
             });
             helper.transformer = Some(transformer);
@@ -361,7 +361,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
     #[inline]
     fn options(&self) -> &FridaOptions {
-        &self.options
+        self.options
     }
     #[cfg(target_arch = "aarch64")]
     #[inline]

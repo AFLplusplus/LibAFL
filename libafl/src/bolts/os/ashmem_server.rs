@@ -329,18 +329,18 @@ impl AshmemService {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 client
                     .stream
-                    .send_fds(&id.to_string().as_bytes(), &[server_fd])?;
+                    .send_fds(id.to_string().as_bytes(), &[server_fd])?;
                 client.maps.entry(server_fd).or_default().push(mapping);
             }
             AshmemResponse::Id(id) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                client.stream.send_fds(&id.to_string().as_bytes(), &[])?;
+                client.stream.send_fds(id.to_string().as_bytes(), &[])?;
             }
             AshmemResponse::RefCount(refcount) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 client
                     .stream
-                    .send_fds(&refcount.to_string().as_bytes(), &[])?;
+                    .send_fds(refcount.to_string().as_bytes(), &[])?;
             }
         }
         Ok(())

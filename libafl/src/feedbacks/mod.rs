@@ -62,7 +62,7 @@ where
         let start_time = crate::cpu::read_time_counter();
 
         // Execute this feedback
-        let ret = self.is_interesting(state, manager, input, observers, &exit_kind);
+        let ret = self.is_interesting(state, manager, input, observers, exit_kind);
 
         // Get the elapsed time for checking this feedback
         let elapsed = crate::cpu::read_time_counter() - start_time;
@@ -244,6 +244,7 @@ where
         OT: ObserversTuple;
 
     #[cfg(feature = "introspection")]
+    #[allow(clippy::too_many_arguments)]
     fn is_pair_interesting_with_perf<EM, OT>(
         first: &mut A,
         second: &mut B,
@@ -315,7 +316,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
@@ -325,7 +326,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )?;
@@ -386,7 +387,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
@@ -400,7 +401,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )
@@ -457,7 +458,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
@@ -467,7 +468,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )?;
@@ -499,7 +500,7 @@ where
         OT: ObserversTuple,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
-        if a == false {
+        if !a {
             return Ok(false);
         }
 
@@ -528,12 +529,12 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index,
         )?;
 
-        if a == false {
+        if !a {
             return Ok(false);
         }
 
@@ -542,7 +543,7 @@ where
             manager,
             input,
             observers,
-            &exit_kind,
+            exit_kind,
             feedback_stats,
             feedback_index + 1,
         )

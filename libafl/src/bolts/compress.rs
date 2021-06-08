@@ -32,7 +32,7 @@ impl GzipCompressor {
             //compress if the buffer is large enough
             let compressed = buf
                 .iter()
-                .cloned()
+                .copied()
                 .encode(&mut GZipEncoder::new(), Action::Finish)
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Some(compressed))
@@ -47,7 +47,7 @@ impl GzipCompressor {
     pub fn decompress(&self, buf: &[u8]) -> Result<Vec<u8>, Error> {
         Ok(buf
             .iter()
-            .cloned()
+            .copied()
             .decode(&mut GZipDecoder::new())
             .collect::<Result<Vec<_>, _>>()?)
     }

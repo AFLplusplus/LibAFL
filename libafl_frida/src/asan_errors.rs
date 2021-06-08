@@ -86,7 +86,7 @@ impl AsanErrors {
 
     /// Clears this `AsanErrors` struct
     pub fn clear(&mut self) {
-        self.errors.clear()
+        self.errors.clear();
     }
 
     /// Gets the amount of `AsanErrors` in this struct
@@ -102,6 +102,7 @@ impl AsanErrors {
     }
 
     /// Get a mutable reference to the global [`AsanErrors`] object
+    #[must_use]
     pub fn get_mut<'a>() -> &'a mut Self {
         unsafe { ASAN_ERRORS.as_mut().unwrap() }
     }
@@ -121,7 +122,7 @@ impl AsanErrors {
             .add_frame_filter(Box::new(|frames| {
                 frames.retain(
                     |x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")),
-                )
+                );
             }));
 
         #[allow(clippy::non_ascii_literal)]

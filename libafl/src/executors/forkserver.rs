@@ -346,7 +346,7 @@ where
 
         self.executor
             .out_file_mut()
-            .write_buf(&input.target_bytes().as_slice());
+            .write_buf(input.target_bytes().as_slice());
 
         let send_len = self
             .executor
@@ -505,7 +505,7 @@ where
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase
-        self.out_file.write_buf(&input.target_bytes().as_slice());
+        self.out_file.write_buf(input.target_bytes().as_slice());
 
         let send_len = self
             .forkserver
