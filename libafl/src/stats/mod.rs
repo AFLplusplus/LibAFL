@@ -442,7 +442,7 @@ impl ClientPerfStats {
     /// the current clock counter
     #[must_use]
     pub fn new() -> Self {
-        let start_time = crate::cpu::read_time_counter();
+        let start_time = crate::bolts::cpu::read_time_counter();
 
         Self {
             start_time,
@@ -467,7 +467,7 @@ impl ClientPerfStats {
     /// Start a timer with the current time counter
     #[inline]
     pub fn start_timer(&mut self) {
-        self.timer_start = Some(crate::cpu::read_time_counter());
+        self.timer_start = Some(crate::bolts::cpu::read_time_counter());
     }
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
@@ -494,7 +494,7 @@ impl ClientPerfStats {
             }
             Some(timer_start) => {
                 // Calculate the elapsed time
-                let elapsed = crate::cpu::read_time_counter() - timer_start;
+                let elapsed = crate::bolts::cpu::read_time_counter() - timer_start;
 
                 // Reset the timer
                 self.timer_start = None;

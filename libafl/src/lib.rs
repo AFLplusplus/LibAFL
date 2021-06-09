@@ -25,7 +25,6 @@ pub use libafl_derive::*;
 
 pub mod bolts;
 pub mod corpus;
-pub mod cpu;
 pub mod events;
 pub mod executors;
 pub mod feedbacks;

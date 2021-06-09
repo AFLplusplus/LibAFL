@@ -1,6 +1,7 @@
 //! Bolts are no conceptual fuzzing elements, but they keep libafl-based fuzzers together.
 
 pub mod bindings;
+pub mod cpu;
 pub mod launcher;
 pub mod llmp;
 pub mod os;
