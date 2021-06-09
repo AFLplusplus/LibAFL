@@ -108,9 +108,8 @@ impl FridaOptions {
                     }
                     "cmplog" => {
                         options.enable_cmplog = value.parse().unwrap();
-                        match cfg!(feature = "cmplog") {
-                            false => panic!("cmplog feature is disabled!"),
-                            _ => (),
+                        if !cfg!(feature = "cmplog") && options.enable_cmplog {
+                            panic!("cmplog feature is disabled!")
                         }
                     }
                     _ => {

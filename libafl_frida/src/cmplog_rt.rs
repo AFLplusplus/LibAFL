@@ -19,7 +19,7 @@ impl CmpLogRuntime {
         }
     }
 
-    /// Call the external function that populates the cmplog_map with the relevant values
+    /// Call the external function that populates the `cmplog_map` with the relevant values
     extern "C" fn populate_lists(&mut self, op1: u64, op2: u64, retaddr: u64) {
         // println!(
         //     "entered populate_lists with: {:#02x}, {:#02x}, {:#02x}",
