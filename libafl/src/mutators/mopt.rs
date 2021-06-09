@@ -1,4 +1,4 @@
-//! The MOpt mutator scheduler, see https://github.com/puppet-meteor/MOpt-AFL
+//! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL>
 
 // MOpt global variables, currently the variable names are identical to the original MOpt implementation
 // TODO: but I have to rename it when I implement the main algorithm because I don't find these names are any suggestive of their meaning
@@ -119,7 +119,10 @@ where
         }
     }
 
+    /// Get a float below the given `size` value times `0.001`.
+    /// So `size` 100 will result in anything between `0` and 0.1`.
     #[inline]
+    #[allow(clippy::cast_precision_loss)]
     pub fn rand_below(&mut self, size: u64) -> f64 {
         self.rand.below(size) as f64 * 0.001
     }
