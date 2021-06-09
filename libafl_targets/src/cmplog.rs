@@ -201,7 +201,6 @@ where
         unsafe {
             CMPLOG_ENABLED = 0;
         }
-
         if self.add_meta {
             self.add_cmpvalues_meta(state);
         }
@@ -222,7 +221,6 @@ impl<'a> CmpLogObserver<'a> {
         Self {
             name: name.to_string(),
             size: None,
-
             add_meta,
             map: OwnedRefMut::Ref(map),
         }
