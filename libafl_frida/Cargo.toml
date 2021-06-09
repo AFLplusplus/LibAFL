@@ -13,7 +13,7 @@ edition = "2018"
 
 [features]
 default = []
-cmplog_runtime = []
+cmplog = []
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

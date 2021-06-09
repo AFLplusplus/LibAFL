@@ -35,10 +35,10 @@ use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
-#[cfg(feature = "cmplog_runtime")]
+#[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
 
-#[cfg(feature = "cmplog_runtime")]
+#[cfg(feature = "cmplog")]
 enum CmplogOperandType {
     Regid(capstone::RegId),
     Imm(u64),
@@ -89,7 +89,7 @@ pub struct FridaInstrumentationHelper<'a> {
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
     asan_runtime: AsanRuntime,
-    #[cfg(all(feature = "cmplog_runtime"))]
+    #[cfg(feature = "cmplog")]
     cmplog_runtime: CmpLogRuntime,
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
@@ -276,7 +276,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .build()
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(options.clone()),
-            #[cfg(all(feature = "cmplog_runtime"))]
+            #[cfg(feature = "cmplog")]
             cmplog_runtime: CmpLogRuntime::new(),
             ranges: RangeMap::new(),
             module_map: ModuleMap::new_from_names(modules_to_instrument),
@@ -340,7 +340,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             todo!("Implement ASAN for non-aarch64 targets");
                             #[cfg(target_arch = "aarch64")]
                             if let Ok((basereg, indexreg, displacement, width, shift, extender)) =
-                                helper.is_interesting_asan_instruction(address, instr)
+                                helper.asan_is_interesting_instruction(address, instr)
                             {
                                 helper.emit_shadow_check(
                                     address,
@@ -357,12 +357,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         if helper.options().cmplog_enabled() {
                             #[cfg(not(target_arch = "aarch64"))]
                             todo!("Implement cmplog for non-aarch64 targets");
-                            #[cfg(all(feature = "cmplog_runtime", target_arch = "aarch64"))]
+                            #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                             // check if this instruction is a compare instruction and if so save the registers values
                             if let Ok((op1, op2)) =
-                                helper.is_interesting_cmplog_instruction(address, instr)
+                                helper.cmplog_is_interesting_instruction(address, instr)
                             {
-                                println!("emmiting at {} => {}", address, instr);
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
                                 helper.emit_comparison_handling(address, &output, op1, op2);
                             }
@@ -382,7 +381,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.init(gum, modules_to_instrument);
             }
-            #[cfg(all(feature = "cmplog_runtime"))]
+            #[cfg(feature = "cmplog")]
             if helper.options.cmplog_enabled() {
                 helper.cmplog_runtime.init();
             }
@@ -401,8 +400,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
 
-    #[cfg(all(feature = "cmplog_runtime", target_arch = "aarch64"))]
+    #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
+    /// Emit the instrumentation code which is responsible for opernads value extraction and cmplog map population
     fn emit_comparison_handling(
         &self,
         _address: u64,
@@ -440,7 +440,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     }
                 }
             }
-            CmplogOperandType::Mem(basereg, indexreg, displacement, width) => {
+            CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
                 let basereg = self.writer_register(basereg);
                 let indexreg = if indexreg.0 != 0 {
                     Some(self.writer_register(indexreg))
@@ -509,7 +509,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     }
                 }
             }
-            CmplogOperandType::Mem(basereg, indexreg, displacement, width) => {
+            CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
                 let basereg = self.writer_register(basereg);
                 let indexreg = if indexreg.0 != 0 {
                     Some(self.writer_register(indexreg))
@@ -983,7 +983,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
     #[cfg(target_arch = "aarch64")]
     #[inline]
-    fn is_interesting_asan_instruction(
+    fn asan_is_interesting_instruction(
         &self,
         _address: u64,
         instr: &Insn,
@@ -1033,9 +1033,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Err(())
     }
 
-    #[cfg(all(feature = "cmplog_runtime", target_arch = "aarch64"))]
+    #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
-    fn is_interesting_cmplog_instruction(
+    /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
+    fn cmplog_is_interesting_instruction(
         &self,
         _address: u64,
         instr: &Insn,

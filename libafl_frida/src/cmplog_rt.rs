@@ -1,11 +1,5 @@
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use libafl_targets::cmplog::{
-    libafl_cmplog_map, CmpLogHeader, CmpLogMap, CmpLogOperands, CMPLOG_MAP_W,
-};
-use nix::{
-    libc::{memmove, memset},
-    sys::mman::{mmap, MapFlags, ProtFlags},
-};
+use libafl_targets::cmplog::CMPLOG_MAP_W;
 use std::ffi::c_void;
 
 extern crate libafl_targets;
@@ -13,44 +7,7 @@ extern "C" {
     pub fn libafl_targets_cmplog_wrapper(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
-
-// #[repr(C)]
-// #[derive(Debug, Clone, Copy)]
-// pub struct CmpLogHeader {
-//     hits: u16,
-//     shape: u8,
-//     kind: u8,
-// }
-
-// #[repr(C)]
-// #[derive(Debug, Clone, Copy)]
-// pub struct CmpLogOperands(u64, u64);
-
-// #[repr(C)]
-// #[derive(Debug, Clone, Copy)]
-// pub struct CmpLogMap {
-//     headers: [CmpLogHeader; CMPLOG_MAP_W],
-//     operands: [CmpLogOperands; CMPLOG_MAP_W],
-// }
-
-// #[no_mangle]
-// pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
-//     headers: [CmpLogHeader {
-//         hits: 0,
-//         shape: 0,
-//         kind: 0,
-//     }; CMPLOG_MAP_W],
-//     operands: [CmpLogOperands(0, 0); CMPLOG_MAP_W],
-// };
-
 pub struct CmpLogRuntime {
-    regs: [u64; 3],
-    // cmp_idx: usize,
-    // cmplog_map: CmpLogMap,
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
 }
 
@@ -58,20 +15,11 @@ impl CmpLogRuntime {
     #[must_use]
     pub fn new() -> CmpLogRuntime {
         Self {
-            regs: [0; 3],
-            // cmp_idx: 0,
-            // cmplog_map: CmpLogMap {
-            //     headers: [CmpLogHeader {
-            //         hits: 0,
-            //         shape: 0,
-            //         kind: 0,
-            //     }; CMPLOG_MAP_W],
-            //     operands: [CmpLogOperands(0, 0); CMPLOG_MAP_W],
-            // },
             ops_save_register_and_blr_to_populate: None,
         }
     }
 
+    /// Call the external function that populates the cmplog_map with the relevant values
     extern "C" fn populate_lists(&mut self, op1: u64, op2: u64, retaddr: u64) {
         // println!(
         //     "entered populate_lists with: {:#02x}, {:#02x}, {:#02x}",
@@ -117,10 +65,7 @@ impl CmpLogRuntime {
                 ; b >done
                 ; self_addr:
                 ; .qword self as *mut _  as *mut c_void as i64
-                ; self_regs_addr: //for rust based population of the lists..
-                ; .qword &mut self.regs as *mut _ as *mut c_void as i64
                 ; populate_lists:
-                //; .qword __sanitizer_cov_trace_cmp8 as *mut c_void as i64
                 ; .qword  CmpLogRuntime::populate_lists as *mut c_void as i64
                 ; done:
             );};
@@ -138,30 +83,6 @@ impl CmpLogRuntime {
         );
     }
     pub fn init(&mut self) {
-        // workaround frida's frida-gum-allocate-near bug:
-        unsafe {
-            for _ in 0..64 {
-                mmap(
-                    std::ptr::null_mut(),
-                    128 * 1024,
-                    ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE,
-                    -1,
-                    0,
-                )
-                .expect("Failed to map dummy regions for frida workaround");
-                mmap(
-                    std::ptr::null_mut(),
-                    4 * 1024 * 1024,
-                    ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE,
-                    -1,
-                    0,
-                )
-                .expect("Failed to map dummy regions for frida workaround");
-            }
-        }
-
         self.generate_instrumentation_blobs();
     }
 

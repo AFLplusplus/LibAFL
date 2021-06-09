@@ -140,7 +140,7 @@ pub use libafl_cmplog_map as CMPLOG_MAP;
 
 /// Value indicating if cmplog is enabled.
 #[no_mangle]
-pub static mut libafl_cmplog_enabled: u8 = 1;
+pub static mut libafl_cmplog_enabled: u8 = 0;
 
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 

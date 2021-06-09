@@ -33,7 +33,6 @@ use libafl::{
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
-    //stages::mutational::StdMutationalStage,
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
