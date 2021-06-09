@@ -109,19 +109,8 @@ void func1() {
 // http://www.libpng.org/pub/png/book/chapter13.html
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
-   if(data[10] == 0xAB &&
-       data[11] == 0xCD &&
-       data[12] == 0xEF &&
-       data[13] == 0xAA &&
-       data[14] == 0x8F &&
-       data[15] == 0x13 &&
-       data[16] == 0x24 &&
-       data[17] == 0xAA &&
-       data[18] == 0xBB ) {
-        printf("passed the test!");
-    } else {
-        printf("x");
-        return 0;
+    if (size >= 8 && *(uint64_t*)data == 0xABCDEFAA8F1324AA){
+        abort();
     }
 
 
