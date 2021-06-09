@@ -1,4 +1,4 @@
-//! A `ShadowExecutor` wraps an executor to have shadow observer that will not be considered by the manager
+//! A `ShadowExecutor` wraps an executor to have shadow observer that will not be considered by the feedbacks and the manager
 
 use crate::{
     executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
@@ -27,7 +27,7 @@ pub trait HasShadowObserverHooks<EM, I, S, SOT, Z> {
     ) -> Result<(), Error>;
 }
 
-/// A [`ShadowExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
+/// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
 pub struct ShadowExecutor<E, SOT> {
     executor: E,
     shadow_observers: SOT,
@@ -69,6 +69,14 @@ where
     #[inline]
     pub fn shadow_observers_mut(&mut self) -> &mut SOT {
         &mut self.shadow_observers
+    }
+
+    pub fn shadow_hooks(&self) -> &bool {
+        &self.shadow_hooks
+    }
+
+    pub fn shadow_hooks_mut(&mut self) -> &mut bool {
+        &mut self.shadow_hooks
     }
 }
 
