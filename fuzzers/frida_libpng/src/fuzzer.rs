@@ -29,6 +29,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::I2SRandReplace,
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
@@ -417,26 +418,54 @@ unsafe fn fuzz(
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        // Secondary harness due to mut ownership
-        let mut frida_harness = |input: &BytesInput| {
-            let target = input.target_bytes();
-            let buf = target.as_slice();
-            (target_func)(buf.as_ptr(), buf.len());
-            ExitKind::Ok
+        if frida_options.cmplog_enabled() {
+            // Secondary harness due to mut ownership
+            let mut frida_harness = |input: &BytesInput| {
+                let target = input.target_bytes();
+                let buf = target.as_slice();
+                (target_func)(buf.as_ptr(), buf.len());
+                ExitKind::Ok
+            };
+
+            // Secondary helper due to mut ownership
+            let mut frida_helper = FridaInstrumentationHelper::new(
+                &gum,
+                &frida_options,
+                module_name,
+                &modules_to_instrument,
+            );
+
+            // Setup a tracing stage in which we log comparisons
+            let tracing = TracingStage::new(FridaInProcessExecutor::new(
+                &gum,
+                InProcessExecutor::new(
+                    &mut frida_harness,
+                    tuple_list!(cmplog_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
+                    &mut fuzzer,
+                    &mut state,
+                    &mut mgr,
+                )?,
+                &mut frida_helper,
+                Duration::new(10, 0),
+            ));
+
+            // Setup a randomic Input2State stage
+            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+                I2SRandReplace::new()
+            )));
+
+            // Setup a basic mutator
+            let mutational = StdMutationalStage::new(mutator);
+
+            // The order of the stages matter!
+            let mut stages = tuple_list!(tracing, i2s, mutational);
+
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        } else {
+            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
         };
-
-        // Setup a tracing stage in which we log comparisons
-        let tracing = TracingStage::new(InProcessExecutor::new(
-            &mut frida_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?);
-
-        let mut stages = tuple_list!(tracing, StdMutationalStage::new(mutator));
-
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
         Ok(())
     };
 
