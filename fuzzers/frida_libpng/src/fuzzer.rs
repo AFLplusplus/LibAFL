@@ -29,10 +29,11 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::I2SRandReplace,
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
-    stages::mutational::StdMutationalStage,
+    stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
@@ -57,6 +58,7 @@ use libafl_frida::{
     helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     FridaOptions,
 };
+use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
@@ -300,7 +302,7 @@ unsafe fn fuzz(
             unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
         > = lib.get(symbol_name.as_bytes()).unwrap();
 
-        let mut frida_harness = move |input: &BytesInput| {
+        let mut frida_harness = |input: &BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
             (target_func)(buf.as_ptr(), buf.len());
@@ -315,6 +317,9 @@ unsafe fn fuzz(
             module_name,
             &modules_to_instrument,
         );
+
+        // Create an observation channel using cmplog map
+        let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
 
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
@@ -378,7 +383,6 @@ unsafe fn fuzz(
 
         // Setup a basic mutator with a mutational stage
         let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
@@ -413,7 +417,54 @@ unsafe fn fuzz(
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        if frida_options.cmplog_enabled() {
+            // Secondary harness due to mut ownership
+            let mut frida_harness = |input: &BytesInput| {
+                let target = input.target_bytes();
+                let buf = target.as_slice();
+                (target_func)(buf.as_ptr(), buf.len());
+                ExitKind::Ok
+            };
+
+            // Secondary helper due to mut ownership
+            let mut frida_helper = FridaInstrumentationHelper::new(
+                &gum,
+                &frida_options,
+                module_name,
+                &modules_to_instrument,
+            );
+
+            // Setup a tracing stage in which we log comparisons
+            let tracing = TracingStage::new(FridaInProcessExecutor::new(
+                &gum,
+                InProcessExecutor::new(
+                    &mut frida_harness,
+                    tuple_list!(cmplog_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
+                    &mut fuzzer,
+                    &mut state,
+                    &mut mgr,
+                )?,
+                &mut frida_helper,
+                Duration::new(10, 0),
+            ));
+
+            // Setup a randomic Input2State stage
+            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+                I2SRandReplace::new()
+            )));
+
+            // Setup a basic mutator
+            let mutational = StdMutationalStage::new(mutator);
+
+            // The order of the stages matter!
+            let mut stages = tuple_list!(tracing, i2s, mutational);
+
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        } else {
+            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        };
         Ok(())
     };
 
