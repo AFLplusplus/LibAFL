@@ -219,13 +219,11 @@ where
     /// The stats to use
     #[builder(setter(strip_option))]
     stats: Option<ST>,
+    /// [`LlmpSender`] for restarts
+    sender: LlmpSender<SP>,
     /// Phantom data
     #[builder(setter(skip), default = PhantomData {})]
     _phantom: PhantomData<(I, S)>,
-    /// The events that happened since the last handle_in_broker
-    events: Vec<Event<I>>,
-    /// (Optional) llmp sender for restarts
-    sender: LlmpSender<SP>,
 }
 
 #[cfg(feature = "std")]
@@ -294,7 +292,6 @@ where
     /// Creates a new [`SimpleEventManager`].
     pub fn new(stats: ST, sender: LlmpSender<SP>, shmem_provider: SP) -> Self {
         Self {
-            events: vec![],
             stats: None,
             sender,
             simple_event_mgr: SimpleEventManager::new(stats),
