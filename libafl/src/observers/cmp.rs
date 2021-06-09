@@ -40,7 +40,7 @@ impl CmpValues {
             CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1))),
             CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1))),
             CmpValues::U64(t) => Some(*t),
-            _ => None,
+            CmpValues::Bytes(_) => None,
         }
     }
 }

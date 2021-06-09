@@ -10,7 +10,7 @@ use core::ptr::{addr_of, read_volatile};
 
 #[cfg(feature = "std")]
 use crate::bolts::{
-    llmp::{LlmpClient, LlmpReceiver},
+    llmp::{LlmpClient, LlmpConnection, LlmpReceiver},
     shmem::StdShMemProvider,
 };
 
@@ -19,7 +19,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::{
     bolts::{
-        llmp::{self, Flags, LlmpClientDescription, LlmpConnection, LlmpSender, Tag},
+        llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
     events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
@@ -263,7 +263,7 @@ where
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
-        self.await_restart_safe()
+        self.await_restart_safe();
     }
 }
 
@@ -332,7 +332,7 @@ where
     /// Write the config for a client [`EventManager`] to env vars, a new client can reattach using [`LlmpEventManager::existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
-        self.llmp.to_env(env_name).unwrap()
+        self.llmp.to_env(env_name).unwrap();
     }
 
     // Handle arriving events in the client
@@ -510,7 +510,7 @@ where
     S: DeserializeOwned,
     SP: ShMemProvider,
 {
-    let tuple: (S, _) = postcard::from_bytes(&state_corpus_serialized)?;
+    let tuple: (S, _) = postcard::from_bytes(state_corpus_serialized)?;
     Ok((
         tuple.0,
         LlmpEventManager::existing_client_from_description(shmem_provider, &tuple.1)?,
@@ -558,13 +558,15 @@ where
     /// Otherwise, the OS may already have removed the shared maps,
     #[inline]
     fn await_restart_safe(&mut self) {
-        self.llmp_mgr.await_restart_safe()
+        self.llmp_mgr.await_restart_safe();
     }
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        unsafe { self.sender.reset() };
+        unsafe {
+            self.sender.reset();
+        }
         let state_corpus_serialized = serialize_state_mgr(state, &self.llmp_mgr)?;
         self.sender
             .send_buf(_LLMP_TAG_RESTART, &state_corpus_serialized)
@@ -598,10 +600,10 @@ where
 }
 
 /// The llmp connection from the actual fuzzer to the process supervising it
-const _ENV_FUZZER_SENDER: &str = &"_AFL_ENV_FUZZER_SENDER";
-const _ENV_FUZZER_RECEIVER: &str = &"_AFL_ENV_FUZZER_RECEIVER";
+const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
+const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
-const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = &"_AFL_ENV_FUZZER_BROKER_CLIENT";
+const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
@@ -881,13 +883,15 @@ where
             Some((_sender, _tag, msg)) => {
                 println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
                 let (state, mgr): (S, LlmpEventManager<I, OT, S, SP>) =
-                    deserialize_state_mgr(new_shmem_provider, &msg)?;
+                    deserialize_state_mgr(new_shmem_provider, msg)?;
 
                 (Some(state), LlmpRestartingEventManager::new(mgr, sender))
             }
         };
         // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
-        unsafe { mgr.sender_mut().reset() };
+        unsafe {
+            mgr.sender_mut().reset();
+        }
         /* TODO: Not sure if this is needed
         // We commit an empty NO_RESTART message to this buf, against infinite loops,
         // in case something crashes in the fuzzer.

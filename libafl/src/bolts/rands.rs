@@ -327,7 +327,7 @@ pub struct XkcdRand {
 #[cfg(test)]
 impl Rand for XkcdRand {
     fn set_seed(&mut self, val: u64) {
-        self.val = val
+        self.val = val;
     }
 
     fn next(&mut self) -> u64 {

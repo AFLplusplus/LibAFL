@@ -62,7 +62,7 @@ For broker2broker communication, all messages are forwarded via network sockets.
 use alloc::{string::String, vec::Vec};
 use core::{
     cmp::max,
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     fmt::Debug,
     mem::size_of,
     ptr, slice,
@@ -73,7 +73,6 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use std::{
-    convert::TryInto,
     env,
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
@@ -281,12 +280,14 @@ impl Listener {
 
 /// Get sharedmem from a page
 #[inline]
+#[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page_mut<SHM: ShMem>(afl_shmem: &mut SHM) -> *mut LlmpPage {
     afl_shmem.map_mut().as_mut_ptr() as *mut LlmpPage
 }
 
 /// Get sharedmem from a page
 #[inline]
+#[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page<SHM: ShMem>(afl_shmem: &SHM) -> *const LlmpPage {
     afl_shmem.map().as_ptr() as *const LlmpPage
 }
@@ -460,7 +461,9 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 }
 
 /// Pointer to the message behind the last message
+/// The messages are padded, so accesses will be aligned properly.
 #[inline]
+#[allow(clippy::cast_ptr_alignment)]
 unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
     /* DBG("_llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
     (last_msg as *mut u8)
@@ -489,7 +492,7 @@ pub enum LlmpMsgHookResult {
 
 /// Message sent over the "wire"
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct LlmpMsg {
     /// A tag
     pub tag: Tag, //u32
@@ -621,7 +624,7 @@ where
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(match self {
             LlmpConnection::IsClient { client } => client.describe()?,
-            _ => todo!("Only client can be described atm."),
+            LlmpConnection::IsBroker { .. } => todo!("Only client can be described atm."),
         })
     }
 
@@ -654,7 +657,7 @@ where
 
 /// Contents of the share mem pages, used by llmp internally
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct LlmpPage {
     /// to check if this page got initialized properly
     pub magic: u64,
@@ -683,7 +686,7 @@ pub struct LlmpPage {
 /// This is an internal message!
 /// [`LLMP_TAG_END_OF_PAGE_V1`]
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 struct LlmpPayloadSharedMapInfo {
     /// The map size
     pub map_size: usize,
@@ -697,7 +700,7 @@ pub struct LlmpSender<SP>
 where
     SP: ShMemProvider,
 {
-    /// ID of this sender. Only used in the broker.
+    /// ID of this sender.
     pub id: u32,
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
@@ -709,6 +712,9 @@ where
     /// By keeping the message history around,
     /// new clients may join at any time in the future.
     pub keep_pages_forever: bool,
+    /// True, if we allocatd a message, but didn't call [`Self::send()`] yet
+    has_unsent_message: bool,
+    /// The sharedmem provider to get new sharaed maps if we're full
     shmem_provider: SP,
 }
 
@@ -730,6 +736,7 @@ where
             )],
             // drop pages to the broker if it already read them
             keep_pages_forever,
+            has_unsent_message: false,
             shmem_provider,
         })
     }
@@ -804,6 +811,7 @@ where
             out_maps: vec![out_map],
             // drop pages to the broker if it already read them
             keep_pages_forever: false,
+            has_unsent_message: false,
             shmem_provider,
         })
     }
@@ -864,111 +872,85 @@ where
     /// Never call [`alloc_next`] without either sending or cancelling the last allocated message for this page!
     /// There can only ever be up to one message allocated per page at each given time.
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
-        let buf_len_padded;
-        let mut complete_msg_size = llmp_align(size_of::<LlmpMsg>() + buf_len);
         let map = self.out_maps.last_mut().unwrap();
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
+
+        if self.has_unsent_message {
+            panic!("Called alloc without callind send inbetween");
+        }
+
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
-            "Allocating {} (>={}) bytes on page {:?} / map {:?} (last msg: {:?})",
-            complete_msg_size, buf_len, page, &map, last_msg
+            "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
+            buf_len, page, &map, last_msg
         );
-        /* DBG("XXX complete_msg_size %lu (h: %lu)\n", complete_msg_size, sizeof(llmp_message)); */
-        /* In case we don't have enough space, make sure the next page will be large
-         * enough */
-        // For future allocs, keep track of the maximum (aligned) alloc size we used
-        (*page).max_alloc_size = max((*page).max_alloc_size, complete_msg_size);
 
-        let mut ret: *mut LlmpMsg;
-        /* DBG("last_msg %p %d (%d)\n", last_msg, last_msg ? (int)last_msg->tag : -1, (int)LLMP_TAG_END_OF_PAGE_V1); */
-        if last_msg.is_null() || (*last_msg).tag == LLMP_TAG_END_OF_PAGE {
-            /* We start fresh, on a new page */
-            ret = (*page).messages.as_mut_ptr();
-            /* The initial message may not be alligned, so we at least align the end of
-            it. Technically, c_ulong can be smaller than a pointer, then who knows what
-            happens */
-            let base_addr = ret as usize;
-            buf_len_padded =
-                llmp_align(base_addr + complete_msg_size) - base_addr - size_of::<LlmpMsg>();
-            complete_msg_size = buf_len_padded + size_of::<LlmpMsg>();
-            /* Still space for the new message plus the additional "we're full" message?
-             */
+        let msg_start = (*page).messages.as_mut_ptr() as usize + (*page).size_used;
 
+        // Make sure the end of our msg is aligned.
+        let buf_len_padded = llmp_align(msg_start + buf_len + size_of::<LlmpMsg>())
+            - msg_start
+            - size_of::<LlmpMsg>();
+
+        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        dbg!(
+            page,
+            *page,
+            (*page).size_used,
+            buf_len_padded,
+            EOP_MSG_SIZE,
+            (*page).size_total
+        );
+
+        // We need enough space for the current page size_used + payload + padding
+        if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
+            > (*page).size_total
+        {
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            dbg!(
-                page,
-                *page,
-                (*page).size_used,
-                complete_msg_size,
-                EOP_MSG_SIZE,
-                (*page).size_total
-            );
-            if (*page).size_used + complete_msg_size + EOP_MSG_SIZE > (*page).size_total {
-                /* We're full. */
-                return None;
-            }
-            /* We need to start with 1 for ids, as current message id is initialized
-             * with 0... */
-            (*ret).message_id = if last_msg.is_null() {
-                1
-            } else {
-                (*last_msg).message_id + 1
-            }
-        } else if (*page).current_msg_id == (*last_msg).message_id {
-            buf_len_padded = complete_msg_size - size_of::<LlmpMsg>();
-            /* DBG("XXX ret %p id %u buf_len_padded %lu complete_msg_size %lu\n", ret, ret->message_id, buf_len_padded,
-             * complete_msg_size); */
+            println!("LLMP: Page full.");
 
-            /* Still space for the new message plus the additional "we're full" message? */
-            if (*page).size_used + complete_msg_size + EOP_MSG_SIZE > (*page).size_total {
-                /* We're full. */
-                return None;
-            }
-            ret = match llmp_next_msg_ptr_checked(map, last_msg, complete_msg_size) {
-                Ok(msg) => msg,
-                Err(e) => {
-                    #[cfg(feature = "std")]
-                    dbg!("Unexpected error allocing new msg", e);
-                    #[cfg(feature = "std")]
-                    return None;
-                    #[cfg(not(feature = "std"))]
-                    panic!("Unexpected error allocing new msg {:?}", e);
-                }
-            };
-            (*ret).message_id = (*last_msg).message_id + 1
+            /* We're full. */
+            return None;
+        }
+
+        let ret = msg_start as *mut LlmpMsg;
+
+        /* We need to start with 1 for ids, as current message id is initialized
+         * with 0... */
+        (*ret).message_id = if last_msg.is_null() {
+            1
+        } else if (*page).current_msg_id == (*last_msg).message_id {
+            (*last_msg).message_id + 1
         } else {
             /* Oops, wrong usage! */
             panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {})", ptr::addr_of!((*page).current_msg_id), (*last_msg).message_id);
-        }
+        };
 
-        /* The beginning of our message should be messages + size_used, else nobody
-         * sent the last msg! */
-        /* DBG("XXX ret %p - page->messages %p = %lu != %lu, will add %lu -> %p\n", ret, page->messages,
-        (c_ulong)((u8 *)ret - (u8 *)page->messages), page->size_used, complete_msg_size, ((u8 *)ret) + complete_msg_size);
-        */
-
-        if last_msg.is_null() && (*page).size_used != 0
-            || ((ret as usize) - (*page).messages.as_mut_ptr() as usize) != (*page).size_used
-        {
-            panic!("Allocated new message without calling send() inbetween. ret: {:?}, page: {:?}, complete_msg_size: {:?}, size_used: {:?}, last_msg: {:?}", ret, page,
-                buf_len_padded, ptr::addr_of!((*page).size_used), last_msg);
-        }
-        (*page).size_used += complete_msg_size;
-        (*ret).buf_len_padded = buf_len_padded as u64;
         (*ret).buf_len = buf_len as u64;
-        /* DBG("Returning new message at %p with len %ld, TAG was %x", ret, ret->buf_len_padded, ret->tag); */
-        /* Maybe catch some bugs... */
+        (*ret).buf_len_padded = buf_len_padded as u64;
+        (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
+
         (*_llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
         (*ret).tag = LLMP_TAG_UNINITIALIZED;
+
+        // For future allocs, keep track of the maximum (aligned) alloc size we used
+        (*page).max_alloc_size = max(
+            (*page).max_alloc_size,
+            size_of::<LlmpMsg>() + buf_len_padded,
+        );
+
+        self.has_unsent_message = true;
+
         Some(ret)
     }
 
     /// Commit the message last allocated by [`alloc_next`] to the queue.
     /// After commiting, the msg shall no longer be altered!
     /// It will be read by the consuming threads (`broker->clients` or `client->broker`)
+    /// If `overwrite_client_id` is `false`, the message's `sender` won't be touched (for broker forwarding)
     #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
-    unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
+    unsafe fn send(&mut self, msg: *mut LlmpMsg, overwrite_client_id: bool) -> Result<(), Error> {
         // dbg!("Sending msg {:?}", msg);
 
         if self.last_msg_sent == msg {
@@ -976,6 +958,10 @@ where
         }
         if (*msg).tag == LLMP_TAG_UNSET {
             panic!("No tag set on message with id {}", (*msg).message_id);
+        }
+        // A client gets the sender id assigned to by the broker during the initial handshake.
+        if overwrite_client_id {
+            (*msg).sender = self.id;
         }
         let page = self.out_maps.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
@@ -989,6 +975,7 @@ where
         ptr::write_volatile(ptr::addr_of_mut!((*page).current_msg_id), (*msg).message_id);
         compiler_fence(Ordering::SeqCst);
         self.last_msg_sent = msg;
+        self.has_unsent_message = false;
         Ok(())
     }
 
@@ -1034,17 +1021,19 @@ where
         println!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
 
         (*new_map).max_alloc_size = (*old_map).max_alloc_size;
+        (*new_map).sender = self.id;
+
         /* On the old map, place a last message linking to the new map for the clients
          * to consume */
-        let mut out: *mut LlmpMsg = self.alloc_eop()?;
-        (*out).sender = (*old_map).sender;
+        let out = self.alloc_eop()?;
 
+        #[allow(clippy::cast_ptr_alignment)]
         let mut end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
         (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
         (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_slice();
 
         /* Send the last msg on the old buf */
-        self.send(out)?;
+        self.send(out, true)?;
 
         // Set the new page as current page.
         self.out_maps.push(new_map_shmem);
@@ -1095,6 +1084,51 @@ where
         (*page).size_used -= (*msg).buf_len_padded as usize + size_of::<LlmpMsg>();
     }
 
+    /// Shrinks the allocated [`LlmpMsg`] to a given size.
+    ///
+    /// # Safety
+    /// The msg pointer will be dereferenced, if it's not `null`.
+    pub unsafe fn shrink_alloced(
+        &mut self,
+        msg: *mut LlmpMsg,
+        shrinked_len: usize,
+    ) -> Result<(), Error> {
+        if msg.is_null() {
+            return Err(Error::IllegalArgument(
+                "Null msg passed to shrink_alloced".into(),
+            ));
+        } else if !self.has_unsent_message {
+            return Err(Error::IllegalState(
+                "Called shrink_alloced, but the msg was not unsent".into(),
+            ));
+        }
+
+        let old_len_padded = (*msg).buf_len_padded;
+
+        let msg_start = msg as usize;
+        // Make sure the end of our msg is aligned.
+        let buf_len_padded = llmp_align(msg_start + shrinked_len + size_of::<LlmpMsg>())
+            - msg_start
+            - size_of::<LlmpMsg>();
+
+        if buf_len_padded > old_len_padded.try_into().unwrap() {
+            return Err(Error::IllegalArgument(format!("Cannot shrink msg of size {} (paded: {}) to requested larger size of {} (padded: {})!", (*msg).buf_len, old_len_padded, shrinked_len, buf_len_padded)));
+        }
+
+        (*msg).buf_len = shrinked_len as u64;
+        (*msg).buf_len_padded = buf_len_padded as u64;
+
+        let page = self.out_maps.last_mut().unwrap().page_mut();
+
+        // Doing this step by step will catch underflows in debug builds :)
+        (*page).size_used -= old_len_padded as usize;
+        (*page).size_used += buf_len_padded as usize;
+
+        (*_llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
+
+        Ok(())
+    }
+
     /// Allocates a message of the given size, tags it, and sends it off.
     pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         // Make sure we don't reuse already allocated tags
@@ -1115,7 +1149,7 @@ where
             (*msg).flags = LLMP_FLAG_INITIALIZED;
             buf.as_ptr()
                 .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
-            self.send(msg)
+            self.send(msg, true)
         }
     }
 
@@ -1139,7 +1173,7 @@ where
             (*msg).flags = flags;
             buf.as_ptr()
                 .copy_to_nonoverlapping((*msg).buf.as_mut_ptr(), buf.len());
-            self.send(msg)
+            self.send(msg, true)
         }
     }
 
@@ -1287,6 +1321,7 @@ where
                             size_of::<LlmpPayloadSharedMapInfo>()
                         );
                     }
+                    #[allow(clippy::cast_ptr_alignment)]
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
                     /* The pageinfo points to the map we're about to unmap.
@@ -1339,7 +1374,7 @@ where
             if (*last_msg).tag == LLMP_TAG_END_OF_PAGE && !llmp_msg_in_page(page, last_msg) {
                 panic!("BUG: full page passed to await_message_blocking or reset failed");
             }
-            current_msg_id = (*last_msg).message_id
+            current_msg_id = (*last_msg).message_id;
         }
         loop {
             compiler_fence(Ordering::SeqCst);
@@ -1355,7 +1390,7 @@ where
     /// Returns the next message, tag, buf, if avaliable, else None
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, &[u8])>, Error> {
+    pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
         if let Some((sender, tag, _flags, buf)) = self.recv_buf_with_flags()? {
             Ok(Some((sender, tag, buf)))
         } else {
@@ -1541,18 +1576,19 @@ where
     #[cfg(feature = "std")]
     pub unsafe fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
-            env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR)
+            env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR);
         } else {
             env::set_var(
                 &format!("{}_OFFSET", map_env_name),
                 format!("{}", self.msg_to_offset(msg)?),
-            )
-        };
+            );
+        }
         Ok(())
     }
 
     /// Gets this message from this page, at the indicated offset.
     /// Will return [`crate::Error::IllegalArgument`] error if the offset is out of bounds.
+    #[allow(clippy::cast_ptr_alignment)]
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         let offset = offset as usize;
         unsafe {
@@ -1600,7 +1636,9 @@ pub struct LlmpBrokerSignalHandler {
 #[cfg(unix)]
 impl Handler for LlmpBrokerSignalHandler {
     fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: &mut ucontext_t) {
-        unsafe { ptr::write_volatile(&mut self.shutting_down, true) };
+        unsafe {
+            ptr::write_volatile(&mut self.shutting_down, true);
+        }
     }
 
     fn signals(&self) -> Vec<Signal> {
@@ -1627,6 +1665,7 @@ where
                 // Broker never cleans up the pages so that new
                 // clients may join at any time
                 keep_pages_forever: true,
+                has_unsent_message: false,
                 shmem_provider: shmem_provider.clone(),
             },
             llmp_clients: vec![],
@@ -1744,9 +1783,9 @@ where
         (msg as *const u8).copy_to_nonoverlapping(out as *mut u8, complete_size);
         (*out).buf_len_padded = actual_size;
         /* We need to replace the message ID with our own */
-        if let Err(e) = self.llmp_out.send(out) {
-            panic!("Error sending msg: {:?}", e)
-        };
+        if let Err(e) = self.llmp_out.send(out, false) {
+            panic!("Error sending msg: {:?}", e);
+        }
         self.llmp_out.last_msg_sent = out;
         Ok(())
     }
@@ -1803,8 +1842,8 @@ where
 
             #[cfg(feature = "std")]
             if let Some(time) = sleep_time {
-                thread::sleep(time)
-            };
+                thread::sleep(time);
+            }
 
             #[cfg(not(feature = "std"))]
             match sleep_time {
@@ -1852,10 +1891,11 @@ where
                 .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+            #[allow(clippy::cast_ptr_alignment)]
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
             (*pageinfo).shm_str = *shmem_description.id.as_slice();
             (*pageinfo).map_size = shmem_description.size;
-            sender.send(msg)
+            sender.send(msg, true)
         }
     }
 
@@ -2034,7 +2074,7 @@ where
                     stream,
                     shmem_provider,
                     *current_client_id,
-                    &broker_map_description,
+                    broker_map_description,
                 ) {
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
                         println!("B2B: Error announcing client {:?}", shmem_description);
@@ -2093,6 +2133,7 @@ where
                 )],
                 // drop pages to the broker, if it already read them.
                 keep_pages_forever: false,
+                has_unsent_message: false,
                 shmem_provider: shmem_provider_clone.clone(),
             };
 
@@ -2148,6 +2189,7 @@ where
 
     /// broker broadcast to its own page for all others to read */
     #[inline]
+    #[allow(clippy::cast_ptr_alignment)]
     unsafe fn handle_new_msgs<F>(&mut self, client_id: u32, on_new_msg: &mut F) -> Result<(), Error>
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
@@ -2221,8 +2263,8 @@ where
                 if let LlmpMsgHookResult::Handled =
                     (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
                 {
-                    should_forward_msg = false
-                };
+                    should_forward_msg = false;
+                }
                 if should_forward_msg {
                     self.forward_msg(msg)?;
                 }
@@ -2360,6 +2402,7 @@ where
                 })],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
+                has_unsent_message: false,
                 shmem_provider: shmem_provider.clone(),
             },
 
@@ -2377,7 +2420,7 @@ where
     /// # Safety
     /// Needs to be called with a proper msg pointer
     pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
-        self.sender.send(msg)
+        self.sender.send(msg, true)
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
@@ -2402,6 +2445,7 @@ where
                 .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
+            #[allow(clippy::cast_ptr_alignment)]
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
             (*pageinfo).shm_str = *shm_str;
             (*pageinfo).map_size = shm_id;
@@ -2439,13 +2483,13 @@ where
     /// Returns the next message, tag, buf, if avaliable, else None
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub fn recv_buf(&mut self) -> Result<Option<(u32, Tag, &[u8])>, Error> {
+    pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
         self.receiver.recv_buf()
     }
 
     /// Receives a buf from the broker, looping until a messages becomes avaliable
     #[inline]
-    pub fn recv_buf_blocking(&mut self) -> Result<(u32, Tag, &[u8]), Error> {
+    pub fn recv_buf_blocking(&mut self) -> Result<(ClientId, Tag, &[u8]), Error> {
         self.receiver.recv_buf_blocking()
     }
 

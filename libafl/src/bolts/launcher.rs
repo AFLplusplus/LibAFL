@@ -36,6 +36,7 @@ use typed_builder::TypedBuilder;
 pub type LauncherClientFnRef<'a, I, OT, S, SP> =
     &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>) -> Result<(), Error>;
 
+const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
@@ -54,7 +55,7 @@ where
     stats: ST,
     /// The 'main' function to run for each client forked. This probably shouldn't return
     run_client: LauncherClientFnRef<'a, I, OT, S, SP>,
-    /// The broker port to use
+    /// The broker port to use (or to attach to, in case [`Self::with_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -66,6 +67,12 @@ where
     /// clusters.
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
+    /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
+    /// The reason you may not want this is, if you already have a [`Launcher`]
+    /// with a different configuration (for the same target) running on this machine.
+    /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
+    #[builder(default = true)]
+    spawn_broker: bool,
 }
 
 #[cfg(feature = "std")]
@@ -128,23 +135,37 @@ where
                 };
             }
         }
-        #[cfg(feature = "std")]
-        println!("I am broker!!.");
 
-        // TODO we don't want always a broker here, thing about using different laucher process to spawn different configurations
-        RestartingMgr::<I, OT, S, SP, ST>::builder()
-            .shmem_provider(self.shmem_provider.clone())
-            .stats(Some(self.stats.clone()))
-            .broker_port(self.broker_port)
-            .kind(ManagerKind::Broker)
-            .remote_broker_addr(self.remote_broker_addr)
-            .build()
-            .launch()?;
+        if self.spawn_broker {
+            #[cfg(feature = "std")]
+            println!("I am broker!!.");
 
-        // Broker exited. kill all clients.
-        for handle in &handles {
-            unsafe {
-                libc::kill(*handle, libc::SIGINT);
+            // TODO we don't want always a broker here, thing about using different laucher process to spawn different configurations
+            RestartingMgr::<I, OT, S, SP, ST>::builder()
+                .shmem_provider(self.shmem_provider.clone())
+                .stats(Some(self.stats.clone()))
+                .broker_port(self.broker_port)
+                .kind(ManagerKind::Broker)
+                .remote_broker_addr(self.remote_broker_addr)
+                .build()
+                .launch()?;
+
+            // Broker exited. kill all clients.
+            for handle in &handles {
+                unsafe {
+                    libc::kill(*handle, libc::SIGINT);
+                }
+            }
+        } else {
+            for handle in &handles {
+                let mut status = 0;
+                println!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+                unsafe {
+                    libc::waitpid(*handle, &mut status, 0);
+                    if status != 0 {
+                        println!("Client with pid {} exited with status {}", handle, status);
+                    }
+                }
             }
         }
 
@@ -215,25 +236,33 @@ where
             Err(_) => panic!("Env variables are broken, received non-unicode!"),
         };
 
-        #[cfg(feature = "std")]
-        println!("I am broker!!.");
+        if self.spawn_broker {
+            #[cfg(feature = "std")]
+            println!("I am broker!!.");
 
-        RestartingMgr::<I, OT, S, SP, ST>::builder()
-            .shmem_provider(self.shmem_provider.clone())
-            .stats(Some(self.stats.clone()))
-            .broker_port(self.broker_port)
-            .kind(ManagerKind::Broker)
-            .remote_broker_addr(self.remote_broker_addr)
-            .build()
-            .launch()?;
+            RestartingMgr::<I, OT, S, SP, ST>::builder()
+                .shmem_provider(self.shmem_provider.clone())
+                .stats(Some(self.stats.clone()))
+                .broker_port(self.broker_port)
+                .kind(ManagerKind::Broker)
+                .remote_broker_addr(self.remote_broker_addr)
+                .build()
+                .launch()?;
 
-        //broker exited. kill all clients.
-        for handle in &mut handles {
-            handle.kill()?;
+            //broker exited. kill all clients.
+            for handle in &mut handles {
+                handle.kill()?;
+            }
+        } else {
+            println!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+            for handle in &mut handles {
+                let ecode = handle.wait()?;
+                if !ecode.success() {
+                    println!("Client with handle {:?} exited with {:?}", handle, ecode);
+                }
+            }
         }
 
         Ok(())
     }
 }
-
-const _AFL_LAUNCHER_CLIENT: &str = &"AFL_LAUNCHER_CLIENT";
