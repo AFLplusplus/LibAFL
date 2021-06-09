@@ -72,15 +72,11 @@ impl CmpLogRuntime {
         }
     }
 
-    extern "C" fn populate_lists(&mut self) {
-        let op1 = self.regs[0];
-        let op2 = self.regs[1];
-        let retaddr = self.regs[2];
-
-        println!(
-            "entered populate_lists with: {:#02x}, {:#02x}, {:#02x}",
-            op1, op2, retaddr
-        );
+    extern "C" fn populate_lists(&mut self, op1: u64, op2: u64, retaddr: u64) {
+        // println!(
+        //     "entered populate_lists with: {:#02x}, {:#02x}, {:#02x}",
+        //     op1, op2, retaddr
+        // );
         let mut k = (retaddr >> 4) ^ (retaddr << 8);
 
         k &= (CMPLOG_MAP_W as u64) - 1;
@@ -88,14 +84,6 @@ impl CmpLogRuntime {
         unsafe {
             libafl_targets_cmplog_wrapper(k, 8, op1, op2);
         }
-
-        println!("returned from c code");
-
-        // self.cmplog_map.headers[self.cmp_idx].hits += 1;
-        // self.cmplog_map.headers[self.cmp_idx].shape = 8;
-        // let cmplog_ops: CmpLogOperands = CmpLogOperands(op1, op2);
-        // self.cmplog_map.operands[self.cmp_idx] = cmplog_ops;
-        // self.cmp_idx += 1;
     }
 
     /// Generate the instrumentation blobs for the current arch.
@@ -112,10 +100,8 @@ impl CmpLogRuntime {
                 ; stp x14, x15, [sp, #-0x10]!
                 ; stp x29, x30, [sp, #-0x10]!
               // jump to rust based population of the lists
-                ; ldr x5, >self_regs_addr
-                ; stp x0, x1, [x5]
-                ; adr x2, >done
-                ; str x2, [x5, 0x10]
+                ; mov x2, x0
+                ; adr x3, >done
                 ; ldr x4, >populate_lists
                 ; ldr x0, >self_addr
                 ; blr x4
