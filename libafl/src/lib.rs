@@ -199,7 +199,7 @@ mod tests {
         let stats = SimpleStats::new(|s| {
             println!("{}", s);
         });
-        let mut event_manager = SimpleEventManager::<_, _, StdShMemProvider, _>::new(stats);
+        let mut event_manager = SimpleEventManager::new(stats);
 
         let scheduler = RandCorpusScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());

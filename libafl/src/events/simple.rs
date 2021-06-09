@@ -44,7 +44,7 @@ where
     events: Vec<Event<I>>,
 }
 
-impl<I, ST> EventFirer<I, S> for SimpleEventManager<I, ST>
+impl<I, S, ST> EventFirer<I, S> for SimpleEventManager<I, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -58,7 +58,7 @@ where
     }
 }
 
-impl<I, ST> EventRestarter<S> for SimpleEventManager<I, ST>
+impl<I, S, ST> EventRestarter<S> for SimpleEventManager<I, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -184,7 +184,7 @@ where
 
     // Handle arriving events in the client
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
-    fn handle_in_client(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn handle_in_client<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         Err(Error::Unknown(format!(
             "Received illegal message that message should not have arrived: {:?}.",
             event
@@ -206,20 +206,20 @@ where
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
     /// The actual simple event mgr
-    simple_event_mgr: SimpleEventManager<I, S>,
+    simple_event_mgr: SimpleEventManager<I, ST>,
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
     /// The stats to use
-    #[builder]
-    stats: ST,
+    #[builder(setter(strip_option))]
+    stats: Option<ST>,
     /// Phantom data
     #[builder(setter(skip), default = PhantomData {})]
     _phantom: PhantomData<(I, S)>,
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
     /// (Optional) llmp sender for restarts
-    sender: Option<LlmpSender<SP>>,
+    sender: LlmpSender<SP>,
 }
 
 impl<I, S, SP, ST> EventFirer<I, S> for SimpleRestartingEventManager<I, S, SP, ST>
@@ -247,7 +247,8 @@ where
         unsafe {
             self.sender.reset();
         }
-        self.sender.send_buf(_LLMP_TAG_RESTART, &postcard::to_allocvec(state)?)
+        self.sender
+            .send_buf(_LLMP_TAG_RESTART, &postcard::to_allocvec(state)?)
     }
 }
 
@@ -258,12 +259,7 @@ where
     SP: ShMemProvider,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error> {
+    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.simple_event_mgr.process(fuzzer, state, executor)
     }
 }
@@ -285,118 +281,33 @@ where
     ST: Stats, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    pub fn new(stats: ST, sender: LlmpSender<SP>, shmem_provider: ShMemProvider) -> Self {
+    pub fn new(stats: ST, sender: LlmpSender<SP>, shmem_provider: SP) -> Self {
         Self {
-            stats,
             events: vec![],
+            stats: None,
             sender,
             simple_event_mgr: SimpleEventManager::new(stats),
             shmem_provider: shmem_provider,
-            phantom: PhantomData {},
+            _phantom: PhantomData {},
         }
-    }
-
-    // Handle arriving events in the broker
-    #[allow(clippy::unnecessary_wraps)]
-    fn handle_in_broker(stats: &mut ST, event: &Event<I>) -> Result<BrokerEventResult, Error> {
-        match event {
-            Event::NewTestcase {
-                input: _,
-                client_config: _,
-                corpus_size,
-                observers_buf: _,
-                time,
-                executions,
-            } => {
-                stats
-                    .client_stats_mut_for(0)
-                    .update_corpus_size(*corpus_size as u64);
-                stats
-                    .client_stats_mut_for(0)
-                    .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), 0);
-                Ok(BrokerEventResult::Handled)
-            }
-            Event::UpdateStats {
-                time,
-                executions,
-                phantom: _,
-            } => {
-                // TODO: The stats buffer should be added on client add.
-                stats
-                    .client_stats_mut_for(0)
-                    .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), 0);
-                Ok(BrokerEventResult::Handled)
-            }
-            Event::UpdateUserStats {
-                name,
-                value,
-                phantom: _,
-            } => {
-                stats
-                    .client_stats_mut_for(0)
-                    .update_user_stats(name.clone(), value.clone());
-                stats.display(event.name().to_string(), 0);
-                Ok(BrokerEventResult::Handled)
-            }
-            #[cfg(feature = "introspection")]
-            Event::UpdatePerfStats {
-                time,
-                executions,
-                introspection_stats,
-                phantom: _,
-            } => {
-                // TODO: The stats buffer should be added on client add.
-                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                stats.client_stats_mut()[0].update_introspection_stats(**introspection_stats);
-                stats.display(event.name().to_string(), 0);
-                Ok(BrokerEventResult::Handled)
-            }
-            Event::Objective { objective_size } => {
-                stats
-                    .client_stats_mut_for(0)
-                    .update_objective_size(*objective_size as u64);
-                stats.display(event.name().to_string(), 0);
-                Ok(BrokerEventResult::Handled)
-            }
-            Event::Log {
-                severity_level,
-                message,
-                phantom: _,
-            } => {
-                let (_, _) = (message, severity_level);
-                #[cfg(feature = "std")]
-                println!("[LOG {}]: {}", severity_level, message);
-                Ok(BrokerEventResult::Handled)
-            } //_ => Ok(BrokerEventResult::Forward),
-        }
-    }
-
-    // Handle arriving events in the client
-    #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
-    fn handle_in_client(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        Err(Error::Unknown(format!(
-            "Received illegal message that message should not have arrived: {:?}.",
-            event
-        )))
     }
 }
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, OT, S, SP, ST> SimpleRestartingEventManager<I, OT, S, SP, ST>
+impl<I, S, SP, ST> SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple,
     S: DeserializeOwned + Serialize,
     SP: ShMemProvider,
     ST: Stats + Clone,
 {
     /// Launch the restarting manager
-    pub fn launch(&mut self) -> Result<(Option<S>, SimpleEventManager<I, S, SP, ST>), Error> {
+    pub fn launch(
+        &mut self,
+    ) -> Result<(Option<S>, SimpleRestartingEventManager<I, S, SP, ST>), Error> {
         // We start ourself as child process to actually fuzz
-        let (mut sender, mut receiver, _new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER)
+        let (mut sender, mut receiver, new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
             // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
@@ -475,7 +386,11 @@ where
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    SimpleEventManager::restarting(self.stats.take().unwrap(), sender),
+                    SimpleRestartingEventManager::new(
+                        self.stats.take().unwrap(),
+                        sender,
+                        new_shmem_provider,
+                    ),
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
@@ -489,7 +404,11 @@ where
 
                 (
                     Some(state),
-                    SimpleEventManager::restarting(self.stats.take().unwrap(), sender),
+                    SimpleRestartingEventManager::new(
+                        self.stats.take().unwrap(),
+                        sender,
+                        new_shmem_provider,
+                    ),
                 )
             }
         };
