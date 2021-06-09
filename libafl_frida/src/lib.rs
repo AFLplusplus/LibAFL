@@ -135,7 +135,7 @@ impl FridaOptions {
                     assert_eq!(
                         core_ids.len(),
                         1,
-                        "[asan_cores] Client should only be enabled on one core"
+                        "Client should only be bound to a single core"
                     );
                     let core_id = core_ids[0].id;
                     options.enable_asan = asan_cores.contains(&core_id);
@@ -147,7 +147,7 @@ impl FridaOptions {
                     assert_eq!(
                         core_ids.len(),
                         1,
-                        "[cmplog_cores] Client should only be enabled on one core"
+                        "Client should only be bound to a single core"
                     );
                     let core_id = core_ids[0].id;
                     options.enable_cmplog = cmplog_cores.contains(&core_id);
