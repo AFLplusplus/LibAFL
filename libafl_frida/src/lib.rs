@@ -121,7 +121,7 @@ impl FridaOptions {
                             panic!("cmplog feature is disabled!")
                         }
                     }
-                    "cmplog_cores" => {
+                    "cmplog-cores" => {
                         cmplog_cores = parse_core_bind_arg(value);
                     }
                     _ => {
