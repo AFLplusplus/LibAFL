@@ -72,6 +72,12 @@ void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2) {
 
 }
 
+#ifdef SANCOV_CMPLOG
+void libafl_targets_cmplog_wrapper(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2){
+    return __libafl_targets_cmplog(k, shape, arg1, arg2);
+}
+#endif
+
 void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
   uintptr_t rt = RETADDR;
