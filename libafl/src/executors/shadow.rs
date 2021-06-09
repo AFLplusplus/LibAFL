@@ -40,7 +40,7 @@ where
     SOT: ObserversTuple,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
-    pub fn new<EM, I, S, Z>(executor: E, shadow_observers: SOT) -> Self {
+    pub fn new(executor: E, shadow_observers: SOT) -> Self {
         Self {
             executor,
             shadow_observers,
