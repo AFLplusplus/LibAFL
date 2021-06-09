@@ -10,6 +10,7 @@ pub mod asan_errors;
 /// The frida address sanitizer runtime
 pub mod asan_rt;
 
+#[cfg(all(feature = "cmplog_runtime"))]
 /// The frida cmplog runtime
 pub mod cmplog_rt;
 

@@ -33,8 +33,12 @@ use rangemap::RangeMap;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
-use crate::{asan_rt::AsanRuntime, cmplog_rt::CmpLogRuntime, FridaOptions};
+use crate::{asan_rt::AsanRuntime, FridaOptions};
 
+#[cfg(feature = "cmplog_runtime")]
+use crate::cmplog_rt::CmpLogRuntime;
+
+#[cfg(feature = "cmplog_runtime")]
 enum CmplogOperandType {
     Regid(capstone::RegId),
     Imm(u64),
@@ -85,6 +89,7 @@ pub struct FridaInstrumentationHelper<'a> {
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
     asan_runtime: AsanRuntime,
+    #[cfg(all(feature = "cmplog_runtime"))]
     cmplog_runtime: CmpLogRuntime,
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
@@ -271,6 +276,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .build()
                 .expect("Failed to create Capstone object"),
             asan_runtime: AsanRuntime::new(options.clone()),
+            #[cfg(all(feature = "cmplog_runtime"))]
             cmplog_runtime: CmpLogRuntime::new(),
             ranges: RangeMap::new(),
             module_map: ModuleMap::new_from_names(modules_to_instrument),
@@ -348,11 +354,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                 );
                             }
                         }
-
                         if helper.options().cmplog_enabled() {
                             #[cfg(not(target_arch = "aarch64"))]
                             todo!("Implement cmplog for non-aarch64 targets");
-                            #[cfg(target_arch = "aarch64")]
+                            #[cfg(all(feature = "cmplog_runtime", target_arch = "aarch64"))]
                             // check if this instruction is a compare instruction and if so save the registers values
                             if let Ok((op1, op2)) =
                                 helper.is_interesting_cmplog_instruction(address, instr)
@@ -377,6 +382,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.init(gum, modules_to_instrument);
             }
+            #[cfg(all(feature = "cmplog_runtime"))]
             if helper.options.cmplog_enabled() {
                 helper.cmplog_runtime.init();
             }
@@ -395,7 +401,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(feature = "cmplog_runtime", target_arch = "aarch64"))]
     #[inline]
     fn emit_comparison_handling(
         &self,
@@ -1027,7 +1033,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Err(())
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(feature = "cmplog_runtime", target_arch = "aarch64"))]
     #[inline]
     fn is_interesting_cmplog_instruction(
         &self,
