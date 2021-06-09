@@ -9,7 +9,12 @@ pub mod alloc;
 pub mod asan_errors;
 /// The frida address sanitizer runtime
 pub mod asan_rt;
-/// The `LibAFL` frida helper
+
+#[cfg(feature = "cmplog")]
+/// The frida cmplog runtime
+pub mod cmplog_rt;
+
+/// The `LibAFL` firda helper
 pub mod helper;
 
 // for parsing asan cores
@@ -28,6 +33,7 @@ pub struct FridaOptions {
     enable_coverage: bool,
     enable_drcov: bool,
     instrument_suppress_locations: Option<Vec<(String, usize)>>,
+    enable_cmplog: bool,
 }
 
 impl FridaOptions {
@@ -100,6 +106,12 @@ impl FridaOptions {
                             );
                         }
                     }
+                    "cmplog" => {
+                        options.enable_cmplog = value.parse().unwrap();
+                        if !cfg!(feature = "cmplog") && options.enable_cmplog {
+                            panic!("cmplog feature is disabled!")
+                        }
+                    }
                     _ => {
                         panic!("unknown FRIDA option: '{}'", option);
                     }
@@ -142,6 +154,13 @@ impl FridaOptions {
     #[inline]
     pub fn drcov_enabled(&self) -> bool {
         self.enable_drcov
+    }
+
+    /// Is `CmpLog` enabled?
+    #[must_use]
+    #[inline]
+    pub fn cmplog_enabled(&self) -> bool {
+        self.enable_cmplog
     }
 
     /// Should ASAN detect leaks
@@ -190,6 +209,7 @@ impl Default for FridaOptions {
             enable_coverage: true,
             enable_drcov: false,
             instrument_suppress_locations: None,
+            enable_cmplog: false,
         }
     }
 }
