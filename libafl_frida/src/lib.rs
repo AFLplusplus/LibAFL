@@ -109,7 +109,6 @@ impl FridaOptions {
                     }
                     "cmplog" => {
                         options.enable_cmplog = value.parse().unwrap();
-
                         #[cfg(not(target_arch = "aarch64"))]
                         if options.enable_cmplog {
                             panic!(

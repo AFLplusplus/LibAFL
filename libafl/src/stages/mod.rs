@@ -9,7 +9,7 @@ pub mod mutational;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
 pub mod tracing;
-pub use tracing::TracingStage;
+pub use tracing::{ShadowTracingStage, TracingStage};
 
 //pub mod power;
 //pub use power::PowerMutationalStage;
