@@ -13,6 +13,9 @@ pub use forkserver::{Forkserver, ForkserverExecutor, OutFile, TimeoutForkserverE
 pub mod combined;
 pub use combined::CombinedExecutor;
 
+pub mod shadow;
+pub use shadow::{HasShadowObserverHooks, ShadowExecutor};
+
 use crate::{
     bolts::serdeany::SerdeAny,
     inputs::{HasTargetBytes, Input},

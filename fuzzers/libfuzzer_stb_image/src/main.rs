@@ -10,7 +10,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::setup_restarting_mgr_std,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -18,7 +18,7 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::I2SRandReplace,
     observers::{StdMapObserver, TimeObserver},
-    stages::{StdMutationalStage, TracingStage},
+    stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     stats::MultiStats,
     Error,
@@ -123,13 +123,16 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     };
 
     // Create the executor for an in-process function with just one observer for edge coverage
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut restarting_mgr,
-    )?;
+    let mut executor = ShadowExecutor::new(
+        InProcessExecutor::new(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut restarting_mgr,
+        )?,
+        tuple_list!(cmplog_observer),
+    );
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
@@ -151,22 +154,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Secondary harness due to mut ownership
-    let mut harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
-        libfuzzer_test_one_input(buf);
-        ExitKind::Ok
-    };
-
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(cmplog_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut restarting_mgr,
-    )?);
+    let tracing = ShadowTracingStage::new(&mut executor);
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));

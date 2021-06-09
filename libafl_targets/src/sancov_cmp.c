@@ -8,43 +8,6 @@
 #include "cmplog.h"
 #endif
 
-#if defined(__APPLE__)
-
-void __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2);
-void __sanitizer_cov_trace_const_cmp1(uint8_t arg1, uint8_t arg2) {
-  __sanitizer_cov_trace_cmp1(arg1, arg2);
-}
-
-void __sanitizer_cov_trace_cmp2(uint16_t arg1, uint16_t arg2);
-void __sanitizer_cov_trace_const_cmp2(uint16_t arg1, uint16_t arg2) {
-  __sanitizer_cov_trace_cmp2(arg1, arg2);
-}
-
-void __sanitizer_cov_trace_cmp4(uint32_t arg1, uint32_t arg2);
-void __sanitizer_cov_trace_const_cmp4(uint32_t arg1, uint32_t arg2) {
-  __sanitizer_cov_trace_cmp4(arg1, arg2);
-}
-
-void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2);
-void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2) {
-    __sanitizer_cov_trace_cmp8(arg1, arg2);
-}
-
-#elif defined(_MSC_VER)
-  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp1=__sanitizer_cov_trace_cmp1")
-  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp2=__sanitizer_cov_trace_cmp2")
-  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp4=__sanitizer_cov_trace_cmp4")
-  #pragma comment(linker, "/alternatename:__sanitizer_cov_trace_const_cmp8=__sanitizer_cov_trace_cmp8")
-#else
-void __sanitizer_cov_trace_const_cmp1(uint8_t arg1, uint8_t arg2) __attribute__((alias("__sanitizer_cov_trace_cmp1")));
-void __sanitizer_cov_trace_const_cmp2(uint16_t arg1, uint16_t arg2)
-    __attribute__((alias("__sanitizer_cov_trace_cmp2")));
-void __sanitizer_cov_trace_const_cmp4(uint32_t arg1, uint32_t arg2)
-    __attribute__((alias("__sanitizer_cov_trace_cmp4")));
-void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2)
-    __attribute__((alias("__sanitizer_cov_trace_cmp8")));
-#endif
-
 void __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2) {
 
   uintptr_t k = RETADDR;
@@ -109,6 +72,12 @@ void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2) {
 
 }
 
+#ifdef SANCOV_CMPLOG
+void libafl_targets_cmplog_wrapper(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2){
+    return __libafl_targets_cmplog(k, shape, arg1, arg2);
+}
+#endif
+
 void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
   uintptr_t rt = RETADDR;
@@ -147,3 +116,18 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
 }
 
+void __sanitizer_cov_trace_const_cmp1(uint8_t arg1, uint8_t arg2) {
+  __sanitizer_cov_trace_cmp1(arg1, arg2);
+}
+
+void __sanitizer_cov_trace_const_cmp2(uint16_t arg1, uint16_t arg2) {
+  __sanitizer_cov_trace_cmp2(arg1, arg2);
+}
+
+void __sanitizer_cov_trace_const_cmp4(uint32_t arg1, uint32_t arg2) {
+  __sanitizer_cov_trace_cmp4(arg1, arg2);
+}
+
+void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2) {
+    __sanitizer_cov_trace_cmp8(arg1, arg2);
+}

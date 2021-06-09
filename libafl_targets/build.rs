@@ -19,10 +19,16 @@ fn main() {
         let mut sancov_cmp = cc::Build::new();
 
         #[cfg(feature = "sancov_value_profile")]
-        sancov_cmp.define("SANCOV_VALUE_PROFILE", "1");
+        {
+            sancov_cmp.define("SANCOV_VALUE_PROFILE", "1");
+            println!("cargo:rerun-if-changed=src/value_profile.h");
+        }
 
         #[cfg(feature = "sancov_cmplog")]
-        sancov_cmp.define("SANCOV_CMPLOG", "1");
+        {
+            sancov_cmp.define("SANCOV_CMPLOG", "1");
+            println!("cargo:rerun-if-changed=src/cmplog.h");
+        }
 
         sancov_cmp
             .file(_src_dir.join("sancov_cmp.c"))
