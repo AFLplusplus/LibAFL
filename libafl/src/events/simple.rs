@@ -38,7 +38,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 
 /// A simple, single-threaded event manager that just logs
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SimpleEventManager<I, ST>
 where
     I: Input,
