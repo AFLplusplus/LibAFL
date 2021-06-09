@@ -9,15 +9,19 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     bolts::{
         llmp::{self, LlmpReceiver, LlmpSender},
-        os::{fork, ForkResult},
         shmem::ShMemProvider,
     },
     events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
     inputs::Input,
-    observers::ObserversTuple,
     stats::Stats,
     Error,
 };
+
+#[cfg(unix)]
+use crate::bolts::os::{fork, ForkResult};
+
+#[cfg(windows)]
+use crate::bolts::os::startable_self;
 
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
