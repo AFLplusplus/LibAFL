@@ -1,30 +1,32 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
 use alloc::{string::ToString, vec::Vec};
-use core::marker::PhantomData;
 #[cfg(feature = "std")]
-use core::ptr::{addr_of, read_volatile};
+use core::{
+    marker::PhantomData,
+    ptr::{addr_of, read_volatile},
+};
+#[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "std")]
+use typed_builder::TypedBuilder;
 
+#[cfg(all(feature = "std", windows))]
+use crate::bolts::os::startable_self;
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::os::{fork, ForkResult};
+#[cfg(feature = "std")]
+use crate::bolts::{
+    llmp::{LlmpReceiver, LlmpSender},
+    shmem::ShMemProvider,
+};
 use crate::{
-    bolts::{
-        llmp::{self, LlmpReceiver, LlmpSender},
-        shmem::ShMemProvider,
-    },
+    bolts::llmp,
     events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
     inputs::Input,
     stats::Stats,
     Error,
 };
-
-#[cfg(unix)]
-use crate::bolts::os::{fork, ForkResult};
-
-#[cfg(windows)]
-use crate::bolts::os::startable_self;
-
-#[cfg(feature = "std")]
-use typed_builder::TypedBuilder;
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
@@ -226,6 +228,7 @@ where
     sender: LlmpSender<SP>,
 }
 
+#[cfg(feature = "std")]
 impl<I, S, SP, ST> EventFirer<I, S> for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
@@ -238,6 +241,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<I, S, SP, ST> EventRestarter<S> for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
@@ -256,6 +260,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<E, I, S, SP, ST, Z> EventProcessor<E, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
@@ -268,6 +273,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<E, I, S, SP, ST, Z> EventManager<E, I, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
@@ -277,6 +283,7 @@ where
 {
 }
 
+#[cfg(feature = "std")]
 impl<I, S, SP, ST> SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
