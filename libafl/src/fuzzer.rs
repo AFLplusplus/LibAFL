@@ -120,6 +120,18 @@ pub trait Evaluator<E, EM, I, S> {
         input: I,
         send_events: bool
     ) -> Result<(bool, Option<usize>), Error>;
+
+    /// Runs the input and triggers observers and feedback.
+    /// Adds an input, to the corpus even if it's not considered `interesting` by the `feedback`.
+    /// Returns the `index` of the new testcase in the corpus.
+    /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
+    fn add_input(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+    ) -> Result<usize, Error>;
 }
 
 /// The main fuzzer trait.
@@ -410,6 +422,42 @@ where
                 Ok((false, None))
             }
         }
+    }
+
+    /// Adds an input, even if it's not conisered `interesting` by any of the executors
+    fn add_input(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+    ) -> Result<usize, Error> {
+        let _ = self.execute_input(state, executor, manager, &input)?;
+        let observers = executor.observers();
+        // Always consider this to be "interesting"
+
+        // Not a solution
+        self.objective_mut().discard_metadata(state, &input)?;
+
+        // Add the input to the main corpus
+        let mut testcase = Testcase::new(input.clone());
+        self.feedback_mut().append_metadata(state, &mut testcase)?;
+        let idx = state.corpus_mut().add(testcase)?;
+        self.scheduler_mut().on_add(state, idx)?;
+
+        let observers_buf = manager.serialize_observers(observers)?;
+        manager.fire(
+            state,
+            Event::NewTestcase {
+                input,
+                observers_buf,
+                corpus_size: state.corpus().count(),
+                client_config: "TODO".into(),
+                time: current_time(),
+                executions: *state.executions(),
+            },
+        )?;
+        Ok(idx)
     }
 }
 
