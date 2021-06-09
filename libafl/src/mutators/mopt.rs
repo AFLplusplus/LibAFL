@@ -4,6 +4,7 @@
 // TODO: but I have to rename it when I implement the main algorithm because I don't find these names are any suggestive of their meaning
 // Why there's so many puppets around..?
 
+use alloc::{string::ToString, vec::Vec};
 
 use crate::{bolts::rands::Rand, Error};
 
@@ -15,7 +16,7 @@ where
     limit_time_puppet: u64, // Time before we move onto pacemaker fuzzing mode
     origi_hit_cnt_puppet: u64,
     last_limit_time_start: u64, // Unneeded variable
-    total_pacemaker_time: u64, // Simply tmp_core_time + tmp_pilot_time
+    total_pacemaker_time: u64,  // Simply tmp_core_time + tmp_pilot_time
     total_puppet_find: u64,
     temp_puppet_find: u64,
     most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
@@ -23,24 +24,24 @@ where
     old_hit_count: u64, // Unneeded variable
     SPLICE_CYCLES_puppet: i32,
     limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
-    key_puppet: i32, // If we are in the pacemaker fuzzing mode?
-    key_module: i32, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
+    key_puppet: i32,     // If we are in the pacemaker fuzzing mode?
+    key_module: i32,     // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
     w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
     w_end: f64,
     w_now: f64,
     g_now: i32,
     g_max: i32,
     operator_num: usize, // Operator_num, swarm_num, period_core are defined as macros in the original implementation, but I put it into the struct here so that we can tune these values
-    swarm_num: usize, // Number of swarms
-    period_pilot : usize, // We'll generate test for period_pilot times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.2
+    swarm_num: usize,    // Number of swarms
+    period_pilot: usize, // We'll generate test for period_pilot times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.2
     period_core: usize, // We'll generate test for period_core times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.3
     temp_pilot_time: u64, // The number of testcase generated using pilot fzzing module so far
     tmp_core_time: u64, // The number of testcase generated using core fuzzing module so far
-    swarm_now: usize, // Current swarm
+    swarm_now: usize,   // Current swarm
     x_now: Vec<Vec<f64>>, // The positions of PSO algo
     L_best: Vec<Vec<f64>>, // The local optimum
     eff_best: Vec<Vec<f64>>,
-    G_best: Vec<f64>, // The global optimum
+    G_best: Vec<f64>,     // The global optimum
     v_now: Vec<Vec<f64>>, // The speed
     probability_now: Vec<Vec<f64>>,
     swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
@@ -61,15 +62,16 @@ impl<R> MOpt<R>
 where
     R: Rand,
 {
-    pub fn new(&self, limit_time_puppet: u64, rand: R, operator_num: usize, swarm_num: usize) -> Self{
+    pub fn new(
+        &self,
+        limit_time_puppet: u64,
+        rand: R,
+        operator_num: usize,
+        swarm_num: usize,
+    ) -> Self {
         let limit_time_puppet2 = limit_time_puppet * 60 * 1000;
-        let key_puppet = if limit_time_puppet == 0{
-            1
-        }
-        else{
-            0
-        };
-        Self{
+        let key_puppet = if limit_time_puppet == 0 { 1 } else { 0 };
+        Self {
             rand: rand,
             limit_time_puppet: 0,
             origi_hit_cnt_puppet: 0,
@@ -82,7 +84,7 @@ where
             most_time_puppet: 0,
             old_hit_count: 0,
             SPLICE_CYCLES_puppet: 0,
-            limit_time_sig : 1,
+            limit_time_sig: 1,
             key_puppet: key_puppet,
             key_module: 0,
             w_init: 0.9,
@@ -118,7 +120,7 @@ where
     }
 
     #[inline]
-    pub fn rand_below(&mut self, size: u64) -> f64{
+    pub fn rand_below(&mut self, size: u64) -> f64 {
         self.rand.below(size) as f64 * 0.001
     }
 
@@ -127,25 +129,24 @@ where
         let mut res = 0;
         let mut sentry = 0;
 
-        let operator_num = if extras < 2{
+        let operator_num = if extras < 2 {
             self.operator_num - 2
-        }
-        else{
+        } else {
             self.operator_num
         };
 
         // Fetch a random sele value
-        let sele : f64 = self.probability_now[self.swarm_now][operator_num - 1] * (self.rand_below(10000) * 0.0001);
-        
-        for i in 0..operator_num{
+        let sele: f64 = self.probability_now[self.swarm_now][operator_num - 1]
+            * (self.rand_below(10000) * 0.0001);
+
+        for i in 0..operator_num {
             if i == 0 {
-                if sele < self.probability_now[self.swarm_now][i]{
+                if sele < self.probability_now[self.swarm_now][i] {
                     res = i;
                     break;
                 }
-            }
-            else{
-                if sele < self.probability_now[self.swarm_now][i]{
+            } else {
+                if sele < self.probability_now[self.swarm_now][i] {
                     res = i;
                     sentry = 1;
                     break;
@@ -153,25 +154,26 @@ where
             }
         }
 
-        if (sentry == 1 && sele < self.probability_now[self.swarm_now][res - 1]) || (res + 1 < operator_num && sele > self.probability_now[self.swarm_now][res + 1]) {
+        if (sentry == 1 && sele < self.probability_now[self.swarm_now][res - 1])
+            || (res + 1 < operator_num && sele > self.probability_now[self.swarm_now][res + 1])
+        {
             return Err(Error::MOpt("Error in select_algorithm".to_string()));
         }
 
         Ok(res)
     }
-
 }
 
-const v_max : f64 = 1.0;
-const v_min : f64 = 0.05;
-const limit_time_bound : f64 = 1.1;
-const SPLICE_CYCLES_puppet_up : usize = 25;
-const SPLICE_CYCLES_puppet_low : usize = 5;
-const STAGE_RANDOMBYTE : usize = 12;
-const STAGE_DELETEBYTE : usize = 13;
-const STAGE_Clone75 : usize = 14;
+const v_max: f64 = 1.0;
+const v_min: f64 = 0.05;
+const limit_time_bound: f64 = 1.1;
+const SPLICE_CYCLES_puppet_up: usize = 25;
+const SPLICE_CYCLES_puppet_low: usize = 5;
+const STAGE_RANDOMBYTE: usize = 12;
+const STAGE_DELETEBYTE: usize = 13;
+const STAGE_Clone75: usize = 14;
 const STAGE_OverWrite75: usize = 15;
 const STAGE_OverWriteExtra: usize = 16;
-const STAGE_InsertExtra : usize = 17;
+const STAGE_InsertExtra: usize = 17;
 
-const period_pilot_tmp : f64 = 5000.0;
+const period_pilot_tmp: f64 = 5000.0;
