@@ -206,7 +206,7 @@ impl Default for FridaOptions {
             enable_coverage: true,
             enable_drcov: false,
             instrument_suppress_locations: None,
-            enable_cmplog: true,
+            enable_cmplog: false,
         }
     }
 }
