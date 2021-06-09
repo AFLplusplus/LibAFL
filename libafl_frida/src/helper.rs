@@ -725,7 +725,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         }
         #[cfg(target_arch = "x86_64")]
         {
-            println!("here");
             writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
             writer.put_push_reg(X86Register::Rdi);
             writer.put_mov_reg_address(
