@@ -21,7 +21,7 @@ use libafl::{
     },
     executors::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind,
-        HasExecHooksTuple, HasObservers, HasObserversHooks, ShadowExecutor
+        HasExecHooksTuple, HasObservers, HasObserversHooks, ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -415,7 +415,6 @@ unsafe fn fuzz(
         }
 
         if frida_options.cmplog_enabled() {
-
             // Create an observation channel using cmplog map
             let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
 

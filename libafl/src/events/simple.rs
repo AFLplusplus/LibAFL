@@ -295,7 +295,7 @@ where
             stats: None,
             sender,
             simple_event_mgr: SimpleEventManager::new(stats),
-            shmem_provider: shmem_provider,
+            shmem_provider,
             _phantom: PhantomData {},
         }
     }

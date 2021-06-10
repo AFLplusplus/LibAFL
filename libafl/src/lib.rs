@@ -165,7 +165,7 @@ impl From<ParseIntError> for Error {
 #[cfg(test)]
 mod tests {
     use crate::{
-        bolts::{rands::StdRand, shmem::StdShMemProvider, tuples::tuple_list},
+        bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
