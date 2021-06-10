@@ -21,7 +21,7 @@ use libafl::{
     },
     executors::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind,
-        HasExecHooksTuple, HasObservers, HasObserversHooks,
+        HasExecHooksTuple, HasObservers, HasObserversHooks, ShadowExecutor
     },
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -33,7 +33,7 @@ use libafl::{
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
-    stages::{StdMutationalStage, TracingStage},
+    stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
@@ -318,9 +318,6 @@ unsafe fn fuzz(
             &modules_to_instrument,
         );
 
-        // Create an observation channel using cmplog map
-        let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
-
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
@@ -406,7 +403,7 @@ unsafe fn fuzz(
                 &mut mgr,
             )?,
             &mut frida_helper,
-            Duration::new(10, 0),
+            Duration::new(30, 0),
         );
 
         // In case the corpus is empty (on first run), reset
@@ -418,35 +415,13 @@ unsafe fn fuzz(
         }
 
         if frida_options.cmplog_enabled() {
-            // Secondary harness due to mut ownership
-            let mut frida_harness = |input: &BytesInput| {
-                let target = input.target_bytes();
-                let buf = target.as_slice();
-                (target_func)(buf.as_ptr(), buf.len());
-                ExitKind::Ok
-            };
 
-            // Secondary helper due to mut ownership
-            let mut frida_helper = FridaInstrumentationHelper::new(
-                &gum,
-                &frida_options,
-                module_name,
-                &modules_to_instrument,
-            );
+            // Create an observation channel using cmplog map
+            let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
 
-            // Setup a tracing stage in which we log comparisons
-            let tracing = TracingStage::new(FridaInProcessExecutor::new(
-                &gum,
-                InProcessExecutor::new(
-                    &mut frida_harness,
-                    tuple_list!(cmplog_observer, AsanErrorsObserver::new(&ASAN_ERRORS)),
-                    &mut fuzzer,
-                    &mut state,
-                    &mut mgr,
-                )?,
-                &mut frida_helper,
-                Duration::new(10, 0),
-            ));
+            let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+
+            let tracing = ShadowTracingStage::new(&mut executor);
 
             // Setup a randomic Input2State stage
             let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
