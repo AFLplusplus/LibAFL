@@ -6,10 +6,21 @@
 
 use alloc::{string::ToString, vec::Vec};
 
-use crate::{bolts::rands::Rand, Error};
+use crate::{
+    bolts::rands::Rand,
+    inputs::Input,
+    mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple},
+    state::HasRand,
+    Error,
+};
+use core::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 
-pub struct MOpt<R>
+pub struct MOpt<I, R>
 where
+    I: Input,
     R: Rand,
 {
     rand: R,
@@ -56,19 +67,15 @@ where
     core_operator_cycles_puppet: Vec<u64>,
     core_operator_cycles_puppet_v2: Vec<u64>,
     core_operator_cycles_puppet_v3: Vec<u64>,
+    phantom: PhantomData<I>,
 }
 
-impl<R> MOpt<R>
+impl<I, R> MOpt<I, R>
 where
+    I: Input,
     R: Rand,
 {
-    pub fn new(
-        &self,
-        limit_time_puppet: u64,
-        rand: R,
-        operator_num: usize,
-        swarm_num: usize,
-    ) -> Self {
+    pub fn new(limit_time_puppet: u64, rand: R, operator_num: usize, swarm_num: usize) -> Self {
         let limit_time_puppet2 = limit_time_puppet * 60 * 1000;
         let key_puppet = if limit_time_puppet == 0 { 1 } else { 0 };
         Self {
@@ -116,6 +123,7 @@ where
             core_operator_cycles_puppet: vec![0; operator_num],
             core_operator_cycles_puppet_v2: vec![0; operator_num],
             core_operator_cycles_puppet_v3: vec![0; operator_num],
+            phantom: PhantomData,
         }
     }
 
@@ -125,6 +133,25 @@ where
     #[allow(clippy::cast_precision_loss)]
     pub fn rand_below(&mut self, size: u64) -> f64 {
         self.rand.below(size) as f64 * 0.001
+    }
+
+    #[inline]
+    pub fn key_module(&self) -> i32 {
+        self.key_module
+    }
+
+    pub fn pilot_fuzzing(&mut self, input: &mut I) -> Result<MutationResult, Error> {
+        // TODO
+        Ok(MutationResult::Mutated)
+    }
+
+    pub fn core_fuzzing(&mut self, input: &mut I) -> Result<MutationResult, Error> {
+        // TODO
+        Ok(MutationResult::Mutated)
+    }
+
+    pub fn pso_update(&mut self) -> Result<(), Error> {
+        Ok(())
     }
 
     // The function select_algorithm() from https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397, it's more of select_mutator for libAFL
@@ -178,5 +205,103 @@ const STAGE_Clone75: usize = 14;
 const STAGE_OverWrite75: usize = 15;
 const STAGE_OverWriteExtra: usize = 16;
 const STAGE_InsertExtra: usize = 17;
-
 const period_pilot_tmp: f64 = 5000.0;
+
+pub struct MOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand + Copy,
+    S: HasRand<R>,
+{
+    mopt: MOpt<I, R>,
+    mutations: MT,
+    phantom: PhantomData<(R, S)>,
+}
+
+impl<I, MT, R, S> Debug for MOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand + Copy,
+    S: HasRand<R>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MOptMutator with {} mutations for Input type {}",
+            self.mutations.len(),
+            core::any::type_name::<I>()
+        )
+    }
+}
+
+impl<I, MT, R, S> Mutator<I, S> for MOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand + Copy,
+    S: HasRand<R>,
+{
+    #[inline]
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if self.mopt.key_module() == 2 {
+            self.mopt.pso_update();
+        }
+
+        let mutate_result = match self.mopt.key_module() {
+            0 => self.mopt.pilot_fuzzing(input),
+            1 => self.mopt.core_fuzzing(input),
+            _ => return Err(Error::MOpt("invalid key_module".to_string())),
+        };
+
+        mutate_result
+    }
+}
+
+impl<I, MT, R, S> ComposedByMutations<I, MT, S> for MOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand + Copy,
+    S: HasRand<R>,
+{
+    /// Get the mutations
+    #[inline]
+    fn mutations(&self) -> &MT {
+        &self.mutations
+    }
+
+    // Get the mutations (mut)
+    #[inline]
+    fn mutations_mut(&mut self) -> &mut MT {
+        &mut self.mutations
+    }
+}
+
+impl<I, MT, R, S> MOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand + Copy,
+    S: HasRand<R>,
+{
+    pub fn new(
+        state: S,
+        mutations: MT,
+        limit_time: u64,
+        operator_num: usize,
+        swarm_num: usize,
+    ) -> Self {
+        MOptMutator {
+            mopt: MOpt::new(limit_time, state.rand().clone(), operator_num, swarm_num),
+            mutations: mutations,
+            phantom: PhantomData,
+        }
+    }
+}
