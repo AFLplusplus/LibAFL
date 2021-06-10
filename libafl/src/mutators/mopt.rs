@@ -299,7 +299,7 @@ where
         swarm_num: usize,
     ) -> Self {
         MOptMutator {
-            mopt: MOpt::new(limit_time, state.rand().clone(), operator_num, swarm_num),
+            mopt: MOpt::new(limit_time, state.rand().clone(), mutations.len(), swarm_num),
             mutations: mutations,
             phantom: PhantomData,
         }
