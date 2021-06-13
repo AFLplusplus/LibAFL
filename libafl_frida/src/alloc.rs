@@ -170,8 +170,10 @@ impl Allocator {
         } else {
             size
         };
-        if size > (1 << 30) {
-            println!("Allocation is too large: 0x{:x}", size);
+        if size > self.options.asan_max_allocation() {
+            if self.options.asan_max_allocation_panics() {
+                panic!("Allocation is too large: 0x{:x}", size);
+            }
             return std::ptr::null_mut();
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;

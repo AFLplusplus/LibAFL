@@ -30,6 +30,8 @@ pub struct FridaOptions {
     enable_asan_leak_detection: bool,
     enable_asan_continue_after_error: bool,
     enable_asan_allocation_backtraces: bool,
+    asan_max_allocation: usize,
+    asan_max_allocation_panics: bool,
     enable_coverage: bool,
     enable_drcov: bool,
     instrument_suppress_locations: Option<Vec<(String, usize)>>,
@@ -71,6 +73,12 @@ impl FridaOptions {
                     }
                     "asan-allocation-backtraces" => {
                         options.enable_asan_allocation_backtraces = value.parse().unwrap();
+                    }
+                    "asan-max-allocation" => {
+                        options.asan_max_allocation = value.parse().unwrap();
+                    }
+                    "asan-max-allocation-panics" => {
+                        options.asan_max_allocation_panics = value.parse().unwrap();
                     }
                     "asan-cores" => {
                         asan_cores = parse_core_bind_arg(value);
@@ -193,6 +201,20 @@ impl FridaOptions {
         self.enable_asan_leak_detection
     }
 
+    /// The maximum size that the ASAN allocator should allocate
+    #[must_use]
+    #[inline]
+    pub fn asan_max_allocation(&self) -> usize {
+        self.asan_max_allocation
+    }
+
+    /// Should we panic if the max ASAN allocation size is exceeded
+    #[must_use]
+    #[inline]
+    pub fn asan_max_allocation_panics(&self) -> bool {
+        self.asan_max_allocation_panics
+    }
+
     /// Should ASAN continue after a memory error is detected
     #[must_use]
     #[inline]
@@ -229,6 +251,8 @@ impl Default for FridaOptions {
             enable_asan_leak_detection: false,
             enable_asan_continue_after_error: false,
             enable_asan_allocation_backtraces: true,
+            asan_max_allocation: 1 << 30,
+            asan_max_allocation_panics: false,
             enable_coverage: true,
             enable_drcov: false,
             instrument_suppress_locations: None,
