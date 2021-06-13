@@ -39,7 +39,7 @@ where
     key_puppet: i32,     // If we are in the pacemaker fuzzing mode?
     key_module: i32,     // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
     w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
-    w_end: f64,
+    w_end: f64,  // w_* means inertia
     w_now: f64,
     g_now: i32,
     g_max: i32,
@@ -142,7 +142,66 @@ where
     }
 
     pub fn pso_update(&mut self) -> Result<(), Error> {
-        // TODO
+        self.g_now += 1;
+        if self.g_now > self.g_max {
+            self.g_now = 0;
+        }
+        self.w_now = (self.w_init - self.w_end) * ((self.g_max - self.g_now) as f64)
+            / (self.g_max as f64)
+            + self.w_end;
+
+        let mut operator_find_sum = 0;
+
+        for i in 0..self.operator_num {
+            self.operator_finds_puppet[i] = self.core_operator_cycles_puppet[i];
+
+            for j in 0..self.swarm_num {
+                self.operator_finds_puppet[i] += self.stage_finds_puppet[j][i];
+            }
+            operator_find_sum += self.operator_finds_puppet[i];
+        }
+
+        for i in 0..self.operator_num {
+            if self.operator_finds_puppet[i] > 0 {
+                self.G_best[i] =
+                    (self.operator_finds_puppet[i] as f64) / (operator_find_sum as f64);
+            }
+        }
+
+        for swarm in 0..self.swarm_num {
+            let mut probability_sum = 0.0;
+            for i in 0..self.operator_num {
+                self.probability_now[swarm][i] = 0.0;
+                self.v_now[swarm][i] = self.w_now * self.v_now[swarm][i]
+                    + self.rand_below(1000) * (self.L_best[swarm][i] - self.x_now[swarm][i])
+                    + self.rand_below(1000) * (self.G_best[i] - self.x_now[swarm][i]);
+                self.x_now[swarm][i] += self.v_now[swarm][i];
+
+                if self.x_now[swarm][i] > v_max {
+                    self.x_now[swarm][i] = v_max;
+                } else if self.x_now[swarm][i] < v_min {
+                    self.x_now[swarm][i] = v_min;
+                }
+                probability_sum += self.x_now[swarm][i];
+            }
+
+            for i in 0..self.operator_num {
+                self.x_now[swarm][i] = self.x_now[swarm][i] / probability_sum;
+                if i != 0 {
+                    self.probability_now[swarm][i] =
+                        self.probability_now[swarm][i - 1] + self.x_now[swarm][i];
+                } else {
+                    self.probability_now[swarm][i] = self.x_now[swarm][i];
+                }
+            }
+            if self.probability_now[swarm][self.operator_num - 1] < 0.99
+                || self.probability_now[swarm][self.operator_num - 1] > 1.01
+            {
+                return Err(Error::MOpt("Error in pso_update".to_string()));
+            }
+        }
+        self.swarm_now = 0;
+        // self.key_module = 0;
         Ok(())
     }
 
