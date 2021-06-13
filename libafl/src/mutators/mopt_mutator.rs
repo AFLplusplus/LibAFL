@@ -9,7 +9,7 @@ use alloc::{string::ToString, vec::Vec};
 use crate::{
     bolts::rands::Rand,
     inputs::Input,
-    mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple},
+    mutators::{MutationResult, Mutator, MutatorsTuple},
     state::HasRand,
     Error,
 };
@@ -18,6 +18,7 @@ use core::{
     marker::PhantomData,
 };
 
+#[derive(Clone, Debug)]
 pub struct MOpt<I, R>
 where
     I: Input,
@@ -140,17 +141,8 @@ where
         self.key_module
     }
 
-    pub fn pilot_fuzzing(&mut self, input: &mut I) -> Result<MutationResult, Error> {
-        // TODO
-        Ok(MutationResult::Mutated)
-    }
-
-    pub fn core_fuzzing(&mut self, input: &mut I) -> Result<MutationResult, Error> {
-        // TODO
-        Ok(MutationResult::Mutated)
-    }
-
     pub fn pso_update(&mut self) -> Result<(), Error> {
+        // TODO
         Ok(())
     }
 
@@ -207,6 +199,11 @@ const STAGE_OverWriteExtra: usize = 16;
 const STAGE_InsertExtra: usize = 17;
 const period_pilot_tmp: f64 = 5000.0;
 
+pub enum MOptMode {
+    PILOT_FUZZING,
+    CORE_FUZZING,
+}
+
 pub struct MOptMutator<I, MT, R, S>
 where
     I: Input,
@@ -214,9 +211,9 @@ where
     R: Rand + Copy,
     S: HasRand<R>,
 {
-    mopt: MOpt<I, R>,
+    mode: MOptMode, // Same as MOpt.key_module. Key_module should be deleted later
     mutations: MT,
-    phantom: PhantomData<(R, S)>,
+    phantom: PhantomData<(I, R, S)>,
 }
 
 impl<I, MT, R, S> Debug for MOptMutator<I, MT, R, S>
@@ -246,41 +243,16 @@ where
     #[inline]
     fn mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
+        _state: &mut S,
+        _input: &mut I,
+        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if self.mopt.key_module() == 2 {
-            self.mopt.pso_update();
-        }
-
-        let mutate_result = match self.mopt.key_module() {
-            0 => self.mopt.pilot_fuzzing(input),
-            1 => self.mopt.core_fuzzing(input),
-            _ => return Err(Error::MOpt("invalid key_module".to_string())),
+        let result = match self.mode {
+            MOptMode::CORE_FUZZING => self.core_mutate(_state, _input, _stage_idx),
+            MOptMode::PILOT_FUZZING => self.pilot_mutate(_state, _input, _stage_idx),
         };
 
-        mutate_result
-    }
-}
-
-impl<I, MT, R, S> ComposedByMutations<I, MT, S> for MOptMutator<I, MT, R, S>
-where
-    I: Input,
-    MT: MutatorsTuple<I, S>,
-    R: Rand + Copy,
-    S: HasRand<R>,
-{
-    /// Get the mutations
-    #[inline]
-    fn mutations(&self) -> &MT {
-        &self.mutations
-    }
-
-    // Get the mutations (mut)
-    #[inline]
-    fn mutations_mut(&mut self) -> &mut MT {
-        &mut self.mutations
+        result
     }
 }
 
@@ -291,17 +263,30 @@ where
     R: Rand + Copy,
     S: HasRand<R>,
 {
-    pub fn new(
-        state: S,
-        mutations: MT,
-        limit_time: u64,
-        operator_num: usize,
-        swarm_num: usize,
-    ) -> Self {
-        MOptMutator {
-            mopt: MOpt::new(limit_time, state.rand().clone(), mutations.len(), swarm_num),
+    pub fn new(state: S, mutations: MT) -> Self {
+        Self {
+            mode: MOptMode::CORE_FUZZING,
             mutations: mutations,
             phantom: PhantomData,
         }
+    }
+    fn core_mutate(
+        &mut self,
+        _state: &mut S,
+        _input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        // TODO
+        Ok(MutationResult::Mutated)
+    }
+
+    fn pilot_mutate(
+        &mut self,
+        _state: &mut S,
+        _input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        // TODO
+        Ok(MutationResult::Mutated)
     }
 }
