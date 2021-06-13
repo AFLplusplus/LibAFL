@@ -109,13 +109,6 @@ impl From<postcard::Error> for Error {
     }
 }
 
-#[cfg(feature = "llmp_compression")]
-impl From<compression::prelude::CompressionError> for Error {
-    fn from(err: compression::prelude::CompressionError) -> Self {
-        Self::Compression(format!("{:?}", err))
-    }
-}
-
 /// Stringify the json serializer error
 #[cfg(feature = "std")]
 impl From<serde_json::Error> for Error {
