@@ -133,6 +133,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
+    #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,

@@ -5,6 +5,9 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 #[cfg(feature = "std")]
 use crate::bolts::current_nanos;
 
+#[cfg(feature = "rand_trait")]
+use rand_core::{self, impls::fill_bytes_via_next, RngCore};
+
 const HASH_CONST: u64 = 0xa5b35705;
 
 /// The standard rand implementation for `LibAFL`.
@@ -117,6 +120,25 @@ macro_rules! impl_randomseed {
             /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
             fn new() -> Self {
                 Self::with_seed(current_nanos())
+            }
+        }
+
+        #[cfg(feature = "rand_trait")]
+        impl RngCore for $rand {
+            fn next_u32(&mut self) -> u32 {
+                self::next() as u32
+            }
+
+            fn next_u64(&mut self) -> u64 {
+                self::next()
+            }
+
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                fill_bytes_via_next(&mut self, dest)
+            }
+
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+                Ok(self.fill_bytes(dest))
             }
         }
     };
