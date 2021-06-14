@@ -47,9 +47,7 @@ impl GzipCompressor {
 
         match decompressed {
             Ok(buf) => Ok(buf),
-            Err(_) => Err(Error::Compression(
-                "Failed to decompress the buffer".to_string(),
-            )),
+            Err(_) => Err(Error::Compression),
         }
     }
 }
