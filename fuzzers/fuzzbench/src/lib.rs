@@ -1,37 +1,41 @@
-//! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
-//! The example harness is built for `stb_image`.
+//! A singlethreade libfuzzer-like fuzzer that can auto-restart.
 
 use clap::{App, Arg};
-use std::{env, path::PathBuf};
+use core::time::Duration;
+use std::{env, fs::File, io::Write, path::PathBuf};
 
 use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
+        tuples::{tuple_list, Merge},
     },
     corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::{token_mutations::I2SRandReplace, Tokens},
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        token_mutations::I2SRandReplace,
+        tokens_mutations, Tokens,
+    },
     observers::{StdMapObserver, TimeObserver},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     Error,
 };
-
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
 };
 
+/// The fuzzer main (as `no_mangle` c function)
+#[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -42,26 +46,39 @@ pub fn main() {
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
-            Arg::with_name("corpus")
-                .short("c")
-                .long("corpus")
-                .help("The directory to place finds in")
+            Arg::new("corpus")
+                .about("The directory to place finds in")
+                .required(true)
+                .index(1)
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("seeds")
-                .short("s")
-                .long("seeds")
-                .help("The directory to read initial inputs from")
+            Arg::new("seeds")
+                .about("The directory to read initial inputs from")
+                .required(true)
+                .index(2)
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("tokens")
-                .short("x")
+            Arg::new("tokens")
+                .short('x')
                 .long("tokens")
-                .help("A file to read tokens from, to be used during fuzzing")
-                .takes_value(true)
-                .required(false),
+                .about("A file to read tokens from, to be used during fuzzing")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("logfile")
+                .short('l')
+                .long("logfile")
+                .about("Duplicates all output to this file")
+                .default_value("libafl.log"),
+        )
+        .arg(
+            Arg::new("timeout")
+                .short('t')
+                .long("timeout")
+                .about("Timeout for each individual execution, in milliseconds")
+                .default_value("1000"),
         )
         .get_matches();
 
@@ -80,7 +97,18 @@ pub fn main() {
 
     let tokens = res.value_of("tokens").map(PathBuf::from);
 
-    fuzz(corpus, crashes, seeds, tokens).expect("An error occurred while fuzzing");
+    let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
+
+    let timeout = Duration::from_millis(
+        res.value_of("timeout")
+            .unwrap()
+            .to_string()
+            .parse()
+            .expect("Could not parse timeout in milliseconds"),
+    );
+
+    fuzz(corpus, crashes, seeds, tokens, logfile, timeout)
+        .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
@@ -88,28 +116,36 @@ fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
     seed_dir: PathBuf,
-    token_file: Option<PathBuf>,
+    tokenfile: Option<PathBuf>,
+    logfile: PathBuf,
+    timeout: Duration,
 ) -> Result<(), Error> {
+    let mut log = File::create(logfile)?;
+
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = SimpleStats::new(|s| println!("{}", s));
+    let stats = SimpleStats::new(move |s| {
+        println!("{}", s);
+        writeln!(&mut log, "{}", s).unwrap();
+    });
 
     // We need a shared map to store our state before a crash.
     // This way, we are able to continue fuzzing afterwards.
-    let mut shmem_provider = StdShMemProvider::new().unwrap();
+    #[cfg(target_os = "android")]
+    AshmemService::start().expect("Failed to start Ashmem service");
+    let mut shmem_provider = StdShMemProvider::new()?;
 
-    let (state, mut restarting_mgr) =
-        match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
-            // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-            Ok(res) => res,
-            Err(err) => match err {
-                Error::ShuttingDown => {
-                    return Ok(());
-                }
-                _ => {
-                    panic!("Failed to setup the restarter: {}", err);
-                }
-            },
-        };
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
+        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {}", err);
+            }
+        },
+    };
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
@@ -135,7 +171,7 @@ fn fuzz(
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -153,7 +189,15 @@ fn fuzz(
         )
     });
 
-    println!("We're a client, let's fuzz :)");
+    println!("Let's fuzz :)");
+
+    // The actual target run starts here.
+    // Call LLVMFUzzerInitialize() if present.
+    // let args: Vec<String> = env::args().collect();
+    let args = [];
+    if libfuzzer_initialize(&args) == -1 {
+        println!("Warning: LLVMFuzzerInitialize failed with -1")
+    }
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
@@ -169,60 +213,59 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    // Create the executor for an in-process function with just one observer for edge coverage
-    let mut executor = ShadowExecutor::new(
+    let mut tracing_harness = harness;
+
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
+    let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
             &mut state,
-            &mut restarting_mgr,
+            &mut mgr,
         )?,
-        tuple_list!(cmplog_observer),
+        timeout,
     );
 
-    // The actual target run starts here.
-    // Call LLVMFUzzerInitialize() if present.
-    //let args: Vec<String> = env::args().collect();
-    let args = [];
-    if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1")
-    }
+    // Setup a tracing stage in which we log comparisons
+    let tracing = TracingStage::new(TimeoutExecutor::new(
+        InProcessExecutor::new(
+            &mut tracing_harness,
+            tuple_list!(cmplog_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+        )?,
+        // Give it more time!
+        timeout * 10,
+    ));
 
-    // Create a PNG dictionary if not existing
-    if let Some(token_file) = token_file {
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+    // Setup a basic mutator
+    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let mutational = StdMutationalStage::new(mutator);
+
+    // The order of the stages matter!
+    let mut stages = tuple_list!(tracing, i2s, mutational);
+
+    // Read tokens
+    if let Some(tokenfile) = tokenfile {
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::from_tokens_file(token_file).unwrap());
+            state.add_metadata(Tokens::from_tokens_file(tokenfile)?);
         }
     }
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut fuzzer,
-                &mut executor,
-                &mut restarting_mgr,
-                &[seed_dir.clone()],
-            )
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &seed_dir));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Setup a tracing stage in which we log comparisons
-    let tracing = ShadowTracingStage::new(&mut executor);
-
-    // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
-
-    // Setup a basic mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mutational = StdMutationalStage::new(mutator);
-
-    // The order of the stages matter!
-    let mut stages = tuple_list!(tracing, i2s, mutational);
-
-    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
     // Never reached
     Ok(())

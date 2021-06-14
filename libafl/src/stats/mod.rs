@@ -19,6 +19,12 @@ use crate::bolts::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
+/// Number of stages in the fuzzer
+pub(crate) const NUM_STAGES: usize = 8;
+
+/// Number of feedback mechanisms to measure for performance
+pub(crate) const NUM_FEEDBACKS: usize = 16;
+
 /// User-defined stats types
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
@@ -224,6 +230,7 @@ impl Stats for NopStats {
 
 impl NopStats {
     /// Create new [`NopStats`]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             start_time: current_time(),
@@ -349,54 +356,6 @@ macro_rules! mark_feedback_time {
         $state.introspection_stats_mut().mark_feedback_time();
     }};
 }
-
-/// Stats that print exactly nothing.
-/// Not good for debuging, very good for speed.
-pub struct NopStats {
-    start_time: Duration,
-    client_stats: Vec<ClientStats>,
-}
-
-impl Stats for NopStats {
-    /// the client stats, mutable
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
-
-    /// the client stats
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
-
-    /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration {
-        self.start_time
-    }
-
-    fn display(&mut self, _event_msg: String, _sender_id: u32) {}
-}
-
-impl NopStats {
-    /// Create new [`NopStats`]
-    pub fn new() -> Self {
-        Self {
-            start_time: current_time(),
-            client_stats: vec![],
-        }
-    }
-}
-
-impl Default for NopStats {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Number of stages in the fuzzer
-pub(crate) const NUM_STAGES: usize = 8;
-
-/// Number of feedback mechanisms to measure for performance
-pub(crate) const NUM_FEEDBACKS: usize = 16;
 
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -812,6 +771,7 @@ impl core::fmt::Display for ClientPerfStats {
 
 #[cfg(feature = "introspection")]
 impl Default for ClientPerfStats {
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }
