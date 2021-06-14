@@ -37,36 +37,12 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 875876f
-extern "C" {
-    // void __sanitizer_cov_trace_cmp4(uint32_t arg1, uint32_t arg2)
-    fn __sanitizer_cov_trace_cmp4(a: u32, b: u32);
-}
-
-<<<<<<< HEAD
-=======
->>>>>>> 81f7397 (generic inmemory fuzzer)
->>>>>>> 875876f
 /// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-<<<<<<< HEAD
-    
-    unsafe { __sanitizer_cov_trace_cmp4(0,0) };
-=======
-<<<<<<< HEAD
-=======
-    
-    unsafe { __sanitizer_cov_trace_cmp4(0,0) };
->>>>>>> 81f7397 (generic inmemory fuzzer)
->>>>>>> 875876f
 
     let workdir = env::current_dir().unwrap();
 

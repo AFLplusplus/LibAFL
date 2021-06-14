@@ -10,13 +10,17 @@ fn main() {
         let mut cc = ClangWrapper::new("clang", "clang++");
         cc.from_args(&args)
             .unwrap()
-            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
+            .add_link_arg("-Wl,--whole-archive".into())
             .unwrap()
             .add_link_arg(
                 dir.join(format!("{}generic_inmemory.{}", LIB_PREFIX, LIB_EXT))
                     .display()
                     .to_string(),
             )
+            .unwrap()
+            .add_link_arg("-Wl,-no-whole-archive".into())
+            .unwrap()
+            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
             .unwrap();
         // Libraries needed by libafl on Windows
         #[cfg(windows)]
