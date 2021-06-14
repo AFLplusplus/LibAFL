@@ -8,6 +8,11 @@ pub mod sancov_pcguard;
 #[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 pub use sancov_pcguard::*;
 
+#[cfg(any(feature = "sancov_cmplog", feature = "sancov_value_profile"))]
+pub mod sancov_cmp;
+#[cfg(any(feature = "sancov_cmplog", feature = "sancov_value_profile"))]
+pub use sancov_cmp::*;
+
 #[cfg(feature = "libfuzzer")]
 pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]

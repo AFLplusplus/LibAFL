@@ -141,7 +141,12 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.perform_mutational(fuzzer, executor, state, manager, corpus_idx)
+        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().finish_stage();
+
+        ret
     }
 }
 
