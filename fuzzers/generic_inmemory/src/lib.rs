@@ -37,11 +37,6 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
-extern "C" {
-    // void __sanitizer_cov_trace_cmp4(uint32_t arg1, uint32_t arg2)
-    fn __sanitizer_cov_trace_cmp4(a: u32, b: u32);
-}
-
 /// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
 pub fn main() {
@@ -49,8 +44,6 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
     
-    unsafe { __sanitizer_cov_trace_cmp4(0,0) };
-
     let workdir = env::current_dir().unwrap();
 
     let yaml = load_yaml!("clap-config.yaml");
