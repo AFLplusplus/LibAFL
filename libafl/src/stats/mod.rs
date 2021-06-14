@@ -196,6 +196,48 @@ pub trait Stats {
     }
 }
 
+/// Stats that print exactly nothing.
+/// Not good for debuging, very good for speed.
+pub struct NopStats {
+    start_time: Duration,
+    client_stats: Vec<ClientStats>,
+}
+
+impl Stats for NopStats {
+    /// the client stats, mutable
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        &mut self.client_stats
+    }
+
+    /// the client stats
+    fn client_stats(&self) -> &[ClientStats] {
+        &self.client_stats
+    }
+
+    /// Time this fuzzing run stated
+    fn start_time(&mut self) -> time::Duration {
+        self.start_time
+    }
+
+    fn display(&mut self, _event_msg: String, _sender_id: u32) {}
+}
+
+impl NopStats {
+    /// Create new [`NopStats`]
+    pub fn new() -> Self {
+        Self {
+            start_time: current_time(),
+            client_stats: vec![],
+        }
+    }
+}
+
+impl Default for NopStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Tracking stats during fuzzing.
 #[derive(Clone, Debug)]
 pub struct SimpleStats<F>

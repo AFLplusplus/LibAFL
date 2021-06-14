@@ -52,7 +52,7 @@ pub enum Error {
     Serialize(String),
     /// Compression error
     #[cfg(feature = "llmp_compression")]
-    Compression(String),
+    Compression,
     /// File related error
     #[cfg(feature = "std")]
     File(io::Error),
@@ -83,7 +83,7 @@ impl fmt::Display for Error {
         match self {
             Self::Serialize(s) => write!(f, "Error in Serialization: `{0}`", &s),
             #[cfg(feature = "llmp_compression")]
-            Self::Compression(s) => write!(f, "Error in Compression: `{0}`", &s),
+            Self::Compression => write!(f, "Error in decompression"),
             #[cfg(feature = "std")]
             Self::File(err) => write!(f, "File IO failed: {:?}", &err),
             Self::EmptyOptional(s) => write!(f, "Optional value `{0}` was not set", &s),
@@ -106,13 +106,6 @@ impl fmt::Display for Error {
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
         Self::Serialize(format!("{:?}", err))
-    }
-}
-
-#[cfg(feature = "llmp_compression")]
-impl From<compression::prelude::CompressionError> for Error {
-    fn from(err: compression::prelude::CompressionError) -> Self {
-        Self::Compression(format!("{:?}", err))
     }
 }
 
