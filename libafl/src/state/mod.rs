@@ -19,6 +19,7 @@ use crate::{
     fuzzer::Evaluator,
     generators::Generator,
     inputs::Input,
+    mutators::MOpt,
     stats::ClientPerfStats,
     Error,
 };
@@ -134,6 +135,16 @@ pub trait HasStartTime {
 
     /// The starting time (mut)
     fn start_time_mut(&mut self) -> &mut Duration;
+}
+
+pub trait HasMOpt<I, R>
+where
+    I: Input,
+    R: Rand,
+{
+    fn mopt(&self) -> &MOpt<I, R>;
+
+    fn mopt_mut(&self) -> &mut MOpt<I, R>;
 }
 
 /// The state a fuzz run.

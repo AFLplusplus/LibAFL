@@ -5,9 +5,9 @@ use crate::{
     corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
-    mutators::{MOpt, Mutator},
+    mutators::Mutator,
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfStats, HasCorpus, HasRand},
+    state::{HasClientPerfStats, HasCorpus, HasMOpt, HasRand},
     Error,
 };
 
@@ -18,11 +18,10 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
-    mopt: MOpt<I, R>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, E, EM, I, R, S, Z)>,
 }
@@ -34,7 +33,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -90,7 +89,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -112,20 +111,13 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
-    pub fn new(
-        mutator: M,
-        limit_time: u64,
-        rand: R,
-        operator_num: usize,
-        swarm_num: usize,
-    ) -> Self {
+    pub fn new(mutator: M) -> Self {
         Self {
             mutator,
-            mopt: MOpt::new(limit_time, rand, operator_num, swarm_num),
             phantom: PhantomData,
         }
     }

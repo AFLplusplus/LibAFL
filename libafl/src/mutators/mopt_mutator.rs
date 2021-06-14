@@ -10,7 +10,7 @@ use crate::{
     bolts::rands::Rand,
     inputs::Input,
     mutators::{MutationResult, Mutator, MutatorsTuple},
-    state::HasRand,
+    state::{HasMOpt, HasRand},
     Error,
 };
 use core::{
@@ -37,7 +37,7 @@ where
     SPLICE_CYCLES_puppet: i32,
     limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
     key_puppet: i32,     // If we are in the pacemaker fuzzing mode?
-    key_module: i32,     // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
+    key_module: MOptMode, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
     w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
     w_end: f64,  // w_* means inertia
     w_now: f64,
@@ -94,7 +94,7 @@ where
             SPLICE_CYCLES_puppet: 0,
             limit_time_sig: 1,
             key_puppet: key_puppet,
-            key_module: 0,
+            key_module: MOptMode::CORE_FUZZING,
             w_init: 0.9,
             w_end: 0.3,
             w_now: 0.0,
@@ -137,7 +137,7 @@ where
     }
 
     #[inline]
-    pub fn key_module(&self) -> i32 {
+    pub fn key_module(&self) -> MOptMode {
         self.key_module
     }
 
@@ -258,6 +258,7 @@ const STAGE_OverWriteExtra: usize = 16;
 const STAGE_InsertExtra: usize = 17;
 const period_pilot_tmp: f64 = 5000.0;
 
+#[derive(Clone, Copy, Debug)]
 pub enum MOptMode {
     PILOT_FUZZING,
     CORE_FUZZING,
@@ -268,9 +269,8 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand + Copy,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMOpt<I, R>,
 {
-    mode: MOptMode, // Same as MOpt.key_module. Key_module should be deleted later
     mutations: MT,
     phantom: PhantomData<(I, R, S)>,
 }
@@ -280,7 +280,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand + Copy,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMOpt<I, R>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -297,18 +297,19 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand + Copy,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMOpt<I, R>,
 {
     #[inline]
     fn mutate(
         &mut self,
-        _state: &mut S,
+        state: &mut S,
         _input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let result = match self.mode {
-            MOptMode::CORE_FUZZING => self.core_mutate(_state, _input, _stage_idx),
-            MOptMode::PILOT_FUZZING => self.pilot_mutate(_state, _input, _stage_idx),
+        let mode = state.mopt().key_module();
+        let result = match mode {
+            MOptMode::CORE_FUZZING => self.core_mutate(state, _input, _stage_idx),
+            MOptMode::PILOT_FUZZING => self.pilot_mutate(state, _input, _stage_idx),
         };
 
         result
@@ -320,11 +321,10 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand + Copy,
-    S: HasRand<R>,
+    S: HasRand<R> + HasMOpt<I, R>,
 {
-    pub fn new(state: S, mutations: MT) -> Self {
+    pub fn new(_state: S, mutations: MT) -> Self {
         Self {
-            mode: MOptMode::CORE_FUZZING,
             mutations: mutations,
             phantom: PhantomData,
         }
