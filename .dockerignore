@@ -1,0 +1,27 @@
+target
+Cargo.lock
+
+*.o
+*.a
+*.so
+*.out
+*.elf
+*.bin
+*.dll
+*.exe
+*.dSYM
+
+.cur_input
+
+crashes
+
+callgrind.out.*
+perf.data
+perf.data.old
+
+.vscode
+test.dict
+
+# Ignore all built fuzzers
+fuzzer_*
+AFLplusplus
