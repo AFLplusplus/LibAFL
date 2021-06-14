@@ -9,7 +9,7 @@ use alloc::{string::ToString, vec::Vec};
 use crate::{
     bolts::rands::Rand,
     inputs::Input,
-    mutators::{MutationResult, Mutator, MutatorsTuple},
+    mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasMOpt, HasRand},
     Error,
 };
@@ -66,8 +66,8 @@ where
     core_operator_finds_puppet: Vec<u64>,
     core_operator_finds_puppet_v2: Vec<u64>,
     core_operator_cycles_puppet: Vec<u64>,
-    core_operator_cycles_puppet_v2: Vec<u64>,
-    core_operator_cycles_puppet_v3: Vec<u64>,
+    core_operator_ctr: Vec<u64>,
+    core_operator_ctr_sum: Vec<u64>,
     phantom: PhantomData<I>,
 }
 
@@ -122,8 +122,8 @@ where
             core_operator_finds_puppet: vec![0; operator_num],
             core_operator_finds_puppet_v2: vec![0; operator_num],
             core_operator_cycles_puppet: vec![0; operator_num],
-            core_operator_cycles_puppet_v2: vec![0; operator_num],
-            core_operator_cycles_puppet_v3: vec![0; operator_num],
+            core_operator_ctr: vec![0; operator_num],
+            core_operator_ctr_sum: vec![0; operator_num],
             phantom: PhantomData,
         }
     }
@@ -139,6 +139,23 @@ where
     #[inline]
     pub fn key_module(&self) -> MOptMode {
         self.key_module
+    }
+
+    #[inline]
+    pub fn core_update_operator_ctr(&mut self) {
+        for i in 0..self.operator_num {
+            self.core_operator_ctr_sum[i] = self.core_operator_ctr[i];
+        }
+    }
+
+    #[inline]
+    pub fn core_inc_operator_ctr(&mut self, idx: usize) {
+        self.core_operator_ctr[idx] += 1;
+    }
+
+    #[inline]
+    pub fn operator_num(&self) -> usize {
+        self.operator_num
     }
 
     pub fn pso_update(&mut self) -> Result<(), Error> {
@@ -206,15 +223,19 @@ where
     }
 
     // The function select_algorithm() from https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397, it's more of select_mutator for libAFL
-    pub fn select_algorithm(&mut self, extras: usize) -> Result<usize, Error> {
+    pub fn select_algorithm(&mut self) -> Result<usize, Error> {
         let mut res = 0;
         let mut sentry = 0;
 
+        /*
+        // extras are for dictionaries, we don't need this piece of code for now
         let operator_num = if extras < 2 {
             self.operator_num - 2
         } else {
             self.operator_num
         };
+        */
+        let operator_num = self.operator_num;
 
         // Fetch a random sele value
         let sele: f64 = self.probability_now[self.swarm_now][operator_num - 1]
@@ -268,7 +289,7 @@ pub struct MOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand + Copy,
+    R: Rand,
     S: HasRand<R> + HasMOpt<I, R>,
 {
     mutations: MT,
@@ -279,7 +300,7 @@ impl<I, MT, R, S> Debug for MOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand + Copy,
+    R: Rand,
     S: HasRand<R> + HasMOpt<I, R>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -296,23 +317,17 @@ impl<I, MT, R, S> Mutator<I, S> for MOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand + Copy,
+    R: Rand,
     S: HasRand<R> + HasMOpt<I, R>,
 {
     #[inline]
     fn mutate(
         &mut self,
         state: &mut S,
-        _input: &mut I,
-        _stage_idx: i32,
+        input: &mut I,
+        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let mode = state.mopt().key_module();
-        let result = match mode {
-            MOptMode::CORE_FUZZING => self.core_mutate(state, _input, _stage_idx),
-            MOptMode::PILOT_FUZZING => self.pilot_mutate(state, _input, _stage_idx),
-        };
-
-        result
+        self.scheduled_mutate(state, input, stage_idx)
     }
 }
 
@@ -320,7 +335,7 @@ impl<I, MT, R, S> MOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand + Copy,
+    R: Rand,
     S: HasRand<R> + HasMOpt<I, R>,
 {
     pub fn new(_state: S, mutations: MT) -> Self {
@@ -331,12 +346,25 @@ where
     }
     fn core_mutate(
         &mut self,
-        _state: &mut S,
-        _input: &mut I,
-        _stage_idx: i32,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO
-        Ok(MutationResult::Mutated)
+        let mut r = MutationResult::Mutated;
+        state.mopt_mut().core_update_operator_ctr();
+        for i in 0..self.iterations(state, input) {
+            let idx = self.schedule(state, input);
+            let outcome = self
+                .mutations_mut()
+                .get_and_mutate(idx, state, input, stage_idx)?;
+            if outcome != MutationResult::Mutated {
+                r = MutationResult::Skipped;
+            }
+            state.mopt_mut().core_inc_operator_ctr(idx);
+        }
+
+        Ok(r)
     }
 
     fn pilot_mutate(
@@ -347,5 +375,58 @@ where
     ) -> Result<MutationResult, Error> {
         // TODO
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, MT, R, S> ComposedByMutations<I, MT, S> for MOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand,
+    S: HasRand<R> + HasMOpt<I, R>,
+{
+    /// Get the mutations
+    #[inline]
+    fn mutations(&self) -> &MT {
+        &self.mutations
+    }
+
+    // Get the mutations (mut)
+    #[inline]
+    fn mutations_mut(&mut self) -> &mut MT {
+        &mut self.mutations
+    }
+}
+
+impl<I, MT, R, S> ScheduledMutator<I, MT, S> for MOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand,
+    S: HasRand<R> + HasMOpt<I, R>,
+{
+    /// Compute the number of iterations used to apply stacked mutations
+    fn iterations(&self, state: &mut S, _: &I) -> u64 {
+        1 << (1 + state.rand_mut().below(6))
+    }
+
+    /// Get the next mutation to apply
+    fn schedule(&self, state: &mut S, _: &I) -> usize {
+        state.mopt_mut().select_algorithm().unwrap()
+    }
+
+    fn scheduled_mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let mode = state.mopt().key_module();
+        let result = match mode {
+            MOptMode::CORE_FUZZING => self.core_mutate(state, input, stage_idx),
+            MOptMode::PILOT_FUZZING => self.pilot_mutate(state, input, stage_idx),
+        };
+
+        result
     }
 }
