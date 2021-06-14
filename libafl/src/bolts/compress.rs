@@ -5,8 +5,9 @@
 use crate::Error;
 use alloc::vec::Vec;
 use core::fmt::Debug;
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use std::io::prelude::*;
+use miniz_oxide::{
+    deflate::compress_to_vec, deflate::CompressionLevel, inflate::decompress_to_vec,
+};
 
 /// Compression for your stream compression needs.
 #[derive(Debug)]
@@ -31,9 +32,7 @@ impl GzipCompressor {
     pub fn compress(&self, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if buf.len() >= self.threshold {
             //compress if the buffer is large enough
-            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(buf).unwrap();
-            let compressed = encoder.finish().unwrap();
+            let compressed = compress_to_vec(buf, CompressionLevel::BestSpeed as u8);
             Ok(Some(compressed))
         } else {
             Ok(None)
@@ -44,10 +43,14 @@ impl GzipCompressor {
     /// Flag is used to indicate if it's compressed or not
     #[allow(clippy::unused_self)]
     pub fn decompress(&self, buf: &[u8]) -> Result<Vec<u8>, Error> {
-        let mut decoder = GzDecoder::new(buf);
-        let mut decoded = Vec::<u8>::new();
-        decoder.read_to_end(&mut decoded)?;
-        Ok(decoded)
+        let decompressed = decompress_to_vec(buf);
+
+        match decompressed {
+            Ok(buf) => Ok(buf),
+            Err(_) => Err(Error::Compression(
+                "Failed to decompress the buffer".to_string(),
+            )),
+        }
     }
 }
 
