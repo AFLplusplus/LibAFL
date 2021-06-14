@@ -113,7 +113,7 @@ pub trait RandomSeed: Rand + Default {
 }
 
 // helper macro to impl RandomSeed
-macro_rules! impl_randomseed {
+macro_rules! impl_random {
     ($rand: ty) => {
         #[cfg(feature = "std")]
         impl RandomSeed for $rand {
@@ -144,11 +144,11 @@ macro_rules! impl_randomseed {
     };
 }
 
-impl_randomseed!(Xoshiro256StarRand);
-impl_randomseed!(XorShift64Rand);
-impl_randomseed!(Lehmer64Rand);
-impl_randomseed!(RomuTrioRand);
-impl_randomseed!(RomuDuoJrRand);
+impl_random!(Xoshiro256StarRand);
+impl_random!(XorShift64Rand);
+impl_random!(Lehmer64Rand);
+impl_random!(RomuTrioRand);
+impl_random!(RomuDuoJrRand);
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
