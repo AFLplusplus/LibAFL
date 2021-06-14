@@ -2,23 +2,16 @@
 
 This folder contains an example fuzzer tailored for fuzzbench.
 It uses the best possible setting, with the exception of a SimpleRestartingEventManager instead of an LlmpEventManager - since fuzzbench is single threaded.
-Real fuzz campaings should consider using multithreaded LlmpEventManager, see the other examples.
+Real fuzz campaigns should consider using multithreaded LlmpEventManager, see the other examples.
 
 ## Build
 
 To build this example, run `cargo build --release`.
-This will build the the fuzzer (src/main.rs) with the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback as a standalone binary.
+This will build the fuzzer compilers (`libafl_cc` and `libafl_cpp`) with `src/lib.rs` as fuzzer.
+The fuzzer uses the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback.
 
-Unlike the libpng example, in this example the harness (that entirely includes the program under test) is compiled in the `build.rs` file while building the crate, and linked with the fuzzer by cargo when producing the final binary, `target/release/libfuzzer_stb_image`.
-
-## Run
-
-The first time you run the binary (`target/release/libfuzzer_stb_image`), the broker will open a tcp port (currently on port `1337`), waiting for fuzzer clients to connect. This port is local and only used for the initial handshake. All further communication happens via shared map, to be independent of the kernel.
-
-Each following execution will run a fuzzer client.
-As this example uses in-process fuzzing, we added a Restarting Event Manager (`setup_restarting_mgr`).
-This means each client will start itself again to listen for crashes and timeouts.
-By restarting the actual fuzzer, it can recover from these exit conditions.
+These can then be used to build libfuzzer harnesses in the software project of your choice.
+Finally, just run the resulting binary with `out_dir`, `in_dir`.
 
 In any real-world scenario, you should use `taskset` to pin each client to an empty CPU core, the lib does not pick an empty core automatically (yet).
 
