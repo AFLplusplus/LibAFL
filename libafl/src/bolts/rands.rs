@@ -126,15 +126,15 @@ macro_rules! impl_randomseed {
         #[cfg(feature = "rand_trait")]
         impl RngCore for $rand {
             fn next_u32(&mut self) -> u32 {
-                self::next() as u32
+                self.next() as u32
             }
 
             fn next_u64(&mut self) -> u64 {
-                self::next()
+                self.next()
             }
 
             fn fill_bytes(&mut self, dest: &mut [u8]) {
-                fill_bytes_via_next(&mut self, dest)
+                fill_bytes_via_next(self, dest)
             }
 
             fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
