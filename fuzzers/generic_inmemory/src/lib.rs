@@ -43,7 +43,7 @@ pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-    
+
     let workdir = env::current_dir().unwrap();
 
     let yaml = load_yaml!("clap-config.yaml");
