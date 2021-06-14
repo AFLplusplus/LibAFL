@@ -79,15 +79,15 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let mut r = MutationResult::Skipped;
+        let mut r = MutationResult::Mutated;
         let num = self.iterations(state, input);
         for _ in 0..num {
             let idx = self.schedule(state, input);
             let outcome = self
                 .mutations_mut()
                 .get_and_mutate(idx, state, input, stage_idx)?;
-            if outcome == MutationResult::Mutated {
-                r = MutationResult::Mutated;
+            if outcome != MutationResult::Mutated {
+                r = MutationResult::Skipped;
             }
         }
         Ok(r)
@@ -398,7 +398,7 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let mut r = MutationResult::Skipped;
+        let mut r = MutationResult::Mutated;
         let num = self.iterations(state, input);
         self.mutation_log.clear();
         for _ in 0..num {
@@ -407,8 +407,8 @@ where
             let outcome = self
                 .mutations_mut()
                 .get_and_mutate(idx, state, input, stage_idx)?;
-            if outcome == MutationResult::Mutated {
-                r = MutationResult::Mutated;
+            if outcome != MutationResult::Mutated {
+                r = MutationResult::Skipped;
             }
         }
         Ok(r)
