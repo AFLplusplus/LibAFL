@@ -8,12 +8,13 @@ fn main() {
         dir.pop();
 
         let mut cc = ClangWrapper::new("clang", "clang++");
-        cc.from_args(&args)
+        cc.is_cpp()
+            .from_args(&args)
             .unwrap()
             .add_link_arg("-Wl,--whole-archive".into())
             .unwrap()
             .add_link_arg(
-                dir.join(format!("{}libfuzzer_libmozjpeg.{}", LIB_PREFIX, LIB_EXT))
+                dir.join(format!("{}generic_inmemory.{}", LIB_PREFIX, LIB_EXT))
                     .display()
                     .to_string(),
             )
@@ -22,6 +23,7 @@ fn main() {
             .unwrap()
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
             .unwrap();
+        // Libraries needed by libafl on Windows
         #[cfg(windows)]
         cc.add_link_arg("-lws2_32".into())
             .unwrap()
@@ -30,5 +32,7 @@ fn main() {
             .add_link_arg("-lAdvapi32".into())
             .unwrap();
         cc.run().unwrap();
+    } else {
+        panic!("LibAFL CC: No Arguments given");
     }
 }
