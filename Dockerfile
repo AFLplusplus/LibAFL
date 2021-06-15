@@ -4,7 +4,7 @@ LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
 # Install clang 11
-RUN apt update && apt install -y build-essential git wget clang-11 clang-tools-11 libc++-11-dev libc++abi-11-dev
+RUN apt update && apt install -y build-essential git wget clang clang-tools libc++-11-dev libc++abi-11-dev
 
 RUN cargo install sccache
 
@@ -16,7 +16,7 @@ ENV IS_DOCKER="1"
 RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
     echo "export PS1='"'[LibAFL \h] \w$(__git_ps1) \$ '"'" >> ~/.bashrc
 
-RUN --mount=type=cache,target=/root/.cache/sccache rustup component add rustfmt clippy
+RUN rustup component add rustfmt clippy
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
@@ -44,7 +44,7 @@ COPY scripts/dummy.rs libafl_targets/src/lib.rs
 COPY libafl_tests/Cargo.toml libafl_tests/build.rs libafl_tests/
 COPY scripts/dummy.rs libafl_tests/src/lib.rs
 
-RUN --mount=type=cache,target=/root/.cache/sccache cargo build && cargo build --release
+RUN cargo build && cargo build --release
 
 COPY scripts scripts
 COPY docs docs
@@ -71,11 +71,11 @@ COPY libafl_targets/src libafl_targets/src
 RUN touch libafl_targets/src/lib.rs
 COPY libafl_frida/src libafl_frida/src
 RUN touch libafl_frida/src/lib.rs
-RUN --mount=type=cache,target=/root/.cache/sccache cargo build && cargo build --release
+RUN cargo build && cargo build --release
 
 # Copy fuzzers over
 COPY fuzzers fuzzers
 
-RUN --mount=type=cache,target=/root/.cache/sccache ./scripts/build_all_fuzzers.sh
+#RUN --mount=type=cache,target=/root/.cache/sccache ./scripts/build_all_fuzzers.sh
 
 ENTRYPOINT [ "/bin/bash" ]

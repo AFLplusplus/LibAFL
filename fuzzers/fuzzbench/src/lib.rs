@@ -36,7 +36,7 @@ use libafl_targets::{
 
 /// The fuzzer main (as `no_mangle` c function)
 #[no_mangle]
-pub extern "c" fn fuzzer_main() {
+pub extern "C" fn fuzzer_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
