@@ -7,7 +7,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    bolts::rands::Rand,
+    bolts::{current_time, rands::Rand},
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasMOpt, HasRand},
@@ -16,6 +16,7 @@ use crate::{
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    time::Duration,
 };
 
 #[derive(Clone, Debug)]
@@ -26,10 +27,10 @@ where
 {
     rand: R,
     limit_time_puppet: u64, // Time before we move onto pacemaker fuzzing mode
-    origi_hit_cnt_puppet: u64,
-    last_limit_time_start: u64, // Unneeded variable
-    total_pacemaker_time: u64,  // Simply tmp_core_time + tmp_pilot_time
-    total_puppet_find: u64,
+    finds_since_switching: usize, // How many findings have we found since we switched to the current mode?
+    last_limit_time_start: Duration, // Unneeded variable
+    total_pacemaker_time: u64,    // Simply tmp_core_time + tmp_pilot_time
+    total_finds: usize,
     temp_puppet_find: u64,
     most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
     most_time_puppet: u64, // Unneeded for LibAFL
@@ -47,8 +48,8 @@ where
     swarm_num: usize,    // Number of swarms
     period_pilot: usize, // We'll generate test for period_pilot times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.2
     period_core: usize, // We'll generate test for period_core times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.3
-    temp_pilot_time: u64, // The number of testcase generated using pilot fzzing module so far
-    tmp_core_time: u64, // The number of testcase generated using core fuzzing module so far
+    pilot_time: usize,  // The number of testcase generated using pilot fzzing module so far
+    core_time: usize,   // The number of testcase generated using core fuzzing module so far
     swarm_now: usize,   // Current swarm
     x_now: Vec<Vec<f64>>, // The positions of PSO algo
     L_best: Vec<Vec<f64>>, // The local optimum
@@ -57,17 +58,17 @@ where
     v_now: Vec<Vec<f64>>, // The speed
     probability_now: Vec<Vec<f64>>,
     swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
-    stage_finds_puppet: Vec<Vec<u64>>,
-    stage_finds_puppet_v2: Vec<Vec<u64>>,
-    stage_cycles_puppet: Vec<Vec<u64>>,
-    stage_cycles_puppet_v2: Vec<Vec<u64>>,
-    stage_cycles_puppet_v3: Vec<Vec<u64>>,
-    operator_finds_puppet: Vec<u64>,
-    core_operator_finds_puppet: Vec<u64>,
-    core_operator_finds_puppet_v2: Vec<u64>,
-    core_operator_cycles_puppet: Vec<u64>,
-    core_operator_ctr: Vec<u64>,
-    core_operator_ctr_sum: Vec<u64>,
+    stage_finds_puppet: Vec<Vec<usize>>,
+    stage_finds_puppet_v2: Vec<Vec<usize>>,
+    stage_cycles_puppet: Vec<Vec<usize>>,
+    stage_cycles_puppet_v2: Vec<Vec<usize>>,
+    stage_cycles_puppet_v3: Vec<Vec<usize>>,
+    operator_finds_puppet: Vec<usize>,
+    core_operator_finds_puppet: Vec<usize>,
+    core_operator_finds_puppet_v2: Vec<usize>,
+    core_operator_cycles_puppet: Vec<usize>,
+    core_operator_ctr: Vec<usize>,
+    core_operator_ctr_last: Vec<usize>,
     phantom: PhantomData<I>,
 }
 
@@ -82,11 +83,10 @@ where
         Self {
             rand: rand,
             limit_time_puppet: 0,
-            origi_hit_cnt_puppet: 0,
-            last_limit_time_start: 0,
-            temp_pilot_time: 0,
+            finds_since_switching: 0,
+            last_limit_time_start: Duration::from_millis(0),
             total_pacemaker_time: 0,
-            total_puppet_find: 0,
+            total_finds: 0,
             temp_puppet_find: 0,
             most_time_key: 0,
             most_time_puppet: 0,
@@ -104,7 +104,8 @@ where
             swarm_num: swarm_num,
             period_pilot: 50000,
             period_core: 500000,
-            tmp_core_time: 0,
+            pilot_time: 0,
+            core_time: 0,
             swarm_now: 0,
             x_now: vec![vec![0.0; operator_num]; swarm_num],
             L_best: vec![vec![0.0; operator_num]; swarm_num],
@@ -123,7 +124,7 @@ where
             core_operator_finds_puppet_v2: vec![0; operator_num],
             core_operator_cycles_puppet: vec![0; operator_num],
             core_operator_ctr: vec![0; operator_num],
-            core_operator_ctr_sum: vec![0; operator_num],
+            core_operator_ctr_last: vec![0; operator_num],
             phantom: PhantomData,
         }
     }
@@ -142,20 +143,67 @@ where
     }
 
     #[inline]
-    pub fn core_update_operator_ctr(&mut self) {
-        for i in 0..self.operator_num {
-            self.core_operator_ctr_sum[i] = self.core_operator_ctr[i];
-        }
+    pub fn core_operator_ctr(&self, idx: usize) -> usize {
+        self.core_operator_ctr[idx]
     }
 
-    #[inline]
-    pub fn core_inc_operator_ctr(&mut self, idx: usize) {
-        self.core_operator_ctr[idx] += 1;
+    pub fn core_operator_ctr_last(&self, idx: usize) -> usize {
+        self.core_operator_ctr_last[idx]
     }
 
     #[inline]
     pub fn operator_num(&self) -> usize {
         self.operator_num
+    }
+
+    #[inline]
+    pub fn finds_since_switching(&self) -> usize {
+        self.finds_since_switching
+    }
+
+    #[inline]
+    pub fn last_limit_time_start(&self) -> Duration {
+        self.last_limit_time_start
+    }
+
+    #[inline]
+    pub fn update_core_operator_ctr(&mut self) {
+        for i in 0..self.operator_num {
+            self.core_operator_ctr_last[i] = self.core_operator_ctr[i];
+        }
+    }
+
+    #[inline]
+    pub fn set_last_limit_time_start(&mut self) {
+        self.last_limit_time_start = current_time();
+    }
+
+    #[inline]
+    pub fn add_finds_since_switching(&mut self, v: usize) {
+        self.finds_since_switching += v;
+    }
+
+    #[inline]
+    pub fn add_core_operator_finds(&mut self, idx: usize, v: usize) {
+        self.core_operator_finds_puppet_v2[idx] += v;
+    }
+
+    #[inline]
+    pub fn add_core_operator_ctr(&mut self, idx: usize, v: usize) {
+        self.core_operator_ctr[idx] += v;
+    }
+
+    #[inline]
+    pub fn add_core_time(&mut self, v: usize) {
+        self.core_time += v;
+    }
+
+    pub fn add_pilot_time(&mut self, v: usize) {
+        self.pilot_time += v;
+    }
+
+    pub fn add_total_finds(&mut self, v: usize) {
+        self.total_finds += v;
     }
 
     #[allow(clippy::cast_precision_loss)]
@@ -228,14 +276,6 @@ where
         let mut res = 0;
         let mut sentry = 0;
 
-        /*
-        // extras are for dictionaries, we don't need this piece of code for now
-        let operator_num = if extras < 2 {
-            self.operator_num - 2
-        } else {
-            self.operator_num
-        };
-        */
         let operator_num = self.operator_num;
 
         // Fetch a random sele value
@@ -353,7 +393,7 @@ where
     ) -> Result<MutationResult, Error> {
         // TODO
         let mut r = MutationResult::Mutated;
-        state.mopt_mut().core_update_operator_ctr();
+        state.mopt_mut().update_core_operator_ctr();
         for i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
             let outcome = self
@@ -362,7 +402,7 @@ where
             if outcome != MutationResult::Mutated {
                 r = MutationResult::Skipped;
             }
-            state.mopt_mut().core_inc_operator_ctr(idx);
+            state.mopt_mut().add_core_operator_ctr(idx, 1);
         }
 
         Ok(r)

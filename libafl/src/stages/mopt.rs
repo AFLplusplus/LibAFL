@@ -5,11 +5,13 @@ use crate::{
     corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
-    mutators::Mutator,
+    mutators::{MOptMode, Mutator},
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfStats, HasCorpus, HasMOpt, HasRand},
+    state::{HasClientPerfStats, HasCorpus, HasMOpt, HasRand, HasSolutions},
     Error,
 };
+
+const limit_time_bound: f64 = 1.1;
 
 #[derive(Clone, Debug)]
 pub struct MOptStage<C, E, EM, I, M, R, S, Z>
@@ -18,7 +20,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
@@ -33,7 +35,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -64,22 +66,52 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        let num = self.iterations(state);
+        match state.mopt().key_module() {
+            MOptMode::CORE_FUZZING => {
+                if state.mopt().finds_since_switching() == 0 {
+                    // Now, we have just switched back from PILOT_FUZZING mode
+                    let finds = state.corpus().count() + state.solutions().count();
+                    state.mopt_mut().add_finds_since_switching(finds);
+                    state.mopt_mut().set_last_limit_time_start();
+                }
 
-        for i in 0..num {
-            let mut input = state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow_mut()
-                .load_input()?
-                .clone();
+                let num = self.iterations(state);
 
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+                for i in 0..num {
+                    let mut input = state
+                        .corpus()
+                        .get(corpus_idx)?
+                        .borrow_mut()
+                        .load_input()?
+                        .clone();
 
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
+                    self.mutator_mut().mutate(state, &mut input, i as i32)?;
 
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+                    state.mopt_mut().add_core_time(1);
+
+                    let finds_before = state.corpus().count() + state.solutions().count();
+
+                    let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
+
+                    let finds = state.corpus().count() + state.solutions().count();
+                    if state.corpus().count() + state.solutions().count() > finds_before {
+                        let diff = finds - finds_before;
+                        state.mopt_mut().add_total_finds(diff);
+                        for i in 0..state.mopt().operator_num() {
+                            if state.mopt().core_operator_ctr(i)
+                                > state.mopt().core_operator_ctr_last(i)
+                            {
+                                state.mopt_mut().add_core_operator_finds(i, diff);
+                            }
+                        }
+                    }
+
+                    self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+                }
+            }
+            MOptMode::PILOT_FUZZING => {}
         }
+
         Ok(())
     }
 }
@@ -90,7 +122,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -112,7 +144,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
