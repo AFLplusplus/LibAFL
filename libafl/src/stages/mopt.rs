@@ -54,7 +54,7 @@ where
 
         1 + state.rand_mut().below(128) as usize
     }
-    
+
     #[allow(clippy::cast_possible_wrap)]
     fn perform_mutational(
         &mut self,

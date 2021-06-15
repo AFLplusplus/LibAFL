@@ -158,7 +158,6 @@ where
         self.operator_num
     }
 
-
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
         self.g_now += 1;
