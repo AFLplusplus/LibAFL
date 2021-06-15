@@ -158,13 +158,15 @@ where
         self.operator_num
     }
 
+
+    #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
         self.g_now += 1;
         if self.g_now > self.g_max {
             self.g_now = 0;
         }
-        self.w_now = (self.w_init - self.w_end) * ((self.g_max - self.g_now) as f64)
-            / (self.g_max as f64)
+        self.w_now = (self.w_init - self.w_end) * f64::from(self.g_max - self.g_now)
+            / f64::from(self.g_max)
             + self.w_end;
 
         let mut operator_find_sum = 0;
@@ -338,7 +340,7 @@ where
     R: Rand,
     S: HasRand<R> + HasMOpt<I, R>,
 {
-    pub fn new(_state: S, mutations: MT) -> Self {
+    pub fn new(mutations: MT) -> Self {
         Self {
             mutations: mutations,
             phantom: PhantomData,

@@ -144,7 +144,7 @@ where
 {
     fn mopt(&self) -> &MOpt<I, R>;
 
-    fn mopt_mut(&self) -> &mut MOpt<I, R>;
+    fn mopt_mut(&mut self) -> &mut MOpt<I, R>;
 }
 
 /// The state a fuzz run.
