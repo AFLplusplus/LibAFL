@@ -1,11 +1,10 @@
 # syntax=docker/dockerfile:1.2
 FROM rust:bullseye AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
-LABEL "about"="AFLplusplus docker image"
+LABEL "about"="LibAFL Docker image"
 
-# Install clang 12
-RUN apt update && apt install -y lsb-release wget software-properties-common && \
-    wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 12
+# Install clang 11
+RUN apt update && apt install -y build-essential git wget clang-11 clang-tools-11 libc++-11-dev libc++abi-11-dev
 
 RUN cargo install sccache
 
@@ -77,8 +76,6 @@ RUN --mount=type=cache,target=/root/.cache/sccache cargo build && cargo build --
 # Copy fuzzers over
 COPY fuzzers fuzzers
 
-RUN apt-get install -y clang
-RUN sudo apt install libc++-11-dev libc++abi-11-dev
 RUN --mount=type=cache,target=/root/.cache/sccache ./scripts/build_all_fuzzers.sh
 
 ENTRYPOINT [ "/bin/bash" ]
