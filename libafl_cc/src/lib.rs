@@ -48,7 +48,7 @@ pub trait CompilerWrapper {
     /// Get if in linking mode
     fn is_linking(&self) -> bool;
 
-    /// Silences libafl_cc output
+    /// Silences `libafl_cc` output
     fn silence(&mut self) -> &'_ mut Self;
 
     /// Returns `true` if `silence` was called
