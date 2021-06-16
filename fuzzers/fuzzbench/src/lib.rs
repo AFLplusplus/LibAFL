@@ -99,12 +99,12 @@ pub extern "C" fn fuzzer_main() {
     );
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
-    let mut corpus = PathBuf::from(res.value_of("corpus").unwrap().to_string());
+    let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
     let mut crashes = corpus.clone();
     crashes.push("crashes");
-    corpus.push("queue");
+    out_dir.push("queue");
 
-    let seeds = PathBuf::from(res.value_of("seeds").unwrap().to_string());
+    let in_dir = PathBuf::from(res.value_of("in").unwrap().to_string());
 
     let tokens = res.value_of("tokens").map(PathBuf::from);
 
@@ -118,7 +118,7 @@ pub extern "C" fn fuzzer_main() {
             .expect("Could not parse timeout in milliseconds"),
     );
 
-    fuzz(corpus, crashes, seeds, tokens, logfile, timeout)
+    fuzz(out_dir, crashes, in_dir, tokens, logfile, timeout)
         .expect("An error occurred while fuzzing");
 }
 
