@@ -3,9 +3,7 @@ FROM rust:bullseye AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
-# Install clang 11
-RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev
-
+# install sccache to cache subsequent builds of dependencies
 RUN cargo install sccache
 
 ENV HOME=/root
@@ -14,9 +12,14 @@ ENV SCCACHE_DIR=$HOME/.cache/sccache
 ENV RUSTC_WRAPPER="/usr/local/cargo/bin/sccache"
 ENV IS_DOCKER="1"
 RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
-    echo "export PS1='"'[LibAFL \h] \w$(__git_ps1) \$ '"'" >> ~/.bashrc
+    echo "export PS1='"'[LibAFL \h] \w$(__git_ps1) \$ '"'" >> ~/.bashrc && \
+    mkdir ~/.cargo && \
+    echo "[build]\nrustc-wrapper = \"${RUSTC_WRAPPER}\"" >> ~/.cargo/config
 
 RUN rustup component add rustfmt clippy
+
+# Install clang 11, common build tools
+RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
