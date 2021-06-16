@@ -38,7 +38,7 @@ use crate::{asan_rt::AsanRuntime, FridaOptions};
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
 
-#[cfg(feature = "cmplog")]
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 enum CmplogOperandType {
     Regid(capstone::RegId),
     Imm(u64),

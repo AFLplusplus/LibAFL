@@ -59,13 +59,13 @@ where
         OT: ObserversTuple,
     {
         // Start a timer for this feedback
-        let start_time = crate::cpu::read_time_counter();
+        let start_time = crate::bolts::cpu::read_time_counter();
 
         // Execute this feedback
         let ret = self.is_interesting(state, manager, input, observers, exit_kind);
 
         // Get the elapsed time for checking this feedback
-        let elapsed = crate::cpu::read_time_counter() - start_time;
+        let elapsed = crate::bolts::cpu::read_time_counter() - start_time;
 
         // TODO: A more meaningful way to get perf for each feedback
 

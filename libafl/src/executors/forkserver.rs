@@ -204,10 +204,11 @@ impl Forkserver {
             .spawn()
         {
             Ok(_) => {}
-            Err(_) => {
-                return Err(Error::Forkserver(
-                    "Could not spawn a forkserver!".to_string(),
-                ));
+            Err(err) => {
+                return Err(Error::Forkserver(format!(
+                    "Could not spawn forkserver: {:#?}",
+                    err
+                )));
             }
         };
 
@@ -352,6 +353,9 @@ where
             .executor
             .forkserver_mut()
             .write_ctl(last_run_timed_out)?;
+
+        self.executor.forkserver_mut().set_last_run_timed_out(0);
+
         if send_len != 4 {
             return Err(Error::Forkserver(
                 "Unable to request new process from fork server (OOM?)".to_string(),

@@ -4,8 +4,10 @@
 #[cfg(feature = "llmp_compression")]
 use crate::Error;
 use alloc::vec::Vec;
-use compression::prelude::*;
 use core::fmt::Debug;
+use miniz_oxide::{
+    deflate::compress_to_vec, deflate::CompressionLevel, inflate::decompress_to_vec,
+};
 
 /// Compression for your stream compression needs.
 #[derive(Debug)]
@@ -30,11 +32,7 @@ impl GzipCompressor {
     pub fn compress(&self, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         if buf.len() >= self.threshold {
             //compress if the buffer is large enough
-            let compressed = buf
-                .iter()
-                .copied()
-                .encode(&mut GZipEncoder::new(), Action::Finish)
-                .collect::<Result<Vec<_>, _>>()?;
+            let compressed = compress_to_vec(buf, CompressionLevel::BestSpeed as u8);
             Ok(Some(compressed))
         } else {
             Ok(None)
@@ -45,11 +43,12 @@ impl GzipCompressor {
     /// Flag is used to indicate if it's compressed or not
     #[allow(clippy::unused_self)]
     pub fn decompress(&self, buf: &[u8]) -> Result<Vec<u8>, Error> {
-        Ok(buf
-            .iter()
-            .copied()
-            .decode(&mut GZipDecoder::new())
-            .collect::<Result<Vec<_>, _>>()?)
+        let decompressed = decompress_to_vec(buf);
+
+        match decompressed {
+            Ok(buf) => Ok(buf),
+            Err(_) => Err(Error::Compression),
+        }
     }
 }
 

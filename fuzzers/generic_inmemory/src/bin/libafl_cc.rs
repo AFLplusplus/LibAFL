@@ -11,7 +11,7 @@ fn main() {
         cc.is_cpp(false)
             .from_args(&args)
             .unwrap()
-            .link_staticlib(&dir, "libfuzzer_libpng".into())
+            .link_staticlib(&dir, "generic_inmemory".into())
             .unwrap()
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
             .unwrap();

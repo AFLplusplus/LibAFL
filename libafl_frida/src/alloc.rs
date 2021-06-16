@@ -170,8 +170,11 @@ impl Allocator {
         } else {
             size
         };
-        if size > (1 << 30) {
-            panic!("Allocation is too large: 0x{:x}", size);
+        if size > self.options.asan_max_allocation() {
+            if self.options.asan_max_allocation_panics() {
+                panic!("Allocation is too large: 0x{:x}", size);
+            }
+            return std::ptr::null_mut();
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
 
@@ -290,7 +293,12 @@ impl Allocator {
     }
 
     pub fn reset(&mut self) {
+        let mut tmp_allocations = Vec::new();
         for (address, mut allocation) in self.allocations.drain() {
+            if !allocation.freed {
+                tmp_allocations.push(allocation);
+                continue;
+            }
             // First poison the memory.
             Self::poison(map_to_shadow!(self, address), allocation.size);
 
@@ -305,6 +313,10 @@ impl Allocator {
                 .entry(allocation.actual_size)
                 .or_default()
                 .push(allocation);
+        }
+
+        for allocation in tmp_allocations {
+            self.allocations.insert(allocation.address, allocation);
         }
     }
 

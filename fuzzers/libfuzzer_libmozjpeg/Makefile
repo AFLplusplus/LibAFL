@@ -1,13 +1,13 @@
 PWD=`pwd`
-FUZZER_NAME="fuzzer_libpng"
+FUZZER_NAME="fuzzer_mozjpeg"
 
 PHONY: all
 
 all: fuzzer
 
-libpng-1.6.37:
-	wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-	tar -xvf libpng-1.6.37.tar.xz
+mozjpeg-4.0.3:
+	wget https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz
+	tar -xzvf v4.0.3.tar.gz
 
 target/release/libafl_cxx: src/* src/bin/*
 	# Build the libpng libfuzzer library
@@ -17,26 +17,26 @@ libafl_cxx: target/release/libafl_cxx
 
 libafl_cc: target/release/libafl_cxx
 
-libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37 libafl_cc
-	cd libpng-1.6.37 && ./configure && cd ..
-	$(MAKE) -C libpng-1.6.37 CC=$(realpath target/release/libafl_cc) CXX=$(realpath target/release/libafl_cxx)
+mozjpeg-4.0.3-compiled: mozjpeg-4.0.3 libafl_cc
+	cd $(PWD)/mozjpeg-4.0.3 && cmake --disable-shared . -DCMAKE_C_COMPILER=$(abspath $(PWD)/../target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(abspath $(PWD)/../target/release/libafl_cxx) -G "Unix Makefiles"
+	$(MAKE) -C $(PWD)/mozjpeg-4.0.3
 	
 
-fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
-	# Build the libpng libfuzzer library
+fuzzer: mozjpeg-4.0.3-compiled libafl_cxx
+	# Build the mozjpeg libfuzzer library
 	cargo build --release
 
-    # Build the libpng harness	
+  # Build the mozjpeg harness	
 	target/release/libafl_cxx \
 		$(PWD)/harness.cc \
-		$(PWD)/libpng-1.6.37/.libs/libpng16.a \
-		-I$(PWD)/libpng-1.6.37/ \
+		$(PWD)/mozjpeg-4.0.3/*.a \
+		-I$(PWD)/mozjpeg-4.0.3/ \
 		-o $(FUZZER_NAME) \
 		-lm -lz
 
 clean:
 	rm ./$(FUZZER_NAME)
-	$(MAKE) -C libpng-1.6.37 clean
+	$(MAKE) -C mozjpeg-4.0.3 clean
 
 run: all
 	./$(FUZZER_NAME) &
