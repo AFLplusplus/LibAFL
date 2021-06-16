@@ -57,7 +57,7 @@ where
         1 + state.rand_mut().below(128) as usize
     }
 
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss)]
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,
@@ -71,7 +71,7 @@ where
                 if state.mopt().finds_since_switching() == 0 {
                     // Now, we have just switched back from PILOT_FUZZING mode
                     let finds = state.corpus().count() + state.solutions().count();
-                    state.mopt_mut().add_finds_since_switching(finds);
+                    state.mopt_mut().set_finds_since_switching(finds);
                     state.mopt_mut().set_last_limit_time_start();
                 }
 
@@ -87,26 +87,46 @@ where
 
                     self.mutator_mut().mutate(state, &mut input, i as i32)?;
 
-                    state.mopt_mut().add_core_time(1);
+                    let core_time = state.mopt().core_time();
+                    state.mopt_mut().set_core_time(core_time);
 
                     let finds_before = state.corpus().count() + state.solutions().count();
 
                     let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
+                    self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+
                     let finds = state.corpus().count() + state.solutions().count();
-                    if state.corpus().count() + state.solutions().count() > finds_before {
+                    if finds > finds_before {
                         let diff = finds - finds_before;
                         state.mopt_mut().add_total_finds(diff);
                         for i in 0..state.mopt().operator_num() {
                             if state.mopt().core_operator_ctr(i)
                                 > state.mopt().core_operator_ctr_last(i)
                             {
-                                state.mopt_mut().add_core_operator_finds(i, diff);
+                                let prev = state.mopt().core_operator_finds_per_stage(i);
+                                state
+                                    .mopt_mut()
+                                    .set_core_operator_finds_per_stage(i, diff + prev);
                             }
                         }
                     }
 
-                    self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+                    if (finds as f64)
+                        > (finds as f64) * limit_time_bound
+                            + (state.mopt().finds_since_switching() as f64)
+                    {
+                        // Move to the Pilot fuzzing mode
+                        state.mopt_mut().set_key_module(MOptMode::PILOT_FUZZING);
+                        state.mopt_mut().set_finds_since_switching(0);
+                    }
+
+                    if (state.mopt().core_time() > state.mopt().period_core()) {
+                        // Make a call to pso_update()
+                        state.mopt_mut().set_core_time(0);
+                        state.mopt_mut().update_core_operator_ctr_pso();
+                        state.mopt_mut().pso_update();
+                    }
                 }
             }
             MOptMode::PILOT_FUZZING => {}

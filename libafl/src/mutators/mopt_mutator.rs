@@ -29,12 +29,10 @@ where
     limit_time_puppet: u64, // Time before we move onto pacemaker fuzzing mode
     finds_since_switching: usize, // How many findings have we found since we switched to the current mode?
     last_limit_time_start: Duration, // Unneeded variable
-    total_pacemaker_time: u64,    // Simply tmp_core_time + tmp_pilot_time
     total_finds: usize,
     temp_puppet_find: u64,
     most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
     most_time_puppet: u64, // Unneeded for LibAFL
-    old_hit_count: u64, // Unneeded variable
     SPLICE_CYCLES_puppet: i32,
     limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
     key_puppet: i32,     // If we are in the pacemaker fuzzing mode?
@@ -64,10 +62,10 @@ where
     stage_cycles_puppet_v2: Vec<Vec<usize>>,
     stage_cycles_puppet_v3: Vec<Vec<usize>>,
     operator_finds_puppet: Vec<usize>,
-    core_operator_finds_puppet: Vec<usize>,
-    core_operator_finds_puppet_v2: Vec<usize>,
-    core_operator_cycles_puppet: Vec<usize>,
-    core_operator_ctr: Vec<usize>,
+    core_operator_finds_pso: Vec<usize>,
+    core_operator_finds_per_stage: Vec<usize>,
+    core_operator_ctr_pso: Vec<usize>,
+    core_operator_ctr_per_stage: Vec<usize>,
     core_operator_ctr_last: Vec<usize>,
     phantom: PhantomData<I>,
 }
@@ -85,12 +83,10 @@ where
             limit_time_puppet: 0,
             finds_since_switching: 0,
             last_limit_time_start: Duration::from_millis(0),
-            total_pacemaker_time: 0,
             total_finds: 0,
             temp_puppet_find: 0,
             most_time_key: 0,
             most_time_puppet: 0,
-            old_hit_count: 0,
             SPLICE_CYCLES_puppet: 0,
             limit_time_sig: 1,
             key_puppet: key_puppet,
@@ -120,10 +116,10 @@ where
             stage_cycles_puppet_v2: vec![vec![0; operator_num]; swarm_num],
             stage_cycles_puppet_v3: vec![vec![0; operator_num]; swarm_num],
             operator_finds_puppet: vec![0; operator_num],
-            core_operator_finds_puppet: vec![0; operator_num],
-            core_operator_finds_puppet_v2: vec![0; operator_num],
-            core_operator_cycles_puppet: vec![0; operator_num],
-            core_operator_ctr: vec![0; operator_num],
+            core_operator_finds_pso: vec![0; operator_num],
+            core_operator_finds_per_stage: vec![0; operator_num],
+            core_operator_ctr_pso: vec![0; operator_num],
+            core_operator_ctr_per_stage: vec![0; operator_num],
             core_operator_ctr_last: vec![0; operator_num],
             phantom: PhantomData,
         }
@@ -144,7 +140,7 @@ where
 
     #[inline]
     pub fn core_operator_ctr(&self, idx: usize) -> usize {
-        self.core_operator_ctr[idx]
+        self.core_operator_ctr_per_stage[idx]
     }
 
     pub fn core_operator_ctr_last(&self, idx: usize) -> usize {
@@ -154,6 +150,26 @@ where
     #[inline]
     pub fn operator_num(&self) -> usize {
         self.operator_num
+    }
+
+    #[inline]
+    pub fn core_time(&self) -> usize {
+        self.core_time
+    }
+
+    #[inline]
+    pub fn pilot_time(&self) -> usize {
+        self.pilot_time
+    }
+
+    #[inline]
+    pub fn period_core(&self) -> usize {
+        self.period_core
+    }
+
+    #[inline]
+    pub fn period_pilot(&self) -> usize {
+        self.period_pilot
     }
 
     #[inline]
@@ -167,9 +183,22 @@ where
     }
 
     #[inline]
-    pub fn update_core_operator_ctr(&mut self) {
+    pub fn core_operator_finds_per_stage(&self, idx: usize) -> usize {
+        self.core_operator_finds_per_stage[idx]
+    }
+
+    #[inline]
+    pub fn update_core_operator_ctr_last(&mut self) {
         for i in 0..self.operator_num {
-            self.core_operator_ctr_last[i] = self.core_operator_ctr[i];
+            self.core_operator_ctr_last[i] = self.core_operator_ctr_per_stage[i];
+        }
+    }
+
+    #[inline]
+    pub fn update_core_operator_ctr_pso(&mut self) {
+        for i in 0..self.operator_num {
+            self.core_operator_finds_pso[i] = self.core_operator_finds_per_stage[i];
+            self.core_operator_ctr_pso[i] = self.core_operator_ctr_per_stage[i];
         }
     }
 
@@ -179,27 +208,32 @@ where
     }
 
     #[inline]
-    pub fn add_finds_since_switching(&mut self, v: usize) {
-        self.finds_since_switching += v;
+    pub fn set_key_module(&mut self, mode: MOptMode) {
+        self.key_module = mode;
     }
 
     #[inline]
-    pub fn add_core_operator_finds(&mut self, idx: usize, v: usize) {
-        self.core_operator_finds_puppet_v2[idx] += v;
+    pub fn set_finds_since_switching(&mut self, v: usize) {
+        self.finds_since_switching = v;
+    }
+
+    #[inline]
+    pub fn set_core_operator_finds_per_stage(&mut self, idx: usize, v: usize) {
+        self.core_operator_finds_per_stage[idx] = v;
     }
 
     #[inline]
     pub fn add_core_operator_ctr(&mut self, idx: usize, v: usize) {
-        self.core_operator_ctr[idx] += v;
+        self.core_operator_ctr_per_stage[idx] += v;
     }
 
     #[inline]
-    pub fn add_core_time(&mut self, v: usize) {
-        self.core_time += v;
+    pub fn set_core_time(&mut self, v: usize) {
+        self.core_time = v;
     }
 
-    pub fn add_pilot_time(&mut self, v: usize) {
-        self.pilot_time += v;
+    pub fn set_pilot_time(&mut self, v: usize) {
+        self.pilot_time = v;
     }
 
     pub fn add_total_finds(&mut self, v: usize) {
@@ -219,7 +253,7 @@ where
         let mut operator_find_sum = 0;
 
         for i in 0..self.operator_num {
-            self.operator_finds_puppet[i] = self.core_operator_cycles_puppet[i];
+            self.operator_finds_puppet[i] = self.core_operator_ctr_pso[i];
 
             for j in 0..self.swarm_num {
                 self.operator_finds_puppet[i] += self.stage_finds_puppet[j][i];
@@ -309,7 +343,7 @@ where
 
 const v_max: f64 = 1.0;
 const v_min: f64 = 0.05;
-const limit_time_bound: f64 = 1.1;
+
 const SPLICE_CYCLES_puppet_up: usize = 25;
 const SPLICE_CYCLES_puppet_low: usize = 5;
 const STAGE_RANDOMBYTE: usize = 12;
@@ -393,7 +427,7 @@ where
     ) -> Result<MutationResult, Error> {
         // TODO
         let mut r = MutationResult::Mutated;
-        state.mopt_mut().update_core_operator_ctr();
+        state.mopt_mut().update_core_operator_ctr_last();
         for i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
             let outcome = self
