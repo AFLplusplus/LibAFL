@@ -19,6 +19,12 @@ use crate::bolts::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
+/// Number of stages in the fuzzer
+pub(crate) const NUM_STAGES: usize = 8;
+
+/// Number of feedback mechanisms to measure for performance
+pub(crate) const NUM_FEEDBACKS: usize = 16;
+
 /// User-defined stats types
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
@@ -224,6 +230,7 @@ impl Stats for NopStats {
 
 impl NopStats {
     /// Create new [`NopStats`]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             start_time: current_time(),
@@ -349,12 +356,6 @@ macro_rules! mark_feedback_time {
         $state.introspection_stats_mut().mark_feedback_time();
     }};
 }
-
-/// Number of stages in the fuzzer
-pub(crate) const NUM_STAGES: usize = 8;
-
-/// Number of feedback mechanisms to measure for performance
-pub(crate) const NUM_FEEDBACKS: usize = 16;
 
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -770,6 +771,7 @@ impl core::fmt::Display for ClientPerfStats {
 
 #[cfg(feature = "introspection")]
 impl Default for ClientPerfStats {
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }

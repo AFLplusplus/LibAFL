@@ -460,7 +460,8 @@ where
         stats_timeout: Duration,
     ) -> Result<Duration, Error> {
         let cur = current_time();
-        if cur - last > stats_timeout {
+        // default to 0 here to avoid crashes on clock skew
+        if cur.checked_sub(last).unwrap_or_default() > stats_timeout {
             // Default no introspection implmentation
             #[cfg(not(feature = "introspection"))]
             manager.fire(
