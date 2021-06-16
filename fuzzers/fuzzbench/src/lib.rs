@@ -118,11 +118,7 @@ pub extern "C" fn fuzzer_main() {
             .expect("Could not parse timeout in milliseconds"),
     );
 
-<<<<<<< HEAD
     fuzz(out_dir, crashes, in_dir, tokens, logfile, timeout)
-=======
-    fuzz(corpus, crashes, seeds, tokens, logfile, timeout)
->>>>>>> main
         .expect("An error occurred while fuzzing");
 }
 
