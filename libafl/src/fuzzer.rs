@@ -118,7 +118,7 @@ pub trait Evaluator<E, EM, I, S> {
         executor: &mut E,
         manager: &mut EM,
         input: I,
-        send_events: bool
+        send_events: bool,
     ) -> Result<(bool, Option<usize>), Error>;
 
     /// Runs the input and triggers observers and feedback.
@@ -364,7 +364,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: I,
-        send_events: bool
+        send_events: bool,
     ) -> Result<(bool, Option<usize>), Error> {
         let result = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
@@ -409,7 +409,7 @@ where
                 let mut testcase = Testcase::new(input);
                 self.objective_mut().append_metadata(state, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
-                
+
                 if send_events {
                     manager.fire(
                         state,
