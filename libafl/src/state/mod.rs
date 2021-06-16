@@ -137,10 +137,12 @@ pub trait HasStartTime {
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
-pub trait HasMOpt {
+pub trait HasMOpt: HasMetadata {
     fn mopt(&self) -> &MOpt;
 
     fn mopt_mut(&mut self) -> &mut MOpt;
+
+    fn initialize_mopt(&mut self, operator_num: usize, swarm_num: usize);
 }
 
 /// The state a fuzz run.
@@ -536,5 +538,9 @@ where
 
     fn mopt_mut(&mut self) -> &mut MOpt {
         self.metadata.get_mut::<MOpt>().unwrap()
+    }
+
+    fn initialize_mopt(&mut self, operator_num: usize, swarm_num: usize) {
+        self.add_metadata::<MOpt>(MOpt::new(operator_num, swarm_num));
     }
 }

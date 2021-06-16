@@ -244,7 +244,8 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
-    pub fn new(mutator: M) -> Self {
+    pub fn new(mutator: M, state: &mut S, operator_num: usize, swarm_num: usize) -> Self {
+        state.initialize_mopt(operator_num, swarm_num);
         Self {
             mutator,
             phantom: PhantomData,
