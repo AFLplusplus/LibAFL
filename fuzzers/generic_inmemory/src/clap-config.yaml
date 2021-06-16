@@ -33,9 +33,10 @@ args:
         about: "Set the execution timeout in milliseconds, default 10000"
         value_name: TIMEOUT
         takes_value: true
-    - dict:
-        long: dict
-        about: "Feed the fuzzer with an user-specified dictionary of tokens"
+    - tokens:
+        long: tokens
+        short: x
+        about: "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\")"
         value_name: DICT
         multiple: true
         takes_value: true

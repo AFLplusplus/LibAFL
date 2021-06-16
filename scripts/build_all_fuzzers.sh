@@ -1,4 +1,5 @@
 #!/bin/bash
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR/.."
 
@@ -8,11 +9,20 @@ cd fuzzers
 
 for fuzzer in *;
 do
-    echo "[+] Checking fmt and building $fuzzer"
-    cd $fuzzer \
-        && cargo fmt --all -- --check \
-        && cargo clippy \
-        && cargo build \
-        && cd .. \
-    || exit 1
+    cd $fuzzer
+    # Clippy checks
+    if [ "$1" != "--no-fmt" ]; then
+        
+        echo "[*] Checking fmt for $fuzzer"
+        cargo fmt --all -- --check || exit 1
+        echo "[*] Running clippy for $fuzzer"
+        cargo clippy || exit 1
+    else
+        echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
+    fi
+    echo "[*] Building $fuzzer"
+    cargo build || exit 1
+    cd ..
+    echo "[+] Done building $fuzzer"
+    echo ""
 done
