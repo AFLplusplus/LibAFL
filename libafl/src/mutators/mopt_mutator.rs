@@ -301,7 +301,8 @@ where
             }
         }
         self.swarm_now = 0;
-        // self.key_module = 0;
+
+        self.key_module = MOptMode::PILOT_FUZZING;
         Ok(())
     }
 
