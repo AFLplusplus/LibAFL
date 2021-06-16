@@ -1,6 +1,6 @@
 //! Compiler Wrapper from `LibAFL`
 
-use std::{process::Command, string::String, vec::Vec, path::Path};
+use std::{path::Path, process::Command, string::String, vec::Vec};
 
 /// `LibAFL` CC Error Type
 #[derive(Debug)]
@@ -41,7 +41,7 @@ pub trait CompilerWrapper {
 
     /// Add a compiler argument only when linking
     fn add_link_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
-    
+
     /// Link static C lib
     fn link_staticlib(&mut self, dir: &Path, name: String) -> Result<&'_ mut Self, Error>;
 
@@ -138,7 +138,7 @@ impl CompilerWrapper for ClangWrapper {
 
         // Fuzzing define common among tools
         new_args.push("-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1".into());
-        
+
         // Libraries needed by libafl on Windows
         #[cfg(windows)]
         if linking {
@@ -165,7 +165,7 @@ impl CompilerWrapper for ClangWrapper {
         self.link_args.push(arg);
         Ok(self)
     }
-    
+
     fn link_staticlib(&mut self, dir: &Path, name: String) -> Result<&'_ mut Self, Error> {
         self.add_link_arg("-Wl,--whole-archive".into())?
             .add_link_arg(
