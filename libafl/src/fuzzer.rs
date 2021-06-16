@@ -4,7 +4,7 @@ use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusScheduler, Testcase},
     events::{Event, EventFirer, EventManager},
-    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
     mark_feature_time,
@@ -66,33 +66,44 @@ where
 }
 
 /// Evaluate if an input is interesting using the feedback
-pub trait IsInteresting<I, OT, S>
+pub trait ExecutionProcessor<I, OT, S>
 where
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     I: Input,
 {
     /// Evaluate if a set of observation channels has an interesting state
-    fn is_interesting<EM>(
+    fn process_execution<EM>(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &I,
+        input: I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
         EM: EventFirer<I, S>;
 }
 
-/// Add to the state if interesting
-pub trait IfInteresting<I, S> {
-    /// Adds this input to the corpus, if it's intersting, and return the index
-    fn add_if_interesting(
+/// Evaluate an input modyfing the state of the fuzzer
+pub trait EvaluatorObservers<I, OT, S>: Sized
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    /// Runs the input and triggers observers and feedback,
+    /// returns if is interesting an (option) the index of the new testcase in the corpus
+    fn evaluate_input_with_observers<E, EM>(
         &mut self,
         state: &mut S,
-        input: &I,
-        is_interesting: bool,
-    ) -> Result<Option<usize>, Error>;
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
+    where
+        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
+        EM: EventManager<E, I, S, Self>;
 }
 
 /// Evaluate an input modyfing the state of the fuzzer
@@ -105,7 +116,7 @@ pub trait Evaluator<E, EM, I, S> {
         executor: &mut E,
         manager: &mut EM,
         input: I,
-    ) -> Result<(bool, Option<usize>), Error> {
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
         self.evaluate_input_events(state, executor, manager, input, true)
     }
 
@@ -119,7 +130,7 @@ pub trait Evaluator<E, EM, I, S> {
         manager: &mut EM,
         input: I,
         send_events: bool,
-    ) -> Result<(bool, Option<usize>), Error>;
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error>;
 
     /// Runs the input and triggers observers and feedback.
     /// Adds an input, to the corpus even if it's not considered `interesting` by the `feedback`.
@@ -214,9 +225,10 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     ) -> Result<Duration, Error>;
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ExecuteInputResult {
     None,
-    Interesting,
+    Corpus,
     Solution,
 }
 
@@ -284,98 +296,86 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> IsInteresting<I, OT, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
-where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    OT: ObserversTuple,
-    S: HasCorpus<C, I>,
-{
-    /// Evaluate if a set of observation channels has an interesting state
-    fn is_interesting<EM>(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: &I,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<I, S>,
-    {
-        self.feedback_mut()
-            .is_interesting(state, manager, input, observers, exit_kind)
-    }
-}
-
-impl<C, CS, F, I, OF, OT, S, SC> IfInteresting<I, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
-where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    OT: ObserversTuple,
-    S: HasCorpus<C, I>,
-{
-    /// Adds this input to the corpus, if it's intersting, and return the index
-    #[inline]
-    fn add_if_interesting(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        is_interesting: bool,
-    ) -> Result<Option<usize>, Error> {
-        if is_interesting {
-            let mut testcase = Testcase::new(input.clone());
-            self.feedback_mut().append_metadata(state, &mut testcase)?;
-            let idx = state.corpus_mut().add(testcase)?;
-            self.scheduler_mut().on_add(state, idx)?;
-            Ok(Some(idx))
-        } else {
-            self.feedback_mut().discard_metadata(state, input)?;
-            Ok(None)
-        }
-    }
-}
-
-impl<C, CS, E, EM, F, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
+impl<C, CS, F, I, OF, OT, S, SC> ExecutionProcessor<I, OT, S>
     for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
 where
     C: Corpus<I>,
+    SC: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<EM, I, S, Self> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Self>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-    EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
-    SC: Corpus<I>,
+    OT: ObserversTuple<I, S>,
+    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats + HasExecutions,
 {
-    /// Process one input, adding to the respective corpuses if needed and firing the right events
-    #[inline]
-    fn evaluate_input_events(
+    /// Evaluate if a set of observation channels has an interesting state
+    fn process_execution<EM>(
         &mut self,
         state: &mut S,
-        executor: &mut E,
         manager: &mut EM,
         input: I,
+        observers: &OT,
+        exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<(bool, Option<usize>), Error> {
-        let result = self.execute_input(state, executor, manager, &input)?;
-        let observers = executor.observers();
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
+    where
+        EM: EventFirer<I, S>,
+    {
+        let mut res = ExecuteInputResult::None;
 
-        match result {
+        start_timer!(state);
+        let is_solution = self
+            .objective_mut()
+            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+        mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
+
+        if is_solution {
+            res = ExecuteInputResult::Solution;
+        } else {
+            #[cfg(not(feature = "introspection"))]
+            let is_corpus = self
+                .feedback_mut()
+                .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
+            #[cfg(feature = "introspection")]
+            let is_corpus = {
+                // Init temporary feedback stats here. We can't use the typical pattern above
+                // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
+                // new `mut self` to `is_interesting_with_perf`. We use this stack
+                // variable to get the stats and then update the feedbacks directly
+                let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
+                let feedback_index = 0;
+                let is_corpus = self.feedback_mut().is_interesting_with_perf(
+                    state,
+                    manager,
+                    input,
+                    observers,
+                    &exit_kind,
+                    &mut feedback_stats,
+                    feedback_index,
+                )?;
+
+                // Update the feedback stats
+                state
+                    .introspection_stats_mut()
+                    .update_feedbacks(feedback_stats);
+
+                // Return the total fitness
+                is_corpus
+            };
+
+            if is_corpus {
+                res = ExecuteInputResult::Corpus;
+            }
+        }
+
+        match res {
             ExecuteInputResult::None => {
                 self.feedback_mut().discard_metadata(state, &input)?;
                 self.objective_mut().discard_metadata(state, &input)?;
-                Ok((false, None))
+                Ok((res, None))
             }
-            ExecuteInputResult::Interesting => {
+            ExecuteInputResult::Corpus => {
                 // Not a solution
                 self.objective_mut().discard_metadata(state, &input)?;
 
@@ -399,7 +399,7 @@ where
                         },
                     )?;
                 }
-                Ok((true, Some(idx)))
+                Ok((res, Some(idx)))
             }
             ExecuteInputResult::Solution => {
                 // Not interesting
@@ -419,9 +419,69 @@ where
                     )?;
                 }
 
-                Ok((false, None))
+                Ok((res, None))
             }
         }
+    }
+}
+
+impl<C, CS, F, I, OF, OT, S, SC> EvaluatorObservers<I, OT, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    OT: ObserversTuple<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
+    SC: Corpus<I>,
+{
+    /// Process one input, adding to the respective corpuses if needed and firing the right events
+    #[inline]
+    fn evaluate_input_with_observers<E, EM>(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
+    where
+        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
+        EM: EventManager<E, I, S, Self>,
+    {
+        let exit_kind = self.execute_input(state, executor, manager, &input)?;
+        let observers = executor.observers();
+        self.process_execution(state, manager, input, observers, &exit_kind, send_events)
+    }
+}
+
+impl<C, CS, E, EM, F, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
+    EM: EventManager<E, I, S, Self>,
+    F: Feedback<I, S>,
+    I: Input,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
+    SC: Corpus<I>,
+{
+    /// Process one input, adding to the respective corpuses if needed and firing the right events
+    #[inline]
+    fn evaluate_input_events(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
+        self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
 
     /// Adds an input, even if it's not conisered `interesting` by any of the executors
@@ -584,14 +644,13 @@ where
         executor: &mut E,
         event_mgr: &mut EM,
         input: &I,
-    ) -> Result<ExecuteInputResult, Error>
+    ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Self>,
-        OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Self>,
-        EM: EventManager<E, I, S, Self>,
+        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
+        OT: ObserversTuple<I, S>,
     {
         start_timer!(state);
-        executor.pre_exec_observers(self, state, event_mgr, input)?;
+        executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
@@ -601,57 +660,9 @@ where
         *state.executions_mut() += 1;
 
         start_timer!(state);
-        executor.post_exec_observers(self, state, event_mgr, input)?;
+        executor.observers_mut().post_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
-        let observers = executor.observers();
-
-        start_timer!(state);
-        let is_solution = self
-            .objective_mut()
-            .is_interesting(state, event_mgr, input, observers, &exit_kind)?;
-        mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
-
-        if is_solution {
-            return Ok(ExecuteInputResult::Solution);
-        }
-
-        #[cfg(not(feature = "introspection"))]
-        let is_interesting = self
-            .feedback_mut()
-            .is_interesting(state, event_mgr, &input, observers, &exit_kind)?;
-
-        #[cfg(feature = "introspection")]
-        let is_interesting = {
-            // Init temporary feedback stats here. We can't use the typical pattern above
-            // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
-            // new `mut self` to `is_interesting_with_perf`. We use this stack
-            // variable to get the stats and then update the feedbacks directly
-            let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
-            let feedback_index = 0;
-            let is_interesting = self.feedback_mut().is_interesting_with_perf(
-                state,
-                event_mgr,
-                input,
-                observers,
-                &exit_kind,
-                &mut feedback_stats,
-                feedback_index,
-            )?;
-
-            // Update the feedback stats
-            state
-                .introspection_stats_mut()
-                .update_feedbacks(feedback_stats);
-
-            // Return the total fitness
-            is_interesting
-        };
-
-        if is_interesting {
-            Ok(ExecuteInputResult::Interesting)
-        } else {
-            Ok(ExecuteInputResult::None)
-        }
+        Ok(exit_kind)
     }
 }

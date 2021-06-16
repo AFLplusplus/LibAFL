@@ -15,31 +15,65 @@ use crate::{
         current_time,
         tuples::{MatchName, Named},
     },
-    executors::HasExecHooks,
     Error,
 };
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer: Named + serde::Serialize + serde::de::DeserializeOwned {
+pub trait Observer<I, S>: Named + serde::Serialize + serde::de::DeserializeOwned {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
     fn flush(&mut self) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Called right before exexution starts
+    #[inline]
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Called right after execution finished.
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {}
+pub trait ObserversTuple<I, S>: MatchName + serde::Serialize + serde::de::DeserializeOwned {
+    /// This is called right before the next execution.
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 
-impl ObserversTuple for () {}
+    /// This is called right after the last execution
+    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+}
 
-impl<Head, Tail> ObserversTuple for (Head, Tail)
+impl<I, S> ObserversTuple<I, S> for () {
+    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<Head, Tail, I, S> ObserversTuple<I, S> for (Head, Tail)
 where
-    Head: Observer,
-    Tail: ObserversTuple,
+    Head: Observer<I, S>,
+    Tail: ObserversTuple<I, S>,
 {
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.0.pre_exec(state, input)?;
+        self.1.pre_exec_all(state, input)
+    }
+
+    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.0.post_exec(state, input)?;
+        self.1.post_exec_all(state, input)
+    }
 }
 
 /// A simple observer, just overlooking the runtime of the target.
@@ -68,28 +102,14 @@ impl TimeObserver {
     }
 }
 
-impl Observer for TimeObserver {}
-
-impl<EM, I, S, Z> HasExecHooks<EM, I, S, Z> for TimeObserver {
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+impl<I, S> Observer<I, S> for TimeObserver {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
         Ok(())
     }

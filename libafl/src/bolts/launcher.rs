@@ -46,7 +46,7 @@ where
     I: Input,
     ST: Stats,
     SP: ShMemProvider + 'static,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: DeserializeOwned,
 {
     /// The ShmemProvider to use
@@ -81,7 +81,7 @@ where
 impl<'a, I, OT, S, SP, ST> Launcher<'a, I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     ST: Stats + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,

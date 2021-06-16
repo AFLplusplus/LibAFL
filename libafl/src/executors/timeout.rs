@@ -3,7 +3,7 @@
 use core::time::Duration;
 
 use crate::{
-    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
     Error,
@@ -129,10 +129,10 @@ where
     }
 }
 
-impl<E, OT> HasObservers<OT> for TimeoutExecutor<E>
+impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutExecutor<E>
 where
-    E: HasObservers<OT>,
-    OT: ObserversTuple,
+    E: HasObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -143,12 +143,4 @@ where
     fn observers_mut(&mut self) -> &mut OT {
         self.executor.observers_mut()
     }
-}
-
-impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutExecutor<E>
-where
-    E: HasObservers<OT>,
-    I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
-{
 }

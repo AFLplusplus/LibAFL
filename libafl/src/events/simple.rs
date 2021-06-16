@@ -71,7 +71,7 @@ where
 {
 }
 
-impl<E, I, S, ST, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, ST>
+impl<E, I, S, ST, Z> EventProcessor<E, I, S, Z> for SimpleEventManager<I, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -259,7 +259,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, ST, Z> EventProcessor<E, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<E, I, S, SP, ST, Z> EventProcessor<E, I, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
     S: Serialize,

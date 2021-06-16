@@ -14,9 +14,9 @@ use crate::{
         serdeany::{SerdeAny, SerdeAnyMap},
     },
     corpus::Corpus,
-    events::{Event, EventManager, LogSeverity},
+    events::{Event, EventFirer, LogSeverity},
     feedbacks::FeedbackStatesTuple,
-    fuzzer::Evaluator,
+    fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::Input,
     stats::ClientPerfStats,
@@ -385,9 +385,8 @@ where
                 if forced {
                     let _ = fuzzer.add_input(self, executor, manager, input)?;
                 } else {
-                    let (is_interesting, _) =
-                        fuzzer.evaluate_input(self, executor, manager, input)?;
-                    if !is_interesting {
+                    let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                    if res == ExecuteInputResult::None {
                         println!("File {:?} was not interesting, skipped.", &path);
                     }
                 }
@@ -411,7 +410,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventManager<E, I, Self, Z>,
+        EM: EventFirer<I, Self>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(fuzzer, executor, manager, in_dir, forced)?;
@@ -424,7 +423,6 @@ where
                 phantom: PhantomData,
             },
         )?;
-        manager.process(fuzzer, self, executor)?;
         Ok(())
     }
 
@@ -440,7 +438,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventManager<E, I, Self, Z>,
+        EM: EventFirer<I, Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
@@ -455,7 +453,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventManager<E, I, Self, Z>,
+        EM: EventFirer<I, Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
@@ -481,13 +479,13 @@ where
     where
         G: Generator<I, R>,
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventManager<E, I, Self, Z>,
+        EM: EventFirer<I, Self>,
     {
         let mut added = 0;
         for _ in 0..num {
             let input = generator.generate(self.rand_mut())?;
-            let (is_interesting, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-            if is_interesting {
+            let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+            if res != ExecuteInputResult::None {
                 added += 1;
             }
         }
@@ -499,7 +497,6 @@ where
                 phantom: PhantomData,
             },
         )?;
-        manager.process(fuzzer, self, executor)?;
         Ok(())
     }
 

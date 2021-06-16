@@ -13,7 +13,7 @@ use std::{
 
 use crate::{
     bolts::os::{dup2, pipes::Pipe},
-    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
@@ -414,7 +414,7 @@ where
 pub struct ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     target: String,
     args: Vec<String>,
@@ -427,7 +427,7 @@ where
 impl<I, OT> ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     pub fn new(target: String, arguments: &[String], observers: OT) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
@@ -496,7 +496,7 @@ where
 impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn run_target(
@@ -554,10 +554,10 @@ where
     }
 }
 
-impl<I, OT> HasObservers<OT> for ForkserverExecutor<I, OT>
+impl<I, OT> HasObservers<I, OT, S> for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -573,14 +573,14 @@ where
 impl<EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+    OT: ObserversTuple<I, S> + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
 
 impl<I, OT> HasForkserver for ForkserverExecutor<I, OT>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn forkserver(&self) -> &Forkserver {
@@ -603,10 +603,10 @@ where
     }
 }
 
-impl<E, OT> HasObservers<OT> for TimeoutForkserverExecutor<E>
+impl<E, OT> HasObservers<I, OT, S> for TimeoutForkserverExecutor<E>
 where
-    E: HasObservers<OT>,
-    OT: ObserversTuple,
+    E: HasObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -621,9 +621,9 @@ where
 
 impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutForkserverExecutor<E>
 where
-    E: HasObservers<OT>,
+    E: HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+    OT: ObserversTuple<I, S> + HasExecHooksTuple<EM, I, S, Z>,
 {
 }
 

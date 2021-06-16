@@ -24,8 +24,8 @@ use crate::{
     },
     events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
     executors::ExitKind,
-    executors::{Executor, HasExecHooksTuple, HasObservers, HasObserversHooks},
-    fuzzer::{Evaluator, IfInteresting, IsInteresting},
+    executors::{Executor, HasObservers},
+    fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
     observers::ObserversTuple,
     stats::Stats,
@@ -245,7 +245,7 @@ where
 pub struct LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -259,7 +259,7 @@ where
 impl<I, OT, S, SP> Drop for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
@@ -271,7 +271,7 @@ where
 impl<I, OT, S, SP> LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw llmp client
@@ -356,9 +356,9 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple + HasExecHooksTuple<Self, I, S, Z>,
-        E: Executor<Self, I, S, Z> + HasObservers<OT> + HasObserversHooks<Self, I, OT, S, Z>,
-        Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, Self, I, S>,
+        OT: ObserversTuple<I, S>,
+        E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
+        Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
     {
         match event {
             Event::NewTestcase {
@@ -375,20 +375,24 @@ where
                 println!("Received new Testcase from {}", _sender_id);
 
                 if client_config != self.configuration {
-                    fuzzer.evaluate_input_events(state, executor, self, input, false)?;
+                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?;
                 } else {
                     let observers: OT = postcard::from_bytes(&observers_buf)?;
                     // TODO include ExitKind in NewTestcase
                     // TODO check for objective too
-                    let is_interesting =
-                        fuzzer.is_interesting(state, self, &input, &observers, &ExitKind::Ok)?;
-                    if fuzzer
-                        .add_if_interesting(state, &input, is_interesting)?
-                        .is_some()
+                    let _ = fuzzer.process_execution(
+                        state,
+                        self,
+                        input,
+                        &observers,
+                        &ExitKind::Ok,
+                        false,
+                    )?;
+                    /*if is_interesting
                     {
                         #[cfg(feature = "std")]
                         println!("Added received Testcase");
-                    }
+                    }*/
                 }
                 Ok(())
             }
@@ -403,7 +407,7 @@ where
 impl<I, OT, S, SP> EventFirer<I, S> for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -438,7 +442,7 @@ where
 impl<I, OT, S, SP> EventRestarter<S> for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -450,13 +454,13 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, Z> EventProcessor<E, S, Z> for LlmpEventManager<I, OT, S, SP>
+impl<E, I, OT, S, SP, Z> EventProcessor<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
     SP: ShMemProvider,
-    E: Executor<Self, I, S, Z> + HasObservers<OT> + HasObserversHooks<Self, I, OT, S, Z>,
+    E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<Self, I, S, Z>,
-    Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, Self, I, S>, //CE: CustomEvent<I>,
+    OT: ObserversTuple<I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -494,10 +498,10 @@ where
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
     SP: ShMemProvider,
-    E: Executor<Self, I, S, Z> + HasObservers<OT> + HasObserversHooks<Self, I, OT, S, Z>,
+    E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<Self, I, S, Z>,
-    Z: IfInteresting<I, S> + IsInteresting<I, OT, S> + Evaluator<E, Self, I, S>, //CE: CustomEvent<I>,
+    OT: ObserversTuple<I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
 }
 
@@ -510,7 +514,7 @@ pub fn serialize_state_mgr<I, OT, S, SP>(
 ) -> Result<Vec<u8>, Error>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: Serialize,
     SP: ShMemProvider,
 {
@@ -526,7 +530,7 @@ pub fn deserialize_state_mgr<I, OT, S, SP>(
 ) -> Result<(S, LlmpEventManager<I, OT, S, SP>), Error>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: DeserializeOwned,
     SP: ShMemProvider,
 {
@@ -546,7 +550,7 @@ where
 pub struct LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -559,7 +563,7 @@ where
 impl<I, OT, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: Serialize,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
@@ -573,7 +577,7 @@ where
 impl<I, OT, S, SP> EventRestarter<S> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: Serialize,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
@@ -597,16 +601,12 @@ where
     }
 }
 
-impl<E, I, OT, S, SP, Z> EventProcessor<E, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
+impl<E, I, OT, S, SP, Z> EventProcessor<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
-    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z>
-        + HasObservers<OT>
-        + HasObserversHooks<LlmpEventManager<I, OT, S, SP>, I, OT, S, Z>,
+    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    Z: IfInteresting<I, S>
-        + IsInteresting<I, OT, S>
-        + Evaluator<E, LlmpEventManager<I, OT, S, SP>, I, S>,
-    OT: ObserversTuple + HasExecHooksTuple<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -617,15 +617,11 @@ where
 
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
-    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z>
-        + HasObservers<OT>
-        + HasObserversHooks<LlmpEventManager<I, OT, S, SP>, I, OT, S, Z>,
+    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     S: Serialize,
-    Z: IfInteresting<I, S>
-        + IsInteresting<I, OT, S>
-        + Evaluator<E, LlmpEventManager<I, OT, S, SP>, I, S>,
-    OT: ObserversTuple + HasExecHooksTuple<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -640,7 +636,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -691,7 +687,7 @@ where
     I: Input,
     S: DeserializeOwned,
     ST: Stats + Clone,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: DeserializeOwned,
 {
     #[cfg(target_os = "android")]
@@ -715,7 +711,7 @@ where
 pub struct RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: DeserializeOwned,
     SP: ShMemProvider + 'static,
     ST: Stats,
@@ -747,7 +743,7 @@ where
 impl<I, OT, S, SP, ST> RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
     S: DeserializeOwned,
     SP: ShMemProvider,
     ST: Stats + Clone,
