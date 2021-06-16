@@ -15,7 +15,12 @@ pub struct CombinedExecutor<A, B> {
 
 impl<A, B> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self {
+    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
+    where
+        A: Executor<EM, I, S, Z>,
+        B: Executor<EM, I, S, Z>,
+        I: Input,
+    {
         Self { primary, secondary }
     }
 

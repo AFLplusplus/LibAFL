@@ -8,10 +8,10 @@ fn main() {
         dir.pop();
 
         let mut cc = ClangWrapper::new("clang", "clang++");
-        cc.is_cpp(false)
+        cc.is_cpp(true)
             .from_args(&args)
             .unwrap()
-            .link_staticlib(&dir, "libfuzzer_libpng".into())
+            .link_staticlib(&dir, "generic_inmemory".into())
             .unwrap()
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
             .unwrap();

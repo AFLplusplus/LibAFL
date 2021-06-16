@@ -364,12 +364,15 @@ where
     SC: Corpus<I>,
 {
     /// loads inputs from a directory
+    /// If `forced` is `true`, the value will be loaded,
+    /// even if it's not considered to be `interesting`.
     fn load_from_directory<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
         in_dir: &Path,
+        forced: bool,
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
@@ -388,16 +391,67 @@ where
             if attr.is_file() && attr.len() > 0 {
                 println!("Loading file {:?} ...", &path);
                 let input = I::from_file(&path)?;
-                let (is_interesting, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-                if !is_interesting {
-                    println!("File {:?} was not interesting, skipped.", &path);
+                if forced {
+                    let _ = fuzzer.add_input(self, executor, manager, input)?;
+                } else {
+                    let (is_interesting, _) =
+                        fuzzer.evaluate_input(self, executor, manager, input)?;
+                    if !is_interesting {
+                        println!("File {:?} was not interesting, skipped.", &path);
+                    }
                 }
             } else if attr.is_dir() {
-                self.load_from_directory(fuzzer, executor, manager, &path)?;
+                self.load_from_directory(fuzzer, executor, manager, &path, forced)?;
             }
         }
 
         Ok(())
+    }
+
+    /// Loads initial inputs from the passed-in `in_dirs`.
+    /// If `forced` is true, will add all testcases, no matter what.
+    fn load_initial_inputs_internal<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        in_dirs: &[PathBuf],
+        forced: bool,
+    ) -> Result<(), Error>
+    where
+        Z: Evaluator<E, EM, I, Self>,
+        EM: EventManager<E, I, Self, Z>,
+    {
+        for in_dir in in_dirs {
+            self.load_from_directory(fuzzer, executor, manager, in_dir, forced)?;
+        }
+        manager.fire(
+            self,
+            Event::Log {
+                severity_level: LogSeverity::Debug,
+                message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
+                phantom: PhantomData,
+            },
+        )?;
+        manager.process(fuzzer, self, executor)?;
+        Ok(())
+    }
+
+    /// Loads all intial inputs, even if they are not consiered `intesting`.
+    /// This is rarely the right method, use `load_initial_inputs`,
+    /// and potentially fix your `Feedback`, instead.
+    pub fn load_initial_inputs_forced<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        in_dirs: &[PathBuf],
+    ) -> Result<(), Error>
+    where
+        Z: Evaluator<E, EM, I, Self>,
+        EM: EventManager<E, I, Self, Z>,
+    {
+        self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
 
     /// Loads initial inputs from the passed-in `in_dirs`.
@@ -412,19 +466,7 @@ where
         Z: Evaluator<E, EM, I, Self>,
         EM: EventManager<E, I, Self, Z>,
     {
-        for in_dir in in_dirs {
-            self.load_from_directory(fuzzer, executor, manager, in_dir)?;
-        }
-        manager.fire(
-            self,
-            Event::Log {
-                severity_level: LogSeverity::Debug,
-                message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
-                phantom: PhantomData,
-            },
-        )?;
-        manager.process(fuzzer, self, executor)?;
-        Ok(())
+        self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
 }
 

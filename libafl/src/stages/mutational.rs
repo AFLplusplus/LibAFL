@@ -133,6 +133,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
+    #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -141,7 +142,12 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.perform_mutational(fuzzer, executor, state, manager, corpus_idx)
+        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().finish_stage();
+
+        ret
     }
 }
 

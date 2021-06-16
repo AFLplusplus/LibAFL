@@ -196,6 +196,48 @@ pub trait Stats {
     }
 }
 
+/// Stats that print exactly nothing.
+/// Not good for debuging, very good for speed.
+pub struct NopStats {
+    start_time: Duration,
+    client_stats: Vec<ClientStats>,
+}
+
+impl Stats for NopStats {
+    /// the client stats, mutable
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        &mut self.client_stats
+    }
+
+    /// the client stats
+    fn client_stats(&self) -> &[ClientStats] {
+        &self.client_stats
+    }
+
+    /// Time this fuzzing run stated
+    fn start_time(&mut self) -> time::Duration {
+        self.start_time
+    }
+
+    fn display(&mut self, _event_msg: String, _sender_id: u32) {}
+}
+
+impl NopStats {
+    /// Create new [`NopStats`]
+    pub fn new() -> Self {
+        Self {
+            start_time: current_time(),
+            client_stats: vec![],
+        }
+    }
+}
+
+impl Default for NopStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Tracking stats during fuzzing.
 #[derive(Clone, Debug)]
 pub struct SimpleStats<F>
@@ -442,7 +484,7 @@ impl ClientPerfStats {
     /// the current clock counter
     #[must_use]
     pub fn new() -> Self {
-        let start_time = crate::cpu::read_time_counter();
+        let start_time = crate::bolts::cpu::read_time_counter();
 
         Self {
             start_time,
@@ -467,7 +509,7 @@ impl ClientPerfStats {
     /// Start a timer with the current time counter
     #[inline]
     pub fn start_timer(&mut self) {
-        self.timer_start = Some(crate::cpu::read_time_counter());
+        self.timer_start = Some(crate::bolts::cpu::read_time_counter());
     }
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
@@ -494,7 +536,7 @@ impl ClientPerfStats {
             }
             Some(timer_start) => {
                 // Calculate the elapsed time
-                let elapsed = crate::cpu::read_time_counter() - timer_start;
+                let elapsed = crate::bolts::cpu::read_time_counter() - timer_start;
 
                 // Reset the timer
                 self.timer_start = None;

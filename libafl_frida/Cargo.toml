@@ -10,12 +10,17 @@ license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "frida", "instrumentation"]
 edition = "2018"
 
+
+[features]
+default = []
+cmplog = []
+
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.3.1", features = ["std", "libafl_derive"] }
-libafl_targets = { path = "../libafl_targets", version = "0.3.2" }
+libafl_targets = { path = "../libafl_targets", version = "0.3.2", features = ["sancov_cmplog"] }
 nix = "0.20.0"
 libc = "0.2.92"
 hashbrown = "0.11"
