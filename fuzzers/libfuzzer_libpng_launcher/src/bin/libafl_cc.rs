@@ -13,7 +13,7 @@ fn main() {
             .unwrap()
             .link_staticlib(&dir, "libfuzzer_libpng".into())
             .unwrap()
-            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
+            .add_arg("-fsanitize-coverage=trace-pc-guard".into())
             .unwrap();
         cc.run().unwrap();
     } else {

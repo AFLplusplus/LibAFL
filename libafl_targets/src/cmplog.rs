@@ -115,12 +115,8 @@ impl CmpMap for CmpLogMap {
     }
 
     fn reset(&mut self) -> Result<(), Error> {
-        self.headers = [CmpLogHeader {
-            hits: 0,
-            shape: 0,
-            kind: 0,
-        }; CMPLOG_MAP_W];
-        self.operands = [[CmpLogOperands(0, 0); CMPLOG_MAP_H]; CMPLOG_MAP_W];
+        self.headers = unsafe { core::mem::zeroed() };
+        // self.operands = unsafe { core::mem::zeroed() };
         Ok(())
     }
 }
