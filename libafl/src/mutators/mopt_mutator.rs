@@ -7,7 +7,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    bolts::{current_time, rands::Rand},
+    bolts::{current_time, rands::Rand, rands::StdRand},
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasMOpt, HasRand},
@@ -18,15 +18,11 @@ use core::{
     marker::PhantomData,
     time::Duration,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
-pub struct MOpt<I, R>
-where
-    I: Input,
-    R: Rand,
-{
-    rand: R,
-    limit_time_puppet: u64, // Time before we move onto pacemaker fuzzing mode
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MOpt {
+    rand: StdRand,
     finds_since_switching: usize, // How many findings have we found since we switched to the current mode?
     last_limit_time_start: Duration, // Unneeded variable
     total_finds: usize,
@@ -35,7 +31,6 @@ where
     most_time_puppet: u64, // Unneeded for LibAFL
     SPLICE_CYCLES_puppet: i32,
     limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
-    key_puppet: i32,     // If we are in the pacemaker fuzzing mode?
     key_module: MOptMode, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
     w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
     w_end: f64,  // w_* means inertia
@@ -67,20 +62,14 @@ where
     core_operator_ctr_pso: Vec<usize>,
     core_operator_ctr_per_stage: Vec<usize>,
     core_operator_ctr_last: Vec<usize>,
-    phantom: PhantomData<I>,
 }
 
-impl<I, R> MOpt<I, R>
-where
-    I: Input,
-    R: Rand,
-{
-    pub fn new(limit_time_puppet: u64, rand: R, operator_num: usize, swarm_num: usize) -> Self {
-        let limit_time_puppet2 = limit_time_puppet * 60 * 1000;
-        let key_puppet = if limit_time_puppet == 0 { 1 } else { 0 };
+crate::impl_serdeany!(MOpt);
+
+impl MOpt {
+    pub fn new(operator_num: usize, swarm_num: usize) -> Self {
         Self {
-            rand: rand,
-            limit_time_puppet: 0,
+            rand: StdRand::with_seed(0),
             finds_since_switching: 0,
             last_limit_time_start: Duration::from_millis(0),
             total_finds: 0,
@@ -89,7 +78,6 @@ where
             most_time_puppet: 0,
             SPLICE_CYCLES_puppet: 0,
             limit_time_sig: 1,
-            key_puppet: key_puppet,
             key_module: MOptMode::CORE_FUZZING,
             w_init: 0.9,
             w_end: 0.3,
@@ -121,7 +109,6 @@ where
             core_operator_ctr_pso: vec![0; operator_num],
             core_operator_ctr_per_stage: vec![0; operator_num],
             core_operator_ctr_last: vec![0; operator_num],
-            phantom: PhantomData,
         }
     }
 
@@ -129,7 +116,8 @@ where
     /// So `size` 100 will result in anything between `0` and 0.1`.
     #[inline]
     #[allow(clippy::cast_precision_loss)]
-    pub fn rand_below(&mut self, size: u64) -> f64 {
+    pub fn rand_below(&mut self, size: u64) -> f64
+where {
         self.rand.below(size) as f64 * 0.001
     }
 
@@ -471,7 +459,7 @@ const STAGE_OverWrite75: usize = 15;
 const STAGE_OverWriteExtra: usize = 16;
 const STAGE_InsertExtra: usize = 17;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum MOptMode {
     PILOT_FUZZING,
     CORE_FUZZING,
@@ -482,7 +470,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt<I, R>,
+    S: HasRand<R> + HasMOpt,
 {
     mutations: MT,
     phantom: PhantomData<(I, R, S)>,
@@ -493,7 +481,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt<I, R>,
+    S: HasRand<R> + HasMOpt,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -510,7 +498,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt<I, R>,
+    S: HasRand<R> + HasMOpt,
 {
     #[inline]
     fn mutate(
@@ -528,7 +516,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt<I, R>,
+    S: HasRand<R> + HasMOpt,
 {
     pub fn new(mutations: MT) -> Self {
         Self {
@@ -595,7 +583,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt<I, R>,
+    S: HasRand<R> + HasMOpt,
 {
     /// Get the mutations
     #[inline]
@@ -615,7 +603,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt<I, R>,
+    S: HasRand<R> + HasMOpt,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {

@@ -137,14 +137,10 @@ pub trait HasStartTime {
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
-pub trait HasMOpt<I, R>
-where
-    I: Input,
-    R: Rand,
-{
-    fn mopt(&self) -> &MOpt<I, R>;
+pub trait HasMOpt {
+    fn mopt(&mut self) -> &MOpt;
 
-    fn mopt_mut(&mut self) -> &mut MOpt<I, R>;
+    fn mopt_mut(&mut self) -> &mut MOpt;
 }
 
 /// The state a fuzz run.
@@ -523,5 +519,23 @@ where
 
     fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
         unimplemented!()
+    }
+}
+
+
+impl<C, FT, I, R, SC> HasMOpt for StdState<C, FT, I, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbackStatesTuple,
+    SC: Corpus<I>,
+{
+    fn mopt(&mut self) -> &MOpt{
+        self.metadata.get::<MOpt>().unwrap()
+    }
+
+    fn mopt_mut(&mut self) -> &mut MOpt{
+        self.metadata.get_mut::<MOpt>().unwrap()
     }
 }

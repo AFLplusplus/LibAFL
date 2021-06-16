@@ -21,7 +21,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
@@ -36,7 +36,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -214,7 +214,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -236,7 +236,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt<I, R>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
