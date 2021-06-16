@@ -56,11 +56,11 @@ where
     v_now: Vec<Vec<f64>>, // The speed
     probability_now: Vec<Vec<f64>>,
     swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
-    stage_finds_puppet: Vec<Vec<usize>>,
-    stage_finds_puppet_v2: Vec<Vec<usize>>,
-    stage_cycles_puppet: Vec<Vec<usize>>,
-    stage_cycles_puppet_v2: Vec<Vec<usize>>,
-    stage_cycles_puppet_v3: Vec<Vec<usize>>,
+    pilot_operator_finds_pso: Vec<Vec<usize>>,
+    pilot_operator_finds_per_stage: Vec<Vec<usize>>,
+    pilot_operator_ctr_pso: Vec<Vec<usize>>,
+    pilot_operator_ctr_per_stage: Vec<Vec<usize>>,
+    pilot_operator_ctr_last: Vec<Vec<usize>>,
     operator_finds_puppet: Vec<usize>,
     core_operator_finds_pso: Vec<usize>,
     core_operator_finds_per_stage: Vec<usize>,
@@ -110,11 +110,11 @@ where
             v_now: vec![vec![0.0; operator_num]; swarm_num],
             probability_now: vec![vec![0.0; operator_num]; swarm_num],
             swarm_fitness: vec![0.0; swarm_num],
-            stage_finds_puppet: vec![vec![0; operator_num]; swarm_num],
-            stage_finds_puppet_v2: vec![vec![0; operator_num]; swarm_num],
-            stage_cycles_puppet: vec![vec![0; operator_num]; swarm_num],
-            stage_cycles_puppet_v2: vec![vec![0; operator_num]; swarm_num],
-            stage_cycles_puppet_v3: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_finds_pso: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_finds_per_stage: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_ctr_pso: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_ctr_per_stage: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_ctr_last: vec![vec![0; operator_num]; swarm_num],
             operator_finds_puppet: vec![0; operator_num],
             core_operator_finds_pso: vec![0; operator_num],
             core_operator_finds_per_stage: vec![0; operator_num],
@@ -145,6 +145,11 @@ where
 
     pub fn core_operator_ctr_last(&self, idx: usize) -> usize {
         self.core_operator_ctr_last[idx]
+    }
+
+    #[inline]
+    pub fn swarm_now(&self) -> usize {
+        self.swarm_now
     }
 
     #[inline]
@@ -183,8 +188,31 @@ where
     }
 
     #[inline]
+    pub fn pilot_operator_ctr_per_stage(&self, swarm_now: usize, idx: usize) -> usize {
+        self.pilot_operator_ctr_per_stage[swarm_now][idx]
+    }
+
+    #[inline]
+    pub fn set_pilot_operator_ctr_per_stage(&mut self, swarm_now: usize, idx: usize, v: usize) {
+        self.pilot_operator_ctr_per_stage[swarm_now][idx] = v;
+    }
+
+    #[inline]
     pub fn core_operator_finds_per_stage(&self, idx: usize) -> usize {
         self.core_operator_finds_per_stage[idx]
+    }
+
+    #[inline]
+    pub fn core_operator_ctr_per_stage(&self, idx: usize) -> usize {
+        self.core_operator_ctr_per_stage[idx]
+    }
+
+    #[inline]
+    pub fn update_pilot_operator_ctr_last(&mut self, swarm_now: usize) {
+        for i in 0..self.operator_num {
+            self.pilot_operator_ctr_last[swarm_now][i] =
+                self.pilot_operator_ctr_per_stage[swarm_now][i]
+        }
     }
 
     #[inline]
@@ -223,8 +251,8 @@ where
     }
 
     #[inline]
-    pub fn add_core_operator_ctr(&mut self, idx: usize, v: usize) {
-        self.core_operator_ctr_per_stage[idx] += v;
+    pub fn set_core_operator_ctr_per_stage(&mut self, idx: usize, v: usize) {
+        self.core_operator_ctr_per_stage[idx] = v;
     }
 
     #[inline]
@@ -256,7 +284,7 @@ where
             self.operator_finds_puppet[i] = self.core_operator_ctr_pso[i];
 
             for j in 0..self.swarm_num {
-                self.operator_finds_puppet[i] += self.stage_finds_puppet[j][i];
+                self.operator_finds_puppet[i] += self.pilot_operator_finds_pso[j][i];
             }
             operator_find_sum += self.operator_finds_puppet[i];
         }
@@ -277,10 +305,10 @@ where
                     + self.rand_below(1000) * (self.G_best[i] - self.x_now[swarm][i]);
                 self.x_now[swarm][i] += self.v_now[swarm][i];
 
-                if self.x_now[swarm][i] > v_max {
-                    self.x_now[swarm][i] = v_max;
-                } else if self.x_now[swarm][i] < v_min {
-                    self.x_now[swarm][i] = v_min;
+                if self.x_now[swarm][i] > V_MAX {
+                    self.x_now[swarm][i] = V_MAX;
+                } else if self.x_now[swarm][i] < V_MIN {
+                    self.x_now[swarm][i] = V_MIN;
                 }
                 probability_sum += self.x_now[swarm][i];
             }
@@ -342,8 +370,8 @@ where
     }
 }
 
-const v_max: f64 = 1.0;
-const v_min: f64 = 0.05;
+const V_MAX: f64 = 1.0;
+const V_MIN: f64 = 0.05;
 
 const SPLICE_CYCLES_puppet_up: usize = 25;
 const SPLICE_CYCLES_puppet_low: usize = 5;
@@ -427,17 +455,20 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO
-        let mut r = MutationResult::Mutated;
+        let mut r = MutationResult::Skipped;
         state.mopt_mut().update_core_operator_ctr_last();
         for i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
             let outcome = self
                 .mutations_mut()
                 .get_and_mutate(idx, state, input, stage_idx)?;
-            if outcome != MutationResult::Mutated {
-                r = MutationResult::Skipped;
+            if outcome == MutationResult::Mutated {
+                r = MutationResult::Mutated;
             }
-            state.mopt_mut().add_core_operator_ctr(idx, 1);
+            let prev = state.mopt().core_operator_ctr_per_stage(idx);
+            state
+                .mopt_mut()
+                .set_core_operator_ctr_per_stage(idx, prev + 1);
         }
 
         Ok(r)
@@ -445,12 +476,29 @@ where
 
     fn pilot_mutate(
         &mut self,
-        _state: &mut S,
-        _input: &mut I,
-        _stage_idx: i32,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        // TODO
-        Ok(MutationResult::Mutated)
+        let mut r = MutationResult::Skipped;
+        let swarm_now = state.mopt().swarm_now();
+        state.mopt_mut().update_pilot_operator_ctr_last(swarm_now);
+
+        for i in 0..self.iterations(state, input) {
+            let idx = self.schedule(state, input);
+            let outcome = self
+                .mutations_mut()
+                .get_and_mutate(idx, state, input, stage_idx)?;
+            if outcome == MutationResult::Mutated {
+                r = MutationResult::Mutated;
+            }
+            let prev = state.mopt().pilot_operator_ctr_per_stage(swarm_now, idx);
+            state
+                .mopt_mut()
+                .set_pilot_operator_ctr_per_stage(swarm_now, idx, prev + 1);
+        }
+
+        Ok(r)
     }
 }
 

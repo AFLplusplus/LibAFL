@@ -77,7 +77,7 @@ where
 
                 let num = self.iterations(state);
 
-                for i in 0..num {
+                for stage_id in 0..num {
                     let mut input = state
                         .corpus()
                         .get(corpus_idx)?
@@ -85,16 +85,18 @@ where
                         .load_input()?
                         .clone();
 
-                    self.mutator_mut().mutate(state, &mut input, i as i32)?;
+                    self.mutator_mut()
+                        .mutate(state, &mut input, stage_id as i32)?;
 
                     let core_time = state.mopt().core_time();
-                    state.mopt_mut().set_core_time(core_time);
+                    state.mopt_mut().set_core_time(core_time + 1);
 
                     let finds_before = state.corpus().count() + state.solutions().count();
 
                     let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
-                    self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+                    self.mutator_mut()
+                        .post_exec(state, stage_id as i32, corpus_idx)?;
 
                     let finds = state.corpus().count() + state.solutions().count();
                     if finds > finds_before {
@@ -129,7 +131,20 @@ where
                     }
                 }
             }
-            MOptMode::PILOT_FUZZING => {}
+            MOptMode::PILOT_FUZZING => {
+                let num = self.iterations(state);
+                for stage_id in 0..num {
+                    let mut input = state
+                        .corpus()
+                        .get(corpus_idx)?
+                        .borrow_mut()
+                        .load_input()?
+                        .clone();
+
+                    self.mutator_mut()
+                        .mutate(state, &mut input, stage_id as i32)?;
+                }
+            }
         }
 
         Ok(())
