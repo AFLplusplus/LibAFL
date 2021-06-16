@@ -5,7 +5,7 @@ use crate::{
     corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
-    mutators::{MOptMode, Mutator},
+    mutators::{MOptMode, MOptMutator, MutatorsTuple},
     stages::{MutationalStage, Stage},
     state::{HasClientPerfStats, HasCorpus, HasMOpt, HasRand, HasSolutions},
     Error,
@@ -15,10 +15,11 @@ const LIMIT_TIME_BOUND: f64 = 1.1;
 const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 #[derive(Clone, Debug)]
-pub struct MOptStage<C, E, EM, I, M, R, S, Z>
+pub struct MOptStage<C, E, EM, I, M, MT, R, S, Z>
 where
     C: Corpus<I>,
-    M: Mutator<I, S>,
+    M: MOptMutator<I, MT, R, S>,
+    MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
     S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
@@ -26,14 +27,15 @@ where
 {
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, R, S, Z)>,
+    phantom: PhantomData<(C, E, EM, I, MT, R, S, Z)>,
 }
 
-impl<C, E, EM, I, M, R, S, Z> MutationalStage<C, E, EM, I, M, S, Z>
-    for MOptStage<C, E, EM, I, M, R, S, Z>
+impl<C, E, EM, I, M, MT, R, S, Z> MutationalStage<C, E, EM, I, M, S, Z>
+    for MOptStage<C, E, EM, I, M, MT, R, S, Z>
 where
     C: Corpus<I>,
-    M: Mutator<I, S>,
+    M: MOptMutator<I, MT, R, S>,
+    MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
     S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
@@ -208,10 +210,11 @@ where
     }
 }
 
-impl<C, E, EM, I, M, R, S, Z> Stage<E, EM, S, Z> for MOptStage<C, E, EM, I, M, R, S, Z>
+impl<C, E, EM, I, M, MT, R, S, Z> Stage<E, EM, S, Z> for MOptStage<C, E, EM, I, M, MT, R, S, Z>
 where
     C: Corpus<I>,
-    M: Mutator<I, S>,
+    M: MOptMutator<I, MT, R, S>,
+    MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
     S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
@@ -230,10 +233,11 @@ where
     }
 }
 
-impl<C, E, EM, I, M, R, S, Z> MOptStage<C, E, EM, I, M, R, S, Z>
+impl<C, E, EM, I, M, MT, R, S, Z> MOptStage<C, E, EM, I, M, MT, R, S, Z>
 where
     C: Corpus<I>,
-    M: Mutator<I, S>,
+    M: MOptMutator<I, MT, R, S>,
+    MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
     S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,

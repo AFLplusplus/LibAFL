@@ -465,7 +465,7 @@ pub enum MOptMode {
     CORE_FUZZING,
 }
 
-pub struct MOptMutator<I, MT, R, S>
+pub struct StdMOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
@@ -476,7 +476,7 @@ where
     phantom: PhantomData<(I, R, S)>,
 }
 
-impl<I, MT, R, S> Debug for MOptMutator<I, MT, R, S>
+impl<I, MT, R, S> Debug for StdMOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
@@ -486,14 +486,14 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "MOptMutator with {} mutations for Input type {}",
+            "StdMOptMutator with {} mutations for Input type {}",
             self.mutations.len(),
             core::any::type_name::<I>()
         )
     }
 }
 
-impl<I, MT, R, S> Mutator<I, S> for MOptMutator<I, MT, R, S>
+impl<I, MT, R, S> Mutator<I, S> for StdMOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
@@ -511,7 +511,7 @@ where
     }
 }
 
-impl<I, MT, R, S> MOptMutator<I, MT, R, S>
+impl<I, MT, R, S> StdMOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
@@ -578,7 +578,7 @@ where
     }
 }
 
-impl<I, MT, R, S> ComposedByMutations<I, MT, S> for MOptMutator<I, MT, R, S>
+impl<I, MT, R, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
@@ -598,7 +598,7 @@ where
     }
 }
 
-impl<I, MT, R, S> ScheduledMutator<I, MT, S> for MOptMutator<I, MT, R, S>
+impl<I, MT, R, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, R, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
@@ -629,4 +629,22 @@ where
 
         result
     }
+}
+
+pub trait MOptMutator<I, MT, R, S>: ScheduledMutator<I, MT, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand,
+    S: HasRand<R> + HasMOpt,
+{
+}
+
+impl<I, MT, R, S> MOptMutator<I, MT, R, S> for StdMOptMutator<I, MT, R, S>
+where
+    I: Input,
+    MT: MutatorsTuple<I, S>,
+    R: Rand,
+    S: HasRand<R> + HasMOpt,
+{
 }

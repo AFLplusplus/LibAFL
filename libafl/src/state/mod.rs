@@ -138,7 +138,7 @@ pub trait HasStartTime {
 }
 
 pub trait HasMOpt {
-    fn mopt(&mut self) -> &MOpt;
+    fn mopt(&self) -> &MOpt;
 
     fn mopt_mut(&mut self) -> &mut MOpt;
 }
@@ -522,7 +522,6 @@ where
     }
 }
 
-
 impl<C, FT, I, R, SC> HasMOpt for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
@@ -531,11 +530,11 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    fn mopt(&mut self) -> &MOpt{
+    fn mopt(&self) -> &MOpt {
         self.metadata.get::<MOpt>().unwrap()
     }
 
-    fn mopt_mut(&mut self) -> &mut MOpt{
+    fn mopt_mut(&mut self) -> &mut MOpt {
         self.metadata.get_mut::<MOpt>().unwrap()
     }
 }
