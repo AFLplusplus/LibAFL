@@ -48,10 +48,19 @@ pub trait CompilerWrapper {
     /// Get if in linking mode
     fn is_linking(&self) -> bool;
 
+    /// Silences libafl_cc output
+    fn silence(&mut self) -> &'_ mut Self;
+
+    /// Returns `true` if `silence` was called
+    fn is_silent(&self) -> bool;
+
     /// Run the compiler
     fn run(&mut self) -> Result<(), Error> {
         let args = self.command()?;
-        dbg!(&args);
+
+        if !self.is_silent() {
+            dbg!(&args);
+        }
         if args.is_empty() {
             return Err(Error::InvalidArguments(
                 "The number of arguments cannot be 0".into(),
@@ -61,7 +70,9 @@ pub trait CompilerWrapper {
             Ok(s) => s,
             Err(e) => return Err(Error::Io(e)),
         };
-        dbg!(status);
+        if !self.is_silent() {
+            dbg!(status);
+        }
         Ok(())
     }
 }
@@ -69,6 +80,7 @@ pub trait CompilerWrapper {
 /// Wrap Clang
 #[allow(clippy::struct_excessive_bools)]
 pub struct ClangWrapper {
+    is_silent: bool,
     optimize: bool,
     wrapped_cc: String,
     wrapped_cxx: String,
@@ -180,6 +192,15 @@ impl CompilerWrapper for ClangWrapper {
     fn is_linking(&self) -> bool {
         self.linking
     }
+
+    fn silence(&mut self) -> &'_ mut Self {
+        self.is_silent = true;
+        self
+    }
+
+    fn is_silent(&self) -> bool {
+        self.is_silent
+    }
 }
 
 impl ClangWrapper {
@@ -198,6 +219,7 @@ impl ClangWrapper {
             base_args: vec![],
             cc_args: vec![],
             link_args: vec![],
+            is_silent: false,
         }
     }
 

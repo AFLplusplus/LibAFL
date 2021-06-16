@@ -30,3 +30,14 @@ clap = { version = "3.0.0-beta.2", features = ["default"] }
 [lib]
 name = "fuzzbench"
 crate-type = ["staticlib"]
+
+[[bin]]
+# For c binaries
+name = "libafl_cc"
+path = "src/bin/libafl_cc.rs"
+
+[[bin]]
+# For cpp binaries
+name = "libafl_cxx"
+path = "src/bin/libafl_cc.rs"
+
