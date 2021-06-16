@@ -1,4 +1,4 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper, LIB_EXT, LIB_PREFIX};
+use libafl_cc::{ClangWrapper, CompilerWrapper};
 use std::env;
 
 fn main() {
@@ -15,40 +15,19 @@ fn main() {
 
         dir.pop();
 
-        let mut cc = if is_cpp {
-            let mut cc = ClangWrapper::new("clang", "clang++");
-            cc.is_cpp();
-            cc
-        } else {
-            ClangWrapper::new("clang", "clang")
-        };
+        let mut cc = ClangWrapper::new("clang", if is_cpp { "clang++" } else { "clang" });
 
-        cc.from_args(&args).unwrap();
-        #[cfg(target_os = "linux")]
-        cc.add_link_arg("-Wl,--whole-archive".into()).unwrap();
-        //#[cfg(any(target_os = "macos", target_os = "ios"))]
-        //cc.add_link_arg("-all_load".into()).unwrap();
-        cc.add_link_arg(
-            dir.join(format!("{}fuzzbench.{}", LIB_PREFIX, LIB_EXT))
-                .display()
-                .to_string(),
-        )
-        .unwrap();
-        #[cfg(target_os = "linux")]
-        cc.add_link_arg("-Wl,-no-whole-archive".into()).unwrap();
-        cc.add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
-            .unwrap();
-        // Libraries needed by libafl on Windows
-        #[cfg(windows)]
-        cc.add_link_arg("-lws2_32".into())
+        cc.is_cpp(is_cpp)
+            .from_args(&args)
             .unwrap()
-            .add_link_arg("-lBcrypt".into())
+            .link_staticlib(&dir, "fuzzbench".into())
             .unwrap()
-            .add_link_arg("-lAdvapi32".into())
+            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
+            .unwrap()
+            // silence the compiler wrapper output, needed for some configure scripts.
+            .silence()
+            .run()
             .unwrap();
-        // silence the compiler wrapper output, needed for some configure scripts.
-        cc.silence();
-        cc.run().unwrap();
     } else {
         panic!("LibAFL CC: No Arguments given");
     }

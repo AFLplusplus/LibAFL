@@ -179,13 +179,21 @@ impl CompilerWrapper for ClangWrapper {
     }
 
     fn link_staticlib(&mut self, dir: &Path, name: String) -> Result<&'_ mut Self, Error> {
-        self.add_link_arg("-Wl,--whole-archive".into())?
-            .add_link_arg(
-                dir.join(format!("{}{}.{}", LIB_PREFIX, name, LIB_EXT))
-                    .display()
-                    .to_string(),
-            )?
-            .add_link_arg("-Wl,-no-whole-archive".into())
+        if cfg!(any(target_os = "macos", target_os = "ios")) {
+            //self.add_link_arg("-force_load".into())?;
+        } else {
+            self.add_link_arg("-Wl,--whole-archive".into())?;
+        }
+        self.add_link_arg(
+            dir.join(format!("{}{}.{}", LIB_PREFIX, name, LIB_EXT))
+                .display()
+                .to_string(),
+        )?;
+        if cfg!(any(target_os = "macos", target_os = "ios")) {
+            Ok(self)
+        } else {
+            self.add_link_arg("-Wl,-no-whole-archive".into())
+        }
     }
 
     fn command(&mut self) -> Result<Vec<String>, Error> {
