@@ -4,7 +4,7 @@ LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
 # Install clang 11
-RUN apt update && apt install -y build-essential git wget clang clang-tools libc++-11-dev libc++abi-11-dev
+RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev
 
 RUN cargo install sccache
 
@@ -76,6 +76,6 @@ RUN cargo build && cargo build --release
 # Copy fuzzers over
 COPY fuzzers fuzzers
 
-#RUN --mount=type=cache,target=/root/.cache/sccache ./scripts/build_all_fuzzers.sh
+# RUN ./scripts/build_all_fuzzers.sh --no-fmt
 
 ENTRYPOINT [ "/bin/bash" ]
