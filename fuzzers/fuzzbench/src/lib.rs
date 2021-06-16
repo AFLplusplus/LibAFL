@@ -100,7 +100,7 @@ pub extern "C" fn fuzzer_main() {
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
     let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
-    let mut crashes = corpus.clone();
+    let mut crashes = out_dir.clone();
     crashes.push("crashes");
     out_dir.push("queue");
 
