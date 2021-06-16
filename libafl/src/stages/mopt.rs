@@ -189,6 +189,16 @@ where
                         state.mopt_mut().set_pilot_time(0);
                         let total_finds = state.mopt().total_finds();
                         state.mopt_mut().set_finds_until_last_switching(total_finds);
+                        state.mopt_mut().update_pilot_operator_ctr_pso(swarm_now);
+
+                        state.mopt_mut().set_swarm_now(swarm_now + 1);
+
+                        if state.mopt().swarm_now() == state.mopt().swarm_num() {
+                            // Move to CORE_FUZING mode
+                            state.mopt_mut().set_key_module(MOptMode::CORE_FUZZING);
+
+                            state.mopt_mut().init_core_module()?;
+                        }
                     }
                 }
             }

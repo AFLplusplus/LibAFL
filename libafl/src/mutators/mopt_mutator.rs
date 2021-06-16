@@ -189,6 +189,11 @@ where
     }
 
     #[inline]
+    pub fn swarm_num(&self) -> usize {
+        self.swarm_num
+    }
+
+    #[inline]
     pub fn pilot_operator_finds_per_stage(&self, swarm_now: usize, idx: usize) -> usize {
         self.pilot_operator_finds_per_stage[swarm_now][idx]
     }
@@ -218,6 +223,27 @@ where
         self.core_operator_ctr_last[idx]
     }
 
+    pub fn init_core_module(&mut self) -> Result<(), Error> {
+        // Initialize core_operator_* values
+        for i in 0..self.operator_num {
+            self.core_operator_ctr_per_stage[i] = self.core_operator_ctr_pso[i];
+            self.core_operator_ctr_last[i] = self.core_operator_ctr_pso[i];
+            self.core_operator_finds_per_stage[i] = self.core_operator_finds_pso[i]
+        }
+
+        let mut swarm_eff = 0.0;
+        let mut best_swarm = 0;
+        for i in 0..self.swarm_num {
+            if self.swarm_fitness[i] > swarm_eff {
+                swarm_eff = self.swarm_fitness[i];
+                best_swarm = i;
+            }
+        }
+
+        self.swarm_now = best_swarm;
+        Ok(())
+    }
+
     #[inline]
     pub fn update_pilot_operator_ctr_last(&mut self, swarm_now: usize) {
         for i in 0..self.operator_num {
@@ -230,6 +256,31 @@ where
     pub fn update_core_operator_ctr_last(&mut self) {
         for i in 0..self.operator_num {
             self.core_operator_ctr_last[i] = self.core_operator_ctr_per_stage[i];
+        }
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    pub fn update_pilot_operator_ctr_pso(&mut self, swarm_now: usize) {
+        let mut eff = 0.0;
+        for i in 0..self.operator_num() {
+            if self.pilot_operator_ctr_per_stage[swarm_now][i]
+                > self.pilot_operator_ctr_pso[swarm_now][i]
+            {
+                eff = ((self.pilot_operator_finds_per_stage[swarm_now][i]
+                    - self.pilot_operator_finds_pso[swarm_now][i]) as f64)
+                    / ((self.pilot_operator_ctr_per_stage[swarm_now][i]
+                        - self.pilot_operator_ctr_pso[swarm_now][i]) as f64)
+            }
+
+            if self.eff_best[swarm_now][i] < eff {
+                self.eff_best[swarm_now][i] = eff;
+                self.L_best[swarm_now][i] = self.x_now[swarm_now][i];
+            }
+
+            self.pilot_operator_finds_pso[swarm_now][i] =
+                self.pilot_operator_finds_per_stage[swarm_now][i];
+            self.pilot_operator_ctr_pso[swarm_now][i] =
+                self.pilot_operator_ctr_per_stage[swarm_now][i];
         }
     }
 
@@ -279,6 +330,11 @@ where
     #[inline]
     pub fn set_pilot_operator_finds_per_stage(&mut self, swarm_now: usize, idx: usize, v: usize) {
         self.pilot_operator_finds_per_stage[swarm_now][idx] = v;
+    }
+
+    #[inline]
+    pub fn set_swarm_now(&mut self, v: usize) {
+        self.swarm_now = v;
     }
 
     #[inline]
@@ -414,7 +470,6 @@ const STAGE_Clone75: usize = 14;
 const STAGE_OverWrite75: usize = 15;
 const STAGE_OverWriteExtra: usize = 16;
 const STAGE_InsertExtra: usize = 17;
-const period_pilot_tmp: f64 = 5000.0;
 
 #[derive(Clone, Copy, Debug)]
 pub enum MOptMode {
