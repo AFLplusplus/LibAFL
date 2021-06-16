@@ -1,12 +1,23 @@
 //! A singlethreade libfuzzer-like fuzzer that can auto-restart.
 
 use clap::{App, Arg};
-use core::time::Duration;
-use std::{env, fs::File, io::Write, path::PathBuf};
+use core::{cell::RefCell, time::Duration};
+#[cfg(unix)]
+use nix::{self, unistd::dup};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::{
+    env,
+    fs::{File, OpenOptions},
+    io,
+    io::Write,
+    path::PathBuf,
+};
 
 use libafl::{
     bolts::{
-        current_nanos,
+        current_nanos, current_time,
+        os::dup2,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -120,12 +131,28 @@ fn fuzz(
     logfile: PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
-    let mut log = File::create(logfile)?;
+    let log = RefCell::new(
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&logfile)?,
+    );
+
+    #[cfg(unix)]
+    let mut stdout_cpy = unsafe {
+        let new_fd = dup(io::stdout().as_raw_fd())?;
+        File::from_raw_fd(new_fd)
+    };
+    #[cfg(unix)]
+    let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = SimpleStats::new(move |s| {
+    let stats = SimpleStats::new(|s| {
+        #[cfg(unix)]
+        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        #[cfg(windows)]
         println!("{}", s);
-        writeln!(&mut log, "{}", s).unwrap();
+        writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
     // We need a shared map to store our state before a crash.
@@ -264,6 +291,21 @@ fn fuzz(
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &seed_dir));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
+
+    // Remove target ouput (logs still survive)
+    #[cfg(unix)]
+    {
+        let null_fd = file_null.as_raw_fd();
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stderr().as_raw_fd())?;
+    }
+    // reopen file to make sure we're at the end
+    log.replace(
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&logfile)?,
+    );
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
