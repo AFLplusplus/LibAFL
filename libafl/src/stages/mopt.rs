@@ -11,7 +11,8 @@ use crate::{
     Error,
 };
 
-const limit_time_bound: f64 = 1.1;
+const LIMIT_TIME_BOUND: f64 = 1.1;
+const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 #[derive(Clone, Debug)]
 pub struct MOptStage<C, E, EM, I, M, R, S, Z>
@@ -101,9 +102,10 @@ where
                     let finds = state.corpus().count() + state.solutions().count();
                     if finds > finds_before {
                         let diff = finds - finds_before;
-                        state.mopt_mut().add_total_finds(diff);
+                        let cur_total_finds = state.mopt().total_finds();
+                        state.mopt_mut().set_total_finds(diff + cur_total_finds);
                         for i in 0..state.mopt().operator_num() {
-                            if state.mopt().core_operator_ctr(i)
+                            if state.mopt().core_operator_ctr_per_stage(i)
                                 > state.mopt().core_operator_ctr_last(i)
                             {
                                 let prev = state.mopt().core_operator_finds_per_stage(i);
@@ -115,7 +117,7 @@ where
                     }
 
                     if (finds as f64)
-                        > (finds as f64) * limit_time_bound
+                        > (finds as f64) * LIMIT_TIME_BOUND
                             + (state.mopt().finds_since_switching() as f64)
                     {
                         // Move to the Pilot fuzzing mode
@@ -123,11 +125,13 @@ where
                         state.mopt_mut().set_finds_since_switching(0);
                     }
 
-                    if (state.mopt().core_time() > state.mopt().period_core()) {
+                    if state.mopt().core_time() > state.mopt().period_core() {
                         // Make a call to pso_update()
                         state.mopt_mut().set_core_time(0);
+                        let total_finds = state.mopt().total_finds();
+                        state.mopt_mut().set_finds_until_last_switching(total_finds);
                         state.mopt_mut().update_core_operator_ctr_pso();
-                        state.mopt_mut().pso_update();
+                        state.mopt_mut().pso_update()?;
                     }
                 }
             }
@@ -143,6 +147,49 @@ where
 
                     self.mutator_mut()
                         .mutate(state, &mut input, stage_id as i32)?;
+
+                    let pilot_time = state.mopt().pilot_time();
+                    state.mopt_mut().set_pilot_time(pilot_time + 1);
+
+                    let finds_before = state.corpus().count() + state.solutions().count();
+
+                    let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
+
+                    self.mutator_mut()
+                        .post_exec(state, stage_id as i32, corpus_idx)?;
+
+                    let swarm_now = state.mopt().swarm_now();
+                    let finds = state.corpus().count() + state.solutions().count();
+                    let diff = finds - finds_before;
+
+                    if finds > finds_before {
+                        let cur_total_finds = state.mopt().total_finds();
+                        state.mopt_mut().set_total_finds(diff + cur_total_finds);
+                        for i in 0..state.mopt().operator_num() {
+                            if state.mopt().pilot_operator_ctr_per_stage(swarm_now, i)
+                                > state.mopt().pilot_operator_ctr_last(swarm_now, i)
+                            {
+                                let prev =
+                                    state.mopt().pilot_operator_finds_per_stage(swarm_now, i);
+                                state.mopt_mut().set_pilot_operator_finds_per_stage(
+                                    swarm_now,
+                                    i,
+                                    diff + prev,
+                                );
+                            }
+                        }
+                    }
+
+                    if state.mopt().pilot_time() > state.mopt().period_pilot() {
+                        let new_finds =
+                            state.mopt().total_finds() - state.mopt().finds_until_last_switching();
+                        let f = (new_finds as f64)
+                            / ((state.mopt().pilot_time() as f64) / (PERIOD_PILOT_COEF));
+                        state.mopt_mut().set_swarm_fitness(swarm_now, f);
+                        state.mopt_mut().set_pilot_time(0);
+                        let total_finds = state.mopt().total_finds();
+                        state.mopt_mut().set_finds_until_last_switching(total_finds);
+                    }
                 }
             }
         }

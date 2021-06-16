@@ -30,7 +30,7 @@ where
     finds_since_switching: usize, // How many findings have we found since we switched to the current mode?
     last_limit_time_start: Duration, // Unneeded variable
     total_finds: usize,
-    temp_puppet_find: u64,
+    finds_until_last_switching: usize,
     most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
     most_time_puppet: u64, // Unneeded for LibAFL
     SPLICE_CYCLES_puppet: i32,
@@ -84,7 +84,7 @@ where
             finds_since_switching: 0,
             last_limit_time_start: Duration::from_millis(0),
             total_finds: 0,
-            temp_puppet_find: 0,
+            finds_until_last_switching: 0,
             most_time_key: 0,
             most_time_puppet: 0,
             SPLICE_CYCLES_puppet: 0,
@@ -139,15 +139,6 @@ where
     }
 
     #[inline]
-    pub fn core_operator_ctr(&self, idx: usize) -> usize {
-        self.core_operator_ctr_per_stage[idx]
-    }
-
-    pub fn core_operator_ctr_last(&self, idx: usize) -> usize {
-        self.core_operator_ctr_last[idx]
-    }
-
-    #[inline]
     pub fn swarm_now(&self) -> usize {
         self.swarm_now
     }
@@ -155,6 +146,11 @@ where
     #[inline]
     pub fn operator_num(&self) -> usize {
         self.operator_num
+    }
+
+    #[inline]
+    pub fn total_finds(&self) -> usize {
+        self.total_finds
     }
 
     #[inline]
@@ -183,8 +179,18 @@ where
     }
 
     #[inline]
+    pub fn finds_until_last_switching(&self) -> usize {
+        self.finds_until_last_switching
+    }
+
+    #[inline]
     pub fn last_limit_time_start(&self) -> Duration {
         self.last_limit_time_start
+    }
+
+    #[inline]
+    pub fn pilot_operator_finds_per_stage(&self, swarm_now: usize, idx: usize) -> usize {
+        self.pilot_operator_finds_per_stage[swarm_now][idx]
     }
 
     #[inline]
@@ -193,8 +199,8 @@ where
     }
 
     #[inline]
-    pub fn set_pilot_operator_ctr_per_stage(&mut self, swarm_now: usize, idx: usize, v: usize) {
-        self.pilot_operator_ctr_per_stage[swarm_now][idx] = v;
+    pub fn pilot_operator_ctr_last(&self, swarm_now: usize, idx: usize) -> usize {
+        self.pilot_operator_ctr_last[swarm_now][idx]
     }
 
     #[inline]
@@ -205,6 +211,11 @@ where
     #[inline]
     pub fn core_operator_ctr_per_stage(&self, idx: usize) -> usize {
         self.core_operator_ctr_per_stage[idx]
+    }
+
+    #[inline]
+    pub fn core_operator_ctr_last(&self, idx: usize) -> usize {
+        self.core_operator_ctr_last[idx]
     }
 
     #[inline]
@@ -246,6 +257,11 @@ where
     }
 
     #[inline]
+    pub fn set_finds_until_last_switching(&mut self, v: usize) {
+        self.finds_until_last_switching = v;
+    }
+
+    #[inline]
     pub fn set_core_operator_finds_per_stage(&mut self, idx: usize, v: usize) {
         self.core_operator_finds_per_stage[idx] = v;
     }
@@ -256,16 +272,33 @@ where
     }
 
     #[inline]
+    pub fn set_pilot_operator_ctr_per_stage(&mut self, swarm_now: usize, idx: usize, v: usize) {
+        self.pilot_operator_ctr_per_stage[swarm_now][idx] = v;
+    }
+
+    #[inline]
+    pub fn set_pilot_operator_finds_per_stage(&mut self, swarm_now: usize, idx: usize, v: usize) {
+        self.pilot_operator_finds_per_stage[swarm_now][idx] = v;
+    }
+
+    #[inline]
     pub fn set_core_time(&mut self, v: usize) {
         self.core_time = v;
     }
 
+    #[inline]
     pub fn set_pilot_time(&mut self, v: usize) {
         self.pilot_time = v;
     }
 
-    pub fn add_total_finds(&mut self, v: usize) {
-        self.total_finds += v;
+    #[inline]
+    pub fn set_total_finds(&mut self, v: usize) {
+        self.total_finds = v;
+    }
+
+    #[inline]
+    pub fn set_swarm_fitness(&mut self, swarm_now: usize, fitness: f64) {
+        self.swarm_fitness[swarm_now] = fitness;
     }
 
     #[allow(clippy::cast_precision_loss)]
