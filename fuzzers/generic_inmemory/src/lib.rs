@@ -66,8 +66,8 @@ pub fn main() {
         .value_of("output")
         .map(|s| PathBuf::from(s))
         .unwrap_or(workdir.clone());
-    let dicts: Vec<&str> = matches
-        .values_of("dict")
+    let token_files: Vec<&str> = matches
+        .values_of("tokens")
         .map(|v| v.collect())
         .unwrap_or(vec![]);
     let timeout_ms = matches
@@ -129,8 +129,8 @@ pub fn main() {
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
-            for dict in &dicts {
-                state.add_metadata(Tokens::from_tokens_file(dict)?);
+            for tokens_file in &token_files {
+                state.add_metadata(Tokens::from_tokens_file(tokens_file)?);
             }
         }
 

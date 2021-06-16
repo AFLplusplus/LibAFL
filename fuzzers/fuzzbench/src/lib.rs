@@ -57,15 +57,15 @@ pub extern "C" fn fuzzer_main() {
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
-            Arg::new("corpus")
-                .about("The directory to place finds in")
+            Arg::new("out")
+                .about("The directory to place finds in ('corpus')")
                 .required(true)
                 .index(1)
                 .takes_value(true),
         )
         .arg(
-            Arg::new("seeds")
-                .about("The directory to read initial inputs from")
+            Arg::new("in")
+                .about("The directory to read initial inputs from ('seeds')")
                 .required(true)
                 .index(2)
                 .takes_value(true),
