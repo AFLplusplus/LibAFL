@@ -5,6 +5,9 @@ use xxhash_rust::xxh3::xxh3_64_with_seed;
 #[cfg(feature = "std")]
 use crate::bolts::current_nanos;
 
+#[cfg(feature = "rand_trait")]
+use rand_core::{self, impls::fill_bytes_via_next, RngCore};
+
 const HASH_CONST: u64 = 0xa5b35705;
 
 /// The standard rand implementation for `LibAFL`.
@@ -110,7 +113,7 @@ pub trait RandomSeed: Rand + Default {
 }
 
 // helper macro to impl RandomSeed
-macro_rules! impl_randomseed {
+macro_rules! impl_random {
     ($rand: ty) => {
         #[cfg(feature = "std")]
         impl RandomSeed for $rand {
@@ -119,14 +122,33 @@ macro_rules! impl_randomseed {
                 Self::with_seed(current_nanos())
             }
         }
+
+        #[cfg(feature = "rand_trait")]
+        impl RngCore for $rand {
+            fn next_u32(&mut self) -> u32 {
+                self.next() as u32
+            }
+
+            fn next_u64(&mut self) -> u64 {
+                self.next()
+            }
+
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                fill_bytes_via_next(self, dest)
+            }
+
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+                Ok(self.fill_bytes(dest))
+            }
+        }
     };
 }
 
-impl_randomseed!(Xoshiro256StarRand);
-impl_randomseed!(XorShift64Rand);
-impl_randomseed!(Lehmer64Rand);
-impl_randomseed!(RomuTrioRand);
-impl_randomseed!(RomuDuoJrRand);
+impl_random!(Xoshiro256StarRand);
+impl_random!(XorShift64Rand);
+impl_random!(Lehmer64Rand);
+impl_random!(RomuTrioRand);
+impl_random!(RomuDuoJrRand);
 
 /// XXH3 Based, hopefully speedy, rnd implementation
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
