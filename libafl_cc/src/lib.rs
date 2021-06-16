@@ -1,6 +1,6 @@
 //! Compiler Wrapper from `LibAFL`
 
-use std::{process::Command, string::String, vec::Vec};
+use std::{path::Path, process::Command, string::String, vec::Vec};
 
 /// `LibAFL` CC Error Type
 #[derive(Debug)]
@@ -41,6 +41,9 @@ pub trait CompilerWrapper {
 
     /// Add a compiler argument only when linking
     fn add_link_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
+
+    /// Link static C lib
+    fn link_staticlib(&mut self, dir: &Path, name: String) -> Result<&'_ mut Self, Error>;
 
     /// Command to run the compiler
     fn command(&mut self) -> Result<Vec<String>, Error>;
@@ -148,6 +151,14 @@ impl CompilerWrapper for ClangWrapper {
         // Fuzzing define common among tools
         new_args.push("-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1".into());
 
+        // Libraries needed by libafl on Windows
+        #[cfg(windows)]
+        if linking {
+            new_args.push("-lws2_32".into());
+            new_args.push("-lBcrypt".into());
+            new_args.push("-lAdvapi32".into());
+        }
+
         self.base_args = new_args;
         Ok(self)
     }
@@ -165,6 +176,16 @@ impl CompilerWrapper for ClangWrapper {
     fn add_link_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error> {
         self.link_args.push(arg);
         Ok(self)
+    }
+
+    fn link_staticlib(&mut self, dir: &Path, name: String) -> Result<&'_ mut Self, Error> {
+        self.add_link_arg("-Wl,--whole-archive".into())?
+            .add_link_arg(
+                dir.join(format!("{}{}.{}", LIB_PREFIX, name, LIB_EXT))
+                    .display()
+                    .to_string(),
+            )?
+            .add_link_arg("-Wl,-no-whole-archive".into())
     }
 
     fn command(&mut self) -> Result<Vec<String>, Error> {
@@ -229,9 +250,9 @@ impl ClangWrapper {
         self
     }
 
-    /// set cpp mode
-    pub fn is_cpp(&mut self) -> &'_ mut Self {
-        self.is_cpp = true;
+    /// Set cpp mode
+    pub fn is_cpp(&mut self, value: bool) -> &'_ mut Self {
+        self.is_cpp = value;
         self
     }
 }
