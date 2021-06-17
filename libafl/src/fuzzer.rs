@@ -348,7 +348,7 @@ where
                 let is_corpus = self.feedback_mut().is_interesting_with_perf(
                     state,
                     manager,
-                    input,
+                    &input,
                     observers,
                     &exit_kind,
                     &mut feedback_stats,
