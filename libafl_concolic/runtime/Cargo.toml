@@ -5,11 +5,7 @@ authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 edition = "2018"
 
 [lib]
-# this needs to be a "dylib", *not* a "cdylib". 
-# rustc will otherwise strip the symbols exported from the linked common runtime static library
-crate-type = ["dylib"]
-# we need to make sure the target file is called "libSymRuntime.so"
-name = "SymRuntime"
+crate-type = ["staticlib"]
 
 [profile.dev]
 panic = "abort"
