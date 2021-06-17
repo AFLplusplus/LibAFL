@@ -3,8 +3,12 @@
 
 #include "common.h"
 
+#ifndef CMPLOG_MAP_W
 #define CMPLOG_MAP_W 65536
+#endif
+#ifndef CMPLOG_MAP_H
 #define CMPLOG_MAP_H 32
+#endif
 
 #define CMPLOG_KIND_INS 0
 #define CMPLOG_KIND_RTN 1

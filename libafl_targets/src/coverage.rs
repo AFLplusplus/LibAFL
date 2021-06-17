@@ -1,8 +1,6 @@
 //! Coverage maps as static mut array
 
-// TODO compile time flag
-/// The map size for the edges map.
-pub const EDGES_MAP_SIZE: usize = 65536;
+use crate::EDGES_MAP_SIZE;
 
 /// The map for edges.
 pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
