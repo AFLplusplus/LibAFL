@@ -14,6 +14,7 @@ members = [
     "libafl_qemu",
     "libafl_tests",
     "libafl_concolic/concolic",
+    "libafl_concolic/dump_constraints",
 ]
 default-members = [
     "libafl",
