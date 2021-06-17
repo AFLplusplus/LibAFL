@@ -68,9 +68,9 @@ pub const CMPLOG_MAP_H: usize = {};
         }
 
         sancov_cmp
-            .define("CMP_MAP_SIZE", format!("{}", cmp_map_size))
-            .define("CMPLOG_MAP_W", format!("{}", cmplog_map_w))
-            .define("CMPLOG_MAP_H", format!("{}", cmplog_map_h))
+            .define("CMP_MAP_SIZE", Some(&*format!("{}", cmp_map_size)))
+            .define("CMPLOG_MAP_W", Some(&*format!("{}", cmplog_map_w)))
+            .define("CMPLOG_MAP_H", Some(&*format!("{}", cmplog_map_h)))
             .file(_src_dir.join("sancov_cmp.c"))
             .compile("sancov_cmp");
     }
