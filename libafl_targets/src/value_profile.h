@@ -3,10 +3,11 @@
 
 #include "common.h"
 
-// TODO compile time flag
-#define MAP_SIZE 65536
+#ifndef CMP_MAP_SIZE
+#define CMP_MAP_SIZE 65536
+#endif
 
-extern uint8_t libafl_cmp_map[MAP_SIZE];
+extern uint8_t libafl_cmp_map[CMP_MAP_SIZE];
 
 #ifdef _MSC_VER
   #include <intrin.h>

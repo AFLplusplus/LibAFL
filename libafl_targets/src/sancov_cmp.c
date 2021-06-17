@@ -14,7 +14,7 @@ void __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2) {
   k = (k >> 4) ^ (k << 8);
 
 #ifdef SANCOV_VALUE_PROFILE
-  k &= MAP_SIZE - 1;
+  k &= CMP_MAP_SIZE - 1;
   __libafl_targets_value_profile1(k, arg1, arg2);
 #endif
 #ifdef SANCOV_CMPLOG
@@ -30,7 +30,7 @@ void __sanitizer_cov_trace_cmp2(uint16_t arg1, uint16_t arg2) {
   k = (k >> 4) ^ (k << 8);
 
 #ifdef SANCOV_VALUE_PROFILE
-  k &= MAP_SIZE - 1;
+  k &= CMP_MAP_SIZE - 1;
   __libafl_targets_value_profile2(k, arg1, arg2);
 #endif
 #ifdef SANCOV_CMPLOG
@@ -46,7 +46,7 @@ void __sanitizer_cov_trace_cmp4(uint32_t arg1, uint32_t arg2) {
   k = (k >> 4) ^ (k << 8);
 
 #ifdef SANCOV_VALUE_PROFILE
-  k &= MAP_SIZE - 1;
+  k &= CMP_MAP_SIZE - 1;
   __libafl_targets_value_profile4(k, arg1, arg2);
 #endif
 #ifdef SANCOV_CMPLOG
@@ -62,7 +62,7 @@ void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2) {
   k = (k >> 4) ^ (k << 8);
 
 #ifdef SANCOV_VALUE_PROFILE
-  k &= MAP_SIZE - 1;
+  k &= CMP_MAP_SIZE - 1;
   __libafl_targets_value_profile8(k, arg1, arg2);
 #endif
 #ifdef SANCOV_CMPLOG
@@ -90,7 +90,7 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
     k = (k >> 4) ^ (k << 8);
     // val , cases[i + 2]
 #ifdef SANCOV_VALUE_PROFILE
-    k &= MAP_SIZE - 1;
+    k &= CMP_MAP_SIZE - 1;
     switch (cases[1]) {
         case 8:
         __libafl_targets_value_profile1(k, (uint8_t)val, (uint8_t)cases[i + 2]);

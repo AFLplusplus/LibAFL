@@ -1,8 +1,6 @@
 //! Value profile support for `LibAFL`
 
-// TODO compile time flag
-/// The Cmp map size.
-pub const CMP_MAP_SIZE: usize = 65536;
+use crate::CMP_MAP_SIZE;
 
 /// The constant cmplog map for the current `LibAFL` target
 #[no_mangle]

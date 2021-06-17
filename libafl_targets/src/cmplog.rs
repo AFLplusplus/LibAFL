@@ -10,11 +10,8 @@ use libafl::{
 
 use serde::{Deserialize, Serialize};
 
-// TODO compile time flag
-/// The `CmpLogMap` W value
-pub const CMPLOG_MAP_W: usize = 65536;
-/// The `CmpLogMap` H value
-pub const CMPLOG_MAP_H: usize = 32;
+use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
+
 /// The `CmpLog` map size
 pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 
