@@ -542,13 +542,13 @@ impl<W: Write> MessageFileWriter<W> {
     }
 }
 
-impl<T: ShMem> MessageFileWriter<ShmemCursor<T>> {
+impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
     pub fn new_from_shmem(shmem: T) -> Self {
-        Self::new_from_writer(ShmemCursor::from_shmem(shmem))
+        Self::new_from_writer(ShMemCursor::from_shmem(shmem))
     }
 }
 
-impl MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
+impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
     pub fn new_from_stdshmem_env(env_name: impl AsRef<str>) -> Self {
         Self::new_from_shmem(
             StdShMemProvider::new()
@@ -559,7 +559,7 @@ impl MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
     }
 }
 
-use libafl::bolts::shmem::{ShMem, ShMemProvider, ShmemCursor, StdShMemProvider};
+use libafl::bolts::shmem::{ShMem, ShMemProvider, ShMemCursor, StdShMemProvider};
 
 pub type StdShMemMessageFileWriter =
-    MessageFileWriter<ShmemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
+    MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;

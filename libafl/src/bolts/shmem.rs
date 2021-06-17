@@ -980,15 +980,14 @@ pub mod win32_shmem {
     }
 }
 
-/// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`].
-#[cfg(feature = "std")]
-pub struct ShmemCursor<T: ShMem> {
+/// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`] in std environments.
+pub struct ShMemCursor<T: ShMem> {
     inner: T,
     pos: usize,
 }
 
 #[cfg(feature = "std")]
-impl<T: ShMem> ShmemCursor<T> {
+impl<T: ShMem> ShMemCursor<T> {
     pub fn from_shmem(shmem: T) -> Self {
         Self {
             inner: shmem,
@@ -1002,7 +1001,7 @@ impl<T: ShMem> ShmemCursor<T> {
 }
 
 #[cfg(feature = "std")]
-impl<T: ShMem> std::io::Write for ShmemCursor<T> {
+impl<T: ShMem> std::io::Write for ShMemCursor<T> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self.slice_mut().write(buf) {
             Ok(w) => {
