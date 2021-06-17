@@ -1,3 +1,3 @@
 [submodule "libafl_concolic/libafl_symcc"]
 	path = libafl_concolic/libafl_symcc
-	url = ../../julihoh/libafl_symcc.git
+	url = ../symcc.git
