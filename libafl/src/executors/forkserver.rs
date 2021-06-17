@@ -411,7 +411,7 @@ where
 }
 
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
-pub struct ForkserverExecutor<I, OT>
+pub struct ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
@@ -421,10 +421,10 @@ where
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, OT> ForkserverExecutor<I, OT>
+impl<I, OT, S> ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
@@ -493,7 +493,7 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT>
+impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
@@ -554,7 +554,7 @@ where
     }
 }
 
-impl<I, OT> HasObservers<I, OT, S> for ForkserverExecutor<I, OT>
+impl<I, OT, S> HasObservers<I, OT, S> for ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
@@ -570,14 +570,7 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for ForkserverExecutor<I, OT>
-where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S> + HasExecHooksTuple<EM, I, S, Z>,
-{
-}
-
-impl<I, OT> HasForkserver for ForkserverExecutor<I, OT>
+impl<I, OT, S> HasForkserver for ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
@@ -603,7 +596,7 @@ where
     }
 }
 
-impl<E, OT> HasObservers<I, OT, S> for TimeoutForkserverExecutor<E>
+impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutForkserverExecutor<E>
 where
     E: HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
@@ -617,14 +610,6 @@ where
     fn observers_mut(&mut self) -> &mut OT {
         self.executor.observers_mut()
     }
-}
-
-impl<E, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for TimeoutForkserverExecutor<E>
-where
-    E: HasObservers<I, OT, S>,
-    I: Input,
-    OT: ObserversTuple<I, S> + HasExecHooksTuple<EM, I, S, Z>,
-{
 }
 
 #[cfg(test)]
@@ -657,7 +642,7 @@ mod tests {
             &mut shmem_map,
         ));
 
-        let executor = ForkserverExecutor::<NopInput, _>::new(
+        let executor = ForkserverExecutor::<NopInput, _, ()>::new(
             bin.to_string(),
             &args,
             tuple_list!(edges_observer),
