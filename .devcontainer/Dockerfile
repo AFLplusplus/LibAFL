@@ -23,6 +23,15 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     g++ \
     python2 \
     python3-pip \
-    cmake
+    cmake \ 
+    ninja-build
 
 RUN pip3 install lit
+
+# install corrosion for concolic support
+RUN cp /tmp \
+    && mkdir corrosion \
+    && git clone https://github.com/AndrewGaspar/corrosion.git \
+    && cmake -Scorrosion -Bbuild -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --config Release \
+    && cmake --install build --config Release
