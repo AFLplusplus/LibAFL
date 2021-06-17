@@ -1,6 +1,6 @@
 use ctor::{ctor, dtor};
 
-use concolic::{Message, MessageFileWriter, SymExprRef, StdShMemMessageFileWriter};
+use concolic::{Message, MessageFileWriter, StdShMemMessageFileWriter, SymExprRef};
 
 struct State {
     writer: StdShMemMessageFileWriter,
@@ -19,16 +19,24 @@ impl State {
     fn unwrap(&self, expr: Option<SymExprRef>) -> SymExprRef {
         expr.unwrap()
     }
+
+    fn end(&mut self) {
+        self.log_message(Message::End);
+    }
 }
 
 static mut GLOBAL_DATA: Option<State> = None;
 
 #[ctor]
 fn init() {
-    unsafe { GLOBAL_DATA = Some(State::new()) }
+    unsafe {
+        GLOBAL_DATA = Some(State::new());
+        libc::atexit(fini);
+    }
 }
-#[dtor]
-fn fini() {
+
+extern "C" fn fini() {
+    with_state(|s| s.end());
     // drops the global data object
     unsafe { GLOBAL_DATA = None }
 }

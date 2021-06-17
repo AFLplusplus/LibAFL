@@ -300,6 +300,9 @@ pub enum Message {
         taken: bool,
         site_id: usize,
     },
+
+    /// This marks the end of the trace.
+    End,
 }
 
 pub struct MessageFileReader<R: Read> {
@@ -312,8 +315,12 @@ impl<R: Read> MessageFileReader<R> {
     pub fn next_message(&mut self) -> Option<bincode::Result<(SymExprRef, Message)>> {
         match self.deserializer_config.deserialize_from(&mut self.reader) {
             Ok(mut message) => {
-                let message_id = self.transform_message(&mut message);
-                Some(Ok((message_id, message)))
+                if let Message::End = message {
+                    None
+                } else {
+                    let message_id = self.transform_message(&mut message);
+                    Some(Ok((message_id, message)))
+                }
             }
             Err(e) => match *e {
                 bincode::ErrorKind::Io(ref io_err) => match io_err.kind() {
@@ -413,6 +420,9 @@ impl<R: Read> MessageFileReader<R> {
             }
             Message::PushPathConstraint { constraint: op, .. } => {
                 *op = self.make_absolute(*op);
+            }
+            Message::End => {
+                panic!("should not pass End message to this function")
             }
         }
         NonZeroUsize::new(ret).unwrap()
@@ -534,6 +544,7 @@ impl<W: Write> MessageFileWriter<W> {
             Message::PushPathConstraint { constraint: op, .. } => {
                 *op = self.make_relative(*op);
             }
+            Message::End => {}
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)
@@ -559,7 +570,7 @@ impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
     }
 }
 
-use libafl::bolts::shmem::{ShMem, ShMemProvider, ShMemCursor, StdShMemProvider};
+use libafl::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
 
 pub type StdShMemMessageFileWriter =
     MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
