@@ -40,11 +40,11 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     }
 
     while start < stop {
-        MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1);
-        if MAX_EDGES_NUM >= EDGES_MAP.len() {
-            panic!("The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE env to increase it at compile time.", EDGES_MAP.len());
-        }
         *start = MAX_EDGES_NUM as u32;
         start = start.offset(1);
+        MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1);
+        if MAX_EDGES_NUM > EDGES_MAP.len() {
+            panic!("The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE env to increase it at compile time.", EDGES_MAP.len());
+        }
     }
 }
