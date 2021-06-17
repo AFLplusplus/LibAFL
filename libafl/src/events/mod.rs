@@ -9,7 +9,9 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::Input, observers::ObserversTuple, stats::UserStats, Error};
+use crate::{
+    executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
+};
 
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
@@ -79,6 +81,8 @@ where
         input: I,
         /// The state of the observers when this testcase was found
         observers_buf: Vec<u8>,
+        /// The exit kind
+        exit_kind: ExitKind,
         /// The new corpus size of this client
         corpus_size: usize,
         /// The client config for this observers/testcase combination
@@ -151,6 +155,7 @@ where
                 input: _,
                 client_config: _,
                 corpus_size: _,
+                exit_kind: _,
                 observers_buf: _,
                 time: _,
                 executions: _,
@@ -277,6 +282,7 @@ mod tests {
             tuples::{tuple_list, Named},
         },
         events::Event,
+        executors::ExitKind,
         inputs::bytes::BytesInput,
         observers::StdMapObserver,
     };
@@ -293,6 +299,7 @@ mod tests {
         let e = Event::NewTestcase {
             input: i,
             observers_buf,
+            exit_kind: ExitKind::Ok,
             corpus_size: 123,
             client_config: "conf".into(),
             time: current_time(),
@@ -307,6 +314,7 @@ mod tests {
                 input: _,
                 observers_buf,
                 corpus_size: _,
+                exit_kind: _,
                 client_config: _,
                 time: _,
                 executions: _,

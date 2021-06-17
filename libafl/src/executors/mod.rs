@@ -17,19 +17,15 @@ pub mod shadow;
 pub use shadow::{HasShadowObserverHooks, ShadowExecutor};
 
 use crate::{
-    bolts::serdeany::SerdeAny,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
 
-use alloc::boxed::Box;
-
-/// A `CustomExitKind` for exits that do not fit to one of the default `ExitKind`.
-pub trait CustomExitKind: core::fmt::Debug + SerdeAny + 'static {}
+use serde::{Deserialize, Serialize};
 
 /// How an execution finished.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExitKind {
     /// The run exited normally.
     Ok,
@@ -39,8 +35,8 @@ pub enum ExitKind {
     Oom,
     /// The run timed out
     Timeout,
-    /// The run resulted in a custom `ExitKind`.
-    Custom(Box<dyn CustomExitKind>),
+    // The run resulted in a custom `ExitKind`.
+    // Custom(Box<dyn SerdeAny>),
 }
 
 /// Holds a tuple of Observers

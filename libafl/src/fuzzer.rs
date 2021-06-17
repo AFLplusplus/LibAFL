@@ -392,6 +392,7 @@ where
                         Event::NewTestcase {
                             input,
                             observers_buf,
+                            exit_kind: exit_kind.clone(),
                             corpus_size: state.corpus().count(),
                             client_config: "TODO".into(),
                             time: current_time(),
@@ -492,7 +493,7 @@ where
         manager: &mut EM,
         input: I,
     ) -> Result<usize, Error> {
-        let _ = self.execute_input(state, executor, manager, &input)?;
+        let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
 
@@ -511,6 +512,7 @@ where
             Event::NewTestcase {
                 input,
                 observers_buf,
+                exit_kind: exit_kind.clone(),
                 corpus_size: state.corpus().count(),
                 client_config: "TODO".into(),
                 time: current_time(),

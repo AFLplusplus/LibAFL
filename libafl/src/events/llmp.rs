@@ -23,7 +23,6 @@ use crate::{
         shmem::ShMemProvider,
     },
     events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
-    executors::ExitKind,
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
@@ -162,6 +161,7 @@ where
             Event::NewTestcase {
                 input: _,
                 client_config: _,
+                exit_kind: _,
                 corpus_size,
                 observers_buf: _,
                 time,
@@ -364,6 +364,7 @@ where
             Event::NewTestcase {
                 input,
                 client_config,
+                exit_kind,
                 corpus_size: _,
                 observers_buf,
                 time: _,
@@ -372,27 +373,18 @@ where
                 // TODO: here u should match client_config, if equal to the current one do not re-execute
                 // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
-                println!("Received new Testcase from {}", _sender_id);
+                println!("Received new Testcase from {} ({}) {:?}", _sender_id, client_config, input);
 
-                if client_config != self.configuration {
-                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?;
+                let res = if false && client_config != self.configuration {
+                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
                 } else {
                     let observers: OT = postcard::from_bytes(&observers_buf)?;
-                    // TODO include ExitKind in NewTestcase
-                    // TODO check for objective too
-                    let _ = fuzzer.process_execution(
-                        state,
-                        self,
-                        input,
-                        &observers,
-                        &ExitKind::Ok,
-                        false,
-                    )?;
-                    /*if is_interesting
-                    {
-                        #[cfg(feature = "std")]
-                        println!("Added received Testcase");
-                    }*/
+                    fuzzer
+                        .process_execution(state, self, input, &observers, &exit_kind, false)?
+                };
+                #[cfg(feature = "std")]
+                if let Some(item) = res.1 {
+                    println!("Added received Testcase as item #{}", item);
                 }
                 Ok(())
             }

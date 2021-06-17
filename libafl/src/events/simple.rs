@@ -116,6 +116,7 @@ where
             Event::NewTestcase {
                 input: _,
                 client_config: _,
+                exit_kind: _,
                 corpus_size,
                 observers_buf: _,
                 time,
