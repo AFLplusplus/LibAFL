@@ -1,46 +1,72 @@
-use ctor::{ctor, dtor};
+use ctor::ctor;
 
 use concolic::{Message, MessageFileWriter, StdShMemMessageFileWriter, SymExprRef};
 
-struct State {
+mod expression_filters;
+
+use crate::expression_filters::{ExpressionFilter, NopExpressionFilter};
+
+struct State<F: ExpressionFilter = NopExpressionFilter> {
     writer: StdShMemMessageFileWriter,
+    filter: F,
 }
 
-impl State {
+impl State<NopExpressionFilter> {
     fn new() -> Self {
         let writer = MessageFileWriter::new_from_stdshmem_env("SHARED_MEMORY_MESSAGES");
-        Self { writer }
+        Self {
+            writer,
+            filter: NopExpressionFilter,
+        }
+    }
+}
+
+impl<F: ExpressionFilter> State<F> {
+    /// Logs the message to the trace. This is a convenient place to debug the expressions if necessary.
+    fn log_message(&mut self, message: Message) -> Option<SymExprRef> {
+        if self.filter.symbolize(&message) {
+            Some(self.writer.write_message(message))
+        } else {
+            None
+        }
     }
 
-    fn log_message(&mut self, message: Message) -> SymExprRef {
-        self.writer.write_message(message)
-    }
-
+    /// This is here to have a version of the normal [`Option::unwrap`] that is compatible with the `expression_builder`
+    /// macro below.
     fn unwrap(&self, expr: Option<SymExprRef>) -> SymExprRef {
         expr.unwrap()
     }
 
+    /// This is called at the end of the process, giving us the opprtunity to signal the end of the trace.
     fn end(&mut self) {
         self.log_message(Message::End);
     }
 }
 
+// We are creating a piece of shared mutable state here for our runtime, which is used unsafely.
+// The correct solution here would be to either use a mutex or have per-thread state,
+// however, this is not really supported in SymCC yet.
+// Therefore we make the assumption that there is only ever a single thread, which should
+// mean that this is 'safe'.
 static mut GLOBAL_DATA: Option<State> = None;
 
 #[ctor]
 fn init() {
+    // See comment on GLOBAL_DATA declaration.
     unsafe {
         GLOBAL_DATA = Some(State::new());
         libc::atexit(fini);
     }
 }
 
+/// [`libc::atexit`] handler
 extern "C" fn fini() {
     with_state(|s| s.end());
     // drops the global data object
     unsafe { GLOBAL_DATA = None }
 }
 
+/// A little helper function that encapsulates access to the shared mutable state.
 fn with_state<R>(cb: impl FnOnce(&mut State) -> R) -> R {
     use unchecked_unwrap::UncheckedUnwrap;
     let s = unsafe { GLOBAL_DATA.as_mut().unchecked_unwrap() };
@@ -63,11 +89,32 @@ pub unsafe extern "C" fn _sym_push_path_constraint(
     })
 }
 
+// Call stack tracing
+#[allow(clippy::missing_safety_doc)]
+#[no_mangle]
+pub unsafe extern "C" fn _sym_notify_call(location_id: usize) {
+    with_state(|s| s.filter.notify_call(location_id))
+}
+
+#[allow(clippy::missing_safety_doc)]
+#[no_mangle]
+pub unsafe extern "C" fn _sym_notify_return(location_id: usize) {
+    with_state(|s| s.filter.notify_return(location_id))
+}
+
+#[allow(clippy::missing_safety_doc)]
+#[no_mangle]
+pub unsafe extern "C" fn _sym_notify_basic_block(location_id: usize) {
+    with_state(|s| s.filter.notify_basic_block(location_id))
+}
+
+/// A macro to generate the boilerplate for declaring a runtime function for SymCC that simply logs the function call
+/// according to [`concolic::Message`].
 macro_rules! expression_builder {
     ($c_name:ident ( $($param_name:ident : $param_type:ty $( => $param_expr:tt)? ),+ ) => $message:ident) => {
         #[allow(clippy::missing_safety_doc)]
         #[no_mangle]
-        pub unsafe extern "C" fn $c_name( $( $param_name : $param_type, )+ ) -> SymExprRef {
+        pub unsafe extern "C" fn $c_name( $( $param_name : $param_type, )+ ) -> Option<SymExprRef> {
             with_state(|s| {
                 s.log_message(Message::$message { $($param_name $(: s.$param_expr($param_name))? ,)+ })
             })
@@ -76,7 +123,7 @@ macro_rules! expression_builder {
     ($c_name:ident ( ) => $message:ident) => {
         #[allow(clippy::missing_safety_doc)]
         #[no_mangle]
-        pub unsafe extern "C" fn $c_name( ) -> SymExprRef {
+        pub unsafe extern "C" fn $c_name( ) -> Option<SymExprRef> {
             with_state(|s| {
                 s.log_message(Message::$message)
             })
