@@ -1,5 +1,5 @@
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use libafl_targets::cmplog::CMPLOG_MAP_W;
+use libafl_targets::CMPLOG_MAP_W;
 use std::ffi::c_void;
 
 extern crate libafl_targets;
