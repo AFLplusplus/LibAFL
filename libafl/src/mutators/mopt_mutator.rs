@@ -44,8 +44,8 @@ pub struct MOpt {
     pub pilot_time: usize,  // The number of testcase generated using pilot fzzing module so far
     pub core_time: usize,   // The number of testcase generated using core fuzzing module so far
     pub swarm_now: usize,   // Current swarm
-    x_now: Vec<Vec<f64>>, // The positions of PSO algo
-    L_best: Vec<Vec<f64>>, // The local optimum
+    x_now: Vec<Vec<f64>>,   // The positions of PSO algo
+    L_best: Vec<Vec<f64>>,  // The local optimum
     eff_best: Vec<Vec<f64>>,
     G_best: Vec<f64>,     // The global optimum
     v_now: Vec<Vec<f64>>, // The speed
@@ -194,7 +194,6 @@ where {
     pub fn set_last_limit_time_start(&mut self) {
         self.last_limit_time_start = current_time();
     }
-
 
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
@@ -392,9 +391,7 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            state
-                .mopt_mut()
-                .core_operator_ctr_per_stage[idx] += 1;
+            state.mopt_mut().core_operator_ctr_per_stage[idx] += 1;
         }
 
         Ok(r)
@@ -418,9 +415,7 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            state
-                .mopt_mut()
-                .pilot_operator_ctr_per_stage[swarm_now][idx] += 1;
+            state.mopt_mut().pilot_operator_ctr_per_stage[swarm_now][idx] += 1;
         }
 
         Ok(r)

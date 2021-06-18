@@ -108,9 +108,7 @@ where
                             if state.mopt().core_operator_ctr_per_stage[i]
                                 > state.mopt().core_operator_ctr_last[i]
                             {
-                                state
-                                    .mopt_mut()
-                                    .core_operator_finds_per_stage[i] += diff;
+                                state.mopt_mut().core_operator_finds_per_stage[i] += diff;
                             }
                         }
                     }
@@ -166,7 +164,8 @@ where
                             if state.mopt().pilot_operator_ctr_per_stage[swarm_now][i]
                                 > state.mopt().pilot_operator_ctr_last[swarm_now][i]
                             {
-                                state.mopt_mut().pilot_operator_finds_per_stage[swarm_now][i] += diff;
+                                state.mopt_mut().pilot_operator_finds_per_stage[swarm_now][i] +=
+                                    diff;
                             }
                         }
                     }
