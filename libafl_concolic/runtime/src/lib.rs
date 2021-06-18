@@ -98,7 +98,7 @@ pub unsafe extern "C" fn _sym_notify_call(location_id: usize) {
 
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
-pub unsafe extern "C" fn _sym_notify_return(location_id: usize) {
+pub unsafe extern "C" fn _sym_notify_ret(location_id: usize) {
     with_state(|s| s.filter.notify_return(location_id))
 }
 
