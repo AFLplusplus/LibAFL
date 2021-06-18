@@ -1,13 +1,8 @@
-//! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL>
-
-// MOpt global variables, currently the variable names are identical to the original MOpt implementation
-// TODO: but I have to rename it when I implement the main algorithm because I don't find these names are any suggestive of their meaning
-// Why there's so many puppets around..?
-
+//! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    bolts::{current_time, rands::Rand, rands::StdRand},
+    bolts::{rands::Rand, rands::StdRand},
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasMOpt, HasRand},
@@ -16,50 +11,76 @@ use crate::{
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
-    time::Duration,
 };
 use serde::{Deserialize, Serialize};
 
+/// A Struct for managing MOpt-mutator parameters
+/// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode
+/// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator
+/// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MOpt {
+    /// Random number generator
     pub rand: StdRand,
-    pub finds_until_core_begin: usize, // How many findings have we found since we switched to the current mode?
-    pub last_limit_time_start: Duration, // Unneeded variable
+    /// The number of finds until the beginning of this core fuzzing mode
+    pub finds_until_core_begin: usize,
+    /// The number of total findings (unique crashes and unique interesting paths). This is equivalent to `state.corpus().count() + state.solutions().count()`;
     pub total_finds: usize,
+    /// The number of finds until the beginning of this pilot fuzzing mode
     pub finds_until_pilot_begin: usize,
-    pub most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
-    pub most_time_puppet: u64, // Unneeded for LibAFL
-    pub limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
-    pub key_module: MOptMode, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
-    pub w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
-    pub w_end: f64,  // w_* means inertia
+    /// The MOpt mode that we are currently using the pilot fuzzing mode or the core_fuzzing mode
+    pub key_module: MOptMode,
+    /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
+    pub w_init: f64,
+    pub w_end: f64,
     pub w_now: f64,
     pub g_now: i32,
     pub g_max: i32,
-    pub operator_num: usize, // Operator_num, swarm_num, period_core are defined as macros in the original implementation, but I put it into the struct here so that we can tune these values
-    pub swarm_num: usize,    // Number of swarms
-    pub period_pilot: usize, // We'll generate test for period_pilot times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.2
-    pub period_core: usize, // We'll generate test for period_core times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.3
-    pub pilot_time: usize,  // The number of testcase generated using pilot fzzing module so far
-    pub core_time: usize,   // The number of testcase generated using core fuzzing module so far
-    pub swarm_now: usize,   // Current swarm
-    x_now: Vec<Vec<f64>>,   // The positions of PSO algo
-    l_best: Vec<Vec<f64>>,  // The local optimum
+    /// The number of mutation operators
+    pub operator_num: usize,
+    /// The number of swarms that we want to employ during the pilot fuzzing mode
+    pub swarm_num: usize,
+    /// We'll generate testcases for `period_pilot` times before we call pso_update in core fuzzing module
+    pub period_pilot: usize,
+    /// We'll generate testcases for `period_core` times before we call pso_update in core fuzzing module
+    pub period_core: usize,
+    /// The number of testcases generated during this pilot fuzzing mode
+    pub pilot_time: usize,
+    /// The number of testcases generated during this core fuzzing mode
+    pub core_time: usize,
+    /// The swarm identifier that we are currently using in the pilot fuzzing mode
+    pub swarm_now: usize,
+    /// These are the parameters for the PSO algorithm
+    x_now: Vec<Vec<f64>>,
+    l_best: Vec<Vec<f64>>,
     eff_best: Vec<Vec<f64>>,
-    g_best: Vec<f64>,     // The global optimum
-    v_now: Vec<Vec<f64>>, // The speed
+    g_best: Vec<f64>,
+    v_now: Vec<Vec<f64>>,
+    /// The probability that we want to use to choose the mutation operator.
     probability_now: Vec<Vec<f64>>,
-    pub swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
+    /// The fitness for each swarm, we'll calculate the fitness in the pilot fuzzing mode and use the best one in the core fuzzing mode
+    pub swarm_fitness: Vec<f64>,
+    /// (Pilot Mode) Finds by each operators. This vector is used in pso_update
     pub pilot_operator_finds_pso: Vec<Vec<usize>>,
-    pub pilot_operator_finds_per_stage: Vec<Vec<usize>>,
+    /// (Pilot Mode) Finds by each operator till now.
+    pub pilot_operator_finds_this: Vec<Vec<usize>>,
+    /// (Pilot Mode) The number of mutation operator used. This vector is used in pso_update
     pub pilot_operator_ctr_pso: Vec<Vec<usize>>,
-    pub pilot_operator_ctr_per_stage: Vec<Vec<usize>>,
+    /// (Pilot Mode) The number of mutation operator used till now
+    pub pilot_operator_ctr_this: Vec<Vec<usize>>,
+    /// (Pilot Mode) The number of mutation operator used till last execution
     pub pilot_operator_ctr_last: Vec<Vec<usize>>,
+    /// Vector used in pso_update
     pub operator_finds_puppet: Vec<usize>,
+    /// (Core Mode) Finds by each operators. This vector is used in pso_update
     pub core_operator_finds_pso: Vec<usize>,
-    pub core_operator_finds_per_stage: Vec<usize>,
+    /// (Core Mode) Finds by each operator till now.
+    pub core_operator_finds_this: Vec<usize>,
+    /// (Core Mode) The number of mutation operator used. This vector is used in pso_update
     pub core_operator_ctr_pso: Vec<usize>,
-    pub core_operator_ctr_per_stage: Vec<usize>,
+    /// (Core Mode) The number of mutation operator used till now
+    pub core_operator_ctr_this: Vec<usize>,
+    /// (Core Mode) The number of mutation operator used till last execution
     pub core_operator_ctr_last: Vec<usize>,
 }
 
@@ -71,12 +92,8 @@ impl MOpt {
         Self {
             rand: StdRand::with_seed(0),
             finds_until_core_begin: 0,
-            last_limit_time_start: Duration::from_millis(0),
             total_finds: 0,
             finds_until_pilot_begin: 0,
-            most_time_key: 0,
-            most_time_puppet: 0,
-            limit_time_sig: 1,
             key_module: MOptMode::Corefuzzing,
             w_init: 0.9,
             w_end: 0.3,
@@ -98,15 +115,15 @@ impl MOpt {
             probability_now: vec![vec![0.0; operator_num]; swarm_num],
             swarm_fitness: vec![0.0; swarm_num],
             pilot_operator_finds_pso: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_finds_per_stage: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_finds_this: vec![vec![0; operator_num]; swarm_num],
             pilot_operator_ctr_pso: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_ctr_per_stage: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_ctr_this: vec![vec![0; operator_num]; swarm_num],
             pilot_operator_ctr_last: vec![vec![0; operator_num]; swarm_num],
             operator_finds_puppet: vec![0; operator_num],
             core_operator_finds_pso: vec![0; operator_num],
-            core_operator_finds_per_stage: vec![0; operator_num],
+            core_operator_finds_this: vec![0; operator_num],
             core_operator_ctr_pso: vec![0; operator_num],
-            core_operator_ctr_per_stage: vec![0; operator_num],
+            core_operator_ctr_this: vec![0; operator_num],
             core_operator_ctr_last: vec![0; operator_num],
         }
     }
@@ -115,17 +132,16 @@ impl MOpt {
     /// So `size` 100 will result in anything between `0` and 0.1`.
     #[inline]
     #[allow(clippy::cast_precision_loss)]
-    pub fn rand_below(&mut self, size: u64) -> f64
-where {
+    pub fn rand_below(&mut self, size: u64) -> f64 {
         self.rand.below(size) as f64 * 0.001
     }
 
+    /// Initialize `core_operator_*` values
     pub fn init_core_module(&mut self) -> Result<(), Error> {
-        // Initialize core_operator_* values
         for i in 0..self.operator_num {
-            self.core_operator_ctr_per_stage[i] = self.core_operator_ctr_pso[i];
+            self.core_operator_ctr_this[i] = self.core_operator_ctr_pso[i];
             self.core_operator_ctr_last[i] = self.core_operator_ctr_pso[i];
-            self.core_operator_finds_per_stage[i] = self.core_operator_finds_pso[i]
+            self.core_operator_finds_this[i] = self.core_operator_finds_pso[i]
         }
 
         let mut swarm_eff = 0.0;
@@ -144,28 +160,30 @@ where {
     #[inline]
     pub fn update_pilot_operator_ctr_last(&mut self, swarm_now: usize) {
         for i in 0..self.operator_num {
-            self.pilot_operator_ctr_last[swarm_now][i] =
-                self.pilot_operator_ctr_per_stage[swarm_now][i]
+            self.pilot_operator_ctr_last[swarm_now][i] = self.pilot_operator_ctr_this[swarm_now][i]
         }
     }
 
     #[inline]
     pub fn update_core_operator_ctr_last(&mut self) {
         for i in 0..self.operator_num {
-            self.core_operator_ctr_last[i] = self.core_operator_ctr_per_stage[i];
+            self.core_operator_ctr_last[i] = self.core_operator_ctr_this[i];
         }
     }
+
+    /// Finds the local optimum for each operator
+    /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L8709>
 
     #[allow(clippy::cast_precision_loss)]
     pub fn update_pilot_operator_ctr_pso(&mut self, swarm_now: usize) {
         let mut eff = 0.0;
         for i in 0..self.operator_num {
-            if self.pilot_operator_ctr_per_stage[swarm_now][i]
+            if self.pilot_operator_ctr_this[swarm_now][i]
                 > self.pilot_operator_ctr_pso[swarm_now][i]
             {
-                eff = ((self.pilot_operator_finds_per_stage[swarm_now][i]
+                eff = ((self.pilot_operator_finds_this[swarm_now][i]
                     - self.pilot_operator_finds_pso[swarm_now][i]) as f64)
-                    / ((self.pilot_operator_ctr_per_stage[swarm_now][i]
+                    / ((self.pilot_operator_ctr_this[swarm_now][i]
                         - self.pilot_operator_ctr_pso[swarm_now][i]) as f64)
             }
 
@@ -175,25 +193,21 @@ where {
             }
 
             self.pilot_operator_finds_pso[swarm_now][i] =
-                self.pilot_operator_finds_per_stage[swarm_now][i];
-            self.pilot_operator_ctr_pso[swarm_now][i] =
-                self.pilot_operator_ctr_per_stage[swarm_now][i];
+                self.pilot_operator_finds_this[swarm_now][i];
+            self.pilot_operator_ctr_pso[swarm_now][i] = self.pilot_operator_ctr_this[swarm_now][i];
         }
     }
 
     #[inline]
     pub fn update_core_operator_ctr_pso(&mut self) {
         for i in 0..self.operator_num {
-            self.core_operator_finds_pso[i] = self.core_operator_finds_per_stage[i];
-            self.core_operator_ctr_pso[i] = self.core_operator_ctr_per_stage[i];
+            self.core_operator_finds_pso[i] = self.core_operator_finds_this[i];
+            self.core_operator_ctr_pso[i] = self.core_operator_ctr_this[i];
         }
     }
 
-    #[inline]
-    pub fn set_last_limit_time_start(&mut self) {
-        self.last_limit_time_start = current_time();
-    }
-
+    /// Update the PSO algorithm parameters
+    /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L10623>
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
         self.g_now += 1;
@@ -260,7 +274,8 @@ where {
         Ok(())
     }
 
-    // The function select_algorithm() from https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397, it's more of select_mutator for libAFL
+    /// This function is used to decide the operator that we want to apply next
+    /// see <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397>
     pub fn select_algorithm(&mut self) -> Result<usize, Error> {
         let mut res = 0;
         let mut sentry = 0;
@@ -380,7 +395,7 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            state.mopt_mut().core_operator_ctr_per_stage[idx] += 1;
+            state.mopt_mut().core_operator_ctr_this[idx] += 1;
         }
 
         Ok(r)
@@ -404,7 +419,7 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            state.mopt_mut().pilot_operator_ctr_per_stage[swarm_now][idx] += 1;
+            state.mopt_mut().pilot_operator_ctr_this[swarm_now][idx] += 1;
         }
 
         Ok(r)

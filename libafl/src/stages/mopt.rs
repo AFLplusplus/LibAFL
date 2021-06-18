@@ -75,7 +75,6 @@ where
                     // Now, we have just switched back from PILOT_FUZZING mode
                     let finds = state.corpus().count() + state.solutions().count();
                     state.mopt_mut().finds_until_core_begin = finds;
-                    state.mopt_mut().set_last_limit_time_start();
                 }
 
                 let num = self.iterations(state);
@@ -105,10 +104,10 @@ where
                         let diff = finds_after - finds_before;
                         state.mopt_mut().total_finds += diff;
                         for i in 0..state.mopt().operator_num {
-                            if state.mopt().core_operator_ctr_per_stage[i]
+                            if state.mopt().core_operator_ctr_this[i]
                                 > state.mopt().core_operator_ctr_last[i]
                             {
-                                state.mopt_mut().core_operator_finds_per_stage[i] += diff;
+                                state.mopt_mut().core_operator_finds_this[i] += diff;
                             }
                         }
                     }
@@ -161,11 +160,10 @@ where
                         let diff = finds_after - finds_before;
                         state.mopt_mut().total_finds += diff;
                         for i in 0..state.mopt().operator_num {
-                            if state.mopt().pilot_operator_ctr_per_stage[swarm_now][i]
+                            if state.mopt().pilot_operator_ctr_this[swarm_now][i]
                                 > state.mopt().pilot_operator_ctr_last[swarm_now][i]
                             {
-                                state.mopt_mut().pilot_operator_finds_per_stage[swarm_now][i] +=
-                                    diff;
+                                state.mopt_mut().pilot_operator_finds_this[swarm_now][i] += diff;
                             }
                         }
                     }
