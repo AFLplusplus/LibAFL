@@ -29,7 +29,6 @@ pub struct MOpt {
     pub finds_until_pilot_begin: usize,
     pub most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
     pub most_time_puppet: u64, // Unneeded for LibAFL
-    pub SPLICE_CYCLES_puppet: i32,
     pub limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
     pub key_module: MOptMode, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
     pub w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
@@ -45,9 +44,9 @@ pub struct MOpt {
     pub core_time: usize,   // The number of testcase generated using core fuzzing module so far
     pub swarm_now: usize,   // Current swarm
     x_now: Vec<Vec<f64>>,   // The positions of PSO algo
-    L_best: Vec<Vec<f64>>,  // The local optimum
+    l_best: Vec<Vec<f64>>,  // The local optimum
     eff_best: Vec<Vec<f64>>,
-    G_best: Vec<f64>,     // The global optimum
+    g_best: Vec<f64>,     // The global optimum
     v_now: Vec<Vec<f64>>, // The speed
     probability_now: Vec<Vec<f64>>,
     pub swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
@@ -67,6 +66,7 @@ pub struct MOpt {
 crate::impl_serdeany!(MOpt);
 
 impl MOpt {
+    #[must_use]
     pub fn new(operator_num: usize, swarm_num: usize) -> Self {
         Self {
             rand: StdRand::with_seed(0),
@@ -76,25 +76,24 @@ impl MOpt {
             finds_until_pilot_begin: 0,
             most_time_key: 0,
             most_time_puppet: 0,
-            SPLICE_CYCLES_puppet: 0,
             limit_time_sig: 1,
-            key_module: MOptMode::CORE_FUZZING,
+            key_module: MOptMode::Corefuzzing,
             w_init: 0.9,
             w_end: 0.3,
             w_now: 0.0,
             g_now: 0,
             g_max: 5000,
-            operator_num: operator_num,
-            swarm_num: swarm_num,
+            operator_num,
+            swarm_num,
             period_pilot: 50000,
             period_core: 500000,
             pilot_time: 0,
             core_time: 0,
             swarm_now: 0,
             x_now: vec![vec![0.0; operator_num]; swarm_num],
-            L_best: vec![vec![0.0; operator_num]; swarm_num],
+            l_best: vec![vec![0.0; operator_num]; swarm_num],
             eff_best: vec![vec![0.0; operator_num]; swarm_num],
-            G_best: vec![0.0; operator_num],
+            g_best: vec![0.0; operator_num],
             v_now: vec![vec![0.0; operator_num]; swarm_num],
             probability_now: vec![vec![0.0; operator_num]; swarm_num],
             swarm_fitness: vec![0.0; swarm_num],
@@ -172,7 +171,7 @@ where {
 
             if self.eff_best[swarm_now][i] < eff {
                 self.eff_best[swarm_now][i] = eff;
-                self.L_best[swarm_now][i] = self.x_now[swarm_now][i];
+                self.l_best[swarm_now][i] = self.x_now[swarm_now][i];
             }
 
             self.pilot_operator_finds_pso[swarm_now][i] =
@@ -218,7 +217,7 @@ where {
 
         for i in 0..self.operator_num {
             if self.operator_finds_puppet[i] > 0 {
-                self.G_best[i] =
+                self.g_best[i] =
                     (self.operator_finds_puppet[i] as f64) / (operator_find_sum as f64);
             }
         }
@@ -228,8 +227,8 @@ where {
             for i in 0..self.operator_num {
                 self.probability_now[swarm][i] = 0.0;
                 self.v_now[swarm][i] = self.w_now * self.v_now[swarm][i]
-                    + self.rand_below(1000) * (self.L_best[swarm][i] - self.x_now[swarm][i])
-                    + self.rand_below(1000) * (self.G_best[i] - self.x_now[swarm][i]);
+                    + self.rand_below(1000) * (self.l_best[swarm][i] - self.x_now[swarm][i])
+                    + self.rand_below(1000) * (self.g_best[i] - self.x_now[swarm][i]);
                 self.x_now[swarm][i] += self.v_now[swarm][i];
 
                 if self.x_now[swarm][i] > V_MAX {
@@ -241,12 +240,12 @@ where {
             }
 
             for i in 0..self.operator_num {
-                self.x_now[swarm][i] = self.x_now[swarm][i] / probability_sum;
-                if i != 0 {
+                self.x_now[swarm][i] /= probability_sum;
+                if i == 0 {
+                    self.probability_now[swarm][i] = self.x_now[swarm][i];
+                } else {
                     self.probability_now[swarm][i] =
                         self.probability_now[swarm][i - 1] + self.x_now[swarm][i];
-                } else {
-                    self.probability_now[swarm][i] = self.x_now[swarm][i];
                 }
             }
             if self.probability_now[swarm][self.operator_num - 1] < 0.99
@@ -257,7 +256,7 @@ where {
         }
         self.swarm_now = 0;
 
-        self.key_module = MOptMode::PILOT_FUZZING;
+        self.key_module = MOptMode::Pilotfuzzing;
         Ok(())
     }
 
@@ -269,26 +268,25 @@ where {
         let operator_num = self.operator_num;
 
         // Fetch a random sele value
-        let sele: f64 = self.probability_now[self.swarm_now][operator_num - 1]
+        let select_prob: f64 = self.probability_now[self.swarm_now][operator_num - 1]
             * (self.rand_below(10000) * 0.0001);
 
         for i in 0..operator_num {
             if i == 0 {
-                if sele < self.probability_now[self.swarm_now][i] {
+                if select_prob < self.probability_now[self.swarm_now][i] {
                     res = i;
                     break;
                 }
-            } else {
-                if sele < self.probability_now[self.swarm_now][i] {
-                    res = i;
-                    sentry = 1;
-                    break;
-                }
+            } else if select_prob < self.probability_now[self.swarm_now][i] {
+                res = i;
+                sentry = 1;
+                break;
             }
         }
 
-        if (sentry == 1 && sele < self.probability_now[self.swarm_now][res - 1])
-            || (res + 1 < operator_num && sele > self.probability_now[self.swarm_now][res + 1])
+        if (sentry == 1 && select_prob < self.probability_now[self.swarm_now][res - 1])
+            || (res + 1 < operator_num
+                && select_prob > self.probability_now[self.swarm_now][res + 1])
         {
             return Err(Error::MOpt("Error in select_algorithm".to_string()));
         }
@@ -300,19 +298,10 @@ where {
 const V_MAX: f64 = 1.0;
 const V_MIN: f64 = 0.05;
 
-const SPLICE_CYCLES_puppet_up: usize = 25;
-const SPLICE_CYCLES_puppet_low: usize = 5;
-const STAGE_RANDOMBYTE: usize = 12;
-const STAGE_DELETEBYTE: usize = 13;
-const STAGE_Clone75: usize = 14;
-const STAGE_OverWrite75: usize = 15;
-const STAGE_OverWriteExtra: usize = 16;
-const STAGE_InsertExtra: usize = 17;
-
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum MOptMode {
-    PILOT_FUZZING,
-    CORE_FUZZING,
+    Pilotfuzzing,
+    Corefuzzing,
 }
 
 pub struct StdMOptMutator<I, MT, R, S>
@@ -370,7 +359,7 @@ where
 {
     pub fn new(mutations: MT) -> Self {
         Self {
-            mutations: mutations,
+            mutations,
             phantom: PhantomData,
         }
     }
@@ -466,12 +455,10 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mode = state.mopt().key_module;
-        let result = match mode {
-            MOptMode::CORE_FUZZING => self.core_mutate(state, input, stage_idx),
-            MOptMode::PILOT_FUZZING => self.pilot_mutate(state, input, stage_idx),
-        };
-
-        result
+        match mode {
+            MOptMode::Corefuzzing => self.core_mutate(state, input, stage_idx),
+            MOptMode::Pilotfuzzing => self.pilot_mutate(state, input, stage_idx),
+        }
     }
 }
 

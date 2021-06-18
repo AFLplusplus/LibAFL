@@ -70,7 +70,7 @@ where
         corpus_idx: usize,
     ) -> Result<(), Error> {
         match state.mopt().key_module {
-            MOptMode::CORE_FUZZING => {
+            MOptMode::Corefuzzing => {
                 if state.mopt().finds_until_core_begin == 0 {
                     // Now, we have just switched back from PILOT_FUZZING mode
                     let finds = state.corpus().count() + state.solutions().count();
@@ -118,7 +118,7 @@ where
                             + (state.mopt().finds_until_core_begin as f64)
                     {
                         // Move to the Pilot fuzzing mode
-                        state.mopt_mut().key_module = MOptMode::PILOT_FUZZING;
+                        state.mopt_mut().key_module = MOptMode::Pilotfuzzing;
                         state.mopt_mut().finds_until_core_begin = 0;
                     }
 
@@ -132,7 +132,7 @@ where
                     }
                 }
             }
-            MOptMode::PILOT_FUZZING => {
+            MOptMode::Pilotfuzzing => {
                 let num = self.iterations(state);
                 for stage_id in 0..num {
                     let mut input = state
@@ -185,7 +185,7 @@ where
 
                         if state.mopt().swarm_now == state.mopt().swarm_num {
                             // Move to CORE_FUZING mode
-                            state.mopt_mut().key_module = MOptMode::CORE_FUZZING;
+                            state.mopt_mut().key_module = MOptMode::Corefuzzing;
 
                             state.mopt_mut().init_core_module()?;
                         }
