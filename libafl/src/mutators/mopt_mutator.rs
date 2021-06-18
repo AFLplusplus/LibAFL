@@ -22,46 +22,46 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MOpt {
-    rand: StdRand,
-    finds_since_switching: usize, // How many findings have we found since we switched to the current mode?
-    last_limit_time_start: Duration, // Unneeded variable
-    total_finds: usize,
-    finds_until_last_switching: usize,
-    most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
-    most_time_puppet: u64, // Unneeded for LibAFL
-    SPLICE_CYCLES_puppet: i32,
-    limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
-    key_module: MOptMode, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
-    w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
-    w_end: f64,  // w_* means inertia
-    w_now: f64,
-    g_now: i32,
-    g_max: i32,
-    operator_num: usize, // Operator_num, swarm_num, period_core are defined as macros in the original implementation, but I put it into the struct here so that we can tune these values
-    swarm_num: usize,    // Number of swarms
-    period_pilot: usize, // We'll generate test for period_pilot times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.2
-    period_core: usize, // We'll generate test for period_core times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.3
-    pilot_time: usize,  // The number of testcase generated using pilot fzzing module so far
-    core_time: usize,   // The number of testcase generated using core fuzzing module so far
-    swarm_now: usize,   // Current swarm
+    pub rand: StdRand,
+    pub finds_until_core_begin: usize, // How many findings have we found since we switched to the current mode?
+    pub last_limit_time_start: Duration, // Unneeded variable
+    pub total_finds: usize,
+    pub finds_until_pilot_begin: usize,
+    pub most_time_key: u64, // This is a flag to indicate if we'll stop fuzzing after 'most_time_puppet', these are unneeded for LibAFL
+    pub most_time_puppet: u64, // Unneeded for LibAFL
+    pub SPLICE_CYCLES_puppet: i32,
+    pub limit_time_sig: i32, // If we are using MOpt or not, for LibAFL, this one is useless, I guess I'll find bunch of useless variables for LibAFL and will delete later.
+    pub key_module: MOptMode, // Pilot_fuzzing(0) or core_fuzzing(1) or pso_updating(2)
+    pub w_init: f64, // These w_* and g_* are the coefficients for updating the positions and the velocities for PSO algorithm.
+    pub w_end: f64,  // w_* means inertia
+    pub w_now: f64,
+    pub g_now: i32,
+    pub g_max: i32,
+    pub operator_num: usize, // Operator_num, swarm_num, period_core are defined as macros in the original implementation, but I put it into the struct here so that we can tune these values
+    pub swarm_num: usize,    // Number of swarms
+    pub period_pilot: usize, // We'll generate test for period_pilot times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.2
+    pub period_core: usize, // We'll generate test for period_core times before we call pso_update in core fuzzing module, as stated in the original thesis 4.1.3
+    pub pilot_time: usize,  // The number of testcase generated using pilot fzzing module so far
+    pub core_time: usize,   // The number of testcase generated using core fuzzing module so far
+    pub swarm_now: usize,   // Current swarm
     x_now: Vec<Vec<f64>>, // The positions of PSO algo
     L_best: Vec<Vec<f64>>, // The local optimum
     eff_best: Vec<Vec<f64>>,
     G_best: Vec<f64>,     // The global optimum
     v_now: Vec<Vec<f64>>, // The speed
     probability_now: Vec<Vec<f64>>,
-    swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
-    pilot_operator_finds_pso: Vec<Vec<usize>>,
-    pilot_operator_finds_per_stage: Vec<Vec<usize>>,
-    pilot_operator_ctr_pso: Vec<Vec<usize>>,
-    pilot_operator_ctr_per_stage: Vec<Vec<usize>>,
-    pilot_operator_ctr_last: Vec<Vec<usize>>,
-    operator_finds_puppet: Vec<usize>,
-    core_operator_finds_pso: Vec<usize>,
-    core_operator_finds_per_stage: Vec<usize>,
-    core_operator_ctr_pso: Vec<usize>,
-    core_operator_ctr_per_stage: Vec<usize>,
-    core_operator_ctr_last: Vec<usize>,
+    pub swarm_fitness: Vec<f64>, // The fitness value for each swarm, we want to see which swarm is the *best* in core fuzzing module
+    pub pilot_operator_finds_pso: Vec<Vec<usize>>,
+    pub pilot_operator_finds_per_stage: Vec<Vec<usize>>,
+    pub pilot_operator_ctr_pso: Vec<Vec<usize>>,
+    pub pilot_operator_ctr_per_stage: Vec<Vec<usize>>,
+    pub pilot_operator_ctr_last: Vec<Vec<usize>>,
+    pub operator_finds_puppet: Vec<usize>,
+    pub core_operator_finds_pso: Vec<usize>,
+    pub core_operator_finds_per_stage: Vec<usize>,
+    pub core_operator_ctr_pso: Vec<usize>,
+    pub core_operator_ctr_per_stage: Vec<usize>,
+    pub core_operator_ctr_last: Vec<usize>,
 }
 
 crate::impl_serdeany!(MOpt);
@@ -70,10 +70,10 @@ impl MOpt {
     pub fn new(operator_num: usize, swarm_num: usize) -> Self {
         Self {
             rand: StdRand::with_seed(0),
-            finds_since_switching: 0,
+            finds_until_core_begin: 0,
             last_limit_time_start: Duration::from_millis(0),
             total_finds: 0,
-            finds_until_last_switching: 0,
+            finds_until_pilot_begin: 0,
             most_time_key: 0,
             most_time_puppet: 0,
             SPLICE_CYCLES_puppet: 0,
@@ -121,96 +121,6 @@ where {
         self.rand.below(size) as f64 * 0.001
     }
 
-    #[inline]
-    pub fn key_module(&self) -> MOptMode {
-        self.key_module
-    }
-
-    #[inline]
-    pub fn swarm_now(&self) -> usize {
-        self.swarm_now
-    }
-
-    #[inline]
-    pub fn operator_num(&self) -> usize {
-        self.operator_num
-    }
-
-    #[inline]
-    pub fn total_finds(&self) -> usize {
-        self.total_finds
-    }
-
-    #[inline]
-    pub fn core_time(&self) -> usize {
-        self.core_time
-    }
-
-    #[inline]
-    pub fn pilot_time(&self) -> usize {
-        self.pilot_time
-    }
-
-    #[inline]
-    pub fn period_core(&self) -> usize {
-        self.period_core
-    }
-
-    #[inline]
-    pub fn period_pilot(&self) -> usize {
-        self.period_pilot
-    }
-
-    #[inline]
-    pub fn finds_since_switching(&self) -> usize {
-        self.finds_since_switching
-    }
-
-    #[inline]
-    pub fn finds_until_last_switching(&self) -> usize {
-        self.finds_until_last_switching
-    }
-
-    #[inline]
-    pub fn last_limit_time_start(&self) -> Duration {
-        self.last_limit_time_start
-    }
-
-    #[inline]
-    pub fn swarm_num(&self) -> usize {
-        self.swarm_num
-    }
-
-    #[inline]
-    pub fn pilot_operator_finds_per_stage(&self, swarm_now: usize, idx: usize) -> usize {
-        self.pilot_operator_finds_per_stage[swarm_now][idx]
-    }
-
-    #[inline]
-    pub fn pilot_operator_ctr_per_stage(&self, swarm_now: usize, idx: usize) -> usize {
-        self.pilot_operator_ctr_per_stage[swarm_now][idx]
-    }
-
-    #[inline]
-    pub fn pilot_operator_ctr_last(&self, swarm_now: usize, idx: usize) -> usize {
-        self.pilot_operator_ctr_last[swarm_now][idx]
-    }
-
-    #[inline]
-    pub fn core_operator_finds_per_stage(&self, idx: usize) -> usize {
-        self.core_operator_finds_per_stage[idx]
-    }
-
-    #[inline]
-    pub fn core_operator_ctr_per_stage(&self, idx: usize) -> usize {
-        self.core_operator_ctr_per_stage[idx]
-    }
-
-    #[inline]
-    pub fn core_operator_ctr_last(&self, idx: usize) -> usize {
-        self.core_operator_ctr_last[idx]
-    }
-
     pub fn init_core_module(&mut self) -> Result<(), Error> {
         // Initialize core_operator_* values
         for i in 0..self.operator_num {
@@ -250,7 +160,7 @@ where {
     #[allow(clippy::cast_precision_loss)]
     pub fn update_pilot_operator_ctr_pso(&mut self, swarm_now: usize) {
         let mut eff = 0.0;
-        for i in 0..self.operator_num() {
+        for i in 0..self.operator_num {
             if self.pilot_operator_ctr_per_stage[swarm_now][i]
                 > self.pilot_operator_ctr_pso[swarm_now][i]
             {
@@ -285,65 +195,6 @@ where {
         self.last_limit_time_start = current_time();
     }
 
-    #[inline]
-    pub fn set_key_module(&mut self, mode: MOptMode) {
-        self.key_module = mode;
-    }
-
-    #[inline]
-    pub fn set_finds_since_switching(&mut self, v: usize) {
-        self.finds_since_switching = v;
-    }
-
-    #[inline]
-    pub fn set_finds_until_last_switching(&mut self, v: usize) {
-        self.finds_until_last_switching = v;
-    }
-
-    #[inline]
-    pub fn set_core_operator_finds_per_stage(&mut self, idx: usize, v: usize) {
-        self.core_operator_finds_per_stage[idx] = v;
-    }
-
-    #[inline]
-    pub fn set_core_operator_ctr_per_stage(&mut self, idx: usize, v: usize) {
-        self.core_operator_ctr_per_stage[idx] = v;
-    }
-
-    #[inline]
-    pub fn set_pilot_operator_ctr_per_stage(&mut self, swarm_now: usize, idx: usize, v: usize) {
-        self.pilot_operator_ctr_per_stage[swarm_now][idx] = v;
-    }
-
-    #[inline]
-    pub fn set_pilot_operator_finds_per_stage(&mut self, swarm_now: usize, idx: usize, v: usize) {
-        self.pilot_operator_finds_per_stage[swarm_now][idx] = v;
-    }
-
-    #[inline]
-    pub fn set_swarm_now(&mut self, v: usize) {
-        self.swarm_now = v;
-    }
-
-    #[inline]
-    pub fn set_core_time(&mut self, v: usize) {
-        self.core_time = v;
-    }
-
-    #[inline]
-    pub fn set_pilot_time(&mut self, v: usize) {
-        self.pilot_time = v;
-    }
-
-    #[inline]
-    pub fn set_total_finds(&mut self, v: usize) {
-        self.total_finds = v;
-    }
-
-    #[inline]
-    pub fn set_swarm_fitness(&mut self, swarm_now: usize, fitness: f64) {
-        self.swarm_fitness[swarm_now] = fitness;
-    }
 
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
@@ -533,7 +384,7 @@ where
         // TODO
         let mut r = MutationResult::Skipped;
         state.mopt_mut().update_core_operator_ctr_last();
-        for i in 0..self.iterations(state, input) {
+        for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
             let outcome = self
                 .mutations_mut()
@@ -541,10 +392,9 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            let prev = state.mopt().core_operator_ctr_per_stage(idx);
             state
                 .mopt_mut()
-                .set_core_operator_ctr_per_stage(idx, prev + 1);
+                .core_operator_ctr_per_stage[idx] += 1;
         }
 
         Ok(r)
@@ -557,10 +407,10 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
-        let swarm_now = state.mopt().swarm_now();
+        let swarm_now = state.mopt().swarm_now;
         state.mopt_mut().update_pilot_operator_ctr_last(swarm_now);
 
-        for i in 0..self.iterations(state, input) {
+        for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
             let outcome = self
                 .mutations_mut()
@@ -568,10 +418,9 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            let prev = state.mopt().pilot_operator_ctr_per_stage(swarm_now, idx);
             state
                 .mopt_mut()
-                .set_pilot_operator_ctr_per_stage(swarm_now, idx, prev + 1);
+                .pilot_operator_ctr_per_stage[swarm_now][idx] += 1;
         }
 
         Ok(r)
@@ -621,7 +470,7 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let mode = state.mopt().key_module();
+        let mode = state.mopt().key_module;
         let result = match mode {
             MOptMode::CORE_FUZZING => self.core_mutate(state, input, stage_idx),
             MOptMode::PILOT_FUZZING => self.pilot_mutate(state, input, stage_idx),

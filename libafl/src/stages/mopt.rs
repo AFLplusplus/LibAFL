@@ -69,12 +69,12 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        match state.mopt().key_module() {
+        match state.mopt().key_module {
             MOptMode::CORE_FUZZING => {
-                if state.mopt().finds_since_switching() == 0 {
+                if state.mopt().finds_until_core_begin == 0 {
                     // Now, we have just switched back from PILOT_FUZZING mode
                     let finds = state.corpus().count() + state.solutions().count();
-                    state.mopt_mut().set_finds_since_switching(finds);
+                    state.mopt_mut().finds_until_core_begin = finds;
                     state.mopt_mut().set_last_limit_time_start();
                 }
 
@@ -91,8 +91,7 @@ where
                     self.mutator_mut()
                         .mutate(state, &mut input, stage_id as i32)?;
 
-                    let core_time = state.mopt().core_time();
-                    state.mopt_mut().set_core_time(core_time + 1);
+                    state.mopt_mut().core_time += 1;
 
                     let finds_before = state.corpus().count() + state.solutions().count();
 
@@ -101,37 +100,35 @@ where
                     self.mutator_mut()
                         .post_exec(state, stage_id as i32, corpus_idx)?;
 
-                    let finds = state.corpus().count() + state.solutions().count();
-                    if finds > finds_before {
-                        let diff = finds - finds_before;
-                        let cur_total_finds = state.mopt().total_finds();
-                        state.mopt_mut().set_total_finds(diff + cur_total_finds);
-                        for i in 0..state.mopt().operator_num() {
-                            if state.mopt().core_operator_ctr_per_stage(i)
-                                > state.mopt().core_operator_ctr_last(i)
+                    let finds_after = state.corpus().count() + state.solutions().count();
+                    if finds_after > finds_before {
+                        let diff = finds_after - finds_before;
+                        state.mopt_mut().total_finds += diff;
+                        for i in 0..state.mopt().operator_num {
+                            if state.mopt().core_operator_ctr_per_stage[i]
+                                > state.mopt().core_operator_ctr_last[i]
                             {
-                                let prev = state.mopt().core_operator_finds_per_stage(i);
                                 state
                                     .mopt_mut()
-                                    .set_core_operator_finds_per_stage(i, diff + prev);
+                                    .core_operator_finds_per_stage[i] += diff;
                             }
                         }
                     }
 
-                    if (finds as f64)
-                        > (finds as f64) * LIMIT_TIME_BOUND
-                            + (state.mopt().finds_since_switching() as f64)
+                    if (finds_after as f64)
+                        > (finds_after as f64) * LIMIT_TIME_BOUND
+                            + (state.mopt().finds_until_core_begin as f64)
                     {
                         // Move to the Pilot fuzzing mode
-                        state.mopt_mut().set_key_module(MOptMode::PILOT_FUZZING);
-                        state.mopt_mut().set_finds_since_switching(0);
+                        state.mopt_mut().key_module = MOptMode::PILOT_FUZZING;
+                        state.mopt_mut().finds_until_core_begin = 0;
                     }
 
-                    if state.mopt().core_time() > state.mopt().period_core() {
+                    if state.mopt().core_time > state.mopt().period_core {
                         // Make a call to pso_update()
-                        state.mopt_mut().set_core_time(0);
-                        let total_finds = state.mopt().total_finds();
-                        state.mopt_mut().set_finds_until_last_switching(total_finds);
+                        state.mopt_mut().core_time = 0;
+                        let total_finds = state.mopt().total_finds;
+                        state.mopt_mut().finds_until_pilot_begin = total_finds;
                         state.mopt_mut().update_core_operator_ctr_pso();
                         state.mopt_mut().pso_update()?;
                     }
@@ -150,8 +147,7 @@ where
                     self.mutator_mut()
                         .mutate(state, &mut input, stage_id as i32)?;
 
-                    let pilot_time = state.mopt().pilot_time();
-                    state.mopt_mut().set_pilot_time(pilot_time + 1);
+                    state.mopt_mut().pilot_time += 1;
 
                     let finds_before = state.corpus().count() + state.solutions().count();
 
@@ -160,44 +156,37 @@ where
                     self.mutator_mut()
                         .post_exec(state, stage_id as i32, corpus_idx)?;
 
-                    let swarm_now = state.mopt().swarm_now();
-                    let finds = state.corpus().count() + state.solutions().count();
-                    let diff = finds - finds_before;
+                    let swarm_now = state.mopt().swarm_now;
+                    let finds_after = state.corpus().count() + state.solutions().count();
 
-                    if finds > finds_before {
-                        let cur_total_finds = state.mopt().total_finds();
-                        state.mopt_mut().set_total_finds(diff + cur_total_finds);
-                        for i in 0..state.mopt().operator_num() {
-                            if state.mopt().pilot_operator_ctr_per_stage(swarm_now, i)
-                                > state.mopt().pilot_operator_ctr_last(swarm_now, i)
+                    if finds_after > finds_before {
+                        let diff = finds_after - finds_before;
+                        state.mopt_mut().total_finds += diff;
+                        for i in 0..state.mopt().operator_num {
+                            if state.mopt().pilot_operator_ctr_per_stage[swarm_now][i]
+                                > state.mopt().pilot_operator_ctr_last[swarm_now][i]
                             {
-                                let prev =
-                                    state.mopt().pilot_operator_finds_per_stage(swarm_now, i);
-                                state.mopt_mut().set_pilot_operator_finds_per_stage(
-                                    swarm_now,
-                                    i,
-                                    diff + prev,
-                                );
+                                state.mopt_mut().pilot_operator_finds_per_stage[swarm_now][i] += diff;
                             }
                         }
                     }
 
-                    if state.mopt().pilot_time() > state.mopt().period_pilot() {
+                    if state.mopt().pilot_time > state.mopt().period_pilot {
                         let new_finds =
-                            state.mopt().total_finds() - state.mopt().finds_until_last_switching();
+                            state.mopt().total_finds - state.mopt().finds_until_pilot_begin;
                         let f = (new_finds as f64)
-                            / ((state.mopt().pilot_time() as f64) / (PERIOD_PILOT_COEF));
-                        state.mopt_mut().set_swarm_fitness(swarm_now, f);
-                        state.mopt_mut().set_pilot_time(0);
-                        let total_finds = state.mopt().total_finds();
-                        state.mopt_mut().set_finds_until_last_switching(total_finds);
+                            / ((state.mopt().pilot_time as f64) / (PERIOD_PILOT_COEF));
+                        state.mopt_mut().swarm_fitness[swarm_now] = f;
+                        state.mopt_mut().pilot_time = 0;
+                        let total_finds = state.mopt().total_finds;
+                        state.mopt_mut().finds_until_pilot_begin = total_finds;
                         state.mopt_mut().update_pilot_operator_ctr_pso(swarm_now);
 
-                        state.mopt_mut().set_swarm_now(swarm_now + 1);
+                        state.mopt_mut().swarm_now += 1;
 
-                        if state.mopt().swarm_now() == state.mopt().swarm_num() {
+                        if state.mopt().swarm_now == state.mopt().swarm_num {
                             // Move to CORE_FUZING mode
-                            state.mopt_mut().set_key_module(MOptMode::CORE_FUZZING);
+                            state.mopt_mut().key_module = MOptMode::CORE_FUZZING;
 
                             state.mopt_mut().init_core_module()?;
                         }
