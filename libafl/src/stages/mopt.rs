@@ -15,30 +15,32 @@ const LIMIT_TIME_BOUND: f64 = 1.1;
 const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 #[derive(Clone, Debug)]
-pub struct MOptStage<C, E, EM, I, M, MT, R, S, Z>
+pub struct MOptStage<C, E, EM, I, M, MT, R, S, SC, Z>
 where
     C: Corpus<I>,
     M: MOptMutator<I, MT, R, S>,
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, MT, R, S, Z)>,
+    phantom: PhantomData<(C, E, EM, I, MT, R, S, SC, Z)>,
 }
 
-impl<C, E, EM, I, M, MT, R, S, Z> MutationalStage<C, E, EM, I, M, S, Z>
-    for MOptStage<C, E, EM, I, M, MT, R, S, Z>
+impl<C, E, EM, I, M, MT, R, S, SC, Z> MutationalStage<C, E, EM, I, M, S, Z>
+    for MOptStage<C, E, EM, I, M, MT, R, S, SC, Z>
 where
     C: Corpus<I>,
     M: MOptMutator<I, MT, R, S>,
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -196,14 +198,15 @@ where
     }
 }
 
-impl<C, E, EM, I, M, MT, R, S, Z> Stage<E, EM, S, Z> for MOptStage<C, E, EM, I, M, MT, R, S, Z>
+impl<C, E, EM, I, M, MT, R, S, SC, Z> Stage<E, EM, S, Z> for MOptStage<C, E, EM, I, M, MT, R, S, SC, Z>
 where
     C: Corpus<I>,
     M: MOptMutator<I, MT, R, S>,
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -219,19 +222,20 @@ where
     }
 }
 
-impl<C, E, EM, I, M, MT, R, S, Z> MOptStage<C, E, EM, I, M, MT, R, S, Z>
+impl<C, E, EM, I, M, MT, R, S, SC, Z> MOptStage<C, E, EM, I, M, MT, R, S, SC, Z>
 where
     C: Corpus<I>,
     M: MOptMutator<I, MT, R, S>,
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<C, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
-    pub fn new(mutator: M, state: &mut S, operator_num: usize, swarm_num: usize) -> Self {
-        state.initialize_mopt(operator_num, swarm_num);
+    pub fn new(mutator: M, state: &mut S, swarm_num: usize) -> Self {
+        state.initialize_mopt(mutator.mutations().len(), swarm_num);
         Self {
             mutator,
             phantom: PhantomData,
