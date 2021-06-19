@@ -17,9 +17,9 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    mutators::mopt_mutator::StdMOptMutator,
     mutators::scheduled::{havoc_mutations, tokens_mutations},
     mutators::token_mutations::Tokens,
-    mutators::mopt_mutator::StdMOptMutator,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mopt::MOptStage,
     state::{HasCorpus, HasMetadata, StdState},
@@ -119,7 +119,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Setup a basic mutator with a mutational stage
-
 
     let mutator = StdMOptMutator::new(havoc_mutations().merge(tokens_mutations()));
     let mut stages = tuple_list!(MOptStage::new(mutator, &mut state, 5));
