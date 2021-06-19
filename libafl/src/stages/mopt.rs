@@ -198,7 +198,8 @@ where
     }
 }
 
-impl<C, E, EM, I, M, MT, R, S, SC, Z> Stage<E, EM, S, Z> for MOptStage<C, E, EM, I, M, MT, R, S, SC, Z>
+impl<C, E, EM, I, M, MT, R, S, SC, Z> Stage<E, EM, S, Z>
+    for MOptStage<C, E, EM, I, M, MT, R, S, SC, Z>
 where
     C: Corpus<I>,
     M: MOptMutator<I, MT, R, S>,
