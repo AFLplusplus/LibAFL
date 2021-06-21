@@ -15,9 +15,10 @@ fn main() {
 
         dir.pop();
 
-        let mut cc = ClangWrapper::new("clang", if is_cpp { "clang++" } else { "clang" });
+        let mut cc = ClangWrapper::new("clang", "clang++");
 
         cc.is_cpp(is_cpp)
+            .silence()
             .from_args(&args)
             .unwrap()
             .link_staticlib(&dir, "fuzzbench".into())
