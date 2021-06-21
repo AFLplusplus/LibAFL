@@ -17,8 +17,7 @@ fn main() {
 
         let mut cc = ClangWrapper::new("clang", "clang++");
 
-        cc.is_cpp(is_cpp)
-            .silence()
+        if let Some(code) = cc.is_cpp(is_cpp)
             .from_args(&args)
             .unwrap()
             .link_staticlib(&dir, "fuzzbench".into())
@@ -28,7 +27,9 @@ fn main() {
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence()
             .run()
-            .unwrap();
+            .unwrap() {
+          std::process::exit(code);
+        }
     } else {
         panic!("LibAFL CC: No Arguments given");
     }
