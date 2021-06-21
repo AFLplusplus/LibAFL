@@ -8,10 +8,10 @@ use nix::{self, unistd::dup};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     env,
-    fs::{File, OpenOptions},
-    io,
-    io::Write,
+    fs::{self, File, OpenOptions},
+    io::{self, Write},
     path::PathBuf,
+    process,
 };
 
 use libafl::{
@@ -52,7 +52,7 @@ pub extern "C" fn fuzzer_main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = App::new("libafl_fuzzbench")
+    let res = match App::new("libafl_fuzzbench")
         .version("0.4.0")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
@@ -91,7 +91,20 @@ pub extern "C" fn fuzzer_main() {
                 .about("Timeout for each individual execution, in milliseconds")
                 .default_value("1000"),
         )
-        .get_matches();
+        .try_get_matches()
+    {
+        Ok(res) => res,
+        Err(err) => {
+            println!(
+                "Syntax: {}, [-x dictionary] corpus_dir seed_dir\n{:?}",
+                env::current_exe()
+                    .unwrap_or_else(|_| "fuzzer".into())
+                    .to_string_lossy(),
+                err.info,
+            );
+            return;
+        }
+    };
 
     println!(
         "Workdir: {:?}",
@@ -100,11 +113,22 @@ pub extern "C" fn fuzzer_main() {
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
     let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
+    if fs::create_dir(&out_dir).is_err() {
+        println!("Out dir at {:?} already exists.", &out_dir);
+        if !out_dir.is_dir() {
+            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            return;
+        }
+    }
     let mut crashes = out_dir.clone();
     crashes.push("crashes");
     out_dir.push("queue");
 
     let in_dir = PathBuf::from(res.value_of("in").unwrap().to_string());
+    if !in_dir.is_dir() {
+        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        return;
+    }
 
     let tokens = res.value_of("tokens").map(PathBuf::from);
 
@@ -287,7 +311,10 @@ fn fuzz(
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &seed_dir));
+            .unwrap_or_else(|_| {
+                println!("Failed to load initial corpus at {:?}", &seed_dir);
+                process::exit(0);
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
