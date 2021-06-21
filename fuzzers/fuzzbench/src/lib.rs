@@ -220,8 +220,7 @@ fn fuzz(
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
-    // let args: Vec<String> = env::args().collect();
-    let args = [];
+    let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
         println!("Warning: LLVMFuzzerInitialize failed with -1")
     }
