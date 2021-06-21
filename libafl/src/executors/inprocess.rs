@@ -15,6 +15,11 @@ use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
+#[cfg(unix)]
+pub use unix_signal_handler::{nop_handler, HandlerFuncPtr};
+#[cfg(all(windows, feature = "std"))]
+pub use windows_exception_handler::{nop_handler, HandlerFuncPtr};
+
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -39,14 +44,11 @@ where
     /// The observers, observing each run
     observers: OT,
     /// On crash C function pointer
-    #[cfg(unix)]
-    crash_handler: unix_signal_handler::HandlerFuncPtr,
+    #[cfg(any(unix, all(windows, feature = "std")))]
+    crash_handler: HandlerFuncPtr,
     /// On timeout C function pointer
     #[cfg(unix)]
-    timeout_handler: unix_signal_handler::HandlerFuncPtr,
-    /// On crash C function pointer
-    #[cfg(all(windows, feature = "std"))]
-    crash_handler: windows_exception_handler::HandlerFuncPtr,
+    timeout_handler: HandlerFuncPtr,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -301,7 +303,7 @@ mod unix_signal_handler {
     unsafe impl Send for InProcessExecutorHandlerData {}
     unsafe impl Sync for InProcessExecutorHandlerData {}
 
-    unsafe fn nop_handler(
+    pub unsafe fn nop_handler(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -605,7 +607,7 @@ mod windows_exception_handler {
     unsafe impl Send for InProcessExecutorHandlerData {}
     unsafe impl Sync for InProcessExecutorHandlerData {}
 
-    unsafe fn nop_handler(
+    pub unsafe fn nop_handler(
         _code: ExceptionCode,
         _exception_pointers: *mut EXCEPTION_POINTERS,
         _data: &mut InProcessExecutorHandlerData,
@@ -728,7 +730,7 @@ mod tests {
 
     use crate::{
         bolts::tuples::tuple_list,
-        executors::{Executor, ExitKind, InProcessExecutor},
+        executors::{inprocess, Executor, ExitKind, InProcessExecutor},
         inputs::NopInput,
     };
 
@@ -739,6 +741,10 @@ mod tests {
         let mut in_process_executor = InProcessExecutor::<_, NopInput, (), ()> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
+            #[cfg(any(unix, all(windows, feature = "std")))]
+            crash_handler: inprocess::nop_handler,
+            #[cfg(unix)]
+            timeout_handler: inprocess::nop_handler,
             phantom: PhantomData,
         };
         let input = NopInput {};
