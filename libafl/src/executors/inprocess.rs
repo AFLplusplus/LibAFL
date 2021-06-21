@@ -38,6 +38,15 @@ where
     harness_fn: &'a mut H,
     /// The observers, observing each run
     observers: OT,
+    /// On crash C function pointer
+    #[cfg(unix)]
+    crash_handler: unix_signal_handler::HandlerFuncPtr,
+    /// On timeout C function pointer
+    #[cfg(unix)]
+    timeout_handler: unix_signal_handler::HandlerFuncPtr,
+    /// On crash C function pointer
+    #[cfg(all(windows, feature = "std"))]
+    crash_handler: windows_exception_handler::HandlerFuncPtr,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -66,6 +75,8 @@ where
                 &mut data.observers_ptr,
                 &self.observers as *const _ as *const c_void,
             );
+            data.crash_handler = self.crash_handler;
+            data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
@@ -84,6 +95,8 @@ where
                 &mut data.observers_ptr,
                 &self.observers as *const _ as *const c_void,
             );
+            data.crash_handler = self.crash_handler;
+            //data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
@@ -170,34 +183,48 @@ where
         #[cfg(unix)]
         unsafe {
             let data = &mut unix_signal_handler::GLOBAL_STATE;
-            write_volatile(
-                &mut data.crash_handler,
-                unix_signal_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S, Z>,
-            );
-            write_volatile(
-                &mut data.timeout_handler,
-                unix_signal_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S, Z>,
-            );
-
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
+
+            Ok(Self {
+                harness_fn,
+                observers,
+                crash_handler: unix_signal_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S, Z>,
+                timeout_handler: unix_signal_handler::inproc_timeout_handler::<
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                >,
+                phantom: PhantomData,
+            })
         }
         #[cfg(all(windows, feature = "std"))]
         unsafe {
             let data = &mut windows_exception_handler::GLOBAL_STATE;
-            write_volatile(
-                &mut data.crash_handler,
-                windows_exception_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S, Z>,
-            );
-            //write_volatile(
-            //    &mut data.timeout_handler,
-            //    windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S, Z>,
-            //);
-
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
-        }
 
+            Ok(Self {
+                harness_fn,
+                observers,
+                crash_handler: windows_exception_handler::inproc_crash_handler::<
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                >,
+                // timeout_handler: windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S, Z>,
+                phantom: PhantomData,
+            })
+        }
+        #[cfg(not(any(unix, all(windows, feature = "std"))))]
         Ok(Self {
             harness_fn,
             observers,
@@ -238,6 +265,9 @@ mod unix_signal_handler {
         state::HasSolutions,
     };
 
+    pub type HandlerFuncPtr =
+        unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
+
     // TODO merge GLOBAL_STATE with the Windows one
 
     /// Signal handling on unix systems needs some nasty unsafe.
@@ -264,8 +294,8 @@ mod unix_signal_handler {
         pub fuzzer_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
-        pub crash_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
-        pub timeout_handler: unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut Self),
+        pub crash_handler: HandlerFuncPtr,
+        pub timeout_handler: HandlerFuncPtr,
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
@@ -541,6 +571,9 @@ mod windows_exception_handler {
         state::HasSolutions,
     };
 
+    pub type HandlerFuncPtr =
+        unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+
     /// Signal handling on unix systems needs some nasty unsafe.
     pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
         /// The state ptr for signal handling
@@ -565,8 +598,8 @@ mod windows_exception_handler {
         pub fuzzer_ptr: *mut c_void,
         pub observers_ptr: *const c_void,
         pub current_input_ptr: *const c_void,
-        pub crash_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
-        //pub timeout_handler: unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut Self),
+        pub crash_handler: HandlerFuncPtr,
+        //pub timeout_handler: HandlerFuncPtr,
     }
 
     unsafe impl Send for InProcessExecutorHandlerData {}
