@@ -38,7 +38,7 @@ typedef struct CmpLogMap {
   union {
       CmpLogOperands operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
       CmpLogRoutine routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
-  };
+  } vals;
 } CmpLogMap;
 
 extern CmpLogMap libafl_cmplog_map;
@@ -49,7 +49,7 @@ static void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, u
 
   if (!libafl_cmplog_enabled) return;
   
-  STATIC_ASSERT(sizeof(libafl_cmplog_map.operands) == sizeof(libafl_cmplog_map.routines));
+  STATIC_ASSERT(sizeof(libafl_cmplog_map.vals.operands) == sizeof(libafl_cmplog_map.vals.routines));
 
   uint16_t hits;
   if (libafl_cmplog_map.headers[k].kind != CMPLOG_KIND_INS) {
@@ -65,8 +65,8 @@ static void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, u
   }
 
   hits &= CMPLOG_MAP_H - 1;
-  libafl_cmplog_map.operands[k][hits].v0 = arg1;
-  libafl_cmplog_map.operands[k][hits].v1 = arg2;
+  libafl_cmplog_map.vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map.vals.operands[k][hits].v1 = arg2;
   
 }
 

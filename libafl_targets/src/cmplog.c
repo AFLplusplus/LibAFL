@@ -99,8 +99,8 @@ void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2)
   }
 
   hits &= CMPLOG_MAP_RTN_H - 1;
-  MEMCPY(libafl_cmplog_map.routines[k][hits].v0, ptr1, len);
-  MEMCPY(libafl_cmplog_map.routines[k][hits].v1, ptr2, len);
+  MEMCPY(libafl_cmplog_map.vals.routines[k][hits].v0, ptr1, len);
+  MEMCPY(libafl_cmplog_map.vals.routines[k][hits].v1, ptr2, len);
 
 }
 
