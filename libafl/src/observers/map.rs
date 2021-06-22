@@ -12,13 +12,12 @@ use crate::{
         ownedref::{OwnedRefMut, OwnedSliceMut},
         tuples::Named,
     },
-    executors::HasExecHooks,
     observers::Observer,
     Error,
 };
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
-pub trait MapObserver<T>: Observer
+pub trait MapObserver<T>: Named + serde::Serialize + serde::de::DeserializeOwned
 where
     T: Default + Copy,
 {
@@ -70,24 +69,13 @@ where
     name: String,
 }
 
-impl<'a, T> Observer for StdMapObserver<'a, T> where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
-{
-}
-
-impl<'a, EM, I, S, T, Z> HasExecHooks<EM, I, S, Z> for StdMapObserver<'a, T>
+impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -186,24 +174,13 @@ where
     name: String,
 }
 
-impl<'a, T, const N: usize> Observer for ConstMapObserver<'a, T, N> where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
-{
-}
-
-impl<'a, EM, I, S, T, Z, const N: usize> HasExecHooks<EM, I, S, Z> for ConstMapObserver<'a, T, N>
+impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -309,23 +286,13 @@ where
     name: String,
 }
 
-impl<'a, T> Observer for VariableMapObserver<'a, T> where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
-{
-}
-
-impl<'a, EM, I, S, T, Z> HasExecHooks<EM, I, S, Z> for VariableMapObserver<'a, T>
+impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    Self: MapObserver<T>,
 {
     #[inline]
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -435,36 +402,22 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
 ];
 
-impl<M> Observer for HitcountsMapObserver<M> where M: MapObserver<u8> {}
-
-impl<EM, I, S, M, Z> HasExecHooks<EM, I, S, Z> for HitcountsMapObserver<M>
+impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8> + HasExecHooks<EM, I, S, Z>,
+    M: MapObserver<u8> + Observer<I, S>,
 {
     #[inline]
-    fn pre_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
-        self.base.pre_exec(fuzzer, state, mgr, input)
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.base.pre_exec(state, input)
     }
 
     #[inline]
-    fn post_exec(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         let cnt = self.usable_count();
         for x in self.map_mut()[0..cnt].iter_mut() {
             *x = COUNT_CLASS_LOOKUP[*x as usize];
         }
-        self.base.post_exec(fuzzer, state, mgr, input)
+        self.base.post_exec(state, input)
     }
 }
 

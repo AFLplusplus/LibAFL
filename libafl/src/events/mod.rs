@@ -9,7 +9,9 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::Input, observers::ObserversTuple, stats::UserStats, Error};
+use crate::{
+    executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
+};
 
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
@@ -79,6 +81,8 @@ where
         input: I,
         /// The state of the observers when this testcase was found
         observers_buf: Vec<u8>,
+        /// The exit kind
+        exit_kind: ExitKind,
         /// The new corpus size of this client
         corpus_size: usize,
         /// The client config for this observers/testcase combination
@@ -151,6 +155,7 @@ where
                 input: _,
                 client_config: _,
                 corpus_size: _,
+                exit_kind: _,
                 observers_buf: _,
                 time: _,
                 executions: _,
@@ -192,6 +197,19 @@ where
 {
     /// Send off an event to the broker
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+
+    /// Serialize all observers for this type and manager
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    where
+        OT: ObserversTuple<I, S>,
+    {
+        Ok(postcard::to_allocvec(observers)?)
+    }
+
+    /// Get the configuration
+    fn configuration(&self) -> &str {
+        "<default>"
+    }
 }
 
 pub trait EventRestarter<S> {
@@ -207,23 +225,15 @@ pub trait EventRestarter<S> {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, S, Z> {
+pub trait EventProcessor<E, I, S, Z> {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
 
-    /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
-    where
-        OT: ObserversTuple,
-    {
-        Ok(postcard::to_allocvec(observers)?)
-    }
-
     /// Deserialize all observers for this type and manager
     fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
@@ -232,7 +242,7 @@ pub trait EventProcessor<E, S, Z> {
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
 pub trait EventManager<E, I, S, Z>:
-    EventFirer<I, S> + EventProcessor<E, S, Z> + EventRestarter<S>
+    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S>
 where
     I: Input,
 {
@@ -253,7 +263,7 @@ where
 
 impl<S> EventRestarter<S> for NopEventManager {}
 
-impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
+impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
     fn process(
         &mut self,
         _fuzzer: &mut Z,
@@ -277,6 +287,7 @@ mod tests {
             tuples::{tuple_list, Named},
         },
         events::Event,
+        executors::ExitKind,
         inputs::bytes::BytesInput,
         observers::StdMapObserver,
     };
@@ -293,6 +304,7 @@ mod tests {
         let e = Event::NewTestcase {
             input: i,
             observers_buf,
+            exit_kind: ExitKind::Ok,
             corpus_size: 123,
             client_config: "conf".into(),
             time: current_time(),
@@ -307,6 +319,7 @@ mod tests {
                 input: _,
                 observers_buf,
                 corpus_size: _,
+                exit_kind: _,
                 client_config: _,
                 time: _,
                 executions: _,
