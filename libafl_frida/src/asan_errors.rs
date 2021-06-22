@@ -448,11 +448,7 @@ pub struct AsanErrorsObserver {
 }
 
 impl<I, S> Observer<I, S> for AsanErrorsObserver {
-    fn pre_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
