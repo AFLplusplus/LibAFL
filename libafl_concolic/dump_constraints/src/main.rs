@@ -45,11 +45,13 @@ fn main() {
         .status()
         .expect("failed to spawn program");
 
-    {// open a new scope to ensure our ressources get dropped before the exit call at the end
+    {
+        // open a new scope to ensure our ressources get dropped before the exit call at the end
         let output_file_path = opt.output.unwrap_or("trace".into());
         let mut output_file =
             BufWriter::new(File::create(output_file_path).expect("unable to open output file"));
-        let mut reader = MessageFileReader::new_from_buffer(shmem.map());
+        let mut reader = MessageFileReader::new_from_length_prefixed_buffer(shmem.map())
+            .expect("unable to create trace reader");
         if opt.plain_text {
             while let Some(message) = reader.next_message() {
                 if let Ok((id, message)) = message {
@@ -60,7 +62,8 @@ fn main() {
                 }
             }
         } else {
-            let mut writer = MessageFileWriter::new_from_writer(output_file);
+            let mut writer = MessageFileWriter::new_from_writer(output_file)
+                .expect("unable to create trace writer");
             while let Some(message) = reader.next_message() {
                 if let Ok((_, message)) = message {
                     writer.write_message(message);
