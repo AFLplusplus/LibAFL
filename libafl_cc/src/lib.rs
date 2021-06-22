@@ -58,7 +58,7 @@ pub trait CompilerWrapper {
     fn is_silent(&self) -> bool;
 
     /// Run the compiler
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<Option<i32>, Error> {
         let args = self.command()?;
 
         if !self.is_silent() {
@@ -76,7 +76,7 @@ pub trait CompilerWrapper {
         if !self.is_silent() {
             dbg!(status);
         }
-        Ok(())
+        Ok(status.code())
     }
 }
 
