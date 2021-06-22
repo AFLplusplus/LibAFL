@@ -303,7 +303,8 @@ mod unix_signal_handler {
     unsafe impl Send for InProcessExecutorHandlerData {}
     unsafe impl Sync for InProcessExecutorHandlerData {}
 
-    pub unsafe fn nop_handler(
+    /// A handler that does nothing.
+    pub fn nop_handler(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
