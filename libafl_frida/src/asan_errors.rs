@@ -9,7 +9,7 @@ use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
     events::EventFirer,
-    executors::{ExitKind, HasExecHooks},
+    executors::ExitKind,
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
@@ -447,14 +447,10 @@ pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl Observer for AsanErrorsObserver {}
-
-impl<EM, I, S, Z> HasExecHooks<EM, I, S, Z> for AsanErrorsObserver {
+impl<I, S> Observer<I, S> for AsanErrorsObserver {
     fn pre_exec(
         &mut self,
-        _fuzzer: &mut Z,
         _state: &mut S,
-        _mgr: &mut EM,
         _input: &I,
     ) -> Result<(), Error> {
         unsafe {
@@ -529,7 +525,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")
