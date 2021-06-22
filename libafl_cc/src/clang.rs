@@ -265,7 +265,7 @@ mod tests {
 
     #[test]
     fn test_clang_version() {
-        ClangWrapper::new("clang", "clang++")
+        ClangWrapper::new()
             .from_args(&["my-clang".into(), "-v".into()])
             .unwrap()
             .run()
