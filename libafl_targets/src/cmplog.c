@@ -4,7 +4,7 @@
 #include "cmplog.h"
 
 #if defined(_WIN32)
-#include <winbase.h>
+#include <windows.h>
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
 #include <sys/syscall.h>
