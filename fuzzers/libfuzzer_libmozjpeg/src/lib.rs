@@ -60,7 +60,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr_std(stats, broker_port).expect("Failed to setup the restarter");
+        setup_restarting_mgr_std(stats, broker_port, "default".into())
+            .expect("Failed to setup the restarter");
 
     // Create an observation channel using the coverage map
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };

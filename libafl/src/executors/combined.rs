@@ -1,7 +1,7 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 
 use crate::{
-    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
     Error,
@@ -52,10 +52,10 @@ where
     }
 }
 
-impl<A, B, OT> HasObservers<OT> for CombinedExecutor<A, B>
+impl<A, B, I, OT, S> HasObservers<I, OT, S> for CombinedExecutor<A, B>
 where
-    A: HasObservers<OT>,
-    OT: ObserversTuple,
+    A: HasObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -66,12 +66,4 @@ where
     fn observers_mut(&mut self) -> &mut OT {
         self.primary.observers_mut()
     }
-}
-
-impl<A, B, EM, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z> for CombinedExecutor<A, B>
-where
-    A: HasObservers<OT>,
-    I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
-{
 }

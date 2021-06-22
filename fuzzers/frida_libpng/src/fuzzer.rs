@@ -20,8 +20,8 @@ use libafl::{
         QueueCorpusScheduler,
     },
     executors::{
-        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind,
-        HasExecHooksTuple, HasObservers, HasObserversHooks, ShadowExecutor,
+        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
+        ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -65,7 +65,7 @@ where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT, S>>,
     /// Frida's dynamic rewriting engine
@@ -82,7 +82,7 @@ where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -120,13 +120,13 @@ where
     }
 }
 
-impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<OT>
+impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<I, OT, S>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -139,22 +139,12 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
-    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
-{
-}
-
 impl<'a, 'b, 'c, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     pub fn new(
         gum: &'a Gum,
@@ -206,6 +196,12 @@ pub fn main() {
                 .index(3),
         )
         .arg(
+            Arg::with_name("configuration")
+                .required(false)
+                .value_name("CONF")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("output")
                 .short("o")
                 .long("output")
@@ -252,6 +248,10 @@ pub fn main() {
             &cores,
             matches.value_of("output"),
             broker_addr,
+            matches
+                .value_of("configuration")
+                .unwrap_or("default launcher")
+                .to_string(),
         )
         .expect("An error occurred while fuzzing");
     }
@@ -269,6 +269,7 @@ fn fuzz(
     _cores: &[usize],
     _stdout_file: Option<&str>,
     _broker_addr: Option<SocketAddr>,
+    _configuration: String,
 ) -> Result<(), ()> {
     todo!("Example not supported on Windows");
 }
@@ -286,6 +287,7 @@ unsafe fn fuzz(
     cores: &[usize],
     stdout_file: Option<&str>,
     broker_addr: Option<SocketAddr>,
+    configuration: String,
 ) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = MultiStats::new(|s| println!("{}", s));
@@ -443,6 +445,7 @@ unsafe fn fuzz(
     };
 
     Launcher::builder()
+        .configuration(configuration)
         .shmem_provider(shmem_provider)
         .stats(stats)
         .run_client(&mut run_client)

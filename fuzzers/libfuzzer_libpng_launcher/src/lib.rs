@@ -167,6 +167,7 @@ pub fn main() {
 
     Launcher::builder()
         .shmem_provider(shmem_provider)
+        .configuration("launcher default".into())
         .stats(stats)
         .run_client(&mut run_client)
         .cores(&cores)

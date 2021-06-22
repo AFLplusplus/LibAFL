@@ -3,7 +3,6 @@
 
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
-    executors::HasExecHooks,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
@@ -146,11 +145,14 @@ pub struct CmpLogObserver<'a> {
     name: String,
 }
 
-impl<'a> CmpObserver<CmpLogMap> for CmpLogObserver<'a> {
+impl<'a, I, S> CmpObserver<CmpLogMap, I, S> for CmpLogObserver<'a>
+where
+    S: HasMetadata,
+{
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
-            None => self.map().len(),
+            None => self.map.as_ref().len(),
             Some(o) => *o.as_ref(),
         }
     }
@@ -164,19 +166,12 @@ impl<'a> CmpObserver<CmpLogMap> for CmpLogObserver<'a> {
     }
 }
 
-impl<'a> Observer for CmpLogObserver<'a> {}
-
-impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a>
+impl<'a, I, S> Observer<I, S> for CmpLogObserver<'a>
 where
     S: HasMetadata,
+    Self: CmpObserver<CmpLogMap, I, S>,
 {
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         unsafe {
             CMPLOG_ENABLED = 1;
@@ -184,13 +179,7 @@ where
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
         }

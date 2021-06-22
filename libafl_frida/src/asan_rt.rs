@@ -1946,6 +1946,7 @@ impl AsanRuntime {
         let backtrace = Backtrace::new();
 
         let (stack_start, stack_end) = Self::current_stack();
+        #[allow(clippy::option_if_let_else)]
         let error = if fault_address >= stack_start && fault_address < stack_end {
             if insn.mnemonic().unwrap().starts_with('l') {
                 AsanError::StackOobRead((
@@ -1962,38 +1963,35 @@ impl AsanRuntime {
                     backtrace,
                 ))
             }
-        } else {
-            #[allow(clippy::option_if_let_else)]
-            if let Some(metadata) = self
-                .allocator
-                .find_metadata(fault_address, self.regs[base_reg as usize])
-            {
-                let asan_readwrite_error = AsanReadWriteError {
-                    registers: self.regs,
-                    pc: actual_pc,
-                    fault: (base_reg, index_reg, displacement as usize, fault_address),
-                    metadata: metadata.clone(),
-                    backtrace,
-                };
-                if insn.mnemonic().unwrap().starts_with('l') {
-                    if metadata.freed {
-                        AsanError::ReadAfterFree(asan_readwrite_error)
-                    } else {
-                        AsanError::OobRead(asan_readwrite_error)
-                    }
-                } else if metadata.freed {
-                    AsanError::WriteAfterFree(asan_readwrite_error)
+        } else if let Some(metadata) = self
+            .allocator
+            .find_metadata(fault_address, self.regs[base_reg as usize])
+        {
+            let asan_readwrite_error = AsanReadWriteError {
+                registers: self.regs,
+                pc: actual_pc,
+                fault: (base_reg, index_reg, displacement as usize, fault_address),
+                metadata: metadata.clone(),
+                backtrace,
+            };
+            if insn.mnemonic().unwrap().starts_with('l') {
+                if metadata.freed {
+                    AsanError::ReadAfterFree(asan_readwrite_error)
                 } else {
-                    AsanError::OobWrite(asan_readwrite_error)
+                    AsanError::OobRead(asan_readwrite_error)
                 }
+            } else if metadata.freed {
+                AsanError::WriteAfterFree(asan_readwrite_error)
             } else {
-                AsanError::Unknown((
-                    self.regs,
-                    actual_pc,
-                    (base_reg, index_reg, displacement as usize, fault_address),
-                    backtrace,
-                ))
+                AsanError::OobWrite(asan_readwrite_error)
             }
+        } else {
+            AsanError::Unknown((
+                self.regs,
+                actual_pc,
+                (base_reg, index_reg, displacement as usize, fault_address),
+                backtrace,
+            ))
         };
         AsanErrors::get_mut().report_error(error);
     }

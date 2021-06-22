@@ -40,7 +40,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple;
+        OT: ObserversTuple<I, S>;
 
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
@@ -56,7 +56,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // Start a timer for this feedback
         let start_time = crate::bolts::cpu::read_time_counter();
@@ -168,7 +168,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         FL::is_pair_interesting(
             &mut self.first,
@@ -194,7 +194,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         FL::is_pair_interesting_with_perf(
             &mut self.first,
@@ -241,7 +241,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple;
+        OT: ObserversTuple<I, S>;
 
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
@@ -258,7 +258,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple;
+        OT: ObserversTuple<I, S>;
 }
 
 pub struct LogicEagerOr {}
@@ -287,7 +287,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -308,7 +308,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_with_perf(
@@ -355,7 +355,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if a {
@@ -379,7 +379,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_with_perf(
@@ -429,7 +429,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -450,7 +450,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_with_perf(
@@ -497,7 +497,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if !a {
@@ -521,7 +521,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_with_perf(
@@ -596,7 +596,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         Ok(!self
             .first
@@ -707,7 +707,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         Ok(false)
     }
@@ -738,7 +738,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         if let ExitKind::Crash = exit_kind {
             Ok(true)
@@ -787,7 +787,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         if let ExitKind::Timeout = exit_kind {
             Ok(true)
@@ -841,7 +841,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();

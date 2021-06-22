@@ -23,7 +23,7 @@ pub use windows_exception_handler::{nop_handler, HandlerFuncPtr};
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
@@ -37,7 +37,7 @@ pub struct InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: &'a mut H,
@@ -56,7 +56,7 @@ impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessExecutor<'a, H, 
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn run_target(
@@ -130,11 +130,11 @@ where
     }
 }
 
-impl<'a, H, I, OT, S> HasObservers<OT> for InProcessExecutor<'a, H, I, OT, S>
+impl<'a, H, I, OT, S> HasObservers<I, OT, S> for InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -147,20 +147,11 @@ where
     }
 }
 
-impl<'a, EM, H, I, OT, S, Z> HasObserversHooks<EM, I, OT, S, Z>
-    for InProcessExecutor<'a, H, I, OT, S>
-where
-    H: FnMut(&I) -> ExitKind,
-    I: Input,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
-{
-}
-
 impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple,
+    OT: ObserversTuple<I, S>,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -349,7 +340,7 @@ mod unix_signal_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I>,
@@ -423,7 +414,7 @@ mod unix_signal_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I>,
@@ -634,7 +625,7 @@ mod windows_exception_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I>,

@@ -9,7 +9,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named, AsSlice},
-    executors::HasExecHooks,
     observers::Observer,
     state::HasMetadata,
     Error,
@@ -95,7 +94,7 @@ pub trait CmpMap: Serialize + DeserializeOwned {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<CM>: Observer
+pub trait CmpObserver<CM, I, S>: Observer<I, S>
 where
     CM: CmpMap,
 {
@@ -110,7 +109,7 @@ where
 
     /// Add [`CmpValuesMetadata`] to the State including the logged values.
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
-    fn add_cmpvalues_meta<S>(&mut self, state: &mut S)
+    fn add_cmpvalues_meta(&mut self, state: &mut S)
     where
         S: HasMetadata,
     {
@@ -181,14 +180,14 @@ where
     name: String,
 }
 
-impl<'a, CM> CmpObserver<CM> for StdCmpObserver<'a, CM>
+impl<'a, CM, I, S> CmpObserver<CM, I, S> for StdCmpObserver<'a, CM>
 where
     CM: CmpMap,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
-            None => self.map().len(),
+            None => self.map.as_ref().len(),
             Some(o) => *o.as_ref(),
         }
     }
@@ -202,19 +201,11 @@ where
     }
 }
 
-impl<'a, CM> Observer for StdCmpObserver<'a, CM> where CM: CmpMap {}
-
-impl<'a, CM, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for StdCmpObserver<'a, CM>
+impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
 where
     CM: CmpMap,
 {
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         Ok(())
     }
