@@ -1,7 +1,7 @@
 use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 use std::env;
 
-fn main() {
+pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let mut dir = env::current_exe().unwrap();

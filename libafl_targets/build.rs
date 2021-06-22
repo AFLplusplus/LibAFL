@@ -64,7 +64,6 @@ pub const CMPLOG_MAP_H: usize = {};
         #[cfg(feature = "sancov_cmplog")]
         {
             sancov_cmp.define("SANCOV_CMPLOG", "1");
-            println!("cargo:rerun-if-changed=src/cmplog.h");
         }
 
         sancov_cmp
@@ -83,6 +82,15 @@ pub const CMPLOG_MAP_H: usize = {};
             .file(_src_dir.join("libfuzzer_compatibility.c"))
             .compile("libfuzzer_compatibility");
     }
+
+    println!("cargo:rerun-if-changed=src/cmplog.h");
+    println!("cargo:rerun-if-changed=src/cmplog.c");
+
+    cc::Build::new()
+        .define("CMPLOG_MAP_W", Some(&*format!("{}", cmplog_map_w)))
+        .define("CMPLOG_MAP_H", Some(&*format!("{}", cmplog_map_h)))
+        .file(_src_dir.join("cmplog.c"))
+        .compile("cmplog");
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
 
