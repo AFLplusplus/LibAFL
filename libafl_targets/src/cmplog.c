@@ -8,7 +8,7 @@
 
 #include <windows.h>
 
-__attribute__((weak)) void *__libafl_asan_region_is_poisoned(void *beg, size_t size) {
+void *__libafl_asan_region_is_poisoned(void *beg, size_t size) {
 
   (void)beg;
   (void)size;
@@ -36,6 +36,14 @@ __attribute__((weak)) void *__asan_region_is_poisoned(void *beg, size_t size) {
 }
 
 #endif
+
+void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
+
+  STATIC_ASSERT(sizeof(libafl_cmplog_map.vals.operands) == sizeof(libafl_cmplog_map.vals.routines));
+  
+  __libafl_targets_cmplog(k, shape, arg1, arg2);
+
+}
 
 // POSIX shenanigan to see if an area is mapped.
 // If it is mapped as X-only, we have a problem, so maybe we should add a check

@@ -45,14 +45,11 @@ extern CmpLogMap libafl_cmplog_map;
 
 extern uint8_t libafl_cmplog_enabled;
 
-void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2);
+void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2);
 
 void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2);
 
-#ifndef CMPLOG_MODULE
-inline
-#endif
-void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
+static inline void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
 
   if (!libafl_cmplog_enabled) return;
   
