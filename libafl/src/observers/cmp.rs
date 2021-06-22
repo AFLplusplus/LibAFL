@@ -113,10 +113,13 @@ where
     where
         S: HasMetadata,
     {
-        if state.metadata().get::<CmpValuesMetadata>().is_none() {
+        #[allow(clippy::clippy::option_if_let_else)] // we can't mutate state in a closure
+        let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {
+            meta
+        } else {
             state.add_metadata(CmpValuesMetadata::new());
-        }
-        let meta = state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap();
+            state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap()
+        };
         meta.list.clear();
         let count = self.usable_count();
         for i in 0..count {
