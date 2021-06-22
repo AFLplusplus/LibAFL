@@ -1,22 +1,31 @@
 // From AFL++'s afl-compiler-rt.c
 
+#define CMPLOG_MODULE
 #include "common.h"
 #include "cmplog.h"
 
 #if defined(_WIN32)
+
 #include <windows.h>
+
+__attribute__((weak)) void *__libafl_asan_region_is_poisoned(void *beg, size_t size) {
+
+  (void)beg;
+  (void)size;
+  return NULL;
+
+}
+
+#pragma comment(linker, "/alternatename:__asan_region_is_poisoned=__libafl_asan_region_is_poisoned")
+
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <fcntl.h>
 
 static int dummy_fd[2] = {2, 2};
 static int dymmy_initialized = 0;
-#endif
-
-void libafl_targets_cmplog_wrapper(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
-    return __libafl_targets_cmplog(k, shape, arg1, arg2);
-}
 
 __attribute__((weak)) void *__asan_region_is_poisoned(void *beg, size_t size) {
 
@@ -25,6 +34,8 @@ __attribute__((weak)) void *__asan_region_is_poisoned(void *beg, size_t size) {
   return NULL;
 
 }
+
+#endif
 
 // POSIX shenanigan to see if an area is mapped.
 // If it is mapped as X-only, we have a problem, so maybe we should add a check

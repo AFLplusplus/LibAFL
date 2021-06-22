@@ -45,12 +45,17 @@ extern CmpLogMap libafl_cmplog_map;
 
 extern uint8_t libafl_cmplog_enabled;
 
-static void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
+void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2);
+
+void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2);
+
+#ifndef CMPLOG_MODULE
+inline
+#endif
+void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
 
   if (!libafl_cmplog_enabled) return;
   
-  STATIC_ASSERT(sizeof(libafl_cmplog_map.vals.operands) == sizeof(libafl_cmplog_map.vals.routines));
-
   uint16_t hits;
   if (libafl_cmplog_map.headers[k].kind != CMPLOG_KIND_INS) {
     libafl_cmplog_map.headers[k].kind = CMPLOG_KIND_INS;
@@ -69,7 +74,5 @@ static void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, u
   libafl_cmplog_map.vals.operands[k][hits].v1 = arg2;
   
 }
-
-void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2);
 
 #endif
