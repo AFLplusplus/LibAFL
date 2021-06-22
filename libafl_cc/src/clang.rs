@@ -11,12 +11,14 @@ use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX};
 
 include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 
+#[allow(clippy::upper_case_acronyms)]
 pub enum LLVMPasses {
     //CmpLogIns,
     CmpLogRtn,
 }
 
 impl LLVMPasses {
+    #[must_use]
     pub fn path(&self) -> PathBuf {
         match self {
             LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR")).join("cmplog-routines-pass.so"),
@@ -205,6 +207,14 @@ impl CompilerWrapper for ClangWrapper {
 
     fn is_silent(&self) -> bool {
         self.is_silent
+    }
+}
+
+impl Default for ClangWrapper {
+    /// Create a new Clang Wrapper
+    #[must_use]
+    fn default() -> Self {
+        Self::new()
     }
 }
 
