@@ -114,10 +114,13 @@ where
     where
         S: HasMetadata,
     {
-        if state.metadata().get::<CmpValuesMetadata>().is_none() {
-            state.add_metadata(CmpValuesMetadata::new());
-        }
-        let meta = state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap();
+        let meta = match state.metadata_mut().get_mut::<CmpValuesMetadata>() {
+            Some(meta) => meta,
+            None => {
+                state.add_metadata(CmpValuesMetadata::new());
+                state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap()
+            }
+        };
         meta.list.clear();
         let count = self.usable_count();
         for i in 0..count {
