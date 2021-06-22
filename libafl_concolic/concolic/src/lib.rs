@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Cursor, Read, Write},
+    io::{self, Cursor, Read, Seek, SeekFrom, Write},
     num::NonZeroUsize,
 };
 
@@ -430,29 +430,63 @@ impl<R: Read> MessageFileReader<R> {
 }
 
 impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
-    pub fn new_from_buffer(buffer: &'buffer [u8]) -> Self {
+    pub fn new_from_buffer(buffer: &'buffer [u8]) -> io::Result<Self> {
         let reader = Cursor::new(buffer);
-        Self {
+        Ok(Self {
             reader,
             deserializer_config: serialization_options(),
             current_id: 1,
-        }
+        })
+    }
+
+    pub fn new_from_length_prefixed_buffer(mut buffer: &'buffer [u8]) -> io::Result<Self> {
+        let mut len_buf = 0u64.to_le_bytes();
+        buffer.read_exact(&mut len_buf)?;
+        let buffer_len = u64::from_le_bytes(len_buf);
+        assert!(buffer_len <= usize::MAX as u64);
+        let buffer_len = buffer_len as usize;
+        let (buffer, _) = buffer.split_at(buffer_len);
+        Self::new_from_buffer(buffer)
+    }
+
+    pub fn get_buffer(&self) -> &[u8] {
+        self.reader.get_ref()
     }
 }
 
 pub struct MessageFileWriter<W: Write> {
     id_counter: usize,
     writer: W,
+    writer_start_position: u64,
     serialization_options: DefaultOptions,
 }
 
-impl<W: Write> MessageFileWriter<W> {
-    pub fn new_from_writer(writer: W) -> Self {
-        Self {
-            writer,
+impl<W: Write + Seek> MessageFileWriter<W> {
+    pub fn new_from_writer(mut writer: W) -> io::Result<Self> {
+        let writer_start_position = writer.stream_position()?;
+        // write dummy trace length
+        writer.write_all(&0u64.to_le_bytes())?;
+        Ok(Self {
             id_counter: 1,
+            writer,
+            writer_start_position,
             serialization_options: serialization_options(),
-        }
+        })
+    }
+
+    #[must_use]
+    pub fn end(mut self) -> io::Result<()> {
+        // calculate size of trace
+        let end_pos = self.writer.stream_position()?;
+        let trace_header_len = 0u64.to_le_bytes().len() as u64;
+        assert!(end_pos > self.writer_start_position + trace_header_len);
+        let trace_length = end_pos - self.writer_start_position - trace_header_len;
+
+        // write trace size to beginning of trace
+        self.writer
+            .seek(SeekFrom::Start(self.writer_start_position))?;
+        self.writer.write_all(&trace_length.to_le_bytes())?;
+        Ok(())
     }
 
     fn make_relative(&self, expr: SymExprRef) -> SymExprRef {
@@ -554,13 +588,13 @@ impl<W: Write> MessageFileWriter<W> {
 }
 
 impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
-    pub fn new_from_shmem(shmem: T) -> Self {
+    pub fn new_from_shmem(shmem: T) -> io::Result<Self> {
         Self::new_from_writer(ShMemCursor::from_shmem(shmem))
     }
 }
 
 impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
-    pub fn new_from_stdshmem_env(env_name: impl AsRef<str>) -> Self {
+    pub fn new_from_stdshmem_env(env_name: impl AsRef<str>) -> io::Result<Self> {
         Self::new_from_shmem(
             StdShMemProvider::new()
                 .expect("unable to initialize StdShMemProvider")

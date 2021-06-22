@@ -13,7 +13,8 @@ struct State<F: ExpressionFilter = NopExpressionFilter> {
 
 impl State<NopExpressionFilter> {
     fn new() -> Self {
-        let writer = MessageFileWriter::new_from_stdshmem_env("SHARED_MEMORY_MESSAGES");
+        let writer = MessageFileWriter::new_from_stdshmem_env("SHARED_MEMORY_MESSAGES")
+            .expect("unable to initialise writer");
         Self {
             writer,
             filter: NopExpressionFilter,
@@ -38,8 +39,11 @@ impl<F: ExpressionFilter> State<F> {
     }
 
     /// This is called at the end of the process, giving us the opprtunity to signal the end of the trace.
-    fn end(&mut self) {
+    fn end(mut self) {
         self.log_message(Message::End);
+        self.writer
+            .end()
+            .expect("unable to end message file writer");
     }
 }
 
@@ -61,9 +65,8 @@ fn init() {
 
 /// [`libc::atexit`] handler
 extern "C" fn fini() {
-    with_state(|s| s.end());
     // drops the global data object
-    unsafe { GLOBAL_DATA = None }
+    unsafe { GLOBAL_DATA.take().unwrap().end() }
 }
 
 /// A little helper function that encapsulates access to the shared mutable state.
