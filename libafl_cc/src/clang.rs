@@ -189,8 +189,8 @@ impl CompilerWrapper for ClangWrapper {
         self.linking
     }
 
-    fn silence(&mut self) -> &'_ mut Self {
-        self.is_silent = true;
+    fn silence(&mut self, value: bool) -> &'_ mut Self {
+        self.is_silent = value;
         self
     }
 
@@ -237,14 +237,15 @@ impl ClangWrapper {
     }
 
     /// Set cpp mode
-    pub fn is_cpp(&mut self, value: bool) -> &'_ mut Self {
+    pub fn cpp(&mut self, value: bool) -> &'_ mut Self {
         self.is_cpp = value;
         self
     }
 
     // Add LLVM pass
-    pub fn add_pass(&mut self, pass: LLVMPasses) {
+    pub fn add_pass(&mut self, pass: LLVMPasses) -> &'_ mut Self {
         self.passes.push(pass);
+        self
     }
 }
 

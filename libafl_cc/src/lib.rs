@@ -3,7 +3,7 @@
 use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
 
 pub mod clang;
-pub use clang::ClangWrapper;
+pub use clang::{ClangWrapper, LLVMPasses};
 
 /// `LibAFL` CC Error Type
 #[derive(Debug)]
@@ -65,9 +65,9 @@ pub trait CompilerWrapper {
     fn is_linking(&self) -> bool;
 
     /// Silences `libafl_cc` output
-    fn silence(&mut self) -> &'_ mut Self;
+    fn silence(&mut self, value: bool) -> &'_ mut Self;
 
-    /// Returns `true` if `silence` was called
+    /// Returns `true` if `silence` was called with `true`
     fn is_silent(&self) -> bool;
 
     /// Run the compiler

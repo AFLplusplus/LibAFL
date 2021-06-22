@@ -1,4 +1,4 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper};
+use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 use std::env;
 
 fn main() {
@@ -15,18 +15,16 @@ fn main() {
 
         dir.pop();
 
-        let mut cc = ClangWrapper::new("clang", "clang++");
-
+        let mut cc = ClangWrapper::new();
         if let Some(code) = cc
-            .is_cpp(is_cpp)
+            .cpp(is_cpp)
+            // silence the compiler wrapper output, needed for some configure scripts.
+            .silence(false)
             .from_args(&args)
             .unwrap()
-            .link_staticlib(&dir, "fuzzbench".into())
-            .unwrap()
-            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp".into())
-            .unwrap()
-            // silence the compiler wrapper output, needed for some configure scripts.
-            .silence()
+            .link_staticlib(&dir, "fuzzbench")
+            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
+            .add_pass(LLVMPasses::CmpLogRtn)
             .run()
             .unwrap()
         {
