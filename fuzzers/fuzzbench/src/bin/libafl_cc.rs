@@ -21,12 +21,12 @@ fn main() {
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(false)
             .from_args(&args)
-            .unwrap()
+            .expect("Failed to parse the command line".into())
             .link_staticlib(&dir, "fuzzbench")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
             .add_pass(LLVMPasses::CmpLogRtn)
             .run()
-            .unwrap()
+            .expect("Failed to run the wrapped compiler".into())
         {
             std::process::exit(code);
         }

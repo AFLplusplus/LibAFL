@@ -53,6 +53,39 @@ pub trait CompilerWrapper {
     where
         S: AsRef<str>;
 
+    /// Add compiler arguments
+    fn add_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_arg(arg);
+        }
+        self
+    }
+
+    /// Add compiler arguments only when compiling
+    fn add_cc_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_cc_arg(arg);
+        }
+        self
+    }
+
+    /// Add compiler arguments only when linking
+    fn add_link_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_link_arg(arg);
+        }
+        self
+    }
+
     /// Link static C lib
     fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
     where

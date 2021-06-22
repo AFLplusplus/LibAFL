@@ -38,6 +38,7 @@ pub struct ClangWrapper {
     x_set: bool,
     bit_mode: u32,
 
+    from_args_called: bool,
     base_args: Vec<String>,
     cc_args: Vec<String>,
     link_args: Vec<String>,
@@ -56,6 +57,14 @@ impl CompilerWrapper for ClangWrapper {
                 "The number of arguments cannot be 0".to_string(),
             ));
         }
+
+        if self.from_args_called {
+            return Err(Error::Unknown(
+                "CompilerWrapper::from_args cannot be called twice on the same instance"
+                    .to_string(),
+            ));
+        }
+        self.from_args_called = true;
 
         if args.len() == 1 {
             return Err(Error::InvalidArguments(
@@ -212,6 +221,7 @@ impl ClangWrapper {
             linking: false,
             x_set: false,
             bit_mode: 0,
+            from_args_called: false,
             base_args: vec![],
             cc_args: vec![],
             link_args: vec![],
