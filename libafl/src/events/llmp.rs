@@ -370,17 +370,17 @@ where
                 time: _,
                 executions: _,
             } => {
-                // TODO: here u should match client_config, if equal to the current one do not re-execute
-                // we need to pass engine to process() too, TODO
                 #[cfg(feature = "std")]
-                println!("Received new Testcase from {} ({}) {:?}", _sender_id, client_config, input);
+                println!(
+                    "Received new Testcase from {} ({}) {:?}",
+                    _sender_id, client_config, input
+                );
 
-                let res = if false && client_config != self.configuration {
-                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
-                } else {
+                let res = if client_config == self.configuration {
                     let observers: OT = postcard::from_bytes(&observers_buf)?;
-                    fuzzer
-                        .process_execution(state, self, input, &observers, &exit_kind, false)?
+                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
+                } else {
+                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
                 };
                 #[cfg(feature = "std")]
                 if let Some(item) = res.1 {
@@ -428,6 +428,10 @@ where
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
+    }
+
+    fn configuration(&self) -> &str {
+        &self.configuration
     }
 }
 
@@ -563,6 +567,10 @@ where
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)
+    }
+
+    fn configuration(&self) -> &str {
+        self.llmp_mgr.configuration()
     }
 }
 

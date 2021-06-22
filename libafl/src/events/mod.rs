@@ -205,6 +205,11 @@ where
     {
         Ok(postcard::to_allocvec(observers)?)
     }
+
+    /// Get the configuration
+    fn configuration(&self) -> &str {
+        "<default>"
+    }
 }
 
 pub trait EventRestarter<S> {
