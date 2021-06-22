@@ -19,7 +19,7 @@ fn main() {
         if let Some(code) = cc
             .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.
-            .silence(false)
+            .silence(true)
             .from_args(&args)
             .expect("Failed to parse the command line".into())
             .link_staticlib(&dir, "fuzzbench")
