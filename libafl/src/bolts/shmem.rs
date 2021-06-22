@@ -1036,3 +1036,31 @@ impl<T: ShMem> std::io::Write for ShMemCursor<T> {
         }
     }
 }
+
+#[cfg(feature = "std")]
+impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        let effective_new_pos = match pos {
+            std::io::SeekFrom::Start(s) => s,
+            std::io::SeekFrom::End(offset) => {
+                let map_len = self.inner.map().len();
+                assert!(map_len as u64 <= i64::MAX as u64);
+                let signed_pos = map_len as i64;
+                let effective = signed_pos.checked_add(offset).unwrap();
+                assert!(effective >= 0);
+                effective as u64
+            }
+            std::io::SeekFrom::Current(offset) => {
+                let current_pos = self.pos;
+                assert!(current_pos as u64 <= i64::MAX as u64);
+                let signed_pos = current_pos as i64;
+                let effective = signed_pos.checked_add(offset).unwrap();
+                assert!(effective >= 0);
+                effective as u64
+            },
+        };
+        assert!(effective_new_pos <= usize::MAX as u64);
+        self.pos = effective_new_pos as usize;
+        Ok(effective_new_pos)
+    }
+}
