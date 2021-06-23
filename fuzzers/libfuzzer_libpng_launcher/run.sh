@@ -21,9 +21,8 @@ fi
 # Compile the harness
 ./target/release/libafl_cxx ./harness.cc libpng-1.6.37/.libs/libpng16.a -I libpng-1.6.37/ -o fuzzer_libpng -lz -lm || exit 1
 
-echo "WAS?"
-timeout 3s ./fuzzer_libpng --cores 0 2>/dev/null
+timeout 3s ./fuzzer_libpng --cores 0 >log 2>/dev/null
 
 rm -rf ./fuzzer_libpng
-rm -rf ./broker_log
+rm -rf ./log 
 exit 0
