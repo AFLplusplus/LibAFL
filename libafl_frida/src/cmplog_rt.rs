@@ -4,7 +4,7 @@ use std::ffi::c_void;
 
 extern crate libafl_targets;
 extern "C" {
-    pub fn libafl_targets_cmplog_wrapper(k: u64, shape: u8, arg1: u64, arg2: u64);
+    pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
 pub struct CmpLogRuntime {
@@ -31,7 +31,7 @@ impl CmpLogRuntime {
         k &= (CMPLOG_MAP_W as u64) - 1;
 
         unsafe {
-            libafl_targets_cmplog_wrapper(k, 8, op1, op2);
+            __libafl_targets_cmplog_instructions(k, 8, op1, op2);
         }
     }
 
