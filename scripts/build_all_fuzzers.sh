@@ -22,6 +22,10 @@ do
     fi
     echo "[*] Building $fuzzer"
     cargo build || exit 1
+    if [ -e ./run.sh ]; then
+        echo "[*] Testing $fuzzer"
+        ./run.sh || exit 1
+    fi
     cd ..
     echo "[+] Done building $fuzzer"
     echo ""
