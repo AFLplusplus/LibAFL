@@ -20,10 +20,10 @@
 typedef struct CmpLogHeader {
     uint16_t hits;
     uint8_t shape;
-    uint8_t kind;
+    uint8_t reserved;
 } CmpLogHeader;
 
-typedef struct CmpLogOperands {
+typedef struct CmpLogInstruction {
     uint64_t v0;
     uint64_t v1;
 } CmpLogOperands;
@@ -35,10 +35,12 @@ typedef struct CmpLogRoutine {
 
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];
-  union {
-      CmpLogOperands operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
-      CmpLogRoutine routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
-  } vals;
+  CmpLogInstruction operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
+} CmpLogMap;
+
+typedef struct CmpLogMap {
+  CmpLogHeader headers[CMPLOG_MAP_W];
+  CmpLogRoutine operands[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
 } CmpLogMap;
 
 extern CmpLogMap libafl_cmplog_map;

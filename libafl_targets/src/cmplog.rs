@@ -15,12 +15,17 @@ use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
 /// The `CmpLog` map size
 pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 
-big_array! { BigArray; }
+/// The size of a logged routine argument in bytes
+pub const CMPLOG_RTN_LEN: usize = 32;
+
+pub const CMPLOG_MAP_RTN_H: usize = (CMPLOG_MAP_H * core::mem::size_of::<CmpLogOperands>()) / core::mem::size_of::<CmpLogRoutine>();
 
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
 /// `CmpLog` return kind
 pub const CMPLOG_KIND_RTN: u8 = 1;
+
+big_array! { BigArray; }
 
 /// The header for `CmpLog` hits.
 #[repr(C)]
@@ -36,14 +41,27 @@ pub struct CmpLogHeader {
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
 pub struct CmpLogOperands(u64, u64);
 
+/// The routine arguments logged during `CmpLog`.
+#[repr(C)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+pub struct CmpLogRoutine([u8; CMPLOG_RTN_LEN], [u8; CMPLOG_RTN_LEN]);
+
+#[repr(C)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub union CmpLogVals {
+    #[serde(with = "BigArray")]
+    operands: [[CmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W],
+    #[serde(with = "BigArray")]
+    routines: [[CmpLogRoutine; CMPLOG_MAP_RTN_H]; CMPLOG_MAP_W],
+}
+
 /// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct CmpLogMap {
     #[serde(with = "BigArray")]
     headers: [CmpLogHeader; CMPLOG_MAP_W],
-    #[serde(with = "BigArray")]
-    operands: [[CmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W],
+    vals: CmpLogVals,
 }
 
 impl Default for CmpLogMap {
@@ -81,26 +99,26 @@ impl CmpMap for CmpLogMap {
             match self.headers[idx].shape {
                 1 => {
                     return CmpValues::U8((
-                        self.operands[idx][execution].0 as u8,
-                        self.operands[idx][execution].1 as u8,
+                        self.vals.operands[idx][execution].0 as u8,
+                        self.vals.operands[idx][execution].1 as u8,
                     ))
                 }
                 2 => {
                     return CmpValues::U16((
-                        self.operands[idx][execution].0 as u16,
-                        self.operands[idx][execution].1 as u16,
+                        self.vals.operands[idx][execution].0 as u16,
+                        self.vals.operands[idx][execution].1 as u16,
                     ))
                 }
                 4 => {
                     return CmpValues::U32((
-                        self.operands[idx][execution].0 as u32,
-                        self.operands[idx][execution].1 as u32,
+                        self.vals.operands[idx][execution].0 as u32,
+                        self.vals.operands[idx][execution].1 as u32,
                     ))
                 }
                 8 => {
                     return CmpValues::U64((
-                        self.operands[idx][execution].0 as u64,
-                        self.operands[idx][execution].1 as u64,
+                        self.vals.operands[idx][execution].0 as u64,
+                        self.vals.operands[idx][execution].1 as u64,
                     ))
                 }
                 _ => {}
@@ -112,7 +130,7 @@ impl CmpMap for CmpLogMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         self.headers = unsafe { core::mem::zeroed() };
-        // self.operands = unsafe { core::mem::zeroed() };
+        // self.vals.operands = unsafe { core::mem::zeroed() };
         Ok(())
     }
 }
