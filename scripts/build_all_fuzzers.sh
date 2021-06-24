@@ -5,6 +5,9 @@ cd "$SCRIPT_DIR/.."
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
+# Dependencies
+sudo apt install -y libc6-dev
+
 cd fuzzers
 
 for fuzzer in *;
@@ -23,10 +26,11 @@ do
     echo "[*] Building $fuzzer"
     cargo build || exit 1
     if [ -e ./run.sh ]; then
+    echo "[+] Done building $fuzzer"
         echo "[*] Testing $fuzzer"
         ./run.sh || exit 1
+	echo "[+] Done testing $fuzzer"
     fi
     cd ..
-    echo "[+] Done building $fuzzer"
     echo ""
 done
