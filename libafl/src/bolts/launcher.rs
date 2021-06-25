@@ -32,9 +32,13 @@ use core_affinity::CoreId;
 use typed_builder::TypedBuilder;
 
 /// The Launcher client callback type reference
+///
+/// The callback expects optionally a State, a [`LlmpRestartingEventManager`]
+/// and the id of the client. If State is None, then this is the first start of the client. If there
+/// is a state then the client restarted.
 #[cfg(feature = "std")]
 pub type LauncherClientFnRef<'a, I, OT, S, SP> =
-    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>) -> Result<(), Error>;
+    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>;
 
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
@@ -129,7 +133,7 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client)(state, mgr)?;
+                        (self.run_client)(state, mgr, id)?;
                         break;
                     }
                 };
@@ -182,19 +186,21 @@ where
             Ok(core_conf) => {
                 //todo: silence stdout and stderr for clients
 
+                let id = core_conf.parse()?;
+
                 // the actual client. do the fuzzing
                 let (state, mgr) = RestartingMgr::<I, OT, S, SP, ST>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
                         cpu_core: Some(CoreId {
-                            id: core_conf.parse()?,
+                            id,
                         }),
                     })
                     .build()
                     .launch()?;
 
-                (self.run_client)(state, mgr)?;
+                (self.run_client)(state, mgr, id)?;
 
                 unreachable!("Fuzzer client code should never get here!");
             }
