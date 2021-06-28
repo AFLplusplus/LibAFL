@@ -832,7 +832,7 @@ where
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
             // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-            let sender = { LlmpSender::new(self.shmem_provider.clone(), 0, false)? };
+            let sender = { LlmpSender::new(self.shmem_provider.clone(), mgr.llmp.sender.id, false)? };
 
             let map = {
                 self.shmem_provider
