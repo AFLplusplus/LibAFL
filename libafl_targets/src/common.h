@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+#define true 1
+#define false 0
+
+#define STATIC_ASSERT(pred) switch(0){case 0:case pred:;}
+
 #ifdef _WIN32
   #define RETADDR (uintptr_t)_ReturnAddress()
   #define EXPORT_FN __declspec(dllexport)
@@ -35,6 +40,55 @@
   #define MEMCPY memcpy
 #endif
 
-#define STATIC_ASSERT(pred) switch(0){case 0:case pred:;}
+#ifdef _WIN32
+
+// From Libfuzzer
+// Intermediate macro to ensure the parameter is expanded before stringified.
+#define STRINGIFY_(A) #A
+#define STRINGIFY(A) STRINGIFY_(A)
+
+#if _MSC_VER
+// Copied from compiler-rt/lib/sanitizer_common/sanitizer_win_defs.h
+#if defined(_M_IX86) || defined(__i386__)
+#define WIN_SYM_PREFIX "_"
+#else
+#define WIN_SYM_PREFIX
+#endif
+
+// Declare external functions as having alternativenames, so that we can
+// determine if they are not defined.
+#define EXTERNAL_FUNC(Name, Default)                                   \
+  __pragma(comment(linker, "/alternatename:" WIN_SYM_PREFIX STRINGIFY( \
+                               Name) "=" WIN_SYM_PREFIX STRINGIFY(Default)))
+
+#define CHECK_WEAK_FN(Name) ((void*)Name != (void*)&Name##Def)
+#else
+// Declare external functions as weak to allow them to default to a specified
+// function if not defined explicitly. We must use weak symbols because clang's
+// support for alternatename is not 100%, see
+// https://bugs.llvm.org/show_bug.cgi?id=40218 for more details.
+#define EXTERNAL_FUNC(Name, Default) \
+  __attribute__((weak, alias(STRINGIFY(Default))))
+
+#define CHECK_WEAK_FN(Name) (Name != NULL)
+#endif  // _MSC_VER
+
+#define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)         \
+  RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
+  EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
+#else
+
+#if defined(__APPLE__)
+  // TODO: Find a proper way to deal with weak fns on Apple!
+  #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)           \
+  RETURN_TYPE NAME FUNC_SIG __attribute__((weak_import)) { return 0; }
+#else
+// Declare these symbols as weak to allow them to be optionally defined.
+#define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                            \
+  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
+#endif
+
+#define CHECK_WEAK_FN(Name) (Name != NULL)
+#endif
 
 #endif

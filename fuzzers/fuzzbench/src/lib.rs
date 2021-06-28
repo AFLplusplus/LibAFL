@@ -45,9 +45,9 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
-/// The fuzzer main (as `no_mangle` c function)
+/// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
-pub extern "C" fn fuzzer_main() {
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();

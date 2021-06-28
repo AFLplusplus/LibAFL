@@ -1,4 +1,4 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
+use libafl_cc::{ClangWrapper, CompilerWrapper};
 use std::env;
 
 pub fn main() {
