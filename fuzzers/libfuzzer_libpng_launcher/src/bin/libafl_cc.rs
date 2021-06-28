@@ -21,11 +21,11 @@ pub fn main() {
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
             .from_args(&args)
-            .expect("Failed to parse the command line".into())
+            .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libpng")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .run()
-            .expect("Failed to run the wrapped compiler".into())
+            .expect("Failed to run the wrapped compiler")
         {
             std::process::exit(code);
         }

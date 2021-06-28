@@ -73,6 +73,9 @@
 #define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif  // _MSC_VER
 
+#define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+  EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)         \
   RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
   EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
@@ -80,9 +83,16 @@
 
 #if defined(__APPLE__)
   // TODO: Find a proper way to deal with weak fns on Apple!
+  #define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+    EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) { return 0; }
+
   #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)           \
-  RETURN_TYPE NAME FUNC_SIG __attribute__((weak_import)) { return 0; }
+  RETURN_TYPE NAME FUNC_SIG __attribute__((weak_import))
 #else
+
+#define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+  EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+
 // Declare these symbols as weak to allow them to be optionally defined.
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                            \
   __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
