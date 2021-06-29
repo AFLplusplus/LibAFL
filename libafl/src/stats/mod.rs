@@ -689,26 +689,26 @@ impl ClientPerfStats {
         self.stages_used[stage_index] = true;
     }
 
-    fn elapsed_cycles(&self) -> u64 {
+    pub fn elapsed_cycles(&self) -> u64 {
         self.current_time - self.start_time
     }
 
-    fn manager_cycles(&self) -> u64 {
+    pub fn manager_cycles(&self) -> u64 {
         self.manager
     }
 
-    fn scheduler_cycles(&self) -> u64 {
+    pub fn scheduler_cycles(&self) -> u64 {
         self.scheduler
     }
 
-    fn used_stages(&self) -> impl Iterator<Item = (usize, &[u64; PerfFeature::Count as usize])> {
+    pub fn used_stages(&self) -> impl Iterator<Item = (usize, &[u64; PerfFeature::Count as usize])> {
         let used = self.stages_used.clone();
         self.stages.iter().enumerate().filter(move |(stage_index, _)| {
             used[*stage_index as usize]
         })
     }
 
-    fn feedbacks(&self) -> impl Iterator<Item = (usize, &u64)> {
+    pub fn feedbacks(&self) -> impl Iterator<Item = (usize, &u64)> {
         self.feedbacks.iter().enumerate()
     }
 }
