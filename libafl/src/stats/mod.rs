@@ -688,6 +688,29 @@ impl ClientPerfStats {
         // Set that the current stage is being used
         self.stages_used[stage_index] = true;
     }
+
+    fn elapsed_cycles(&self) -> u64 {
+        self.current_time - self.start_time
+    }
+
+    fn manager_cycles(&self) -> u64 {
+        self.manager
+    }
+
+    fn scheduler_cycles(&self) -> u64 {
+        self.scheduler
+    }
+
+    fn used_stages(&self) -> impl Iterator<Item = (usize, &[u64; PerfFeature::Count as usize])> {
+        let used = self.stages_used.clone();
+        self.stages.iter().enumerate().filter(move |(stage_index, _)| {
+            used[*stage_index as usize]
+        })
+    }
+
+    fn feedbacks(&self) -> impl Iterator<Item = (usize, &u64)> {
+        self.feedbacks.iter().enumerate()
+    }
 }
 
 #[cfg(feature = "introspection")]
@@ -695,7 +718,7 @@ impl core::fmt::Display for ClientPerfStats {
     #[allow(clippy::cast_precision_loss)]
     fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         // Calculate the elapsed time from the stats
-        let elapsed: f64 = (self.current_time - self.start_time) as f64;
+        let elapsed: f64 = self.elapsed_cycles() as f64;
 
         // Calculate the percentages for each benchmark
         let scheduler_percent = self.scheduler as f64 / elapsed;
@@ -714,12 +737,8 @@ impl core::fmt::Display for ClientPerfStats {
         )?;
 
         // Calculate each stage
-        for (stage_index, features) in self.stages.iter().enumerate() {
-            // Make sure this stage is actually used before dumping its information
-            if !self.stages_used[stage_index as usize] {
-                continue;
-            }
-
+        // Make sure we only iterate over used stages
+        for (stage_index, features) in self.used_stages() {
             // Write the stage header
             writeln!(f, "  Stage {}:", stage_index)?;
 
@@ -742,7 +761,7 @@ impl core::fmt::Display for ClientPerfStats {
                 writeln!(f, "    {:6.4}: {:?}", feature_percent, feature)?;
             }
 
-            for (feedback_index, feedback) in self.feedbacks.iter().enumerate() {
+            for (feedback_index, feedback) in self.feedbacks() {
                 // Calculate this current stage's percentage
                 let feedback_percent = *feedback as f64 / elapsed;
 
