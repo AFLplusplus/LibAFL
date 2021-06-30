@@ -31,7 +31,7 @@ use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, 
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
 #[no_mangle]
-pub fn main() {
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();

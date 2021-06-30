@@ -1,4 +1,4 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
+use libafl_cc::{ClangWrapper, CompilerWrapper};
 use std::env;
 
 pub fn main() {
@@ -21,11 +21,11 @@ pub fn main() {
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
             .from_args(&args)
-            .expect("Failed to parse the command line".into())
+            .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libmozjpeg")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
             .run()
-            .expect("Failed to run the wrapped compiler".into())
+            .expect("Failed to run the wrapped compiler")
         {
             std::process::exit(code);
         }

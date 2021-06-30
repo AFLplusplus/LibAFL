@@ -46,6 +46,8 @@ pub const CMPLOG_MAP_H: usize = {};
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
 
+    println!("cargo:rerun-if-changed=src/common.h");
+
     //std::env::set_var("CC", "clang");
     //std::env::set_var("CXX", "clang++");
 

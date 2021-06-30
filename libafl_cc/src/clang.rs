@@ -2,12 +2,23 @@
 
 use std::{
     convert::Into,
+    env,
     path::{Path, PathBuf},
     string::String,
     vec::Vec,
 };
 
 use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX};
+
+fn dll_extension<'a>() -> &'a str {
+    if cfg!(target_os = "windows") {
+        "dll"
+    } else if cfg!(any(target_os = "ios", target_os = "macos")) {
+        "dylib"
+    } else {
+        "so"
+    }
+}
 
 include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 
@@ -21,7 +32,8 @@ impl LLVMPasses {
     #[must_use]
     pub fn path(&self) -> PathBuf {
         match self {
-            LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR")).join("cmplog-routines-pass.so"),
+            LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("cmplog-routines-pass.{}", dll_extension())),
         }
     }
 }
