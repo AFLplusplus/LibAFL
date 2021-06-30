@@ -701,11 +701,14 @@ impl ClientPerfStats {
         self.scheduler
     }
 
-    pub fn used_stages(&self) -> impl Iterator<Item = (usize, &[u64; PerfFeature::Count as usize])> {
+    pub fn used_stages(
+        &self,
+    ) -> impl Iterator<Item = (usize, &[u64; PerfFeature::Count as usize])> {
         let used = self.stages_used.clone();
-        self.stages.iter().enumerate().filter(move |(stage_index, _)| {
-            used[*stage_index as usize]
-        })
+        self.stages
+            .iter()
+            .enumerate()
+            .filter(move |(stage_index, _)| used[*stage_index as usize])
     }
 
     pub fn feedbacks(&self) -> impl Iterator<Item = (usize, &u64)> {
