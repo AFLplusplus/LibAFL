@@ -25,7 +25,10 @@ use crate::{
         llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter,
+    },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
@@ -502,6 +505,12 @@ where
     OT: ObserversTuple<I, S>,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
+    /// Gets the id assigned to this sender.
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId {
+            id: self.llmp.sender.id as usize,
+        }
+    }
 }
 
 /// Serialize the current state and corpus during an executiont to bytes.
