@@ -424,6 +424,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             if let Ok((op1, op2, special_case)) =
                                 helper.cmplog_is_interesting_instruction(address, instr)
                             {
+                                println!("interesting instr: {}", instr);
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
                                 helper.emit_comparison_handling(
                                     address,
@@ -1401,7 +1402,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         // We only care for compare instrunctions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
             "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls"
-            | "cbz" | "tbz" | "tbnz" => (),
+            | "cbz" | "tbz" => (),
             _ => return Err(()),
         }
         let operands = self
@@ -1412,11 +1413,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .operands();
 
         // cbz - 1 operand, tbz - 3 operands
-        let special_case = ["cbz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
+        let special_case = ["cbz", "tbz"].contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 || !special_case {
             return Err(());
         }
-        // cbz marked as special since there is only 1 operand
+        // cbz needs special since there is only 1 operand
         let special_case = instr.mnemonic().unwrap() == "cbz";
 
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
@@ -1457,14 +1458,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 }
             }
         };
-
-        // tbz will need to have special handling at emit time(masking operand1 value with operand2)
-        let special_case = match instr.mnemonic().unwrap() {
-            "tbz" => Some(SpecialCmpLogCase::Tbz),
-            "tbnz" => Some(SpecialCmpLogCase::Tbnz),
-            _ => None,
-        };
-
         if operand1.is_some() && operand2.is_some() {
             Ok((operand1.unwrap(), operand2.unwrap(), special_case))
         } else {
