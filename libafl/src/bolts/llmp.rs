@@ -475,7 +475,7 @@ unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
 /// May be used to restore the map by id.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct LlmpDescription {
-    /// Info about the ShredMap in use
+    /// Info about the [`ShMem`] in use
     shmem: ShMemDescription,
     /// The last message sent or received, depnding on page type
     last_message_offset: Option<u64>,
