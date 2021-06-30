@@ -615,9 +615,14 @@ impl ClientPerfStats {
 
     /// Update the time spent in the feedback
     pub fn update_feedback(&mut self, name: &str, time: u64) {
-        self.feedbacks[name]
-            .checked_add(time)
-            .expect("update_feedback overflow");
+        self.feedbacks.insert(
+            name.into(),
+            self.feedbacks
+                .get(name)
+                .unwrap_or(&0)
+                .checked_add(time)
+                .expect("update_feedback overflow"),
+        );
     }
 
     /// Update the time spent in all the feedbacks

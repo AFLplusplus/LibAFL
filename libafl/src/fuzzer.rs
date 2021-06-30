@@ -329,11 +329,15 @@ where
     {
         let mut res = ExecuteInputResult::None;
 
-        start_timer!(state);
+        #[cfg(not(feature = "introspection"))]
         let is_solution = self
             .objective_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
-        mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
+
+        #[cfg(feature = "introspection")]
+        let is_solution = self
+            .objective_mut()
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
         if is_solution {
             res = ExecuteInputResult::Solution;
