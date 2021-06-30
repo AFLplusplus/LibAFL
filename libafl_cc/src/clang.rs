@@ -162,23 +162,13 @@ impl CompilerWrapper for ClangWrapper {
     where
         S: AsRef<str>,
     {
-        if cfg!(any(target_os = "macos", target_os = "ios")) {
-            //self.add_link_arg("-force_load".into())?;
-        } else {
-            //self.add_link_arg("-Wl,--whole-archive");
-        }
         self.add_link_arg(
             dir.join(format!("{}{}.{}", LIB_PREFIX, name.as_ref(), LIB_EXT))
                 .into_os_string()
                 .into_string()
                 .unwrap(),
         );
-        if cfg!(any(target_os = "macos", target_os = "ios")) {
-            self
-        } else {
-            self
-            //self.add_link_arg("-Wl,-no-whole-archive")
-        }
+        self
     }
 
     fn command(&mut self) -> Result<Vec<String>, Error> {

@@ -24,7 +24,6 @@ pub fn main() {
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libmozjpeg")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
-            .add_arg("-fsanitize=fuzzer-no-link")
             .run()
             .expect("Failed to run the wrapped compiler")
         {
