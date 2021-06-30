@@ -165,7 +165,7 @@ impl CompilerWrapper for ClangWrapper {
         if cfg!(any(target_os = "macos", target_os = "ios")) {
             //self.add_link_arg("-force_load".into())?;
         } else {
-            self.add_link_arg("-Wl,--whole-archive");
+            //self.add_link_arg("-Wl,--whole-archive");
         }
         self.add_link_arg(
             dir.join(format!("{}{}.{}", LIB_PREFIX, name.as_ref(), LIB_EXT))
@@ -176,7 +176,8 @@ impl CompilerWrapper for ClangWrapper {
         if cfg!(any(target_os = "macos", target_os = "ios")) {
             self
         } else {
-            self.add_link_arg("-Wl,-no-whole-archive")
+            self
+            //self.add_link_arg("-Wl,-no-whole-archive")
         }
     }
 

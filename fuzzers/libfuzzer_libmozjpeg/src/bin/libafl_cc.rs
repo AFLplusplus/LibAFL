@@ -19,11 +19,12 @@ pub fn main() {
         if let Some(code) = cc
             .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.
-            .silence(true)
+            .silence(false)
             .from_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libmozjpeg")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
+            .add_arg("-fsanitize=fuzzer-no-link")
             .run()
             .expect("Failed to run the wrapped compiler")
         {
