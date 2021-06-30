@@ -95,7 +95,7 @@
   }
 
   #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-  RETURN_TYPE NAME FUNC_SIG __attribute__((weak))
+  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
 
 #else
 
