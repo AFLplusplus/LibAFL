@@ -90,7 +90,7 @@
     EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) { return (RETURN_TYPE) 0; }
 
   #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)      \
-  RETURN_TYPE NAME FUNC_SIG __attribute__((weak_import)) { \
+  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG { \
       return (RETURN_TYPE) 0;                              \
   }
 
