@@ -23,13 +23,15 @@ do
     else
         echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
     fi
-    echo "[*] Building $fuzzer"
-    cargo build || exit 1
-    echo "[+] Done building $fuzzer"
+
     if [ -e ./run.sh ]; then
         echo "[*] Testing $fuzzer"
         ./run.sh || exit 1
 	    echo "[+] Done testing $fuzzer"
+    else
+        echo "[*] Building $fuzzer"
+        cargo build || exit 1
+        echo "[+] Done building $fuzzer"
     fi
     cd ..
     echo ""
