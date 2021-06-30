@@ -15,6 +15,7 @@ members = [
     "libafl_tests",
     "libafl_concolic/concolic",
     "libafl_concolic/dump_constraints",
+    "libafl_concolic/test/basic_concolic_fuzzer",
 ]
 default-members = [
     "libafl",
@@ -25,5 +26,5 @@ default-members = [
 ]
 exclude = [
     "fuzzers",
-    "libafl_concolic/runtime",
+    "libafl_concolic/runtime"
 ]
