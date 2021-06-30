@@ -1,5 +1,13 @@
 use std::{env, fs::File, io::Write, path::Path, process::Command, str};
 
+fn dll_extension<'a>() -> &'a str {
+    match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+        "windwos" => "dll",
+        "macos" | "ios" => "dylib",
+        _ => "so",
+    }
+}
+
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
@@ -43,14 +51,22 @@ pub const CLANGXX_PATH: &str = {:?};
         let ldflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
 
         let cxxflags: Vec<&str> = cxxflags.trim().split_whitespace().collect();
-        let ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
+        let mut ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
+
+        match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+            "macos" | "ios" => {
+                ldflags.push("-undefined");
+                ldflags.push("dynamic_lookup");
+            }
+            _ => (),
+        };
 
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
             .arg(src_dir.join("cmplog-routines-pass.cc"))
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
-            .arg(out_dir.join("cmplog-routines-pass.so"))
+            .arg(out_dir.join(format!("cmplog-routines-pass.{}", dll_extension())))
             .status()
             .expect("Failed to compile cmplog-routines-pass.cc");
     } else {
