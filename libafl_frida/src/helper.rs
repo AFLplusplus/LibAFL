@@ -362,6 +362,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             if let Ok((op1, op2)) =
                                 helper.cmplog_is_interesting_instruction(address, instr)
                             {
+                                println!("interesting instr: {}", instr);
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
                                 helper.emit_comparison_handling(address, &output, op1, op2);
                             }
@@ -1043,7 +1044,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
     ) -> Result<(CmplogOperandType, CmplogOperandType), ()> {
         // We only care for compare instrunctions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
-            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls" => (),
+            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls"
+            | "cbz" | "tbz" => (),
             _ => return Err(()),
         }
         let operands = self
@@ -1052,9 +1054,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .unwrap()
             .arch_detail()
             .operands();
-        if operands.len() != 2 {
+
+        // cbz - 1 operand, tbz - 3 operands
+        let special_case = ["cbz", "tbz"].contains(&instr.mnemonic().unwrap());
+        if operands.len() != 2 || !special_case {
             return Err(());
         }
+        // cbz needs special since there is only 1 operand
+        let special_case = instr.mnemonic().unwrap() == "cbz";
 
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
             match arm64operand.op_type {
@@ -1073,23 +1080,27 @@ impl<'a> FridaInstrumentationHelper<'a> {
             None
         };
 
-        let operand2 = if let Arm64Operand(arm64operand2) = operands.last().unwrap() {
-            match arm64operand2.op_type {
-                Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
-                Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
-                Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
-                    opmem.base(),
-                    opmem.index(),
-                    opmem.disp(),
-                    self.instruction_width(instr, &operands),
-                )),
-                Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
-                _ => return Err(()),
+        let operand2 = match special_case {
+            true => Some(CmplogOperandType::Imm(0)),
+            false => {
+                if let Arm64Operand(arm64operand2) = &operands[1] {
+                    match arm64operand2.op_type {
+                        Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
+                        Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
+                        Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
+                            opmem.base(),
+                            opmem.index(),
+                            opmem.disp(),
+                            self.instruction_width(instr, &operands),
+                        )),
+                        Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
+                        _ => return Err(()),
+                    }
+                } else {
+                    None
+                }
             }
-        } else {
-            None
         };
-
         if operand1.is_some() && operand2.is_some() {
             Ok((operand1.unwrap(), operand2.unwrap()))
         } else {
