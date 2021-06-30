@@ -54,6 +54,8 @@ pub const CLANGXX_PATH: &str = {:?};
         let mut ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
 
         match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+            // Needed on macos.
+            // Explanation at https://github.com/banach-space/llvm-tutor/blob/787b09ed31ff7f0e7bdd42ae20547d27e2991512/lib/CMakeLists.txt#L59
             "macos" | "ios" => {
                 ldflags.push("-undefined");
                 ldflags.push("dynamic_lookup");
