@@ -606,7 +606,7 @@ macro_rules! impl_serdeany {
                 self
             }
 
-            fn as_any_boxed(self: ::alloc::boxed::Box<Self>) -> ::alloc::boxed::Box<dyn core::any::Any> {
+            fn as_any_boxed(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn core::any::Any> {
                 self
             }
         }
