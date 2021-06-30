@@ -18,7 +18,7 @@ libafl_cxx: target/release/libafl_cxx
 libafl_cc: target/release/libafl_cxx
 
 mozjpeg-4.0.3-compiled: mozjpeg-4.0.3 libafl_cc
-	cd $(PWD)/mozjpeg-4.0.3 && cmake . -DENABLE_SHARED -DCMAKE_C_COMPILER=$(abspath $(PWD)/../target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(abspath $(PWD)/../target/release/libafl_cxx) -G "Unix Makefiles"
+	cd $(PWD)/mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DCMAKE_C_COMPILER=$(abspath $(PWD)/../target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(abspath $(PWD)/../target/release/libafl_cxx) -G "Unix Makefiles"
 	$(MAKE) -C $(PWD)/mozjpeg-4.0.3
 	
 
