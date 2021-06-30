@@ -213,7 +213,7 @@ where
                 client.update_executions(*executions as u64, *time);
 
                 // Update the performance stats for this client
-                client.update_introspection_stats(**introspection_stats);
+                client.update_introspection_stats((**introspection_stats).clone());
 
                 // Display the stats via `.display` only on core #1
                 stats.display(event.name().to_string(), sender_id);

@@ -22,9 +22,6 @@ const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 /// Number of stages in the fuzzer
 pub(crate) const NUM_STAGES: usize = 8;
 
-/// Number of feedback mechanisms to measure for performance
-pub(crate) const NUM_FEEDBACKS: usize = 16;
-
 /// User-defined stats types
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
@@ -358,7 +355,7 @@ macro_rules! mark_feedback_time {
 }
 
 /// Client performance statistics
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClientPerfStats {
     /// Starting counter (in clock cycles from [`cpu::read_time_counter`])
     start_time: u64,
@@ -387,14 +384,14 @@ pub struct ClientPerfStats {
     stages: [[u64; PerfFeature::Count as usize]; NUM_STAGES],
 
     /// Clock cycles spent in each feedback mechanism of the fuzzer.
-    feedbacks: [u64; NUM_FEEDBACKS],
+    feedbacks: HashMap<String, u64>,
 
     /// Current time set by `start_timer`
     timer_start: Option<u64>,
 }
 
 /// Various features that are measured for performance
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[repr(u8)]
 pub enum PerfFeature {
     /// Getting an input from the corpus
@@ -496,7 +493,7 @@ impl ClientPerfStats {
             curr_feedback: 0,
             stages: [[0; NUM_PERF_FEATURES]; NUM_STAGES],
             stages_used: [false; NUM_STAGES],
-            feedbacks: [0; NUM_FEEDBACKS],
+            feedbacks: HashMap::new(),
             timer_start: None,
         }
     }
@@ -519,7 +516,7 @@ impl ClientPerfStats {
         self.update_scheduler(stats.scheduler);
         self.update_manager(stats.manager);
         self.update_stages(stats.stages);
-        self.update_feedbacks(stats.feedbacks);
+        self.update_feedbacks(&stats.feedbacks);
     }
 
     /// Gets the elapsed time since the internal timer started. Resets the timer when
@@ -578,33 +575,6 @@ impl ClientPerfStats {
         self.update_feature(feature, elapsed);
     }
 
-    /// Update the time spent in the current [`Feedback`] with the elapsed time that we
-    /// have seen
-    pub fn mark_feedback_time(&mut self) {
-        // Sanity check that these stats have enough room for these benchmarks
-        assert!(
-            (self.curr_feedback as usize) < NUM_FEEDBACKS,
-            "Current fuzzer has more 
-                stages than the `ClientPerfStats` supports ({}). Please update the 
-                NUM_FEEDBACKS const value in src/stats/mod.rs and rebuild",
-            NUM_FEEDBACKS
-        );
-
-        // Get the current elapsed time
-        let elapsed = self.mark_time();
-
-        // Get a `usize` for the index
-        let index: usize = self.curr_feedback.try_into().unwrap();
-
-        // Update the current feedback's time with the given time
-        self.feedbacks[index] = self.feedbacks[index]
-            .checked_add(elapsed)
-            .expect("mark_feedback_time overflow");
-
-        // Increment the feedback index to the next feedback
-        self.curr_feedback += 1;
-    }
-
     /// Add the given `time` to the `scheduler` stats
     #[inline]
     pub fn update_scheduler(&mut self, time: u64) {
@@ -643,12 +613,17 @@ impl ClientPerfStats {
         self.curr_feedback = 0;
     }
 
-    /// Update the time spent in the feedbacks
-    pub fn update_feedbacks(&mut self, feedbacks: [u64; NUM_FEEDBACKS]) {
-        for (feedback_index, feedback) in feedbacks.iter().enumerate() {
-            self.feedbacks[feedback_index] = self.feedbacks[feedback_index]
-                .checked_add(*feedback)
-                .expect("update_feedback overflow");
+    /// Update the time spent in the feedback
+    pub fn update_feedback(&mut self, name: &str, time: u64) {
+        self.feedbacks[name]
+            .checked_add(time)
+            .expect("update_feedback overflow");
+    }
+
+    /// Update the time spent in all the feedbacks
+    pub fn update_feedbacks(&mut self, feedbacks: &HashMap<String, u64>) {
+        for (key, value) in feedbacks.into_iter() {
+            self.update_feedback(key, *value);
         }
     }
 
@@ -711,8 +686,8 @@ impl ClientPerfStats {
             .filter(move |(stage_index, _)| used[*stage_index as usize])
     }
 
-    pub fn feedbacks(&self) -> impl Iterator<Item = (usize, &u64)> {
-        self.feedbacks.iter().enumerate()
+    pub fn feedbacks(&self) -> &HashMap<String, u64> {
+        &self.feedbacks
     }
 }
 
@@ -764,9 +739,9 @@ impl core::fmt::Display for ClientPerfStats {
                 writeln!(f, "    {:6.4}: {:?}", feature_percent, feature)?;
             }
 
-            for (feedback_index, feedback) in self.feedbacks() {
+            for (feedback_name, feedback_time) in self.feedbacks() {
                 // Calculate this current stage's percentage
-                let feedback_percent = *feedback as f64 / elapsed;
+                let feedback_percent = *feedback_time as f64 / elapsed;
 
                 // Ignore this feedback if it isn't used
                 if feedback_percent == 0.0 {
@@ -779,8 +754,8 @@ impl core::fmt::Display for ClientPerfStats {
                 // Write the percentage for this feedback
                 writeln!(
                     f,
-                    "    {:6.4}: Feedback index {}",
-                    feedback_percent, feedback_index
+                    "    {:6.4}: Feedback {}",
+                    feedback_percent, feedback_name
                 )?;
             }
         }

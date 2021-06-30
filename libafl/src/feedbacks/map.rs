@@ -16,7 +16,7 @@ use crate::{
     feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    state::{HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfStats, HasFeedbackStates, HasMetadata},
     stats::UserStats,
     Error,
 };
@@ -211,7 +211,7 @@ where
     R: Reducer<T>,
     O: MapObserver<T>,
     I: Input,
-    S: HasFeedbackStates<FT>,
+    S: HasFeedbackStates<FT> + HasClientPerfStats,
     FT: FeedbackStatesTuple,
 {
     fn is_interesting<EM, OT>(
@@ -430,6 +430,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<usize>,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
