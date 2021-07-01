@@ -7,16 +7,6 @@ edition = "2018"
 [lib]
 crate-type = ["staticlib"]
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-lto = true
-codegen-units = 1
-opt-level = 3
-debug=true
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -24,6 +14,3 @@ ctor = "0.1"
 unchecked_unwrap = "3"
 concolic = {path = "../concolic"}
 libc = "0.2"
-
-[build-dependencies]
-cmake = "0.1"
