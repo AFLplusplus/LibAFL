@@ -418,12 +418,12 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
-        let swarm_now = state.metadata().get::<MOpt>().unwrap().swarm_now;
-        state
-            .metadata_mut()
-            .get_mut::<MOpt>()
-            .unwrap()
-            .update_pilot_operator_ctr_last(swarm_now);
+        let swarm_now;
+        {
+            let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+            swarm_now = mopt.swarm_now;
+            mopt.update_pilot_operator_ctr_last(swarm_now);
+        }
 
         for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
