@@ -19,7 +19,7 @@ libafl_cc: target/release/libafl_cxx
 
 libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37 libafl_cc
 	cd libpng-1.6.37 && ./configure && cd ..
-	$(MAKE) -C libpng-1.6.37 CC="$(PWD)/target/release/libafl_cc" CXX="$(PWD)/target/release/libafl_cxx"
+	$(MAKE) -C libpng-1.6.37 CC="$(pwd)/target/release/libafl_cc" CXX="$(pwd)/target/release/libafl_cxx"
 	
 
 fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
@@ -28,9 +28,9 @@ fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
 
 	# Build the libpng harness	
 	target/release/libafl_cxx \
-		$(PWD)/harness.cc \
-		$(PWD)/libpng-1.6.37/.libs/libpng16.a \
-		-I$(PWD)/libpng-1.6.37/ \
+		$(pwd)/harness.cc \
+		$(pwd)/libpng-1.6.37/.libs/libpng16.a \
+		-I$(pwd)/libpng-1.6.37/ \
 		-o $(FUZZER_NAME) \
 		-lm -lz
 

@@ -18,8 +18,8 @@ libafl_cxx: target/release/libafl_cxx
 libafl_cc: target/release/libafl_cxx
 
 mozjpeg-4.0.3-compiled: mozjpeg-4.0.3 libafl_cc
-	cd $(PWD)/mozjpeg-4.0.3 && cmake --disable-shared . -DCMAKE_C_COMPILER=$(abspath $(PWD)/../target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(abspath $(PWD)/../target/release/libafl_cxx) -G "Unix Makefiles"
-	$(MAKE) -C $(PWD)/mozjpeg-4.0.3
+	cd $(pwd)/mozjpeg-4.0.3 && cmake --disable-shared . -DCMAKE_C_COMPILER=$(abspath $(pwd)/../target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(abspath $(pwd)/../target/release/libafl_cxx) -G "Unix Makefiles"
+	$(MAKE) -C $(pwd)/mozjpeg-4.0.3
 	
 
 fuzzer: mozjpeg-4.0.3-compiled libafl_cxx
@@ -28,9 +28,9 @@ fuzzer: mozjpeg-4.0.3-compiled libafl_cxx
 
   # Build the mozjpeg harness	
 	target/release/libafl_cxx \
-		$(PWD)/harness.cc \
-		$(PWD)/mozjpeg-4.0.3/*.a \
-		-I$(PWD)/mozjpeg-4.0.3/ \
+		$(pwd)/harness.cc \
+		$(pwd)/mozjpeg-4.0.3/*.a \
+		-I$(pwd)/mozjpeg-4.0.3/ \
 		-o $(FUZZER_NAME) \
 		-lm -lz
 

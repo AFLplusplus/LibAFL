@@ -14,7 +14,7 @@ fi
 if [ ! -e libpng-1.6.37/.libs/libpng16.a ]; then
     cd libpng-1.6.37
     ./configure || exit 1
-    make CC="$(PWD)/../target/release/libafl_cc" CXX="$(PWD)/../target/release/libafl_cxx" -j `nproc` || exit 1
+    make CC="$(pwd)/../target/release/libafl_cc" CXX="$(pwd)/../target/release/libafl_cxx" -j `nproc` || exit 1
     cd ..
 fi
 
