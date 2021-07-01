@@ -56,6 +56,14 @@ pub(crate) struct SelectiveSymbolicationFilter {
     bytes_to_symbolize: HashSet<usize>,
 }
 
+impl SelectiveSymbolicationFilter {
+    pub(crate) fn from_offsets(offset: HashSet<usize>) -> Self {
+        Self {
+            bytes_to_symbolize: offset,
+        }
+    }
+}
+
 impl ExpressionFilter for SelectiveSymbolicationFilter {
     fn symbolize(&mut self, msg: &SymExpr) -> bool {
         if let SymExpr::GetInputByte { offset } = msg {
@@ -68,6 +76,9 @@ impl ExpressionFilter for SelectiveSymbolicationFilter {
     fn notify_return(&mut self, _location_id: usize) {}
     fn notify_basic_block(&mut self, _location_id: usize) {}
 }
+
+/// The name of the environment variable that contains the byte offsets to be symbolized.
+pub(crate) const SELECTIVE_SYMBOLICATION_ENV_NAME: &'static str = "LIBAFL_SELECTIVE_SYMBOLICATION";
 
 /// An [`ExpressionFilter`] that combines two expression filters and decides to symbolize expressions where both filters
 /// decide to symbolize.

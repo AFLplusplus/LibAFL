@@ -1,37 +1,73 @@
+use std::{collections::HashSet, env};
+
 use ctor::ctor;
 
 use concolic::{
     serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
     SymExpr, SymExprRef,
 };
+use expression_filters::{SelectiveSymbolicationFilter, SELECTIVE_SYMBOLICATION_ENV_NAME};
 
 mod expression_filters;
 
-use crate::expression_filters::{ExpressionFilter, NopExpressionFilter};
+use crate::expression_filters::ExpressionFilter;
 
-struct State<F: ExpressionFilter = NopExpressionFilter> {
+struct State {
     writer: StdShMemMessageFileWriter,
-    filter: F,
+    symbolication_filter: Option<SelectiveSymbolicationFilter>,
 }
 
-impl State<NopExpressionFilter> {
+impl State {
     fn new() -> Self {
+        let symbolication_filter = env::var(SELECTIVE_SYMBOLICATION_ENV_NAME)
+            .ok()
+            .map(|str| {
+                str.split(',')
+                    .map(|s| s.trim().parse::<usize>())
+                    .collect::<Result<HashSet<usize>, _>>()
+                    .expect("failed parsing selective symbolication arguments.")
+            })
+            .map(SelectiveSymbolicationFilter::from_offsets);
+
         let writer =
             MessageFileWriter::from_stdshmem_default_env().expect("unable to initialise writer");
         Self {
             writer,
-            filter: NopExpressionFilter,
+            symbolication_filter,
         }
     }
 }
 
-impl<F: ExpressionFilter> State<F> {
+impl State {
     /// Logs the message to the trace. This is a convenient place to debug the expressions if necessary.
     fn log_message(&mut self, message: SymExpr) -> Option<SymExprRef> {
-        if self.filter.symbolize(&message) {
+        if self
+            .symbolication_filter
+            .as_mut()
+            .map(|f| f.symbolize(&message))
+            .unwrap_or(true)
+        {
             Some(self.writer.write_message(message))
         } else {
             None
+        }
+    }
+
+    fn notify_call(&mut self, location_id: usize) {
+        if let Some(f) = &mut self.symbolication_filter {
+            f.notify_call(location_id)
+        }
+    }
+
+    fn notify_return(&mut self, location_id: usize) {
+        if let Some(f) = &mut self.symbolication_filter {
+            f.notify_return(location_id)
+        }
+    }
+
+    fn notify_basic_block(&mut self, location_id: usize) {
+        if let Some(f) = &mut self.symbolication_filter {
+            f.notify_basic_block(location_id)
         }
     }
 
@@ -95,19 +131,19 @@ pub unsafe extern "C" fn _sym_push_path_constraint(
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn _sym_notify_call(location_id: usize) {
-    with_state(|s| s.filter.notify_call(location_id))
+    with_state(|s| s.notify_call(location_id))
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn _sym_notify_ret(location_id: usize) {
-    with_state(|s| s.filter.notify_return(location_id))
+    with_state(|s| s.notify_return(location_id))
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn _sym_notify_basic_block(location_id: usize) {
-    with_state(|s| s.filter.notify_basic_block(location_id))
+    with_state(|s| s.notify_basic_block(location_id))
 }
 
 /// A macro to generate the boilerplate for declaring a runtime function for SymCC that simply logs the function call
