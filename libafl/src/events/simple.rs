@@ -285,6 +285,7 @@ where
 {
 }
 
+#[cfg(feature = "std")]
 impl<I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
