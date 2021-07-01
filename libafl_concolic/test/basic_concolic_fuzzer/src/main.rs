@@ -4,7 +4,9 @@ mod metadata;
 mod observer;
 
 use concolic::serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE};
-use libafl::feedbacks::EagerOrFeedback;
+use concolic::HITMAP_ENV_NAME;
+use libafl::feedbacks::{MapFeedbackState, MaxMapFeedback};
+use libafl::observers::{ConstMapObserver, HitcountsMapObserver};
 use libafl::stages::TracingStage;
 use libafl::{
     bolts::{
@@ -24,6 +26,7 @@ use libafl::{
     state::{HasCorpus, StdState},
     stats::SimpleStats,
 };
+use libafl::{feedback_and, feedback_or};
 
 use std::path::PathBuf;
 
@@ -34,40 +37,60 @@ use observer::ConcolicObserver;
 #[allow(clippy::similar_names)]
 pub fn main() {
     //Coverage map shared between observer and executor
-    let mut shmem = StdShMemProvider::new()
+    let mut concolic_shmem = StdShMemProvider::new()
         .unwrap()
         .new_map(DEFAULT_SIZE)
         .unwrap();
     //let the forkserver know the shmid
-    shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
+    concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
     // Create an observation channel using the signals map
     /*let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
         "shared_mem",
         &mut shmem_map,
     )); */
 
+    let concolic_observer = ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
+
+    const MAP_SIZE: usize = 65536;
+    //Coverage map shared between observer and executor
+    let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
+    //let the forkserver know the shmid
+    shmem.write_to_env(HITMAP_ENV_NAME).unwrap();
+    let mut shmem_map = shmem.map_mut();
+
+    // Create an observation channel using the signals map
+    let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
+        "shared_mem",
+        &mut shmem_map,
+    ));
+
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let concolic_observer = ConcolicObserver::new("concolic".to_string(), shmem.map_mut());
-
     // The state of the edges feedback.
-    //let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
     // The state of the edges feedback for crashes.
-    //let objective_state = MapFeedbackState::new("crash_edges", MAP_SIZE);
+    let objective_state = MapFeedbackState::new("crash_edges", MAP_SIZE);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = TimeFeedback::new_with_observer(&time_observer);
-
-    let feedback_conc = ConcolicFeedback::from_observer(&concolic_observer);
-
-    let feedback = EagerOrFeedback::new(feedback, feedback_conc);
+    let feedback = feedback_or!(
+        // New maximization map feedback linked to the edges observer and the feedback state
+        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        // Time feedback, this one does not need a feedback state
+        TimeFeedback::new_with_observer(&time_observer),
+        ConcolicFeedback::from_observer(&concolic_observer)
+    );
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
-    let objective = CrashFeedback::new();
+    let objective = feedback_and!(
+        // Must be a crash
+        CrashFeedback::new(),
+        // Take it onlt if trigger new coverage over crashes
+        MaxMapFeedback::new(&objective_state, &edges_observer)
+    );
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -80,7 +103,7 @@ pub fn main() {
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(),
+        tuple_list!(feedback_state, objective_state),
     );
 
     // The Stats trait define how the fuzzer stats are reported to the user
@@ -96,7 +119,11 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut executor = CommandExecutor::from_observers(tuple_list!(time_observer));
+    let mut executor = CommandExecutor::from_observers(tuple_list!(
+        concolic_observer,
+        time_observer,
+        edges_observer
+    ));
 
     state
         .corpus_mut()
@@ -106,9 +133,7 @@ pub fn main() {
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
 
-    let tracing_stage = TracingStage::new(CommandExecutor::from_observers(tuple_list!(
-        concolic_observer
-    )));
+    let tracing_stage = TracingStage::new(CommandExecutor::from_observers(tuple_list!()));
     let mut stages = tuple_list!(tracing_stage, StdMutationalStage::new(mutator));
 
     fuzzer
