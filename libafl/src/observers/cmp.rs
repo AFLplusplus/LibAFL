@@ -113,7 +113,7 @@ where
     where
         S: HasMetadata,
     {
-        #[allow(clippy::clippy::option_if_let_else)] // we can't mutate state in a closure
+        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
         let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {
             meta
         } else {

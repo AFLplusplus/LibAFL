@@ -38,7 +38,11 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 use alloc::{rc::Rc, string::ToString};
-use core::{cell::RefCell, fmt::Debug, mem::ManuallyDrop};
+use core::{
+    cell::RefCell,
+    fmt::{Debug, Display},
+    mem::ManuallyDrop,
+};
 
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
@@ -102,18 +106,28 @@ impl ShMemId {
         &self.id
     }
 
-    /// Get a string representation of this id
+    /// Returns the first null-byte in or the end of the buffer
     #[must_use]
-    pub fn to_string(&self) -> &str {
-        let eof_pos = self.id.iter().position(|&c| c == 0).unwrap();
-        alloc::str::from_utf8(&self.id[..eof_pos]).unwrap()
+    pub fn null_pos(&self) -> usize {
+        self.id.iter().position(|&c| c == 0).unwrap()
     }
 
-    /// Get an integer representation of this id
+    /// Returns a `str` representation of this [`ShMemId`]
     #[must_use]
-    pub fn to_int(&self) -> i32 {
-        let id: i32 = self.to_string().parse().unwrap();
-        id
+    pub fn as_str(&self) -> &str {
+        alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
+    }
+}
+
+impl From<ShMemId> for i32 {
+    fn from(id: ShMemId) -> i32 {
+        id.as_str().parse().unwrap()
+    }
+}
+
+impl Display for ShMemId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -523,7 +537,8 @@ pub mod unix_shmem {
             /// Get a [`UnixShMem`] of the existing shared memory mapping identified by id
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let map = shmat(id.to_int(), ptr::null(), 0) as *mut c_uchar;
+                    let id_int: i32 = id.into();
+                    let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map == usize::MAX as *mut c_void as *mut c_uchar || map.is_null() {
                         return Err(Error::Unknown(
@@ -560,7 +575,8 @@ pub mod unix_shmem {
         impl Drop for CommonUnixShMem {
             fn drop(&mut self) {
                 unsafe {
-                    shmctl(self.id.to_int(), 0, ptr::null_mut());
+                    let id_int: i32 = self.id.into();
+                    shmctl(id_int, 0, ptr::null_mut());
                 }
             }
         }
