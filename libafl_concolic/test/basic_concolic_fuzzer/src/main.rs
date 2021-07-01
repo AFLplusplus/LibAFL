@@ -5,6 +5,7 @@ mod observer;
 
 use concolic::serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE};
 use libafl::feedbacks::EagerOrFeedback;
+use libafl::stages::TracingStage;
 use libafl::{
     bolts::{
         current_nanos,
@@ -95,8 +96,7 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut executor =
-        CommandExecutor::from_observers(tuple_list!(time_observer, concolic_observer));
+    let mut executor = CommandExecutor::from_observers(tuple_list!(time_observer));
 
     state
         .corpus_mut()
@@ -105,7 +105,11 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    let tracing_stage = TracingStage::new(CommandExecutor::from_observers(tuple_list!(
+        concolic_observer
+    )));
+    let mut stages = tuple_list!(tracing_stage, StdMutationalStage::new(mutator));
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
