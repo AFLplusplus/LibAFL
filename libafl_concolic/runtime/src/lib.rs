@@ -184,7 +184,7 @@ macro_rules! expression_builder {
         #[no_mangle]
         pub unsafe extern "C" fn $c_name( $( $param_name : $param_type, )+ ) -> Option<SymExprRef> {
             with_state(|s| {
-                Some(s.log_message(SymExpr::$message { $($param_name $(: $param_name2?)? ,)+ })?)
+                s.log_message(SymExpr::$message { $($param_name $(: $param_name2?)? ,)+ })
             })
         }
     };
@@ -193,7 +193,7 @@ macro_rules! expression_builder {
         #[no_mangle]
         pub unsafe extern "C" fn $c_name( ) -> Option<SymExprRef> {
             with_state(|s| {
-                Some(s.log_message(SymExpr::$message)?)
+                s.log_message(SymExpr::$message)
             })
         }
     };
