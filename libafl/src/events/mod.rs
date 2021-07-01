@@ -253,19 +253,19 @@ pub trait EventProcessor<E, I, S, Z> {
     }
 }
 
+pub trait HasEventManagerId {
+    /// The id of this manager. For Multiprocessed [`EventManager`]s,
+    /// each client sholud have a unique ids.
+    fn mgr_id(&self) -> EventManagerId;
+}
+
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`RestartingEventManager`]
 pub trait EventManager<E, I, S, Z>:
-    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S>
+    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S> + HasEventManagerId
 where
     I: Input,
 {
-    /// The id of this `0` for
-    fn mgr_id(&self) -> EventManagerId {
-        EventManagerId {
-            ..EventManagerId::default()
-        }
-    }
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
@@ -295,6 +295,12 @@ impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
 }
 
 impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+
+impl HasEventManagerId for NopEventManager {
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
+}
 
 #[cfg(test)]
 mod tests {

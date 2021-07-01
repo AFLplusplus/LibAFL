@@ -27,7 +27,7 @@ use crate::{
     },
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
-        EventRestarter,
+        EventRestarter, HasEventManagerId,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -499,11 +499,19 @@ where
 
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
-    SP: ShMemProvider,
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
+{
+}
+
+impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
 {
     /// Gets the id assigned to this sender.
     fn mgr_id(&self) -> EventManagerId {
@@ -637,6 +645,18 @@ where
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
+}
+
+impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    S: Serialize,
+    SP: ShMemProvider + 'static,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        self.llmp_mgr.mgr_id()
+    }
 }
 
 /// The llmp connection from the actual fuzzer to the process supervising it
