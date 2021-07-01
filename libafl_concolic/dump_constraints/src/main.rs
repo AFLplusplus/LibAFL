@@ -7,8 +7,8 @@ use std::{
 };
 
 use concolic::{
-    serialization_format::{MessageFileReader, MessageFileWriter},
-    SymExpr,
+    serialization_format::{shared_memory::DEFAULT_ENV_NAME, MessageFileReader, MessageFileWriter},
+    SymExpr, HITMAP_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
 use structopt::StructOpt;
 
@@ -24,6 +24,14 @@ struct Opt {
     #[structopt(short, long)]
     plain_text: bool,
 
+    /// Outputs coverage information to the given file
+    #[structopt(short, long)]
+    coverage_file: Option<PathBuf>,
+
+    /// Outputs coverage information to the given file
+    #[structopt(short, long)]
+    symbolize_offsets: Option<Vec<usize>>,
+
     /// Trace file path, "trace" by default.
     #[structopt(parse(from_os_str), short, long)]
     output: Option<PathBuf>,
@@ -37,23 +45,56 @@ fn main() {
     let opt = Opt::from_args();
 
     let mut shmemprovider = StdShMemProvider::default();
-    let shmem = shmemprovider
+    let concolic_shmem = shmemprovider
         .new_map(1024 * 1024 * 1024)
         .expect("unable to create shared mapping");
-    shmem
-        .write_to_env("SHARED_MEMORY_MESSAGES")
+    concolic_shmem
+        .write_to_env(DEFAULT_ENV_NAME)
         .expect("unable to write shared mapping info to environment");
+
+    const COVERAGE_MAP_SIZE: usize = 65536;
+    let coverage_map = StdShMemProvider::new()
+        .unwrap()
+        .new_map(COVERAGE_MAP_SIZE)
+        .unwrap();
+    //let the forkserver know the shmid
+    coverage_map.write_to_env(HITMAP_ENV_NAME).unwrap();
+
+    if let Some(symbolize_offsets) = opt.symbolize_offsets {
+        std::env::set_var(
+            SELECTIVE_SYMBOLICATION_ENV_NAME,
+            symbolize_offsets
+                .iter()
+                .map(|offset| offset.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
+
     let res = Command::new(&opt.program.first().expect("no program argument given"))
         .args(opt.program.iter().skip(1))
         .status()
         .expect("failed to spawn program");
-
     {
+        if let Some(coverage_file_path) = opt.coverage_file {
+            let mut f = BufWriter::new(
+                File::create(coverage_file_path).expect("unable to open coverage file"),
+            );
+            for (index, count) in coverage_map
+                .map()
+                .iter()
+                .enumerate()
+                .filter(|(_, &v)| v != 0)
+            {
+                writeln!(&mut f, "{}\t{}", index, count).expect("failed to write coverage file");
+            }
+        }
+
         // open a new scope to ensure our ressources get dropped before the exit call at the end
         let output_file_path = opt.output.unwrap_or_else(|| "trace".into());
         let mut output_file =
             BufWriter::new(File::create(output_file_path).expect("unable to open output file"));
-        let mut reader = MessageFileReader::from_length_prefixed_buffer(shmem.map())
+        let mut reader = MessageFileReader::from_length_prefixed_buffer(concolic_shmem.map())
             .expect("unable to create trace reader");
         if opt.plain_text {
             while let Some(message) = reader.next_message() {
@@ -65,8 +106,8 @@ fn main() {
                 }
             }
         } else {
-            let mut writer = MessageFileWriter::from_writer(output_file)
-                .expect("unable to create trace writer");
+            let mut writer =
+                MessageFileWriter::from_writer(output_file).expect("unable to create trace writer");
             while let Some(message) = reader.next_message() {
                 if let Ok((_, message)) = message {
                     writer.write_message(message);

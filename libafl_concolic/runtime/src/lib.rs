@@ -8,9 +8,9 @@ use ctor::ctor;
 
 use concolic::{
     serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
-    SymExpr, SymExprRef, HITMAP_ENV_NAME,
+    SymExpr, SymExprRef, HITMAP_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
-use expression_filters::{SelectiveSymbolicationFilter, SELECTIVE_SYMBOLICATION_ENV_NAME};
+use expression_filters::SelectiveSymbolicationFilter;
 use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
 
 mod expression_filters;
@@ -67,14 +67,12 @@ impl State {
     }
 
     fn notify_call(&mut self, location_id: usize) {
-        self.register_location_on_hitmap(location_id);
         if let Some(f) = &mut self.symbolication_filter {
             f.notify_call(location_id)
         }
     }
 
     fn notify_return(&mut self, location_id: usize) {
-        self.register_location_on_hitmap(location_id);
         if let Some(f) = &mut self.symbolication_filter {
             f.notify_return(location_id)
         }
