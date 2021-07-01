@@ -62,7 +62,11 @@ where
         1 + state.rand_mut().below(128) as usize
     }
 
-    #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss, clippy::too_many_lines)]
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::too_many_lines
+    )]
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,
