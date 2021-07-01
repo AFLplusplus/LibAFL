@@ -1,20 +1,27 @@
-use std::{collections::HashSet, env};
+use std::{
+    collections::{hash_map::DefaultHasher, HashSet},
+    env,
+    hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
+};
 
 use ctor::ctor;
 
 use concolic::{
     serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
-    SymExpr, SymExprRef,
+    SymExpr, SymExprRef, HITMAP_ENV_NAME,
 };
 use expression_filters::{SelectiveSymbolicationFilter, SELECTIVE_SYMBOLICATION_ENV_NAME};
+use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
 
 mod expression_filters;
 
 use crate::expression_filters::ExpressionFilter;
 
-struct State {
+struct State<HashBuilder: BuildHasher = BuildHasherDefault<DefaultHasher>> {
     writer: StdShMemMessageFileWriter,
     symbolication_filter: Option<SelectiveSymbolicationFilter>,
+    hitcounts_map: Option<<StdShMemProvider as ShMemProvider>::Mem>,
+    hasher_builder: HashBuilder,
 }
 
 impl State {
@@ -28,12 +35,18 @@ impl State {
                     .expect("failed parsing selective symbolication arguments.")
             })
             .map(SelectiveSymbolicationFilter::from_offsets);
+        let hitcounts_map = StdShMemProvider::new()
+            .unwrap()
+            .existing_from_env(HITMAP_ENV_NAME)
+            .ok();
 
         let writer =
             MessageFileWriter::from_stdshmem_default_env().expect("unable to initialise writer");
         Self {
             writer,
             symbolication_filter,
+            hitcounts_map,
+            hasher_builder: BuildHasherDefault::default(),
         }
     }
 }
@@ -54,20 +67,37 @@ impl State {
     }
 
     fn notify_call(&mut self, location_id: usize) {
+        self.register_location_on_hitmap(location_id);
         if let Some(f) = &mut self.symbolication_filter {
             f.notify_call(location_id)
         }
     }
 
     fn notify_return(&mut self, location_id: usize) {
+        self.register_location_on_hitmap(location_id);
         if let Some(f) = &mut self.symbolication_filter {
             f.notify_return(location_id)
         }
     }
 
     fn notify_basic_block(&mut self, location_id: usize) {
+        self.register_location_on_hitmap(location_id);
         if let Some(f) = &mut self.symbolication_filter {
             f.notify_basic_block(location_id)
+        }
+    }
+
+    fn register_location_on_hitmap(&mut self, location: usize) {
+        if let Some(m) = &mut self.hitcounts_map {
+            let mut hasher = self.hasher_builder.build_hasher();
+            location.hash(&mut hasher);
+            let hash = hasher.finish() as usize;
+            let val = unsafe {
+                // SAFETY: the index is modulo by the length, therefore it is always in bounds
+                let len = m.len();
+                m.map_mut().get_unchecked_mut(hash % len)
+            };
+            *val = val.saturating_add(1);
         }
     }
 
