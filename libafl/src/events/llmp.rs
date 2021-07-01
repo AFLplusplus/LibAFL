@@ -55,6 +55,8 @@ use crate::bolts::os::ashmem_server::AshmemService;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+use super::HasEventManagerId;
+
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
 /// Only handle this in the broker
@@ -499,11 +501,19 @@ where
 
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
-    SP: ShMemProvider,
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
+{
+}
+
+impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
 {
     /// Gets the id assigned to this sender.
     fn mgr_id(&self) -> EventManagerId {
@@ -637,6 +647,18 @@ where
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
+}
+
+impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    S: Serialize,
+    SP: ShMemProvider + 'static,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        self.llmp_mgr.mgr_id()
+    }
 }
 
 /// The llmp connection from the actual fuzzer to the process supervising it

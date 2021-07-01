@@ -26,6 +26,8 @@ use crate::{
     Error,
 };
 
+use super::{EventManagerId, HasEventManagerId};
+
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
 const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
@@ -94,6 +96,16 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
+}
+
+impl<I, ST> HasEventManagerId for SimpleEventManager<I, ST>
+where
+    I: Input,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
 }
 
 impl<I, ST> SimpleEventManager<I, ST>
@@ -270,6 +282,18 @@ where
     SP: ShMemProvider,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
+}
+
+impl<I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<I, S, SP, ST>
+where
+    I: Input,
+    S: Serialize,
+    SP: ShMemProvider,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> super::EventManagerId {
+        self.simple_event_mgr.mgr_id()
+    }
 }
 
 #[cfg(feature = "std")]
