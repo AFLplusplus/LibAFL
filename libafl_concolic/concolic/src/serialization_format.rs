@@ -123,7 +123,12 @@ impl<R: Read> MessageFileReader<R> {
             | SymExpr::BuildFloatMul { a, b }
             | SymExpr::BuildFloatDiv { a, b }
             | SymExpr::BuildFloatRem { a, b }
-            | SymExpr::ConcatHelper { a, b } => {
+            | SymExpr::ConcatHelper { a, b }
+            | SymExpr::BuildInsert {
+                target: a,
+                to_insert: b,
+                ..
+            } => {
                 *a = self.make_absolute(*a);
                 *b = self.make_absolute(*b);
                 self.current_id += 1;
@@ -255,7 +260,12 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             | SymExpr::BuildFloatMul { a, b }
             | SymExpr::BuildFloatDiv { a, b }
             | SymExpr::BuildFloatRem { a, b }
-            | SymExpr::ConcatHelper { a, b } => {
+            | SymExpr::ConcatHelper { a, b }
+            | SymExpr::BuildInsert {
+                target: a,
+                to_insert: b,
+                ..
+            } => {
                 *a = self.make_relative(*a);
                 *b = self.make_relative(*b);
                 self.id_counter += 1;

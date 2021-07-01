@@ -293,3 +293,4 @@ binary_expression_builder!(_sym_concat_helper, ConcatHelper);
 expression_builder!(_sym_extract_helper(op: Option<SymExprRef> => op?, first_bit:usize, last_bit:usize) => ExtractHelper);
 expression_builder!(_sym_build_extract(op: Option<SymExprRef> => op?, offset:u64, length:u64, little_endian:bool) => BuildExtract);
 unary_expression_builder!(_sym_build_bswap, BuildBswap);
+expression_builder!(_sym_build_insert(target: Option<SymExprRef> => target?, to_insert: Option<SymExprRef> => to_insert?, offset:u64, little_endian:bool) => BuildInsert);
