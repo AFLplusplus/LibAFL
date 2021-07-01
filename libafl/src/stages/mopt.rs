@@ -5,9 +5,9 @@ use crate::{
     corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
-    mutators::{MOptMode, MOptMutator, MutatorsTuple},
+    mutators::{MOpt, MOptMode, MOptMutator, MutatorsTuple},
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfStats, HasCorpus, HasMOpt, HasRand, HasSolutions},
+    state::{HasClientPerfStats, HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
 };
 
@@ -22,7 +22,7 @@ where
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMetadata,
     SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
@@ -39,7 +39,7 @@ where
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMetadata,
     SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
@@ -62,7 +62,7 @@ where
         1 + state.rand_mut().below(128) as usize
     }
 
-    #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss)]
+    #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss, clippy::too_many_lines)]
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,
@@ -71,12 +71,18 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        match state.mopt().key_module {
+        let key_module = state.metadata().get::<MOpt>().unwrap().key_module;
+
+        match key_module {
             MOptMode::Corefuzzing => {
-                if state.mopt().finds_until_core_begin == 0 {
-                    // Now, we have just switched back from PILOT_FUZZING mode
-                    let finds = state.corpus().count() + state.solutions().count();
-                    state.mopt_mut().finds_until_core_begin = finds;
+                let finds = state.corpus().count() + state.solutions().count();
+
+                // We have to limit the lifetime of mopt here.
+                {
+                    let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+                    if mopt.finds_until_core_begin == 0 {
+                        mopt.finds_until_core_begin = finds;
+                    }
                 }
 
                 let num = self.iterations(state);
@@ -92,8 +98,6 @@ where
                     self.mutator_mut()
                         .mutate(state, &mut input, stage_id as i32)?;
 
-                    state.mopt_mut().core_time += 1;
-
                     let finds_before = state.corpus().count() + state.solutions().count();
 
                     let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
@@ -102,34 +106,37 @@ where
                         .post_exec(state, stage_id as i32, corpus_idx)?;
 
                     let finds_after = state.corpus().count() + state.solutions().count();
+
+                    let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+
+                    mopt.core_time += 1;
+
                     if finds_after > finds_before {
                         let diff = finds_after - finds_before;
-                        state.mopt_mut().total_finds += diff;
-                        for i in 0..state.mopt().operator_num {
-                            if state.mopt().core_operator_ctr_this[i]
-                                > state.mopt().core_operator_ctr_last[i]
-                            {
-                                state.mopt_mut().core_operator_finds_this[i] += diff;
+                        mopt.total_finds += diff;
+                        for i in 0..mopt.operator_num {
+                            if mopt.core_operator_ctr_this[i] > mopt.core_operator_ctr_last[i] {
+                                mopt.core_operator_finds_this[i] += diff;
                             }
                         }
                     }
 
                     if (finds_after as f64)
                         > (finds_after as f64) * LIMIT_TIME_BOUND
-                            + (state.mopt().finds_until_core_begin as f64)
+                            + (mopt.finds_until_core_begin as f64)
                     {
                         // Move to the Pilot fuzzing mode
-                        state.mopt_mut().key_module = MOptMode::Pilotfuzzing;
-                        state.mopt_mut().finds_until_core_begin = 0;
+                        mopt.key_module = MOptMode::Pilotfuzzing;
+                        mopt.finds_until_core_begin = 0;
                     }
 
-                    if state.mopt().core_time > state.mopt().period_core {
+                    if mopt.core_time > mopt.period_core {
                         // Make a call to pso_update()
-                        state.mopt_mut().core_time = 0;
-                        let total_finds = state.mopt().total_finds;
-                        state.mopt_mut().finds_until_pilot_begin = total_finds;
-                        state.mopt_mut().update_core_operator_ctr_pso();
-                        state.mopt_mut().pso_update()?;
+                        mopt.core_time = 0;
+                        let total_finds = mopt.total_finds;
+                        mopt.finds_until_pilot_begin = total_finds;
+                        mopt.update_core_operator_ctr_pso();
+                        mopt.pso_update()?;
                     }
                 }
             }
@@ -146,8 +153,6 @@ where
                     self.mutator_mut()
                         .mutate(state, &mut input, stage_id as i32)?;
 
-                    state.mopt_mut().pilot_time += 1;
-
                     let finds_before = state.corpus().count() + state.solutions().count();
 
                     let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
@@ -155,39 +160,42 @@ where
                     self.mutator_mut()
                         .post_exec(state, stage_id as i32, corpus_idx)?;
 
-                    let swarm_now = state.mopt().swarm_now;
                     let finds_after = state.corpus().count() + state.solutions().count();
+
+                    let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+
+                    mopt.pilot_time += 1;
+                    let swarm_now = mopt.swarm_now;
 
                     if finds_after > finds_before {
                         let diff = finds_after - finds_before;
-                        state.mopt_mut().total_finds += diff;
-                        for i in 0..state.mopt().operator_num {
-                            if state.mopt().pilot_operator_ctr_this[swarm_now][i]
-                                > state.mopt().pilot_operator_ctr_last[swarm_now][i]
+                        mopt.total_finds += diff;
+                        for i in 0..mopt.operator_num {
+                            if mopt.pilot_operator_ctr_this[swarm_now][i]
+                                > mopt.pilot_operator_ctr_last[swarm_now][i]
                             {
-                                state.mopt_mut().pilot_operator_finds_this[swarm_now][i] += diff;
+                                mopt.pilot_operator_finds_this[swarm_now][i] += diff;
                             }
                         }
                     }
 
-                    if state.mopt().pilot_time > state.mopt().period_pilot {
-                        let new_finds =
-                            state.mopt().total_finds - state.mopt().finds_until_pilot_begin;
-                        let f = (new_finds as f64)
-                            / ((state.mopt().pilot_time as f64) / (PERIOD_PILOT_COEF));
-                        state.mopt_mut().swarm_fitness[swarm_now] = f;
-                        state.mopt_mut().pilot_time = 0;
-                        let total_finds = state.mopt().total_finds;
-                        state.mopt_mut().finds_until_pilot_begin = total_finds;
-                        state.mopt_mut().update_pilot_operator_ctr_pso(swarm_now);
+                    if mopt.pilot_time > mopt.period_pilot {
+                        let new_finds = mopt.total_finds - mopt.finds_until_pilot_begin;
+                        let f =
+                            (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));
+                        mopt.swarm_fitness[swarm_now] = f;
+                        mopt.pilot_time = 0;
+                        let total_finds = mopt.total_finds;
+                        mopt.finds_until_pilot_begin = total_finds;
+                        mopt.update_pilot_operator_ctr_pso(swarm_now);
 
-                        state.mopt_mut().swarm_now += 1;
+                        mopt.swarm_now += 1;
 
-                        if state.mopt().swarm_now == state.mopt().swarm_num {
+                        if mopt.swarm_now == mopt.swarm_num {
                             // Move to CORE_FUZING mode
-                            state.mopt_mut().key_module = MOptMode::Corefuzzing;
+                            mopt.key_module = MOptMode::Corefuzzing;
 
-                            state.mopt_mut().init_core_module()?;
+                            mopt.init_core_module()?;
                         }
                     }
                 }
@@ -206,7 +214,7 @@ where
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMetadata,
     SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
@@ -230,13 +238,13 @@ where
     MT: MutatorsTuple<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMOpt,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasSolutions<SC, I> + HasRand<R> + HasMetadata,
     SC: Corpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M, state: &mut S, swarm_num: usize) -> Self {
-        state.initialize_mopt(mutator.mutations().len(), swarm_num);
+        state.add_metadata::<MOpt>(MOpt::new(mutator.mutations().len(), swarm_num));
         Self {
             mutator,
             phantom: PhantomData,

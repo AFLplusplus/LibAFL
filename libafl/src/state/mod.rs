@@ -19,7 +19,6 @@ use crate::{
     fuzzer::Evaluator,
     generators::Generator,
     inputs::Input,
-    mutators::MOpt,
     stats::ClientPerfStats,
     Error,
 };
@@ -135,14 +134,6 @@ pub trait HasStartTime {
 
     /// The starting time (mut)
     fn start_time_mut(&mut self) -> &mut Duration;
-}
-
-pub trait HasMOpt: HasMetadata {
-    fn mopt(&self) -> &MOpt;
-
-    fn mopt_mut(&mut self) -> &mut MOpt;
-
-    fn initialize_mopt(&mut self, operator_num: usize, swarm_num: usize);
 }
 
 /// The state a fuzz run.
@@ -563,26 +554,5 @@ where
 
     fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
         unimplemented!()
-    }
-}
-
-impl<C, FT, I, R, SC> HasMOpt for StdState<C, FT, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
-{
-    fn mopt(&self) -> &MOpt {
-        self.metadata.get::<MOpt>().unwrap()
-    }
-
-    fn mopt_mut(&mut self) -> &mut MOpt {
-        self.metadata.get_mut::<MOpt>().unwrap()
-    }
-
-    fn initialize_mopt(&mut self, operator_num: usize, swarm_num: usize) {
-        self.add_metadata::<MOpt>(MOpt::new(operator_num, swarm_num));
     }
 }

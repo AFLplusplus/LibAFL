@@ -5,7 +5,7 @@ use crate::{
     bolts::{rands::Rand, rands::StdRand},
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
-    state::{HasMOpt, HasRand},
+    state::{HasMetadata, HasRand},
     Error,
 };
 use core::{
@@ -324,7 +324,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
     mutations: MT,
     phantom: PhantomData<(I, R, S)>,
@@ -335,7 +335,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -352,7 +352,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
     #[inline]
     fn mutate(
@@ -370,7 +370,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
     pub fn new(mutations: MT) -> Self {
         Self {
@@ -386,7 +386,12 @@ where
     ) -> Result<MutationResult, Error> {
         // TODO
         let mut r = MutationResult::Skipped;
-        state.mopt_mut().update_core_operator_ctr_last();
+        state
+            .metadata_mut()
+            .get_mut::<MOpt>()
+            .unwrap()
+            .update_core_operator_ctr_last();
+
         for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
             let outcome = self
@@ -395,7 +400,12 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            state.mopt_mut().core_operator_ctr_this[idx] += 1;
+
+            state
+                .metadata_mut()
+                .get_mut::<MOpt>()
+                .unwrap()
+                .core_operator_ctr_this[idx] += 1;
         }
 
         Ok(r)
@@ -408,8 +418,12 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
-        let swarm_now = state.mopt().swarm_now;
-        state.mopt_mut().update_pilot_operator_ctr_last(swarm_now);
+        let swarm_now = state.metadata().get::<MOpt>().unwrap().swarm_now;
+        state
+            .metadata_mut()
+            .get_mut::<MOpt>()
+            .unwrap()
+            .update_pilot_operator_ctr_last(swarm_now);
 
         for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
@@ -419,7 +433,12 @@ where
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
-            state.mopt_mut().pilot_operator_ctr_this[swarm_now][idx] += 1;
+
+            state
+                .metadata_mut()
+                .get_mut::<MOpt>()
+                .unwrap()
+                .pilot_operator_ctr_this[swarm_now][idx] += 1;
         }
 
         Ok(r)
@@ -431,7 +450,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
     /// Get the mutations
     #[inline]
@@ -451,7 +470,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
@@ -460,7 +479,12 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> usize {
-        state.mopt_mut().select_algorithm().unwrap()
+        state
+            .metadata_mut()
+            .get_mut::<MOpt>()
+            .unwrap()
+            .select_algorithm()
+            .unwrap()
     }
 
     fn scheduled_mutate(
@@ -469,7 +493,7 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let mode = state.mopt().key_module;
+        let mode = state.metadata().get::<MOpt>().unwrap().key_module;
         match mode {
             MOptMode::Corefuzzing => self.core_mutate(state, input, stage_idx),
             MOptMode::Pilotfuzzing => self.pilot_mutate(state, input, stage_idx),
@@ -482,7 +506,7 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
 }
 
@@ -491,6 +515,6 @@ where
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMOpt,
+    S: HasRand<R> + HasMetadata,
 {
 }
