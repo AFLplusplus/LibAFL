@@ -1,0 +1,24 @@
+use concolic::{Message, MessageFileReader, SymExprRef};
+use serde::{Deserialize, Serialize};
+
+/// A metadata holding a buffer of a concolic trace.
+#[derive(Default, Serialize, Deserialize, Debug)]
+pub struct ConcolicMetadata {
+    /// Constraints data
+    buffer: Vec<u8>,
+}
+
+impl ConcolicMetadata {
+    /// Iterates over all messages in the buffer. Does not consume the buffer.
+    pub fn iter_messages(&self) -> impl Iterator<Item = (SymExprRef, Message)> + '_ {
+        let mut parser = MessageFileReader::new_from_buffer(&self.buffer)
+            .expect("constructing an in-memory reader should never fail");
+        std::iter::from_fn(move || parser.next_message()).flatten()
+    }
+
+    pub(crate) fn from_buffer(buffer: Vec<u8>) -> Self {
+        Self { buffer }
+    }
+}
+
+libafl::impl_serdeany!(ConcolicMetadata);

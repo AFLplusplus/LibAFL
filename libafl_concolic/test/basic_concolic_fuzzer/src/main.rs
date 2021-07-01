@@ -1,32 +1,28 @@
-use concolic::{Message, MessageFileReader};
 use core::time::Duration;
-use libafl::feedbacks::{EagerOrFeedback, Feedback};
+use libafl::executors::Executor;
+use libafl::feedbacks::EagerOrFeedback;
 use libafl::inputs::Input;
-use libafl::observers::ObserversTuple;
-use libafl::state::HasMetadata;
-use libafl::Error;
 use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Named},
+        tuples::tuple_list,
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase},
     events::SimpleEventManager,
-    executors::{ExitKind, HasExecHooks, InProcessExecutor},
+    executors::{ExitKind, InProcessExecutor},
     feedbacks::{CrashFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{Observer, TimeObserver},
+    observers::TimeObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
     stats::SimpleStats,
 };
-use std::num::NonZeroUsize;
+use observer::ConcolicObserver;
 
-use serde::{Deserialize, Serialize};
 use std::{
     io::Write,
     os::unix::prelude::ExitStatusExt,
@@ -35,6 +31,8 @@ use std::{
     thread::sleep,
     time::Instant,
 };
+
+use crate::feedback::ConcolicFeedback;
 
 fn run_target<I: Input + HasTargetBytes>(input: &I) -> ExitKind {
     let mut command = Command::new("../if");
@@ -76,127 +74,10 @@ fn run_target<I: Input + HasTargetBytes>(input: &I) -> ExitKind {
     }
 }
 
-/// A state metadata holding a list of values logged from comparisons
-#[derive(Default, Serialize, Deserialize, Debug)]
-pub struct ConcolicMetadata {
-    /// Constraints data
-    buffer: Vec<u8>,
-}
 
-impl ConcolicMetadata {
-    pub fn iter_messages(&self) -> impl Iterator<Item = (NonZeroUsize, Message)> + '_ {
-        let mut parser = MessageFileReader::new_from_buffer(&self.buffer)
-            .expect("constructing an in-memory reader should never fail");
-        std::iter::from_fn(move || parser.next_message()).flatten()
-    }
-}
-
-libafl::impl_serdeany!(ConcolicMetadata);
-
-/// A standard [`ConcolicObserver`] observer
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ConcolicObserver<'map> {
-    #[serde(skip)]
-    map: &'map [u8],
-    name: String,
-}
-
-impl<'map> Observer for ConcolicObserver<'map> {}
-
-impl<'map> ConcolicObserver<'map> {
-    pub fn create_metadata_from_current_map(&self) -> ConcolicMetadata {
-        let reader = MessageFileReader::new_from_length_prefixed_buffer(self.map)
-            .expect("constructing the message reader from a memory buffer should not fail");
-        ConcolicMetadata {
-            buffer: reader.get_buffer().to_vec(),
-        }
-    }
-}
-
-impl<'map, EM, I: Input, S: HasMetadata, Z> HasExecHooks<EM, I, S, Z> for ConcolicObserver<'map> {
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
-        // Add a copy of the trace to the input metadata
-        Ok(())
-    }
-}
-
-impl<'map> Named for ConcolicObserver<'map> {
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl<'map> ConcolicObserver<'map> {
-    /// Creates a new [`ConcolicObserver`] with the given name and map.
-    #[must_use]
-    pub fn new(name: String, map: &'map [u8]) -> Self {
-        Self { name, map }
-    }
-}
-
-struct ConcolicFeedback {
-    name: String,
-    metadata: Option<ConcolicMetadata>,
-}
-
-impl ConcolicFeedback {
-    pub fn from_observer(observer: &ConcolicObserver) -> Self {
-        Self {
-            name: observer.name().to_owned(),
-            metadata: None,
-        }
-    }
-}
-
-impl Named for ConcolicFeedback {
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl<I: Input, S: HasMetadata> Feedback<I, S> for ConcolicFeedback {
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: libafl::events::EventFirer<I, S>,
-        OT: ObserversTuple,
-    {
-        self.metadata = observers
-            .match_name::<ConcolicObserver>(&self.name)
-            .map(|o| o.create_metadata_from_current_map());
-        Ok(true)
-    }
-
-    fn append_metadata(
-        &mut self,
-        _state: &mut S,
-        _testcase: &mut Testcase<I>,
-    ) -> Result<(), Error> {
-        if let Some(metadata) = self.metadata.take() {
-            for (_id, _expression_type) in metadata.iter_messages() {
-                println!("{} -> {:?}", _id, _expression_type);
-            }
-            _testcase.metadata_mut().insert(metadata);
-        }
-        Ok(())
-    }
-
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-}
+mod feedback;
+mod metadata;
+mod observer;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
