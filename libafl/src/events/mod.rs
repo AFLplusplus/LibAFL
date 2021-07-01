@@ -13,6 +13,20 @@ use crate::{
     executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
 };
 
+/// A per-fuzzer unique ID, usually starting with `0` and increasing
+/// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct EventManagerId {
+    /// The id
+    pub id: usize,
+}
+
+impl Default for EventManagerId {
+    fn default() -> Self {
+        Self { id: 0 }
+    }
+}
+
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
 #[cfg(feature = "introspection")]
@@ -240,12 +254,18 @@ pub trait EventProcessor<E, I, S, Z> {
 }
 
 /// [`EventManager`] is the main communications hub.
-/// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
+/// For the "normal" multi-processed mode, you may want to look into [`RestartingEventManager`]
 pub trait EventManager<E, I, S, Z>:
     EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S>
 where
     I: Input,
 {
+    /// The id of this `0` for
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId {
+            ..EventManagerId::default()
+        }
+    }
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
