@@ -40,7 +40,7 @@ use std::env;
 use alloc::{rc::Rc, string::ToString};
 use core::{
     cell::RefCell,
-    fmt::{Debug, Display},
+    fmt::{self, Debug, Display},
     mem::ManuallyDrop,
 };
 
@@ -126,7 +126,7 @@ impl From<ShMemId> for i32 {
 }
 
 impl Display for ShMemId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
