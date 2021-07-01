@@ -6,7 +6,10 @@ use std::{
     process::{exit, Command},
 };
 
-use concolic::{Message, MessageFileReader, MessageFileWriter};
+use concolic::{
+    serialization_format::{MessageFileReader, MessageFileWriter},
+    SymExpr,
+};
 use structopt::StructOpt;
 
 use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
@@ -50,7 +53,7 @@ fn main() {
         let output_file_path = opt.output.unwrap_or("trace".into());
         let mut output_file =
             BufWriter::new(File::create(output_file_path).expect("unable to open output file"));
-        let mut reader = MessageFileReader::new_from_length_prefixed_buffer(shmem.map())
+        let mut reader = MessageFileReader::from_length_prefixed_buffer(shmem.map())
             .expect("unable to create trace reader");
         if opt.plain_text {
             while let Some(message) = reader.next_message() {
@@ -62,7 +65,7 @@ fn main() {
                 }
             }
         } else {
-            let mut writer = MessageFileWriter::new_from_writer(output_file)
+            let mut writer = MessageFileWriter::from_writer(output_file)
                 .expect("unable to create trace writer");
             while let Some(message) = reader.next_message() {
                 if let Ok((_, message)) = message {
@@ -71,7 +74,7 @@ fn main() {
                     break;
                 }
             }
-            writer.write_message(Message::End);
+            writer.write_message(SymExpr::End);
         }
     }
 

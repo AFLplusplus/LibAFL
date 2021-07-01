@@ -1,6 +1,9 @@
 use ctor::ctor;
 
-use concolic::{Message, MessageFileWriter, StdShMemMessageFileWriter, SymExprRef};
+use concolic::{
+    serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
+    SymExpr, SymExprRef,
+};
 
 mod expression_filters;
 
@@ -13,8 +16,8 @@ struct State<F: ExpressionFilter = NopExpressionFilter> {
 
 impl State<NopExpressionFilter> {
     fn new() -> Self {
-        let writer = MessageFileWriter::new_from_stdshmem_env("SHARED_MEMORY_MESSAGES")
-            .expect("unable to initialise writer");
+        let writer =
+            MessageFileWriter::from_stdshmem_default_env().expect("unable to initialise writer");
         Self {
             writer,
             filter: NopExpressionFilter,
@@ -24,7 +27,7 @@ impl State<NopExpressionFilter> {
 
 impl<F: ExpressionFilter> State<F> {
     /// Logs the message to the trace. This is a convenient place to debug the expressions if necessary.
-    fn log_message(&mut self, message: Message) -> Option<SymExprRef> {
+    fn log_message(&mut self, message: SymExpr) -> Option<SymExprRef> {
         if self.filter.symbolize(&message) {
             Some(self.writer.write_message(message))
         } else {
@@ -34,7 +37,7 @@ impl<F: ExpressionFilter> State<F> {
 
     /// This is called at the end of the process, giving us the opprtunity to signal the end of the trace.
     fn end(mut self) {
-        self.log_message(Message::End);
+        self.log_message(SymExpr::End);
         self.writer
             .end()
             .expect("unable to end message file writer");
@@ -79,7 +82,7 @@ pub unsafe extern "C" fn _sym_push_path_constraint(
 ) {
     if let Some(constraint) = constraint {
         with_state(|s| {
-            s.log_message(Message::PushPathConstraint {
+            s.log_message(SymExpr::PushPathConstraint {
                 constraint,
                 taken,
                 site_id,
@@ -108,14 +111,14 @@ pub unsafe extern "C" fn _sym_notify_basic_block(location_id: usize) {
 }
 
 /// A macro to generate the boilerplate for declaring a runtime function for SymCC that simply logs the function call
-/// according to [`concolic::Message`].
+/// according to [`concolic::SymExpr`].
 macro_rules! expression_builder {
     ($c_name:ident ( $($param_name:ident : $param_type:ty $(=> $param_name2:ident ?)? ),+ ) => $message:ident) => {
         #[allow(clippy::missing_safety_doc)]
         #[no_mangle]
         pub unsafe extern "C" fn $c_name( $( $param_name : $param_type, )+ ) -> Option<SymExprRef> {
             with_state(|s| {
-                Some(s.log_message(Message::$message { $($param_name $(: $param_name2?)? ,)+ })?)
+                Some(s.log_message(SymExpr::$message { $($param_name $(: $param_name2?)? ,)+ })?)
             })
         }
     };
@@ -124,7 +127,7 @@ macro_rules! expression_builder {
         #[no_mangle]
         pub unsafe extern "C" fn $c_name( ) -> Option<SymExprRef> {
             with_state(|s| {
-                Some(s.log_message(Message::$message)?)
+                Some(s.log_message(SymExpr::$message)?)
             })
         }
     };

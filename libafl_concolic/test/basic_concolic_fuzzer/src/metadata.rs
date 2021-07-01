@@ -1,4 +1,4 @@
-use concolic::{Message, MessageFileReader, SymExprRef};
+use concolic::{serialization_format::MessageFileReader, SymExpr, SymExprRef};
 use serde::{Deserialize, Serialize};
 
 /// A metadata holding a buffer of a concolic trace.
@@ -10,9 +10,8 @@ pub struct ConcolicMetadata {
 
 impl ConcolicMetadata {
     /// Iterates over all messages in the buffer. Does not consume the buffer.
-    pub fn iter_messages(&self) -> impl Iterator<Item = (SymExprRef, Message)> + '_ {
-        let mut parser = MessageFileReader::new_from_buffer(&self.buffer)
-            .expect("constructing an in-memory reader should never fail");
+    pub fn iter_messages(&self) -> impl Iterator<Item = (SymExprRef, SymExpr)> + '_ {
+        let mut parser = MessageFileReader::from_buffer(&self.buffer);
         std::iter::from_fn(move || parser.next_message()).flatten()
     }
 
