@@ -36,8 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install llvm
-      run: sudo apt-get install -y llvm llvm-dev clang
+    - name: Install deps
+      run: sudo apt-get install -y llvm llvm-dev clang nasm
+    - name: echo llvm stuff
+      run: command -v llvm-config && command -v llvm-10-config && clang -v
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
     - name: Run a normal build
@@ -78,8 +80,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: MacOS Build
       run: cargo build --verbose
-    - name: Install llvm
-      run: brew install llvm
+    - name: Install deps
+      run: brew install llvm libpng nasm
     - name: Run clippy
       run: ./scripts/clippy.sh
     - name: Build fuzzers
