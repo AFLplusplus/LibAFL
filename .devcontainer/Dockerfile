@@ -24,14 +24,24 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     python2 \
     python3-pip \
     cmake \ 
+    libssl-dev \
     ninja-build
 
 RUN pip3 install lit
 
+RUN cd /tmp \
+    && mkdir cmake \
+    && git clone git@github.com:Kitware/CMake.git \
+    && cd CMake \
+    && ./bootstrap \
+    && make -j4 && make install \
+    && cd ../../ && rm -rf cmake
+
 # install corrosion for concolic support
-RUN cp /tmp \
-    && mkdir corrosion \
+RUN cd /tmp \
+    && mkdir corrosion && cd corrosion \
     && git clone https://github.com/AndrewGaspar/corrosion.git \
     && cmake -Scorrosion -Bbuild -DCMAKE_BUILD_TYPE=Release \
     && cmake --build build --config Release \
-    && cmake --install build --config Release
+    && cmake --install build --config Release \
+    && cd ../../ && rm -rf corrosion
