@@ -78,7 +78,7 @@ impl ExpressionFilter for SelectiveSymbolicationFilter {
 }
 
 /// The name of the environment variable that contains the byte offsets to be symbolized.
-pub(crate) const SELECTIVE_SYMBOLICATION_ENV_NAME: &'static str = "LIBAFL_SELECTIVE_SYMBOLICATION";
+pub(crate) const SELECTIVE_SYMBOLICATION_ENV_NAME: &str = "LIBAFL_SELECTIVE_SYMBOLICATION";
 
 /// An [`ExpressionFilter`] that combines two expression filters and decides to symbolize expressions where both filters
 /// decide to symbolize.

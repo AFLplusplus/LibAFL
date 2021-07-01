@@ -164,7 +164,6 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         })
     }
 
-    #[must_use]
     pub fn end(mut self) -> io::Result<()> {
         // calculate size of trace
         let end_pos = self.writer.stream_position()?;
@@ -289,7 +288,7 @@ pub mod shared_memory {
 
     use super::{MessageFileReader, MessageFileWriter};
 
-    pub const DEFAULT_ENV_NAME: &'static str = "SHARED_MEMORY_MESSAGES";
+    pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";
     pub const DEFAULT_SIZE: usize = 1024 * 1024 * 1024;
 
     impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {

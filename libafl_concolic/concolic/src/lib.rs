@@ -304,4 +304,4 @@ pub enum SymExpr {
 pub mod serialization_format;
 
 /// The environment name used to identify the hitmap for the concolic runtime.
-pub const HITMAP_ENV_NAME: &'static str = "LIBAFL_CONCOLIC_HITMAP";
+pub const HITMAP_ENV_NAME: &str = "LIBAFL_CONCOLIC_HITMAP";
