@@ -20,7 +20,7 @@ Now compile it with:
 
 ```
 cd mozjpeg-4.0.3
-cmake --disable-shared . -DCMAKE_C_COMPILER=$(realpath ../target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(realpath ../target/release/libafl_cxx) -G "Unix Makefiles"
+cmake --disable-shared . -DCMAKE_C_COMPILER="$(PWD)/../target/release/libafl_cc" -DCMAKE_CXX_COMPILER="$(PWD)/../target/release/libafl_cxx" -G "Unix Makefiles"
 make -j `nproc`
 cd ..
 ```
