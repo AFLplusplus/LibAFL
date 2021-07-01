@@ -503,7 +503,7 @@ impl ClientPerfStats {
     }
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
-    pub fn update(&mut self, stats: ClientPerfStats) {
+    pub fn update(&mut self, stats: &ClientPerfStats) {
         self.set_current_time(stats.current_time);
         self.update_scheduler(stats.scheduler);
         self.update_manager(stats.manager);
@@ -613,7 +613,7 @@ impl ClientPerfStats {
 
     /// Update the time spent in all the feedbacks
     pub fn update_feedbacks(&mut self, feedbacks: &HashMap<String, u64>) {
-        for (key, value) in feedbacks.into_iter() {
+        for (key, value) in feedbacks {
             self.update_feedback(key, *value);
         }
     }
@@ -621,7 +621,8 @@ impl ClientPerfStats {
     /// Update the time spent in the stages
     pub fn update_stages(&mut self, stages: &[[u64; PerfFeature::Count as usize]]) {
         if self.stages.len() < stages.len() {
-            self.stages.resize(stages.len(), [0; PerfFeature::Count as usize]);
+            self.stages
+                .resize(stages.len(), [0; PerfFeature::Count as usize]);
             self.stages_used.resize(stages.len(), false);
         }
         for (stage_index, features) in stages.iter().enumerate() {
@@ -632,7 +633,7 @@ impl ClientPerfStats {
             }
         }
     }
-    
+
     /// Update the given [`PerfFeature`] with the given `time`
     pub fn update_feature(&mut self, feature: PerfFeature, time: u64) {
         // Get the current stage index as `usize`
@@ -640,10 +641,11 @@ impl ClientPerfStats {
 
         // Get the index of the given feature
         let feature_index: usize = feature.try_into().unwrap();
-        
+
         if stage_index >= self.stages.len() {
-            self.stages.resize(stage_index +1, [0; PerfFeature::Count as usize]);
-            self.stages_used.resize(stage_index +1, false);
+            self.stages
+                .resize(stage_index + 1, [0; PerfFeature::Count as usize]);
+            self.stages_used.resize(stage_index + 1, false);
         }
 
         // Update the given feature
@@ -655,18 +657,25 @@ impl ClientPerfStats {
         self.stages_used[stage_index] = true;
     }
 
+    /// The elapsed cycles (or time)
+    #[must_use]
     pub fn elapsed_cycles(&self) -> u64 {
         self.current_time - self.start_time
     }
 
+    /// The amount of cycles the `manager` did
+    #[must_use]
     pub fn manager_cycles(&self) -> u64 {
         self.manager
     }
 
+    /// The amount of cycles the `scheduler` did
+    #[must_use]
     pub fn scheduler_cycles(&self) -> u64 {
         self.scheduler
     }
 
+    /// Iterator over all used stages
     pub fn used_stages(
         &self,
     ) -> impl Iterator<Item = (usize, &[u64; PerfFeature::Count as usize])> {
@@ -677,6 +686,8 @@ impl ClientPerfStats {
             .filter(move |(stage_index, _)| used[*stage_index as usize])
     }
 
+    /// A map of all `feedbacks`
+    #[must_use]
     pub fn feedbacks(&self) -> &HashMap<String, u64> {
         &self.feedbacks
     }
@@ -730,9 +741,9 @@ impl core::fmt::Display for ClientPerfStats {
                 writeln!(f, "    {:6.4}: {:?}", feature_percent, feature)?;
             }
         }
-        
+
         writeln!(f, "  Feedbacks:")?;
-        
+
         for (feedback_name, feedback_time) in self.feedbacks() {
             // Calculate this current stage's percentage
             let feedback_percent = *feedback_time as f64 / elapsed;
@@ -746,11 +757,7 @@ impl core::fmt::Display for ClientPerfStats {
             other_percent -= feedback_percent;
 
             // Write the percentage for this feedback
-            writeln!(
-                f,
-                "    {:6.4}: {}",
-                feedback_percent, feedback_name
-            )?;
+            writeln!(f, "    {:6.4}: {}", feedback_percent, feedback_name)?;
         }
 
         write!(f, "  {:6.4}: Not Measured", other_percent)?;

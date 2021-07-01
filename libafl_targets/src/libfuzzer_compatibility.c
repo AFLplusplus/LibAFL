@@ -12,7 +12,7 @@ EXT_FUNC(LLVMFuzzerCustomCrossOver, size_t,
           const uint8_t *Data2, size_t Size2,
           uint8_t *Out, size_t MaxOutSize, unsigned int Seed),
          false);
-EXT_FUNC_DEF(LLVMFuzzerTestOneInput, int, (uint8_t *Data, size_t Size), false);
+EXT_FUNC(LLVMFuzzerTestOneInput, int, (uint8_t *Data, size_t Size), false);
 
 void libafl_main(void);
 EXT_FUNC_IMPL(main, int, (int argc, char** argv), false) {
