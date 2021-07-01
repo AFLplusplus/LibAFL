@@ -27,7 +27,7 @@ use crate::{
     },
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
-        EventRestarter,
+        EventRestarter, HasEventManagerId,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -54,8 +54,6 @@ use crate::bolts::os::ashmem_server::AshmemService;
 
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
-
-use super::HasEventManagerId;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;

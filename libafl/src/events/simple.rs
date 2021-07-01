@@ -20,13 +20,14 @@ use crate::bolts::{
 };
 use crate::{
     bolts::llmp,
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
     inputs::Input,
     stats::Stats,
     Error,
 };
-
-use super::{EventManagerId, HasEventManagerId};
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
@@ -291,7 +292,7 @@ where
     SP: ShMemProvider,
     ST: Stats,
 {
-    fn mgr_id(&self) -> super::EventManagerId {
+    fn mgr_id(&self) -> EventManagerId {
         self.simple_event_mgr.mgr_id()
     }
 }
