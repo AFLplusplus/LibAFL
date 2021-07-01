@@ -284,6 +284,12 @@ pub enum SymExpr {
     BuildBswap {
         op: SymExprRef,
     },
+    BuildInsert {
+        target: SymExprRef,
+        to_insert: SymExprRef,
+        offset: u64,
+        little_endian: bool
+    },
 
     PushPathConstraint {
         constraint: SymExprRef,
