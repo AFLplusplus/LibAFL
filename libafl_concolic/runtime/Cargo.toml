@@ -14,3 +14,4 @@ ctor = "0.1"
 unchecked_unwrap = "3"
 concolic = {path = "../concolic"}
 libc = "0.2"
+libafl = {path = "../../libafl"}
