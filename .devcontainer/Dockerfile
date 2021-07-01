@@ -25,23 +25,30 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     python3-pip \
     cmake \ 
     libssl-dev \
+    cargo \
     ninja-build
 
 RUN pip3 install lit
 
-RUN cd /tmp \
-    && mkdir cmake \
-    && git clone git@github.com:Kitware/CMake.git \
-    && cd CMake \
-    && ./bootstrap \
-    && make -j4 && make install \
-    && cd ../../ && rm -rf cmake
 
 # install corrosion for concolic support
 RUN cd /tmp \
-    && mkdir corrosion && cd corrosion \
+    && mkdir corrosion \
     && git clone https://github.com/AndrewGaspar/corrosion.git \
     && cmake -Scorrosion -Bbuild -DCMAKE_BUILD_TYPE=Release \
     && cmake --build build --config Release \
     && cmake --install build --config Release \
-    && cd ../../ && rm -rf corrosion
+    && rm -rf corrosion \
+    && rm -rf build \
+    && apt-get remove -y cargo \
+    && apt-get autoremove -y
+
+# install cmake from source, because debians version too old
+RUN cd /tmp \
+    && git clone https://github.com/Kitware/CMake.git \
+    && cd CMake \
+    && cmake -G Ninja . \
+    && ninja \
+    && apt-get remove -y cmake \
+    && ninja install \
+    && cd .. && rm -rf CMake
