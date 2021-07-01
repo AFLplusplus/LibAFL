@@ -19,9 +19,6 @@ use crate::bolts::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
-/// Number of stages in the fuzzer
-pub(crate) const NUM_STAGES: usize = 8;
-
 /// User-defined stats types
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
@@ -291,7 +288,7 @@ where
         {
             // Print the client performance stats.
             let fmt = format!(
-                "Client {:03}: {}",
+                "Client {:03}:\n{}",
                 sender_id, self.client_stats[sender_id as usize].introspection_stats
             );
             (self.print_fn)(fmt);
@@ -372,16 +369,12 @@ pub struct ClientPerfStats {
     /// Current stage index to write the next stage benchmark time
     curr_stage: u8,
 
-    /// Current feedback index to write the next feedback benchmark time
-    curr_feedback: u8,
-
     /// Flag to dictate this stage is in use. Used during printing to not print the empty
     /// stages if they are not in use.
-    stages_used: [bool; NUM_STAGES],
+    stages_used: Vec<bool>,
 
-    // TODO(andrea) use an hashmap and indetify feaures using a &'static str
     /// Clock cycles spent in the the various features of each stage
-    stages: [[u64; PerfFeature::Count as usize]; NUM_STAGES],
+    stages: Vec<[u64; PerfFeature::Count as usize]>,
 
     /// Clock cycles spent in each feedback mechanism of the fuzzer.
     feedbacks: HashMap<String, u64>,
@@ -474,7 +467,7 @@ impl From<usize> for PerfFeature {
 
 /// Number of features we can measure for performance
 #[cfg(feature = "introspection")]
-const NUM_PERF_FEATURES: usize = PerfFeature::Count as usize;
+pub const NUM_PERF_FEATURES: usize = PerfFeature::Count as usize;
 
 #[cfg(feature = "introspection")]
 impl ClientPerfStats {
@@ -490,9 +483,8 @@ impl ClientPerfStats {
             scheduler: 0,
             manager: 0,
             curr_stage: 0,
-            curr_feedback: 0,
-            stages: [[0; NUM_PERF_FEATURES]; NUM_STAGES],
-            stages_used: [false; NUM_STAGES],
+            stages: vec![],
+            stages_used: vec![],
             feedbacks: HashMap::new(),
             timer_start: None,
         }
@@ -515,7 +507,7 @@ impl ClientPerfStats {
         self.set_current_time(stats.current_time);
         self.update_scheduler(stats.scheduler);
         self.update_manager(stats.manager);
-        self.update_stages(stats.stages);
+        self.update_stages(&stats.stages);
         self.update_feedbacks(&stats.feedbacks);
     }
 
@@ -607,12 +599,6 @@ impl ClientPerfStats {
         self.curr_stage = 0;
     }
 
-    /// Reset the feedback index counter to zero
-    #[inline]
-    pub fn reset_feedback_index(&mut self) {
-        self.curr_feedback = 0;
-    }
-
     /// Update the time spent in the feedback
     pub fn update_feedback(&mut self, name: &str, time: u64) {
         self.feedbacks.insert(
@@ -633,7 +619,11 @@ impl ClientPerfStats {
     }
 
     /// Update the time spent in the stages
-    pub fn update_stages(&mut self, stages: [[u64; NUM_PERF_FEATURES]; NUM_STAGES]) {
+    pub fn update_stages(&mut self, stages: &[[u64; PerfFeature::Count as usize]]) {
+        if self.stages.len() < stages.len() {
+            self.stages.resize(stages.len(), [0; PerfFeature::Count as usize]);
+            self.stages_used.resize(stages.len(), false);
+        }
         for (stage_index, features) in stages.iter().enumerate() {
             for (feature_index, feature) in features.iter().enumerate() {
                 self.stages[stage_index][feature_index] = self.stages[stage_index][feature_index]
@@ -642,23 +632,19 @@ impl ClientPerfStats {
             }
         }
     }
-
+    
     /// Update the given [`PerfFeature`] with the given `time`
     pub fn update_feature(&mut self, feature: PerfFeature, time: u64) {
-        // Sanity check that these stats have enough room for these benchmarks
-        assert!(
-            (self.curr_stage as usize) < NUM_STAGES,
-            "Current fuzzer has more stages 
-                than the `ClientPerfStats` supports ({}). Please update the NUM_STAGES
-                const value in src/stats/mod.rs and rebuild",
-            NUM_STAGES
-        );
-
         // Get the current stage index as `usize`
         let stage_index: usize = self.curr_stage.try_into().unwrap();
 
         // Get the index of the given feature
         let feature_index: usize = feature.try_into().unwrap();
+        
+        if stage_index >= self.stages.len() {
+            self.stages.resize(stage_index +1, [0; PerfFeature::Count as usize]);
+            self.stages_used.resize(stage_index +1, false);
+        }
 
         // Update the given feature
         self.stages[stage_index][feature_index] = self.stages[stage_index][feature_index]
@@ -715,7 +701,7 @@ impl core::fmt::Display for ClientPerfStats {
         // Create the formatted string
         writeln!(
             f,
-            "Scheduler: {:4.2} | Manager: {:4.2} | Stages:",
+            "  {:6.4}: Scheduler\n  {:6.4}: Manager",
             scheduler_percent, manager_percent
         )?;
 
@@ -743,29 +729,31 @@ impl core::fmt::Display for ClientPerfStats {
                 // Write the percentage for this feature
                 writeln!(f, "    {:6.4}: {:?}", feature_percent, feature)?;
             }
+        }
+        
+        writeln!(f, "  Feedbacks:")?;
+        
+        for (feedback_name, feedback_time) in self.feedbacks() {
+            // Calculate this current stage's percentage
+            let feedback_percent = *feedback_time as f64 / elapsed;
 
-            for (feedback_name, feedback_time) in self.feedbacks() {
-                // Calculate this current stage's percentage
-                let feedback_percent = *feedback_time as f64 / elapsed;
-
-                // Ignore this feedback if it isn't used
-                if feedback_percent == 0.0 {
-                    continue;
-                }
-
-                // Update the other percent by removing this current percent
-                other_percent -= feedback_percent;
-
-                // Write the percentage for this feedback
-                writeln!(
-                    f,
-                    "    {:6.4}: Feedback {}",
-                    feedback_percent, feedback_name
-                )?;
+            // Ignore this feedback if it isn't used
+            if feedback_percent == 0.0 {
+                continue;
             }
+
+            // Update the other percent by removing this current percent
+            other_percent -= feedback_percent;
+
+            // Write the percentage for this feedback
+            writeln!(
+                f,
+                "    {:6.4}: {}",
+                feedback_percent, feedback_name
+            )?;
         }
 
-        write!(f, "  Not Measured: {:4.2}", other_percent)?;
+        write!(f, "  {:6.4}: Not Measured", other_percent)?;
 
         Ok(())
     }
