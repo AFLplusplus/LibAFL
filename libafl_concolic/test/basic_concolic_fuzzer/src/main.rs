@@ -1,7 +1,9 @@
-use core::time::Duration;
-use libafl::executors::Executor;
+mod command_executor;
+mod feedback;
+mod metadata;
+mod observer;
+
 use libafl::feedbacks::EagerOrFeedback;
-use libafl::inputs::Input;
 use libafl::{
     bolts::{
         current_nanos,
@@ -11,73 +13,21 @@ use libafl::{
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase},
     events::SimpleEventManager,
-    executors::{ExitKind, InProcessExecutor},
     feedbacks::{CrashFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::BytesInput,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::TimeObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
     stats::SimpleStats,
 };
+
+use std::path::PathBuf;
+
+use command_executor::CommandExecutor;
+use feedback::ConcolicFeedback;
 use observer::ConcolicObserver;
-
-use std::{
-    io::Write,
-    os::unix::prelude::ExitStatusExt,
-    path::PathBuf,
-    process::{Command, Stdio},
-    thread::sleep,
-    time::Instant,
-};
-
-use crate::feedback::ConcolicFeedback;
-
-fn run_target<I: Input + HasTargetBytes>(input: &I) -> ExitKind {
-    let mut command = Command::new("../if");
-    command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-
-    let start_time = Instant::now();
-    let mut child = command.spawn().expect("failed to start process");
-    let mut stdin = child.stdin.as_ref().unwrap();
-    if let Err(e) = stdin.write_all(input.target_bytes().as_slice()) {
-        todo!("handle error {}", e);
-    }
-
-    loop {
-        match child.try_wait().expect("waiting on child failed") {
-            Some(exit_status) => {
-                if let Some(signal) = exit_status.signal() {
-                    // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-                    match signal {
-                        9 /* SIGKILL */ => {
-                            // we assume the child was killed due to OOM
-                            return ExitKind::Oom;
-                        }
-                        _ => {return ExitKind::Crash;}
-                    }
-                } else {
-                    return ExitKind::Ok;
-                }
-            }
-            None => {
-                if start_time.elapsed() > Duration::from_secs(5) {
-                    return ExitKind::Timeout;
-                }
-                sleep(Duration::from_millis(1));
-            }
-        }
-    }
-}
-
-
-mod feedback;
-mod metadata;
-mod observer;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -142,16 +92,8 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut target = run_target;
-    // Create the executor for the forkserver
-    let mut executor = InProcessExecutor::new(
-        &mut target,
-        tuple_list!(time_observer, concolic_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .unwrap();
+    let mut executor =
+        CommandExecutor::from_observers(tuple_list!(time_observer, concolic_observer));
 
     state
         .corpus_mut()
