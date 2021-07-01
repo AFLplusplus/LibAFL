@@ -1,4 +1,4 @@
-use concolic::MessageFileReader;
+use concolic::serialization_format::MessageFileReader;
 use libafl::{bolts::tuples::Named, executors::HasExecHooks, observers::Observer, Error};
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ impl<'map> Observer for ConcolicObserver<'map> {}
 
 impl<'map> ConcolicObserver<'map> {
     pub fn create_metadata_from_current_map(&self) -> ConcolicMetadata {
-        let reader = MessageFileReader::new_from_length_prefixed_buffer(self.map)
+        let reader = MessageFileReader::from_length_prefixed_buffer(self.map)
             .expect("constructing the message reader from a memory buffer should not fail");
         ConcolicMetadata::from_buffer(reader.get_buffer().to_vec())
     }

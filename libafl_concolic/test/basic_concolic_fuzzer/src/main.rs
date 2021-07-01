@@ -3,6 +3,7 @@ mod feedback;
 mod metadata;
 mod observer;
 
+use concolic::serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE};
 use libafl::feedbacks::EagerOrFeedback;
 use libafl::{
     bolts::{
@@ -31,11 +32,13 @@ use observer::ConcolicObserver;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = 1024 * 1024 * 1024;
     //Coverage map shared between observer and executor
-    let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
+    let mut shmem = StdShMemProvider::new()
+        .unwrap()
+        .new_map(DEFAULT_SIZE)
+        .unwrap();
     //let the forkserver know the shmid
-    shmem.write_to_env("SHARED_MEMORY_MESSAGES").unwrap();
+    shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
     // Create an observation channel using the signals map
     /*let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
         "shared_mem",

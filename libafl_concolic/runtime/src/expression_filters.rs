@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use concolic::Message;
+use concolic::SymExpr;
 
 /// An [`ExpressionFilter`] can decide for each expression whether the expression should be trace symbolically or be
 /// concretized. This allows to implement filtering mechanisms that reduce the amount of traced expressions by
@@ -17,7 +17,7 @@ use concolic::Message;
 pub(crate) trait ExpressionFilter {
     /// Decides whether the expression should continue to be symbolic. If this method returns `true` the expression will
     /// continue to be symbolic, else the value will be concretized in future expressions.
-    fn symbolize(&mut self, msg: &Message) -> bool;
+    fn symbolize(&mut self, msg: &SymExpr) -> bool;
 
     /// This function is called on function entry and receives a location id.
     ///
@@ -42,7 +42,7 @@ pub(crate) trait ExpressionFilter {
 pub(crate) struct NopExpressionFilter;
 
 impl ExpressionFilter for NopExpressionFilter {
-    fn symbolize(&mut self, _msg: &Message) -> bool {
+    fn symbolize(&mut self, _msg: &SymExpr) -> bool {
         true
     }
     fn notify_call(&mut self, _location_id: usize) {}
@@ -57,8 +57,8 @@ pub(crate) struct SelectiveSymbolicationFilter {
 }
 
 impl ExpressionFilter for SelectiveSymbolicationFilter {
-    fn symbolize(&mut self, msg: &Message) -> bool {
-        if let Message::GetInputByte { offset } = msg {
+    fn symbolize(&mut self, msg: &SymExpr) -> bool {
+        if let SymExpr::GetInputByte { offset } = msg {
             self.bytes_to_symbolize.contains(offset)
         } else {
             true
@@ -77,7 +77,7 @@ pub(crate) struct AndExpressionFilter<A: ExpressionFilter, B: ExpressionFilter> 
 }
 
 impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for AndExpressionFilter<A, B> {
-    fn symbolize(&mut self, msg: &Message) -> bool {
+    fn symbolize(&mut self, msg: &SymExpr) -> bool {
         self.a.symbolize(msg) && self.b.symbolize(msg)
     }
     fn notify_call(&mut self, location_id: usize) {
