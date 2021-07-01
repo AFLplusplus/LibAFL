@@ -45,7 +45,7 @@ impl<I: Input, S> Feedback<I, S> for ConcolicFeedback {
         self.metadata = observers
             .match_name::<ConcolicObserver>(&self.name)
             .map(|o| o.create_metadata_from_current_map());
-        Ok(true)
+        Ok(false)
     }
 
     fn append_metadata(
