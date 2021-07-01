@@ -77,9 +77,6 @@ impl ExpressionFilter for SelectiveSymbolicationFilter {
     fn notify_basic_block(&mut self, _location_id: usize) {}
 }
 
-/// The name of the environment variable that contains the byte offsets to be symbolized.
-pub(crate) const SELECTIVE_SYMBOLICATION_ENV_NAME: &str = "LIBAFL_SELECTIVE_SYMBOLICATION";
-
 /// An [`ExpressionFilter`] that combines two expression filters and decides to symbolize expressions where both filters
 /// decide to symbolize.
 pub(crate) struct AndExpressionFilter<A: ExpressionFilter, B: ExpressionFilter> {
