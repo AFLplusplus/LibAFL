@@ -14,10 +14,9 @@ clean:
 
 run:  all
 	taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
-	sleep 0.2
 
 short_test: all
-	timeout 11s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
+	timeout 10s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
 
 test: all
-	timeout 59s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
+	timeout 60s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
