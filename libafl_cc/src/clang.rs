@@ -188,7 +188,7 @@ impl CompilerWrapper for ClangWrapper {
             args.push(self.wrapped_cc.clone());
         }
         args.extend_from_slice(self.base_args.as_slice());
-        if self.passes.len() > 0 {
+        if !self.passes.is_empty() {
             args.push("-fno-experimental-new-pass-manager".into());
         }
         for pass in &self.passes {
