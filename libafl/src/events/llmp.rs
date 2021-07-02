@@ -25,7 +25,10 @@ use crate::{
         llmp::{self, Flags, LlmpClientDescription, LlmpSender, Tag},
         shmem::ShMemProvider,
     },
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
@@ -213,7 +216,7 @@ where
                 client.update_executions(*executions as u64, *time);
 
                 // Update the performance stats for this client
-                client.update_introspection_stats(**introspection_stats);
+                client.update_introspection_stats((**introspection_stats).clone());
 
                 // Display the stats via `.display` only on core #1
                 stats.display(event.name().to_string(), sender_id);
@@ -359,7 +362,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
         E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
         Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
     {
@@ -458,7 +461,7 @@ where
     SP: ShMemProvider,
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
@@ -496,12 +499,26 @@ where
 
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
-    SP: ShMemProvider,
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    SP: ShMemProvider,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
+}
+
+impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    SP: ShMemProvider,
+{
+    /// Gets the id assigned to this sender.
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId {
+            id: self.llmp.sender.id as usize,
+        }
+    }
 }
 
 /// Serialize the current state and corpus during an executiont to bytes.
@@ -609,7 +626,7 @@ where
     E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -624,10 +641,22 @@ where
     I: Input,
     S: Serialize,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
+}
+
+impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    S: Serialize,
+    SP: ShMemProvider + 'static,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        self.llmp_mgr.mgr_id()
+    }
 }
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -639,7 +668,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -690,7 +719,7 @@ where
     I: Input,
     S: DeserializeOwned,
     ST: Stats + Clone,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
     #[cfg(target_os = "android")]
@@ -714,7 +743,7 @@ where
 pub struct RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider + 'static,
     ST: Stats,
@@ -746,7 +775,7 @@ where
 impl<I, OT, S, SP, ST> RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
     ST: Stats + Clone,

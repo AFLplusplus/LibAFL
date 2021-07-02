@@ -44,6 +44,7 @@ pub trait HasFeedback<F, I, S>
 where
     F: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     /// The feedback
     fn feedback(&self) -> &F;
@@ -57,6 +58,7 @@ pub trait HasObjective<I, OF, S>
 where
     OF: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     /// The objective feedback
     fn objective(&self) -> &OF;
@@ -240,6 +242,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
+    S: HasClientPerfStats,
 {
     scheduler: CS,
     feedback: F,
@@ -254,6 +257,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
+    S: HasClientPerfStats,
 {
     fn scheduler(&self) -> &CS {
         &self.scheduler
@@ -270,6 +274,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
+    S: HasClientPerfStats,
 {
     fn feedback(&self) -> &F {
         &self.feedback
@@ -286,6 +291,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
+    S: HasClientPerfStats,
 {
     fn objective(&self) -> &OF {
         &self.objective
@@ -305,7 +311,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
@@ -323,11 +329,15 @@ where
     {
         let mut res = ExecuteInputResult::None;
 
-        start_timer!(state);
+        #[cfg(not(feature = "introspection"))]
         let is_solution = self
             .objective_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
-        mark_feature_time!(state, PerfFeature::GetObjectivesInterestingAll);
+
+        #[cfg(feature = "introspection")]
+        let is_solution = self
+            .objective_mut()
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
         if is_solution {
             res = ExecuteInputResult::Solution;
@@ -338,31 +348,9 @@ where
                 .is_interesting(state, manager, &input, observers, &exit_kind)?;
 
             #[cfg(feature = "introspection")]
-            let is_corpus = {
-                // Init temporary feedback stats here. We can't use the typical pattern above
-                // since we need a `mut self` for `feedbacks_mut`, so we can't also hand a
-                // new `mut self` to `is_interesting_with_perf`. We use this stack
-                // variable to get the stats and then update the feedbacks directly
-                let mut feedback_stats = [0_u64; crate::stats::NUM_FEEDBACKS];
-                let feedback_index = 0;
-                let is_corpus = self.feedback_mut().is_interesting_with_perf(
-                    state,
-                    manager,
-                    &input,
-                    observers,
-                    &exit_kind,
-                    &mut feedback_stats,
-                    feedback_index,
-                )?;
-
-                // Update the feedback stats
-                state
-                    .introspection_stats_mut()
-                    .update_feedbacks(feedback_stats);
-
-                // Return the total fitness
-                is_corpus
-            };
+            let is_corpus = self
+                .feedback_mut()
+                .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
             if is_corpus {
                 res = ExecuteInputResult::Corpus;
@@ -431,7 +419,7 @@ impl<C, CS, F, I, OF, OT, S, SC> EvaluatorObservers<I, OT, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -464,7 +452,7 @@ where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
@@ -569,7 +557,7 @@ where
                     Event::UpdatePerfStats {
                         executions: *state.executions(),
                         time: cur,
-                        introspection_stats: Box::new(*state.introspection_stats()),
+                        introspection_stats: Box::new(state.introspection_stats().clone()),
                         phantom: PhantomData,
                     },
                 )?;

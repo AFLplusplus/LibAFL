@@ -20,7 +20,10 @@ use crate::bolts::{
 };
 use crate::{
     bolts::llmp,
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
     inputs::Input,
     stats::Stats,
     Error,
@@ -96,6 +99,16 @@ where
 {
 }
 
+impl<I, ST> HasEventManagerId for SimpleEventManager<I, ST>
+where
+    I: Input,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
+}
+
 impl<I, ST> SimpleEventManager<I, ST>
 where
     I: Input,
@@ -163,7 +176,8 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                stats.client_stats_mut()[0].update_introspection_stats(**introspection_stats);
+                stats.client_stats_mut()[0]
+                    .update_introspection_stats((**introspection_stats).clone());
                 stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
@@ -270,6 +284,19 @@ where
     SP: ShMemProvider,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
+}
+
+#[cfg(feature = "std")]
+impl<I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<I, S, SP, ST>
+where
+    I: Input,
+    S: Serialize,
+    SP: ShMemProvider,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        self.simple_event_mgr.mgr_id()
+    }
 }
 
 #[cfg(feature = "std")]

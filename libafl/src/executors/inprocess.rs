@@ -28,7 +28,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::HasSolutions,
+    state::{HasClientPerfStats, HasSolutions},
     Error,
 };
 
@@ -170,7 +170,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I>,
+        S: HasSolutions<OC, I> + HasClientPerfStats,
         Z: HasObjective<I, OF, S>,
     {
         #[cfg(unix)]
@@ -255,7 +255,7 @@ mod unix_signal_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::HasSolutions,
+        state::{HasClientPerfStats, HasSolutions},
     };
 
     pub type HandlerFuncPtr =
@@ -343,7 +343,7 @@ mod unix_signal_handler {
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I>,
+        S: HasSolutions<OC, I> + HasClientPerfStats,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -417,7 +417,7 @@ mod unix_signal_handler {
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I>,
+        S: HasSolutions<OC, I> + HasClientPerfStats,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -562,7 +562,7 @@ mod windows_exception_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::HasSolutions,
+        state::{HasClientPerfStats, HasSolutions},
     };
 
     pub type HandlerFuncPtr =
@@ -628,7 +628,7 @@ mod windows_exception_handler {
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I>,
+        S: HasSolutions<OC, I> + HasClientPerfStats,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {

@@ -13,6 +13,20 @@ use crate::{
     executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
 };
 
+/// A per-fuzzer unique ID, usually starting with `0` and increasing
+/// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct EventManagerId {
+    /// The id
+    pub id: usize,
+}
+
+impl Default for EventManagerId {
+    fn default() -> Self {
+        Self { id: 0 }
+    }
+}
+
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
 #[cfg(feature = "introspection")]
@@ -201,7 +215,7 @@ where
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -233,16 +247,22 @@ pub trait EventProcessor<E, I, S, Z> {
     /// Deserialize all observers for this type and manager
     fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
 }
 
+pub trait HasEventManagerId {
+    /// The id of this manager. For Multiprocessed [`EventManager`]s,
+    /// each client sholud have a unique ids.
+    fn mgr_id(&self) -> EventManagerId;
+}
+
 /// [`EventManager`] is the main communications hub.
-/// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
+/// For the "normal" multi-processed mode, you may want to look into [`RestartingEventManager`]
 pub trait EventManager<E, I, S, Z>:
-    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S>
+    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S> + HasEventManagerId
 where
     I: Input,
 {
@@ -275,6 +295,12 @@ impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
 }
 
 impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+
+impl HasEventManagerId for NopEventManager {
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
+}
 
 #[cfg(test)]
 mod tests {

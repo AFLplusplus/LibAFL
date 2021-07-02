@@ -26,9 +26,9 @@ extern "C" {
     static __libafl_target_list: *mut usize;
 }
 
-/// The main fn, `no_mangle` as it is a C main
+/// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
-pub fn main() {
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();

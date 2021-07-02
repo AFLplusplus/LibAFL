@@ -8,8 +8,6 @@ use libafl::{
     Error,
 };
 
-use serde::{Deserialize, Serialize};
-
 use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
 
 /// The `CmpLog` map size
@@ -18,7 +16,8 @@ pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 /// The size of a logged routine argument in bytes
 pub const CMPLOG_RTN_LEN: usize = 32;
 
-pub const CMPLOG_MAP_RTN_H: usize = (CMPLOG_MAP_H * core::mem::size_of::<CmpLogOperands>()) / core::mem::size_of::<CmpLogRoutine>();
+pub const CMPLOG_MAP_RTN_H: usize =
+    (CMPLOG_MAP_H * core::mem::size_of::<CmpLogOperands>()) / core::mem::size_of::<CmpLogRoutine>();
 
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
@@ -29,7 +28,7 @@ big_array! { BigArray; }
 
 /// The header for `CmpLog` hits.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogHeader {
     hits: u16,
     shape: u8,
@@ -38,28 +37,25 @@ pub struct CmpLogHeader {
 
 /// The operands logged during `CmpLog`.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogOperands(u64, u64);
 
 /// The routine arguments logged during `CmpLog`.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogRoutine([u8; CMPLOG_RTN_LEN], [u8; CMPLOG_RTN_LEN]);
 
 #[repr(C)]
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub union CmpLogVals {
-    #[serde(with = "BigArray")]
     operands: [[CmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W],
-    #[serde(with = "BigArray")]
     routines: [[CmpLogRoutine; CMPLOG_MAP_RTN_H]; CMPLOG_MAP_W],
 }
 
 /// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct CmpLogMap {
-    #[serde(with = "BigArray")]
     headers: [CmpLogHeader; CMPLOG_MAP_W],
     vals: CmpLogVals,
 }
@@ -155,7 +151,6 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
 /// A [`CmpObserver`] observer for `CmpLog`
-#[derive(Serialize, Deserialize, Debug)]
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,

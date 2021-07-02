@@ -36,7 +36,7 @@ extern "C" {
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 #[no_mangle]
-pub fn main() {
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
