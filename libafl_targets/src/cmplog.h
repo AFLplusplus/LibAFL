@@ -12,7 +12,7 @@
 
 #define CMPLOG_RTN_LEN 32
 
-#define CMPLOG_MAP_RTN_H ((CMPLOG_MAP_H * sizeof(CmpLogOperands)) / sizeof(CmpLogRoutine)) 
+#define CMPLOG_MAP_RTN_H ((CMPLOG_MAP_H * sizeof(CmpLogInstruction)) / sizeof(CmpLogRoutine)) 
 
 #define CMPLOG_KIND_INS 0
 #define CMPLOG_KIND_RTN 1
@@ -20,13 +20,13 @@
 typedef struct CmpLogHeader {
     uint16_t hits;
     uint8_t shape;
-    uint8_t reserved;
+    uint8_t kind;
 } CmpLogHeader;
 
 typedef struct CmpLogInstruction {
     uint64_t v0;
     uint64_t v1;
-} CmpLogOperands;
+} CmpLogInstruction;
 
 typedef struct CmpLogRoutine {
     uint8_t v0[CMPLOG_RTN_LEN];
@@ -35,12 +35,10 @@ typedef struct CmpLogRoutine {
 
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];
-  CmpLogInstruction operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
-} CmpLogMap;
-
-typedef struct CmpLogMap {
-  CmpLogHeader headers[CMPLOG_MAP_W];
-  CmpLogRoutine operands[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
+  union {
+      CmpLogInstruction operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
+      CmpLogRoutine routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
+  } vals;
 } CmpLogMap;
 
 extern CmpLogMap libafl_cmplog_map;
