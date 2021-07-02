@@ -311,7 +311,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
@@ -419,7 +419,7 @@ impl<C, CS, F, I, OF, OT, S, SC> EvaluatorObservers<I, OT, S>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -452,7 +452,7 @@ where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,

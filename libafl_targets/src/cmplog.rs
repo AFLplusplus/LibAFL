@@ -8,14 +8,10 @@ use libafl::{
     Error,
 };
 
-use serde::{Deserialize, Serialize};
-
 use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
 
 /// The `CmpLog` map size
 pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
-
-big_array! { BigArray; }
 
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
@@ -24,7 +20,7 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 
 /// The header for `CmpLog` hits.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogHeader {
     hits: u16,
     shape: u8,
@@ -33,16 +29,14 @@ pub struct CmpLogHeader {
 
 /// The operands logged during `CmpLog`.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogOperands(u64, u64);
 
 /// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct CmpLogMap {
-    #[serde(with = "BigArray")]
     headers: [CmpLogHeader; CMPLOG_MAP_W],
-    #[serde(with = "BigArray")]
     operands: [[CmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W],
 }
 
@@ -137,7 +131,6 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
 /// A [`CmpObserver`] observer for `CmpLog`
-#[derive(Serialize, Deserialize, Debug)]
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
