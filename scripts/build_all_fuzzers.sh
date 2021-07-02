@@ -20,9 +20,16 @@ do
     else
         echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
     fi
-    echo "[*] Building $fuzzer"
-    cargo build || exit 1
+
+    if [ -e ./Makefile ] && [ "$(uname)" == "Linux" ]; then
+        echo "[*] Testing $fuzzer"
+        make short_test || exit 1
+	    echo "[+] Done testing $fuzzer"
+    else
+        echo "[*] Building $fuzzer"
+        cargo build || exit 1
+        echo "[+] Done building $fuzzer"
+    fi
     cd ..
-    echo "[+] Done building $fuzzer"
     echo ""
 done
