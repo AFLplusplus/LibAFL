@@ -215,7 +215,7 @@ where
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -247,7 +247,7 @@ pub trait EventProcessor<E, I, S, Z> {
     /// Deserialize all observers for this type and manager
     fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }

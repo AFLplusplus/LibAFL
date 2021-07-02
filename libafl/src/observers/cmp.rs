@@ -70,7 +70,7 @@ impl CmpValuesMetadata {
 }
 
 /// A [`CmpMap`] traces comparisons during the current execution
-pub trait CmpMap: Serialize + DeserializeOwned {
+pub trait CmpMap {
     /// Get the number of cmps
     fn len(&self) -> usize;
 
@@ -176,7 +176,7 @@ where
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
 pub struct StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
@@ -185,7 +185,7 @@ where
 
 impl<'a, CM, I, S> CmpObserver<CM, I, S> for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -206,7 +206,7 @@ where
 
 impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
@@ -216,7 +216,7 @@ where
 
 impl<'a, CM> Named for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     fn name(&self) -> &str {
         &self.name
@@ -225,7 +225,7 @@ where
 
 impl<'a, CM> StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]

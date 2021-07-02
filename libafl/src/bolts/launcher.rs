@@ -81,7 +81,7 @@ where
 impl<'a, I, OT, S, SP, ST> Launcher<'a, I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     ST: Stats + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,

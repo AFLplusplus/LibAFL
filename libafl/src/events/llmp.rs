@@ -362,7 +362,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
         E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
         Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
     {
@@ -461,7 +461,7 @@ where
     SP: ShMemProvider,
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
@@ -501,7 +501,7 @@ impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S,
 where
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
@@ -510,7 +510,7 @@ where
 impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider,
 {
     /// Gets the id assigned to this sender.
@@ -626,7 +626,7 @@ where
     E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -641,7 +641,7 @@ where
     I: Input,
     S: Serialize,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -650,7 +650,7 @@ where
 impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: Serialize,
     SP: ShMemProvider + 'static,
 {
@@ -668,7 +668,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -719,7 +719,7 @@ where
     I: Input,
     S: DeserializeOwned,
     ST: Stats + Clone,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
     #[cfg(target_os = "android")]
@@ -743,7 +743,7 @@ where
 pub struct RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider + 'static,
     ST: Stats,
@@ -775,7 +775,7 @@ where
 impl<I, OT, S, SP, ST> RestartingMgr<I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
     ST: Stats + Clone,
