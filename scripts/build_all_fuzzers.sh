@@ -21,9 +21,9 @@ do
         echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
     fi
 
-    if [ -e ./run.sh ]; then
+    if [ -e ./Makefile ]; then
         echo "[*] Testing $fuzzer"
-        ./run.sh || exit 1
+        make short_test || exit 1
 	    echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
