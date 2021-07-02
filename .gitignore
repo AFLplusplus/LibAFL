@@ -1,4 +1,5 @@
 target
+out
 Cargo.lock
 
 *.o
