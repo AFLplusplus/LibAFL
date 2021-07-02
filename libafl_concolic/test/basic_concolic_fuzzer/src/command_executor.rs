@@ -97,6 +97,8 @@ impl<EM, I: HasTargetBytes + Input, S, Z, OT: ObserversTuple> Executor<EM, I, S,
                         // if this fails, there is not much we can do. let's hope it failed because the process finished
                         // in the meantime.
                         let _ = child.kill();
+                        // finally, try to wait to properly clean up system ressources.
+                        let _ = child.wait();
                         return Ok(ExitKind::Timeout);
                     }
                     sleep(Duration::from_millis(1));
