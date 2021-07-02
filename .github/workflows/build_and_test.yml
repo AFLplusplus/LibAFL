@@ -17,13 +17,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - name: Cache cargo registry
-        uses: actions/cache@v2
+      - uses: actions-rs/toolchain@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: clippy-cargo-${{ hashFiles('**/Cargo.toml') }}
+          profile: minimal
+          toolchain: stable
       - name: Add clippy
         run: rustup component add clippy
       #- name: Run clippy
@@ -82,6 +79,10 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
     - name: Windows Build
       run: cargo build --verbose
     - name: Run clippy
