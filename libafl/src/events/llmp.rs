@@ -382,14 +382,14 @@ where
                     _sender_id, client_config, input
                 );
 
-                let res = if client_config == self.configuration {
+                let _res = if client_config == self.configuration {
                     let observers: OT = postcard::from_bytes(&observers_buf)?;
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
                     fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
                 };
                 #[cfg(feature = "std")]
-                if let Some(item) = res.1 {
+                if let Some(item) = _res.1 {
                     println!("Added received Testcase as item #{}", item);
                 }
                 Ok(())
