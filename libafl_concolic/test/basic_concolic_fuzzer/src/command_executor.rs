@@ -47,7 +47,7 @@ where
 }
 
 impl<I: Input, OT: ObserversTuple, S> CommandExecutor<I, OT, S> {
-    pub fn from_observers(observers: OT) -> Self {
+    pub fn new(observers: OT) -> Self {
         Self {
             observers,
             phantom: PhantomData,

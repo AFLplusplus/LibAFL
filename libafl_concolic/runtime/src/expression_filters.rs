@@ -57,7 +57,7 @@ pub(crate) struct SelectiveSymbolicationFilter {
 }
 
 impl SelectiveSymbolicationFilter {
-    pub(crate) fn from_offsets(offset: HashSet<usize>) -> Self {
+    pub(crate) fn new(offset: HashSet<usize>) -> Self {
         Self {
             bytes_to_symbolize: offset,
         }
