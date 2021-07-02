@@ -80,12 +80,10 @@ impl CmpMap for CmpLogMap {
             } else {
                 CMPLOG_MAP_H
             }
+        } else if self.executions_for(idx) < CMPLOG_MAP_RTN_H {
+            self.executions_for(idx)
         } else {
-            if self.executions_for(idx) < CMPLOG_MAP_RTN_H {
-                self.executions_for(idx)
-            } else {
-                CMPLOG_MAP_RTN_H
-            }
+            CMPLOG_MAP_RTN_H
         }
     }
 
