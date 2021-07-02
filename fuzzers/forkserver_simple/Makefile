@@ -7,7 +7,7 @@ all: fuzzer
 
 fuzzer:
 	cargo build --release
-	cp $(PROJECT_DIR)/target/release/forkserver_simple .
+	cp $(PROJECT_DIR)/target/release/$(FUZZER_NAME) .
 
 clean:
 	rm ./$(FUZZER_NAME)
