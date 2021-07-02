@@ -122,7 +122,7 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut executor = CommandExecutor::from_observers(tuple_list!(time_observer, edges_observer));
+    let mut executor = CommandExecutor::new(tuple_list!(time_observer, edges_observer));
 
     state
         .corpus_mut()
@@ -133,7 +133,7 @@ pub fn main() {
     let concolic_observer_name = (&concolic_observer.name()).to_string();
     let mut stages = tuple_list!(
         ConcolicTracingStage::new(
-            TracingStage::new(CommandExecutor::from_observers(tuple_list!(
+            TracingStage::new(CommandExecutor::new(tuple_list!(
                 concolic_observer
             ))),
             concolic_observer_name,

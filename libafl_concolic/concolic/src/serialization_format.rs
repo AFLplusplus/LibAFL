@@ -313,7 +313,7 @@ pub mod shared_memory {
 
     impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
         pub fn from_shmem(shmem: T) -> io::Result<Self> {
-            Self::from_writer(ShMemCursor::from_shmem(shmem))
+            Self::from_writer(ShMemCursor::new(shmem))
         }
     }
 

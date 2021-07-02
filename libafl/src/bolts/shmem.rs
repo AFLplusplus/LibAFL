@@ -988,7 +988,7 @@ pub struct ShMemCursor<T: ShMem> {
 
 #[cfg(feature = "std")]
 impl<T: ShMem> ShMemCursor<T> {
-    pub fn from_shmem(shmem: T) -> Self {
+    pub fn new(shmem: T) -> Self {
         Self {
             inner: shmem,
             pos: 0,

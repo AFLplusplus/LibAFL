@@ -34,7 +34,7 @@ impl State {
                     .collect::<Result<HashSet<usize>, _>>()
                     .expect("failed parsing selective symbolication arguments.")
             })
-            .map(SelectiveSymbolicationFilter::from_offsets);
+            .map(SelectiveSymbolicationFilter::new);
         let hitcounts_map = StdShMemProvider::new()
             .unwrap()
             .existing_from_env(HITMAP_ENV_NAME)
