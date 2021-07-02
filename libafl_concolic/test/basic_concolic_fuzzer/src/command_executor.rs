@@ -101,7 +101,7 @@ impl<EM, I: HasTargetBytes + Input, S, Z, OT: ObserversTuple> Executor<EM, I, S,
                         let _ = child.wait();
                         return Ok(ExitKind::Timeout);
                     }
-                    sleep(Duration::from_millis(1));
+                    sleep(Duration::from_millis(5));
                 }
             }
         }
