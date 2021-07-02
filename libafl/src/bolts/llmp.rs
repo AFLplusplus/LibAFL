@@ -1012,7 +1012,7 @@ where
             let shm = self.out_maps.last().unwrap();
             println!(
                 "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
-                shm.shmem.id().to_string(),
+                shm.shmem.id(),
                 shm.shmem.len(),
                 bt
             );
@@ -1369,7 +1369,7 @@ where
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
                         "LLMP_DEBUG: Got a new recv map {} with len {:?}",
-                        self.current_recv_map.shmem.id().to_string(),
+                        self.current_recv_map.shmem.id(),
                         self.current_recv_map.shmem.len()
                     );
                     // After we mapped the new page, return the next message, if available
@@ -1500,7 +1500,7 @@ where
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
             "LLMP_DEBUG: Initializing map on {} with size {}",
-            new_map.id().to_string(),
+            new_map.id(),
             new_map.len()
         );
 
@@ -1520,7 +1520,7 @@ where
         //let bt = "<n/a (release)>";
         dbg!(
             "LLMP_DEBUG: Using existing map {} with size {}",
-            existing_map.id().to_string(),
+            existing_map.id(),
             existing_map.len(),
             //bt
         );

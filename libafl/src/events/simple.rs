@@ -176,7 +176,8 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                stats.client_stats_mut()[0].update_introspection_stats(**introspection_stats);
+                stats.client_stats_mut()[0]
+                    .update_introspection_stats((**introspection_stats).clone());
                 stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }

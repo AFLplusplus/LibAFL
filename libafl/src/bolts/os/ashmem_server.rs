@@ -94,8 +94,7 @@ impl ServedShMemProvider {
             .expect("Did not receive a response");
 
         let server_id = ShMemId::from_slice(&shm_slice);
-        let server_id_str = server_id.to_string();
-        let server_fd: i32 = server_id_str.parse()?;
+        let server_fd: i32 = server_id.into();
         Ok((server_fd, fd_buf[0]))
     }
 }
@@ -139,7 +138,7 @@ impl ShMemProvider for ServedShMemProvider {
     }
 
     fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-        let parts = id.to_string().split(':').collect::<Vec<&str>>();
+        let parts = id.as_str().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();
         let (server_fd, client_fd) = self.send_receive(AshmemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
@@ -257,16 +256,17 @@ impl AshmemService {
                 let description = new_map.description();
                 let new_rc = Rc::new(RefCell::new(new_map));
                 self.all_maps
-                    .insert(description.id.to_int(), Rc::downgrade(&new_rc));
+                    .insert(description.id.into(), Rc::downgrade(&new_rc));
                 Ok(AshmemResponse::Mapping(new_rc))
             }
             AshmemRequest::ExistingMap(description) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                if client.maps.contains_key(&description.id.to_int()) {
+                let description_id: i32 = description.id.into();
+                if client.maps.contains_key(&description_id) {
                     Ok(AshmemResponse::Mapping(
                         client
                             .maps
-                            .get_mut(&description.id.to_int())
+                            .get_mut(&description_id)
                             .as_mut()
                             .unwrap()
                             .first()
@@ -277,7 +277,7 @@ impl AshmemService {
                 } else {
                     Ok(AshmemResponse::Mapping(
                         self.all_maps
-                            .get_mut(&description.id.to_int())
+                            .get_mut(&description_id)
                             .unwrap()
                             .clone()
                             .upgrade()

@@ -73,8 +73,6 @@
 #define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif  // _MSC_VER
 
-#define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-  EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
 #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
   EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
 
@@ -84,10 +82,7 @@
 #else
 
 #if defined(__APPLE__)
-  // TODO: Find a proper way to deal with weak fns on Apple!
   // On Apple, weak_import and weak attrs behave differently to linux.
-  #define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-    EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) { return (RETURN_TYPE) 0; }
 
   #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)      \
   __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG { \
