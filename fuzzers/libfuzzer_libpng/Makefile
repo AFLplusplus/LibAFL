@@ -28,9 +28,9 @@ fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
 
     # Build the libpng harness	
 	target/release/libafl_cxx \
-		$(pwd)/harness.cc \
-		$(pwd)/libpng-1.6.37/.libs/libpng16.a \
-		-I$(pwd)/libpng-1.6.37/ \
+		$(PROJECT_DIR)/harness.cc \
+		$(PROJECT_DIR)/libpng-1.6.37/.libs/libpng16.a \
+		-I$(PROJECT_DIR)/libpng-1.6.37/ \
 		-o $(FUZZER_NAME) \
 		-lm -lz
 
