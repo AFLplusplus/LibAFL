@@ -92,10 +92,10 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-      profile: minimal
-      toolchain: stable
+    #- uses: actions-rs/toolchain@v1
+    #  with:
+    #  profile: minimal
+    #  toolchain: stable
     - name: MacOS Build
       run: cargo build --verbose
     - name: Run clippy
@@ -104,14 +104,14 @@ jobs:
       run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
-  macos_fuzzers:
+  macos-fuzzers:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-      profile: minimal
-      toolchain: stable
+    #- uses: actions-rs/toolchain@v1
+    #  with:
+    #  profile: minimal
+    #  toolchain: stable
     - name: Install deps
       run: brew install llvm libpng nasm
  
