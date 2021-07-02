@@ -5,9 +5,6 @@ cd "$SCRIPT_DIR/.."
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-# Dependencies
-sudo apt install -y libc6-dev
-
 cd fuzzers
 
 for fuzzer in *;
