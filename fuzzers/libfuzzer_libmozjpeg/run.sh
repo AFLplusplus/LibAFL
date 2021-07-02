@@ -14,7 +14,7 @@ fi
 if [ ! -e mozjpeg-4.0.3/libjpeg.a ]; then
     cd mozjpeg-4.0.3
     cmake . -DENABLE_SHARED=FALSE -DCMAKE_C_COMPILER="$(pwd)/../target/release/libafl_cc" -DCMAKE_CXX_COMPILER="$(pwd)/../target/release/libafl_cxx" -G "Unix Makefiles" || exit 1
-    make -j `nproc` || exit 1
+    make -j $(nproc || echo 6) || exit 1
     cd ..
 fi
 
