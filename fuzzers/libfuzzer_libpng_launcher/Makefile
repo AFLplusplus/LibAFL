@@ -1,5 +1,5 @@
-PWD=`pwd`
 FUZZER_NAME="fuzzer_libpng"
+PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 PHONY: all
 
@@ -18,8 +18,8 @@ libafl_cxx: target/release/libafl_cxx
 libafl_cc: target/release/libafl_cxx
 
 libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37 libafl_cc
-	cd libpng-1.6.37 && ./configure && cd ..
-	$(MAKE) -C libpng-1.6.37 CC="$(pwd)/target/release/libafl_cc" CXX="$(pwd)/target/release/libafl_cxx"
+	cd libpng-1.6.37 && ./configure
+	$(MAKE) -C libpng-1.6.37 CC="$(PROJECT_DIR)/target/release/libafl_cc" CXX="$(PROJECT_DIR)/target/release/libafl_cxx"
 	
 
 fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
@@ -28,9 +28,9 @@ fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
 
 	# Build the libpng harness	
 	target/release/libafl_cxx \
-		$(pwd)/harness.cc \
-		$(pwd)/libpng-1.6.37/.libs/libpng16.a \
-		-I$(pwd)/libpng-1.6.37/ \
+		$(PROJECT_DIR)/harness.cc \
+		$(PROJECT_DIR)/libpng-1.6.37/.libs/libpng16.a \
+		-I$(PROJECT_DIR)/libpng-1.6.37/ \
 		-o $(FUZZER_NAME) \
 		-lm -lz
 
