@@ -94,4 +94,8 @@ where
             phantom: PhantomData,
         }
     }
+
+    pub fn executor(&self) -> &TE {
+        &self.tracer_executor
+    }
 }
