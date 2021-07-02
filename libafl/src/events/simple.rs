@@ -20,7 +20,10 @@ use crate::bolts::{
 };
 use crate::{
     bolts::llmp,
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
     inputs::Input,
     stats::Stats,
     Error,
@@ -94,6 +97,16 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
+}
+
+impl<I, ST> HasEventManagerId for SimpleEventManager<I, ST>
+where
+    I: Input,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
 }
 
 impl<I, ST> SimpleEventManager<I, ST>
@@ -270,6 +283,19 @@ where
     SP: ShMemProvider,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
+}
+
+#[cfg(feature = "std")]
+impl<I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<I, S, SP, ST>
+where
+    I: Input,
+    S: Serialize,
+    SP: ShMemProvider,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        self.simple_event_mgr.mgr_id()
+    }
 }
 
 #[cfg(feature = "std")]
