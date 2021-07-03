@@ -8,8 +8,6 @@ use core::{
 };
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
-#[cfg(feature = "std")]
-use typed_builder::TypedBuilder;
 
 #[cfg(all(feature = "std", windows))]
 use crate::bolts::os::startable_self;
@@ -22,7 +20,10 @@ use crate::bolts::{
 };
 use crate::{
     bolts::llmp,
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
     inputs::Input,
     stats::Stats,
     Error,
@@ -71,7 +72,7 @@ where
 {
 }
 
-impl<E, I, S, ST, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, ST>
+impl<E, I, S, ST, Z> EventProcessor<E, I, S, Z> for SimpleEventManager<I, ST>
 where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
@@ -98,6 +99,16 @@ where
 {
 }
 
+impl<I, ST> HasEventManagerId for SimpleEventManager<I, ST>
+where
+    I: Input,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
+}
+
 impl<I, ST> SimpleEventManager<I, ST>
 where
     I: Input,
@@ -118,6 +129,7 @@ where
             Event::NewTestcase {
                 input: _,
                 client_config: _,
+                exit_kind: _,
                 corpus_size,
                 observers_buf: _,
                 time,
@@ -164,7 +176,8 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                stats.client_stats_mut()[0].update_introspection_stats(**introspection_stats);
+                stats.client_stats_mut()[0]
+                    .update_introspection_stats((**introspection_stats).clone());
                 stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
@@ -203,7 +216,6 @@ where
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-#[derive(TypedBuilder, Debug)]
 pub struct SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
@@ -213,16 +225,9 @@ where
 {
     /// The actual simple event mgr
     simple_event_mgr: SimpleEventManager<I, ST>,
-    /// The shared memory provider to use for the broker or client spawned by the restarting
-    /// manager.
-    shmem_provider: SP,
-    /// The stats to use
-    #[builder(setter(strip_option))]
-    stats: Option<ST>,
     /// [`LlmpSender`] for restarts
     sender: LlmpSender<SP>,
     /// Phantom data
-    #[builder(setter(skip), default = PhantomData {})]
     _phantom: PhantomData<(I, S)>,
 }
 
@@ -259,7 +264,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, ST, Z> EventProcessor<E, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<E, I, S, SP, ST, Z> EventProcessor<E, I, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
     S: Serialize,
@@ -282,22 +287,15 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, S, SP, ST> SimpleRestartingEventManager<I, S, SP, ST>
+impl<I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<I, S, SP, ST>
 where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //TODO CE: CustomEvent,
+    ST: Stats,
 {
-    /// Creates a new [`SimpleEventManager`].
-    pub fn new(stats: ST, sender: LlmpSender<SP>, shmem_provider: SP) -> Self {
-        Self {
-            stats: None,
-            sender,
-            simple_event_mgr: SimpleEventManager::new(stats),
-            shmem_provider,
-            _phantom: PhantomData {},
-        }
+    fn mgr_id(&self) -> EventManagerId {
+        self.simple_event_mgr.mgr_id()
     }
 }
 
@@ -308,24 +306,32 @@ where
     I: Input,
     S: DeserializeOwned + Serialize,
     SP: ShMemProvider,
-    ST: Stats + Clone,
+    ST: Stats, //TODO CE: CustomEvent,
 {
-    /// Launch the restarting manager
+    /// Creates a new [`SimpleEventManager`].
+    fn new_launched(stats: ST, sender: LlmpSender<SP>) -> Self {
+        Self {
+            sender,
+            simple_event_mgr: SimpleEventManager::new(stats),
+            _phantom: PhantomData {},
+        }
+    }
+
+    /// Launch the simple restarting manager.
+    /// This [`EventManager`] is simple and single threaded,
+    /// but can still used shared maps to recover from crashes and timeouts.
+    #[allow(clippy::similar_names)]
     pub fn launch(
-        &mut self,
+        stats: ST,
+        shmem_provider: &mut SP,
     ) -> Result<(Option<S>, SimpleRestartingEventManager<I, S, SP, ST>), Error> {
         // We start ourself as child process to actually fuzz
-        let (mut sender, mut receiver, new_shmem_provider) = if std::env::var(_ENV_FUZZER_SENDER)
-            .is_err()
-        {
+        let (mut sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-            let sender = { LlmpSender::new(self.shmem_provider.clone(), 0, false)? };
+            let sender = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
 
-            let map = {
-                self.shmem_provider
-                    .clone_ref(&sender.out_maps.last().unwrap().shmem)?
-            };
-            let receiver = LlmpReceiver::on_existing_map(self.shmem_provider.clone(), map, None)?;
+            let map = { shmem_provider.clone_ref(&sender.out_maps.last().unwrap().shmem)? };
+            let receiver = LlmpReceiver::on_existing_map(shmem_provider.clone(), map, None)?;
             // Store the information to a map.
             sender.to_env(_ENV_FUZZER_SENDER)?;
             receiver.to_env(_ENV_FUZZER_RECEIVER)?;
@@ -338,15 +344,15 @@ where
                 // On Unix, we fork
                 #[cfg(unix)]
                 let child_status = {
-                    self.shmem_provider.pre_fork()?;
+                    shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
-                            self.shmem_provider.post_fork(false)?;
+                            shmem_provider.post_fork(false)?;
                             handle.status()
                         }
                         ForkResult::Child => {
-                            self.shmem_provider.post_fork(true)?;
-                            break (sender, receiver, self.shmem_provider.clone());
+                            shmem_provider.post_fork(true)?;
+                            break (sender, receiver);
                         }
                     }
                 };
@@ -376,12 +382,8 @@ where
             // We get here *only on Windows*, if we were started by a restarting fuzzer.
             // A sender and a receiver for single communication
             (
-                LlmpSender::on_existing_from_env(self.shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
-                LlmpReceiver::on_existing_from_env(
-                    self.shmem_provider.clone(),
-                    _ENV_FUZZER_RECEIVER,
-                )?,
-                self.shmem_provider.clone(),
+                LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
+                LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
             )
         };
 
@@ -394,11 +396,7 @@ where
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    SimpleRestartingEventManager::new(
-                        self.stats.take().unwrap(),
-                        sender,
-                        new_shmem_provider,
-                    ),
+                    SimpleRestartingEventManager::new_launched(stats, sender),
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
@@ -412,11 +410,7 @@ where
 
                 (
                     Some(state),
-                    SimpleRestartingEventManager::new(
-                        self.stats.take().unwrap(),
-                        sender,
-                        new_shmem_provider,
-                    ),
+                    SimpleRestartingEventManager::new_launched(stats, sender),
                 )
             }
         };

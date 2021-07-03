@@ -9,7 +9,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named, AsSlice},
-    executors::HasExecHooks,
     observers::Observer,
     state::HasMetadata,
     Error,
@@ -71,7 +70,7 @@ impl CmpValuesMetadata {
 }
 
 /// A [`CmpMap`] traces comparisons during the current execution
-pub trait CmpMap: Serialize + DeserializeOwned {
+pub trait CmpMap {
     /// Get the number of cmps
     fn len(&self) -> usize;
 
@@ -95,7 +94,7 @@ pub trait CmpMap: Serialize + DeserializeOwned {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<CM>: Observer
+pub trait CmpObserver<CM, I, S>: Observer<I, S>
 where
     CM: CmpMap,
 {
@@ -110,14 +109,17 @@ where
 
     /// Add [`CmpValuesMetadata`] to the State including the logged values.
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
-    fn add_cmpvalues_meta<S>(&mut self, state: &mut S)
+    fn add_cmpvalues_meta(&mut self, state: &mut S)
     where
         S: HasMetadata,
     {
-        if state.metadata().get::<CmpValuesMetadata>().is_none() {
+        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
+        let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {
+            meta
+        } else {
             state.add_metadata(CmpValuesMetadata::new());
-        }
-        let meta = state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap();
+            state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap()
+        };
         meta.list.clear();
         let count = self.usable_count();
         for i in 0..count {
@@ -174,21 +176,21 @@ where
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
 pub struct StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: String,
 }
 
-impl<'a, CM> CmpObserver<CM> for StdCmpObserver<'a, CM>
+impl<'a, CM, I, S> CmpObserver<CM, I, S> for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
-            None => self.map().len(),
+            None => self.map.as_ref().len(),
             Some(o) => *o.as_ref(),
         }
     }
@@ -202,19 +204,11 @@ where
     }
 }
 
-impl<'a, CM> Observer for StdCmpObserver<'a, CM> where CM: CmpMap {}
-
-impl<'a, CM, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for StdCmpObserver<'a, CM>
+impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         Ok(())
     }
@@ -222,7 +216,7 @@ where
 
 impl<'a, CM> Named for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     fn name(&self) -> &str {
         &self.name
@@ -231,7 +225,7 @@ where
 
 impl<'a, CM> StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]

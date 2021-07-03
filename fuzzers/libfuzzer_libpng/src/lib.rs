@@ -32,7 +32,7 @@ use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, 
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
 #[no_mangle]
-pub fn main() {
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
@@ -55,17 +55,18 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let stats = MultiStats::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-    let (state, mut restarting_mgr) = match setup_restarting_mgr_std(stats, broker_port) {
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {}", err);
-            }
-        },
-    };
+    let (state, mut restarting_mgr) =
+        match setup_restarting_mgr_std(stats, broker_port, "default".into()) {
+            Ok(res) => res,
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
+                }
+                _ => {
+                    panic!("Failed to setup the restarter: {}", err);
+                }
+            },
+        };
 
     // Create an observation channel using the coverage map
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };

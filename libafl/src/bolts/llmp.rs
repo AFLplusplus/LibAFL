@@ -475,7 +475,7 @@ unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
 /// May be used to restore the map by id.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct LlmpDescription {
-    /// Info about the SharedMap in use
+    /// Info about the [`ShMem`] in use
     shmem: ShMemDescription,
     /// The last message sent or received, depnding on page type
     last_message_offset: Option<u64>,
@@ -751,15 +751,36 @@ where
         self.last_msg_sent = ptr::null_mut();
     }
 
+    /// Reads the stored sender / client id for the given `env_name` (by appending `_CLIENT_ID`).
+    /// If the content of the env is `_NULL`, returns [`Option::None`].
+    #[cfg(feature = "std")]
+    #[inline]
+    fn client_id_from_env(env_name: &str) -> Result<Option<ClientId>, Error> {
+        let client_id_str = env::var(&format!("{}_CLIENT_ID", env_name))?;
+        Ok(if client_id_str == _NULL_ENV_STR {
+            None
+        } else {
+            Some(client_id_str.parse()?)
+        })
+    }
+
+    /// Writes the `id` to an env var
+    #[cfg(feature = "std")]
+    fn client_id_to_env(env_name: &str, id: ClientId) {
+        env::set_var(&format!("{}_CLIENT_ID", env_name), &format!("{}", id));
+    }
+
     /// Reattach to a vacant `out_map`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(mut shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         let msg_sent_offset = msg_offset_from_env(env_name)?;
-        Self::on_existing_map(
+        let mut ret = Self::on_existing_map(
             shmem_provider.clone(),
             shmem_provider.existing_from_env(env_name)?,
             msg_sent_offset,
-        )
+        )?;
+        ret.id = Self::client_id_from_env(env_name)?.unwrap_or_default();
+        Ok(ret)
     }
 
     /// Store the info to this sender to env.
@@ -768,6 +789,7 @@ where
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_map = self.out_maps.last().unwrap();
         current_out_map.shmem.write_to_env(env_name)?;
+        Self::client_id_to_env(env_name, self.id);
         unsafe { current_out_map.msg_to_env(self.last_msg_sent, env_name) }
     }
 
@@ -990,7 +1012,7 @@ where
             let shm = self.out_maps.last().unwrap();
             println!(
                 "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
-                shm.shmem.id().to_string(),
+                shm.shmem.id(),
                 shm.shmem.len(),
                 bt
             );
@@ -1347,7 +1369,7 @@ where
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
                         "LLMP_DEBUG: Got a new recv map {} with len {:?}",
-                        self.current_recv_map.shmem.id().to_string(),
+                        self.current_recv_map.shmem.id(),
                         self.current_recv_map.shmem.len()
                     );
                     // After we mapped the new page, return the next message, if available
@@ -1478,7 +1500,7 @@ where
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
             "LLMP_DEBUG: Initializing map on {} with size {}",
-            new_map.id().to_string(),
+            new_map.id(),
             new_map.len()
         );
 
@@ -1498,7 +1520,7 @@ where
         //let bt = "<n/a (release)>";
         dbg!(
             "LLMP_DEBUG: Using existing map {} with size {}",
-            existing_map.id().to_string(),
+            existing_map.id(),
             existing_map.len(),
             //bt
         );

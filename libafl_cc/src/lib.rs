@@ -1,6 +1,9 @@
 //! Compiler Wrapper from `LibAFL`
 
-use std::{path::Path, process::Command, string::String, vec::Vec};
+use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
+
+pub mod clang;
+pub use clang::{ClangWrapper, LLVMPasses};
 
 /// `LibAFL` CC Error Type
 #[derive(Debug)]
@@ -31,19 +34,62 @@ pub const LIB_PREFIX: &str = "lib";
 /// Wrap a compiler hijacking its arguments
 pub trait CompilerWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
-    fn from_args(&mut self, args: &[String]) -> Result<&'_ mut Self, Error>;
+    fn from_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
+    where
+        S: AsRef<str>;
 
     /// Add a compiler argument
-    fn add_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
+    fn add_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
 
     /// Add a compiler argument only when compiling
-    fn add_cc_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
+    fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
 
     /// Add a compiler argument only when linking
-    fn add_link_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error>;
+    fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
+
+    /// Add compiler arguments
+    fn add_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_arg(arg);
+        }
+        self
+    }
+
+    /// Add compiler arguments only when compiling
+    fn add_cc_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_cc_arg(arg);
+        }
+        self
+    }
+
+    /// Add compiler arguments only when linking
+    fn add_link_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_link_arg(arg);
+        }
+        self
+    }
 
     /// Link static C lib
-    fn link_staticlib(&mut self, dir: &Path, name: String) -> Result<&'_ mut Self, Error>;
+    fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
 
     /// Command to run the compiler
     fn command(&mut self) -> Result<Vec<String>, Error>;
@@ -51,10 +97,19 @@ pub trait CompilerWrapper {
     /// Get if in linking mode
     fn is_linking(&self) -> bool;
 
+    /// Silences `libafl_cc` output
+    fn silence(&mut self, value: bool) -> &'_ mut Self;
+
+    /// Returns `true` if `silence` was called with `true`
+    fn is_silent(&self) -> bool;
+
     /// Run the compiler
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<Option<i32>, Error> {
         let args = self.command()?;
-        dbg!(&args);
+
+        if !self.is_silent() {
+            dbg!(&args);
+        }
         if args.is_empty() {
             return Err(Error::InvalidArguments(
                 "The number of arguments cannot be 0".into(),
@@ -64,187 +119,9 @@ pub trait CompilerWrapper {
             Ok(s) => s,
             Err(e) => return Err(Error::Io(e)),
         };
-        dbg!(status);
-        Ok(())
-    }
-}
-
-/// Wrap Clang
-#[allow(clippy::struct_excessive_bools)]
-pub struct ClangWrapper {
-    optimize: bool,
-    wrapped_cc: String,
-    wrapped_cxx: String,
-
-    name: String,
-    is_cpp: bool,
-    linking: bool,
-    x_set: bool,
-    bit_mode: u32,
-
-    base_args: Vec<String>,
-    cc_args: Vec<String>,
-    link_args: Vec<String>,
-}
-
-#[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
-impl CompilerWrapper for ClangWrapper {
-    fn from_args<'a>(&'a mut self, args: &[String]) -> Result<&'a mut Self, Error> {
-        let mut new_args = vec![];
-        if args.is_empty() {
-            return Err(Error::InvalidArguments(
-                "The number of arguments cannot be 0".to_string(),
-            ));
+        if !self.is_silent() {
+            dbg!(status);
         }
-
-        if args.len() == 1 {
-            return Err(Error::InvalidArguments(
-                "LibAFL Compiler wrapper - no commands specified. Use me as compiler.".to_string(),
-            ));
-        }
-
-        self.name = args[0].clone();
-        // Detect C++ compiler looking at the wrapper name
-        self.is_cpp = self.is_cpp || self.name.ends_with("++");
-
-        // Sancov flag
-        // new_args.push("-fsanitize-coverage=trace-pc-guard".into());
-
-        let mut linking = true;
-        // Detect stray -v calls from ./configure scripts.
-        if args.len() > 1 && args[1] == "-v" {
-            linking = false;
-        }
-
-        for arg in &args[1..] {
-            match arg.as_str() {
-                "-x" => self.x_set = true,
-                "-m32" => self.bit_mode = 32,
-                "-m64" => self.bit_mode = 64,
-                "-c" | "-S" | "-E" => linking = false,
-                "-shared" => linking = false, // TODO dynamic list?
-                "-Wl,-z,defs" | "-Wl,--no-undefined" => continue,
-                _ => (),
-            };
-            new_args.push(arg.clone());
-        }
-        self.linking = linking;
-
-        if self.optimize {
-            new_args.push("-g".into());
-            new_args.push("-O3".into());
-            new_args.push("-funroll-loops".into());
-        }
-
-        // Fuzzing define common among tools
-        new_args.push("-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1".into());
-
-        // Libraries needed by libafl on Windows
-        #[cfg(windows)]
-        if linking {
-            new_args.push("-lws2_32".into());
-            new_args.push("-lBcrypt".into());
-            new_args.push("-lAdvapi32".into());
-        }
-
-        self.base_args = new_args;
-        Ok(self)
-    }
-
-    fn add_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error> {
-        self.base_args.push(arg);
-        Ok(self)
-    }
-
-    fn add_cc_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error> {
-        self.cc_args.push(arg);
-        Ok(self)
-    }
-
-    fn add_link_arg(&mut self, arg: String) -> Result<&'_ mut Self, Error> {
-        self.link_args.push(arg);
-        Ok(self)
-    }
-
-    fn link_staticlib(&mut self, dir: &Path, name: String) -> Result<&'_ mut Self, Error> {
-        self.add_link_arg("-Wl,--whole-archive".into())?
-            .add_link_arg(
-                dir.join(format!("{}{}.{}", LIB_PREFIX, name, LIB_EXT))
-                    .display()
-                    .to_string(),
-            )?
-            .add_link_arg("-Wl,-no-whole-archive".into())
-    }
-
-    fn command(&mut self) -> Result<Vec<String>, Error> {
-        let mut args = vec![];
-        if self.is_cpp {
-            args.push(self.wrapped_cxx.clone());
-        } else {
-            args.push(self.wrapped_cc.clone());
-        }
-        args.extend_from_slice(self.base_args.as_slice());
-        if self.linking {
-            if self.x_set {
-                args.push("-x".into());
-                args.push("none".into());
-            }
-
-            args.extend_from_slice(self.link_args.as_slice());
-        } else {
-            args.extend_from_slice(self.cc_args.as_slice());
-        }
-
-        Ok(args)
-    }
-
-    fn is_linking(&self) -> bool {
-        self.linking
-    }
-}
-
-impl ClangWrapper {
-    /// Create a new Clang Wrapper
-    #[must_use]
-    pub fn new(wrapped_cc: &str, wrapped_cxx: &str) -> Self {
-        Self {
-            optimize: true,
-            wrapped_cc: wrapped_cc.into(),
-            wrapped_cxx: wrapped_cxx.into(),
-            name: "".into(),
-            is_cpp: false,
-            linking: false,
-            x_set: false,
-            bit_mode: 0,
-            base_args: vec![],
-            cc_args: vec![],
-            link_args: vec![],
-        }
-    }
-
-    /// Disable optimizations
-    pub fn dont_optimize(&mut self) -> &'_ mut Self {
-        self.optimize = false;
-        self
-    }
-
-    /// Set cpp mode
-    pub fn is_cpp(&mut self, value: bool) -> &'_ mut Self {
-        self.is_cpp = value;
-        self
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{ClangWrapper, CompilerWrapper};
-
-    #[test]
-    fn test_clang_version() {
-        ClangWrapper::new("clang", "clang++")
-            .from_args(&["my-clang".into(), "-v".into()])
-            .unwrap()
-            .run()
-            .unwrap();
+        Ok(status.code())
     }
 }

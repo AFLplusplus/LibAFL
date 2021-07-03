@@ -37,9 +37,9 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
-/// The main fn, `no_mangle` as it is a C main
+/// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
-pub fn main() {
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
@@ -53,26 +53,26 @@ pub fn main() {
         .expect("No valid core count given!");
     let broker_port = matches
         .value_of("broker_port")
-        .map(|s| s.parse().expect("Invalid broker port".into()))
+        .map(|s| s.parse().expect("Invalid broker port"))
         .unwrap_or(1337);
     let remote_broker_addr = matches
         .value_of("remote_broker_addr")
-        .map(|s| s.parse().expect("Invalid broker address".into()));
+        .map(|s| s.parse().expect("Invalid broker address"));
     let input_dirs: Vec<PathBuf> = matches
         .values_of("input")
-        .map(|v| v.map(|s| PathBuf::from(s)).collect())
-        .unwrap_or(vec![]);
+        .map(|v| v.map(PathBuf::from).collect())
+        .unwrap_or_default();
     let output_dir = matches
         .value_of("output")
-        .map(|s| PathBuf::from(s))
-        .unwrap_or(workdir.clone());
-    let dicts: Vec<&str> = matches
-        .values_of("dict")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| workdir.clone());
+    let token_files: Vec<&str> = matches
+        .values_of("tokens")
         .map(|v| v.collect())
-        .unwrap_or(vec![]);
+        .unwrap_or_default();
     let timeout_ms = matches
         .value_of("timeout")
-        .map(|s| s.parse().expect("Invalid timeout".into()))
+        .map(|s| s.parse().expect("Invalid timeout"))
         .unwrap_or(10000);
     // let cmplog_enabled = matches.is_present("cmplog");
 
@@ -129,8 +129,8 @@ pub fn main() {
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
-            for dict in &dicts {
-                state.add_metadata(Tokens::from_tokens_file(dict)?);
+            for tokens_file in &token_files {
+                state.add_metadata(Tokens::from_tokens_file(tokens_file)?);
             }
         }
 
@@ -197,7 +197,7 @@ pub fn main() {
 
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
-            if input_dirs.len() == 0 {
+            if input_dirs.is_empty() {
                 // Generator of printable bytearrays of max size 32
                 let mut generator = RandBytesGenerator::new(32);
 
@@ -233,6 +233,7 @@ pub fn main() {
 
     Launcher::builder()
         .shmem_provider(shmem_provider)
+        .configuration("launcher default".into())
         .stats(stats)
         .run_client(&mut run_client)
         .cores(&cores)

@@ -16,15 +16,15 @@ use crate::{
     feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    state::{HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfStats, HasFeedbackStates, HasMetadata},
     stats::UserStats,
     Error,
 };
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<FT, O, S, T> = MapFeedback<FT, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<FT, O, S, T> = MapFeedback<FT, O, MinReducer, S, T>;
+pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, O, MinReducer, S, T>;
 
 /// A Reducer function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
@@ -185,7 +185,7 @@ where
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<FT, O, R, S, T>
+pub struct MapFeedback<FT, I, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -202,16 +202,16 @@ where
     /// Name identifier of the observer
     observer_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(FT, S, R, O, T)>,
+    phantom: PhantomData<(FT, I, S, R, O, T)>,
 }
 
-impl<I, FT, O, R, S, T> Feedback<I, S> for MapFeedback<FT, O, R, S, T>
+impl<I, FT, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
     I: Input,
-    S: HasFeedbackStates<FT>,
+    S: HasFeedbackStates<FT> + HasClientPerfStats,
     FT: FeedbackStatesTuple,
 {
     fn is_interesting<EM, OT>(
@@ -224,7 +224,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -312,7 +312,7 @@ where
     }
 }
 
-impl<FT, O, R, S, T> Named for MapFeedback<FT, O, R, S, T>
+impl<FT, I, O, R, S, T> Named for MapFeedback<FT, I, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -326,7 +326,7 @@ where
     }
 }
 
-impl<FT, O, R, S, T> MapFeedback<FT, O, R, S, T>
+impl<FT, I, O, R, S, T> MapFeedback<FT, I, O, R, S, T>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
@@ -430,6 +430,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<usize>,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -441,7 +442,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();

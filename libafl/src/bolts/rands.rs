@@ -13,7 +13,7 @@ const HASH_CONST: u64 = 0xa5b35705;
 /// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
-pub type StdRand = RomuTrioRand;
+pub type StdRand = RomuDuoJrRand;
 
 /// Ways to get random around here
 /// Please note that these are not cryptographically secure

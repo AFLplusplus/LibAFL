@@ -7,7 +7,7 @@ use core::any::{Any, TypeId};
 
 // yolo
 
-/// Get a `type_id` from it's previously unpacked `u64`.
+/// Get a `type_id` from its previously unpacked `u64`.
 /// Opposite of [`unpack_type_id(id)`].
 ///
 /// # Safety

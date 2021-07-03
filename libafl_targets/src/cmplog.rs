@@ -3,23 +3,15 @@
 
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
-    executors::HasExecHooks,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
 };
 
-use serde::{Deserialize, Serialize};
+use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
 
-// TODO compile time flag
-/// The `CmpLogMap` W value
-pub const CMPLOG_MAP_W: usize = 65536;
-/// The `CmpLogMap` H value
-pub const CMPLOG_MAP_H: usize = 32;
 /// The `CmpLog` map size
 pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
-
-big_array! { BigArray; }
 
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
@@ -28,7 +20,7 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 
 /// The header for `CmpLog` hits.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogHeader {
     hits: u16,
     shape: u8,
@@ -37,16 +29,14 @@ pub struct CmpLogHeader {
 
 /// The operands logged during `CmpLog`.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogOperands(u64, u64);
 
 /// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct CmpLogMap {
-    #[serde(with = "BigArray")]
     headers: [CmpLogHeader; CMPLOG_MAP_W],
-    #[serde(with = "BigArray")]
     operands: [[CmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W],
 }
 
@@ -115,12 +105,8 @@ impl CmpMap for CmpLogMap {
     }
 
     fn reset(&mut self) -> Result<(), Error> {
-        self.headers = [CmpLogHeader {
-            hits: 0,
-            shape: 0,
-            kind: 0,
-        }; CMPLOG_MAP_W];
-        self.operands = [[CmpLogOperands(0, 0); CMPLOG_MAP_H]; CMPLOG_MAP_W];
+        self.headers = unsafe { core::mem::zeroed() };
+        // self.operands = unsafe { core::mem::zeroed() };
         Ok(())
     }
 }
@@ -145,7 +131,6 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
 /// A [`CmpObserver`] observer for `CmpLog`
-#[derive(Serialize, Deserialize, Debug)]
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
@@ -153,11 +138,14 @@ pub struct CmpLogObserver<'a> {
     name: String,
 }
 
-impl<'a> CmpObserver<CmpLogMap> for CmpLogObserver<'a> {
+impl<'a, I, S> CmpObserver<CmpLogMap, I, S> for CmpLogObserver<'a>
+where
+    S: HasMetadata,
+{
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
-            None => self.map().len(),
+            None => self.map.as_ref().len(),
             Some(o) => *o.as_ref(),
         }
     }
@@ -171,19 +159,12 @@ impl<'a> CmpObserver<CmpLogMap> for CmpLogObserver<'a> {
     }
 }
 
-impl<'a> Observer for CmpLogObserver<'a> {}
-
-impl<'a, EM, I, S, Z> HasExecHooks<EM, I, S, Z> for CmpLogObserver<'a>
+impl<'a, I, S> Observer<I, S> for CmpLogObserver<'a>
 where
     S: HasMetadata,
+    Self: CmpObserver<CmpLogMap, I, S>,
 {
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         unsafe {
             CMPLOG_ENABLED = 1;
@@ -191,13 +172,7 @@ where
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
         }

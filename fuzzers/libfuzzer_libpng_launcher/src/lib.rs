@@ -35,9 +35,9 @@ use libafl::{
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
-/// The main fn, `no_mangle` as it is a C main
+/// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
-pub fn main() {
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
@@ -167,6 +167,7 @@ pub fn main() {
 
     Launcher::builder()
         .shmem_provider(shmem_provider)
+        .configuration("launcher default".into())
         .stats(stats)
         .run_client(&mut run_client)
         .cores(&cores)
