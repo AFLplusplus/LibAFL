@@ -11,7 +11,6 @@ use crate::{
     Error,
 };
 
-const LIMIT_TIME_BOUND: f64 = 1.1;
 const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 #[derive(Clone, Debug)]
@@ -79,15 +78,7 @@ where
 
         match key_module {
             MOptMode::Corefuzzing => {
-                let finds = state.corpus().count() + state.solutions().count();
 
-                // We have to limit the lifetime of mopt here.
-                {
-                    let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
-                    if mopt.finds_until_core_begin == 0 {
-                        mopt.finds_until_core_begin = finds;
-                    }
-                }
 
                 let num = self.iterations(state);
 
@@ -123,15 +114,6 @@ where
                                 mopt.core_operator_finds_this[i] += diff;
                             }
                         }
-                    }
-
-                    if (finds_after as f64)
-                        > (finds_after as f64) * LIMIT_TIME_BOUND
-                            + (mopt.finds_until_core_begin as f64)
-                    {
-                        // Move to the Pilot fuzzing mode
-                        mopt.key_module = MOptMode::Pilotfuzzing;
-                        mopt.finds_until_core_begin = 0;
                     }
 
                     if mopt.core_time > mopt.period_core {

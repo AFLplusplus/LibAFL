@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 /// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode
 /// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator
 /// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator
+/// With the current implementation we are always in the pacemaker fuzzing mode.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MOpt {
     /// Random number generator
