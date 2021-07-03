@@ -122,7 +122,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Setup a basic mutator with a mutational stage
 
     let mutator = StdMOptMutator::new(havoc_mutations().merge(tokens_mutations()));
-    let mut stages = tuple_list!(MOptStage::new(mutator, &mut state, 5));
+    let mut stages = tuple_list!(MOptStage::new(mutator, &mut state, 5)?);
 
     /*
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));

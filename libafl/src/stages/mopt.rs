@@ -247,11 +247,11 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
-    pub fn new(mutator: M, state: &mut S, swarm_num: usize) -> Self {
-        state.add_metadata::<MOpt>(MOpt::new(mutator.mutations().len(), swarm_num));
-        Self {
+    pub fn new(mutator: M, state: &mut S, swarm_num: usize) -> Result<Self, Error> {
+        state.add_metadata::<MOpt>(MOpt::new(mutator.mutations().len(), swarm_num)?);
+        Ok(Self {
             mutator,
             phantom: PhantomData,
-        }
+        })
     }
 }

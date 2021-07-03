@@ -88,13 +88,13 @@ crate::impl_serdeany!(MOpt);
 
 impl MOpt {
     #[must_use]
-    pub fn new(operator_num: usize, swarm_num: usize) -> Self {
-        Self {
+    pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
+        let mut mopt = Self {
             rand: StdRand::with_seed(0),
             finds_until_core_begin: 0,
             total_finds: 0,
             finds_until_pilot_begin: 0,
-            key_module: MOptMode::Corefuzzing,
+            key_module: MOptMode::Pilotfuzzing,
             w_init: 0.9,
             w_end: 0.3,
             w_now: 0.0,
@@ -125,15 +125,9 @@ impl MOpt {
             core_operator_ctr_pso: vec![0; operator_num],
             core_operator_ctr_this: vec![0; operator_num],
             core_operator_ctr_last: vec![0; operator_num],
-        }
-    }
-
-    /// Get a float below the given `size` value times `0.001`.
-    /// So `size` 100 will result in anything between `0` and 0.1`.
-    #[inline]
-    #[allow(clippy::cast_precision_loss)]
-    pub fn rand_below(&mut self, size: u64) -> f64 {
-        self.rand.below(size) as f64 * 0.001
+        };
+        mopt.pso_initialize()?;
+        Ok(mopt)
     }
 
     /// Initialize `core_operator_*` values
@@ -206,6 +200,66 @@ impl MOpt {
         }
     }
 
+    pub fn pso_initialize(&mut self) -> Result<(), Error> {
+        if self.g_now > self.g_max {
+            self.g_now = 0;
+        }
+        self.w_now = (self.w_init - self.w_end) * f64::from(self.g_max - self.g_now)
+            / f64::from(self.g_max)
+            + self.w_end;
+
+        for swarm in 0..self.swarm_num {
+            let mut total_x_now = 0.0;
+            let mut x_sum = 0.0;
+            for i in 0..self.operator_num {
+                self.x_now[swarm][i] = (self.rand.below(7000) as f64) * 0.0001 + 0.1;
+                total_x_now += self.x_now[swarm][i];
+                self.v_now[swarm][i] = 0.1;
+                self.l_best[swarm][i] = 0.5;
+                self.g_best[i] = 0.5;
+            }
+
+            for i in 0..self.operator_num {
+                self.x_now[swarm][i] = self.x_now[swarm][i] / total_x_now
+            }
+
+            for i in 0..self.operator_num {
+                self.v_now[swarm][i] = self.w_now * self.v_now[swarm][i]
+                    + (self.rand.below(1000) as f64)
+                        * 0.001
+                        * (self.l_best[swarm][i] - self.x_now[swarm][i])
+                    + (self.rand.below(1000) as f64)
+                        * 0.001
+                        * (self.g_best[i] - self.x_now[swarm][i]);
+                self.x_now[swarm][i] += self.v_now[swarm][i];
+
+                if self.x_now[swarm][i] > V_MAX {
+                    self.x_now[swarm][i] = V_MAX;
+                } else if self.x_now[swarm][i] < V_MIN {
+                    self.x_now[swarm][i] = V_MIN;
+                }
+
+                x_sum += self.x_now[swarm][i]
+            }
+
+            for i in 0..self.operator_num {
+                self.x_now[swarm][i] /= x_sum;
+                if i == 0 {
+                    self.probability_now[swarm][i] = self.x_now[swarm][i];
+                } else {
+                    self.probability_now[swarm][i] =
+                        self.probability_now[swarm][i - 1] + self.x_now[swarm][i];
+                }
+            }
+            if self.probability_now[swarm][self.operator_num - 1] < 0.99
+                || self.probability_now[swarm][self.operator_num - 1] > 1.01
+            {
+                return Err(Error::MOpt("Error in pso_update".to_string()));
+            }
+        }
+        Ok(())
+    }
+
     /// Update the PSO algorithm parameters
     /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L10623>
     #[allow(clippy::cast_precision_loss)]
@@ -237,12 +291,16 @@ impl MOpt {
         }
 
         for swarm in 0..self.swarm_num {
-            let mut probability_sum = 0.0;
+            let mut x_sum = 0.0;
             for i in 0..self.operator_num {
                 self.probability_now[swarm][i] = 0.0;
                 self.v_now[swarm][i] = self.w_now * self.v_now[swarm][i]
-                    + self.rand_below(1000) * (self.l_best[swarm][i] - self.x_now[swarm][i])
-                    + self.rand_below(1000) * (self.g_best[i] - self.x_now[swarm][i]);
+                    + (self.rand.below(1000) as f64)
+                        * 0.001
+                        * (self.l_best[swarm][i] - self.x_now[swarm][i])
+                    + (self.rand.below(1000) as f64)
+                        * 0.001
+                        * (self.g_best[i] - self.x_now[swarm][i]);
                 self.x_now[swarm][i] += self.v_now[swarm][i];
 
                 if self.x_now[swarm][i] > V_MAX {
@@ -250,11 +308,11 @@ impl MOpt {
                 } else if self.x_now[swarm][i] < V_MIN {
                     self.x_now[swarm][i] = V_MIN;
                 }
-                probability_sum += self.x_now[swarm][i];
+                x_sum += self.x_now[swarm][i];
             }
 
             for i in 0..self.operator_num {
-                self.x_now[swarm][i] /= probability_sum;
+                self.x_now[swarm][i] /= x_sum;
                 if i == 0 {
                     self.probability_now[swarm][i] = self.x_now[swarm][i];
                 } else {
@@ -271,6 +329,7 @@ impl MOpt {
         self.swarm_now = 0;
 
         self.key_module = MOptMode::Pilotfuzzing;
+        println!("Mopt struct:\n{:#?}", self);
         Ok(())
     }
 
@@ -284,7 +343,7 @@ impl MOpt {
 
         // Fetch a random sele value
         let select_prob: f64 = self.probability_now[self.swarm_now][operator_num - 1]
-            * (self.rand_below(10000) * 0.0001);
+            * ((self.rand.below(10000) as f64) * 0.0001);
 
         for i in 0..operator_num {
             if i == 0 {
@@ -305,7 +364,7 @@ impl MOpt {
         {
             return Err(Error::MOpt("Error in select_algorithm".to_string()));
         }
-
+        println!("{:#?}", res);
         Ok(res)
     }
 }
