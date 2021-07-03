@@ -12,7 +12,7 @@ use libafl::{
     },
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
-    feedback_and_fast, feedback_or_fast,
+    feedback_and, feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
@@ -52,7 +52,7 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or_fast!(
+    let feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
@@ -61,7 +61,7 @@ pub fn main() {
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
-    let objective = feedback_and_fast!(
+    let objective = feedback_and!(
         // Must be a crash
         CrashFeedback::new(),
         // Take it onlt if trigger new coverage over crashes

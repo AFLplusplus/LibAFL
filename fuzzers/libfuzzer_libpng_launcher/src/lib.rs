@@ -21,7 +21,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
-    feedback_or_fast,
+    feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -76,7 +76,7 @@ pub fn libafl_main() {
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
-        let feedback = feedback_or_fast!(
+        let feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
             MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
