@@ -13,7 +13,7 @@ use libafl::{
     },
     events::{setup_restarting_mgr_std, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
-    feedback_or,
+    feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -79,7 +79,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let feedback = feedback_or_fast!(
         // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
@@ -87,7 +87,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
+    let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {

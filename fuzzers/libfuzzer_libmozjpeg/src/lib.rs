@@ -12,7 +12,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::setup_restarting_mgr_std,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedback_or,
+    feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -83,7 +83,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let allocs_feedback_state = MapFeedbackState::with_observer(&allocs_observer);
 
     // Feedback to rate the interestingness of an input
-    let feedback = feedback_or!(
+    let feedback = feedback_or_fast!(
         MaxMapFeedback::new(&edges_feedback_state, &edges_observer),
         MaxMapFeedback::new(&cmps_feedback_state, &cmps_observer),
         MaxMapFeedback::new(&allocs_feedback_state, &allocs_observer)

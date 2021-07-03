@@ -23,7 +23,7 @@ use libafl::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
         ShadowExecutor,
     },
-    feedback_or,
+    feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
@@ -333,7 +333,7 @@ unsafe fn fuzz(
         let feedback_state = MapFeedbackState::with_observer(&edges_observer);
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
-        let feedback = feedback_or!(
+        let feedback = feedback_or_fast!(
             // New maximization map feedback linked to the edges observer and the feedback state
             MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
@@ -341,7 +341,7 @@ unsafe fn fuzz(
         );
 
         // Feedbacks to recognize an input as solution
-        let objective = feedback_or!(
+        let objective = feedback_or_fast!(
             CrashFeedback::new(),
             TimeoutFeedback::new(),
             AsanErrorsFeedback::new()
