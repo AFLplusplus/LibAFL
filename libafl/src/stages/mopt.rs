@@ -118,7 +118,7 @@ where
                         // Make a call to pso_update()
                         mopt.core_time = 0;
                         let total_finds = mopt.total_finds;
-                        mopt.finds_until_pilot_begin = total_finds;
+                        mopt.finds_before_switch = total_finds;
                         mopt.update_core_operator_ctr_pso();
                         mopt.pso_update()?;
                     }
@@ -164,13 +164,13 @@ where
                     }
 
                     if mopt.pilot_time > mopt.period_pilot {
-                        let new_finds = mopt.total_finds - mopt.finds_until_pilot_begin;
+                        let new_finds = mopt.total_finds - mopt.finds_before_switch;
                         let f =
                             (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));
                         mopt.swarm_fitness[swarm_now] = f;
                         mopt.pilot_time = 0;
                         let total_finds = mopt.total_finds;
-                        mopt.finds_until_pilot_begin = total_finds;
+                        mopt.finds_before_switch = total_finds;
                         mopt.update_pilot_operator_ctr_pso(swarm_now);
 
                         mopt.swarm_now += 1;

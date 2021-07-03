@@ -19,16 +19,14 @@ use serde::{Deserialize, Serialize};
 /// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator
 /// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator
 /// With the current implementation we are always in the pacemaker fuzzing mode.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct MOpt {
     /// Random number generator
     pub rand: StdRand,
-    /// The number of finds until the beginning of this core fuzzing mode
-    pub finds_until_core_begin: usize,
     /// The number of total findings (unique crashes and unique interesting paths). This is equivalent to `state.corpus().count() + state.solutions().count()`;
     pub total_finds: usize,
-    /// The number of finds until the beginning of this pilot fuzzing mode
-    pub finds_until_pilot_begin: usize,
+    /// The number of finds before switching to this mode.
+    pub finds_before_switch: usize,
     /// The MOpt mode that we are currently using the pilot fuzzing mode or the core_fuzzing mode
     pub key_module: MOptMode,
     /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
@@ -87,13 +85,20 @@ pub struct MOpt {
 
 crate::impl_serdeany!(MOpt);
 
+impl fmt::Debug for MOpt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MOpt")
+            .field("total_finds", &self.total_finds)
+            .finish()
+    }
+}
+
 impl MOpt {
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
         let mut mopt = Self {
             rand: StdRand::with_seed(0),
-            finds_until_core_begin: 0,
             total_finds: 0,
-            finds_until_pilot_begin: 0,
+            finds_before_switch: 0,
             key_module: MOptMode::Pilotfuzzing,
             w_init: 0.9,
             w_end: 0.3,
