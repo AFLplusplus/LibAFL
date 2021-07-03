@@ -88,7 +88,42 @@ crate::impl_serdeany!(MOpt);
 impl fmt::Debug for MOpt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MOpt")
-            .field("total_finds", &self.total_finds)
+            .field("\ntotal_finds", &self.total_finds)
+            .field("\nfinds_before_switch", &self.finds_before_switch)
+            .field("\nkey_module", &self.key_module)
+            .field("\nw_init", &self.w_init)
+            .field("\nw_end", &self.w_end)
+            .field("\nw_now", &self.g_now)
+            .field("\ng_now", &self.g_max)
+            .field("\npilot_time", &self.pilot_time)
+            .field("\ncore_time", &self.core_time)
+            .field("\n\nx_now", &self.x_now)
+            .field("\n\nl_best", &self.l_best)
+            .field("\n\neff_best", &self.eff_best)
+            .field("\n\ng_best", &self.g_best)
+            .field("\n\nv_now", &self.v_now)
+            .field("\n\nprobability_now", &self.probability_now)
+            .field("\n\nswarm_fitness", &self.swarm_fitness)
+            .field(
+                "\n\npilot_operator_finds_pso",
+                &self.pilot_operator_finds_pso,
+            )
+            .field(
+                "\n\npilot_operator_finds_this",
+                &self.pilot_operator_finds_this,
+            )
+            .field("\n\npilot_operator_ctr_pso", &self.pilot_operator_ctr_pso)
+            .field("\n\npilot_operator_ctr_this", &self.pilot_operator_ctr_this)
+            .field("\n\npilot_operator_ctr_last", &self.pilot_operator_ctr_last)
+            .field("\n\noperator_finds_puppuet", &self.operator_finds_puppet)
+            .field("\n\ncore_operator_finds_pso", &self.core_operator_finds_pso)
+            .field(
+                "\n\ncore_operator_finds_this",
+                &self.core_operator_finds_this,
+            )
+            .field("\n\ncore_operator_ctr_pso", &self.core_operator_ctr_pso)
+            .field("\n\ncore_operator_ctr_this", &self.core_operator_ctr_this)
+            .field("\n\ncore_operator_ctr_last", &self.core_operator_ctr_last)
             .finish()
     }
 }
@@ -335,7 +370,7 @@ impl MOpt {
         self.swarm_now = 0;
 
         self.key_module = MOptMode::Pilotfuzzing;
-        //println!("Mopt struct:\n{:#?}", self);
+        //println!("Mopt struct:\n{:?}", self);
         Ok(())
     }
 
