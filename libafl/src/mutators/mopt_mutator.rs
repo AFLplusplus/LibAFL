@@ -199,7 +199,6 @@ impl MOpt {
         }
     }
 
-
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_initialize(&mut self) -> Result<(), Error> {
         if self.g_now > self.g_max {
@@ -330,6 +329,7 @@ impl MOpt {
         self.swarm_now = 0;
 
         self.key_module = MOptMode::Pilotfuzzing;
+        //println!("Mopt struct:\n{:#?}", self);
         Ok(())
     }
 
