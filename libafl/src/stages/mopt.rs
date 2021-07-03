@@ -78,8 +78,6 @@ where
 
         match key_module {
             MOptMode::Corefuzzing => {
-
-
                 let num = self.iterations(state);
 
                 for stage_id in 0..num {
