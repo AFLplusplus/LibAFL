@@ -87,7 +87,6 @@ pub struct MOpt {
 crate::impl_serdeany!(MOpt);
 
 impl MOpt {
-    #[must_use]
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
         let mut mopt = Self {
             rand: StdRand::with_seed(0),
@@ -200,6 +199,8 @@ impl MOpt {
         }
     }
 
+
+    #[allow(clippy::cast_precision_loss)]
     pub fn pso_initialize(&mut self) -> Result<(), Error> {
         if self.g_now > self.g_max {
             self.g_now = 0;
@@ -220,7 +221,7 @@ impl MOpt {
             }
 
             for i in 0..self.operator_num {
-                self.x_now[swarm][i] = self.x_now[swarm][i] / total_x_now
+                self.x_now[swarm][i] /= total_x_now
             }
 
             for i in 0..self.operator_num {
@@ -329,12 +330,12 @@ impl MOpt {
         self.swarm_now = 0;
 
         self.key_module = MOptMode::Pilotfuzzing;
-        println!("Mopt struct:\n{:#?}", self);
         Ok(())
     }
 
     /// This function is used to decide the operator that we want to apply next
     /// see <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397>
+    #[allow(clippy::cast_precision_loss)]
     pub fn select_algorithm(&mut self) -> Result<usize, Error> {
         let mut res = 0;
         let mut sentry = 0;
@@ -364,7 +365,6 @@ impl MOpt {
         {
             return Err(Error::MOpt("Error in select_algorithm".to_string()));
         }
-        println!("{:#?}", res);
         Ok(res)
     }
 }
