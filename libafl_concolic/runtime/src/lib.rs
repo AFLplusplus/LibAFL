@@ -10,10 +10,7 @@ use concolic::{
     serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
     SymExpr, SymExprRef, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
-use expression_filters::{
-    AndOptionallyExpressionFilter, ExpressionFilterExt, FloatExpressionFilter, NopExpressionFilter,
-    SelectiveSymbolicationFilter,
-};
+use expression_filters::{AndOpt, ExpressionFilterExt, NoFloat, Nop, SelectiveSymbolication};
 use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
 
 mod expression_filters;
@@ -28,12 +25,11 @@ struct State<Filter: ExpressionFilter, HashBuilder: BuildHasher = BuildHasherDef
     hasher_builder: HashBuilder,
 }
 
-type DefaultExpressionFilter =
-AndOptionallyExpressionFilter<AndOptionallyExpressionFilter<NopExpressionFilter, SelectiveSymbolicationFilter>, FloatExpressionFilter>;
+type DefaultExpressionFilter = AndOpt<AndOpt<Nop, SelectiveSymbolication>, NoFloat>;
 
 impl State<DefaultExpressionFilter> {
     fn new() -> Self {
-        let filter= NopExpressionFilter
+        let filter = Nop
             .and_optionally(
                 env::var(SELECTIVE_SYMBOLICATION_ENV_NAME)
                     .ok()
@@ -43,14 +39,14 @@ impl State<DefaultExpressionFilter> {
                             .collect::<Result<HashSet<usize>, _>>()
                             .expect("failed parsing selective symbolication arguments.")
                     })
-                    .map(SelectiveSymbolicationFilter::new),
+                    .map(SelectiveSymbolication::new),
             )
             .and_optionally(
                 env::var(NO_FLOAT_ENV_NAME)
                     .ok()
                     .map(|str| str.is_empty() || str.trim() == "1")
                     .unwrap_or_default()
-                    .then(|| FloatExpressionFilter),
+                    .then(|| NoFloat),
             );
         let hitcounts_map = StdShMemProvider::new()
             .unwrap()
