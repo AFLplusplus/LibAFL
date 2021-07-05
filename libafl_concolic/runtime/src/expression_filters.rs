@@ -204,3 +204,122 @@ impl ExpressionFilter for NoFloat {
 
     fn notify_basic_block(&mut self, _location_id: usize) {}
 }
+
+pub(crate) mod coverage {
+    use std::{
+        collections::hash_map::DefaultHasher,
+        convert::TryInto,
+        hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
+        marker::PhantomData,
+    };
+
+    use super::ExpressionFilter;
+
+    const MAP_SIZE: usize = 65536;
+
+    /// A coverage-based filter based on the expression pruning from [QSym](https://github.com/sslab-gatech/qsym)
+    /// [here](https://github.com/sslab-gatech/qsym/blob/master/qsym/pintool/call_stack_manager.cpp).
+    pub(crate) struct CallStackCoverage<
+        THasher: Hasher = DefaultHasher,
+        THashBuilder: BuildHasher = BuildHasherDefault<THasher>,
+    > {
+        call_stack: Vec<usize>,
+        call_stack_hash: u64,
+        is_interesting: bool,
+        bitmap: Vec<u16>,
+        pending: bool,
+        last_location: usize,
+        hasher_builder: THashBuilder,
+        hasher_phantom: PhantomData<THasher>,
+    }
+
+    impl Default for CallStackCoverage<DefaultHasher, BuildHasherDefault<DefaultHasher>> {
+        fn default() -> Self {
+            Self {
+                call_stack: Vec::new(),
+                call_stack_hash: 0,
+                is_interesting: true,
+                bitmap: vec![0; MAP_SIZE],
+                pending: false,
+                last_location: 0,
+                hasher_builder: BuildHasherDefault::default(),
+                hasher_phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<THasher: Hasher, THashBuilder: BuildHasher> CallStackCoverage<THasher, THashBuilder> {
+        pub fn visit_call(&mut self, location: usize) {
+            self.call_stack.push(location);
+            self.update_call_stack_hash()
+        }
+
+        pub fn visit_ret(&mut self, location: usize) {
+            if self.call_stack.is_empty() {
+                return;
+            }
+            let num_elements_to_remove = self
+                .call_stack
+                .iter()
+                .rev()
+                .take_while(|&&loc| loc != location)
+                .count()
+                + 1;
+
+            self.call_stack
+                .truncate(self.call_stack.len() - num_elements_to_remove);
+            self.update_call_stack_hash();
+        }
+
+        pub fn visit_basic_block(&mut self, location: usize) {
+            self.last_location = location;
+            self.pending = true;
+        }
+
+        pub fn is_interesting(&self) -> bool {
+            self.is_interesting
+        }
+
+        pub fn update_bitmap(&mut self) {
+            if self.pending {
+                self.pending = false;
+
+                let mut hasher = self.hasher_builder.build_hasher();
+                self.last_location.hash(&mut hasher);
+                self.call_stack_hash.hash(&mut hasher);
+                let hash = hasher.finish();
+                let index: usize = (hash % MAP_SIZE as u64).try_into().unwrap();
+                let value = self.bitmap[index] / 8;
+                self.is_interesting = value == 0 || value.is_power_of_two();
+                *self.bitmap.get_mut(index).unwrap() += 1;
+            }
+        }
+
+        fn update_call_stack_hash(&mut self) {
+            let mut hasher = self.hasher_builder.build_hasher();
+            self.call_stack
+                .iter()
+                .for_each(|&loc| loc.hash(&mut hasher));
+            self.call_stack_hash = hasher.finish();
+        }
+    }
+
+    impl ExpressionFilter for CallStackCoverage {
+        fn symbolize(&mut self, _msg: &concolic::SymExpr) -> bool {
+            self.update_bitmap();
+            self.is_interesting()
+        }
+
+        fn notify_call(&mut self, location_id: usize) {
+            self.visit_call(location_id)
+        }
+
+        fn notify_return(&mut self, location_id: usize) {
+            self.visit_ret(location_id)
+        }
+
+        fn notify_basic_block(&mut self, location_id: usize) {
+            self.visit_basic_block(location_id)
+        }
+    }
+}

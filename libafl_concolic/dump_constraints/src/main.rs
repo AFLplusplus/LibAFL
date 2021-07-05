@@ -8,7 +8,8 @@ use std::{
 
 use concolic::{
     serialization_format::{shared_memory::DEFAULT_ENV_NAME, MessageFileReader, MessageFileWriter},
-    SymExpr, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
+    SymExpr, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
+    SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
 use structopt::StructOpt;
 
@@ -32,9 +33,13 @@ struct Opt {
     #[structopt(short, long)]
     symbolize_offsets: Option<Vec<usize>>,
 
-    /// Concretizes all floating point operations.
+    /// Concretize all floating point operations.
     #[structopt(long)]
     no_float: bool,
+
+    /// Prune expressions from high-frequency code locations.
+    #[structopt(long)]
+    prune: bool,
 
     /// Trace file path, "trace" by default.
     #[structopt(parse(from_os_str), short, long)]
@@ -77,6 +82,10 @@ fn main() {
 
     if opt.no_float {
         std::env::set_var(NO_FLOAT_ENV_NAME, "1")
+    }
+
+    if opt.prune {
+        std::env::set_var(EXPRESSION_PRUNING, "1")
     }
 
     let res = Command::new(&opt.program.first().expect("no program argument given"))
