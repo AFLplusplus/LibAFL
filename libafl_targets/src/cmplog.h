@@ -12,7 +12,7 @@
 
 #define CMPLOG_RTN_LEN 32
 
-#define CMPLOG_MAP_RTN_H ((CMPLOG_MAP_H * sizeof(CmpLogOperands)) / sizeof(CmpLogRoutine)) 
+#define CMPLOG_MAP_RTN_H ((CMPLOG_MAP_H * sizeof(CmpLogInstruction)) / sizeof(CmpLogRoutine)) 
 
 #define CMPLOG_KIND_INS 0
 #define CMPLOG_KIND_RTN 1
@@ -23,10 +23,10 @@ typedef struct CmpLogHeader {
     uint8_t kind;
 } CmpLogHeader;
 
-typedef struct CmpLogOperands {
+typedef struct CmpLogInstruction {
     uint64_t v0;
     uint64_t v1;
-} CmpLogOperands;
+} CmpLogInstruction;
 
 typedef struct CmpLogRoutine {
     uint8_t v0[CMPLOG_RTN_LEN];
@@ -36,7 +36,7 @@ typedef struct CmpLogRoutine {
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];
   union {
-      CmpLogOperands operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
+      CmpLogInstruction operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
       CmpLogRoutine routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
   } vals;
 } CmpLogMap;
