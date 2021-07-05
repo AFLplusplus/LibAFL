@@ -8,9 +8,12 @@ use ctor::ctor;
 
 use concolic::{
     serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
-    SymExpr, SymExprRef, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
+    SymExpr, SymExprRef, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
+    SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
-use expression_filters::{AndOpt, ExpressionFilterExt, NoFloat, Nop, SelectiveSymbolication};
+use expression_filters::{
+    coverage::CallStackCoverage, AndOpt, ExpressionFilterExt, NoFloat, Nop, SelectiveSymbolication,
+};
 use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
 
 mod expression_filters;
@@ -25,9 +28,17 @@ struct State<Filter: ExpressionFilter, HashBuilder: BuildHasher = BuildHasherDef
     hasher_builder: HashBuilder,
 }
 
-type DefaultExpressionFilter = AndOpt<AndOpt<Nop, SelectiveSymbolication>, NoFloat>;
+type DefaultExpressionFilter =
+    AndOpt<AndOpt<AndOpt<Nop, SelectiveSymbolication>, NoFloat>, CallStackCoverage>;
 
 impl State<DefaultExpressionFilter> {
+    fn parse_env_bool(env_name: &str) -> bool {
+        env::var(env_name)
+            .ok()
+            .map(|str| str.is_empty() || str.trim() == "1")
+            .unwrap_or_default()
+    }
+
     fn new() -> Self {
         let filter = Nop
             .and_optionally(
@@ -41,12 +52,9 @@ impl State<DefaultExpressionFilter> {
                     })
                     .map(SelectiveSymbolication::new),
             )
+            .and_optionally(Self::parse_env_bool(NO_FLOAT_ENV_NAME).then(|| NoFloat))
             .and_optionally(
-                env::var(NO_FLOAT_ENV_NAME)
-                    .ok()
-                    .map(|str| str.is_empty() || str.trim() == "1")
-                    .unwrap_or_default()
-                    .then(|| NoFloat),
+                Self::parse_env_bool(EXPRESSION_PRUNING).then(CallStackCoverage::default),
             );
         let hitcounts_map = StdShMemProvider::new()
             .unwrap()
