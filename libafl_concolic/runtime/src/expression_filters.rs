@@ -39,9 +39,9 @@ pub(crate) trait ExpressionFilter {
 }
 
 /// An expression filter that always keeps expressions symbolic.
-pub(crate) struct NopExpressionFilter;
+pub(crate) struct Nop;
 
-impl ExpressionFilter for NopExpressionFilter {
+impl ExpressionFilter for Nop {
     fn symbolize(&mut self, _msg: &SymExpr) -> bool {
         true
     }
@@ -52,11 +52,11 @@ impl ExpressionFilter for NopExpressionFilter {
 
 /// An [`ExpressionFilter`] that concretizes all input byte expressions that are not included in a predetermined set of
 /// of input byte offsets.
-pub(crate) struct SelectiveSymbolicationFilter {
+pub(crate) struct SelectiveSymbolication {
     bytes_to_symbolize: HashSet<usize>,
 }
 
-impl SelectiveSymbolicationFilter {
+impl SelectiveSymbolication {
     pub(crate) fn new(offset: HashSet<usize>) -> Self {
         Self {
             bytes_to_symbolize: offset,
@@ -64,7 +64,7 @@ impl SelectiveSymbolicationFilter {
     }
 }
 
-impl ExpressionFilter for SelectiveSymbolicationFilter {
+impl ExpressionFilter for SelectiveSymbolication {
     fn symbolize(&mut self, msg: &SymExpr) -> bool {
         if let SymExpr::GetInputByte { offset } = msg {
             self.bytes_to_symbolize.contains(offset)
@@ -79,12 +79,12 @@ impl ExpressionFilter for SelectiveSymbolicationFilter {
 
 /// An [`ExpressionFilter`] that combines two expression filters and decides to symbolize expressions where both filters
 /// decide to symbolize.
-pub(crate) struct AndExpressionFilter<A: ExpressionFilter, B: ExpressionFilter> {
+pub(crate) struct And<A: ExpressionFilter, B: ExpressionFilter> {
     a: A,
     b: B,
 }
 
-impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for AndExpressionFilter<A, B> {
+impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for And<A, B> {
     fn symbolize(&mut self, msg: &SymExpr) -> bool {
         self.a.symbolize(msg) && self.b.symbolize(msg)
     }
@@ -102,14 +102,12 @@ impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for AndExpressio
     }
 }
 
-pub(crate) struct AndOptionallyExpressionFilter<A: ExpressionFilter, B: ExpressionFilter> {
+pub(crate) struct AndOpt<A: ExpressionFilter, B: ExpressionFilter> {
     a: A,
     b: Option<B>,
 }
 
-impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter
-    for AndOptionallyExpressionFilter<A, B>
-{
+impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for AndOpt<A, B> {
     fn symbolize(&mut self, msg: &SymExpr) -> bool {
         self.a.symbolize(msg) && self.b.as_mut().map(|b| b.symbolize(msg)).unwrap_or(true)
     }
@@ -136,43 +134,37 @@ impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter
 pub(crate) trait ExpressionFilterExt: ExpressionFilter {
     /// Combines two filters into a new filter that decides to symbolize if _both_ this filter and the given filter
     /// decide to symbolize.
-    fn and<Other: ExpressionFilter>(self, other: Other) -> AndExpressionFilter<Self, Other>
+    fn and<Other: ExpressionFilter>(self, other: Other) -> And<Self, Other>
     where
         Self: Sized;
 
     /// Combines two filters into a new filter that decides to symbolize if _both_ this filter and the given filter
     /// decide to symbolize. Accepts an optional for the combined filter and ignores it if set to None.
-    fn and_optionally<Other: ExpressionFilter>(
-        self,
-        other: Option<Other>,
-    ) -> AndOptionallyExpressionFilter<Self, Other>
+    fn and_optionally<Other: ExpressionFilter>(self, other: Option<Other>) -> AndOpt<Self, Other>
     where
         Self: Sized;
 }
 
 impl<F: ExpressionFilter> ExpressionFilterExt for F {
-    fn and<Other: ExpressionFilter>(self, other: Other) -> AndExpressionFilter<Self, Other>
+    fn and<Other: ExpressionFilter>(self, other: Other) -> And<Self, Other>
     where
         Self: Sized,
     {
-        AndExpressionFilter { a: self, b: other }
+        And { a: self, b: other }
     }
 
-    fn and_optionally<Other: ExpressionFilter>(
-        self,
-        other: Option<Other>,
-    ) -> AndOptionallyExpressionFilter<Self, Other>
+    fn and_optionally<Other: ExpressionFilter>(self, other: Option<Other>) -> AndOpt<Self, Other>
     where
         Self: Sized,
     {
-        AndOptionallyExpressionFilter { a: self, b: other }
+        AndOpt { a: self, b: other }
     }
 }
 
 /// Concretizes all floating point operations.
-pub(crate) struct FloatExpressionFilter;
+pub(crate) struct NoFloat;
 
-impl ExpressionFilter for FloatExpressionFilter {
+impl ExpressionFilter for NoFloat {
     fn symbolize(&mut self, msg: &SymExpr) -> bool {
         !matches!(
             msg,
