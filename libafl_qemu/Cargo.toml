@@ -1,0 +1,19 @@
+[package]
+name = "libafl_qemu"
+version = "0.5.0"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+description = "QEMU user backend library for LibAFL"
+documentation = "https://docs.rs/libafl_qemu"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "qemu", "instrumentation"]
+edition = "2018"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+qemu_libafl_bridge = "0.1.0"
+libafl = { path = "../libafl", version = "0.5.0" }
+libafl_targets = { path = "../libafl_targets", version = "0.5.0" }

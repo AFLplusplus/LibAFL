@@ -22,4 +22,5 @@ default-members = [
 ]
 exclude = [
     "fuzzers",
+    "libafl_qemu",
 ]
