@@ -102,10 +102,50 @@ impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for AndExpressio
     }
 }
 
+pub(crate) struct AndOptionallyExpressionFilter<A: ExpressionFilter, B: ExpressionFilter> {
+    a: A,
+    b: Option<B>,
+}
+
+impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter
+    for AndOptionallyExpressionFilter<A, B>
+{
+    fn symbolize(&mut self, msg: &SymExpr) -> bool {
+        self.a.symbolize(msg) && self.b.as_mut().map(|b| b.symbolize(msg)).unwrap_or(true)
+    }
+    fn notify_call(&mut self, location_id: usize) {
+        self.a.notify_call(location_id);
+        if let Some(b) = self.b.as_mut() {
+            b.notify_call(location_id)
+        }
+    }
+    fn notify_return(&mut self, location_id: usize) {
+        self.a.notify_return(location_id);
+        if let Some(b) = self.b.as_mut() {
+            b.notify_return(location_id)
+        }
+    }
+    fn notify_basic_block(&mut self, location_id: usize) {
+        self.a.notify_basic_block(location_id);
+        if let Some(b) = self.b.as_mut() {
+            b.notify_basic_block(location_id)
+        }
+    }
+}
+
 pub(crate) trait ExpressionFilterExt: ExpressionFilter {
     /// Combines two filters into a new filter that decides to symbolize if _both_ this filter and the given filter
     /// decide to symbolize.
     fn and<Other: ExpressionFilter>(self, other: Other) -> AndExpressionFilter<Self, Other>
+    where
+        Self: Sized;
+
+    /// Combines two filters into a new filter that decides to symbolize if _both_ this filter and the given filter
+    /// decide to symbolize. Accepts an optional for the combined filter and ignores it if set to None.
+    fn and_optionally<Other: ExpressionFilter>(
+        self,
+        other: Option<Other>,
+    ) -> AndOptionallyExpressionFilter<Self, Other>
     where
         Self: Sized;
 }
@@ -117,4 +157,58 @@ impl<F: ExpressionFilter> ExpressionFilterExt for F {
     {
         AndExpressionFilter { a: self, b: other }
     }
+
+    fn and_optionally<Other: ExpressionFilter>(
+        self,
+        other: Option<Other>,
+    ) -> AndOptionallyExpressionFilter<Self, Other>
+    where
+        Self: Sized,
+    {
+        AndOptionallyExpressionFilter { a: self, b: other }
+    }
+}
+
+/// Concretizes all floating point operations.
+pub(crate) struct FloatExpressionFilter;
+
+impl ExpressionFilter for FloatExpressionFilter {
+    fn symbolize(&mut self, msg: &SymExpr) -> bool {
+        !matches!(
+            msg,
+            SymExpr::BuildFloat { .. }
+                | SymExpr::BuildFloatOrdered { .. }
+                | SymExpr::BuildFloatOrderedGreaterThan { .. }
+                | SymExpr::BuildFloatOrderedGreaterEqual { .. }
+                | SymExpr::BuildFloatOrderedLessThan { .. }
+                | SymExpr::BuildFloatOrderedLessEqual { .. }
+                | SymExpr::BuildFloatOrderedEqual { .. }
+                | SymExpr::BuildFloatOrderedNotEqual { .. }
+                | SymExpr::BuildFloatUnordered { .. }
+                | SymExpr::BuildFloatUnorderedGreaterThan { .. }
+                | SymExpr::BuildFloatUnorderedGreaterEqual { .. }
+                | SymExpr::BuildFloatUnorderedLessThan { .. }
+                | SymExpr::BuildFloatUnorderedLessEqual { .. }
+                | SymExpr::BuildFloatUnorderedEqual { .. }
+                | SymExpr::BuildFloatUnorderedNotEqual { .. }
+                | SymExpr::BuildFloatAbs { .. }
+                | SymExpr::BuildFloatAdd { .. }
+                | SymExpr::BuildFloatSub { .. }
+                | SymExpr::BuildFloatMul { .. }
+                | SymExpr::BuildFloatDiv { .. }
+                | SymExpr::BuildFloatRem { .. }
+                | SymExpr::BuildIntToFloat { .. }
+                | SymExpr::BuildFloatToFloat { .. }
+                | SymExpr::BuildBitsToFloat { .. }
+                | SymExpr::BuildFloatToBits { .. }
+                | SymExpr::BuildFloatToSignedInteger { .. }
+                | SymExpr::BuildFloatToUnsignedInteger { .. }
+        )
+    }
+
+    fn notify_call(&mut self, _location_id: usize) {}
+
+    fn notify_return(&mut self, _location_id: usize) {}
+
+    fn notify_basic_block(&mut self, _location_id: usize) {}
 }
