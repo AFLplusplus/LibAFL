@@ -23,7 +23,7 @@ use libafl::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
         ShadowExecutor,
     },
-    feedback_or,
+    feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
@@ -341,7 +341,7 @@ unsafe fn fuzz(
         );
 
         // Feedbacks to recognize an input as solution
-        let objective = feedback_or!(
+        let objective = feedback_or_fast!(
             CrashFeedback::new(),
             TimeoutFeedback::new(),
             AsanErrorsFeedback::new()
