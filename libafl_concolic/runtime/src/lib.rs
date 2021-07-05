@@ -8,33 +8,50 @@ use ctor::ctor;
 
 use concolic::{
     serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
-    SymExpr, SymExprRef, HITMAP_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
+    SymExpr, SymExprRef, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
-use expression_filters::SelectiveSymbolicationFilter;
+use expression_filters::{
+    AndOptionallyExpressionFilter, ExpressionFilterExt, FloatExpressionFilter, NopExpressionFilter,
+    SelectiveSymbolicationFilter,
+};
 use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
 
 mod expression_filters;
 
 use crate::expression_filters::ExpressionFilter;
 
-struct State<HashBuilder: BuildHasher = BuildHasherDefault<DefaultHasher>> {
+struct State<Filter: ExpressionFilter, HashBuilder: BuildHasher = BuildHasherDefault<DefaultHasher>>
+{
     writer: StdShMemMessageFileWriter,
-    symbolication_filter: Option<SelectiveSymbolicationFilter>,
+    filter: Filter,
     hitcounts_map: Option<<StdShMemProvider as ShMemProvider>::Mem>,
     hasher_builder: HashBuilder,
 }
 
-impl State {
+type DefaultExpressionFilter =
+AndOptionallyExpressionFilter<AndOptionallyExpressionFilter<NopExpressionFilter, SelectiveSymbolicationFilter>, FloatExpressionFilter>;
+
+impl State<DefaultExpressionFilter> {
     fn new() -> Self {
-        let symbolication_filter = env::var(SELECTIVE_SYMBOLICATION_ENV_NAME)
-            .ok()
-            .map(|str| {
-                str.split(',')
-                    .map(|s| s.trim().parse::<usize>())
-                    .collect::<Result<HashSet<usize>, _>>()
-                    .expect("failed parsing selective symbolication arguments.")
-            })
-            .map(SelectiveSymbolicationFilter::new);
+        let filter= NopExpressionFilter
+            .and_optionally(
+                env::var(SELECTIVE_SYMBOLICATION_ENV_NAME)
+                    .ok()
+                    .map(|str| {
+                        str.split(',')
+                            .map(|s| s.trim().parse::<usize>())
+                            .collect::<Result<HashSet<usize>, _>>()
+                            .expect("failed parsing selective symbolication arguments.")
+                    })
+                    .map(SelectiveSymbolicationFilter::new),
+            )
+            .and_optionally(
+                env::var(NO_FLOAT_ENV_NAME)
+                    .ok()
+                    .map(|str| str.is_empty() || str.trim() == "1")
+                    .unwrap_or_default()
+                    .then(|| FloatExpressionFilter),
+            );
         let hitcounts_map = StdShMemProvider::new()
             .unwrap()
             .existing_from_env(HITMAP_ENV_NAME)
@@ -44,22 +61,17 @@ impl State {
             MessageFileWriter::from_stdshmem_default_env().expect("unable to initialise writer");
         Self {
             writer,
-            symbolication_filter,
+            filter,
             hitcounts_map,
             hasher_builder: BuildHasherDefault::default(),
         }
     }
 }
 
-impl State {
+impl<Filter: ExpressionFilter> State<Filter> {
     /// Logs the message to the trace. This is a convenient place to debug the expressions if necessary.
     fn log_message(&mut self, message: SymExpr) -> Option<SymExprRef> {
-        if self
-            .symbolication_filter
-            .as_mut()
-            .map(|f| f.symbolize(&message))
-            .unwrap_or(true)
-        {
+        if self.filter.symbolize(&message) {
             Some(self.writer.write_message(message))
         } else {
             None
@@ -67,22 +79,16 @@ impl State {
     }
 
     fn notify_call(&mut self, location_id: usize) {
-        if let Some(f) = &mut self.symbolication_filter {
-            f.notify_call(location_id)
-        }
+        self.filter.notify_call(location_id)
     }
 
     fn notify_return(&mut self, location_id: usize) {
-        if let Some(f) = &mut self.symbolication_filter {
-            f.notify_return(location_id)
-        }
+        self.filter.notify_return(location_id)
     }
 
     fn notify_basic_block(&mut self, location_id: usize) {
         self.register_location_on_hitmap(location_id);
-        if let Some(f) = &mut self.symbolication_filter {
-            f.notify_basic_block(location_id)
-        }
+        self.filter.notify_basic_block(location_id)
     }
 
     fn register_location_on_hitmap(&mut self, location: usize) {
@@ -113,7 +119,7 @@ impl State {
 // however, this is not really supported in SymCC yet.
 // Therefore we make the assumption that there is only ever a single thread, which should
 // mean that this is 'safe'.
-static mut GLOBAL_DATA: Option<State> = None;
+static mut GLOBAL_DATA: Option<State<DefaultExpressionFilter>> = None;
 
 #[ctor]
 fn init() {
@@ -131,7 +137,7 @@ extern "C" fn fini() {
 }
 
 /// A little helper function that encapsulates access to the shared mutable state.
-fn with_state<R>(cb: impl FnOnce(&mut State) -> R) -> R {
+fn with_state<R>(cb: impl FnOnce(&mut State<DefaultExpressionFilter>) -> R) -> R {
     use unchecked_unwrap::UncheckedUnwrap;
     let s = unsafe { GLOBAL_DATA.as_mut().unchecked_unwrap() };
     cb(s)

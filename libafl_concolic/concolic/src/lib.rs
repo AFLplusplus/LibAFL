@@ -308,3 +308,6 @@ pub const HITMAP_ENV_NAME: &str = "LIBAFL_CONCOLIC_HITMAP";
 
 /// The name of the environment variable that contains the byte offsets to be symbolized.
 pub const SELECTIVE_SYMBOLICATION_ENV_NAME: &str = "LIBAFL_SELECTIVE_SYMBOLICATION";
+
+/// The name of the environment variable that contains the byte offsets to be symbolized.
+pub const NO_FLOAT_ENV_NAME: &str = "LIBAFL_CONCOLIC_NO_FLOAT";
