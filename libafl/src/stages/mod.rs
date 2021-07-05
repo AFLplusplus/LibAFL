@@ -11,6 +11,9 @@ pub use mutational::{MutationalStage, StdMutationalStage};
 pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
+pub mod mopt;
+pub use mopt::*;
+
 //pub mod power;
 //pub use power::PowerMutationalStage;
 use crate::Error;

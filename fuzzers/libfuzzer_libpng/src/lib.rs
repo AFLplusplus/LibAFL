@@ -17,10 +17,11 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+    mutators::mopt_mutator::StdMOptMutator,
+    mutators::scheduled::{havoc_mutations, tokens_mutations},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    stages::mutational::StdMutationalStage,
+    stages::mopt::MOptStage,
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
@@ -119,8 +120,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Setup a basic mutator with a mutational stage
+
+    let mutator = StdMOptMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let mut stages = tuple_list!(MOptStage::new(mutator, &mut state, 5)?);
+
+    /*
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    */
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
