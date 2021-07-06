@@ -2,6 +2,7 @@ mod command_executor;
 mod feedback;
 mod metadata;
 mod observer;
+mod stage;
 
 use concolic::serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE};
 use concolic::HITMAP_ENV_NAME;
@@ -30,12 +31,11 @@ use libafl::{
 use libafl::{feedback_and, feedback_or};
 use std::path::PathBuf;
 
-use command_executor::CommandExecutor;
+use command_executor::generic::CommandConfigurator;
 use observer::ConcolicObserver;
+use stage::{ConcolicMutationalStage, ConcolicTracingStage};
 
-use crate::stage::{ConcolicMutationalStage, ConcolicTracingStage};
-
-mod stage;
+use crate::command_executor::MyCommandConfigurator;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -121,7 +121,8 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut executor = CommandExecutor::new(tuple_list!(time_observer, edges_observer));
+    let mut executor =
+        MyCommandConfigurator::default().into_executor(tuple_list!(time_observer, edges_observer));
 
     state
         .corpus_mut()
@@ -132,7 +133,9 @@ pub fn main() {
     let concolic_observer_name = (&concolic_observer.name()).to_string();
     let mut stages = tuple_list!(
         ConcolicTracingStage::new(
-            TracingStage::new(CommandExecutor::new(tuple_list!(concolic_observer))),
+            TracingStage::new(
+                MyCommandConfigurator::default().into_executor(tuple_list!(concolic_observer))
+            ),
             concolic_observer_name,
         ),
         ConcolicMutationalStage::new(),
