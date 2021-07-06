@@ -3,8 +3,7 @@ use std::{
     marker::PhantomData,
     os::unix::prelude::ExitStatusExt,
     process::{Command, Stdio},
-    thread::sleep,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use libafl::{
@@ -12,6 +11,7 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
 };
+use wait_timeout::ChildExt;
 
 impl<I, OT, S> HasObservers<OT> for CommandExecutor<I, OT, S>
 where
@@ -71,38 +71,26 @@ impl<EM, I: HasTargetBytes + Input, S, Z, OT: ObserversTuple> Executor<EM, I, S,
             .stdout(Stdio::null())
             .stderr(Stdio::null());
 
-        let start_time = Instant::now();
         let mut child = command.spawn().expect("failed to start process");
         let mut stdin = child.stdin.as_ref().unwrap();
         stdin.write_all(input.target_bytes().as_slice())?;
 
-        loop {
-            match child.try_wait().expect("waiting on child failed") {
-                Some(exit_status) => {
-                    if let Some(signal) = exit_status.signal() {
-                        // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-                        match signal {
-                    9 /* SIGKILL */ => {
-                        // we assume the child was killed due to OOM
-                        return Ok(ExitKind::Oom);
-                    }
-                    _ => {return Ok(ExitKind::Crash);}
-                }
-                    } else {
-                        return Ok(ExitKind::Ok);
-                    }
-                }
-                None => {
-                    if start_time.elapsed() > Duration::from_secs(5) {
-                        // if this fails, there is not much we can do. let's hope it failed because the process finished
-                        // in the meantime.
-                        let _ = child.kill();
-                        // finally, try to wait to properly clean up system ressources.
-                        let _ = child.wait();
-                        return Ok(ExitKind::Timeout);
-                    }
-                    sleep(Duration::from_millis(5));
-                }
+        match child
+            .wait_timeout(Duration::from_secs(5))
+            .expect("waiting on child failed")
+            .map(|status| status.signal())
+        {
+            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
+            Some(Some(9)) => Ok(ExitKind::Oom),
+            Some(Some(_)) => Ok(ExitKind::Crash),
+            Some(None) => Ok(ExitKind::Ok),
+            None => {
+                // if this fails, there is not much we can do. let's hope it failed because the process finished
+                // in the meantime.
+                let _ = child.kill();
+                // finally, try to wait to properly clean up system ressources.
+                let _ = child.wait();
+                Ok(ExitKind::Timeout)
             }
         }
     }

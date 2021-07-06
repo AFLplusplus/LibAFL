@@ -10,3 +10,4 @@ libafl = { path = "../../../libafl/" }
 concolic = { path = "../../concolic" }
 serde = "1.0"
 z3 = "0.10"
+wait-timeout = "0.2.0"
