@@ -1,15 +1,18 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
 use clap::{App, Arg};
+use goblin::elf::Elf;
+
 use core::time::Duration;
 use std::{
     env,
-    fs::{self},
+    fs::{self, File},
+    io::Read,
     path::PathBuf,
+    str,
 };
 
 use libafl::Error;
-
 use libafl_qemu::{amd64::Amd64Regs, QemuEmulator};
 
 /// The fuzzer main (as `no_mangle` C function)
@@ -20,7 +23,7 @@ pub fn libafl_qemu_main() {
     //RegistryBuilder::register::<Tokens>();
 
     let mut args = vec!["libafl_qemu_fuzzbench".into()];
-    let mut args_iter = std::env::args();
+    let mut args_iter = env::args();
     while let Some(arg) = args_iter.next() {
         if arg.starts_with("--libafl") {
             args.push(arg);
@@ -122,6 +125,17 @@ pub fn libafl_qemu_main() {
         .expect("An error occurred while fuzzing");
 }
 
+fn resolve_symbol(elf: &Elf, name: &str) -> isize {
+    for sym in elf.syms.iter() {
+        if let Some(sym_name) = elf.strtab.get_at(sym.st_name) {
+            if sym_name == name {
+                return sym.st_value as isize;
+            }
+        }
+    }
+    0
+}
+
 /// The actual fuzzer
 fn fuzz(
     _corpus_dir: PathBuf,
@@ -133,7 +147,18 @@ fn fuzz(
 ) -> Result<(), Error> {
     let mut emu = QemuEmulator::new();
 
-    emu.set_breakpoint(0x00401176); // LLVMFuzzerTestOneInput
+    let mut elf_buffer = Vec::new();
+    let elf = {
+        let mut binary_file = File::open(emu.exec_path())?;
+        binary_file.read_to_end(&mut elf_buffer)?;
+        Elf::parse(&elf_buffer).map_err(|e| Error::Unknown(format!("{}", e)))
+    }?;
+
+    let test_one_input_ptr = resolve_symbol(&elf, "LLVMFuzzerTestOneInput");
+
+    println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
+
+    emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
 
     emu.run();
 
@@ -142,7 +167,7 @@ fn fuzz(
         emu.read_reg::<_, usize>(Amd64Regs::Rip).unwrap()
     );
 
-    emu.remove_breakpoint(0x00401176); // LLVMFuzzerTestOneInput
+    emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
 
     emu.set_breakpoint(0x004011bd); // LLVMFuzzerTestOneInput ret
 
