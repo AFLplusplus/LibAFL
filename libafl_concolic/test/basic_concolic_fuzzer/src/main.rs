@@ -28,13 +28,12 @@ use libafl::{
     stats::SimpleStats,
 };
 use libafl::{feedback_and, feedback_or};
-
 use std::path::PathBuf;
 
 use command_executor::CommandExecutor;
 use observer::ConcolicObserver;
 
-use crate::stage::ConcolicTracingStage;
+use crate::stage::{ConcolicMutationalStage, ConcolicTracingStage};
 
 mod stage;
 
@@ -133,11 +132,10 @@ pub fn main() {
     let concolic_observer_name = (&concolic_observer.name()).to_string();
     let mut stages = tuple_list!(
         ConcolicTracingStage::new(
-            TracingStage::new(CommandExecutor::new(tuple_list!(
-                concolic_observer
-            ))),
+            TracingStage::new(CommandExecutor::new(tuple_list!(concolic_observer))),
             concolic_observer_name,
         ),
+        ConcolicMutationalStage::new(),
         StdMutationalStage::new(StdScheduledMutator::new(havoc_mutations()))
     );
 
