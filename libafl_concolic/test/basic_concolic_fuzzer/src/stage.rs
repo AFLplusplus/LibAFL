@@ -401,7 +401,6 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 let negated_constraint = op.not().simplify();
                 solver.push();
                 solver.assert(&negated_constraint);
-                //dbg!(&solver);
                 match solver.check() {
                     z3::SatResult::Unsat => {
                         // negation is unsat => no mutation
@@ -553,7 +552,7 @@ where
 
         let mutations = if let Some(meta) = testcase.borrow().metadata().get::<ConcolicMetadata>() {
             start_timer!(state);
-            let mutations = dbg!(generate_mutations(meta.iter_messages()));
+            let mutations = generate_mutations(meta.iter_messages());
             mark_feature_time!(state, PerfFeature::Mutate);
             Some(mutations)
         } else {
@@ -568,7 +567,7 @@ where
                     input_copy.bytes_mut()[index] = new_byte;
                 }
                 // Time is measured directly the `evaluate_input` function
-                let _ = dbg!(fuzzer.evaluate_input(state, executor, manager, input_copy)?);
+                let _ = fuzzer.evaluate_input(state, executor, manager, input_copy)?;
             }
         }
         Ok(())
