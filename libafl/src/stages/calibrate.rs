@@ -1,13 +1,13 @@
 use core::marker::PhantomData;
 
 use crate::{
-    bolts::rands::Rand,
-    corpus::Corpus,
+    bolts::current_time,
+    corpus::{Corpus, PowerScheduleData}, 
     fuzzer::Evaluator,
     inputs::Input,
-    mutators::Mutator,
+    executors::Executor,
     stages::Stage,
-    state::{HasClientPerfStats, HasCorpus, HasRand},
+    state::{HasCorpus, HasMetadata},
     Error,
 };
 
@@ -17,6 +17,7 @@ use crate::{
 pub struct CalibrateStage<C, E, EM, I, S, Z>
 where
     C: Corpus<I>,
+    E: Executor<EM, I, S, Z>,
     I: Input,
     S: HasCorpus<C, I>,
     Z: Evaluator<E, EM, I, S>,
@@ -26,10 +27,13 @@ where
     phantom: PhantomData<(C, E, EM, I, S, Z)>,
 }
 
+// The number of times we run the program in the calibration stage
+const CAL_STAGE_MAX : usize = 8;
 
 impl<C, E, EM, I, S, Z> Stage<E, EM, S, Z> for CalibrateStage<C, E, EM, I, S, Z>
 where
     C: Corpus<I>,
+    E: Executor<EM, I, S, Z>,
     I: Input,
     S: HasCorpus<C, I>,
     Z: Evaluator<E, EM, I, S>,
@@ -38,14 +42,31 @@ where
     #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        _state: &mut S,
-        _manager: &mut EM,
-        _corpus_idx: usize,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+        corpus_idx: usize,
     ) -> Result<(), Error> {
-        /// Run the PUT via executor, check time passed
-        /// Update exec_us, bitmap_size, handicap... etc.
+
+        let iter = self.cal_stages();
+
+        // Timer start
+        let start = current_time();
+
+        for _i in 0..iter {
+            let input = state.corpus().get(corpus_idx)?.borrow_mut().load_input()?.clone();
+            let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
+        }
+        // Timer end
+        let end = current_time();
+
+
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let mut data = testcase.metadata_mut().get_mut::<PowerScheduleData>().unwrap();
+        data.exec_us += (end - start) / (iter as u32);
+        data.bitmap_size = 0; // TODO
+        data.handicap = 0; // TODO
 
         Ok(())
     }
@@ -54,11 +75,16 @@ where
 impl<C, E, I, EM, S, Z> CalibrateStage<C, E, EM, I, S, Z>
 where
     C: Corpus<I>,
+    E: Executor<EM, I, S, Z>,
     I: Input,
     S: HasCorpus<C, I>,
     Z: Evaluator<E, EM, I, S>,
 {
-    /// Creates a new default mutational stage
+    #[inline]
+    fn cal_stages(&self) -> usize{
+        CAL_STAGE_MAX
+    }
+
     pub fn new() -> Self {
         Self {
             total_exec_us: 0.0,

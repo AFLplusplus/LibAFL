@@ -13,6 +13,16 @@ use crate::{
     Error,
 };
 
+
+pub enum PowerSchedule{
+    EXPLORE,
+    FAST,
+    COE,
+    LIN,
+    QUAD,
+    EXPLOIT,
+}
+
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
@@ -58,7 +68,8 @@ where
 
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S) -> usize {
-        1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
+        // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
+        self.calculate_score()
     }
 }
 
@@ -75,6 +86,14 @@ where
     CS: CorpusScheduler<I, S>,
     R: Rand,
 {
+    #[inline]
+    fn calculate_score(&self) -> usize{
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let mut data = testcase.metadata_mut().get_mut::<PowerScheduleData>().unwrap();
+
+        let mut perf_score = 100;
+    }
+
     #[inline]
     fn perform(
         &self,
