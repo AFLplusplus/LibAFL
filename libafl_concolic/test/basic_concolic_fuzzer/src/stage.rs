@@ -140,9 +140,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::BuildZext { op, bits } => Some(bv!(op).zero_ext(bits as u32).into()),
             SymExpr::BuildTrunc { op, bits } => Some(bv!(op).extract((bits - 1) as u32, 0).into()),
             SymExpr::BuildBoolToBits { op, bits } => Some(
-                translation[&op]
-                    .as_bool()
-                    .unwrap()
+                bool!(op)
                     .ite(
                         &BV::from_u64(&ctx, 1, bits as u32),
                         &BV::from_u64(&ctx, 0, bits as u32),
