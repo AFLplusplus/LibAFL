@@ -135,8 +135,6 @@ fn fuzz(
 
     emu.set_breakpoint(0x00401176); // LLVMFuzzerTestOneInput
 
-    println!("Run");
-
     emu.run();
 
     println!(
@@ -144,8 +142,19 @@ fn fuzz(
         emu.read_reg::<_, usize>(Amd64Regs::Rip).unwrap()
     );
 
-    emu.write_reg(Amd64Regs::Rsi, 6i32).unwrap();
-    emu.run();
+    emu.remove_breakpoint(0x00401176); // LLVMFuzzerTestOneInput
+
+    emu.set_breakpoint(0x004011bd); // LLVMFuzzerTestOneInput ret
+
+    let buf_ptr: isize = emu.read_reg(Amd64Regs::Rdi).unwrap();
+
+    for i in 0..100 {
+        emu.write_reg(Amd64Regs::Rdi, buf_ptr).unwrap();
+        emu.write_reg(Amd64Regs::Rsi, i).unwrap();
+        emu.write_reg(Amd64Regs::Rip, 0x00401176usize).unwrap();
+
+        emu.run();
+    }
 
     // Never reached
     Ok(())
