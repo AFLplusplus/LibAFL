@@ -14,6 +14,9 @@ pub use tracing::{ShadowTracingStage, TracingStage};
 pub mod mopt;
 pub use mopt::*;
 
+pub mod calibrate;
+pub use calibrate::CalibrateStage;
+
 //pub mod power;
 //pub use power::PowerMutationalStage;
 use crate::Error;

@@ -205,3 +205,33 @@ where
         Testcase::new(input)
     }
 }
+
+
+/// An entry in the Testcase Corpus with more detailed data needed for power schedule
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct PowerScheduleTestcase<I>
+where
+    I: Input,
+{
+    /// The input of this testcase
+    input: Option<I>,
+    /// Filename, if this testcase is backed by a file in the filesystem
+    filename: Option<String>,
+    /// Map of metadata associated with this testcase
+    metadata: SerdeAnyMap,
+    /// Time needed to execute the input
+    exec_time: Duration,
+    /// Cached len of the input, if any
+    cached_len: Option<usize>,
+    /// Number of bits set in bitmap
+    bitmap_size: usize,
+    /// Number of fuzzing iterations
+    fuzz_level: usize,
+    /// Number of queue cycles behind
+    handicap: usize,
+    /// Path depth 
+    depth: usize,
+    /// Offset in n_fuzz
+    n_fuzz_entry: usize,
+}
