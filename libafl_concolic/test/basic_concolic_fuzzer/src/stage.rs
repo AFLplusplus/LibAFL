@@ -1,6 +1,6 @@
 use concolic::{SymExpr, SymExprRef};
 use libafl::{
-    corpus::Corpus,
+    corpus::{Corpus, Testcase},
     executors::{Executor, HasExecHooksTuple, HasObservers, HasObserversHooks},
     inputs::{HasBytesVec, Input},
     mark_feature_time,
@@ -42,19 +42,15 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
         );
 
         if little_endian {
-            let mut result = bv.extract(
-                (size as u64 - offset * 8 - 1).try_into().unwrap(),
-                (size - offset * 8 - 8).try_into().unwrap(),
-            );
-            for i in 1..length {
-                result = bv
-                    .extract(
-                        (size - (offset + 1) * 8 - 1).try_into().unwrap(),
+            (0..length)
+                .map(|i| {
+                    bv.extract(
+                        (size - (offset + i) * 8 - 1).try_into().unwrap(),
                         (size - (offset + i + 1) * 8).try_into().unwrap(),
                     )
-                    .concat(&result);
-            }
-            result
+                })
+                .reduce(|acc, next| next.concat(&acc))
+                .unwrap()
         } else {
             bv.extract(
                 (size - offset * 8 - 1).try_into().unwrap(),
@@ -64,6 +60,25 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
     }
 
     let mut translation = HashMap::<SymExprRef, Dynamic>::new();
+
+    macro_rules! bool {
+        ($op:ident) => {
+            translation[&$op].as_bool().unwrap()
+        };
+    }
+
+    macro_rules! bv {
+        ($op:ident) => {
+            translation[&$op].as_bv().unwrap()
+        };
+    }
+
+    macro_rules! bv_binop {
+        ($a:ident $op:tt $b:ident) => {
+            Some(bv!($a).$op(&bv!($b)).into())
+        };
+    }
+
     for (id, msg) in iter {
         let z3_expr: Option<Dynamic> = match msg {
             SymExpr::GetInputByte { offset } => {
@@ -79,133 +94,25 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::BuildTrue => Some(Bool::from_bool(&ctx, true).into()),
             SymExpr::BuildFalse => Some(Bool::from_bool(&ctx, false).into()),
             SymExpr::BuildBool { value } => Some(Bool::from_bool(&ctx, value).into()),
-            SymExpr::BuildNeg { op } => Some(translation[&op].as_bv().unwrap().bvneg().into()),
-            SymExpr::BuildAdd { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvadd(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSub { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvsub(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildMul { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvmul(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildUnsignedDiv { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvudiv(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSignedDiv { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvsdiv(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildUnsignedRem { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvurem(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSignedRem { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvsrem(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildShiftLeft { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvshl(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildLogicalShiftRight { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvlshr(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildArithmeticShiftRight { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvashr(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSignedLessThan { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvslt(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSignedLessEqual { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvsle(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSignedGreaterThan { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvsgt(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSignedGreaterEqual { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvsge(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildUnsignedLessThan { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvult(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildUnsignedLessEqual { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvule(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildUnsignedGreaterThan { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvugt(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildUnsignedGreaterEqual { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvuge(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
+            SymExpr::BuildNeg { op } => Some(bv!(op).bvneg().into()),
+            SymExpr::BuildAdd { a, b } => bv_binop!(a bvadd b),
+            SymExpr::BuildSub { a, b } => bv_binop!(a bvsub b),
+            SymExpr::BuildMul { a, b } => bv_binop!(a bvmul b),
+            SymExpr::BuildUnsignedDiv { a, b } => bv_binop!(a bvudiv b),
+            SymExpr::BuildSignedDiv { a, b } => bv_binop!(a bvsdiv b),
+            SymExpr::BuildUnsignedRem { a, b } => bv_binop!(a bvurem b),
+            SymExpr::BuildSignedRem { a, b } => bv_binop!(a bvsrem b),
+            SymExpr::BuildShiftLeft { a, b } => bv_binop!(a bvshl b),
+            SymExpr::BuildLogicalShiftRight { a, b } => bv_binop!(a bvlshr b),
+            SymExpr::BuildArithmeticShiftRight { a, b } => bv_binop!(a bvashr b),
+            SymExpr::BuildSignedLessThan { a, b } => bv_binop!(a bvslt b),
+            SymExpr::BuildSignedLessEqual { a, b } => bv_binop!(a bvsle b),
+            SymExpr::BuildSignedGreaterThan { a, b } => bv_binop!(a bvsgt b),
+            SymExpr::BuildSignedGreaterEqual { a, b } => bv_binop!(a bvsge b),
+            SymExpr::BuildUnsignedLessThan { a, b } => bv_binop!(a bvult b),
+            SymExpr::BuildUnsignedLessEqual { a, b } => bv_binop!(a bvule b),
+            SymExpr::BuildUnsignedGreaterThan { a, b } => bv_binop!(a bvugt b),
+            SymExpr::BuildUnsignedGreaterEqual { a, b } => bv_binop!(a bvuge b),
             SymExpr::BuildNot { op } => {
                 let translated = &translation[&op];
                 Some(if let Some(bv) = translated.as_bv() {
@@ -223,75 +130,15 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::BuildNotEqual { a, b } => {
                 Some(translation[&a]._eq(&translation[&b]).not().into())
             }
-            SymExpr::BuildBoolAnd { a, b } => Some(
-                Bool::and(
-                    &ctx,
-                    &[
-                        &translation[&a].as_bool().unwrap(),
-                        &translation[&b].as_bool().unwrap(),
-                    ],
-                )
-                .into(),
-            ),
-            SymExpr::BuildBoolOr { a, b } => Some(
-                Bool::or(
-                    &ctx,
-                    &[
-                        &translation[&a].as_bool().unwrap(),
-                        &translation[&b].as_bool().unwrap(),
-                    ],
-                )
-                .into(),
-            ),
-            SymExpr::BuildBoolXor { a, b } => Some(
-                translation[&a]
-                    .as_bool()
-                    .unwrap()
-                    .xor(&translation[&b].as_bool().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildAnd { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvand(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildOr { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvor(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildXor { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .bvxor(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
-            SymExpr::BuildSext { op, bits } => Some(
-                translation[&op]
-                    .as_bv()
-                    .unwrap()
-                    .sign_ext(bits as u32)
-                    .into(),
-            ),
-            SymExpr::BuildZext { op, bits } => Some(
-                translation[&op]
-                    .as_bv()
-                    .unwrap()
-                    .zero_ext(bits as u32)
-                    .into(),
-            ),
-            SymExpr::BuildTrunc { op, bits } => Some(
-                translation[&op]
-                    .as_bv()
-                    .unwrap()
-                    .extract((bits - 1) as u32, 0)
-                    .into(),
-            ),
+            SymExpr::BuildBoolAnd { a, b } => Some(Bool::and(&ctx, &[&bool!(a), &bool!(b)]).into()),
+            SymExpr::BuildBoolOr { a, b } => Some(Bool::or(&ctx, &[&bool!(a), &bool!(b)]).into()),
+            SymExpr::BuildBoolXor { a, b } => Some(bool!(a).xor(&bool!(b)).into()),
+            SymExpr::BuildAnd { a, b } => bv_binop!(a bvand b),
+            SymExpr::BuildOr { a, b } => bv_binop!(a bvor b),
+            SymExpr::BuildXor { a, b } => bv_binop!(a bvxor b),
+            SymExpr::BuildSext { op, bits } => Some(bv!(op).sign_ext(bits as u32).into()),
+            SymExpr::BuildZext { op, bits } => Some(bv!(op).zero_ext(bits as u32).into()),
+            SymExpr::BuildTrunc { op, bits } => Some(bv!(op).extract((bits - 1) as u32, 0).into()),
             SymExpr::BuildBoolToBits { op, bits } => Some(
                 translation[&op]
                     .as_bool()
@@ -302,35 +149,20 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                     )
                     .into(),
             ),
-            SymExpr::ConcatHelper { a, b } => Some(
-                translation[&a]
-                    .as_bv()
-                    .unwrap()
-                    .concat(&translation[&b].as_bv().unwrap())
-                    .into(),
-            ),
+            SymExpr::ConcatHelper { a, b } => bv_binop!(a concat b),
             SymExpr::ExtractHelper {
                 op,
                 first_bit,
                 last_bit,
-            } => Some(
-                translation[&op]
-                    .as_bv()
-                    .unwrap()
-                    .extract(first_bit as u32, last_bit as u32)
-                    .into(),
-            ),
+            } => Some(bv!(op).extract(first_bit as u32, last_bit as u32).into()),
             SymExpr::BuildExtract {
                 op,
                 offset,
                 length,
                 little_endian,
-            } => {
-                let bv = translation[&op].as_bv().unwrap();
-                Some(build_extract(&bv, offset, length, little_endian).into())
-            }
+            } => Some(build_extract(&(bv!(op)), offset, length, little_endian).into()),
             SymExpr::BuildBswap { op } => {
-                let bv = translation[&op].as_bv().unwrap();
+                let bv = bv!(op);
                 let bits = bv.get_size();
                 assert_eq!(
                     bits % 16,
@@ -345,8 +177,8 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 offset,
                 little_endian,
             } => {
-                let target = translation[&target].as_bv().unwrap();
-                let to_insert = translation[&to_insert].as_bv().unwrap();
+                let target = bv!(target);
+                let to_insert = bv!(to_insert);
                 let bits_to_insert = to_insert.get_size() as u64;
                 assert_eq!(bits_to_insert % 8, 0, "can only insert full bytes");
                 let after_len = (target.get_size() as u64 / 8) - offset - (bits_to_insert / 8);
@@ -510,7 +342,7 @@ where
     OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
-    /// Creates a new default mutational stage
+    /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
     pub fn new(inner: TracingStage<C, EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
         Self {
             inner,
@@ -519,18 +351,18 @@ where
     }
 }
 
-/// Wraps a [`TracingStage`] to add concolic observing.
+/// A mutational stage that uses Z3 to solve concolic constraints attached to the [`Testcase`] by the [`ConcolicTracingStage`].
 #[derive(Clone, Debug)]
-pub struct ConcolicMutationalStage<C, EM, I, S, Z>
+pub struct SimpleConcolicMutationalStage<C, EM, I, S, Z>
 where
     I: Input,
     C: Corpus<I>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
-    inner: PhantomData<(C, EM, I, S, Z)>,
+    _phantom: PhantomData<(C, EM, I, S, Z)>,
 }
 
-impl<E, C, EM, I, S, Z> Stage<E, EM, S, Z> for ConcolicMutationalStage<C, EM, I, S, Z>
+impl<E, C, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<C, EM, I, S, Z>
 where
     I: Input + HasBytesVec,
     C: Corpus<I>,
@@ -574,14 +406,15 @@ where
     }
 }
 
-impl<C, EM, I, S, Z> ConcolicMutationalStage<C, EM, I, S, Z>
+impl<C, EM, I, S, Z> Default for SimpleConcolicMutationalStage<C, EM, I, S, Z>
 where
     I: Input,
     C: Corpus<I>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
-    /// Creates a new default mutational stage
-    pub fn new() -> Self {
-        Self { inner: PhantomData }
+    fn default() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
     }
 }

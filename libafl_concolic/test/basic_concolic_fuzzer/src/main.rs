@@ -33,7 +33,7 @@ use std::path::PathBuf;
 
 use command_executor::generic::CommandConfigurator;
 use observer::ConcolicObserver;
-use stage::{ConcolicMutationalStage, ConcolicTracingStage};
+use stage::{SimpleConcolicMutationalStage, ConcolicTracingStage};
 
 use crate::command_executor::MyCommandConfigurator;
 
@@ -138,7 +138,7 @@ pub fn main() {
             ),
             concolic_observer_name,
         ),
-        ConcolicMutationalStage::new(),
+        SimpleConcolicMutationalStage::default(),
         StdMutationalStage::new(StdScheduledMutator::new(havoc_mutations()))
     );
 
