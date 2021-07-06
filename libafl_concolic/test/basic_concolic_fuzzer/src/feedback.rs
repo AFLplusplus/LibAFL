@@ -54,9 +54,6 @@ impl<I: Input, S> Feedback<I, S> for ConcolicFeedback {
         _testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
-            for (_id, _expression_type) in metadata.iter_messages() {
-                println!("{} -> {:?}", _id, _expression_type);
-            }
             _testcase.metadata_mut().insert(metadata);
         }
         Ok(())
