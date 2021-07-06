@@ -1,1 +1,1 @@
-pub use qemu_libafl_bridge;
+pub use qemu_libafl_bridge::*;

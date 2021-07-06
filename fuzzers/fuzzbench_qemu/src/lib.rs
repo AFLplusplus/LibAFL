@@ -1,45 +1,16 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
 use clap::{App, Arg};
-use core::{cell::RefCell, time::Duration};
-#[cfg(unix)]
-use nix::{self, unistd::dup};
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use core::time::Duration;
 use std::{
     env,
-    fs::{self, File, OpenOptions},
-    io::{self, Write},
+    fs::{self},
     path::PathBuf,
-    process,
 };
 
-use libafl::{
-    bolts::{
-        current_nanos, current_time,
-        os::dup2,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-    },
-    corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
-    events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
-    feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
-    mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
-        token_mutations::I2SRandReplace,
-        tokens_mutations, Tokens,
-    },
-    observers::{StdMapObserver, TimeObserver},
-    stages::{StdMutationalStage, TracingStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
-    Error,
-};
+use libafl::Error;
+
+use libafl_qemu::{amd64::Amd64Regs, QemuEmulator};
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -153,13 +124,29 @@ pub fn libafl_qemu_main() {
 
 /// The actual fuzzer
 fn fuzz(
-    corpus_dir: PathBuf,
-    objective_dir: PathBuf,
-    seed_dir: PathBuf,
-    tokenfile: Option<PathBuf>,
-    logfile: PathBuf,
-    timeout: Duration,
+    _corpus_dir: PathBuf,
+    _objective_dir: PathBuf,
+    _seed_dir: PathBuf,
+    _tokenfile: Option<PathBuf>,
+    _logfile: PathBuf,
+    _timeout: Duration,
 ) -> Result<(), Error> {
+    let mut emu = QemuEmulator::new();
+
+    emu.set_breakpoint(0x00401176); // LLVMFuzzerTestOneInput
+
+    println!("Run");
+
+    emu.run();
+
+    println!(
+        "Break at {:#x}",
+        emu.read_reg::<_, usize>(Amd64Regs::Rip).unwrap()
+    );
+
+    emu.write_reg(Amd64Regs::Rsi, 6i32).unwrap();
+    emu.run();
+
     // Never reached
     Ok(())
 }
