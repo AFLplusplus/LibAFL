@@ -59,7 +59,11 @@ where
                     }
                 }
                 None => {
-                    state.metadata_mut().get_mut::<PowerScheduleGlobalData>().unwrap().queue_cycles += 1;
+                    state
+                        .metadata_mut()
+                        .get_mut::<PowerScheduleGlobalData>()
+                        .unwrap()
+                        .queue_cycles += 1;
                     0
                 }
             };

@@ -223,7 +223,7 @@ pub struct PowerScheduleTestData {
 }
 
 impl PowerScheduleTestData {
-    pub fn new(depth: u64) -> Self{ 
+    pub fn new(depth: u64) -> Self {
         Self {
             bitmap_size: 0,
             fuzz_level: 0,

@@ -46,6 +46,8 @@ where
         res
     }
 
+    fn hash(&self) -> usize {}
+
     /// Get the initial value for reset()
     fn initial(&self) -> T;
 

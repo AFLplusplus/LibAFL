@@ -5,7 +5,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     mutators::Mutator,
-    stages::{PowerScheduleGlobalData, MutationalStage, Stage},
+    stages::{MutationalStage, PowerScheduleGlobalData, Stage},
     state::{HasClientPerfStats, HasCorpus, HasMetadata},
     Error,
 };
@@ -106,6 +106,23 @@ where
 
             // Time is measured directly the `evaluate_input` function
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
+
+            match corpus_idx {
+                Some(idx) => {
+                    let hash: usize = 0; // TODO
+                    state
+                        .corpus()
+                        .get(idx)?
+                        .borrow_mut()
+                        .metadata_mut()
+                        .get_mut::<PowerScheduleTestData>()
+                        .unwrap()
+                        .n_fuzz_entry = hash;
+
+                    self.n_fuzz[hash] += 1;
+                }
+                None => {}
+            }
 
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
         }

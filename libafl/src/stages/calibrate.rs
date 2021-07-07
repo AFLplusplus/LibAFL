@@ -53,7 +53,11 @@ where
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let iter = self.cal_stages();
-        let handicap = state.metadata().get::<PowerScheduleGlobalData>().unwrap().queue_cycles;
+        let handicap = state
+            .metadata()
+            .get::<PowerScheduleGlobalData>()
+            .unwrap()
+            .queue_cycles;
 
         // Timer start
         let start = current_time();
@@ -83,7 +87,10 @@ where
             data.handicap = handicap as u64;
         }
 
-        let calstat = state.metadata_mut().get_mut::<PowerScheduleGlobalData>().unwrap();
+        let calstat = state
+            .metadata_mut()
+            .get_mut::<PowerScheduleGlobalData>()
+            .unwrap();
 
         calstat.total_cal_us += (end - start).as_millis();
         calstat.total_cal_cycles += iter as u64;
