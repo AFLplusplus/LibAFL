@@ -1,19 +1,29 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
 use clap::{App, Arg};
-use goblin::elf::Elf;
 
 use core::time::Duration;
 use std::{
     env,
-    fs::{self, File},
-    io::Read,
+    fs::{self},
     path::PathBuf,
-    str,
 };
 
-use libafl::Error;
-use libafl_qemu::{amd64::Amd64Regs, QemuEmulator};
+use libafl::{
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    corpus::{OnDiskCorpus, QueueCorpusScheduler},
+    events::SimpleEventManager,
+    executors::{inprocess::InProcessExecutor, ExitKind},
+    fuzzer::{Fuzzer, StdFuzzer},
+    generators::RandPrintablesGenerator,
+    inputs::{BytesInput, HasTargetBytes},
+    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    stages::mutational::StdMutationalStage,
+    state::StdState,
+    stats::SimpleStats,
+    Error,
+};
+use libafl_qemu::{amd64::Amd64Regs, elf::EasyElf, filter_qemu_args, MmapPerms, QemuEmulator};
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -21,18 +31,6 @@ pub fn libafl_qemu_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-
-    let mut args = vec!["libafl_qemu_fuzzbench".into()];
-    let mut args_iter = env::args();
-    while let Some(arg) = args_iter.next() {
-        if arg.starts_with("--libafl") {
-            args.push(arg);
-            args.push(args_iter.next().unwrap());
-        } else if arg.starts_with("-libafl") {
-            args.push("-".to_owned() + &arg);
-            args.push(args_iter.next().unwrap());
-        }
-    }
 
     let res = match App::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
@@ -70,7 +68,7 @@ pub fn libafl_qemu_main() {
                 .about("Timeout for each individual execution, in milliseconds")
                 .default_value("1000"),
         )
-        .try_get_matches_from(args)
+        .try_get_matches_from(filter_qemu_args())
     {
         Ok(res) => res,
         Err(err) => {
@@ -125,21 +123,10 @@ pub fn libafl_qemu_main() {
         .expect("An error occurred while fuzzing");
 }
 
-fn resolve_symbol(elf: &Elf, name: &str) -> isize {
-    for sym in elf.syms.iter() {
-        if let Some(sym_name) = elf.strtab.get_at(sym.st_name) {
-            if sym_name == name {
-                return sym.st_value as isize;
-            }
-        }
-    }
-    0
-}
-
 /// The actual fuzzer
 fn fuzz(
-    _corpus_dir: PathBuf,
-    _objective_dir: PathBuf,
+    corpus_dir: PathBuf,
+    objective_dir: PathBuf,
     _seed_dir: PathBuf,
     _tokenfile: Option<PathBuf>,
     _logfile: PathBuf,
@@ -148,13 +135,9 @@ fn fuzz(
     let mut emu = QemuEmulator::new();
 
     let mut elf_buffer = Vec::new();
-    let elf = {
-        let mut binary_file = File::open(emu.exec_path())?;
-        binary_file.read_to_end(&mut elf_buffer)?;
-        Elf::parse(&elf_buffer).map_err(|e| Error::Unknown(format!("{}", e)))
-    }?;
+    let elf = EasyElf::from_file(emu.exec_path(), &mut elf_buffer)?;
 
-    let test_one_input_ptr = resolve_symbol(&elf, "LLVMFuzzerTestOneInput");
+    let test_one_input_ptr = elf.resolve_symbol("LLVMFuzzerTestOneInput").unwrap();
 
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
@@ -164,22 +147,90 @@ fn fuzz(
 
     println!(
         "Break at {:#x}",
-        emu.read_reg::<_, usize>(Amd64Regs::Rip).unwrap()
+        emu.read_reg::<_, u64>(Amd64Regs::Rip).unwrap()
     );
 
+    let stack_ptr: u64 = emu.read_reg(Amd64Regs::Rsp).unwrap();
+    let mut ret_addr = [0u64];
+    emu.read_mem(stack_ptr, &mut ret_addr);
+    let ret_addr = ret_addr[0];
+
+    println!("Stack pointer = {:#x}", stack_ptr);
+    println!("Return address = {:#x}", ret_addr);
+
     emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    emu.set_breakpoint(0x004011bd); // LLVMFuzzerTestOneInput ret
+    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
 
-    let buf_ptr: isize = emu.read_reg(Amd64Regs::Rdi).unwrap();
+    println!("Placing input at {:#x}", input_addr);
 
-    for i in 0..100 {
-        emu.write_reg(Amd64Regs::Rdi, buf_ptr).unwrap();
-        emu.write_reg(Amd64Regs::Rsi, i).unwrap();
-        emu.write_reg(Amd64Regs::Rip, 0x00401176usize).unwrap();
+    // The wrapped harness function, calling out to the LLVM-style harness
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let mut buf = target.as_slice();
+        if buf.len() > 32 {
+            buf = &buf[0..32];
+        }
+
+        emu.write_mem(input_addr, buf);
+
+        emu.write_reg(Amd64Regs::Rdi, input_addr).unwrap();
+        emu.write_reg(Amd64Regs::Rsi, buf.len()).unwrap();
+        emu.write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
+        emu.write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
 
         emu.run();
-    }
+
+        ExitKind::Ok
+    };
+
+    let stats = SimpleStats::new(|s| {
+        println!("{}", s);
+    });
+
+    // create a State from scratch
+    let mut state = StdState::new(
+        // RNG
+        StdRand::with_seed(current_nanos()),
+        // Corpus that will be evolved, we keep it in memory for performance
+        OnDiskCorpus::new(corpus_dir).unwrap(),
+        // Corpus in which we store solutions (crashes in this example),
+        // on disk so the user can get them after stopping the fuzzer
+        OnDiskCorpus::new(objective_dir).unwrap(),
+        // States of the feedbacks.
+        // They are the data related to the feedbacks that you want to persist in the State.
+        tuple_list!(),
+    );
+
+    // The event manager handle the various events generated during the fuzzing loop
+    // such as the notification of the addition of a new item to the corpus
+    let mut mgr = SimpleEventManager::new(stats);
+
+    // A queue policy to get testcasess from the corpus
+    let scheduler = QueueCorpusScheduler::new();
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
+    let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
+
+    // Generator of printable bytearrays of max size 32
+    let mut generator = RandPrintablesGenerator::new(32);
+
+    // Generate 8 initial inputs
+    state
+        .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+        .expect("Failed to generate the initial corpus");
+
+    // Setup a mutational stage with a basic bytes mutator
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    fuzzer
+        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .expect("Error in the fuzzing loop");
 
     // Never reached
     Ok(())
