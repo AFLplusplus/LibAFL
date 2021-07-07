@@ -1,5 +1,7 @@
 use core::marker::PhantomData;
+use core::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use crate::{
     bolts::current_time,
     corpus::{Corpus, PowerScheduleData}, 
@@ -21,7 +23,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I>,
+    S: HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     map_observer_name: String,
@@ -38,7 +40,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I>,
+    S: HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -64,16 +66,44 @@ where
         // Timer end
         let end = current_time();
 
+        {
+            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+            let mut data = testcase.metadata_mut().get_mut::<PowerScheduleData>().unwrap();
+            data.exec_us += (end - start) / (iter as u32);
+            // data.bitmap_size = executor.observers().match_name::<MapObserver<usize>>(self.map_observer_name).unwrap();
+            data.handicap = 0; // TODO
+        }
 
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let mut data = testcase.metadata_mut().get_mut::<PowerScheduleData>().unwrap();
-        data.exec_us += (end - start) / (iter as u32);
-        // data.bitmap_size = executor.observers().match_name::<MapObserver<usize>>(self.map_observer_name).unwrap();
-        data.handicap = 0; // TODO
+        let calstat = state.metadata_mut().get_mut::<CalibrateStat>().unwrap();
+        
+        calstat.total_cal_us += end - start;
+        calstat.total_cal_cycles += iter;
+        calstat.total_bitmap_size = 0; // TODO
 
         Ok(())
     }
 }
+
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CalibrateStat{
+    pub total_cal_us: Duration,
+    pub total_cal_cycles: usize,
+    pub total_bitmap_size: usize,
+}
+
+impl CalibrateStat{
+    pub fn new() -> Self{
+        Self{
+            total_cal_us: Duration::from_millis(0),
+            total_cal_cycles: 0,
+            total_bitmap_size: 0,
+        }
+    }
+}
+
+crate::impl_serdeany!(CalibrateStat);
+
 
 impl<C, E, I, EM, OT, S, Z> CalibrateStage<C, E, EM, I, OT, S, Z>
 where
@@ -81,7 +111,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I>,
+    S: HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -89,7 +119,8 @@ where
         CAL_STAGE_MAX
     }
 
-    pub fn new(map_observer_name: String) -> Self {
+    pub fn new(state: &mut S, map_observer_name: String) -> Self {
+        state.add_metadata::<CalibrateStat>(CalibrateStat::new());
         Self {
             map_observer_name: map_observer_name,
             phantom: PhantomData,
