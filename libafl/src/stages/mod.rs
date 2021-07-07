@@ -17,9 +17,9 @@ pub use mopt::*;
 pub mod calibrate;
 pub use calibrate::CalibrateStage;
 
-//pub mod power;
-//pub use power::PowerMutationalStage;
+pub mod power;
 use crate::Error;
+pub use power::PowerMutationalStage;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.

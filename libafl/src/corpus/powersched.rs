@@ -1,10 +1,6 @@
-use core::{marker::PhantomData};
+use core::marker::PhantomData;
 
-use crate::{
-    corpus::{Corpus},
-    inputs::Input,
-    state::HasCorpus,
-};
+use crate::{corpus::Corpus, inputs::Input, state::HasCorpus};
 
 pub struct PowerQueueCorpusScheduler<C, I, S>
 where

@@ -1,19 +1,18 @@
 use core::marker::PhantomData;
 use core::time::Duration;
 
-use serde::{Deserialize, Serialize};
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, PowerScheduleData}, 
+    corpus::{Corpus, PowerScheduleData},
+    executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
-    executors::{Executor, HasObservers},
     observers::ObserversTuple,
     stages::Stage,
     state::{HasCorpus, HasMetadata},
     Error,
 };
-
+use serde::{Deserialize, Serialize};
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
@@ -32,7 +31,7 @@ where
 }
 
 // The number of times we run the program in the calibration stage
-const CAL_STAGE_MAX : usize = 8;
+const CAL_STAGE_MAX: usize = 8;
 
 impl<C, E, EM, I, OT, S, Z> Stage<E, EM, S, Z> for CalibrateStage<C, E, EM, I, OT, S, Z>
 where
@@ -53,14 +52,18 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-
         let iter = self.cal_stages();
 
         // Timer start
         let start = current_time();
 
         for _i in 0..iter {
-            let input = state.corpus().get(corpus_idx)?.borrow_mut().load_input()?.clone();
+            let input = state
+                .corpus()
+                .get(corpus_idx)?
+                .borrow_mut()
+                .load_input()?
+                .clone();
             let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
         }
         // Timer end
@@ -68,14 +71,17 @@ where
 
         {
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            let mut data = testcase.metadata_mut().get_mut::<PowerScheduleData>().unwrap();
+            let mut data = testcase
+                .metadata_mut()
+                .get_mut::<PowerScheduleData>()
+                .unwrap();
             data.exec_us += (end - start) / (iter as u32);
             // data.bitmap_size = executor.observers().match_name::<MapObserver<usize>>(self.map_observer_name).unwrap();
             data.handicap = 0; // TODO
         }
 
         let calstat = state.metadata_mut().get_mut::<CalibrateStat>().unwrap();
-        
+
         calstat.total_cal_us += end - start;
         calstat.total_cal_cycles += iter;
         calstat.total_bitmap_size = 0; // TODO
@@ -84,17 +90,16 @@ where
     }
 }
 
-
 #[derive(Serialize, Deserialize, Clone)]
-pub struct CalibrateStat{
+pub struct CalibrateStat {
     pub total_cal_us: Duration,
     pub total_cal_cycles: usize,
     pub total_bitmap_size: usize,
 }
 
-impl CalibrateStat{
-    pub fn new() -> Self{
-        Self{
+impl CalibrateStat {
+    pub fn new() -> Self {
+        Self {
             total_cal_us: Duration::from_millis(0),
             total_cal_cycles: 0,
             total_bitmap_size: 0,
@@ -103,7 +108,6 @@ impl CalibrateStat{
 }
 
 crate::impl_serdeany!(CalibrateStat);
-
 
 impl<C, E, I, EM, OT, S, Z> CalibrateStage<C, E, EM, I, OT, S, Z>
 where
@@ -115,7 +119,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
-    fn cal_stages(&self) -> usize{
+    fn cal_stages(&self) -> usize {
         CAL_STAGE_MAX
     }
 

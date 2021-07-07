@@ -5,8 +5,8 @@ use alloc::{
     vec::Vec,
 };
 use core::slice::from_raw_parts_mut;
-use serde::{Deserialize, Serialize};
 use num::Integer;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
@@ -34,11 +34,11 @@ where
     }
 
     /// Count the set bytes in the map
-    fn count_bytes(&self) -> usize{
+    fn count_bytes(&self) -> usize {
         let initial = self.initial();
         let cnt = self.usable_count();
         let mut res = 0;
-        for x in self.map()[0..cnt].iter(){
+        for x in self.map()[0..cnt].iter() {
             if *x != initial {
                 res += 1;
             }

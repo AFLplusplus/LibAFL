@@ -55,10 +55,9 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut S) -> usize {
+    fn iterations(&self, state: &mut S, _corpus_idx: usize) -> Result<usize, Error> {
         // TODO: we want to use calculate_score here
-
-        1 + state.rand_mut().below(128) as usize
+        Ok(1 + state.rand_mut().below(128) as usize)
     }
 
     #[allow(
@@ -78,7 +77,7 @@ where
 
         match key_module {
             MOptMode::Corefuzzing => {
-                let num = self.iterations(state);
+                let num = self.iterations(state, corpus_idx)?;
 
                 for stage_id in 0..num {
                     let mut input = state
@@ -125,7 +124,7 @@ where
                 }
             }
             MOptMode::Pilotfuzzing => {
-                let num = self.iterations(state);
+                let num = self.iterations(state, corpus_idx)?;
                 for stage_id in 0..num {
                     let mut input = state
                         .corpus()

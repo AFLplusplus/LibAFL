@@ -206,9 +206,8 @@ where
     }
 }
 
-
 #[derive(Serialize, Deserialize, Clone)]
-pub struct PowerScheduleData{
+pub struct PowerScheduleData {
     pub cached_len: Option<usize>,
     /// Number of bits set in bitmap
     pub bitmap_size: usize,
@@ -216,7 +215,7 @@ pub struct PowerScheduleData{
     pub fuzz_level: usize,
     /// Number of queue cycles behind
     pub handicap: usize,
-    /// Path depth 
+    /// Path depth
     pub depth: usize,
     /// Offset in n_fuzz
     pub n_fuzz_entry: usize,
