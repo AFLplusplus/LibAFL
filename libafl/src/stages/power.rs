@@ -70,8 +70,17 @@ where
             .get_mut::<PowerScheduleData>()
             .unwrap();
         let caldata = state.metadata().get::<CalibrateData>().unwrap();
+
+        let mut fuzz_mu = 0.0;
+        match self.strat {
+            PowerSchedule::COE => {
+                fuzz_mu = self.fuzz_mu(state)?;
+            }
+            _ => {}
+        }
+
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        Ok(self.calculate_score(psdata, caldata))
+        Ok(self.calculate_score(psdata, caldata, fuzz_mu))
     }
 }
 
@@ -116,8 +125,40 @@ where
         }
     }
 
+    //
     #[inline]
-    fn calculate_score(&self, psdata: &mut PowerScheduleData, caldata: &CalibrateData) -> usize {
+    pub fn fuzz_mu(&self, state: &S) -> Result<f64, Error> {
+        let corpus = state.corpus();
+        let mut n_paths = 0;
+        let mut fuzz_mu = 0.0;
+        for idx in 0..corpus.count() {
+            let n_fuzz_entry = corpus
+                .get(idx)
+                .unwrap()
+                .borrow()
+                .metadata()
+                .get::<PowerScheduleData>()
+                .unwrap()
+                .n_fuzz_entry;
+            fuzz_mu += (self.n_fuzz[n_fuzz_entry] as f64).log2();
+            n_paths += 1;
+        }
+
+        if n_paths == 0 {
+            return Err(Error::Unknown("Queue state corrput".to_string()));
+        }
+
+        fuzz_mu = fuzz_mu / (n_paths as f64);
+        Ok(fuzz_mu)
+    }
+
+    #[inline]
+    fn calculate_score(
+        &self,
+        psdata: &mut PowerScheduleData,
+        caldata: &CalibrateData,
+        fuzz_mu: f64,
+    ) -> usize {
         let mut perf_score = 100.0;
         let avg_exec_us = caldata.total_cal_us / (caldata.total_cal_cycles as u128);
         let avg_bitmap_size = caldata.total_bitmap_size / caldata.total_bitmap_size;
@@ -173,6 +214,8 @@ where
         }
 
         let mut factor: f64 = 1.0;
+
+        // TODO: currently we don't have any favored inputs, if that's introduced we need to modify code here
         match &self.strat {
             PowerSchedule::EXPLORE => {
                 // Nothing happens in EXPLORE
@@ -181,14 +224,27 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                let fuzz_mu = 0.0;
-                let n_paths = 0;
-                // TODO
+                if self.n_fuzz[psdata.n_fuzz_entry] as f64 > fuzz_mu {
+                    factor = 0.0;
+                }
             }
             PowerSchedule::FAST => {
                 if psdata.fuzz_level != 0 {
                     let lg = (self.n_fuzz[psdata.n_fuzz_entry] as f64).log2() as u32;
-                    // TODO, need to look into q->favored.
+                    // Do thing if factor == 5
+                    if lg < 2 {
+                        factor = 4.0;
+                    } else if lg >= 2 && lg < 4 {
+                        factor = 3.0;
+                    } else if lg >= 4 && lg < 5 {
+                        factor = 2.0;
+                    } else if lg >= 6 && lg < 7 {
+                        factor = 0.8;
+                    } else if lg >= 7 && lg < 8 {
+                        factor = 0.6;
+                    } else if lg >= 8 {
+                        factor = 0.4;
+                    }
                 }
             }
             PowerSchedule::LIN => {
