@@ -59,3 +59,6 @@ __attribute__((weak)) int target_munmap(abi_ulong start, abi_ulong len) {
 
 __attribute__((weak)) char* exec_path = NULL;
 __attribute__((weak)) size_t guest_base = 0;
+
+__attribute__((weak)) void (*libafl_exec_edge_hook)(uint32_t);
+__attribute__((weak)) uint32_t (*libafl_gen_edge_hook)(uint64_t, uint64_t);

@@ -27,9 +27,12 @@ extern "C" {
 
     /// int target_munmap(abi_ulong start, abi_ulong len)
     fn target_munmap(start: u64, len: u64) -> i32;
-
+    
     static exec_path: *const u8;
     static guest_base: isize;
+    
+    static mut libafl_exec_edge_hook: unsafe extern "C" fn(u32);
+    static mut libafl_gen_edge_hook: unsafe extern "C" fn(u64, u64) -> u32;
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
@@ -151,6 +154,14 @@ impl QemuEmulator {
         } else {
             Err(format!("Failed to unmap {}", addr))
         }
+    }
+    
+    pub fn set_exec_edge_hook(&mut self, hook: extern "C" fn(u32)) {
+        unsafe { libafl_exec_edge_hook = hook };
+    }
+    
+    pub fn set_gen_edge_hook(&mut self, hook: extern "C" fn(u64, u64) -> u32) {
+        unsafe { libafl_gen_edge_hook = hook };
     }
 
     pub fn new() -> Self {

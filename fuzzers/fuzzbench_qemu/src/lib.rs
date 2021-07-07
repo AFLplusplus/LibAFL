@@ -14,10 +14,12 @@ use libafl::{
     corpus::{OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    observers::{HitcountsMapObserver, VariableMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
     stats::SimpleStats,
@@ -123,6 +125,22 @@ pub fn libafl_qemu_main() {
         .expect("An error occurred while fuzzing");
 }
 
+const MAP_SIZE: usize = 1048576;
+static mut EDGES_COUNTER: usize = 0;
+static mut EDGES_MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
+
+extern "C" fn gen_edges(_src: u64, _dest: u64) -> u32 {
+    unsafe {
+        let id = EDGES_COUNTER;
+        EDGES_COUNTER = (EDGES_COUNTER + 1) & (MAP_SIZE - 1);
+        id as u32
+    }
+}
+
+extern "C" fn exec_edges(id: u32) {
+    unsafe { EDGES_MAP[id as usize] += 1 };
+}
+
 /// The actual fuzzer
 fn fuzz(
     corpus_dir: PathBuf,
@@ -133,6 +151,9 @@ fn fuzz(
     _timeout: Duration,
 ) -> Result<(), Error> {
     let mut emu = QemuEmulator::new();
+
+    emu.set_gen_edge_hook(gen_edges);
+    emu.set_exec_edge_hook(exec_edges);
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.exec_path(), &mut elf_buffer)?;
@@ -189,6 +210,21 @@ fn fuzz(
         println!("{}", s);
     });
 
+    // Create an observation channel using the coverage map
+    let edges = unsafe { &mut EDGES_MAP };
+    let edges_counter = unsafe { &mut EDGES_COUNTER };
+    let edges_observer =
+        HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+
+    // The state of the edges feedback.
+    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+
+    // New maximization map feedback linked to the edges observer and the feedback state
+    let feedback = MaxMapFeedback::new(&feedback_state, &edges_observer);
+
+    // A feedback to choose if an input is a solution or not
+    let objective = CrashFeedback::new();
+
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
@@ -200,7 +236,7 @@ fn fuzz(
         OnDiskCorpus::new(objective_dir).unwrap(),
         // States of the feedbacks.
         // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(),
+        tuple_list!(feedback_state),
     );
 
     // The event manager handle the various events generated during the fuzzing loop
@@ -211,17 +247,23 @@ fn fuzz(
     let scheduler = QueueCorpusScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
+    let mut executor = InProcessExecutor::new(
+        &mut harness,
+        tuple_list!(edges_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )?;
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
 
     // Generate 8 initial inputs
     state
-        .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
