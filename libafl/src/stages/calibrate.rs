@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, PowerScheduleData},
+    corpus::{Corpus, PowerScheduleTestData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -53,6 +53,7 @@ where
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let iter = self.cal_stages();
+        let handicap = state.metadata().get::<PowerScheduleGlobalData>().unwrap().queue_cycles;
 
         // Timer start
         let start = current_time();
@@ -73,16 +74,16 @@ where
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
             let mut data = testcase
                 .metadata_mut()
-                .get_mut::<PowerScheduleData>()
+                .get_mut::<PowerScheduleTestData>()
                 .unwrap();
             data.exec_us += ((end - start) / (iter as u32)).as_millis();
             //let bitmap_size = executor.observers().match_name::<MapObserver<usize>>(self.map_observer_name).unwrap();
             bitmap_size = 1;
             data.bitmap_size = bitmap_size;
-            data.handicap = 0; // TODO
+            data.handicap = handicap as u64;
         }
 
-        let calstat = state.metadata_mut().get_mut::<CalibrateData>().unwrap();
+        let calstat = state.metadata_mut().get_mut::<PowerScheduleGlobalData>().unwrap();
 
         calstat.total_cal_us += (end - start).as_millis();
         calstat.total_cal_cycles += iter as u64;
@@ -94,25 +95,27 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct CalibrateData {
+pub struct PowerScheduleGlobalData {
     pub total_cal_us: u128,
     pub total_cal_cycles: u64,
     pub total_bitmap_size: u64,
-    total_bitmap_entries: u64,
+    pub total_bitmap_entries: u64,
+    pub queue_cycles: usize,
 }
 
-impl CalibrateData {
+impl PowerScheduleGlobalData {
     pub fn new() -> Self {
         Self {
             total_cal_us: 0,
             total_cal_cycles: 0,
             total_bitmap_size: 0,
             total_bitmap_entries: 0,
+            queue_cycles: 0,
         }
     }
 }
 
-crate::impl_serdeany!(CalibrateData);
+crate::impl_serdeany!(PowerScheduleGlobalData);
 
 impl<C, E, I, EM, OT, S, Z> CalibrateStage<C, E, EM, I, OT, S, Z>
 where
@@ -129,7 +132,7 @@ where
     }
 
     pub fn new(state: &mut S, map_observer_name: String) -> Self {
-        state.add_metadata::<CalibrateData>(CalibrateData::new());
+        state.add_metadata::<PowerScheduleGlobalData>(PowerScheduleGlobalData::new());
         Self {
             map_observer_name: map_observer_name,
             phantom: PhantomData,

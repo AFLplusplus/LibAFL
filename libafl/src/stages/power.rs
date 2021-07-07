@@ -1,11 +1,11 @@
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, PowerScheduleData},
+    corpus::{Corpus, PowerScheduleTestData},
     fuzzer::Evaluator,
     inputs::Input,
     mutators::Mutator,
-    stages::{CalibrateData, MutationalStage, Stage},
+    stages::{PowerScheduleGlobalData, MutationalStage, Stage},
     state::{HasClientPerfStats, HasCorpus, HasMetadata},
     Error,
 };
@@ -65,11 +65,11 @@ where
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         let mut testcase = state.corpus().get(corpus_idx).unwrap().borrow_mut();
-        let psdata = testcase
+        let tsdata = testcase
             .metadata_mut()
-            .get_mut::<PowerScheduleData>()
+            .get_mut::<PowerScheduleTestData>()
             .unwrap();
-        let caldata = state.metadata().get::<CalibrateData>().unwrap();
+        let gldata = state.metadata().get::<PowerScheduleGlobalData>().unwrap();
 
         let mut fuzz_mu = 0.0;
         match self.strat {
@@ -80,7 +80,7 @@ where
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        Ok(self.calculate_score(psdata, caldata, fuzz_mu))
+        Ok(self.calculate_score(tsdata, gldata, fuzz_mu))
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -115,7 +115,7 @@ where
             .get(corpus_idx)?
             .borrow_mut()
             .metadata_mut()
-            .get_mut::<PowerScheduleData>()
+            .get_mut::<PowerScheduleTestData>()
             .unwrap()
             .fuzz_level += 1;
         Ok(())
@@ -175,7 +175,7 @@ where
                 .unwrap()
                 .borrow()
                 .metadata()
-                .get::<PowerScheduleData>()
+                .get::<PowerScheduleTestData>()
                 .unwrap()
                 .n_fuzz_entry;
             fuzz_mu += (self.n_fuzz[n_fuzz_entry] as f64).log2();
@@ -193,15 +193,15 @@ where
     #[inline]
     fn calculate_score(
         &self,
-        psdata: &mut PowerScheduleData,
-        caldata: &CalibrateData,
+        tsdata: &mut PowerScheduleTestData,
+        gldata: &PowerScheduleGlobalData,
         fuzz_mu: f64,
     ) -> usize {
         let mut perf_score = 100.0;
-        let avg_exec_us = caldata.total_cal_us / (caldata.total_cal_cycles as u128);
-        let avg_bitmap_size = caldata.total_bitmap_size / caldata.total_bitmap_size;
+        let avg_exec_us = gldata.total_cal_us / (gldata.total_cal_cycles as u128);
+        let avg_bitmap_size = gldata.total_bitmap_size / gldata.total_bitmap_size;
 
-        let q_exec_us = psdata.exec_us as f64;
+        let q_exec_us = tsdata.exec_us as f64;
         if q_exec_us * 0.1 > avg_exec_us as f64 {
             perf_score = 10.0;
         } else if q_exec_us * 0.2 > avg_exec_us as f64 {
@@ -218,7 +218,7 @@ where
             perf_score = 150.0;
         }
 
-        let q_bitmap_size = psdata.bitmap_size as f64;
+        let q_bitmap_size = tsdata.bitmap_size as f64;
         if q_bitmap_size * 0.3 > avg_bitmap_size as f64 {
             perf_score *= 3.0;
         } else if q_bitmap_size * 0.5 > avg_bitmap_size as f64 {
@@ -233,21 +233,21 @@ where
             perf_score *= 0.75;
         }
 
-        if psdata.handicap >= 4 {
+        if tsdata.handicap >= 4 {
             perf_score *= 4.0;
-            psdata.handicap -= 4;
-        } else if psdata.handicap > 0 {
+            tsdata.handicap -= 4;
+        } else if tsdata.handicap > 0 {
             perf_score *= 2.0;
-            psdata.handicap -= 1;
+            tsdata.handicap -= 1;
         }
 
-        if psdata.depth >= 4 && psdata.depth < 8 {
+        if tsdata.depth >= 4 && tsdata.depth < 8 {
             perf_score *= 2.0;
-        } else if psdata.depth >= 8 && psdata.depth < 14 {
+        } else if tsdata.depth >= 8 && tsdata.depth < 14 {
             perf_score *= 3.0;
-        } else if psdata.depth >= 14 && psdata.depth < 25 {
+        } else if tsdata.depth >= 14 && tsdata.depth < 25 {
             perf_score *= 4.0;
-        } else if psdata.depth >= 25 {
+        } else if tsdata.depth >= 25 {
             perf_score *= 5.0;
         }
 
@@ -262,13 +262,13 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if self.n_fuzz[psdata.n_fuzz_entry] as f64 > fuzz_mu {
+                if self.n_fuzz[tsdata.n_fuzz_entry] as f64 > fuzz_mu {
                     factor = 0.0;
                 }
             }
             PowerSchedule::FAST => {
-                if psdata.fuzz_level != 0 {
-                    let lg = (self.n_fuzz[psdata.n_fuzz_entry] as f64).log2() as u32;
+                if tsdata.fuzz_level != 0 {
+                    let lg = (self.n_fuzz[tsdata.n_fuzz_entry] as f64).log2() as u32;
                     // Do thing if factor == 5
                     if lg < 2 {
                         factor = 4.0;
@@ -286,11 +286,11 @@ where
                 }
             }
             PowerSchedule::LIN => {
-                factor = (psdata.fuzz_level as f64) / (self.n_fuzz[psdata.n_fuzz_entry] + 1) as f64;
+                factor = (tsdata.fuzz_level as f64) / (self.n_fuzz[tsdata.n_fuzz_entry] + 1) as f64;
             }
             PowerSchedule::QUAD => {
-                factor = ((psdata.fuzz_level * psdata.fuzz_level) as f64)
-                    / (self.n_fuzz[psdata.n_fuzz_entry] + 1) as f64;
+                factor = ((tsdata.fuzz_level * tsdata.fuzz_level) as f64)
+                    / (self.n_fuzz[tsdata.n_fuzz_entry] + 1) as f64;
             }
         }
 

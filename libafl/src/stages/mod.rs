@@ -15,7 +15,7 @@ pub mod mopt;
 pub use mopt::*;
 
 pub mod calibrate;
-pub use calibrate::{CalibrateData, CalibrateStage};
+pub use calibrate::{PowerScheduleGlobalData, CalibrateStage};
 
 pub mod power;
 use crate::Error;
