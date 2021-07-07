@@ -208,19 +208,18 @@ where
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PowerScheduleData {
-    pub cached_len: Option<usize>,
     /// Number of bits set in bitmap
-    pub bitmap_size: usize,
+    pub bitmap_size: u64,
     /// Number of fuzzing iterations
-    pub fuzz_level: usize,
+    pub fuzz_level: u64,
     /// Number of queue cycles behind
-    pub handicap: usize,
+    pub handicap: u64,
     /// Path depth
-    pub depth: usize,
+    pub depth: u64,
     /// Offset in n_fuzz
     pub n_fuzz_entry: usize,
     /// Average time spent in calibration stage
-    pub exec_us: Duration,
+    pub exec_us: u128,
 }
 
 crate::impl_serdeany!(PowerScheduleData);
