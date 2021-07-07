@@ -32,6 +32,22 @@ where
         self.map().len()
     }
 
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> usize{
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let res = 0;
+        for x in self.map()[0..cnt].iter(){
+            /*
+            // needs partialeq
+            if *x != initial {
+                res += 1;
+            }
+            */
+        }
+        0
+    }
+
     /// Get the initial value for reset()
     fn initial(&self) -> T;
 

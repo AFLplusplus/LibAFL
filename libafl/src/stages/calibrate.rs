@@ -5,7 +5,8 @@ use crate::{
     corpus::{Corpus, PowerScheduleData}, 
     fuzzer::Evaluator,
     inputs::Input,
-    executors::Executor,
+    executors::{Executor, HasObservers},
+    observers::ObserversTuple,
     stages::Stage,
     state::{HasCorpus, HasMetadata},
     Error,
@@ -14,27 +15,29 @@ use crate::{
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct CalibrateStage<C, E, EM, I, S, Z>
+pub struct CalibrateStage<C, E, EM, I, OT, S, Z>
 where
     C: Corpus<I>,
-    E: Executor<EM, I, S, Z>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I>,
     Z: Evaluator<E, EM, I, S>,
 {
-    total_exec_us: f64,
+    map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, S, Z)>,
+    phantom: PhantomData<(C, E, EM, I, OT, S, Z)>,
 }
 
 // The number of times we run the program in the calibration stage
 const CAL_STAGE_MAX : usize = 8;
 
-impl<C, E, EM, I, S, Z> Stage<E, EM, S, Z> for CalibrateStage<C, E, EM, I, S, Z>
+impl<C, E, EM, I, OT, S, Z> Stage<E, EM, S, Z> for CalibrateStage<C, E, EM, I, OT, S, Z>
 where
     C: Corpus<I>,
-    E: Executor<EM, I, S, Z>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I>,
     Z: Evaluator<E, EM, I, S>,
 {
@@ -65,18 +68,19 @@ where
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let mut data = testcase.metadata_mut().get_mut::<PowerScheduleData>().unwrap();
         data.exec_us += (end - start) / (iter as u32);
-        data.bitmap_size = 0; // TODO
+        // data.bitmap_size = executor.observers().match_name::<MapObserver<usize>>(self.map_observer_name).unwrap();
         data.handicap = 0; // TODO
 
         Ok(())
     }
 }
 
-impl<C, E, I, EM, S, Z> CalibrateStage<C, E, EM, I, S, Z>
+impl<C, E, I, EM, OT, S, Z> CalibrateStage<C, E, EM, I, OT, S, Z>
 where
     C: Corpus<I>,
-    E: Executor<EM, I, S, Z>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I>,
     Z: Evaluator<E, EM, I, S>,
 {
@@ -85,9 +89,9 @@ where
         CAL_STAGE_MAX
     }
 
-    pub fn new() -> Self {
+    pub fn new(map_observer_name: String) -> Self {
         Self {
-            total_exec_us: 0.0,
+            map_observer_name: map_observer_name,
             phantom: PhantomData,
         }
     }
