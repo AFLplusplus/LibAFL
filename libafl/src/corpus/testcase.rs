@@ -208,9 +208,9 @@ where
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PowerScheduleData {
-    /// Number of bits set in bitmap
+    /// Number of bits set in bitmap, updated in calibrate_case
     pub bitmap_size: u64,
-    /// Number of fuzzing iterations
+    /// Number of fuzzing iterations, updated in perform_mutational
     pub fuzz_level: u64,
     /// Number of queue cycles behind
     pub handicap: u64,
@@ -218,7 +218,7 @@ pub struct PowerScheduleData {
     pub depth: u64,
     /// Offset in n_fuzz
     pub n_fuzz_entry: usize,
-    /// Average time spent in calibration stage
+    /// Average time spent in calibration stage, updated in calibrate_case
     pub exec_us: u128,
 }
 

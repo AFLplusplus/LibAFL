@@ -82,6 +82,44 @@ where
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
         Ok(self.calculate_score(psdata, caldata, fuzz_mu))
     }
+
+    #[allow(clippy::cast_possible_wrap)]
+    fn perform_mutational(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+        corpus_idx: usize,
+    ) -> Result<(), Error> {
+        let num = self.iterations(state, corpus_idx)?;
+
+        for i in 0..num {
+            let mut input = state
+                .corpus()
+                .get(corpus_idx)?
+                .borrow_mut()
+                .load_input()?
+                .clone();
+
+            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+
+            // Time is measured directly the `evaluate_input` function
+            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
+
+            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+        }
+
+        state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .metadata_mut()
+            .get_mut::<PowerScheduleData>()
+            .unwrap()
+            .fuzz_level += 1;
+        Ok(())
+    }
 }
 
 impl<C, E, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<C, E, EM, I, M, S, Z>
