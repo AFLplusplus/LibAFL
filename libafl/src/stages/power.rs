@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use alloc::string::String;
 
 use crate::{
     corpus::{Corpus, PowerScheduleData},
