@@ -20,6 +20,11 @@ pub enum PowerSchedule {
     EXPLOIT,
 }
 
+const POWER_BETA: f64 = 1.0;
+const MAX_FACTOR: f64 = POWER_BETA * 32.0;
+const N_FUZZ_SIZE: usize = 1 << 21;
+const HAVOC_MAX_MULT: f64 = 64.0;
+
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<C, E, EM, I, M, S, Z>
@@ -31,6 +36,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
+    n_fuzz: [u32; (1 << 21)],
     strat: PowerSchedule,
     phantom: PhantomData<(C, E, EM, I, S, Z)>,
 }
@@ -104,6 +110,7 @@ where
     pub fn new(mutator: M, strat: PowerSchedule) -> Self {
         Self {
             mutator: mutator,
+            n_fuzz: [0; N_FUZZ_SIZE],
             strat: strat,
             phantom: PhantomData,
         }
@@ -170,7 +177,44 @@ where
             PowerSchedule::EXPLORE => {
                 // Nothing happens in EXPLORE
             }
-            _ => {}
+            PowerSchedule::EXPLOIT => {
+                factor = MAX_FACTOR;
+            }
+            PowerSchedule::COE => {
+                let fuzz_mu = 0.0;
+                let n_paths = 0;
+                // TODO
+            }
+            PowerSchedule::FAST => {
+                if psdata.fuzz_level != 0 {
+                    let lg = (self.n_fuzz[psdata.n_fuzz_entry] as f64).log2() as u32;
+                    // TODO, need to look into q->favored.
+                }
+            }
+            PowerSchedule::LIN => {
+                factor = (psdata.fuzz_level as f64) / (self.n_fuzz[psdata.n_fuzz_entry] + 1) as f64;
+            }
+            PowerSchedule::QUAD => {
+                factor = ((psdata.fuzz_level * psdata.fuzz_level) as f64)
+                    / (self.n_fuzz[psdata.n_fuzz_entry] + 1) as f64;
+            }
+        }
+
+        perf_score *= factor / POWER_BETA;
+
+        // Lower bound if the strat is not COE.
+        match self.strat {
+            PowerSchedule::COE => {}
+            _ => {
+                if perf_score < 1.0 {
+                    perf_score = 1.0;
+                }
+            }
+        }
+
+        // Upper bound
+        if perf_score > HAVOC_MAX_MULT * 100.0 {
+            perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
         perf_score as usize

@@ -1,6 +1,5 @@
-use core::marker::PhantomData;
 use alloc::string::String;
-
+use core::marker::PhantomData;
 
 use crate::{
     bolts::current_time,
