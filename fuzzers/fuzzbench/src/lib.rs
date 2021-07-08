@@ -34,7 +34,7 @@ use libafl::{
         token_mutations::I2SRandReplace,
         tokens_mutations, Tokens,
     },
-    observers::{StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
