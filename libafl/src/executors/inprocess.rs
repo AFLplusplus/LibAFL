@@ -577,6 +577,7 @@ mod windows_exception_handler {
     }*/
 
     impl Handler for InProcessExecutorHandlerData {
+        #[allow(clippy::not_unsafe_ptr_arg_deref)]
         fn handle(&mut self, code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
