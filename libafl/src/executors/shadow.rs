@@ -9,26 +9,6 @@ use crate::{
     Error,
 };
 
-pub trait HasShadowObserverHooks<EM, I, S, SOT, Z> {
-    /// Run the pre exec hook for all the shadow [`crate::observers::Observer`]`s`
-    fn pre_exec_shadow_observers(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error>;
-
-    /// Run the post exec hook for all the shadow [`crate::observers::Observer`]`s`
-    fn post_exec_shadow_observers(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error>;
-}
-
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
 pub struct ShadowExecutor<E, I, S, SOT> {
     executor: E,

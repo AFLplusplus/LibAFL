@@ -14,7 +14,7 @@ pub mod combined;
 pub use combined::CombinedExecutor;
 
 pub mod shadow;
-pub use shadow::{HasShadowObserverHooks, ShadowExecutor};
+pub use shadow::ShadowExecutor;
 
 use crate::{
     inputs::{HasTargetBytes, Input},
