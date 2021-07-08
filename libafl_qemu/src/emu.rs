@@ -25,7 +25,7 @@ extern "C" {
     fn target_munmap(start: u64, len: u64) -> i32;
 
     static exec_path: *const u8;
-    static guest_base: isize;
+    static guest_base: usize;
 
     static mut libafl_exec_edge_hook: unsafe extern "C" fn(u32);
     static mut libafl_gen_edge_hook: unsafe extern "C" fn(u64, u64) -> u32;
@@ -95,10 +95,10 @@ where
     let reg = reg.into();
     let mut val = T::zero();
     let success = unsafe { libafl_qemu_read_reg(reg, &mut val as *mut _ as *mut u8) };
-    if success != 0 {
-        Ok(val)
-    } else {
+    if success == 0 {
         Err(format!("Failed to read register {}", reg))
+    } else {
+        Ok(val)
     }
 }
 
@@ -115,13 +115,13 @@ pub fn run() {
 }
 
 #[must_use]
-pub fn g2h(addr: u64) -> *mut u8 {
-    unsafe { transmute(addr as isize + guest_base) }
+pub fn g2h<T>(addr: u64) -> *mut T {
+    unsafe { transmute(addr + guest_base as u64) }
 }
 
 #[must_use]
-pub fn h2g(addr: *const u8) -> u64 {
-    unsafe { (transmute::<_, isize>(addr) - guest_base) as u64 }
+pub fn h2g<T>(addr: *const T) -> u64 {
+    unsafe { (addr as usize - guest_base) as u64 }
 }
 
 #[must_use]
@@ -140,10 +140,10 @@ pub fn map_private(addr: u64, size: usize, perms: MmapPerms) -> Result<u64, Stri
             0,
         )
     };
-    if res != 0 {
-        Ok(res)
-    } else {
+    if res == 0 {
         Err(format!("Failed to map {}", addr))
+    } else {
+        Ok(res)
     }
 }
 
