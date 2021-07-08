@@ -4,9 +4,11 @@ pub mod amd64;
 pub mod x86;
 
 pub mod elf;
-pub mod emu;
 pub mod executor;
 pub mod hooks;
+
+#[cfg(target_os = "linux")]
+pub mod emu;
 
 pub use emu::*;
 pub use executor::QemuExecutor;

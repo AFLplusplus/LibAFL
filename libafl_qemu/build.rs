@@ -5,13 +5,17 @@ fn main() {
     let out_dir = out_dir.to_string_lossy().to_string();
     let src_dir = Path::new("src");
 
-    println!("cargo:rerun-if-changed=src/weaks.c");
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
-    cc::Build::new()
-        .file(src_dir.join("weaks.c"))
-        .compile("weaks");
+    if target_os == "linux" {
+        println!("cargo:rerun-if-changed=src/weaks.c");
 
-    println!("cargo:rustc-link-search=native={}", &out_dir);
+        cc::Build::new()
+            .file(src_dir.join("weaks.c"))
+            .compile("weaks");
+
+        println!("cargo:rustc-link-search=native={}", &out_dir);
+    }
 
     println!("cargo:rerun-if-changed=build.rs");
 }

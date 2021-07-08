@@ -11,6 +11,7 @@ members = [
     "libafl_cc",
     "libafl_targets",
     "libafl_frida",
+    "libafl_qemu",
     "libafl_tests",
 ]
 default-members = [
@@ -22,5 +23,4 @@ default-members = [
 ]
 exclude = [
     "fuzzers",
-    "libafl_qemu",
 ]
