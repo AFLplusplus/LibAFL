@@ -13,7 +13,7 @@ use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::ExitKind,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
@@ -25,7 +25,7 @@ use libafl::{
     stats::SimpleStats,
     Error,
 };
-use libafl_qemu::{amd64::Amd64Regs, elf::EasyElf, filter_qemu_args, MmapPerms, QemuEmulator};
+use libafl_qemu::{amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, MmapPerms, QemuExecutor};
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -150,39 +150,37 @@ fn fuzz(
     _logfile: PathBuf,
     _timeout: Duration,
 ) -> Result<(), Error> {
-    let mut emu = QemuEmulator::new();
-
-    emu.set_gen_edge_hook(gen_edges);
-    emu.set_exec_edge_hook(exec_edges);
+    emu::set_gen_edge_hook(gen_edges);
+    emu::set_exec_edge_hook(exec_edges);
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.exec_path(), &mut elf_buffer)?;
+    let elf = EasyElf::from_file(emu::binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf.resolve_symbol("LLVMFuzzerTestOneInput").unwrap();
 
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
-    emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
 
-    emu.run();
+    emu::run();
 
     println!(
         "Break at {:#x}",
-        emu.read_reg::<_, u64>(Amd64Regs::Rip).unwrap()
+        emu::read_reg::<_, u64>(Amd64Regs::Rip).unwrap()
     );
 
-    let stack_ptr: u64 = emu.read_reg(Amd64Regs::Rsp).unwrap();
+    let stack_ptr: u64 = emu::read_reg(Amd64Regs::Rsp).unwrap();
     let mut ret_addr = [0u64];
-    emu.read_mem(stack_ptr, &mut ret_addr);
+    emu::read_mem(stack_ptr, &mut ret_addr);
     let ret_addr = ret_addr[0];
 
     println!("Stack pointer = {:#x}", stack_ptr);
     println!("Return address = {:#x}", ret_addr);
 
-    emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    emu::remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    emu::set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = emu::map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
 
     println!("Placing input at {:#x}", input_addr);
 
@@ -194,14 +192,14 @@ fn fuzz(
             buf = &buf[0..32];
         }
 
-        emu.write_mem(input_addr, buf);
+        emu::write_mem(input_addr, buf);
 
-        emu.write_reg(Amd64Regs::Rdi, input_addr).unwrap();
-        emu.write_reg(Amd64Regs::Rsi, buf.len()).unwrap();
-        emu.write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
-        emu.write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
+        emu::write_reg(Amd64Regs::Rdi, input_addr).unwrap();
+        emu::write_reg(Amd64Regs::Rsi, buf.len()).unwrap();
+        emu::write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
+        emu::write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
 
-        emu.run();
+        emu::run();
 
         ExitKind::Ok
     };
@@ -250,7 +248,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::new(
+    let mut executor = QemuExecutor::new(
         &mut harness,
         tuple_list!(edges_observer),
         &mut fuzzer,
