@@ -3,9 +3,10 @@
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write, path::PathBuf};
+use std::{fs, fs::File, io::Write};
 
 use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, state::HasMetadata, Error};
 
@@ -31,7 +32,7 @@ where
 {
     entries: Vec<RefCell<Testcase<I>>>,
     current: Option<usize>,
-    dir_path: PathBuf,
+    dir_path: String,
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
@@ -50,7 +51,7 @@ where
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
-            let filename = self.dir_path.join(
+            let filename = PathBuf::from(&self.dir_path).join(
                 testcase
                     .input()
                     .as_ref()
@@ -128,7 +129,7 @@ where
         Ok(Self {
             entries: vec![],
             current: None,
-            dir_path,
+            dir_path: dir_path.into_os_string().into_string().unwrap(),
             meta_format: None,
         })
     }
@@ -143,7 +144,7 @@ where
         Ok(Self {
             entries: vec![],
             current: None,
-            dir_path,
+            dir_path: dir_path.into_os_string().into_string().unwrap(),
             meta_format,
         })
     }
