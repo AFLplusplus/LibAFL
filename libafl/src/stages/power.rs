@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use xxhash_rust::xxh3;
 
 use crate::{
     corpus::{Corpus, PowerScheduleTestData},
@@ -107,9 +108,10 @@ where
             // Time is measured directly the `evaluate_input` function
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
+            let mut hash: usize = 0; // TODO
             match corpus_idx {
                 Some(idx) => {
-                    let hash: usize = 0; // TODO
+                    hash = 0;
                     state
                         .corpus()
                         .get(idx)?
@@ -119,9 +121,12 @@ where
                         .unwrap()
                         .n_fuzz_entry = hash;
 
+                    self.n_fuzz[hash] = 1;
+                }
+                None => {
+                    assert!(self.n_fuzz[hash] != 0);
                     self.n_fuzz[hash] += 1;
                 }
-                None => {}
             }
 
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
