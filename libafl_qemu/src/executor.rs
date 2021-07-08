@@ -21,11 +21,7 @@ extern "C" fn gen_edge_hook_wrapper<S>(src: u64, dst: u64) -> u32 {
     unsafe {
         let state = (GLOBAL_STATE.state_ptr as *mut S).as_mut().unwrap();
         let func: fn(&mut S, u64, u64) -> Option<u32> = transmute(GEN_EDGE_HOOK_PTR);
-        if let Some(id) = (func)(state, src, dst) {
-            id
-        } else {
-            SKIP_EXEC_HOOK
-        }
+        (func)(state, src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -33,11 +29,7 @@ extern "C" fn gen_block_hook_wrapper<S>(addr: u64) -> u32 {
     unsafe {
         let state = (GLOBAL_STATE.state_ptr as *mut S).as_mut().unwrap();
         let func: fn(&mut S, u64) -> Option<u32> = transmute(GEN_BLOCK_HOOK_PTR);
-        if let Some(id) = (func)(state, addr) {
-            id
-        } else {
-            SKIP_EXEC_HOOK
-        }
+        (func)(state, addr).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -75,20 +67,24 @@ where
         })
     }
 
+    #[allow(clippy::unused_self)]
     pub fn hook_edge_generation(&self, hook: fn(&mut S, u64, u64) -> Option<u32>) {
         unsafe { GEN_EDGE_HOOK_PTR = hook as *const _ };
         emu::set_gen_edge_hook(gen_edge_hook_wrapper::<S>);
     }
 
+    #[allow(clippy::unused_self)]
     pub fn hook_edge_execution(&self, hook: extern "C" fn(u32)) {
         emu::set_exec_edge_hook(hook);
     }
 
+    #[allow(clippy::unused_self)]
     pub fn hook_block_generation(&self, hook: fn(&mut S, u64) -> Option<u32>) {
         unsafe { GEN_BLOCK_HOOK_PTR = hook as *const _ };
         emu::set_gen_block_hook(gen_block_hook_wrapper::<S>);
     }
 
+    #[allow(clippy::unused_self)]
     pub fn hook_block_execution(&self, hook: extern "C" fn(u64)) {
         emu::set_exec_block_hook(hook);
     }

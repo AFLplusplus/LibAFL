@@ -1,7 +1,6 @@
-//! Expose QEMU user LibAFL C api to Rust
+//! Expose QEMU user `LibAFL` C api to Rust
 
 use core::{convert::Into, mem::transmute, ptr::copy_nonoverlapping};
-use libc;
 use num::Num;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::{mem::size_of, slice::from_raw_parts, str::from_utf8_unchecked};
@@ -69,6 +68,7 @@ pub fn read_mem<T>(addr: u64, buf: &mut [T]) {
     }
 }
 
+#[must_use]
 pub fn num_regs() -> i32 {
     unsafe { libafl_qemu_num_regs() }
 }
@@ -80,10 +80,10 @@ where
 {
     let reg = reg.into();
     let success = unsafe { libafl_qemu_write_reg(reg, &val as *const _ as *const u8) };
-    if success != 0 {
-        Ok(())
-    } else {
+    if success == 0 {
         Err(format!("Failed to write to register {}", reg))
+    } else {
+        Ok(())
     }
 }
 
@@ -114,14 +114,17 @@ pub fn run() {
     unsafe { libafl_qemu_run() };
 }
 
+#[must_use]
 pub fn g2h(addr: u64) -> *mut u8 {
     unsafe { transmute(addr as isize + guest_base) }
 }
 
+#[must_use]
 pub fn h2g(addr: *const u8) -> u64 {
     unsafe { (transmute::<_, isize>(addr) - guest_base) as u64 }
 }
 
+#[must_use]
 pub fn binary_path<'a>() -> &'a str {
     unsafe { from_utf8_unchecked(from_raw_parts(exec_path, strlen(exec_path))) }
 }

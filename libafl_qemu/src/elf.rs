@@ -27,14 +27,17 @@ impl<'a> EasyElf<'a> {
         Ok(Self { elf })
     }
 
+    #[must_use]
     pub fn goblin(&self) -> &Elf<'a> {
         &self.elf
     }
 
+    #[must_use]
     pub fn goblin_mut(&mut self) -> &mut Elf<'a> {
         &mut self.elf
     }
 
+    #[must_use]
     pub fn resolve_symbol(&self, name: &str) -> Option<u64> {
         for sym in self.elf.syms.iter() {
             if let Some(sym_name) = self.elf.strtab.get_at(sym.st_name) {

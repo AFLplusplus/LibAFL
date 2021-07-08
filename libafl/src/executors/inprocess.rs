@@ -696,7 +696,7 @@ mod tests {
 
     use crate::{
         bolts::tuples::tuple_list,
-        executors::{inprocess, Executor, ExitKind, InProcessExecutor},
+        executors::{Executor, ExitKind, InProcessExecutor},
         inputs::NopInput,
     };
 

@@ -5,12 +5,13 @@ use libafl::state::HasMetadata;
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM};
 
 /// A testcase metadata saying if a testcase is favored
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
     pub map: HashMap<(u64, u64), u32>,
 }
 
 impl QemuEdgesMapMetadata {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: HashMap::new(),
