@@ -1,7 +1,5 @@
 //! Operating System specific abstractions
 
-use alloc::vec::Vec;
-
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
 
@@ -101,6 +99,7 @@ pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
 /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
 /// ` ./fuzzer --cores all` -> one client runs on each available core
 #[must_use]
+#[cfg(feature = "std")]
 pub fn parse_core_bind_arg(args: &str) -> Option<Vec<usize>> {
     let mut cores: Vec<usize> = vec![];
     if args == "all" {
