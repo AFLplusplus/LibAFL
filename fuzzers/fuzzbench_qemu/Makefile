@@ -22,6 +22,8 @@ ifeq ($(strip $(BUILD_TARGET)),release)
   CARGO_ARGS+= --release
 endif
 
+UNAME := $(shell uname)
+
 .PHONY: clean short_test all
 
 all: build/qemu-$(CPU_TARGET)
@@ -46,5 +48,14 @@ clean:
 	rm -rf build
 	cargo clean
 
+ifeq ($(UNAME), Linux)
+
 short_test: target/$(BUILD_TARGET)/lib$(FUZZER_NAME).a
 	@echo "Skipping short test"
+
+else
+
+short_test:
+	@echo "Skipping build and short test"
+
+endif
