@@ -38,3 +38,17 @@ Currently, the supported flags are:
 This is a library that provides some utils to wrap compilers and create source level fuzzers.
 
 At the moment, only the Clang compiler is supported.
+
+### libafl_frida
+
+This library bridges libafl with Frida as instrumentation backend.
+
+With this crate you can instrument targets on Linux/macOS/Windows/Android for coverage collection.
+
+The CmpLog and AddressSanitizer instrumentation and runtimes are currently supported only for ARM64.
+
+### libafl_qemu
+
+This library bridges libafl with QEMU user-mode to fuzz ELF binaries.
+
+It works on Linux and can collect edge coverage withotu collisions.
