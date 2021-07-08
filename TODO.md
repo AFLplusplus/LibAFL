@@ -2,16 +2,16 @@
 
 - [ ] Objective-Specific Corpuses (named per objective)
 - [ ] Good documentation
-- [ ] LLMP compression
-- [ ] AFL-Style Forkserver Executor
 - [ ] LAIN / structured fuzzing example
 - [ ] More informative outpus, deeper introspection (stats, what mutation did x, etc.)
 - [ ] Timeout handling for llmp clients (no ping for n seconds -> treat as disconnected)
-- [ ] "Launcher" example that spawns broker + n clients
 - [ ] Heap for signal handling (bumpallo or llmp directly?)
 - [ ] Frida support for Windows
-- [ ] QEMU based instrumentation
-- [ ] AFL++ LLVM passes in libafl_cc
+- [x] LLMP compression
+- [x] AFL-Style Forkserver Executor
+- [x] "Launcher" example that spawns broker + n clients
+- [x] QEMU based instrumentation
+- [x] AFL++ LLVM passes in libafl_cc
 - [x] LLMP Cross Machine Link (2 brokers connected via TCP)
 - [x] Conditional composition of feedbacks (issue #24)
 - [x] Other objectives examples (e.g. execution of a given program point)
