@@ -202,6 +202,7 @@ where
                     Z,
                 > as *const _,
                 // timeout_handler: windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S, Z> as *const _,
+                timeout_handler: ptr::null(),
                 phantom: PhantomData,
             })
         }
@@ -541,7 +542,7 @@ mod unix_signal_handler {
 #[cfg(all(windows, feature = "std"))]
 mod windows_exception_handler {
     use alloc::vec::Vec;
-    use core::ptr;
+    use core::{mem::transmute, ptr};
     #[cfg(feature = "std")]
     use std::io::{stdout, Write};
 
