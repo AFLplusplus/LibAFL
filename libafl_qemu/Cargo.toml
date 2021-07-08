@@ -16,6 +16,7 @@ edition = "2018"
 [dependencies]
 libafl = { path = "../libafl", version = "0.5.0" }
 libafl_targets = { path = "../libafl_targets", version = "0.5.0" }
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
 num = "0.4"
 num_enum = "0.5.1"

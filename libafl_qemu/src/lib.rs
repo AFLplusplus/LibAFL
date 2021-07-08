@@ -6,6 +6,7 @@ pub mod x86;
 pub mod elf;
 pub mod emu;
 pub mod executor;
+pub mod hooks;
 
 pub use emu::*;
 pub use executor::QemuExecutor;

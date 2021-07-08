@@ -10,9 +10,14 @@ use std::{
 };
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{OnDiskCorpus, QueueCorpusScheduler},
-    events::SimpleEventManager,
+    bolts::{
+        current_nanos,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+    },
+    corpus::{Corpus, OnDiskCorpus, QueueCorpusScheduler},
+    events::SimpleRestartingEventManager,
     executors::ExitKind,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -21,11 +26,13 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{HitcountsMapObserver, VariableMapObserver},
     stages::mutational::StdMutationalStage,
-    state::StdState,
+    state::{HasCorpus, StdState},
     stats::SimpleStats,
     Error,
 };
-use libafl_qemu::{amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, MmapPerms, QemuExecutor};
+use libafl_qemu::{
+    amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, hooks, MmapPerms, QemuExecutor,
+};
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -125,22 +132,6 @@ pub fn libafl_qemu_main() {
         .expect("An error occurred while fuzzing");
 }
 
-const MAP_SIZE: usize = 1048576;
-static mut EDGES_COUNTER: usize = 0;
-static mut EDGES_MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-
-extern "C" fn gen_edges(_src: u64, _dest: u64) -> u32 {
-    unsafe {
-        let id = EDGES_COUNTER;
-        EDGES_COUNTER = (EDGES_COUNTER + 1) & (MAP_SIZE - 1);
-        id as u32
-    }
-}
-
-extern "C" fn exec_edges(id: u32) {
-    unsafe { EDGES_MAP[id as usize] += 1 };
-}
-
 /// The actual fuzzer
 fn fuzz(
     corpus_dir: PathBuf,
@@ -150,18 +141,13 @@ fn fuzz(
     _logfile: PathBuf,
     _timeout: Duration,
 ) -> Result<(), Error> {
-    emu::set_gen_edge_hook(gen_edges);
-    emu::set_exec_edge_hook(exec_edges);
-
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu::binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf.resolve_symbol("LLVMFuzzerTestOneInput").unwrap();
-
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
     emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-
     emu::run();
 
     println!(
@@ -181,8 +167,63 @@ fn fuzz(
     emu::set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
     let input_addr = emu::map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
-
     println!("Placing input at {:#x}", input_addr);
+
+    let stats = SimpleStats::new(|s| {
+        println!("{}", s);
+    });
+
+    let mut shmem_provider = StdShMemProvider::new()?;
+
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
+        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {}", err);
+            }
+        },
+    };
+
+    // Create an observation channel using the coverage map
+    let edges = unsafe { &mut hooks::EDGES_MAP };
+    let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
+    let edges_observer =
+        HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+
+    // The state of the edges feedback.
+    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+
+    // New maximization map feedback linked to the edges observer and the feedback state
+    let feedback = MaxMapFeedback::new(&feedback_state, &edges_observer);
+
+    // A feedback to choose if an input is a solution or not
+    let objective = CrashFeedback::new();
+
+    // create a State from scratch
+    let mut state = state.unwrap_or_else(|| {
+        StdState::new(
+            // RNG
+            StdRand::with_seed(current_nanos()),
+            // Corpus that will be evolved, we keep it in memory for performance
+            OnDiskCorpus::new(corpus_dir).unwrap(),
+            // Corpus in which we store solutions (crashes in this example),
+            // on disk so the user can get them after stopping the fuzzer
+            OnDiskCorpus::new(objective_dir).unwrap(),
+            // States of the feedbacks.
+            // They are the data related to the feedbacks that you want to persist in the State.
+            tuple_list!(feedback_state),
+        )
+    });
+
+    // A queue policy to get testcasess from the corpus
+    let scheduler = QueueCorpusScheduler::new();
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
@@ -204,49 +245,6 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let stats = SimpleStats::new(|s| {
-        println!("{}", s);
-    });
-
-    // Create an observation channel using the coverage map
-    let edges = unsafe { &mut EDGES_MAP };
-    let edges_counter = unsafe { &mut EDGES_COUNTER };
-    let edges_observer =
-        HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
-
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
-    // New maximization map feedback linked to the edges observer and the feedback state
-    let feedback = MaxMapFeedback::new(&feedback_state, &edges_observer);
-
-    // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
-
-    // create a State from scratch
-    let mut state = StdState::new(
-        // RNG
-        StdRand::with_seed(current_nanos()),
-        // Corpus that will be evolved, we keep it in memory for performance
-        OnDiskCorpus::new(corpus_dir).unwrap(),
-        // Corpus in which we store solutions (crashes in this example),
-        // on disk so the user can get them after stopping the fuzzer
-        OnDiskCorpus::new(objective_dir).unwrap(),
-        // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
-    );
-
-    // The event manager handle the various events generated during the fuzzing loop
-    // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
-
-    // A queue policy to get testcasess from the corpus
-    let scheduler = QueueCorpusScheduler::new();
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = QemuExecutor::new(
         &mut harness,
@@ -256,13 +254,18 @@ fn fuzz(
         &mut mgr,
     )?;
 
-    // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    executor.hook_edge_generation(hooks::gen_unique_edges_id);
+    executor.hook_edge_execution(hooks::exec_log_hitcount);
 
-    // Generate 8 initial inputs
-    state
-        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-        .expect("Failed to generate the initial corpus");
+    if state.corpus().count() < 1 {
+        // Generator of printable bytearrays of max size 32
+        let mut generator = RandPrintablesGenerator::new(32);
+
+        // Generate 8 initial inputs
+        state
+            .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+            .expect("Failed to generate the initial corpus");
+    }
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
