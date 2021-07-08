@@ -11,6 +11,8 @@ pub mod x86;
 
 pub mod elf;
 
+pub const SKIP_EXEC_HOOK: u32 = u32::MAX;
+
 extern "C" {
     fn libafl_qemu_write_reg(reg: i32, val: *const u8) -> i32;
     fn libafl_qemu_read_reg(reg: i32, val: *mut u8) -> i32;
@@ -33,6 +35,8 @@ extern "C" {
     
     static mut libafl_exec_edge_hook: unsafe extern "C" fn(u32);
     static mut libafl_gen_edge_hook: unsafe extern "C" fn(u64, u64) -> u32;
+    static mut libafl_exec_block_hook: unsafe extern "C" fn(u64);
+    static mut libafl_gen_block_hook: unsafe extern "C" fn(u64) -> u32;
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
@@ -162,6 +166,14 @@ impl QemuEmulator {
     
     pub fn set_gen_edge_hook(&mut self, hook: extern "C" fn(u64, u64) -> u32) {
         unsafe { libafl_gen_edge_hook = hook };
+    }
+
+    pub fn set_exec_block_hook(&mut self, hook: extern "C" fn(u64)) {
+        unsafe { libafl_exec_block_hook = hook };
+    }
+    
+    pub fn set_gen_block_hook(&mut self, hook: extern "C" fn(u64) -> u32) {
+        unsafe { libafl_gen_block_hook = hook };
     }
 
     pub fn new() -> Self {
