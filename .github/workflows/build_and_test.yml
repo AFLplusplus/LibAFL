@@ -90,7 +90,7 @@ jobs:
     - name: Build aarch64-unknown-none
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
-      run: cd ./fuzzers/baby_no_std && cargo +nightly run; test $? -ne 1 || echo 'no_std fuzzer did not find the panic!'
+      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
   build-docker:
     runs-on: ubunutu-latest
     steps:
