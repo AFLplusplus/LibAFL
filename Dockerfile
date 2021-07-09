@@ -43,6 +43,8 @@ COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
 
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
 COPY scripts/dummy.rs libafl_cc/src/lib.rs
+COPY libafl_cc/build.rs libafl_cc/build.rs
+COPY libafl_cc/src/cmplog-routines-pass.cc libafl_cc/src/cmplog-routines-pass.cc
 
 COPY libafl_targets/Cargo.toml libafl_targets/build.rs libafl_targets/
 COPY libafl_targets/src libafl_targets/src
@@ -77,6 +79,8 @@ RUN touch libafl/src/lib.rs
 COPY libafl_targets/src libafl_targets/src
 RUN touch libafl_targets/src/lib.rs
 COPY libafl_frida/src libafl_frida/src
+RUN touch libafl_qemu/src/lib.rs
+COPY libafl_qemu/src libafl_qemu/src
 RUN touch libafl_frida/src/lib.rs
 RUN cargo build && cargo build --release
 
