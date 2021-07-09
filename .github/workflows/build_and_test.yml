@@ -21,6 +21,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+      - uses: Swatinem/rust-cache@v1
       - name: Add clippy
         run: rustup component add clippy
       #- name: Run clippy
@@ -37,6 +38,7 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - uses: Swatinem/rust-cache@v1
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang
     - name: get clang version
@@ -71,6 +73,7 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
@@ -85,6 +88,7 @@ jobs:
       with:
         profile: minimal
         toolchain: nightly
+    - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly rust-src 
     - name: Build aarch64-unknown-none
@@ -105,6 +109,7 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - uses: Swatinem/rust-cache@v1
     - name: Windows Build
       run: cargo build --verbose
     - name: Run clippy
@@ -119,6 +124,7 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - uses: Swatinem/rust-cache@v1
     - name: MacOS Build
       run: cargo build --verbose
     - name: Run clippy
@@ -135,6 +141,7 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
