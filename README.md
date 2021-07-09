@@ -28,7 +28,7 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 
 + SanitizerCoverage, in [libafl_targets](./libafl_targets)
 + Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net>
-+ More to come (QEMU-mode, ...)
++ QEMU user-mode, in [libafl_qemu](./libafl_qemu)
 
 ## Getting started
 
