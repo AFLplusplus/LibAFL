@@ -23,8 +23,6 @@ jobs:
           toolchain: stable
       - name: Add clippy
         run: rustup component add clippy
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
       #- name: Run clippy
       #  uses: actions-rs/cargo@v1
       #  with:
@@ -73,6 +71,8 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang nasm
     - name: Build and run example fuzzers
@@ -115,9 +115,10 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: brew install llvm libpng nasm
- 
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
     - name: Build and run example fuzzers
