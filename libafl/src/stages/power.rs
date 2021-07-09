@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 use xxhash_rust::xxh3;
+use alloc::string::String;
 
 use crate::{
     corpus::{Corpus, PowerScheduleTestData},
