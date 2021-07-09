@@ -14,8 +14,4 @@
 - [Design](./design/design.md)
   - [Core Concepts](./design/core_concepts.md)
   - [Architecture](./design/architecture.md)
-
-- [Understanding Metadata](./medatata/metadata.md)
-  - [Definition](./medatata/definition.md)
-  - [(De)Serialization](./medatata/de_serialization.md)
-  - [Usage](./medatata/usage.md)
+  - [Metadata](./design/metadata.md)
