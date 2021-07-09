@@ -32,7 +32,7 @@ where
 {
     entries: Vec<RefCell<Testcase<I>>>,
     current: Option<usize>,
-    dir_path: String,
+    dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
@@ -51,7 +51,7 @@ where
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
-            let filename = PathBuf::from(&self.dir_path).join(
+            let filename = self.dir_path.join(
                 testcase
                     .input()
                     .as_ref()
@@ -129,7 +129,7 @@ where
         Ok(Self {
             entries: vec![],
             current: None,
-            dir_path: dir_path.into_os_string().into_string().unwrap(),
+            dir_path: dir_path,
             meta_format: None,
         })
     }
@@ -144,7 +144,7 @@ where
         Ok(Self {
             entries: vec![],
             current: None,
-            dir_path: dir_path.into_os_string().into_string().unwrap(),
+            dir_path: dir_path,
             meta_format,
         })
     }
