@@ -77,6 +77,20 @@ jobs:
       run: sudo apt-get install -y llvm llvm-dev clang nasm
     - name: Build and run example fuzzers
       run: ./scripts/build_all_fuzzers.sh
+  nostd-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup target add aarch64-unknown-none
+    - name: Build aarch64-unknown-none
+      run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+    - name: run x86_64 until panic!
+      run: cd ./fuzzers/baby_no_std && cargo +nightly run; test $? -eq 1 || echo 'no_std fuzzer did not find the panic!' || exit 1 
   windows:
     runs-on: windows-latest
     steps:
