@@ -29,7 +29,7 @@ use core::panic::PanicInfo;
 use static_alloc::Bump;
 
 #[global_allocator]
-static A: Bump<[u8; 1 << 16]> = Bump::uninit();
+static A: Bump<[u8; 512 * 1024 * 1024]> = Bump::uninit();
 
 #[cfg(not(any(windows, unix)))]
 #[panic_handler]
@@ -96,7 +96,7 @@ pub fn main() {
         #[cfg(any(windows, unix))]
         unsafe {
             printf(
-                [b'%' as c_char, b's' as c_char, 0 as c_char].as_ptr(),
+                [b'%' as c_char, b's' as c_char, b'\n' as c_char, 0 as c_char].as_ptr(),
                 CString::new(s).unwrap().as_ptr() as *const c_char,
             );
         }
