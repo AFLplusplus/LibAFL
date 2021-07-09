@@ -153,7 +153,9 @@ fn fuzz(
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu::binary_path(), &mut elf_buffer)?;
 
-    let test_one_input_ptr = elf.resolve_symbol("LLVMFuzzerTestOneInput").unwrap();
+    let test_one_input_ptr = elf
+        .resolve_symbol("LLVMFuzzerTestOneInput", emu::load_addr())
+        .expect("Symbol LLVMFuzzerTestOneInput not found".into());
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
     emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput

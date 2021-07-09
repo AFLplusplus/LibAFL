@@ -1,6 +1,6 @@
 //! Utilities to parse and process ELFs
 
-use goblin::elf::Elf;
+use goblin::elf::{header::ET_DYN, Elf};
 use std::{convert::AsRef, fs::File, io::Read, path::Path, str};
 
 use libafl::Error;
@@ -38,18 +38,26 @@ impl<'a> EasyElf<'a> {
     }
 
     #[must_use]
-    pub fn resolve_symbol(&self, name: &str) -> Option<u64> {
+    pub fn resolve_symbol(&self, name: &str, load_addr: u64) -> Option<u64> {
         for sym in self.elf.syms.iter() {
             if let Some(sym_name) = self.elf.strtab.get_at(sym.st_name) {
                 if sym_name == name {
                     return if sym.st_value == 0 {
                         None
                     } else {
-                        Some(sym.st_value)
+                        if self.is_pic() {
+                            Some(sym.st_value + load_addr)
+                        } else {
+                            Some(sym.st_value)
+                        }
                     };
                 }
             }
         }
         None
+    }
+
+    fn is_pic(&self) -> bool {
+        self.elf.header.e_type == ET_DYN
     }
 }
