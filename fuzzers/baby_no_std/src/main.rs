@@ -1,7 +1,8 @@
 #![no_std]
-#![feature(default_alloc_error_handler)]
 // Embedded targets: build with no_main
 #![cfg_attr(not(any(windows, unix)), no_main)]
+// Embedded needs alloc error handlers which only work on nightly right now...
+#![cfg_attr(not(any(windows, unix)), feature(default_alloc_error_handler))]
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
