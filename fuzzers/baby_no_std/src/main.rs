@@ -1,9 +1,7 @@
 #![no_std]
-#![no_main]
 #![feature(default_alloc_error_handler)]
-
-use core::panic::PanicInfo;
-use static_alloc::Bump;
+// Embedded targets: build with no_main
+#![cfg_attr(not(any(windows, unix)), no_main)]
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
@@ -21,9 +19,19 @@ use libafl::{
     stats::SimpleStats,
 };
 
+#[cfg(any(windows, unix))]
+use cstr_core::CString;
+#[cfg(any(windows, unix))]
+use libc::{c_char, printf};
+
+#[cfg(not(any(windows, unix)))]
+use core::panic::PanicInfo;
+use static_alloc::Bump;
+
 #[global_allocator]
 static A: Bump<[u8; 1 << 16]> = Bump::uninit();
 
+#[cfg(not(any(windows, unix)))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
@@ -83,7 +91,16 @@ pub fn main() {
     );
 
     // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| ());
+    let stats = SimpleStats::new(|s| {
+        // TODO: Print `s` here, if your target permits it.
+        #[cfg(any(windows, unix))]
+        unsafe {
+            printf(
+                [b'%' as c_char, b's' as c_char, 0 as c_char].as_ptr(),
+                CString::new(s).unwrap().as_ptr() as *const c_char,
+            );
+        }
+    });
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus

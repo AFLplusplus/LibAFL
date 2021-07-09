@@ -45,6 +45,9 @@ use core::fmt;
 #[cfg(feature = "std")]
 use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
 
+#[cfg(all(unix, feature = "std"))]
+use nix;
+
 /// Main error struct for AFL
 #[derive(Debug)]
 pub enum Error {
@@ -120,7 +123,7 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
         Self::Unknown(format!("{:?}", err))

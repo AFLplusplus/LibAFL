@@ -12,7 +12,7 @@ pub mod ashmem_server;
 #[cfg(unix)]
 pub mod unix_signals;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 pub mod pipes;
 
 #[cfg(all(unix, feature = "std"))]
