@@ -37,6 +37,10 @@ COPY libafl_frida/Cargo.toml libafl_frida/build.rs libafl_frida/
 COPY scripts/dummy.rs libafl_frida/src/lib.rs
 COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
+COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
+COPY scripts/dummy.rs libafl_qemu/src/lib.rs
+COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
+
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
 COPY scripts/dummy.rs libafl_cc/src/lib.rs
 
