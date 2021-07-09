@@ -92,7 +92,7 @@ jobs:
     - name: run x86_64 until panic!
       run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
   build-docker:
-    runs-on: ubunutu-latest
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Build docker
