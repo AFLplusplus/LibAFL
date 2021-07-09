@@ -2,8 +2,8 @@
 #![no_main]
 #![feature(default_alloc_error_handler)]
 
-use static_alloc::Bump;
 use core::panic::PanicInfo;
+use static_alloc::Bump;
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
