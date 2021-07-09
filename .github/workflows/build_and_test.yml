@@ -86,7 +86,7 @@ jobs:
         profile: minimal
         toolchain: nightly
     - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup target add aarch64-unknown-none && rustup component add rust-src --toolchain aarch64-unknown-none && rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly aarch64-unknown-none && rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
     - name: Build aarch64-unknown-none
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
