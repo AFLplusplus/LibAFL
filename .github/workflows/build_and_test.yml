@@ -23,6 +23,8 @@ jobs:
           toolchain: stable
       - name: Add clippy
         run: rustup component add clippy
+      - name: Add nightly rustfmt and clippy
+        run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
       #- name: Run clippy
       #  uses: actions-rs/cargo@v1
       #  with:
