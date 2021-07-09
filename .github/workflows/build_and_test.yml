@@ -71,10 +71,32 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang nasm
     - name: Build and run example fuzzers
       run: ./scripts/build_all_fuzzers.sh
+  nostd-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly rust-src 
+    - name: Build aarch64-unknown-none
+      run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+    - name: run x86_64 until panic!
+      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build docker
+      run: docker build -t libafl .
   windows:
     runs-on: windows-latest
     steps:
@@ -113,9 +135,10 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: brew install llvm libpng nasm
- 
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
     - name: Build and run example fuzzers
