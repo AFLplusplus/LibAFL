@@ -1,12 +1,11 @@
 //! The [`InProcessExecutor`] is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 
-use core::marker::PhantomData;
+use core::{ffi::c_void, marker::PhantomData, ptr};
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
-    ffi::c_void,
-    ptr::{self, write_volatile},
+    ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
 
@@ -28,6 +27,8 @@ use crate::{
 };
 
 /// The inmem executor simply calls a target function, then returns afterwards.
+#[allow(dead_code)]
+#[derive(Debug)]
 pub struct InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -54,9 +55,9 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
         #[cfg(unix)]
@@ -74,9 +75,9 @@ where
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         #[cfg(all(windows, feature = "std"))]
@@ -94,9 +95,9 @@ where
             //data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
 
@@ -210,6 +211,8 @@ where
         Ok(Self {
             harness_fn,
             observers,
+            crash_handler: ptr::null(),
+            timeout_handler: ptr::null(),
             phantom: PhantomData,
         })
     }

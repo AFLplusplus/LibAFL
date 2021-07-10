@@ -1,9 +1,7 @@
 //! Unix `pipe` wrapper for `LibAFL`
 use crate::Error;
-use nix::unistd::{close, pipe};
-
 #[cfg(feature = "std")]
-use nix::unistd::{read, write};
+use nix::unistd::{close, pipe, read, write};
 #[cfg(feature = "std")]
 use std::{
     io::{self, ErrorKind, Read, Write},
@@ -13,12 +11,14 @@ use std::{
 #[cfg(not(feature = "std"))]
 type RawFd = i32;
 
+#[cfg(feature = "std")]
 #[derive(Debug, Clone)]
 pub struct Pipe {
     read_end: Option<RawFd>,
     write_end: Option<RawFd>,
 }
 
+#[cfg(feature = "std")]
 impl Pipe {
     pub fn new() -> Result<Self, Error> {
         let (read_end, write_end) = pipe()?;
@@ -91,6 +91,7 @@ impl Write for Pipe {
     }
 }
 
+#[cfg(feature = "std")]
 impl Drop for Pipe {
     fn drop(&mut self) {
         if let Some(read_end) = self.read_end {
