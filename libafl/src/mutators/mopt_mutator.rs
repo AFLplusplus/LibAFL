@@ -104,23 +104,23 @@ impl fmt::Debug for MOpt {
             .field("\n\nv_now", &self.v_now)
             .field("\n\nprobability_now", &self.probability_now)
             .field("\n\nswarm_fitness", &self.swarm_fitness)
-            .field(
-                "\n\npilot_operator_finds",
-                &self.pilot_operator_finds,
-            )
+            .field("\n\npilot_operator_finds", &self.pilot_operator_finds)
             .field(
                 "\n\npilot_operator_finds_this",
                 &self.pilot_operator_finds_v2,
             )
             .field("\n\npilot_operator_cycles", &self.pilot_operator_cycles)
-            .field("\n\npilot_operator_cycles_v2", &self.pilot_operator_cycles_v2)
-            .field("\n\npilot_operator_cycles_v3", &self.pilot_operator_cycles_v3)
+            .field(
+                "\n\npilot_operator_cycles_v2",
+                &self.pilot_operator_cycles_v2,
+            )
+            .field(
+                "\n\npilot_operator_cycles_v3",
+                &self.pilot_operator_cycles_v3,
+            )
             .field("\n\noperator_finds_puppuet", &self.operator_finds_puppet)
             .field("\n\ncore_operator_finds", &self.core_operator_finds)
-            .field(
-                "\n\ncore_operator_finds_v2",
-                &self.core_operator_finds_v2,
-            )
+            .field("\n\ncore_operator_finds_v2", &self.core_operator_finds_v2)
             .field("\n\ncore_operator_cycles", &self.core_operator_cycles)
             .field("\n\ncore_operator_cycles_v2", &self.core_operator_cycles_v2)
             .field("\n\ncore_operator_cycles_v3", &self.core_operator_cycles_v3)
@@ -194,7 +194,8 @@ impl MOpt {
     #[inline]
     pub fn update_pilot_operator_cycles_v3(&mut self, swarm_now: usize) {
         for i in 0..self.operator_num {
-            self.pilot_operator_cycles_v3[swarm_now][i] = self.pilot_operator_cycles_v2[swarm_now][i]
+            self.pilot_operator_cycles_v3[swarm_now][i] =
+                self.pilot_operator_cycles_v2[swarm_now][i]
         }
     }
 
@@ -226,8 +227,7 @@ impl MOpt {
                 self.l_best[swarm_now][i] = self.x_now[swarm_now][i];
             }
 
-            self.pilot_operator_finds[swarm_now][i] =
-                self.pilot_operator_finds_v2[swarm_now][i];
+            self.pilot_operator_finds[swarm_now][i] = self.pilot_operator_finds_v2[swarm_now][i];
             self.pilot_operator_cycles[swarm_now][i] = self.pilot_operator_cycles_v2[swarm_now][i];
         }
     }
