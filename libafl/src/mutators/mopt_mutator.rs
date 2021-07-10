@@ -665,25 +665,3 @@ where
         }
     }
 }
-
-pub trait MOptMutator<C, I, MT, R, S, SC>: ScheduledMutator<I, MT, S>
-where
-    C: Corpus<I>,
-    I: Input,
-    MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
-{
-}
-
-impl<C, I, MT, R, S, SC> MOptMutator<C, I, MT, R, S, SC> for StdMOptMutator<C, I, MT, R, S, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
-{
-}
