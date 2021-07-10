@@ -49,7 +49,7 @@ where
     /// This: https://github.com/mboehme/aflfast/blob/7819aeccfb74afad1c475ea49b92d27f536e1c51/afl-fuzz.c#L342
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_string()))
+            Err(Error::Empty(String::from("No entries in corpus")))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {

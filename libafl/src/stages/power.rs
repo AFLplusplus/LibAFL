@@ -206,7 +206,7 @@ where
         }
 
         if n_paths == 0 {
-            return Err(Error::Unknown("Queue state corrput".to_string()));
+            return Err(Error::Unknown(String::from("Queue state corrput")));
         }
 
         fuzz_mu = fuzz_mu / (n_paths as f64);
@@ -214,6 +214,7 @@ where
     }
 
     #[inline]
+    #[allow(clippy::cast_precision_loss)]
     fn calculate_score(
         &self,
         tsdata: &mut PowerScheduleTestData,
