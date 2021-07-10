@@ -28,8 +28,6 @@ pub struct MOpt {
     pub total_finds: usize,
     /// The number of finds before until last swarm.
     pub finds_until_last_swarm: usize,
-    /// The MOpt mode that we are currently using the pilot fuzzing mode or the core_fuzzing mode
-    pub key_module: MOptMode,
     /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
     pub w_init: f64,
     pub w_end: f64,
@@ -91,7 +89,6 @@ impl fmt::Debug for MOpt {
         f.debug_struct("MOpt")
             .field("\ntotal_finds", &self.total_finds)
             .field("\nfinds_until_last_swarm", &self.finds_until_last_swarm)
-            .field("\nkey_module", &self.key_module)
             .field("\nw_init", &self.w_init)
             .field("\nw_end", &self.w_end)
             .field("\nw_now", &self.g_now)
@@ -137,7 +134,6 @@ impl MOpt {
             rand: StdRand::with_seed(0),
             total_finds: 0,
             finds_until_last_swarm: 0,
-            key_module: MOptMode::Pilotfuzzing,
             w_init: 0.9,
             w_end: 0.3,
             w_now: 0.0,
@@ -301,7 +297,6 @@ impl MOpt {
         self.swarm_now = 0;
 
         // After pso_update, go back to pilot-fuzzing module
-        self.key_module = MOptMode::Pilotfuzzing;
         println!("Mopt struct:\n{:?}", self);
         Ok(())
     }
@@ -360,6 +355,7 @@ where
     S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
     SC: Corpus<I>,
 {
+    mode: MOptMode,
     finds_before: usize,
     mutations: MT,
     phantom: PhantomData<(C, I, R, S, SC)>,
@@ -415,7 +411,7 @@ where
         let after = state.corpus().count() + state.solutions().count();
 
         let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
-        let key_module = mopt.key_module;
+        let key_module = self.mode;
         match key_module {
             MOptMode::Corefuzzing => {
                 mopt.core_time += 1;
@@ -439,6 +435,7 @@ where
                         mopt.core_operator_cycles[i] = mopt.core_operator_cycles_v2[i];
                     }
                     mopt.pso_update()?;
+                    self.mode = MOptMode::Pilotfuzzing;
                 }
             }
             MOptMode::Pilotfuzzing => {
@@ -495,7 +492,7 @@ where
                         // If there's only 1 swarm, then no core_fuzzing mode.
                         mopt.pso_update()?;
                     } else if mopt.swarm_now == mopt.swarm_num {
-                        mopt.key_module = MOptMode::Corefuzzing;
+                        self.mode = MOptMode::Corefuzzing;
 
                         for i in 0..mopt.operator_num {
                             mopt.core_operator_cycles_v2[i] = mopt.core_operator_cycles[i];
@@ -533,6 +530,7 @@ where
     pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
         state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
         Ok(Self {
+            mode: MOptMode::Pilotfuzzing,
             finds_before: 0,
             mutations,
             phantom: PhantomData,
@@ -658,7 +656,7 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let mode = state.metadata().get::<MOpt>().unwrap().key_module;
+        let mode = self.mode;
         match mode {
             MOptMode::Corefuzzing => self.core_mutate(state, input, stage_idx),
             MOptMode::Pilotfuzzing => self.pilot_mutate(state, input, stage_idx),
