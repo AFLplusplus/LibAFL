@@ -404,6 +404,7 @@ where
         self.scheduled_mutate(state, input, stage_idx)
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn post_exec(
         &mut self,
         state: &mut S,
@@ -492,27 +493,25 @@ where
                     if mopt.swarm_num == 1 {
                         // If there's only 1 swarm, then no core_fuzzing mode.
                         mopt.pso_update()?;
-                    } else {
-                        if mopt.swarm_now == mopt.swarm_num {
-                            mopt.key_module = MOptMode::Corefuzzing;
+                    } else if mopt.swarm_now == mopt.swarm_num {
+                        mopt.key_module = MOptMode::Corefuzzing;
 
-                            for i in 0..mopt.operator_num {
-                                mopt.core_operator_cycles_v2[i] = mopt.core_operator_cycles[i];
-                                mopt.core_operator_cycles_v3[i] = mopt.core_operator_cycles[i];
-                                mopt.core_operator_finds_v2[i] = mopt.core_operator_finds[i]
-                            }
-
-                            let mut swarm_eff = 0.0;
-                            let mut best_swarm = 0;
-                            for i in 0..mopt.swarm_num {
-                                if mopt.swarm_fitness[i] > swarm_eff {
-                                    swarm_eff = mopt.swarm_fitness[i];
-                                    best_swarm = i;
-                                }
-                            }
-
-                            mopt.swarm_now = best_swarm;
+                        for i in 0..mopt.operator_num {
+                            mopt.core_operator_cycles_v2[i] = mopt.core_operator_cycles[i];
+                            mopt.core_operator_cycles_v3[i] = mopt.core_operator_cycles[i];
+                            mopt.core_operator_finds_v2[i] = mopt.core_operator_finds[i]
                         }
+
+                        let mut swarm_eff = 0.0;
+                        let mut best_swarm = 0;
+                        for i in 0..mopt.swarm_num {
+                            if mopt.swarm_fitness[i] > swarm_eff {
+                                swarm_eff = mopt.swarm_fitness[i];
+                                best_swarm = i;
+                            }
+                        }
+
+                        mopt.swarm_now = best_swarm;
                     }
                 }
             }
