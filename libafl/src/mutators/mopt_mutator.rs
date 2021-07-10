@@ -297,7 +297,6 @@ impl MOpt {
         self.swarm_now = 0;
 
         // After pso_update, go back to pilot-fuzzing module
-        println!("Mopt struct:\n{:?}", self);
         Ok(())
     }
 
