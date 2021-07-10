@@ -12,7 +12,7 @@ use libafl::{
     },
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
-    feedback_and, feedback_and_fast, feedback_or,
+    feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
