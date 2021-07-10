@@ -34,15 +34,15 @@ pub struct MOpt {
     pub w_init: f64,
     pub w_end: f64,
     pub w_now: f64,
-    pub g_now: i32,
-    pub g_max: i32,
+    pub g_now: f64,
+    pub g_max: f64,
     /// The number of mutation operators
     pub operator_num: usize,
     /// The number of swarms that we want to employ during the pilot fuzzing mode
     pub swarm_num: usize,
-    /// We'll generate testcases for `period_pilot` times before we call pso_update in core fuzzing module
+    /// We'll generate inputs for `period_pilot` times before we call pso_update in pilot fuzzing module
     pub period_pilot: usize,
-    /// We'll generate testcases for `period_core` times before we call pso_update in core fuzzing module
+    /// We'll generate inputs for `period_core` times before we call pso_update in core fuzzing module
     pub period_core: usize,
     /// The number of testcases generated during this pilot fuzzing mode
     pub pilot_time: usize,
@@ -61,27 +61,27 @@ pub struct MOpt {
     /// The fitness for each swarm, we'll calculate the fitness in the pilot fuzzing mode and use the best one in the core fuzzing mode
     pub swarm_fitness: Vec<f64>,
     /// (Pilot Mode) Finds by each operators. This vector is used in pso_update
-    pub pilot_operator_finds: Vec<Vec<usize>>,
+    pub pilot_operator_finds: Vec<Vec<u64>>,
     /// (Pilot Mode) Finds by each operator till now.
-    pub pilot_operator_finds_v2: Vec<Vec<usize>>,
+    pub pilot_operator_finds_v2: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used. This vector is used in pso_update
-    pub pilot_operator_cycles: Vec<Vec<usize>>,
+    pub pilot_operator_cycles: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used till now
-    pub pilot_operator_cycles_v2: Vec<Vec<usize>>,
+    pub pilot_operator_cycles_v2: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used till last execution
-    pub pilot_operator_cycles_v3: Vec<Vec<usize>>,
+    pub pilot_operator_cycles_v3: Vec<Vec<u64>>,
     /// Vector used in pso_update
-    pub operator_finds_puppet: Vec<usize>,
+    pub operator_finds_puppet: Vec<u64>,
     /// (Core Mode) Finds by each operators. This vector is used in pso_update
-    pub core_operator_finds: Vec<usize>,
+    pub core_operator_finds: Vec<u64>,
     /// (Core Mode) Finds by each operator till now.
-    pub core_operator_finds_v2: Vec<usize>,
+    pub core_operator_finds_v2: Vec<u64>,
     /// (Core Mode) The number of mutation operator used. This vector is used in pso_update
-    pub core_operator_cycles: Vec<usize>,
+    pub core_operator_cycles: Vec<u64>,
     /// (Core Mode) The number of mutation operator used till now
-    pub core_operator_cycles_v2: Vec<usize>,
+    pub core_operator_cycles_v2: Vec<u64>,
     /// (Core Mode) The number of mutation operator used till last execution
-    pub core_operator_cycles_v3: Vec<usize>,
+    pub core_operator_cycles_v3: Vec<u64>,
 }
 
 crate::impl_serdeany!(MOpt);
@@ -141,8 +141,8 @@ impl MOpt {
             w_init: 0.9,
             w_end: 0.3,
             w_now: 0.0,
-            g_now: 0,
-            g_max: 5000,
+            g_now: 0.0,
+            g_max: 5000.0,
             operator_num,
             swarm_num,
             period_pilot: 50000,
@@ -246,11 +246,10 @@ impl MOpt {
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_initialize(&mut self) -> Result<(), Error> {
         if self.g_now > self.g_max {
-            self.g_now = 0;
+            self.g_now = 0.0;
         }
-        self.w_now = (self.w_init - self.w_end) * f64::from(self.g_max - self.g_now)
-            / f64::from(self.g_max)
-            + self.w_end;
+        self.w_now =
+            (self.w_init - self.w_end) * (self.g_max - self.g_now) / self.g_max + self.w_end;
 
         for swarm in 0..self.swarm_num {
             let mut total_x_now = 0.0;
@@ -308,29 +307,28 @@ impl MOpt {
     /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L10623>
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
-        self.g_now += 1;
+        self.g_now += 1.0;
         if self.g_now > self.g_max {
-            self.g_now = 0;
+            self.g_now = 0.0;
         }
-        self.w_now = (self.w_init - self.w_end) * f64::from(self.g_max - self.g_now)
-            / f64::from(self.g_max)
-            + self.w_end;
+        self.w_now =
+            ((self.w_init - self.w_end) * (self.g_max - self.g_now) / self.g_max) + self.w_end;
 
-        let mut operator_find_sum = 0;
+        let mut operator_finds_sum = 0;
 
         for i in 0..self.operator_num {
-            self.operator_finds_puppet[i] = self.core_operator_cycles[i];
+            self.operator_finds_puppet[i] = self.core_operator_finds[i];
 
             for j in 0..self.swarm_num {
                 self.operator_finds_puppet[i] += self.pilot_operator_finds[j][i];
             }
-            operator_find_sum += self.operator_finds_puppet[i];
+            operator_finds_sum += self.operator_finds_puppet[i];
         }
 
         for i in 0..self.operator_num {
             if self.operator_finds_puppet[i] > 0 {
                 self.g_best[i] =
-                    (self.operator_finds_puppet[i] as f64) / (operator_find_sum as f64);
+                    (self.operator_finds_puppet[i] as f64) / (operator_finds_sum as f64);
             }
         }
 
@@ -372,6 +370,7 @@ impl MOpt {
         }
         self.swarm_now = 0;
 
+        // After pso_update, go back to pilot-fuzzing module
         self.key_module = MOptMode::Pilotfuzzing;
         //println!("Mopt struct:\n{:?}", self);
         Ok(())
@@ -495,7 +494,7 @@ where
                     mopt.total_finds += diff;
                     for i in 0..mopt.operator_num {
                         if mopt.core_operator_cycles_v2[i] > mopt.core_operator_cycles_v3[i] {
-                            mopt.core_operator_finds_v2[i] += diff;
+                            mopt.core_operator_finds_v2[i] += diff as u64;
                         }
                     }
                 }
@@ -518,7 +517,7 @@ where
                         if mopt.pilot_operator_cycles_v2[swarm_now][i]
                             > mopt.pilot_operator_cycles_v3[swarm_now][i]
                         {
-                            mopt.pilot_operator_finds_v2[swarm_now][i] += diff;
+                            mopt.pilot_operator_finds_v2[swarm_now][i] += diff as u64;
                         }
                     }
                 }
