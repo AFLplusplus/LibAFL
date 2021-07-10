@@ -213,7 +213,7 @@ impl MOpt {
     /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L8709>
 
     #[allow(clippy::cast_precision_loss)]
-    pub fn update_pilot_operator_ctr_pso(&mut self, swarm_now: usize) {
+    pub fn update_pilot_operator_cycles(&mut self, swarm_now: usize) {
         let mut eff = 0.0;
         for i in 0..self.operator_num {
             if self.pilot_operator_cycles_v2[swarm_now][i]
@@ -236,7 +236,7 @@ impl MOpt {
     }
 
     #[inline]
-    pub fn update_core_operator_ctr_pso(&mut self) {
+    pub fn update_core_operator_cycles(&mut self) {
         for i in 0..self.operator_num {
             self.core_operator_finds[i] = self.core_operator_finds_v2[i];
             self.core_operator_cycles[i] = self.core_operator_cycles_v2[i];
@@ -431,7 +431,7 @@ where
     S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
     SC: Corpus<I>,
 {
-    finds_before: Option<usize>,
+    finds_before: usize,
     mutations: MT,
     phantom: PhantomData<(C, I, R, S, SC)>,
 }
@@ -471,7 +471,7 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        self.finds_before = Some(state.corpus().count() + state.solutions().count());
+        self.finds_before = state.corpus().count() + state.solutions().count();
         self.scheduled_mutate(state, input, stage_idx)
     }
 
@@ -481,6 +481,67 @@ where
         stage_idx: i32,
         corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
+        let before = self.finds_before;
+        let after = state.corpus().count() + state.solutions().count();
+
+        let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+        let key_module = mopt.key_module;
+        match key_module {
+            MOptMode::Corefuzzing => {
+                mopt.core_time += 1;
+
+                if after > before {
+                    let diff = after - before;
+                    mopt.total_finds += diff;
+                    for i in 0..mopt.operator_num {
+                        if mopt.core_operator_cycles_v2[i] > mopt.core_operator_cycles_v3[i] {
+                            mopt.core_operator_finds_v2[i] += diff;
+                        }
+                    }
+                }
+
+                if mopt.core_time > mopt.period_core {
+                    mopt.core_time = 0;
+                    let total_finds = mopt.total_finds;
+                    mopt.finds_before_switch = total_finds;
+                    mopt.update_core_operator_cycles();
+                    mopt.pso_update()?;
+                }
+            }
+            MOptMode::Pilotfuzzing => {
+                mopt.pilot_time += 1;
+                let swarm_now = mopt.swarm_now;
+
+                if after > before {
+                    let diff = after - before;
+                    for i in 0..mopt.operator_num {
+                        if mopt.pilot_operator_cycles_v2[swarm_now][i]
+                            > mopt.pilot_operator_cycles_v3[swarm_now][i]
+                        {
+                            mopt.pilot_operator_finds_v2[swarm_now][i] += diff;
+                        }
+                    }
+                }
+
+                if mopt.pilot_time > mopt.period_pilot {
+                    let new_finds = mopt.total_finds - mopt.finds_before_switch;
+                    let f = (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));
+                    mopt.swarm_fitness[swarm_now] = f;
+                    mopt.pilot_time = 0;
+                    let total_finds = mopt.total_finds;
+                    mopt.finds_before_switch = total_finds;
+                    mopt.update_pilot_operator_cycles(swarm_now);
+
+                    mopt.swarm_now += 1;
+
+                    if mopt.swarm_now == mopt.swarm_num {
+                        mopt.key_module = MOptMode::Corefuzzing;
+
+                        mopt.init_core_module()?;
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -497,7 +558,7 @@ where
     pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
         state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
         Ok(Self {
-            finds_before: None,
+            finds_before: 0,
             mutations,
             phantom: PhantomData,
         })
@@ -508,7 +569,6 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        // TODO
         let mut r = MutationResult::Skipped;
         state
             .metadata_mut()
