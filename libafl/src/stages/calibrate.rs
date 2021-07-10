@@ -7,7 +7,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
-    observers::ObserversTuple,
+    observers::{MapObserver, ObserversTuple},
     stages::Stage,
     state::{HasCorpus, HasMetadata},
     Error,
@@ -16,28 +16,30 @@ use serde::{Deserialize, Serialize};
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct CalibrateStage<C, E, EM, I, OT, S, Z>
+pub struct CalibrateStage<C, E, EM, I, O, OT, S, Z>
 where
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
+    O: MapObserver<usize>,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, OT, S, Z)>,
+    phantom: PhantomData<(C, E, EM, I, O, OT, S, Z)>,
 }
 
 // The number of times we run the program in the calibration stage
 const CAL_STAGE_MAX: usize = 8;
 
-impl<C, E, EM, I, OT, S, Z> Stage<E, EM, S, Z> for CalibrateStage<C, E, EM, I, OT, S, Z>
+impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrateStage<C, E, EM, I, O, OT, S, Z>
 where
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
+    O: MapObserver<usize>,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -52,7 +54,7 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        let iter = self.cal_stages();
+        let iter = CAL_STAGE_MAX;
         let handicap = state
             .metadata()
             .get::<PowerScheduleGlobalData>()
@@ -73,19 +75,13 @@ where
         }
         // Timer end
         let end = current_time();
-        let bitmap_size;
-        {
-            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            let mut data = testcase
-                .metadata_mut()
-                .get_mut::<PowerScheduleTestData>()
-                .unwrap();
-            data.exec_us += ((end - start) / (iter as u32)).as_millis();
-            //let bitmap_size = executor.observers().match_name::<MapObserver<usize>>(self.map_observer_name).unwrap();
-            bitmap_size = 1;
-            data.bitmap_size = bitmap_size;
-            data.handicap = handicap as u64;
-        }
+
+        let map = executor
+            .observers()
+            .match_name::<O>(&self.map_observer_name)
+            .unwrap();
+
+        let bitmap_size = map.count_bytes();
 
         let calstat = state
             .metadata_mut()
@@ -94,8 +90,18 @@ where
 
         calstat.total_cal_us += (end - start).as_millis();
         calstat.total_cal_cycles += iter as u64;
-        calstat.total_bitmap_size += bitmap_size;
+        calstat.total_bitmap_size += bitmap_size as u64;
         calstat.total_bitmap_entries += 1;
+
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let data = testcase
+            .metadata_mut()
+            .get_mut::<PowerScheduleTestData>()
+            .unwrap();
+        data.exec_us += ((end - start) / (iter as u32)).as_millis();
+
+        data.bitmap_size = bitmap_size as u64;
+        data.handicap = handicap as u64;
 
         Ok(())
     }
@@ -124,20 +130,16 @@ impl PowerScheduleGlobalData {
 
 crate::impl_serdeany!(PowerScheduleGlobalData);
 
-impl<C, E, I, EM, OT, S, Z> CalibrateStage<C, E, EM, I, OT, S, Z>
+impl<C, E, I, EM, O, OT, S, Z> CalibrateStage<C, E, EM, I, O, OT, S, Z>
 where
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
+    O: MapObserver<usize>,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
-    #[inline]
-    fn cal_stages(&self) -> usize {
-        CAL_STAGE_MAX
-    }
-
     pub fn new(state: &mut S, map_observer_name: String) -> Self {
         state.add_metadata::<PowerScheduleGlobalData>(PowerScheduleGlobalData::new());
         Self {
