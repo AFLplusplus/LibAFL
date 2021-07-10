@@ -302,7 +302,7 @@ impl MOpt {
 
         // After pso_update, go back to pilot-fuzzing module
         self.key_module = MOptMode::Pilotfuzzing;
-        //println!("Mopt struct:\n{:?}", self);
+        println!("Mopt struct:\n{:?}", self);
         Ok(())
     }
 
@@ -447,6 +447,7 @@ where
 
                 if after > before {
                     let diff = after - before;
+                    mopt.total_finds += diff;
                     for i in 0..mopt.operator_num {
                         if mopt.pilot_operator_cycles_v2[swarm_now][i]
                             > mopt.pilot_operator_cycles_v3[swarm_now][i]
@@ -580,7 +581,7 @@ where
             swarm_now = mopt.swarm_now;
 
             for i in 0..mopt.operator_num {
-                mopt.pilot_operator_cycles[swarm_now][i] =
+                mopt.pilot_operator_cycles_v3[swarm_now][i] =
                     mopt.pilot_operator_cycles_v2[swarm_now][i];
             }
         }
