@@ -3,9 +3,10 @@ use alloc::{string::ToString, vec::Vec};
 
 use crate::{
     bolts::{rands::Rand, rands::StdRand},
+    corpus::Corpus,
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
-    state::{HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
 };
 use core::{
@@ -127,6 +128,8 @@ impl fmt::Debug for MOpt {
             .finish()
     }
 }
+
+const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 impl MOpt {
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
@@ -419,23 +422,28 @@ pub enum MOptMode {
     Corefuzzing,
 }
 
-pub struct StdMOptMutator<I, MT, R, S>
+pub struct StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
+    finds_before: Option<usize>,
     mutations: MT,
-    phantom: PhantomData<(I, R, S)>,
+    phantom: PhantomData<(C, I, R, S, SC)>,
 }
 
-impl<I, MT, R, S> Debug for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> Debug for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -447,12 +455,14 @@ where
     }
 }
 
-impl<I, MT, R, S> Mutator<I, S> for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> Mutator<I, S> for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     #[inline]
     fn mutate(
@@ -461,22 +471,36 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
+        self.finds_before = Some(state.corpus().count() + state.solutions().count());
         self.scheduled_mutate(state, input, stage_idx)
+    }
+
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        stage_idx: i32,
+        corpus_idx: Option<usize>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
-impl<I, MT, R, S> StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
-    pub fn new(mutations: MT) -> Self {
-        Self {
+    pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
+        state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
+        Ok(Self {
+            finds_before: None,
             mutations,
             phantom: PhantomData,
-        }
+        })
     }
     fn core_mutate(
         &mut self,
@@ -545,12 +569,14 @@ where
     }
 }
 
-impl<I, MT, R, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> ComposedByMutations<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     /// Get the mutations
     #[inline]
@@ -565,12 +591,14 @@ where
     }
 }
 
-impl<I, MT, R, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> ScheduledMutator<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
@@ -601,20 +629,24 @@ where
     }
 }
 
-pub trait MOptMutator<I, MT, R, S>: ScheduledMutator<I, MT, S>
+pub trait MOptMutator<C, I, MT, R, S, SC>: ScheduledMutator<I, MT, S>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
 }
 
-impl<I, MT, R, S> MOptMutator<I, MT, R, S> for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> MOptMutator<C, I, MT, R, S, SC> for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
 }
