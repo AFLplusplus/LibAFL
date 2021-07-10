@@ -60,27 +60,27 @@ pub struct MOpt {
     /// The fitness for each swarm, we'll calculate the fitness in the pilot fuzzing mode and use the best one in the core fuzzing mode
     pub swarm_fitness: Vec<f64>,
     /// (Pilot Mode) Finds by each operators. This vector is used in pso_update
-    pub pilot_operator_finds_pso: Vec<Vec<usize>>,
+    pub pilot_operator_finds: Vec<Vec<usize>>,
     /// (Pilot Mode) Finds by each operator till now.
-    pub pilot_operator_finds_this: Vec<Vec<usize>>,
+    pub pilot_operator_finds_v2: Vec<Vec<usize>>,
     /// (Pilot Mode) The number of mutation operator used. This vector is used in pso_update
-    pub pilot_operator_ctr_pso: Vec<Vec<usize>>,
+    pub pilot_operator_cycles: Vec<Vec<usize>>,
     /// (Pilot Mode) The number of mutation operator used till now
-    pub pilot_operator_ctr_this: Vec<Vec<usize>>,
+    pub pilot_operator_cycles_v2: Vec<Vec<usize>>,
     /// (Pilot Mode) The number of mutation operator used till last execution
-    pub pilot_operator_ctr_last: Vec<Vec<usize>>,
+    pub pilot_operator_cycles_v3: Vec<Vec<usize>>,
     /// Vector used in pso_update
     pub operator_finds_puppet: Vec<usize>,
     /// (Core Mode) Finds by each operators. This vector is used in pso_update
-    pub core_operator_finds_pso: Vec<usize>,
+    pub core_operator_finds: Vec<usize>,
     /// (Core Mode) Finds by each operator till now.
-    pub core_operator_finds_this: Vec<usize>,
+    pub core_operator_finds_v2: Vec<usize>,
     /// (Core Mode) The number of mutation operator used. This vector is used in pso_update
-    pub core_operator_ctr_pso: Vec<usize>,
+    pub core_operator_cycles: Vec<usize>,
     /// (Core Mode) The number of mutation operator used till now
-    pub core_operator_ctr_this: Vec<usize>,
+    pub core_operator_cycles_v2: Vec<usize>,
     /// (Core Mode) The number of mutation operator used till last execution
-    pub core_operator_ctr_last: Vec<usize>,
+    pub core_operator_cycles_v3: Vec<usize>,
 }
 
 crate::impl_serdeany!(MOpt);
@@ -105,25 +105,25 @@ impl fmt::Debug for MOpt {
             .field("\n\nprobability_now", &self.probability_now)
             .field("\n\nswarm_fitness", &self.swarm_fitness)
             .field(
-                "\n\npilot_operator_finds_pso",
-                &self.pilot_operator_finds_pso,
+                "\n\npilot_operator_finds",
+                &self.pilot_operator_finds,
             )
             .field(
                 "\n\npilot_operator_finds_this",
-                &self.pilot_operator_finds_this,
+                &self.pilot_operator_finds_v2,
             )
-            .field("\n\npilot_operator_ctr_pso", &self.pilot_operator_ctr_pso)
-            .field("\n\npilot_operator_ctr_this", &self.pilot_operator_ctr_this)
-            .field("\n\npilot_operator_ctr_last", &self.pilot_operator_ctr_last)
+            .field("\n\npilot_operator_cycles", &self.pilot_operator_cycles)
+            .field("\n\npilot_operator_cycles_v2", &self.pilot_operator_cycles_v2)
+            .field("\n\npilot_operator_cycles_v3", &self.pilot_operator_cycles_v3)
             .field("\n\noperator_finds_puppuet", &self.operator_finds_puppet)
-            .field("\n\ncore_operator_finds_pso", &self.core_operator_finds_pso)
+            .field("\n\ncore_operator_finds", &self.core_operator_finds)
             .field(
-                "\n\ncore_operator_finds_this",
-                &self.core_operator_finds_this,
+                "\n\ncore_operator_finds_v2",
+                &self.core_operator_finds_v2,
             )
-            .field("\n\ncore_operator_ctr_pso", &self.core_operator_ctr_pso)
-            .field("\n\ncore_operator_ctr_this", &self.core_operator_ctr_this)
-            .field("\n\ncore_operator_ctr_last", &self.core_operator_ctr_last)
+            .field("\n\ncore_operator_cycles", &self.core_operator_cycles)
+            .field("\n\ncore_operator_cycles_v2", &self.core_operator_cycles_v2)
+            .field("\n\ncore_operator_cycles_v3", &self.core_operator_cycles_v3)
             .finish()
     }
 }
@@ -154,17 +154,17 @@ impl MOpt {
             v_now: vec![vec![0.0; operator_num]; swarm_num],
             probability_now: vec![vec![0.0; operator_num]; swarm_num],
             swarm_fitness: vec![0.0; swarm_num],
-            pilot_operator_finds_pso: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_finds_this: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_ctr_pso: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_ctr_this: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_ctr_last: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_finds: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_finds_v2: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_cycles: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_cycles_v2: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_cycles_v3: vec![vec![0; operator_num]; swarm_num],
             operator_finds_puppet: vec![0; operator_num],
-            core_operator_finds_pso: vec![0; operator_num],
-            core_operator_finds_this: vec![0; operator_num],
-            core_operator_ctr_pso: vec![0; operator_num],
-            core_operator_ctr_this: vec![0; operator_num],
-            core_operator_ctr_last: vec![0; operator_num],
+            core_operator_finds: vec![0; operator_num],
+            core_operator_finds_v2: vec![0; operator_num],
+            core_operator_cycles: vec![0; operator_num],
+            core_operator_cycles_v2: vec![0; operator_num],
+            core_operator_cycles_v3: vec![0; operator_num],
         };
         mopt.pso_initialize()?;
         Ok(mopt)
@@ -173,9 +173,9 @@ impl MOpt {
     /// Initialize `core_operator_*` values
     pub fn init_core_module(&mut self) -> Result<(), Error> {
         for i in 0..self.operator_num {
-            self.core_operator_ctr_this[i] = self.core_operator_ctr_pso[i];
-            self.core_operator_ctr_last[i] = self.core_operator_ctr_pso[i];
-            self.core_operator_finds_this[i] = self.core_operator_finds_pso[i]
+            self.core_operator_cycles_v2[i] = self.core_operator_cycles[i];
+            self.core_operator_cycles_v3[i] = self.core_operator_cycles[i];
+            self.core_operator_finds_v2[i] = self.core_operator_finds[i]
         }
 
         let mut swarm_eff = 0.0;
@@ -192,16 +192,16 @@ impl MOpt {
     }
 
     #[inline]
-    pub fn update_pilot_operator_ctr_last(&mut self, swarm_now: usize) {
+    pub fn update_pilot_operator_cycles_v3(&mut self, swarm_now: usize) {
         for i in 0..self.operator_num {
-            self.pilot_operator_ctr_last[swarm_now][i] = self.pilot_operator_ctr_this[swarm_now][i]
+            self.pilot_operator_cycles_v3[swarm_now][i] = self.pilot_operator_cycles_v2[swarm_now][i]
         }
     }
 
     #[inline]
-    pub fn update_core_operator_ctr_last(&mut self) {
+    pub fn update_core_operator_cycles_v3(&mut self) {
         for i in 0..self.operator_num {
-            self.core_operator_ctr_last[i] = self.core_operator_ctr_this[i];
+            self.core_operator_cycles_v3[i] = self.core_operator_cycles_v2[i];
         }
     }
 
@@ -212,13 +212,13 @@ impl MOpt {
     pub fn update_pilot_operator_ctr_pso(&mut self, swarm_now: usize) {
         let mut eff = 0.0;
         for i in 0..self.operator_num {
-            if self.pilot_operator_ctr_this[swarm_now][i]
-                > self.pilot_operator_ctr_pso[swarm_now][i]
+            if self.pilot_operator_cycles_v2[swarm_now][i]
+                > self.pilot_operator_cycles[swarm_now][i]
             {
-                eff = ((self.pilot_operator_finds_this[swarm_now][i]
-                    - self.pilot_operator_finds_pso[swarm_now][i]) as f64)
-                    / ((self.pilot_operator_ctr_this[swarm_now][i]
-                        - self.pilot_operator_ctr_pso[swarm_now][i]) as f64)
+                eff = ((self.pilot_operator_finds_v2[swarm_now][i]
+                    - self.pilot_operator_finds[swarm_now][i]) as f64)
+                    / ((self.pilot_operator_cycles_v2[swarm_now][i]
+                        - self.pilot_operator_cycles[swarm_now][i]) as f64)
             }
 
             if self.eff_best[swarm_now][i] < eff {
@@ -226,17 +226,17 @@ impl MOpt {
                 self.l_best[swarm_now][i] = self.x_now[swarm_now][i];
             }
 
-            self.pilot_operator_finds_pso[swarm_now][i] =
-                self.pilot_operator_finds_this[swarm_now][i];
-            self.pilot_operator_ctr_pso[swarm_now][i] = self.pilot_operator_ctr_this[swarm_now][i];
+            self.pilot_operator_finds[swarm_now][i] =
+                self.pilot_operator_finds_v2[swarm_now][i];
+            self.pilot_operator_cycles[swarm_now][i] = self.pilot_operator_cycles_v2[swarm_now][i];
         }
     }
 
     #[inline]
     pub fn update_core_operator_ctr_pso(&mut self) {
         for i in 0..self.operator_num {
-            self.core_operator_finds_pso[i] = self.core_operator_finds_this[i];
-            self.core_operator_ctr_pso[i] = self.core_operator_ctr_this[i];
+            self.core_operator_finds[i] = self.core_operator_finds_v2[i];
+            self.core_operator_cycles[i] = self.core_operator_cycles_v2[i];
         }
     }
 
@@ -316,10 +316,10 @@ impl MOpt {
         let mut operator_find_sum = 0;
 
         for i in 0..self.operator_num {
-            self.operator_finds_puppet[i] = self.core_operator_ctr_pso[i];
+            self.operator_finds_puppet[i] = self.core_operator_cycles[i];
 
             for j in 0..self.swarm_num {
-                self.operator_finds_puppet[i] += self.pilot_operator_finds_pso[j][i];
+                self.operator_finds_puppet[i] += self.pilot_operator_finds[j][i];
             }
             operator_find_sum += self.operator_finds_puppet[i];
         }
@@ -490,7 +490,7 @@ where
             .metadata_mut()
             .get_mut::<MOpt>()
             .unwrap()
-            .update_core_operator_ctr_last();
+            .update_core_operator_cycles_v3();
 
         for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
@@ -505,7 +505,7 @@ where
                 .metadata_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .core_operator_ctr_this[idx] += 1;
+                .core_operator_cycles_v2[idx] += 1;
         }
 
         Ok(r)
@@ -522,7 +522,7 @@ where
         {
             let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
             swarm_now = mopt.swarm_now;
-            mopt.update_pilot_operator_ctr_last(swarm_now);
+            mopt.update_pilot_operator_cycles_v3(swarm_now);
         }
 
         for _i in 0..self.iterations(state, input) {
@@ -538,7 +538,7 @@ where
                 .metadata_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .pilot_operator_ctr_this[swarm_now][idx] += 1;
+                .pilot_operator_cycles_v2[swarm_now][idx] += 1;
         }
 
         Ok(r)

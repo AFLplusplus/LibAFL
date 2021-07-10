@@ -108,8 +108,8 @@ where
                         let diff = finds_after - finds_before;
                         mopt.total_finds += diff;
                         for i in 0..mopt.operator_num {
-                            if mopt.core_operator_ctr_this[i] > mopt.core_operator_ctr_last[i] {
-                                mopt.core_operator_finds_this[i] += diff;
+                            if mopt.core_operator_cycles_v2[i] > mopt.core_operator_cycles_v3[i] {
+                                mopt.core_operator_finds_v2[i] += diff;
                             }
                         }
                     }
@@ -155,10 +155,10 @@ where
                         let diff = finds_after - finds_before;
                         mopt.total_finds += diff;
                         for i in 0..mopt.operator_num {
-                            if mopt.pilot_operator_ctr_this[swarm_now][i]
-                                > mopt.pilot_operator_ctr_last[swarm_now][i]
+                            if mopt.pilot_operator_cycles_v2[swarm_now][i]
+                                > mopt.pilot_operator_cycles_v3[swarm_now][i]
                             {
-                                mopt.pilot_operator_finds_this[swarm_now][i] += diff;
+                                mopt.pilot_operator_finds_v2[swarm_now][i] += diff;
                             }
                         }
                     }
