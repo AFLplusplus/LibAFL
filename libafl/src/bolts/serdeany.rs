@@ -269,8 +269,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name,
                 {
-                    self.map
-                        .insert(unpack_type_id(TypeId::of::<T>()), t);
+                    self.map.insert(unpack_type_id(TypeId::of::<T>()), t);
                 }
 
                 /// Returns the count of elements in this map.
@@ -606,7 +605,9 @@ macro_rules! impl_serdeany {
                 self
             }
 
-            fn as_any_boxed(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn core::any::Any> {
+            fn as_any_boxed(
+                self: ::std::boxed::Box<Self>,
+            ) -> ::std::boxed::Box<dyn core::any::Any> {
                 self
             }
         }

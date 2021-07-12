@@ -43,7 +43,7 @@ pub mod generic {
     };
 
     use libafl::{
-        executors::{Executor, ExitKind, HasExecHooksTuple, HasObservers, HasObserversHooks},
+        executors::{Executor, ExitKind, HasObservers},
         inputs::Input,
         observers::ObserversTuple,
         Error,
@@ -54,7 +54,7 @@ pub mod generic {
     where
         I: Input,
         T: CommandConfigurator<EM, I, S, Z>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         inner: T,
         observers: OT,
@@ -65,7 +65,7 @@ pub mod generic {
     where
         I: Input,
         T: CommandConfigurator<EM, I, S, Z>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         fn run_target(
             &mut self,
@@ -88,19 +88,19 @@ pub mod generic {
                 None => {
                     // if this fails, there is not much we can do. let's hope it failed because the process finished
                     // in the meantime.
-                    let _ = child.kill();
+                    drop(child.kill());
                     // finally, try to wait to properly clean up system ressources.
-                    let _ = child.wait();
+                    drop(child.wait());
                     Ok(ExitKind::Timeout)
                 }
             }
         }
     }
 
-    impl<EM, I, S, Z, T, OT> HasObservers<OT> for CommandExecutor<EM, I, S, Z, T, OT>
+    impl<EM, I, S, Z, T, OT> HasObservers<I, OT, S> for CommandExecutor<EM, I, S, Z, T, OT>
     where
         I: Input,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
         T: CommandConfigurator<EM, I, S, Z>,
     {
         #[inline]
@@ -114,14 +114,6 @@ pub mod generic {
         }
     }
 
-    impl<EM, I, S, Z, T, OT> HasObserversHooks<EM, I, OT, S, Z> for CommandExecutor<EM, I, S, Z, T, OT>
-    where
-        I: Input,
-        OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
-        T: CommandConfigurator<EM, I, S, Z>,
-    {
-    }
-
     pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
         fn spawn_child(
             &mut self,
@@ -133,7 +125,7 @@ pub mod generic {
 
         fn into_executor<OT>(self, observers: OT) -> CommandExecutor<EM, I, S, Z, Self, OT>
         where
-            OT: ObserversTuple,
+            OT: ObserversTuple<I, S>,
         {
             CommandExecutor {
                 inner: self,

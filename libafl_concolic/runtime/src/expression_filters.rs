@@ -109,7 +109,7 @@ pub(crate) struct AndOpt<A: ExpressionFilter, B: ExpressionFilter> {
 
 impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for AndOpt<A, B> {
     fn symbolize(&mut self, msg: &SymExpr) -> bool {
-        self.a.symbolize(msg) && self.b.as_mut().map(|b| b.symbolize(msg)).unwrap_or(true)
+        self.a.symbolize(msg) && self.b.as_mut().map_or(true, |b| b.symbolize(msg))
     }
     fn notify_call(&mut self, location_id: usize) {
         self.a.notify_call(location_id);
@@ -217,7 +217,7 @@ pub(crate) mod coverage {
 
     const MAP_SIZE: usize = 65536;
 
-    /// A coverage-based filter based on the expression pruning from [QSym](https://github.com/sslab-gatech/qsym)
+    /// A coverage-based filter based on the expression pruning from [`QSym`](https://github.com/sslab-gatech/qsym)
     /// [here](https://github.com/sslab-gatech/qsym/blob/master/qsym/pintool/call_stack_manager.cpp).
     pub(crate) struct CallStackCoverage<
         THasher: Hasher = DefaultHasher,

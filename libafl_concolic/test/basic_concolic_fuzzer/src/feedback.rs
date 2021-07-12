@@ -1,6 +1,13 @@
 use libafl::{
-    bolts::tuples::Named, corpus::Testcase, events::EventFirer, executors::ExitKind,
-    feedbacks::Feedback, inputs::Input, observers::ObserversTuple, state::HasMetadata, Error,
+    bolts::tuples::Named,
+    corpus::Testcase,
+    events::EventFirer,
+    executors::ExitKind,
+    feedbacks::Feedback,
+    inputs::Input,
+    observers::ObserversTuple,
+    state::{HasClientPerfStats, HasMetadata},
+    Error,
 };
 
 use crate::{metadata::ConcolicMetadata, observer::ConcolicObserver};
@@ -29,7 +36,11 @@ impl Named for ConcolicFeedback {
     }
 }
 
-impl<I: Input, S> Feedback<I, S> for ConcolicFeedback {
+impl<I, S> Feedback<I, S> for ConcolicFeedback
+where
+    I: Input,
+    S: HasClientPerfStats,
+{
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -40,11 +51,11 @@ impl<I: Input, S> Feedback<I, S> for ConcolicFeedback {
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         self.metadata = observers
             .match_name::<ConcolicObserver>(&self.name)
-            .map(|o| o.create_metadata_from_current_map());
+            .map(ConcolicObserver::create_metadata_from_current_map);
         Ok(false)
     }
 

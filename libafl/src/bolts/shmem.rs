@@ -40,6 +40,7 @@ use std::env;
 use alloc::{rc::Rc, string::ToString};
 use core::{
     cell::RefCell,
+    convert::{TryFrom, TryInto},
     fmt::{self, Debug, Display},
     mem::ManuallyDrop,
 };
@@ -1060,22 +1061,22 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
                 let map_len = self.inner.map().len();
-                assert!(map_len as u64 <= i64::MAX as u64);
+                assert!(i64::try_from(map_len).is_ok());
                 let signed_pos = map_len as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
-                effective as u64
+                effective.try_into().unwrap()
             }
             std::io::SeekFrom::Current(offset) => {
                 let current_pos = self.pos;
-                assert!(current_pos as u64 <= i64::MAX as u64);
+                assert!(i64::try_from(current_pos).is_ok());
                 let signed_pos = current_pos as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
-                effective as u64
-            },
+                effective.try_into().unwrap()
+            }
         };
-        assert!(effective_new_pos <= usize::MAX as u64);
+        assert!(usize::try_from(effective_new_pos).is_ok());
         self.pos = effective_new_pos as usize;
         Ok(effective_new_pos)
     }

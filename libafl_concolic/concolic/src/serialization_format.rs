@@ -282,7 +282,10 @@ impl<W: Write + Seek> MessageFileWriter<W> {
 }
 
 pub mod shared_memory {
-    use std::io::{self, Cursor, Read};
+    use std::{
+        convert::TryFrom,
+        io::{self, Cursor, Read},
+    };
 
     use libafl::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
 
@@ -292,6 +295,7 @@ pub mod shared_memory {
     pub const DEFAULT_SIZE: usize = 1024 * 1024 * 1024;
 
     impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
+        #[must_use]
         pub fn from_buffer(buffer: &'buffer [u8]) -> Self {
             Self::from_reader(Cursor::new(buffer))
         }
@@ -300,12 +304,13 @@ pub mod shared_memory {
             let mut len_buf = 0u64.to_le_bytes();
             buffer.read_exact(&mut len_buf)?;
             let buffer_len = u64::from_le_bytes(len_buf);
-            assert!(buffer_len <= usize::MAX as u64);
+            assert!(usize::try_from(buffer_len).is_ok());
             let buffer_len = buffer_len as usize;
             let (buffer, _) = buffer.split_at(buffer_len);
             Ok(Self::from_buffer(buffer))
         }
 
+        #[must_use]
         pub fn get_buffer(&self) -> &[u8] {
             self.reader.get_ref()
         }

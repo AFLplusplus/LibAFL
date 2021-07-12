@@ -288,7 +288,7 @@ pub enum SymExpr {
         target: SymExprRef,
         to_insert: SymExprRef,
         offset: u64,
-        little_endian: bool
+        little_endian: bool,
     },
 
     PushPathConstraint {

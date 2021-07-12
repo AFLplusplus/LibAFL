@@ -129,7 +129,7 @@ where
         Ok(Self {
             entries: vec![],
             current: None,
-            dir_path: dir_path,
+            dir_path,
             meta_format: None,
         })
     }
@@ -144,7 +144,7 @@ where
         Ok(Self {
             entries: vec![],
             current: None,
-            dir_path: dir_path,
+            dir_path,
             meta_format,
         })
     }

@@ -4,6 +4,7 @@ use std::{
     io::{BufWriter, Write},
     path::PathBuf,
     process::{exit, Command},
+    string::ToString,
 };
 
 use concolic::{
@@ -51,6 +52,8 @@ struct Opt {
 }
 
 fn main() {
+    const COVERAGE_MAP_SIZE: usize = 65536;
+
     let opt = Opt::from_args();
 
     let mut shmemprovider = StdShMemProvider::default();
@@ -61,7 +64,6 @@ fn main() {
         .write_to_env(DEFAULT_ENV_NAME)
         .expect("unable to write shared mapping info to environment");
 
-    const COVERAGE_MAP_SIZE: usize = 65536;
     let coverage_map = StdShMemProvider::new()
         .unwrap()
         .new_map(COVERAGE_MAP_SIZE)
@@ -74,7 +76,7 @@ fn main() {
             SELECTIVE_SYMBOLICATION_ENV_NAME,
             symbolize_offsets
                 .iter()
-                .map(|offset| offset.to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(","),
         );

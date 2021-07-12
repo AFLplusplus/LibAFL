@@ -33,12 +33,14 @@ use std::path::PathBuf;
 
 use command_executor::generic::CommandConfigurator;
 use observer::ConcolicObserver;
-use stage::{SimpleConcolicMutationalStage, ConcolicTracingStage};
+use stage::{ConcolicTracingStage, SimpleConcolicMutationalStage};
 
 use crate::command_executor::MyCommandConfigurator;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
+    const MAP_SIZE: usize = 65536;
+
     //Coverage map shared between observer and executor
     let mut concolic_shmem = StdShMemProvider::new()
         .unwrap()
@@ -54,7 +56,6 @@ pub fn main() {
 
     let concolic_observer = ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
 
-    const MAP_SIZE: usize = 65536;
     //Coverage map shared between observer and executor
     let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
@@ -130,7 +131,7 @@ pub fn main() {
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator
-    let concolic_observer_name = (&concolic_observer.name()).to_string();
+    let concolic_observer_name = concolic_observer.name().to_string();
     let mut stages = tuple_list!(
         ConcolicTracingStage::new(
             TracingStage::new(

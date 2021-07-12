@@ -1,7 +1,7 @@
 use concolic::{SymExpr, SymExprRef};
 use libafl::{
-    corpus::{Corpus, Testcase},
-    executors::{Executor, HasExecHooksTuple, HasObservers, HasObserversHooks},
+    corpus::Corpus,
+    executors::{Executor, HasObservers},
     inputs::{HasBytesVec, Input},
     mark_feature_time,
     observers::ObserversTuple,
@@ -22,19 +22,15 @@ use std::convert::TryInto;
 use std::mem::size_of;
 use std::{collections::HashMap, marker::PhantomData};
 
+#[allow(clippy::too_many_lines)]
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
-    let mut res = Vec::new();
-
-    let ctx = Context::new(&Config::new());
-    let solver = Solver::new(&ctx);
-
     fn build_extract<'ctx>(
         bv: &BV<'ctx>,
         offset: u64,
         length: u64,
         little_endian: bool,
     ) -> BV<'ctx> {
-        let size = bv.get_size() as u64;
+        let size = u64::from(bv.get_size());
         assert_eq!(
             size % 8,
             0,
@@ -58,6 +54,11 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             )
         }
     }
+
+    let mut res = Vec::new();
+
+    let ctx = Context::new(&Config::new());
+    let solver = Solver::new(&ctx);
 
     let mut translation = HashMap::<SymExprRef, Dynamic>::new();
 
@@ -85,7 +86,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 Some(BV::new_const(&ctx, Symbol::Int(offset as u32), 8).into())
             }
             SymExpr::BuildInteger { value, bits } => {
-                Some(BV::from_u64(&ctx, value, bits as u32).into())
+                Some(BV::from_u64(&ctx, value, u32::from(bits)).into())
             }
             SymExpr::BuildInteger128 { high: _, low: _ } => todo!(),
             SymExpr::BuildNullPointer => {
@@ -136,14 +137,16 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::BuildAnd { a, b } => bv_binop!(a bvand b),
             SymExpr::BuildOr { a, b } => bv_binop!(a bvor b),
             SymExpr::BuildXor { a, b } => bv_binop!(a bvxor b),
-            SymExpr::BuildSext { op, bits } => Some(bv!(op).sign_ext(bits as u32).into()),
-            SymExpr::BuildZext { op, bits } => Some(bv!(op).zero_ext(bits as u32).into()),
-            SymExpr::BuildTrunc { op, bits } => Some(bv!(op).extract((bits - 1) as u32, 0).into()),
+            SymExpr::BuildSext { op, bits } => Some(bv!(op).sign_ext(u32::from(bits)).into()),
+            SymExpr::BuildZext { op, bits } => Some(bv!(op).zero_ext(u32::from(bits)).into()),
+            SymExpr::BuildTrunc { op, bits } => {
+                Some(bv!(op).extract(u32::from(bits - 1), 0).into())
+            }
             SymExpr::BuildBoolToBits { op, bits } => Some(
                 bool!(op)
                     .ite(
-                        &BV::from_u64(&ctx, 1, bits as u32),
-                        &BV::from_u64(&ctx, 0, bits as u32),
+                        &BV::from_u64(&ctx, 1, u32::from(bits)),
+                        &BV::from_u64(&ctx, 0, u32::from(bits)),
                     )
                     .into(),
             ),
@@ -167,7 +170,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                     0,
                     "bswap is only compatible with an even number of bvytes in the BV"
                 );
-                Some(build_extract(&bv, 0, bits as u64 / 8, true).into())
+                Some(build_extract(&bv, 0, u64::from(bits) / 8, true).into())
             }
             SymExpr::BuildInsert {
                 target,
@@ -177,9 +180,9 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             } => {
                 let target = bv!(target);
                 let to_insert = bv!(to_insert);
-                let bits_to_insert = to_insert.get_size() as u64;
+                let bits_to_insert = u64::from(to_insert.get_size());
                 assert_eq!(bits_to_insert % 8, 0, "can only insert full bytes");
-                let after_len = (target.get_size() as u64 / 8) - offset - (bits_to_insert / 8);
+                let after_len = (u64::from(target.get_size()) / 8) - offset - (bits_to_insert / 8);
                 Some(
                     std::array::IntoIter::new([
                         if offset == 0 {
@@ -286,8 +289,8 @@ pub struct ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
 where
     I: Input,
     C: Corpus<I>,
-    TE: Executor<EM, I, S, Z> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Z>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
     inner: TracingStage<C, EM, I, OT, S, TE, Z>,
@@ -298,8 +301,8 @@ impl<E, C, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<C, E
 where
     I: Input,
     C: Corpus<I>,
-    TE: Executor<EM, I, S, Z> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Z>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
     #[inline]
@@ -336,8 +339,8 @@ impl<C, EM, I, OT, S, TE, Z> ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
 where
     I: Input,
     C: Corpus<I>,
-    TE: Executor<EM, I, S, Z> + HasObservers<OT> + HasObserversHooks<EM, I, OT, S, Z>,
-    OT: ObserversTuple + HasExecHooksTuple<EM, I, S, Z>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
