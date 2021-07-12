@@ -8,28 +8,32 @@ use core::{
 };
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "std")]
 use std::convert::TryInto;
+
+use crate::{
+    bolts::llmp,
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
+    inputs::Input,
+    stats::Stats,
+    Error,
+};
 
 #[cfg(all(feature = "std", windows))]
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(feature = "std")]
-use crate::bolts::{
-    llmp::{LlmpReceiver, LlmpSender},
-    shmem::ShMemProvider,
-};
 use crate::{
-    bolts::llmp,
-    corpus::Corpus,
-    events::{
-        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId,
+    bolts::{
+        llmp::{LlmpReceiver, LlmpSender},
+        shmem::ShMemProvider,
     },
-    inputs::Input,
+    corpus::Corpus,
     state::{HasCorpus, HasSolutions},
-    stats::Stats,
-    Error,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it

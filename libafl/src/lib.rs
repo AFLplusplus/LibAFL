@@ -42,9 +42,8 @@ pub use fuzzer::*;
 use alloc::string::String;
 use core::fmt;
 
-use std::num::TryFromIntError;
 #[cfg(feature = "std")]
-use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
+use std::{env::VarError, io, num::ParseIntError, num::TryFromIntError, string::FromUtf8Error};
 
 #[cfg(all(unix, feature = "std"))]
 use nix;
@@ -160,6 +159,7 @@ impl From<ParseIntError> for Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
         Self::IllegalState(format!("Expected conversion failed: {:?}", err))
