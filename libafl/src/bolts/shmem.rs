@@ -1,6 +1,13 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
+use alloc::{rc::Rc, string::ToString};
+use core::{
+    cell::RefCell,
+    fmt::{self, Debug, Display},
+    mem::ManuallyDrop,
+};
+
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 /// The default [`ShMemProvider`] for this os.
@@ -35,14 +42,9 @@ pub type StdShMem = OsShMem;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::env;
-
-use alloc::{rc::Rc, string::ToString};
-use core::{
-    cell::RefCell,
+use std::{
     convert::{TryFrom, TryInto},
-    fmt::{self, Debug, Display},
-    mem::ManuallyDrop,
+    env,
 };
 
 #[cfg(all(unix, feature = "std"))]
@@ -1003,7 +1005,6 @@ pub struct ShMemCursor<T: ShMem> {
     pos: usize,
 }
 
-#[cfg(feature = "std")]
 impl<T: ShMem> ShMemCursor<T> {
     pub fn new(shmem: T) -> Self {
         Self {
@@ -1012,7 +1013,8 @@ impl<T: ShMem> ShMemCursor<T> {
         }
     }
 
-    fn slice_mut(&mut self) -> &mut [u8] {
+    /// Slice from the current location on this map to the end, mutable
+    fn empty_slice_mut(&mut self) -> &mut [u8] {
         &mut (self.inner.map_mut()[self.pos..])
     }
 }
@@ -1020,7 +1022,7 @@ impl<T: ShMem> ShMemCursor<T> {
 #[cfg(feature = "std")]
 impl<T: ShMem> std::io::Write for ShMemCursor<T> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match self.slice_mut().write(buf) {
+        match self.empty_slice_mut().write(buf) {
             Ok(w) => {
                 self.pos += w;
                 Ok(w)
@@ -1034,7 +1036,7 @@ impl<T: ShMem> std::io::Write for ShMemCursor<T> {
     }
 
     fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
-        match self.slice_mut().write_vectored(bufs) {
+        match self.empty_slice_mut().write_vectored(bufs) {
             Ok(w) => {
                 self.pos += w;
                 Ok(w)
@@ -1044,7 +1046,7 @@ impl<T: ShMem> std::io::Write for ShMemCursor<T> {
     }
 
     fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
-        match self.slice_mut().write_all(buf) {
+        match self.empty_slice_mut().write_all(buf) {
             Ok(w) => {
                 self.pos += buf.len();
                 Ok(w)

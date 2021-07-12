@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use alloc;
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 
@@ -597,17 +598,17 @@ pub use serdeany_registry::*;
 macro_rules! impl_serdeany {
     ($struct_name:ident) => {
         impl $crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn core::any::Any {
+            fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
 
-            fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
                 self
             }
 
             fn as_any_boxed(
                 self: ::std::boxed::Box<Self>,
-            ) -> ::std::boxed::Box<dyn core::any::Any> {
+            ) -> ::std::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }
@@ -625,11 +626,17 @@ macro_rules! impl_serdeany {
 macro_rules! impl_serdeany {
     ($struct_name:ident) => {
         impl $crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn core::any::Any {
+            fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
 
-            fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
+                self
+            }
+
+            fn as_any_boxed(
+                self: ::alloc::boxed::Box<Self>,
+            ) -> ::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }
