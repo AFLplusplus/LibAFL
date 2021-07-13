@@ -1,5 +1,6 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
+#[cfg(any(windows, unix))]
 use core::time::Duration;
 
 use crate::{

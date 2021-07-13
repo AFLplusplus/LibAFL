@@ -43,7 +43,10 @@ use alloc::string::String;
 use core::fmt;
 
 #[cfg(feature = "std")]
-use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
+use std::{env::VarError, io, num::ParseIntError, num::TryFromIntError, string::FromUtf8Error};
+
+#[cfg(all(unix, feature = "std"))]
+use nix;
 
 /// Main error struct for AFL
 #[derive(Debug)]
@@ -120,7 +123,7 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
         Self::Unknown(format!("{:?}", err))
@@ -153,6 +156,13 @@ impl From<VarError> for Error {
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
         Self::Unknown(format!("Failed to parse Int: {:?}", err))
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<TryFromIntError> for Error {
+    fn from(err: TryFromIntError) -> Self {
+        Self::IllegalState(format!("Expected conversion failed: {:?}", err))
     }
 }
 

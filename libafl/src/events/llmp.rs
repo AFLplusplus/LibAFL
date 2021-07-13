@@ -5,8 +5,10 @@ use alloc::{
     vec::Vec,
 };
 use core::{marker::PhantomData, time::Duration};
-use core_affinity::CoreId;
 use serde::{de::DeserializeOwned, Serialize};
+
+#[cfg(feature = "std")]
+use core_affinity::CoreId;
 
 #[cfg(feature = "std")]
 use core::ptr::{addr_of, read_volatile};
@@ -689,6 +691,7 @@ where
 }
 
 /// The kind of manager we're creating right now
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, Copy)]
 pub enum ManagerKind {
     /// Any kind will do

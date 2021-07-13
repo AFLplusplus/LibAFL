@@ -332,7 +332,7 @@ where
         #[cfg(not(feature = "introspection"))]
         let is_solution = self
             .objective_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+            .is_interesting(state, manager, &input, observers, exit_kind)?;
 
         #[cfg(feature = "introspection")]
         let is_solution = self
@@ -345,7 +345,7 @@ where
             #[cfg(not(feature = "introspection"))]
             let is_corpus = self
                 .feedback_mut()
-                .is_interesting(state, manager, &input, observers, &exit_kind)?;
+                .is_interesting(state, manager, &input, observers, exit_kind)?;
 
             #[cfg(feature = "introspection")]
             let is_corpus = self

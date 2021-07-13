@@ -21,7 +21,7 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, tokens_mutations},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    stages::mopt::MOptStage,
+    stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
@@ -121,8 +121,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Setup a basic mutator with a mutational stage
 
-    let mutator = StdMOptMutator::new(havoc_mutations().merge(tokens_mutations()));
-    let mut stages = tuple_list!(MOptStage::new(mutator, &mut state, 5)?);
+    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     /*
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));

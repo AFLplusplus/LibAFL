@@ -8,16 +8,9 @@ use core::{
 };
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
-
-#[cfg(all(feature = "std", windows))]
-use crate::bolts::os::startable_self;
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::os::{fork, ForkResult};
 #[cfg(feature = "std")]
-use crate::bolts::{
-    llmp::{LlmpReceiver, LlmpSender},
-    shmem::ShMemProvider,
-};
+use std::convert::TryInto;
+
 use crate::{
     bolts::llmp,
     events::{
@@ -27,6 +20,20 @@ use crate::{
     inputs::Input,
     stats::Stats,
     Error,
+};
+
+#[cfg(all(feature = "std", windows))]
+use crate::bolts::os::startable_self;
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::os::{fork, ForkResult};
+#[cfg(feature = "std")]
+use crate::{
+    bolts::{
+        llmp::{LlmpReceiver, LlmpSender},
+        shmem::ShMemProvider,
+    },
+    corpus::Corpus,
+    state::{HasCorpus, HasSolutions},
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -216,8 +223,9 @@ where
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-pub struct SimpleRestartingEventManager<I, S, SP, ST>
+pub struct SimpleRestartingEventManager<'a, C, I, S, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -228,12 +236,13 @@ where
     /// [`LlmpSender`] for restarts
     sender: LlmpSender<SP>,
     /// Phantom data
-    _phantom: PhantomData<(I, S)>,
+    _phantom: PhantomData<&'a (C, I, S)>,
 }
 
 #[cfg(feature = "std")]
-impl<I, S, SP, ST> EventFirer<I, S> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, I, S, SP, ST> EventFirer<I, S> for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -245,8 +254,9 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, S, SP, ST> EventRestarter<S> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, I, S, SP, ST> EventRestarter<S> for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -264,8 +274,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, ST, Z> EventProcessor<E, I, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, E, I, S, SP, ST, Z> EventProcessor<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -277,8 +289,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, ST, Z> EventManager<E, I, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, E, I, S, SP, ST, Z> EventManager<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -287,8 +301,9 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -301,10 +316,11 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, S, SP, ST> SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, I, S, SP, ST> SimpleRestartingEventManager<'a, C, I, S, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
-    S: DeserializeOwned + Serialize,
+    S: DeserializeOwned + Serialize + HasCorpus<C, I> + HasSolutions<C, I>,
     SP: ShMemProvider,
     ST: Stats, //TODO CE: CustomEvent,
 {
@@ -321,10 +337,7 @@ where
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     #[allow(clippy::similar_names)]
-    pub fn launch(
-        stats: ST,
-        shmem_provider: &mut SP,
-    ) -> Result<(Option<S>, SimpleRestartingEventManager<I, S, SP, ST>), Error> {
+    pub fn launch(mut stats: ST, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error> {
         // We start ourself as child process to actually fuzz
         let (mut sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
@@ -407,6 +420,11 @@ where
                 unsafe {
                     sender.reset();
                 }
+
+                // load the corpus size into stats to still display the correct numbers after restart.
+                let client_stats = stats.client_stats_mut_for(0);
+                client_stats.update_corpus_size(state.corpus().count().try_into()?);
+                client_stats.update_objective_size(state.solutions().count().try_into()?);
 
                 (
                     Some(state),
