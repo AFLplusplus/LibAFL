@@ -64,3 +64,9 @@ __attribute__((weak)) void (*libafl_exec_edge_hook)(uint32_t);
 __attribute__((weak)) uint32_t (*libafl_gen_edge_hook)(uint64_t, uint64_t);
 __attribute__((weak)) void (*libafl_exec_block_hook)(uint64_t);
 __attribute__((weak)) uint32_t (*libafl_gen_block_hook)(uint64_t);
+
+__attribute__((weak)) void (*libafl_exec_cmp_hook1)(uint32_t, uint8_t, uint8_t);
+__attribute__((weak)) void (*libafl_exec_cmp_hook2)(uint32_t, uint16_t, uint16_t);
+__attribute__((weak)) void (*libafl_exec_cmp_hook4)(uint32_t, uint32_t, uint32_t);
+__attribute__((weak)) void (*libafl_exec_cmp_hook8)(uint32_t, uint64_t, uint64_t);
+__attribute__((weak)) uint32_t (*libafl_gen_cmp_hook)(uint64_t, uint32_t);

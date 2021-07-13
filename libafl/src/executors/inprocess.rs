@@ -275,6 +275,7 @@ mod unix_signal_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            timeout::remove_timeout,
             ExitKind,
         },
         feedbacks::Feedback,
@@ -422,6 +423,8 @@ mod unix_signal_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
+        remove_timeout();
+
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void
             as *mut ucontext_t);

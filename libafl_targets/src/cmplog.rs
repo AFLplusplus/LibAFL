@@ -24,6 +24,11 @@ pub const CMPLOG_KIND_INS: u8 = 0;
 /// `CmpLog` return kind
 pub const CMPLOG_KIND_RTN: u8 = 1;
 
+// void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
+extern "C" {
+    pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
+}
+
 /// The header for `CmpLog` hits.
 #[repr(C)]
 #[derive(Default, Debug, Clone, Copy)]
