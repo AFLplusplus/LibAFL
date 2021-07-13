@@ -56,12 +56,12 @@ where
         .get_mut::<QemuEdgesMapMetadata>()
         .unwrap();
     let id = max(meta.current_id as usize, unsafe { MAX_EDGES_NUM });
-    if !meta.map.contains_key(&(src, dest)) {
+    if meta.map.contains_key(&(src, dest)) {
+        Some(*meta.map.get(&(src, dest)).unwrap())
+    } else {
         meta.current_id = ((id + 1) & (EDGES_MAP_SIZE - 1)) as u32;
         unsafe { MAX_EDGES_NUM = meta.current_id as usize };
         Some(id as u32)
-    } else {
-        Some(*meta.map.get(&(src, dest)).unwrap())
     }
 }
 
@@ -85,24 +85,24 @@ where
         .get_mut::<QemuCmpsMapMetadata>()
         .unwrap();
     let id = meta.current_id as usize;
-    if !meta.map.contains_key(&addr) {
+    if meta.map.contains_key(&addr) {
+        Some(*meta.map.get(&addr).unwrap())
+    } else {
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u32;
         Some(id as u32)
-    } else {
-        Some(*meta.map.get(&addr).unwrap())
     }
 }
 
 pub extern "C" fn trace_cmp1_cmplog(id: u32, v0: u8, v1: u8) {
-    unsafe { __libafl_targets_cmplog_instructions(id as usize, 1, v0 as u64, v1 as u64) }
+    unsafe { __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1)) }
 }
 
 pub extern "C" fn trace_cmp2_cmplog(id: u32, v0: u16, v1: u16) {
-    unsafe { __libafl_targets_cmplog_instructions(id as usize, 2, v0 as u64, v1 as u64) }
+    unsafe { __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1)) }
 }
 
 pub extern "C" fn trace_cmp4_cmplog(id: u32, v0: u32, v1: u32) {
-    unsafe { __libafl_targets_cmplog_instructions(id as usize, 4, v0 as u64, v1 as u64) }
+    unsafe { __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1)) }
 }
 
 pub extern "C" fn trace_cmp8_cmplog(id: u32, v0: u64, v1: u64) {

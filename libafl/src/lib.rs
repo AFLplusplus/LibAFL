@@ -45,9 +45,6 @@ use core::fmt;
 #[cfg(feature = "std")]
 use std::{env::VarError, io, num::ParseIntError, num::TryFromIntError, string::FromUtf8Error};
 
-#[cfg(all(unix, feature = "std"))]
-use nix;
-
 /// Main error struct for AFL
 #[derive(Debug)]
 pub enum Error {
