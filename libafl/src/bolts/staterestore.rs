@@ -18,7 +18,8 @@ use crate::{
 /// A [`StateRestorer`] saves and restores bytes to a shared map.
 /// If the state gets larger than the preallocated [`ShMem`] shared map,
 /// it will instead write to disk, and store the file name into the map.
-/// Writing to StateRestorer multiple times is not allowed.
+/// Writing to [`StateRestorer`] multiple times is not allowed.
+#[derive(Debug, Clone)]
 pub struct StateRestorer<SP>
 where
     SP: ShMemProvider,
@@ -43,7 +44,7 @@ where
         self.shmem.write_to_env(env_name)
     }
 
-    /// Create a StateRrestore from `env` variable name
+    /// Create a [`StateRrestore`] from `env` variable name
     pub fn from_env(shmem_provider: &mut SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self::new(shmem_provider.existing_from_env(env_name)?))
     }
@@ -118,10 +119,14 @@ where
 
     fn content_mut(&mut self) -> &mut StateShMemContent {
         let ptr = self.shmem.map().as_ptr();
-        unsafe { &mut *(ptr as *mut StateShMemContent) }
+        #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
+        unsafe {
+            &mut *(ptr as *mut StateShMemContent)
+        }
     }
 
     fn content(&self) -> &StateShMemContent {
+        #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
         let ptr = self.shmem.map().as_ptr() as *const StateShMemContent;
         unsafe { &*(ptr) }
     }

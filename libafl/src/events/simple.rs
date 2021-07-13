@@ -365,7 +365,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if staterestorer.has_content() {
+                if !staterestorer.has_content() {
                     #[cfg(unix)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
