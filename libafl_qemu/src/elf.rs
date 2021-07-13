@@ -44,12 +44,10 @@ impl<'a> EasyElf<'a> {
                 if sym_name == name {
                     return if sym.st_value == 0 {
                         None
+                    } else if self.is_pic() {
+                        Some(sym.st_value + load_addr)
                     } else {
-                        if self.is_pic() {
-                            Some(sym.st_value + load_addr)
-                        } else {
-                            Some(sym.st_value)
-                        }
+                        Some(sym.st_value)
                     };
                 }
             }
