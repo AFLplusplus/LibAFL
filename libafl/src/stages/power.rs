@@ -1,48 +1,68 @@
+use alloc::string::String;
 use core::marker::PhantomData;
+use num::Integer;
+use xxhash_rust::xxh3;
 
 use crate::{
-    bolts::rands::Rand,
-    corpus::{Corpus, CorpusScheduler},
-    events::EventManager,
+    corpus::{Corpus, PowerScheduleTestData},
     executors::{Executor, HasObservers},
+    fuzzer::Evaluator,
     inputs::Input,
     mutators::Mutator,
-    observers::ObserversTuple,
-    stages::{Stage, MutationalStage},
-    state::{Evaluator, HasCorpus, HasRand},
+    observers::{MapObserver, ObserversTuple},
+    stages::{MutationalStage, PowerScheduleGlobalData, Stage},
+    state::{HasClientPerfStats, HasCorpus, HasMetadata},
     Error,
 };
 
-/// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
-where
-    M: Mutator<I, S>,
-    I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    CS: CorpusScheduler<I, S>,
-    R: Rand,
-{
-    mutator: M,
-    phantom: PhantomData<(C, CS, E, EM, I, OT, R, S)>,
+pub enum PowerSchedule {
+    EXPLORE,
+    FAST,
+    COE,
+    LIN,
+    QUAD,
+    EXPLOIT,
 }
 
-impl<C, CS, E, EM, I, M, OT, R, S> MutationalStage<C, CS, E, EM, I, M, OT, S>
-    for PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+const POWER_BETA: f64 = 1.0;
+const MAX_FACTOR: f64 = POWER_BETA * 32.0;
+const N_FUZZ_SIZE: usize = 1 << 21;
+const HAVOC_MAX_MULT: f64 = 64.0;
+
+/// The mutational stage using power schedules
+#[derive(Clone, Debug)]
+pub struct PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    M: Mutator<I, S>,
-    I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    CS: CorpusScheduler<I, S>,
-    R: Rand,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    I: Input,
+    M: Mutator<I, S>,
+    O: MapObserver<T>,
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    Z: Evaluator<E, EM, I, S>,
+{
+    map_observer_name: String,
+    mutator: M,
+    n_fuzz: [u32; (1 << 21)],
+    strat: PowerSchedule,
+    phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
+}
+
+impl<C, E, EM, I, M, O, OT, S, T, Z> MutationalStage<C, E, EM, I, M, S, Z>
+    for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    C: Corpus<I>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    I: Input,
+    M: Mutator<I, S>,
+    O: MapObserver<T>,
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -57,54 +77,296 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut S) -> usize {
-        1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-    }
-}
+    fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
+        let mut testcase = state.corpus().get(corpus_idx).unwrap().borrow_mut();
+        let tsdata = testcase
+            .metadata_mut()
+            .get_mut::<PowerScheduleTestData>()
+            .unwrap();
+        let gldata = state.metadata().get::<PowerScheduleGlobalData>().unwrap();
 
-impl<C, CS, E, EM, I, M, OT, R, S> Stage<CS, E, EM, I, S>
-    for PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
-where
-    M: Mutator<I, S>,
-    I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
-    C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    CS: CorpusScheduler<I, S>,
-    R: Rand,
-{
-    #[inline]
-    fn perform(
-        &self,
-        state: &mut S,
+        let mut fuzz_mu = 0.0;
+        match self.strat {
+            PowerSchedule::COE => {
+                fuzz_mu = self.fuzz_mu(state)?;
+            }
+            _ => {}
+        }
+
+        // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
+        Ok(self.calculate_score(tsdata, gldata, fuzz_mu))
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    fn perform_mutational(
+        &mut self,
+        fuzzer: &mut Z,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
-        scheduler: &CS,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        self.perform_mutational(state, executor, manager, scheduler, corpus_idx)
+        let num = self.iterations(state, corpus_idx)?;
+
+        for i in 0..num {
+            let mut input = state
+                .corpus()
+                .get(corpus_idx)?
+                .borrow_mut()
+                .load_input()?
+                .clone();
+
+            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+
+            // Time is measured directly the `evaluate_input` function
+            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
+
+            let mut hash = 0;
+            /*
+            let map = executor
+                .observers()
+                .match_name::<O>(&self.map_observer_name)
+                .unwrap()
+                .map();
+
+            let mut hash = xxh3::xxh3_64(map) as usize;
+            */
+
+            match corpus_idx {
+                Some(idx) => {
+                    hash = 0;
+                    state
+                        .corpus()
+                        .get(idx)?
+                        .borrow_mut()
+                        .metadata_mut()
+                        .get_mut::<PowerScheduleTestData>()
+                        .unwrap()
+                        .n_fuzz_entry = hash;
+
+                    self.n_fuzz[hash] = 1;
+                }
+                None => {
+                    assert!(self.n_fuzz[hash] != 0);
+                    self.n_fuzz[hash] += 1;
+                }
+            }
+
+            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+        }
+
+        state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .metadata_mut()
+            .get_mut::<PowerScheduleTestData>()
+            .unwrap()
+            .fuzz_level += 1;
+        Ok(())
     }
 }
 
-impl<C, CS, E, EM, I, M, OT, R, S> PowerMutationalStage<C, CS, E, EM, I, M, OT, R, S>
+impl<C, E, EM, I, M, O, OT, S, T, Z> Stage<E, EM, S, Z>
+    for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    M: Mutator<I, S>,
-    I: Input,
-    S: HasCorpus<C, I> + Evaluator<I> + HasRand<R>,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
-    EM: EventManager<I, S>,
-    E: Executor<I> + HasObservers<OT>,
-    OT: ObserversTuple,
-    CS: CorpusScheduler<I, S>,
-    R: Rand,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    I: Input,
+    M: Mutator<I, S>,
+    O: MapObserver<T>,
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    Z: Evaluator<E, EM, I, S>,
+{
+    #[inline]
+    #[allow(clippy::let_and_return)]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+        corpus_idx: usize,
+    ) -> Result<(), Error> {
+        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        ret
+    }
+}
+
+impl<C, E, EM, I, M, O, OT, S, T, Z> PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    C: Corpus<I>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    I: Input,
+    M: Mutator<I, S>,
+    O: MapObserver<T>,
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
-    pub fn new(mutator: M) -> Self {
+    pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: &O) -> Self {
         Self {
+            map_observer_name: map_observer_name.name().to_string(),
             mutator: mutator,
+            n_fuzz: [0; N_FUZZ_SIZE],
+            strat: strat,
             phantom: PhantomData,
         }
+    }
+
+    //
+    #[inline]
+    pub fn fuzz_mu(&self, state: &S) -> Result<f64, Error> {
+        let corpus = state.corpus();
+        let mut n_paths = 0;
+        let mut fuzz_mu = 0.0;
+        for idx in 0..corpus.count() {
+            let n_fuzz_entry = corpus
+                .get(idx)
+                .unwrap()
+                .borrow()
+                .metadata()
+                .get::<PowerScheduleTestData>()
+                .unwrap()
+                .n_fuzz_entry;
+            fuzz_mu += (self.n_fuzz[n_fuzz_entry] as f64).log2();
+            n_paths += 1;
+        }
+
+        if n_paths == 0 {
+            return Err(Error::Unknown(String::from("Queue state corrput")));
+        }
+
+        fuzz_mu = fuzz_mu / (n_paths as f64);
+        Ok(fuzz_mu)
+    }
+
+    #[inline]
+    #[allow(clippy::cast_precision_loss)]
+    fn calculate_score(
+        &self,
+        tsdata: &mut PowerScheduleTestData,
+        gldata: &PowerScheduleGlobalData,
+        fuzz_mu: f64,
+    ) -> usize {
+        let mut perf_score = 100.0;
+        let avg_exec_us = gldata.total_cal_us / (gldata.total_cal_cycles as u128);
+        let avg_bitmap_size = gldata.total_bitmap_size / gldata.total_bitmap_size;
+
+        let q_exec_us = tsdata.exec_us as f64;
+        if q_exec_us * 0.1 > avg_exec_us as f64 {
+            perf_score = 10.0;
+        } else if q_exec_us * 0.2 > avg_exec_us as f64 {
+            perf_score = 25.0;
+        } else if q_exec_us * 0.5 > avg_exec_us as f64 {
+            perf_score = 50.0;
+        } else if q_exec_us * 0.75 > avg_exec_us as f64 {
+            perf_score = 75.0;
+        } else if q_exec_us * 4.0 < avg_exec_us as f64 {
+            perf_score = 300.0;
+        } else if q_exec_us * 3.0 < avg_exec_us as f64 {
+            perf_score = 200.0;
+        } else if q_exec_us * 2.0 < avg_exec_us as f64 {
+            perf_score = 150.0;
+        }
+
+        let q_bitmap_size = tsdata.bitmap_size as f64;
+        if q_bitmap_size * 0.3 > avg_bitmap_size as f64 {
+            perf_score *= 3.0;
+        } else if q_bitmap_size * 0.5 > avg_bitmap_size as f64 {
+            perf_score *= 2.0;
+        } else if q_bitmap_size * 0.75 > avg_bitmap_size as f64 {
+            perf_score *= 1.5;
+        } else if q_bitmap_size * 3.0 < avg_bitmap_size as f64 {
+            perf_score *= 0.25;
+        } else if q_bitmap_size * 2.0 < avg_bitmap_size as f64 {
+            perf_score *= 0.5;
+        } else if q_bitmap_size * 1.5 < avg_bitmap_size as f64 {
+            perf_score *= 0.75;
+        }
+
+        if tsdata.handicap >= 4 {
+            perf_score *= 4.0;
+            tsdata.handicap -= 4;
+        } else if tsdata.handicap > 0 {
+            perf_score *= 2.0;
+            tsdata.handicap -= 1;
+        }
+
+        if tsdata.depth >= 4 && tsdata.depth < 8 {
+            perf_score *= 2.0;
+        } else if tsdata.depth >= 8 && tsdata.depth < 14 {
+            perf_score *= 3.0;
+        } else if tsdata.depth >= 14 && tsdata.depth < 25 {
+            perf_score *= 4.0;
+        } else if tsdata.depth >= 25 {
+            perf_score *= 5.0;
+        }
+
+        let mut factor: f64 = 1.0;
+
+        // TODO: currently we don't have any favored inputs, if that's introduced we need to modify code here
+        match &self.strat {
+            PowerSchedule::EXPLORE => {
+                // Nothing happens in EXPLORE
+            }
+            PowerSchedule::EXPLOIT => {
+                factor = MAX_FACTOR;
+            }
+            PowerSchedule::COE => {
+                if self.n_fuzz[tsdata.n_fuzz_entry] as f64 > fuzz_mu {
+                    factor = 0.0;
+                }
+            }
+            PowerSchedule::FAST => {
+                if tsdata.fuzz_level != 0 {
+                    let lg = (self.n_fuzz[tsdata.n_fuzz_entry] as f64).log2() as u32;
+                    // Do thing if factor == 5
+                    if lg < 2 {
+                        factor = 4.0;
+                    } else if lg >= 2 && lg < 4 {
+                        factor = 3.0;
+                    } else if lg >= 4 && lg < 5 {
+                        factor = 2.0;
+                    } else if lg >= 6 && lg < 7 {
+                        factor = 0.8;
+                    } else if lg >= 7 && lg < 8 {
+                        factor = 0.6;
+                    } else if lg >= 8 {
+                        factor = 0.4;
+                    }
+                }
+            }
+            PowerSchedule::LIN => {
+                factor = (tsdata.fuzz_level as f64) / (self.n_fuzz[tsdata.n_fuzz_entry] + 1) as f64;
+            }
+            PowerSchedule::QUAD => {
+                factor = ((tsdata.fuzz_level * tsdata.fuzz_level) as f64)
+                    / (self.n_fuzz[tsdata.n_fuzz_entry] + 1) as f64;
+            }
+        }
+
+        perf_score *= factor / POWER_BETA;
+
+        // Lower bound if the strat is not COE.
+        match self.strat {
+            PowerSchedule::COE => {}
+            _ => {
+                if perf_score < 1.0 {
+                    perf_score = 1.0;
+                }
+            }
+        }
+
+        // Upper bound
+        if perf_score > HAVOC_MAX_MULT * 100.0 {
+            perf_score = HAVOC_MAX_MULT * 100.0;
+        }
+
+        perf_score as usize
     }
 }

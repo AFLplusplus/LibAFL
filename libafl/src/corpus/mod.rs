@@ -1,7 +1,7 @@
 //! Corpuses contain the testcases, either in mem, on disk, or somewhere else.
 
 pub mod testcase;
-pub use testcase::Testcase;
+pub use testcase::{PowerScheduleTestData, Testcase};
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
@@ -20,6 +20,9 @@ pub use minimizer::{
     LenTimeMinimizerCorpusScheduler, LenTimeMulFavFactor, MinimizerCorpusScheduler,
     TopRatedsMetadata,
 };
+
+pub mod powersched;
+pub use powersched::PowerQueueCorpusScheduler;
 
 use alloc::borrow::ToOwned;
 use core::{cell::RefCell, marker::PhantomData};

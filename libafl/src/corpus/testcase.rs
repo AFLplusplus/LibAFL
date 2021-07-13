@@ -205,3 +205,34 @@ where
         Testcase::new(input)
     }
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PowerScheduleTestData {
+    /// Number of bits set in bitmap, updated in calibrate_case
+    pub bitmap_size: u64,
+    /// Number of fuzzing iterations, updated in perform_mutational
+    pub fuzz_level: u64,
+    /// Number of queue cycles behind
+    pub handicap: u64,
+    /// Path depth, initialized in on_add
+    pub depth: u64,
+    /// Offset in n_fuzz
+    pub n_fuzz_entry: usize,
+    /// Average time spent in calibration stage, updated in calibrate_case
+    pub exec_us: u128,
+}
+
+impl PowerScheduleTestData {
+    pub fn new(depth: u64) -> Self {
+        Self {
+            bitmap_size: 0,
+            fuzz_level: 0,
+            handicap: 0,
+            depth: depth,
+            n_fuzz_entry: 0,
+            exec_us: 0,
+        }
+    }
+}
+
+crate::impl_serdeany!(PowerScheduleTestData);
