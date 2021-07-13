@@ -64,7 +64,7 @@ where
     where
         S: Serialize,
     {
-        if self.content().buf_len == 0 {
+        if self.has_content() {
             return Err(Error::IllegalState(
                 "Trying to save state to a non-empty state map".to_string(),
             ));
@@ -72,7 +72,7 @@ where
 
         let serialized = postcard::to_allocvec(state)?;
 
-        if serialized.len() + size_of::<StateShMemContent>() > self.shmem.len() {
+        if size_of::<StateShMemContent>() + serialized.len() > self.shmem.len() {
             // generate a filename
             let mut hasher = AHasher::new_with_keys(0, 0);
             hasher.write(&serialized[serialized.len() - 1024..]);
@@ -84,6 +84,13 @@ where
             // write the filename to shmem
             let filename_buf = postcard::to_allocvec(&filename)?;
             let len = filename_buf.len();
+
+            /*println!(
+                "Storing {} bytes to tmpfile {} (larger than map of {} bytes)",
+                serialized.len(),
+                &filename,
+                self.shmem.len()
+            );*/
 
             let shmem_content = self.content_mut();
             unsafe {
