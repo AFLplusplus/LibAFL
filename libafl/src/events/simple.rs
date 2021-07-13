@@ -406,8 +406,8 @@ where
 
                 // load the corpus size into stats to still display the correct numbers after restart.
                 let client_stats = stats.client_stats_mut_for(0);
-                client_stats.update_corpus_size(state.corpus().count().try_into().unwrap());
-                client_stats.update_objective_size(state.solutions().count().try_into().unwrap());
+                client_stats.update_corpus_size(state.corpus().count().try_into()?);
+                client_stats.update_objective_size(state.solutions().count().try_into()?);
 
                 (
                     Some(state),
