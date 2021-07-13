@@ -9,6 +9,8 @@ pub mod ownedref;
 pub mod rands;
 pub mod serdeany;
 pub mod shmem;
+#[cfg(feature = "std")]
+pub mod staterestore;
 pub mod tuples;
 
 #[cfg(feature = "llmp_compression")]

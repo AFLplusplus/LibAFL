@@ -1,7 +1,6 @@
 //! Compression of events passed between a broker and clients.
 //! Currently we use the gzip compression algorithm for its fast decompression performance.
 
-#[cfg(feature = "llmp_compression")]
 use crate::Error;
 use alloc::vec::Vec;
 use core::fmt::Debug;

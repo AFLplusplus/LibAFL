@@ -159,7 +159,7 @@ pub trait ShMem: Sized + Debug + Clone {
 
     /// The actual shared map, mutable
     fn map_mut(&mut self) -> &mut [u8];
-    ///
+
     /// Write this map's config to env
     #[cfg(feature = "std")]
     fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
@@ -959,7 +959,7 @@ pub mod win32_shmem {
         }
     }
 
-    /// Deinit sharedmaps on drop
+    /// Deinit sharedmaps on [`Drop`]
     impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
@@ -969,7 +969,7 @@ pub mod win32_shmem {
         }
     }
 
-    /// A ShMemProvider which uses win32 functions to provide shared memory mappings.
+    /// A [`ShMemProvider`] which uses `win32` functions to provide shared memory mappings.
     #[derive(Clone, Debug)]
     pub struct Win32ShMemProvider {}
 
@@ -979,7 +979,7 @@ pub mod win32_shmem {
         }
     }
 
-    /// Implement ShMemProvider for Win32ShMemProvider
+    /// Implement [`ShMemProvider`] for [`Win32ShMemProvider`]
     impl ShMemProvider for Win32ShMemProvider {
         type Mem = Win32ShMem;
 
