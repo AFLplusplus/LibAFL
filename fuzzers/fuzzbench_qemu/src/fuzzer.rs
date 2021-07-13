@@ -155,7 +155,7 @@ fn fuzz(
 
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", emu::load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found".into());
+        .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
     emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
