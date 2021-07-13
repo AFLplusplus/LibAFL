@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use libafl::state::HasMetadata;
 pub use libafl_targets::{
-    cmplog::__libafl_targets_cmplog_instructions, CMPLOG_MAP_W, EDGES_MAP, EDGES_MAP_SIZE,
-    MAX_EDGES_NUM,
+    cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
+    EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 
 #[derive(Default, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ impl QemuCmpsMapMetadata {
 
 libafl::impl_serdeany!(QemuCmpsMapMetadata);
 
-pub fn gen_unique_edges_id<S>(state: &mut S, src: u64, dest: u64) -> Option<u32>
+pub fn gen_unique_edge_ids<S>(state: &mut S, src: u64, dest: u64) -> Option<u32>
 where
     S: HasMetadata,
 {
@@ -65,15 +65,15 @@ where
     }
 }
 
-pub extern "C" fn exec_log_hitcount(id: u32) {
+pub extern "C" fn trace_edge_hitcount(id: u32) {
     unsafe { EDGES_MAP[id as usize] += 1 };
 }
 
-pub extern "C" fn exec_log_single(id: u32) {
+pub extern "C" fn trace_edge_single(id: u32) {
     unsafe { EDGES_MAP[id as usize] = 1 };
 }
 
-pub fn gen_unique_cmps_id<S>(state: &mut S, addr: u64, _size: usize) -> Option<u32>
+pub fn gen_unique_cmp_ids<S>(state: &mut S, addr: u64, _size: usize) -> Option<u32>
 where
     S: HasMetadata,
 {

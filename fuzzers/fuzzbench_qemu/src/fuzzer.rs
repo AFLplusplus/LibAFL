@@ -24,23 +24,24 @@ use libafl::{
     },
     corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::{
         scheduled::{havoc_mutations, StdScheduledMutator},
-        tokens_mutations, Tokens,
+        tokens_mutations, I2SRandReplace, Tokens,
     },
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    stages::StdMutationalStage,
+    stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     Error,
 };
 use libafl_qemu::{
-    amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, hooks, MmapPerms, QemuExecutor,
+    amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, hooks, hooks::CmpLogObserver, MmapPerms,
+    QemuExecutor,
 };
 
 /// The fuzzer main (as `no_mangle` C function)
@@ -228,6 +229,9 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
+    // Create an observation channel using cmplog map
+    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut hooks::CMPLOG_MAP }, true);
+
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
@@ -269,8 +273,8 @@ fn fuzz(
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
-        if buf.len() > 32 {
-            buf = &buf[0..32];
+        if buf.len() > 4096 {
+            buf = &buf[0..4096];
         }
 
         emu::write_mem(input_addr, buf);
@@ -279,9 +283,9 @@ fn fuzz(
         emu::write_reg(Amd64Regs::Rsi, buf.len()).unwrap();
         emu::write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
         emu::write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
-
+println!("AAAA");
         emu::run();
-
+println!("BBBB");
         ExitKind::Ok
     };
 
@@ -293,11 +297,19 @@ fn fuzz(
         &mut mgr,
     )?;
 
-    executor.hook_edge_generation(hooks::gen_unique_edges_id);
-    executor.hook_edge_execution(hooks::exec_log_hitcount);
+    // Track edge coverage
+    executor.hook_edge_generation(hooks::gen_unique_edge_ids);
+    executor.hook_edge_execution(hooks::trace_edge_hitcount);
+    // Track 2-4-8 cmps with CmpLog
+    executor.hook_cmp_generation(hooks::gen_unique_cmp_ids);
+    executor.hook_cmp8_execution(hooks::trace_cmp8_cmplog);
+    executor.hook_cmp4_execution(hooks::trace_cmp4_cmplog);
+    executor.hook_cmp2_execution(hooks::trace_cmp2_cmplog);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = TimeoutExecutor::new(executor, timeout);
+    let executor = TimeoutExecutor::new(executor, timeout);
+    // Show the cmplog observer
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
@@ -316,9 +328,15 @@ fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
+    let tracing = ShadowTracingStage::new(&mut executor);
+
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(I2SRandReplace::new());
+
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    let mut stages = tuple_list!(tracing, i2s, StdMutationalStage::new(mutator));
 
     // Remove target ouput (logs still survive)
     #[cfg(unix)]

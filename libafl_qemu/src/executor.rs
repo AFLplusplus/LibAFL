@@ -76,6 +76,14 @@ where
         })
     }
 
+    pub fn inner(&self) -> &InProcessExecutor<'a, H, I, OT, S> {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, I, OT, S> {
+        &mut self.inner
+    }
+
     #[allow(clippy::unused_self)]
     pub fn hook_edge_generation(&self, hook: fn(&mut S, src: u64, dest: u64) -> Option<u32>) {
         unsafe { GEN_EDGE_HOOK_PTR = hook as *const _ };
