@@ -2,13 +2,15 @@
 
 use alloc::string::{String, ToString};
 use core::{marker::PhantomData, time::Duration};
-use serde::{de::DeserializeOwned, Serialize};
-
-#[cfg(feature = "std")]
-use core_affinity::CoreId;
 
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
+#[cfg(feature = "std")]
+use core_affinity::CoreId;
+#[cfg(feature = "std")]
+use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "std")]
+use std::net::{SocketAddr, ToSocketAddrs};
 
 #[cfg(feature = "std")]
 use crate::bolts::{
@@ -16,9 +18,6 @@ use crate::bolts::{
     shmem::StdShMemProvider,
     staterestore::StateRestorer,
 };
-
-#[cfg(feature = "std")]
-use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::{
     bolts::{
@@ -522,6 +521,7 @@ where
 }
 
 /// A manager that can restart on the fly, storing states in-between (in `on_resatrt`)
+#[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct LlmpRestartingEventManager<I, OT, S, SP>
 where
@@ -536,6 +536,7 @@ where
     staterestorer: StateRestorer<SP>,
 }
 
+#[cfg(feature = "std")]
 impl<I, OT, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
@@ -554,6 +555,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<I, OT, S, SP> EventRestarter<S> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
@@ -578,6 +580,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<E, I, OT, S, SP, Z> EventProcessor<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
@@ -592,6 +595,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
@@ -604,6 +608,7 @@ where
 {
 }
 
+#[cfg(feature = "std")]
 impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
@@ -622,6 +627,7 @@ const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
+#[cfg(feature = "std")]
 impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,

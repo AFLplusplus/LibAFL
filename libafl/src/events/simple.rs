@@ -1,8 +1,6 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
-#[cfg(feature = "std")]
 use crate::{
-    bolts::llmp,
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
@@ -37,9 +35,6 @@ const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
 const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
-
-/// We're restarting right now.
-const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
