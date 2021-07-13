@@ -1,11 +1,12 @@
 use alloc::string::String;
 use core::marker::PhantomData;
+use num::Integer;
 use xxhash_rust::xxh3;
 
 use crate::{
     corpus::{Corpus, PowerScheduleTestData},
-    fuzzer::Evaluator,
     executors::{Executor, HasObservers},
+    fuzzer::Evaluator,
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
@@ -31,13 +32,14 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<C, E, EM, I, M, O, OT, S, Z>
+pub struct PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<u8>,
+    O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -46,17 +48,18 @@ where
     mutator: M,
     n_fuzz: [u32; (1 << 21)],
     strat: PowerSchedule,
-    phantom: PhantomData<(C, E, EM, I, O, OT, S, Z)>,
+    phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
 }
 
-impl<C, E, EM, I, M, O, OT, S, Z> MutationalStage<C, E, EM, I, M, S, Z>
-    for PowerMutationalStage<C, E, EM, I, M, O, OT, S, Z>
+impl<C, E, EM, I, M, O, OT, S, T, Z> MutationalStage<C, E, EM, I, M, S, Z>
+    for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<u8>,
+    O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -118,6 +121,8 @@ where
             // Time is measured directly the `evaluate_input` function
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
+            let mut hash = 0;
+            /*
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
@@ -125,6 +130,8 @@ where
                 .map();
 
             let mut hash = xxh3::xxh3_64(map) as usize;
+            */
+
             match corpus_idx {
                 Some(idx) => {
                     hash = 0;
@@ -160,13 +167,15 @@ where
     }
 }
 
-impl<C, E, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<C, E, EM, I, M, O, OT, S, Z>
+impl<C, E, EM, I, M, O, OT, S, T, Z> Stage<E, EM, S, Z>
+    for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<u8>,
+    O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -186,21 +195,22 @@ where
     }
 }
 
-impl<C, E, EM, I, M, O, OT, S, Z> PowerMutationalStage<C, E, EM, I, M, O, OT, S, Z>
+impl<C, E, EM, I, M, O, OT, S, T, Z> PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<u8>,
+    O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
-    pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: String) -> Self {
+    pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: &O) -> Self {
         Self {
-            map_observer_name: map_observer_name,
+            map_observer_name: map_observer_name.name().to_string(),
             mutator: mutator,
             n_fuzz: [0; N_FUZZ_SIZE],
             strat: strat,

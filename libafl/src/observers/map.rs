@@ -46,6 +46,16 @@ where
         res
     }
 
+    fn hash(&self) -> u64 {
+        /*
+        let ptr = self.map().as_ptr() as *const u8;
+        let size = // T's size
+        return xxh3::xxh3_64(from_raw_parts(ptr, self.map().len()));
+        */
+
+        0
+    }
+
     /// Get the initial value for reset()
     fn initial(&self) -> T;
 

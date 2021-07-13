@@ -11,7 +11,6 @@ pub use mutational::{MutationalStage, StdMutationalStage};
 pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
-
 pub mod calibrate;
 pub use calibrate::{CalibrateStage, PowerScheduleGlobalData};
 
