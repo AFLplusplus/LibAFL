@@ -826,7 +826,8 @@ where
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
-            let staterestorer = StateRestorer::new(self.shmem_provider.new_map(256 * 1024 * 1024)?);
+            let staterestorer: StateRestorer<SP> =
+                StateRestorer::new(self.shmem_provider.new_map(256 * 1024 * 1024)?);
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 

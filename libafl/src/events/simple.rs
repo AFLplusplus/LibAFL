@@ -329,7 +329,8 @@ where
         // We start ourself as child process to actually fuzz
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
-            let staterestorer = StateRestorer::new(shmem_provider.new_map(256 * 1024 * 1024)?);
+            let staterestorer: StateRestorer<SP> =
+                StateRestorer::new(shmem_provider.new_map(256 * 1024 * 1024)?);
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
