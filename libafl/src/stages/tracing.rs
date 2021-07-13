@@ -96,6 +96,10 @@ where
             phantom: PhantomData,
         }
     }
+
+    pub fn executor(&self) -> &TE {
+        &self.tracer_executor
+    }
 }
 
 /// A stage that runs the shadow executor using also the shadow observers
