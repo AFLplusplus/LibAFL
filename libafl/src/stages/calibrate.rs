@@ -95,21 +95,25 @@ where
         calstat.total_bitmap_size += bitmap_size as u64;
         calstat.total_bitmap_entries += 1;
 
+        println!("calstat: {:#?}", calstat);
+
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+
         let data = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
             .unwrap();
-        data.exec_us += ((end - start) / (iter as u32)).as_millis();
 
+        data.exec_us += ((end - start) / (iter as u32)).as_millis();
         data.bitmap_size = bitmap_size as u64;
         data.handicap = handicap as u64;
+        println!("data: {:#?}", data);
 
         Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleStats {
     pub total_cal_us: u128,
     pub total_cal_cycles: u64,

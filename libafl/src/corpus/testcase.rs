@@ -206,7 +206,7 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleTestData {
     /// Number of bits set in bitmap, updated in calibrate_case
     pub bitmap_size: u64,

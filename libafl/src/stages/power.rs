@@ -126,6 +126,7 @@ where
                 .unwrap();
 
             let mut hash = observer.hash() as usize;
+            hash = hash % N_FUZZ_SIZE;
 
             match corpus_idx {
                 Some(idx) => {
@@ -142,7 +143,7 @@ where
                     self.n_fuzz[hash] = 1;
                 }
                 None => {
-                    assert!(self.n_fuzz[hash] != 0);
+                    // assert!(self.n_fuzz[hash] == 0);
                     self.n_fuzz[hash] += 1;
                 }
             }
