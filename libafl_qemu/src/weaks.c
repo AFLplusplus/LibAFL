@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef int64_t abi_long;
 typedef uint64_t abi_ulong;
@@ -70,3 +71,11 @@ __attribute__((weak)) void (*libafl_exec_cmp_hook2)(uint32_t, uint16_t, uint16_t
 __attribute__((weak)) void (*libafl_exec_cmp_hook4)(uint32_t, uint32_t, uint32_t);
 __attribute__((weak)) void (*libafl_exec_cmp_hook8)(uint32_t, uint64_t, uint64_t);
 __attribute__((weak)) uint32_t (*libafl_gen_cmp_hook)(uint64_t, uint32_t);
+
+struct syshook_ret {
+    uint64_t retval;
+    bool skip_syscall;
+};
+__attribute__((weak)) struct syshook_ret (*libafl_syscall_hook)(int, uint64_t,
+                                          uint64_t, uint64_t, uint64_t, uint64_t,
+                                          uint64_t, uint64_t, uint64_t);

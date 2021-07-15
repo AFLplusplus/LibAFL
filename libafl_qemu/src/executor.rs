@@ -12,6 +12,7 @@ use libafl::{
     Error,
 };
 
+pub use crate::emu::SyscallHookResult;
 use crate::{emu, emu::SKIP_EXEC_HOOK};
 
 static mut GEN_EDGE_HOOK_PTR: *const c_void = ptr::null();
@@ -130,6 +131,14 @@ where
     #[allow(clippy::unused_self)]
     pub fn hook_cmp8_execution(&self, hook: extern "C" fn(id: u32, v0: u64, v1: u64)) {
         emu::set_exec_cmp8_hook(hook);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_syscalls(
+        &self,
+        hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
+    ) {
+        emu::set_syscall_hook(hook);
     }
 }
 
