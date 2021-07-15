@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::{Corpus, CorpusScheduler, PowerScheduleTestData},
     inputs::Input,
-    stages::PowerScheduleGlobalData,
+    stages::PowerScheduleStats,
     state::{HasCorpus, HasMetadata},
     Error,
 };
@@ -45,8 +45,6 @@ where
         Ok(())
     }
 
-    /// TODO
-    /// This: https://github.com/mboehme/aflfast/blob/7819aeccfb74afad1c475ea49b92d27f536e1c51/afl-fuzz.c#L342
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::Empty(String::from("No entries in corpus")))
@@ -62,7 +60,7 @@ where
                 None => {
                     state
                         .metadata_mut()
-                        .get_mut::<PowerScheduleGlobalData>()
+                        .get_mut::<PowerScheduleStats>()
                         .unwrap()
                         .queue_cycles += 1;
                     0

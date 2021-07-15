@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct CalibrateStage<C, E, EM, I, O, OT, S, T, Z>
+pub struct CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
@@ -35,7 +35,7 @@ where
 // The number of times we run the program in the calibration stage
 const CAL_STAGE_MAX: usize = 8;
 
-impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z> for CalibrateStage<C, E, EM, I, O, OT, S, T, Z>
+impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
@@ -59,7 +59,7 @@ where
         let iter = CAL_STAGE_MAX;
         let handicap = state
             .metadata()
-            .get::<PowerScheduleGlobalData>()
+            .get::<PowerScheduleStats>()
             .unwrap()
             .queue_cycles;
 
@@ -87,7 +87,7 @@ where
 
         let calstat = state
             .metadata_mut()
-            .get_mut::<PowerScheduleGlobalData>()
+            .get_mut::<PowerScheduleStats>()
             .unwrap();
 
         calstat.total_cal_us += (end - start).as_millis();
@@ -110,7 +110,7 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct PowerScheduleGlobalData {
+pub struct PowerScheduleStats {
     pub total_cal_us: u128,
     pub total_cal_cycles: u64,
     pub total_bitmap_size: u64,
@@ -118,7 +118,7 @@ pub struct PowerScheduleGlobalData {
     pub queue_cycles: usize,
 }
 
-impl PowerScheduleGlobalData {
+impl PowerScheduleStats {
     pub fn new() -> Self {
         Self {
             total_cal_us: 0,
@@ -130,9 +130,9 @@ impl PowerScheduleGlobalData {
     }
 }
 
-crate::impl_serdeany!(PowerScheduleGlobalData);
+crate::impl_serdeany!(PowerScheduleStats);
 
-impl<C, E, I, EM, O, OT, S, T, Z> CalibrateStage<C, E, EM, I, O, OT, S, T, Z>
+impl<C, E, I, EM, O, OT, S, T, Z> CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
@@ -144,7 +144,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     pub fn new(state: &mut S, map_observer_name: &O) -> Self {
-        state.add_metadata::<PowerScheduleGlobalData>(PowerScheduleGlobalData::new());
+        state.add_metadata::<PowerScheduleStats>(PowerScheduleStats::new());
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             phantom: PhantomData,

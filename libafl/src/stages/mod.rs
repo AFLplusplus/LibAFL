@@ -12,7 +12,7 @@ pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
 pub mod calibrate;
-pub use calibrate::{CalibrateStage, PowerScheduleGlobalData};
+pub use calibrate::{CalibrationStage, PowerScheduleStats};
 
 pub mod power;
 use crate::Error;

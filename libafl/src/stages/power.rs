@@ -1,7 +1,6 @@
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
 use num::Integer;
-use xxhash_rust::xxh3;
 
 use crate::{
     corpus::{Corpus, PowerScheduleTestData},
@@ -10,7 +9,7 @@ use crate::{
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    stages::{MutationalStage, PowerScheduleGlobalData, Stage},
+    stages::{MutationalStage, PowerScheduleStats, Stage},
     state::{HasClientPerfStats, HasCorpus, HasMetadata},
     Error,
 };
@@ -46,7 +45,7 @@ where
 {
     map_observer_name: String,
     mutator: M,
-    n_fuzz: [u32; (1 << 21)],
+    n_fuzz: Vec<u32>,
     strat: PowerSchedule,
     phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
 }
@@ -83,7 +82,7 @@ where
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
             .unwrap();
-        let gldata = state.metadata().get::<PowerScheduleGlobalData>().unwrap();
+        let gldata = state.metadata().get::<PowerScheduleStats>().unwrap();
 
         let mut fuzz_mu = 0.0;
         match self.strat {
@@ -121,16 +120,12 @@ where
             // Time is measured directly the `evaluate_input` function
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
-            let mut hash = 0;
-            /*
-            let map = executor
+            let observer = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .unwrap()
-                .map();
+                .unwrap();
 
-            let mut hash = xxh3::xxh3_64(map) as usize;
-            */
+            let mut hash = observer.hash() as usize;
 
             match corpus_idx {
                 Some(idx) => {
@@ -212,7 +207,7 @@ where
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator: mutator,
-            n_fuzz: [0; N_FUZZ_SIZE],
+            n_fuzz: vec![0; N_FUZZ_SIZE],
             strat: strat,
             phantom: PhantomData,
         }
@@ -250,7 +245,7 @@ where
     fn calculate_score(
         &self,
         tsdata: &mut PowerScheduleTestData,
-        gldata: &PowerScheduleGlobalData,
+        gldata: &PowerScheduleStats,
         fuzz_mu: f64,
     ) -> usize {
         let mut perf_score = 100.0;
