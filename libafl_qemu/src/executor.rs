@@ -12,10 +12,12 @@ use libafl::{
     Error,
 };
 
+pub use crate::emu::SyscallHookResult;
 use crate::{emu, emu::SKIP_EXEC_HOOK};
 
 static mut GEN_EDGE_HOOK_PTR: *const c_void = ptr::null();
 static mut GEN_BLOCK_HOOK_PTR: *const c_void = ptr::null();
+static mut GEN_CMP_HOOK_PTR: *const c_void = ptr::null();
 
 extern "C" fn gen_edge_hook_wrapper<S>(src: u64, dst: u64) -> u32 {
     unsafe {
@@ -30,6 +32,14 @@ extern "C" fn gen_block_hook_wrapper<S>(addr: u64) -> u32 {
         let state = (GLOBAL_STATE.state_ptr as *mut S).as_mut().unwrap();
         let func: fn(&mut S, u64) -> Option<u32> = transmute(GEN_BLOCK_HOOK_PTR);
         (func)(state, addr).map_or(SKIP_EXEC_HOOK, |id| id)
+    }
+}
+
+extern "C" fn gen_cmp_hook_wrapper<S>(addr: u64, size: u32) -> u32 {
+    unsafe {
+        let state = (GLOBAL_STATE.state_ptr as *mut S).as_mut().unwrap();
+        let func: fn(&mut S, u64, usize) -> Option<u32> = transmute(GEN_CMP_HOOK_PTR);
+        (func)(state, addr, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -67,26 +77,68 @@ where
         })
     }
 
+    pub fn inner(&self) -> &InProcessExecutor<'a, H, I, OT, S> {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, I, OT, S> {
+        &mut self.inner
+    }
+
     #[allow(clippy::unused_self)]
-    pub fn hook_edge_generation(&self, hook: fn(&mut S, u64, u64) -> Option<u32>) {
+    pub fn hook_edge_generation(&self, hook: fn(&mut S, src: u64, dest: u64) -> Option<u32>) {
         unsafe { GEN_EDGE_HOOK_PTR = hook as *const _ };
         emu::set_gen_edge_hook(gen_edge_hook_wrapper::<S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_edge_execution(&self, hook: extern "C" fn(u32)) {
+    pub fn hook_edge_execution(&self, hook: extern "C" fn(id: u32)) {
         emu::set_exec_edge_hook(hook);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_block_generation(&self, hook: fn(&mut S, u64) -> Option<u32>) {
+    pub fn hook_block_generation(&self, hook: fn(&mut S, addr: u64) -> Option<u32>) {
         unsafe { GEN_BLOCK_HOOK_PTR = hook as *const _ };
         emu::set_gen_block_hook(gen_block_hook_wrapper::<S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_block_execution(&self, hook: extern "C" fn(u64)) {
+    pub fn hook_block_execution(&self, hook: extern "C" fn(addr: u64)) {
         emu::set_exec_block_hook(hook);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_cmp_generation(&self, hook: fn(&mut S, addr: u64, size: usize) -> Option<u32>) {
+        unsafe { GEN_CMP_HOOK_PTR = hook as *const _ };
+        emu::set_gen_cmp_hook(gen_cmp_hook_wrapper::<S>);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_cmp1_execution(&self, hook: extern "C" fn(id: u32, v0: u8, v1: u8)) {
+        emu::set_exec_cmp1_hook(hook);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_cmp2_execution(&self, hook: extern "C" fn(id: u32, v0: u16, v1: u16)) {
+        emu::set_exec_cmp2_hook(hook);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_cmp4_execution(&self, hook: extern "C" fn(id: u32, v0: u32, v1: u32)) {
+        emu::set_exec_cmp4_hook(hook);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_cmp8_execution(&self, hook: extern "C" fn(id: u32, v0: u64, v1: u64)) {
+        emu::set_exec_cmp8_hook(hook);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_syscalls(
+        &self,
+        hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
+    ) {
+        emu::set_syscall_hook(hook);
     }
 }
 

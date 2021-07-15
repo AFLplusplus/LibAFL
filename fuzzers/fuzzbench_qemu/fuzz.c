@@ -4,7 +4,7 @@
 
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     // printf("Got %ld bytes.\n", Size);
-    if (Size >= 4 && *(uint16_t*)Data == 0xaabb && *(uint16_t*)&Data[2] == 0xccab)
+    if (Size >= 4 && *(uint32_t*)Data == 0xaabbccdd)
       abort();
 }
 
