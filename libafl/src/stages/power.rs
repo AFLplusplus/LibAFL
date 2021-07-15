@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::{string::{String, ToString}, vec::Vec};
 use core::marker::PhantomData;
 use num::Integer;
 
@@ -78,11 +78,11 @@ where
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         let mut testcase = state.corpus().get(corpus_idx).unwrap().borrow_mut();
-        let tsdata = testcase
+        let testcasedata = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
             .unwrap();
-        let gldata = state.metadata().get::<PowerScheduleStats>().unwrap();
+        let statsdata = state.metadata().get::<PowerScheduleStats>().unwrap();
 
         let mut fuzz_mu = 0.0;
         match self.strat {
@@ -93,7 +93,7 @@ where
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        Ok(self.calculate_score(tsdata, gldata, fuzz_mu))
+        Ok(self.calculate_score(testcasedata, statsdata, fuzz_mu))
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -221,7 +221,12 @@ where
                 .get::<PowerScheduleTestData>()
                 .unwrap()
                 .n_fuzz_entry;
-            fuzz_mu += (self.n_fuzz[n_fuzz_entry] as f64).log2();
+            if cfg!(feature = "std"){
+                fuzz_mu += (self.n_fuzz[n_fuzz_entry] as f64).log2();
+            }
+            else{
+                fuzz_mu += libm::log2(self.n_fuzz[n_fuzz_entry] as f64);
+            }
             n_paths += 1;
         }
 
@@ -237,15 +242,15 @@ where
     #[allow(clippy::cast_precision_loss)]
     fn calculate_score(
         &self,
-        tsdata: &mut PowerScheduleTestData,
-        gldata: &PowerScheduleStats,
+        testcasedata: &mut PowerScheduleTestData,
+        statsdata: &PowerScheduleStats,
         fuzz_mu: f64,
     ) -> usize {
         let mut perf_score = 100.0;
-        let avg_exec_us = gldata.total_cal_us / (gldata.total_cal_cycles as u128);
-        let avg_bitmap_size = gldata.total_bitmap_size / gldata.total_bitmap_size;
+        let avg_exec_us = statsdata.total_cal_us / (statsdata.total_cal_cycles as u128);
+        let avg_bitmap_size = statsdata.total_bitmap_size / statsdata.total_bitmap_size;
 
-        let q_exec_us = tsdata.exec_us as f64;
+        let q_exec_us = testcasedata.exec_us as f64;
         if q_exec_us * 0.1 > avg_exec_us as f64 {
             perf_score = 10.0;
         } else if q_exec_us * 0.2 > avg_exec_us as f64 {
@@ -262,7 +267,7 @@ where
             perf_score = 150.0;
         }
 
-        let q_bitmap_size = tsdata.bitmap_size as f64;
+        let q_bitmap_size = testcasedata.bitmap_size as f64;
         if q_bitmap_size * 0.3 > avg_bitmap_size as f64 {
             perf_score *= 3.0;
         } else if q_bitmap_size * 0.5 > avg_bitmap_size as f64 {
@@ -277,21 +282,21 @@ where
             perf_score *= 0.75;
         }
 
-        if tsdata.handicap >= 4 {
+        if testcasedata.handicap >= 4 {
             perf_score *= 4.0;
-            tsdata.handicap -= 4;
-        } else if tsdata.handicap > 0 {
+            testcasedata.handicap -= 4;
+        } else if testcasedata.handicap > 0 {
             perf_score *= 2.0;
-            tsdata.handicap -= 1;
+            testcasedata.handicap -= 1;
         }
 
-        if tsdata.depth >= 4 && tsdata.depth < 8 {
+        if testcasedata.depth >= 4 && testcasedata.depth < 8 {
             perf_score *= 2.0;
-        } else if tsdata.depth >= 8 && tsdata.depth < 14 {
+        } else if testcasedata.depth >= 8 && testcasedata.depth < 14 {
             perf_score *= 3.0;
-        } else if tsdata.depth >= 14 && tsdata.depth < 25 {
+        } else if testcasedata.depth >= 14 && testcasedata.depth < 25 {
             perf_score *= 4.0;
-        } else if tsdata.depth >= 25 {
+        } else if testcasedata.depth >= 25 {
             perf_score *= 5.0;
         }
 
@@ -306,13 +311,19 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if self.n_fuzz[tsdata.n_fuzz_entry] as f64 > fuzz_mu {
+                if self.n_fuzz[testcasedata.n_fuzz_entry] as f64 > fuzz_mu {
                     factor = 0.0;
                 }
             }
             PowerSchedule::FAST => {
-                if tsdata.fuzz_level != 0 {
-                    let lg = (self.n_fuzz[tsdata.n_fuzz_entry] as f64).log2() as u32;
+                if testcasedata.fuzz_level != 0 {
+                    let lg;
+                    if cfg!(feature = "std"){
+                        lg = (self.n_fuzz[testcasedata.n_fuzz_entry] as f64).log2() as u32;
+                    }
+                    else{
+                        lg = libm::log2(self.n_fuzz[testcasedata.n_fuzz_entry] as f64) as u32;
+                    }
                     // Do thing if factor == 5
                     if lg < 2 {
                         factor = 4.0;
@@ -330,11 +341,11 @@ where
                 }
             }
             PowerSchedule::LIN => {
-                factor = (tsdata.fuzz_level as f64) / (self.n_fuzz[tsdata.n_fuzz_entry] + 1) as f64;
+                factor = (testcasedata.fuzz_level as f64) / (self.n_fuzz[testcasedata.n_fuzz_entry] + 1) as f64;
             }
             PowerSchedule::QUAD => {
-                factor = ((tsdata.fuzz_level * tsdata.fuzz_level) as f64)
-                    / (self.n_fuzz[tsdata.n_fuzz_entry] + 1) as f64;
+                factor = ((testcasedata.fuzz_level * testcasedata.fuzz_level) as f64)
+                    / (self.n_fuzz[testcasedata.n_fuzz_entry] + 1) as f64;
             }
         }
 

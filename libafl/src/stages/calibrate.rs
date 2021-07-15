@@ -9,7 +9,7 @@ use crate::{
     state::{HasCorpus, HasMetadata},
     Error,
 };
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 use num::Integer;
 use serde::{Deserialize, Serialize};
