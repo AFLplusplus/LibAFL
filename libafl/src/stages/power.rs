@@ -1,4 +1,7 @@
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::marker::PhantomData;
 use num::Integer;
 
@@ -221,10 +224,9 @@ where
                 .get::<PowerScheduleTestData>()
                 .unwrap()
                 .n_fuzz_entry;
-            if cfg!(feature = "std"){
+            if cfg!(feature = "std") {
                 fuzz_mu += (self.n_fuzz[n_fuzz_entry] as f64).log2();
-            }
-            else{
+            } else {
                 fuzz_mu += libm::log2(self.n_fuzz[n_fuzz_entry] as f64);
             }
             n_paths += 1;
@@ -318,10 +320,9 @@ where
             PowerSchedule::FAST => {
                 if testcasedata.fuzz_level != 0 {
                     let lg;
-                    if cfg!(feature = "std"){
+                    if cfg!(feature = "std") {
                         lg = (self.n_fuzz[testcasedata.n_fuzz_entry] as f64).log2() as u32;
-                    }
-                    else{
+                    } else {
                         lg = libm::log2(self.n_fuzz[testcasedata.n_fuzz_entry] as f64) as u32;
                     }
                     // Do thing if factor == 5
@@ -341,7 +342,8 @@ where
                 }
             }
             PowerSchedule::LIN => {
-                factor = (testcasedata.fuzz_level as f64) / (self.n_fuzz[testcasedata.n_fuzz_entry] + 1) as f64;
+                factor = (testcasedata.fuzz_level as f64)
+                    / (self.n_fuzz[testcasedata.n_fuzz_entry] + 1) as f64;
             }
             PowerSchedule::QUAD => {
                 factor = ((testcasedata.fuzz_level * testcasedata.fuzz_level) as f64)
