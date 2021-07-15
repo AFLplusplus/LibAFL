@@ -72,8 +72,8 @@ impl<E> TimeoutExecutor<E> {
             tv_usec: 0,
         };
         let itimerval = Itimerval {
-            it_value: it_value,
-            it_interval: it_interval,
+            it_value,
+            it_interval,
         };
         Self {
             executor,

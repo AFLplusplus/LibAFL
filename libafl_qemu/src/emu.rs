@@ -7,6 +7,12 @@ use std::{mem::size_of, slice::from_raw_parts, str::from_utf8_unchecked};
 
 pub const SKIP_EXEC_HOOK: u32 = u32::MAX;
 
+#[repr(C)]
+pub struct SyscallHookResult {
+    retval: u64,
+    skip_syscall: bool,
+}
+
 extern "C" {
     fn libafl_qemu_write_reg(reg: i32, val: *const u8) -> i32;
     fn libafl_qemu_read_reg(reg: i32, val: *mut u8) -> i32;
@@ -38,6 +44,9 @@ extern "C" {
     static mut libafl_exec_cmp_hook4: unsafe extern "C" fn(u32, u32, u32);
     static mut libafl_exec_cmp_hook8: unsafe extern "C" fn(u32, u64, u64);
     static mut libafl_gen_cmp_hook: unsafe extern "C" fn(u64, u32) -> u32;
+
+    static mut libafl_syscall_hook:
+        unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
@@ -201,4 +210,10 @@ pub fn set_exec_cmp8_hook(hook: extern "C" fn(id: u32, v0: u64, v1: u64)) {
 
 pub fn set_gen_cmp_hook(hook: extern "C" fn(addr: u64, size: u32) -> u32) {
     unsafe { libafl_gen_cmp_hook = hook };
+}
+
+pub fn set_syscall_hook(
+    hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
+) {
+    unsafe { libafl_syscall_hook = hook };
 }
