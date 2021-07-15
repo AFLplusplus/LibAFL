@@ -9,7 +9,7 @@ use libafl::{
     bolts::{current_nanos, rands::StdRand},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler, PowerQueueCorpusScheduler,
+        PowerQueueCorpusScheduler, QueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
@@ -128,10 +128,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
     let calibration = CalibrationStage::new(&mut state, &edges_observer);
-    let power = PowerMutationalStage::new(mutator, PowerSchedule::EXPLORE, &edges_observer);
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
 
     let mut stages = tuple_list!(calibration, power);
-    
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());

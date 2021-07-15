@@ -50,7 +50,7 @@ where
     fn hash(&self) -> u64 {
         let ptr = self.map().as_ptr() as *const u8;
         let map_size = self.map().len() / core::mem::size_of::<T>();
-        unsafe{
+        unsafe {
             return xxh3::xxh3_64(from_raw_parts(ptr, map_size));
         }
     }

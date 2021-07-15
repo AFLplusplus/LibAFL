@@ -27,21 +27,19 @@ where
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
-        
+
         let parent_depth = match current_idx {
             Some(idx) => {
                 state
-                .corpus()
-                .get(idx)?
-                .borrow_mut()
-                .metadata_mut()
-                .get_mut::<PowerScheduleTestData>()
-                .unwrap()
-                .depth
-            },
-            None => {
-                0
-            },
+                    .corpus()
+                    .get(idx)?
+                    .borrow_mut()
+                    .metadata_mut()
+                    .get_mut::<PowerScheduleTestData>()
+                    .unwrap()
+                    .depth
+            }
+            None => 0,
         };
 
         // Update depth
@@ -60,19 +58,17 @@ where
             let id = match state.corpus().current() {
                 Some(cur) => {
                     if *cur + 1 >= state.corpus().count() {
+                        state
+                            .metadata_mut()
+                            .get_mut::<PowerScheduleStats>()
+                            .unwrap()
+                            .queue_cycles += 1;
                         0
                     } else {
                         *cur + 1
                     }
                 }
-                None => {
-                    state
-                        .metadata_mut()
-                        .get_mut::<PowerScheduleStats>()
-                        .unwrap()
-                        .queue_cycles += 1;
-                    0
-                }
+                None => 0,
             };
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)

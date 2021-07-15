@@ -130,7 +130,6 @@ where
 
             match corpus_idx {
                 Some(idx) => {
-                    hash = 0;
                     state
                         .corpus()
                         .get(idx)?
@@ -140,10 +139,11 @@ where
                         .unwrap()
                         .n_fuzz_entry = hash;
 
-                    self.n_fuzz[hash] = 1;
+                    self.n_fuzz[hash] += 1;
                 }
                 None => {
-                    // assert!(self.n_fuzz[hash] == 0);
+                    // self.n_fuzz[hash] can be 0 here when the MapObserver.map() is different it's not deemed as interesting
+                    // when the map goes through the AFL's bucket.s
                     self.n_fuzz[hash] += 1;
                 }
             }
@@ -151,14 +151,6 @@ where
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
         }
 
-        state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .metadata_mut()
-            .get_mut::<PowerScheduleTestData>()
-            .unwrap()
-            .fuzz_level += 1;
         Ok(())
     }
 }

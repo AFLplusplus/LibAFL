@@ -35,7 +35,8 @@ where
 // The number of times we run the program in the calibration stage
 const CAL_STAGE_MAX: usize = 8;
 
-impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
+impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
+    for CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
     T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
@@ -90,13 +91,12 @@ where
             .get_mut::<PowerScheduleStats>()
             .unwrap();
 
-        calstat.total_cal_us += (end - start).as_millis();
+        calstat.total_cal_us += (end - start).as_nanos();
         calstat.total_cal_cycles += iter as u64;
         calstat.total_bitmap_size += bitmap_size as u64;
         calstat.total_bitmap_entries += 1;
 
-        println!("calstat: {:#?}", calstat);
-
+        // println!("calstat: {:#?}", calstat);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
         let data = testcase
@@ -104,10 +104,11 @@ where
             .get_mut::<PowerScheduleTestData>()
             .unwrap();
 
-        data.exec_us += ((end - start) / (iter as u32)).as_millis();
+        data.exec_us += ((end - start) / (iter as u32)).as_nanos();
         data.bitmap_size = bitmap_size as u64;
         data.handicap = handicap as u64;
-        println!("data: {:#?}", data);
+        data.fuzz_level += 1;
+        // println!("data: {:#?}", data);
 
         Ok(())
     }
