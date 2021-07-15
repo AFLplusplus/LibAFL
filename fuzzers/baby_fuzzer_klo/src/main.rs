@@ -1,7 +1,4 @@
-use std::path::PathBuf;
-
-use genawaiter::{rc::gen, yield_};
-
+use klo_routines::*;
 use libafl::inputs::{BytesInput, HasTargetBytes};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
@@ -17,6 +14,7 @@ use libafl::{
     state::StdState,
     stats::SimpleStats,
 };
+use std::path::PathBuf;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -30,7 +28,7 @@ fn signals_set(idx: usize) {
 #[allow(clippy::similar_names)]
 fn input_generator() {
     // The closure that produced the input for the generator
-    let mut harness = async move |input: BytesInput| {
+    let mut harness = |input: &BytesInput| {
         yield_(input);
         ExitKind::Ok
     };
@@ -102,7 +100,9 @@ fn input_generator() {
 }
 
 pub fn main() {
-    let mut klo = KloRoutine::new(input_generator);
+    let mut input_generator = input_generator;
+    let mut klo =
+        KloRoutine::<_, &BytesInput>::with_stack_size(&mut input_generator, 512 * 1024 * 1024);
 
     while let Some(input) = klo.resume() {
         let target = input.target_bytes();
