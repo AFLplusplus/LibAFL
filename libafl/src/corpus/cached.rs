@@ -1,4 +1,4 @@
-//! The ondisk corpus stores unused testcases to disk.
+//! The cached ondisk corpus stores testcases to disk keeping a part of them in memory.
 
 use alloc::collections::vec_deque::VecDeque;
 use core::cell::RefCell;
@@ -14,7 +14,7 @@ use crate::{
     Error,
 };
 
-/// A corpus able to store testcases to disk, and load them from disk, when they are being used.
+/// A corpus that keep in memory a maximun number of testcases. The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
