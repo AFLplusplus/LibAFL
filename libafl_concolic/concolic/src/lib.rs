@@ -297,9 +297,9 @@ pub enum SymExpr {
         site_id: usize,
     },
 
-    /// This expression won't be referenced again
-    ExpressionUnreachable {
-        expr: SymExprRef,
+    /// These expressions won't be referenced again
+    ExpressionsUnreachable {
+        exprs: Vec<SymExprRef>,
     },
     /// This marks the end of the trace.
     End,

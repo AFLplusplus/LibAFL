@@ -1,9 +1,4 @@
-use std::{
-    collections::{hash_map::DefaultHasher, HashSet},
-    env,
-    hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
-    io,
-};
+use std::{collections::{hash_map::DefaultHasher, HashSet}, env, hash::{BuildHasher, BuildHasherDefault, Hash, Hasher}, io, slice};
 
 use ctor::ctor;
 
@@ -186,12 +181,14 @@ pub unsafe extern "C" fn _rsym_push_path_constraint(
 
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
-pub unsafe extern "C" fn _rsym_expression_unreachable(expr: Option<SymExprRef>) {
-    if let Some(expr) = expr {
-        with_state(|s| {
-            s.log_message(SymExpr::ExpressionUnreachable { expr });
-        })
-    }
+pub unsafe extern "C" fn _rsym_expression_unreachable(
+    expressions_ptr: *const SymExprRef,
+    expressions_len: usize,
+) {
+    let slice = slice::from_raw_parts(expressions_ptr, expressions_len);
+    with_state(|s| {
+        s.log_message(SymExpr::ExpressionsUnreachable { exprs: slice.to_owned() });
+    })
 }
 
 // Call stack tracing
