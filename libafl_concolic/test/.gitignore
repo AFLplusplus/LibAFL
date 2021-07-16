@@ -1,3 +1,4 @@
 symcc_build
+symqemu_build
 if
 constraints.txt

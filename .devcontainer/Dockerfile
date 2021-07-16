@@ -18,15 +18,20 @@ RUN bash /tmp/library-scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "$
 # [Optional] Uncomment this section to install additional OS packages.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --yes-install-recommends \
-    llvm-dev \
+    cargo \
     clang \
+    cmake \ 
     g++ \
+    libfdt-dev \
+    libglib2.0-dev \
+    libpixman-1-dev \
+    libssl-dev \
+    llvm-dev \
+    ninja-build \
+    pkg-config \
     python2 \
     python3-pip \
-    cmake \ 
-    libssl-dev \
-    cargo \
-    ninja-build
+    zlib1g-dev 
 
 RUN pip3 install lit
 
