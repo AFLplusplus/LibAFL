@@ -133,7 +133,8 @@ impl<R: Read> MessageFileReader<R> {
                 *b = self.make_absolute(*b);
                 self.current_id += 1;
             }
-            SymExpr::PushPathConstraint { constraint: op, .. } => {
+            SymExpr::PushPathConstraint { constraint: op, .. }
+            | SymExpr::ExpressionUnreachable { expr: op } => {
                 *op = self.make_absolute(*op);
             }
             SymExpr::End => {
@@ -269,7 +270,8 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 *b = self.make_relative(*b);
                 self.id_counter += 1;
             }
-            SymExpr::PushPathConstraint { constraint: op, .. } => {
+            SymExpr::PushPathConstraint { constraint: op, .. }
+            | SymExpr::ExpressionUnreachable { expr: op } => {
                 *op = self.make_relative(*op);
             }
             SymExpr::End => {}
