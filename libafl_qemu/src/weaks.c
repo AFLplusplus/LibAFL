@@ -79,3 +79,20 @@ struct syshook_ret {
 __attribute__((weak)) struct syshook_ret (*libafl_syscall_hook)(int, uint64_t,
                                           uint64_t, uint64_t, uint64_t, uint64_t,
                                           uint64_t, uint64_t, uint64_t);
+
+typedef void GSList;
+
+__attribute__((weak)) GSList * read_self_maps(void) {
+    return NULL;
+}
+__attribute__((weak)) void free_self_maps(GSList *map_info) {
+    (void)map_info;
+}
+
+struct libafl_mapinfo {
+    uint64_t start, end;
+    uint64_t offset;
+    const char* path;
+    int flags, is_priv;
+};
+__attribute__((weak)) GSList * libafl_maps_next(GSList *map_info, struct libafl_mapinfo* ret);

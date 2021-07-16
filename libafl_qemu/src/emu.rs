@@ -1,16 +1,86 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
-use core::{convert::Into, mem::transmute, ptr::copy_nonoverlapping};
+use core::{
+    convert::Into,
+    convert::TryFrom,
+    ffi::c_void,
+    mem::{size_of, transmute, MaybeUninit},
+    ptr::copy_nonoverlapping,
+};
 use num::Num;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::{mem::size_of, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 pub const SKIP_EXEC_HOOK: u32 = u32::MAX;
+
+#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
+#[repr(i32)]
+#[allow(clippy::pub_enum_variant_names)]
+pub enum MmapPerms {
+    Read = libc::PROT_READ,
+    Write = libc::PROT_WRITE,
+    Execute = libc::PROT_EXEC,
+    ReadWrite = libc::PROT_READ | libc::PROT_WRITE,
+    ReadExecute = libc::PROT_READ | libc::PROT_EXEC,
+    WriteExecute = libc::PROT_WRITE | libc::PROT_EXEC,
+    ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+}
 
 #[repr(C)]
 pub struct SyscallHookResult {
     retval: u64,
     skip_syscall: bool,
+}
+
+#[repr(C)]
+pub struct MapInfo {
+    start: u64,
+    end: u64,
+    offset: u64,
+    path: *const u8,
+    flags: i32,
+    is_priv: i32,
+}
+
+impl MapInfo {
+    #[must_use]
+    pub fn start(&self) -> u64 {
+        self.start
+    }
+
+    #[must_use]
+    pub fn end(&self) -> u64 {
+        self.end
+    }
+
+    #[must_use]
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
+
+    #[must_use]
+    pub fn path(&self) -> Option<&str> {
+        if self.path.is_null() {
+            None
+        } else {
+            unsafe {
+                Some(from_utf8_unchecked(from_raw_parts(
+                    self.path,
+                    strlen(self.path),
+                )))
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn flags(&self) -> MmapPerms {
+        MmapPerms::try_from(self.flags).unwrap()
+    }
+
+    #[must_use]
+    pub fn is_priv(&self) -> bool {
+        self.is_priv != 0
+    }
 }
 
 extern "C" {
@@ -31,6 +101,11 @@ extern "C" {
     /// int target_munmap(abi_ulong start, abi_ulong len)
     fn target_munmap(start: u64, len: u64) -> i32;
 
+    fn read_self_maps() -> *const c_void;
+    fn free_self_maps(map_info: *const c_void);
+
+    fn libafl_maps_next(map_info: *const c_void, ret: *mut MapInfo) -> *const c_void;
+
     static exec_path: *const u8;
     static guest_base: usize;
 
@@ -49,17 +124,49 @@ extern "C" {
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
 }
 
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
-#[repr(i32)]
-#[allow(clippy::pub_enum_variant_names)]
-pub enum MmapPerms {
-    Read = libc::PROT_READ,
-    Write = libc::PROT_WRITE,
-    Execute = libc::PROT_EXEC,
-    ReadWrite = libc::PROT_READ | libc::PROT_WRITE,
-    ReadExecute = libc::PROT_READ | libc::PROT_EXEC,
-    WriteExecute = libc::PROT_WRITE | libc::PROT_EXEC,
-    ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+pub struct GuestMaps {
+    orig_c_iter: *const c_void,
+    c_iter: *const c_void,
+}
+
+impl GuestMaps {
+    #[must_use]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        unsafe {
+            let maps = read_self_maps();
+            Self {
+                orig_c_iter: maps,
+                c_iter: maps,
+            }
+        }
+    }
+}
+
+impl Iterator for GuestMaps {
+    type Item = MapInfo;
+
+    #[allow(clippy::uninit_assumed_init)]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.c_iter.is_null() {
+            return None;
+        }
+        unsafe {
+            let mut ret: MapInfo = MaybeUninit::uninit().assume_init();
+            self.c_iter = libafl_maps_next(self.c_iter, &mut ret as *mut _);
+            if self.c_iter.is_null() {
+                None
+            } else {
+                Some(ret)
+            }
+        }
+    }
+}
+
+impl Drop for GuestMaps {
+    fn drop(&mut self) {
+        unsafe { free_self_maps(self.orig_c_iter) }
+    }
 }
 
 pub fn write_mem<T>(addr: u64, buf: &[T]) {
