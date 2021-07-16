@@ -4,8 +4,8 @@ use bincode::{DefaultOptions, Options};
 
 use super::{SymExpr, SymExprRef};
 
-pub use bincode::Result;
 pub use bincode::ErrorKind;
+pub use bincode::Result;
 
 fn serialization_options() -> DefaultOptions {
     DefaultOptions::new()
@@ -288,8 +288,8 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;
-        // every 128 messages, make sure we write the current size to the beginning in case our process crashes
-        if current_id % 128 == 0 {
+        // for every path constraint, make sure we can later decode it in case we crash by updating the trace header
+        if let SymExpr::PushPathConstraint { .. } = &message {
             self.write_trace_size()?;
         }
         Ok(SymExprRef::new(current_id).unwrap())
