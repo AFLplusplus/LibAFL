@@ -165,7 +165,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         })
     }
 
-    pub fn end(mut self) -> io::Result<()> {
+    fn write_trace_size(&mut self) -> io::Result<()> {
         // calculate size of trace
         let end_pos = self.writer.stream_position()?;
         let trace_header_len = 0u64.to_le_bytes().len() as u64;
@@ -176,6 +176,13 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         self.writer
             .seek(SeekFrom::Start(self.writer_start_position))?;
         self.writer.write_all(&trace_length.to_le_bytes())?;
+        // rewind to previous position
+        self.writer.seek(SeekFrom::Start(end_pos))?;
+        Ok(())
+    }
+
+    pub fn end(mut self) -> io::Result<()> {
+        self.write_trace_size()?;
         Ok(())
     }
 
@@ -279,6 +286,10 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         self.serialization_options
             .serialize_into(&mut self.writer, &message)
             .expect("unable to serialize message");
+        // every 128 messages, make sure we write the current size to the beginning in case our process crashes
+        if current_id % 128 == 0 {
+            self.write_trace_size().unwrap()
+        }
         SymExprRef::new(current_id).unwrap()
     }
 }
