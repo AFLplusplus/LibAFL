@@ -43,18 +43,22 @@ pub struct MapInfo {
 }
 
 impl MapInfo {
+    #[must_use]
     pub fn start(&self) -> u64 {
         self.start
     }
 
+    #[must_use]
     pub fn end(&self) -> u64 {
         self.end
     }
 
+    #[must_use]
     pub fn offset(&self) -> u64 {
         self.offset
     }
 
+    #[must_use]
     pub fn path(&self) -> Option<&str> {
         if self.path.is_null() {
             None
@@ -68,10 +72,12 @@ impl MapInfo {
         }
     }
 
+    #[must_use]
     pub fn flags(&self) -> MmapPerms {
         MmapPerms::try_from(self.flags).unwrap()
     }
 
+    #[must_use]
     pub fn is_priv(&self) -> bool {
         self.is_priv != 0
     }
@@ -124,6 +130,8 @@ pub struct GuestMaps {
 }
 
 impl GuestMaps {
+    #[must_use]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         unsafe {
             let maps = read_self_maps();
@@ -138,6 +146,7 @@ impl GuestMaps {
 impl Iterator for GuestMaps {
     type Item = MapInfo;
 
+    #[allow(clippy::uninit_assumed_init)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.c_iter.is_null() {
             return None;
