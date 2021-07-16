@@ -64,7 +64,7 @@ where
     /// Store the input to disk if possible
     pub fn store_input(&mut self) -> Result<bool, Error> {
         match self.filename() {
-            Some(f) => {
+            Some(fname) => {
                 let saved = match self.input() {
                     None => false,
                     Some(i) => {
@@ -78,12 +78,10 @@ where
                 }
                 Ok(saved)
             }
-            None => {
-                Ok(false)
-            }
+            None => Ok(false),
         }
     }
-    
+
     /// Get the input, if any
     #[inline]
     pub fn input(&self) -> &Option<I> {

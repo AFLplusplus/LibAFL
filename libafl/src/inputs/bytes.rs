@@ -58,11 +58,6 @@ impl Input for BytesInput {
         hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())
     }
-    
-    /// Report the size in bytes of the contained objects
-    fn size_of(&self) -> usize {
-        core::mem::size_of_val(&self.bytes) + self.bytes.len()
-    }
 }
 
 /// Rc Ref-cell from Input

@@ -59,11 +59,6 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
 
     /// Generate a name for this input
     fn generate_name(&self, idx: usize) -> String;
-    
-    /// Report the size in bytes of the contained objects, default to `core::mem::size_of_val`
-    fn size_of(&self) -> usize {
-        core::mem::size_of_val(self)
-    }
 }
 
 /// An input for tests, mainly. There is no real use much else.
