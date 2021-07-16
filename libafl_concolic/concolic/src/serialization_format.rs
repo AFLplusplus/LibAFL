@@ -4,6 +4,9 @@ use bincode::{DefaultOptions, Options};
 
 use super::{SymExpr, SymExprRef};
 
+pub use bincode::Result;
+pub use bincode::ErrorKind;
+
 fn serialization_options() -> DefaultOptions {
     DefaultOptions::new()
 }
@@ -190,7 +193,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         SymExprRef::new(self.id_counter - expr.get()).unwrap()
     }
 
-    pub fn write_message(&mut self, mut message: SymExpr) -> SymExprRef {
+    pub fn write_message(&mut self, mut message: SymExpr) -> bincode::Result<SymExprRef> {
         let current_id = self.id_counter;
         match &mut message {
             SymExpr::GetInputByte { .. }
@@ -284,13 +287,12 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             SymExpr::End => {}
         }
         self.serialization_options
-            .serialize_into(&mut self.writer, &message)
-            .expect("unable to serialize message");
+            .serialize_into(&mut self.writer, &message)?;
         // every 128 messages, make sure we write the current size to the beginning in case our process crashes
         if current_id % 128 == 0 {
-            self.write_trace_size().unwrap()
+            self.write_trace_size()?;
         }
-        SymExprRef::new(current_id).unwrap()
+        Ok(SymExprRef::new(current_id).unwrap())
     }
 }
 

@@ -2,12 +2,13 @@ use std::{
     collections::{hash_map::DefaultHasher, HashSet},
     env,
     hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
+    io,
 };
 
 use ctor::ctor;
 
 use concolic::{
-    serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
+    serialization_format::{self, shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
     SymExpr, SymExprRef, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
     SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
@@ -76,7 +77,21 @@ impl<Filter: ExpressionFilter> State<Filter> {
     /// Logs the message to the trace. This is a convenient place to debug the expressions if necessary.
     fn log_message(&mut self, message: SymExpr) -> Option<SymExprRef> {
         if self.filter.symbolize(&message) {
-            Some(self.writer.write_message(message))
+            match self.writer.write_message(message) {
+                Ok(id) => Some(id),
+                Err(err) => {
+                    match &*err {
+                        serialization_format::ErrorKind::Io(io_err) => match io_err.kind() {
+                            io::ErrorKind::WriteZero => {
+                                // our buffer is full. exit the process gracefully
+                                std::process::exit(0)
+                            }
+                            _ => panic!("IO Error serializing message: {:?}", io_err),
+                        },
+                        e => panic!("Error serializing message: {}", e),
+                    }
+                }
+            }
         } else {
             None
         }
