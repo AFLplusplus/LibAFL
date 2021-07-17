@@ -9,7 +9,7 @@ use libafl::{
     bolts::{current_nanos, rands::StdRand},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        PowerQueueCorpusScheduler, QueueCorpusScheduler,
+        PowerQueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
@@ -17,13 +17,11 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::mopt_mutator::StdMOptMutator,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
         calibrate::CalibrationStage,
-        mutational::StdMutationalStage,
         power::{PowerMutationalStage, PowerSchedule},
     },
     state::{HasCorpus, HasMetadata, StdState},
