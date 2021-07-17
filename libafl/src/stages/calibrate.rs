@@ -61,7 +61,7 @@ where
         let handicap = state
             .metadata()
             .get::<PowerScheduleStats>()
-            .unwrap()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleStats not found".to_string()))?
             .queue_cycles;
 
         // Timer start
@@ -82,14 +82,14 @@ where
         let map = executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
-            .unwrap();
+            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
 
         let bitmap_size = map.count_bytes();
 
         let calstat = state
             .metadata_mut()
             .get_mut::<PowerScheduleStats>()
-            .unwrap();
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleStats not found".to_string()))?;
 
         calstat.set_exec_time(calstat.exec_time() + (end - start));
         calstat.set_cycles(calstat.cycles() + (iter as u64));
@@ -104,7 +104,7 @@ where
         let data = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
-            .unwrap();
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
 
         data.set_bitmap_size(bitmap_size);
         data.set_handicap(handicap);

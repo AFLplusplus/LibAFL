@@ -46,7 +46,7 @@ where
                 .borrow_mut()
                 .metadata_mut()
                 .get_mut::<PowerScheduleTestData>()
-                .unwrap()
+                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
                 .depth(),
             None => 0,
         };
@@ -71,7 +71,9 @@ where
                         let psstats = state
                             .metadata_mut()
                             .get_mut::<PowerScheduleStats>()
-                            .unwrap();
+                            .ok_or_else(|| {
+                                Error::KeyNotFound("PowerScheduleStats not found".to_string())
+                            })?;
                         psstats.set_queue_cycles(psstats.queue_cycles() + 1);
                         0
                     } else {

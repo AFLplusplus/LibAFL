@@ -81,15 +81,19 @@ where
 
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
-        let mut testcase = state.corpus().get(corpus_idx).unwrap().borrow_mut();
-        let statsdata = state.metadata().get::<PowerScheduleStats>().unwrap();
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let statsdata = state
+            .metadata()
+            .get::<PowerScheduleStats>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleStats not found".to_string()))?;
+
         let mut fuzz_mu = 0.0;
         if let PowerSchedule::COE = self.strat {
             fuzz_mu = self.fuzz_mu(state)?;
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        Ok(self.calculate_score(&mut testcase, statsdata, fuzz_mu))
+        Ok(self.calculate_score(&mut testcase, statsdata, fuzz_mu)?)
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -119,7 +123,7 @@ where
             let observer = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .unwrap();
+                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
 
             let mut hash = observer.hash() as usize;
             hash %= N_FUZZ_SIZE;
@@ -132,7 +136,9 @@ where
                         .borrow_mut()
                         .metadata_mut()
                         .get_mut::<PowerScheduleTestData>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                        })?
                         .set_n_fuzz_entry(hash);
 
                     self.n_fuzz[hash] += 1;
@@ -210,12 +216,11 @@ where
         let mut fuzz_mu = 0.0;
         for idx in 0..corpus.count() {
             let n_fuzz_entry = corpus
-                .get(idx)
-                .unwrap()
+                .get(idx)?
                 .borrow()
                 .metadata()
                 .get::<PowerScheduleTestData>()
-                .unwrap()
+                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
                 .n_fuzz_entry();
             fuzz_mu += libm::log2(f64::from(self.n_fuzz[n_fuzz_entry]));
             n_paths += 1;
@@ -240,9 +245,12 @@ where
         testcase: &mut Testcase<I>,
         statsdata: &PowerScheduleStats,
         fuzz_mu: f64,
-    ) -> usize {
+    ) -> Result<usize, Error> {
         let mut perf_score = 100.0;
-        let q_exec_us = testcase.exec_time().unwrap().as_nanos() as f64;
+        let q_exec_us = testcase
+            .exec_time()
+            .ok_or_else(|| Error::KeyNotFound("exec_time not set".to_string()))?
+            .as_nanos() as f64;
 
         let avg_exec_us = statsdata.exec_time().as_nanos() as f64 / statsdata.cycles() as f64;
         let avg_bitmap_size = statsdata.bitmap_size() / statsdata.bitmap_entries();
@@ -250,7 +258,7 @@ where
         let metadata = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
-            .unwrap();
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
 
         if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
@@ -362,6 +370,6 @@ where
             perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
-        perf_score as usize
+        Ok(perf_score as usize)
     }
 }
