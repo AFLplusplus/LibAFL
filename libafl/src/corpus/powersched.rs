@@ -18,7 +18,7 @@ where
     phantom: PhantomData<(C, I, S)>,
 }
 
-impl<C, I, S> Default for PowerQueueCorpusScheduler<C, I, S> 
+impl<C, I, S> Default for PowerQueueCorpusScheduler<C, I, S>
 where
     S: HasCorpus<C, I> + HasMetadata,
     C: Corpus<I>,
@@ -28,7 +28,6 @@ where
         Self::new()
     }
 }
-
 
 impl<C, I, S> CorpusScheduler<I, S> for PowerQueueCorpusScheduler<C, I, S>
 where

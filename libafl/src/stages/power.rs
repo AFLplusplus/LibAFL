@@ -235,7 +235,11 @@ where
     }
 
     #[inline]
-    #[allow(clippy::cast_precision_loss, clippy::too_many_lines, clippy::cast_sign_loss)]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::too_many_lines,
+        clippy::cast_sign_loss
+    )]
     fn calculate_score(
         &self,
         testcasedata: &mut PowerScheduleTestData,
