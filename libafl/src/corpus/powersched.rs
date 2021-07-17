@@ -18,6 +18,18 @@ where
     phantom: PhantomData<(C, I, S)>,
 }
 
+impl<C, I, S> Default for PowerQueueCorpusScheduler<C, I, S> 
+where
+    S: HasCorpus<C, I> + HasMetadata,
+    C: Corpus<I>,
+    I: Input,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 impl<C, I, S> CorpusScheduler<I, S> for PowerQueueCorpusScheduler<C, I, S>
 where
     S: HasCorpus<C, I> + HasMetadata,
@@ -28,7 +40,7 @@ where
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
 
-        let parent_depth = match current_idx {
+        let mut depth = match current_idx {
             Some(idx) => {
                 state
                     .corpus()
@@ -43,11 +55,12 @@ where
         };
 
         // Update depth
+        depth += 1;
         state
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(PowerScheduleTestData::new(parent_depth + 1 as u64));
+            .add_metadata(PowerScheduleTestData::new(depth));
         Ok(())
     }
 

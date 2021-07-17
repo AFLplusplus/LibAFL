@@ -91,7 +91,7 @@ where
             .get_mut::<PowerScheduleStats>()
             .unwrap();
 
-        calstat.total_cal_us += (end - start).as_nanos();
+        calstat.total_cal_us += (end - start).as_nanos() as u64;
         calstat.total_cal_cycles += iter as u64;
         calstat.total_bitmap_size += bitmap_size as u64;
         calstat.total_bitmap_entries += 1;
@@ -116,7 +116,7 @@ where
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleStats {
-    pub total_cal_us: u128,
+    pub total_cal_us: u64,
     pub total_cal_cycles: u64,
     pub total_bitmap_size: u64,
     pub total_bitmap_entries: u64,
@@ -124,6 +124,7 @@ pub struct PowerScheduleStats {
 }
 
 impl PowerScheduleStats {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             total_cal_us: 0,
@@ -154,5 +155,11 @@ where
             map_observer_name: map_observer_name.name().to_string(),
             phantom: PhantomData,
         }
+    }
+}
+
+impl Default for PowerScheduleStats {
+    fn default() -> Self {
+        Self::new()
     }
 }

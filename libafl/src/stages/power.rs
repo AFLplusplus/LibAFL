@@ -50,6 +50,7 @@ where
     mutator: M,
     n_fuzz: Vec<u32>,
     strat: PowerSchedule,
+    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
 }
 
@@ -88,11 +89,8 @@ where
         let statsdata = state.metadata().get::<PowerScheduleStats>().unwrap();
 
         let mut fuzz_mu = 0.0;
-        match self.strat {
-            PowerSchedule::COE => {
-                fuzz_mu = self.fuzz_mu(state)?;
-            }
-            _ => {}
+        if let PowerSchedule::COE = self.strat {
+            fuzz_mu = self.fuzz_mu(state)?;
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
@@ -129,7 +127,7 @@ where
                 .unwrap();
 
             let mut hash = observer.hash() as usize;
-            hash = hash % N_FUZZ_SIZE;
+            hash %= N_FUZZ_SIZE;
 
             match corpus_idx {
                 Some(idx) => {
@@ -202,9 +200,9 @@ where
     pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
-            mutator: mutator,
+            mutator,
             n_fuzz: vec![0; N_FUZZ_SIZE],
-            strat: strat,
+            strat,
             phantom: PhantomData,
         }
     }
@@ -224,11 +222,7 @@ where
                 .get::<PowerScheduleTestData>()
                 .unwrap()
                 .n_fuzz_entry;
-            if cfg!(feature = "std") {
-                fuzz_mu += (self.n_fuzz[n_fuzz_entry] as f64).log2();
-            } else {
-                fuzz_mu += libm::log2(self.n_fuzz[n_fuzz_entry] as f64);
-            }
+            fuzz_mu += libm::log2(f64::from(self.n_fuzz[n_fuzz_entry]));
             n_paths += 1;
         }
 
@@ -236,12 +230,12 @@ where
             return Err(Error::Unknown(String::from("Queue state corrput")));
         }
 
-        fuzz_mu = fuzz_mu / (n_paths as f64);
+        fuzz_mu /= f64::from(n_paths);
         Ok(fuzz_mu)
     }
 
     #[inline]
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, clippy::too_many_lines, clippy::cast_sign_loss)]
     fn calculate_score(
         &self,
         testcasedata: &mut PowerScheduleTestData,
@@ -249,8 +243,8 @@ where
         fuzz_mu: f64,
     ) -> usize {
         let mut perf_score = 100.0;
-        let avg_exec_us = statsdata.total_cal_us / (statsdata.total_cal_cycles as u128);
-        let avg_bitmap_size = statsdata.total_bitmap_size / statsdata.total_bitmap_size;
+        let avg_exec_us = statsdata.total_cal_us / statsdata.total_cal_cycles;
+        let avg_bitmap_size = statsdata.total_bitmap_size / statsdata.total_bitmap_entries;
 
         let q_exec_us = testcasedata.exec_us as f64;
         if q_exec_us * 0.1 > avg_exec_us as f64 {
@@ -313,41 +307,36 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if self.n_fuzz[testcasedata.n_fuzz_entry] as f64 > fuzz_mu {
+                if f64::from(self.n_fuzz[testcasedata.n_fuzz_entry]) > fuzz_mu {
                     factor = 0.0;
                 }
             }
             PowerSchedule::FAST => {
                 if testcasedata.fuzz_level != 0 {
-                    let lg;
-                    if cfg!(feature = "std") {
-                        lg = (self.n_fuzz[testcasedata.n_fuzz_entry] as f64).log2() as u32;
-                    } else {
-                        lg = libm::log2(self.n_fuzz[testcasedata.n_fuzz_entry] as f64) as u32;
-                    }
+                    let lg = libm::log2(f64::from(self.n_fuzz[testcasedata.n_fuzz_entry]));
                     // Do thing if factor == 5
-                    if lg < 2 {
+                    if lg < 2.0 {
                         factor = 4.0;
-                    } else if lg >= 2 && lg < 4 {
+                    } else if (2.0..4.0).contains(&lg) {
                         factor = 3.0;
-                    } else if lg >= 4 && lg < 5 {
+                    } else if (4.0..5.0).contains(&lg) {
                         factor = 2.0;
-                    } else if lg >= 6 && lg < 7 {
+                    } else if (6.0..7.0).contains(&lg) {
                         factor = 0.8;
-                    } else if lg >= 7 && lg < 8 {
+                    } else if (7.0..8.0).contains(&lg) {
                         factor = 0.6;
-                    } else if lg >= 8 {
+                    } else if lg >= 8.0 {
                         factor = 0.4;
                     }
                 }
             }
             PowerSchedule::LIN => {
                 factor = (testcasedata.fuzz_level as f64)
-                    / (self.n_fuzz[testcasedata.n_fuzz_entry] + 1) as f64;
+                    / f64::from(self.n_fuzz[testcasedata.n_fuzz_entry] + 1);
             }
             PowerSchedule::QUAD => {
                 factor = ((testcasedata.fuzz_level * testcasedata.fuzz_level) as f64)
-                    / (self.n_fuzz[testcasedata.n_fuzz_entry] + 1) as f64;
+                    / f64::from(self.n_fuzz[testcasedata.n_fuzz_entry] + 1);
             }
         }
 
