@@ -99,12 +99,13 @@ where
         // println!("calstat: {:#?}", calstat);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
+        testcase.set_exec_time((end - start) / (iter as u32));
+
         let data = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
             .unwrap();
 
-        data.exec_us += ((end - start) / (iter as u32)).as_nanos();
         data.bitmap_size = bitmap_size as u64;
         data.handicap = handicap as u64;
         data.fuzz_level += 1;

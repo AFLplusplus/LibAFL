@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use num::Integer;
 
 use crate::{
-    corpus::{Corpus, PowerScheduleTestData},
+    corpus::{Corpus, PowerScheduleTestData, Testcase},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -82,19 +82,14 @@ where
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         let mut testcase = state.corpus().get(corpus_idx).unwrap().borrow_mut();
-        let testcasedata = testcase
-            .metadata_mut()
-            .get_mut::<PowerScheduleTestData>()
-            .unwrap();
         let statsdata = state.metadata().get::<PowerScheduleStats>().unwrap();
-
         let mut fuzz_mu = 0.0;
         if let PowerSchedule::COE = self.strat {
             fuzz_mu = self.fuzz_mu(state)?;
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        Ok(self.calculate_score(testcasedata, statsdata, fuzz_mu))
+        Ok(self.calculate_score(&mut testcase, statsdata, fuzz_mu))
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -242,15 +237,20 @@ where
     )]
     fn calculate_score(
         &self,
-        testcasedata: &mut PowerScheduleTestData,
+        testcase: &mut Testcase<I>,
         statsdata: &PowerScheduleStats,
         fuzz_mu: f64,
     ) -> usize {
         let mut perf_score = 100.0;
+        let q_exec_us = testcase.exec_time().unwrap().as_nanos() as f64;
         let avg_exec_us = statsdata.total_cal_us / statsdata.total_cal_cycles;
         let avg_bitmap_size = statsdata.total_bitmap_size / statsdata.total_bitmap_entries;
 
-        let q_exec_us = testcasedata.exec_us as f64;
+        let metadata = testcase
+            .metadata_mut()
+            .get_mut::<PowerScheduleTestData>()
+            .unwrap();
+
         if q_exec_us * 0.1 > avg_exec_us as f64 {
             perf_score = 10.0;
         } else if q_exec_us * 0.2 > avg_exec_us as f64 {
@@ -267,7 +267,7 @@ where
             perf_score = 150.0;
         }
 
-        let q_bitmap_size = testcasedata.bitmap_size as f64;
+        let q_bitmap_size = metadata.bitmap_size as f64;
         if q_bitmap_size * 0.3 > avg_bitmap_size as f64 {
             perf_score *= 3.0;
         } else if q_bitmap_size * 0.5 > avg_bitmap_size as f64 {
@@ -282,21 +282,21 @@ where
             perf_score *= 0.75;
         }
 
-        if testcasedata.handicap >= 4 {
+        if metadata.handicap >= 4 {
             perf_score *= 4.0;
-            testcasedata.handicap -= 4;
-        } else if testcasedata.handicap > 0 {
+            metadata.handicap -= 4;
+        } else if metadata.handicap > 0 {
             perf_score *= 2.0;
-            testcasedata.handicap -= 1;
+            metadata.handicap -= 1;
         }
 
-        if testcasedata.depth >= 4 && testcasedata.depth < 8 {
+        if metadata.depth >= 4 && metadata.depth < 8 {
             perf_score *= 2.0;
-        } else if testcasedata.depth >= 8 && testcasedata.depth < 14 {
+        } else if metadata.depth >= 8 && metadata.depth < 14 {
             perf_score *= 3.0;
-        } else if testcasedata.depth >= 14 && testcasedata.depth < 25 {
+        } else if metadata.depth >= 14 && metadata.depth < 25 {
             perf_score *= 4.0;
-        } else if testcasedata.depth >= 25 {
+        } else if metadata.depth >= 25 {
             perf_score *= 5.0;
         }
 
@@ -311,13 +311,13 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if f64::from(self.n_fuzz[testcasedata.n_fuzz_entry]) > fuzz_mu {
+                if f64::from(self.n_fuzz[metadata.n_fuzz_entry]) > fuzz_mu {
                     factor = 0.0;
                 }
             }
             PowerSchedule::FAST => {
-                if testcasedata.fuzz_level != 0 {
-                    let lg = libm::log2(f64::from(self.n_fuzz[testcasedata.n_fuzz_entry]));
+                if metadata.fuzz_level != 0 {
+                    let lg = libm::log2(f64::from(self.n_fuzz[metadata.n_fuzz_entry]));
                     // Do thing if factor == 5
                     if lg < 2.0 {
                         factor = 4.0;
@@ -335,12 +335,12 @@ where
                 }
             }
             PowerSchedule::LIN => {
-                factor = (testcasedata.fuzz_level as f64)
-                    / f64::from(self.n_fuzz[testcasedata.n_fuzz_entry] + 1);
+                factor = (metadata.fuzz_level as f64)
+                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry] + 1);
             }
             PowerSchedule::QUAD => {
-                factor = ((testcasedata.fuzz_level * testcasedata.fuzz_level) as f64)
-                    / f64::from(self.n_fuzz[testcasedata.n_fuzz_entry] + 1);
+                factor = ((metadata.fuzz_level * metadata.fuzz_level) as f64)
+                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry] + 1);
             }
         }
 

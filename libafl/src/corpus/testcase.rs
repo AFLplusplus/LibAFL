@@ -119,13 +119,20 @@ where
     }
 
     /// Get the execution time of the testcase
+    #[inline]
     pub fn exec_time(&self) -> &Option<Duration> {
         &self.exec_time
     }
 
     /// Get the execution time of the testcase (mut)
+    #[inline]
     pub fn exec_time_mut(&mut self) -> &mut Option<Duration> {
         &mut self.exec_time
+    }
+
+    #[inline]
+    pub fn set_exec_time(&mut self, time: Duration) {
+        self.exec_time = Some(time);
     }
 
     /// Create a new Testcase instace given an input
@@ -218,8 +225,6 @@ pub struct PowerScheduleTestData {
     pub depth: u64,
     /// Offset in n_fuzz
     pub n_fuzz_entry: usize,
-    /// Average time spent in calibration stage, updated in calibrate_case
-    pub exec_us: u128,
 }
 
 impl PowerScheduleTestData {
@@ -231,7 +236,6 @@ impl PowerScheduleTestData {
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
-            exec_us: 0,
         }
     }
 }
