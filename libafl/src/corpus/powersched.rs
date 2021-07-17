@@ -40,16 +40,14 @@ where
         let current_idx = *state.corpus().current();
 
         let mut depth = match current_idx {
-            Some(idx) => {
-                state
-                    .corpus()
-                    .get(idx)?
-                    .borrow_mut()
-                    .metadata_mut()
-                    .get_mut::<PowerScheduleTestData>()
-                    .unwrap()
-                    .depth
-            }
+            Some(idx) => state
+                .corpus()
+                .get(idx)?
+                .borrow_mut()
+                .metadata_mut()
+                .get_mut::<PowerScheduleTestData>()
+                .unwrap()
+                .depth(),
             None => 0,
         };
 
@@ -70,11 +68,11 @@ where
             let id = match state.corpus().current() {
                 Some(cur) => {
                     if *cur + 1 >= state.corpus().count() {
-                        state
+                        let psstats = state
                             .metadata_mut()
                             .get_mut::<PowerScheduleStats>()
-                            .unwrap()
-                            .queue_cycles += 1;
+                            .unwrap();
+                        psstats.set_queue_cycles(psstats.queue_cycles() + 1);
                         0
                     } else {
                         *cur + 1

@@ -35,7 +35,7 @@ where
     }
 
     /// Count the set bytes in the map
-    fn count_bytes(&self) -> usize {
+    fn count_bytes(&self) -> u64 {
         let initial = self.initial();
         let cnt = self.usable_count();
         let mut res = 0;

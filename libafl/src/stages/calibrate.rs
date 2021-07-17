@@ -10,7 +10,7 @@ use crate::{
     Error,
 };
 use alloc::string::{String, ToString};
-use core::marker::PhantomData;
+use core::{marker::PhantomData, time::Duration};
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
@@ -91,24 +91,24 @@ where
             .get_mut::<PowerScheduleStats>()
             .unwrap();
 
-        calstat.total_cal_us += (end - start).as_nanos() as u64;
-        calstat.total_cal_cycles += iter as u64;
-        calstat.total_bitmap_size += bitmap_size as u64;
-        calstat.total_bitmap_entries += 1;
+        calstat.set_exec_time(calstat.exec_time() + (end - start));
+        calstat.set_cycles(calstat.cycles() + (iter as u64));
+        calstat.set_bitmap_size(calstat.bitmap_size() + bitmap_size);
+        calstat.set_bitmap_entries(calstat.bitmap_entries() + 1);
 
         // println!("calstat: {:#?}", calstat);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
         testcase.set_exec_time((end - start) / (iter as u32));
-
+        // println!("time: {:#?}", testcase.exec_time());
         let data = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
             .unwrap();
 
-        data.bitmap_size = bitmap_size as u64;
-        data.handicap = handicap as u64;
-        data.fuzz_level += 1;
+        data.set_bitmap_size(bitmap_size);
+        data.set_handicap(handicap);
+        data.set_fuzz_level(data.fuzz_level() + 1);
         // println!("data: {:#?}", data);
 
         Ok(())
@@ -117,23 +117,68 @@ where
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleStats {
-    pub total_cal_us: u64,
-    pub total_cal_cycles: u64,
-    pub total_bitmap_size: u64,
-    pub total_bitmap_entries: u64,
-    pub queue_cycles: usize,
+    exec_time: Duration,
+    cycles: u64,
+    bitmap_size: u64,
+    bitmap_entries: u64,
+    queue_cycles: u64,
 }
 
 impl PowerScheduleStats {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            total_cal_us: 0,
-            total_cal_cycles: 0,
-            total_bitmap_size: 0,
-            total_bitmap_entries: 0,
+            exec_time: Duration::from_millis(0),
+            cycles: 0,
+            bitmap_size: 0,
+            bitmap_entries: 0,
             queue_cycles: 0,
         }
+    }
+
+    #[must_use]
+    pub fn exec_time(&self) -> Duration {
+        self.exec_time
+    }
+
+    pub fn set_exec_time(&mut self, time: Duration) {
+        self.exec_time = time;
+    }
+
+    #[must_use]
+    pub fn cycles(&self) -> u64 {
+        self.cycles
+    }
+
+    pub fn set_cycles(&mut self, val: u64) {
+        self.cycles = val;
+    }
+
+    #[must_use]
+    pub fn bitmap_size(&self) -> u64 {
+        self.bitmap_size
+    }
+
+    pub fn set_bitmap_size(&mut self, val: u64) {
+        self.bitmap_size = val;
+    }
+
+    #[must_use]
+    pub fn bitmap_entries(&self) -> u64 {
+        self.bitmap_entries
+    }
+
+    pub fn set_bitmap_entries(&mut self, val: u64) {
+        self.bitmap_entries = val;
+    }
+
+    #[must_use]
+    pub fn queue_cycles(&self) -> u64 {
+        self.queue_cycles
+    }
+
+    pub fn set_queue_cycles(&mut self, val: u64) {
+        self.queue_cycles = val;
     }
 }
 

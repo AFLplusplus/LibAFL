@@ -216,15 +216,15 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleTestData {
     /// Number of bits set in bitmap, updated in calibrate_case
-    pub bitmap_size: u64,
+    bitmap_size: u64,
     /// Number of fuzzing iterations, updated in perform_mutational
-    pub fuzz_level: u64,
+    fuzz_level: u64,
     /// Number of queue cycles behind
-    pub handicap: u64,
+    handicap: u64,
     /// Path depth, initialized in on_add
-    pub depth: u64,
+    depth: u64,
     /// Offset in n_fuzz
-    pub n_fuzz_entry: usize,
+    n_fuzz_entry: usize,
 }
 
 impl PowerScheduleTestData {
@@ -237,6 +237,51 @@ impl PowerScheduleTestData {
             depth,
             n_fuzz_entry: 0,
         }
+    }
+
+    #[must_use]
+    pub fn bitmap_size(&self) -> u64 {
+        self.bitmap_size
+    }
+
+    pub fn set_bitmap_size(&mut self, val: u64) {
+        self.bitmap_size = val;
+    }
+
+    #[must_use]
+    pub fn fuzz_level(&self) -> u64 {
+        self.fuzz_level
+    }
+
+    pub fn set_fuzz_level(&mut self, val: u64) {
+        self.fuzz_level = val;
+    }
+
+    #[must_use]
+    pub fn handicap(&self) -> u64 {
+        self.handicap
+    }
+
+    pub fn set_handicap(&mut self, val: u64) {
+        self.handicap = val;
+    }
+
+    #[must_use]
+    pub fn depth(&self) -> u64 {
+        self.depth
+    }
+
+    pub fn set_depth(&mut self, val: u64) {
+        self.depth = val;
+    }
+
+    #[must_use]
+    pub fn n_fuzz_entry(&self) -> usize {
+        self.n_fuzz_entry
+    }
+
+    pub fn set_n_fuzz_entry(&mut self, val: usize) {
+        self.n_fuzz_entry = val;
     }
 }
 

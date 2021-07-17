@@ -133,7 +133,7 @@ where
                         .metadata_mut()
                         .get_mut::<PowerScheduleTestData>()
                         .unwrap()
-                        .n_fuzz_entry = hash;
+                        .set_n_fuzz_entry(hash);
 
                     self.n_fuzz[hash] += 1;
                 }
@@ -216,7 +216,7 @@ where
                 .metadata()
                 .get::<PowerScheduleTestData>()
                 .unwrap()
-                .n_fuzz_entry;
+                .n_fuzz_entry();
             fuzz_mu += libm::log2(f64::from(self.n_fuzz[n_fuzz_entry]));
             n_paths += 1;
         }
@@ -243,31 +243,32 @@ where
     ) -> usize {
         let mut perf_score = 100.0;
         let q_exec_us = testcase.exec_time().unwrap().as_nanos() as f64;
-        let avg_exec_us = statsdata.total_cal_us / statsdata.total_cal_cycles;
-        let avg_bitmap_size = statsdata.total_bitmap_size / statsdata.total_bitmap_entries;
+
+        let avg_exec_us = statsdata.exec_time().as_nanos() as f64 / statsdata.cycles() as f64;
+        let avg_bitmap_size = statsdata.bitmap_size() / statsdata.bitmap_entries();
 
         let metadata = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
             .unwrap();
 
-        if q_exec_us * 0.1 > avg_exec_us as f64 {
+        if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
-        } else if q_exec_us * 0.2 > avg_exec_us as f64 {
+        } else if q_exec_us * 0.2 > avg_exec_us {
             perf_score = 25.0;
-        } else if q_exec_us * 0.5 > avg_exec_us as f64 {
+        } else if q_exec_us * 0.5 > avg_exec_us {
             perf_score = 50.0;
-        } else if q_exec_us * 0.75 > avg_exec_us as f64 {
+        } else if q_exec_us * 0.75 > avg_exec_us {
             perf_score = 75.0;
-        } else if q_exec_us * 4.0 < avg_exec_us as f64 {
+        } else if q_exec_us * 4.0 < avg_exec_us {
             perf_score = 300.0;
-        } else if q_exec_us * 3.0 < avg_exec_us as f64 {
+        } else if q_exec_us * 3.0 < avg_exec_us {
             perf_score = 200.0;
-        } else if q_exec_us * 2.0 < avg_exec_us as f64 {
+        } else if q_exec_us * 2.0 < avg_exec_us {
             perf_score = 150.0;
         }
 
-        let q_bitmap_size = metadata.bitmap_size as f64;
+        let q_bitmap_size = metadata.bitmap_size() as f64;
         if q_bitmap_size * 0.3 > avg_bitmap_size as f64 {
             perf_score *= 3.0;
         } else if q_bitmap_size * 0.5 > avg_bitmap_size as f64 {
@@ -282,21 +283,21 @@ where
             perf_score *= 0.75;
         }
 
-        if metadata.handicap >= 4 {
+        if metadata.handicap() >= 4 {
             perf_score *= 4.0;
-            metadata.handicap -= 4;
-        } else if metadata.handicap > 0 {
+            metadata.set_handicap(metadata.handicap() - 4);
+        } else if metadata.handicap() > 0 {
             perf_score *= 2.0;
-            metadata.handicap -= 1;
+            metadata.set_handicap(metadata.handicap() - 1);
         }
 
-        if metadata.depth >= 4 && metadata.depth < 8 {
+        if metadata.depth() >= 4 && metadata.depth() < 8 {
             perf_score *= 2.0;
-        } else if metadata.depth >= 8 && metadata.depth < 14 {
+        } else if metadata.depth() >= 8 && metadata.depth() < 14 {
             perf_score *= 3.0;
-        } else if metadata.depth >= 14 && metadata.depth < 25 {
+        } else if metadata.depth() >= 14 && metadata.depth() < 25 {
             perf_score *= 4.0;
-        } else if metadata.depth >= 25 {
+        } else if metadata.depth() >= 25 {
             perf_score *= 5.0;
         }
 
@@ -311,13 +312,13 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if f64::from(self.n_fuzz[metadata.n_fuzz_entry]) > fuzz_mu {
+                if f64::from(self.n_fuzz[metadata.n_fuzz_entry()]) > fuzz_mu {
                     factor = 0.0;
                 }
             }
             PowerSchedule::FAST => {
-                if metadata.fuzz_level != 0 {
-                    let lg = libm::log2(f64::from(self.n_fuzz[metadata.n_fuzz_entry]));
+                if metadata.fuzz_level() != 0 {
+                    let lg = libm::log2(f64::from(self.n_fuzz[metadata.n_fuzz_entry()]));
                     // Do thing if factor == 5
                     if lg < 2.0 {
                         factor = 4.0;
@@ -335,12 +336,12 @@ where
                 }
             }
             PowerSchedule::LIN => {
-                factor = (metadata.fuzz_level as f64)
-                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry] + 1);
+                factor = (metadata.fuzz_level() as f64)
+                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry()] + 1);
             }
             PowerSchedule::QUAD => {
-                factor = ((metadata.fuzz_level * metadata.fuzz_level) as f64)
-                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry] + 1);
+                factor = ((metadata.fuzz_level() * metadata.fuzz_level()) as f64)
+                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry()] + 1);
             }
         }
 
