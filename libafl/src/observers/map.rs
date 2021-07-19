@@ -1,13 +1,16 @@
 //! The `MapObserver` provides access a map, usually injected into the target
 
+use ahash::AHasher;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{hash::Hasher, slice::{from_raw_parts, from_raw_parts_mut}};
+use core::{
+    hash::Hasher,
+    slice::{from_raw_parts, from_raw_parts_mut},
+};
 use num::Integer;
 use serde::{Deserialize, Serialize};
-use ahash::AHasher;
 
 use crate::{
     bolts::{
