@@ -28,6 +28,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     map_observer_name: String,
+    stage_max: usize,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
 }
@@ -57,7 +58,7 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        let iter = CAL_STAGE_MAX;
+        let iter = self.stage_max;
         let handicap = state
             .metadata()
             .get::<PowerScheduleStats>()
@@ -199,6 +200,7 @@ where
         state.add_metadata::<PowerScheduleStats>(PowerScheduleStats::new());
         Self {
             map_observer_name: map_observer_name.name().to_string(),
+            stage_max: CAL_STAGE_MAX,
             phantom: PhantomData,
         }
     }

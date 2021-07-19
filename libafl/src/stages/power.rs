@@ -17,7 +17,7 @@ use crate::{
     Error,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PowerSchedule {
     EXPLORE,
     FAST,
@@ -93,7 +93,7 @@ where
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        Ok(self.calculate_score(&mut testcase, statsdata, fuzz_mu)?)
+        self.calculate_score(&mut testcase, statsdata, fuzz_mu)
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -208,7 +208,6 @@ where
         }
     }
 
-    //
     #[inline]
     pub fn fuzz_mu(&self, state: &S) -> Result<f64, Error> {
         let corpus = state.corpus();
@@ -327,19 +326,29 @@ where
             PowerSchedule::FAST => {
                 if metadata.fuzz_level() != 0 {
                     let lg = libm::log2(f64::from(self.n_fuzz[metadata.n_fuzz_entry()]));
-                    // Do thing if factor == 5
-                    if lg < 2.0 {
-                        factor = 4.0;
-                    } else if (2.0..4.0).contains(&lg) {
-                        factor = 3.0;
-                    } else if (4.0..5.0).contains(&lg) {
-                        factor = 2.0;
-                    } else if (6.0..7.0).contains(&lg) {
-                        factor = 0.8;
-                    } else if (7.0..8.0).contains(&lg) {
-                        factor = 0.6;
-                    } else if lg >= 8.0 {
-                        factor = 0.4;
+
+                    match lg {
+                        f if f < 2.0 => {
+                            factor = 4.0;
+                        }
+                        f if (2.0..4.0).contains(&f) => {
+                            factor = 3.0;
+                        }
+                        f if (4.0..5.0).contains(&f) => {
+                            factor = 2.0;
+                        }
+                        f if (5.0..6.0).contains(&f) => {
+                            factor = 1.0;
+                        }
+                        f if (6.0..7.0).contains(&f) => {
+                            factor = 0.8;
+                        }
+                        f if (7.0..8.0).contains(&f) => {
+                            factor = 0.6;
+                        }
+                        _ => {
+                            factor = 0.4;
+                        }
                     }
                 }
             }
@@ -356,13 +365,8 @@ where
         perf_score *= factor / POWER_BETA;
 
         // Lower bound if the strat is not COE.
-        match self.strat {
-            PowerSchedule::COE => {}
-            _ => {
-                if perf_score < 1.0 {
-                    perf_score = 1.0;
-                }
-            }
+        if self.strat == PowerSchedule::COE && perf_score < 1.0 {
+            perf_score = 1.0;
         }
 
         // Upper bound
