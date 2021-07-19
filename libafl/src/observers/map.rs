@@ -4,10 +4,10 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::slice::{from_raw_parts, from_raw_parts_mut};
+use core::{hash::Hasher, slice::{from_raw_parts, from_raw_parts_mut}};
 use num::Integer;
 use serde::{Deserialize, Serialize};
-use xxhash_rust::xxh3;
+use ahash::AHasher;
 
 use crate::{
     bolts::{
@@ -48,11 +48,14 @@ where
     }
 
     fn hash(&self) -> u64 {
+        let mut hasher = AHasher::new_with_keys(0, 0);
         let ptr = self.map().as_ptr() as *const u8;
         let map_size = self.map().len() / core::mem::size_of::<T>();
         unsafe {
-            return xxh3::xxh3_64(from_raw_parts(ptr, map_size));
+            hasher.write(from_raw_parts(ptr, map_size));
         }
+
+        hasher.finish()
     }
 
     /// Get the initial value for reset()
