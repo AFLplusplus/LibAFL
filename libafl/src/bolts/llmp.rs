@@ -96,6 +96,10 @@ use nix::sys::socket::{self, sockopt::ReusePort};
 #[cfg(all(unix, feature = "std"))]
 use std::os::unix::io::AsRawFd;
 
+/// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
+/// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
+/// Instead of increasing this value, you may consider sending new messages at a lower rate, else your Sender will eventually `OOM`.
+const LLMP_CFG_MAX_PENDING_UNREAD_PAGES: usize = 3;
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
 const LLMP_CFG_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -854,7 +858,7 @@ where
             unmap_until_excl += 1;
         }
 
-        if unmap_until_excl == 0 && self.out_maps.len() > 3 {
+        if unmap_until_excl == 0 && self.out_maps.len() > LLMP_CFG_MAX_PENDING_UNREAD_PAGES {
             // We send one last information to the broker before quitting.
             self.send_buf(LLMP_SLOW_RECEIVER_PANIC, &[]).unwrap();
             panic!("The receiver/broker could not process our sent llmp messages in time. Either we're sending too many messages too fast, the broker got stuck, or it crashed. Giving up.");
