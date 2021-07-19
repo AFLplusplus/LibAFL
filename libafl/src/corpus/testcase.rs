@@ -225,6 +225,8 @@ pub struct PowerScheduleTestData {
     depth: u64,
     /// Offset in n_fuzz
     n_fuzz_entry: usize,
+    /// TODO: Check this entry is favored in update_bitmap_score & cull_queue
+    favored: bool,
 }
 
 impl PowerScheduleTestData {
@@ -236,6 +238,7 @@ impl PowerScheduleTestData {
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
+            favored: false,
         }
     }
 
@@ -282,6 +285,15 @@ impl PowerScheduleTestData {
 
     pub fn set_n_fuzz_entry(&mut self, val: usize) {
         self.n_fuzz_entry = val;
+    }
+
+    #[must_use]
+    pub fn favored(&self) -> bool {
+        self.favored
+    }
+
+    pub fn set_favored(&mut self, val: bool) {
+        self.favored = val;
     }
 }
 

@@ -310,7 +310,6 @@ where
 
         let mut factor: f64 = 1.0;
 
-        // TODO: currently we don't have any favored inputs, if that's introduced we need to modify code here
         match &self.strat {
             PowerSchedule::EXPLORE => {
                 // Nothing happens in EXPLORE
@@ -337,18 +336,28 @@ where
                         f if (4.0..5.0).contains(&f) => {
                             factor = 2.0;
                         }
-                        f if (5.0..6.0).contains(&f) => {
-                            factor = 1.0;
-                        }
                         f if (6.0..7.0).contains(&f) => {
-                            factor = 0.8;
+                            if !metadata.favored() {
+                                factor = 0.8;
+                            }
                         }
                         f if (7.0..8.0).contains(&f) => {
-                            factor = 0.6;
+                            if !metadata.favored() {
+                                factor = 0.6;
+                            }
+                        }
+                        f if f >= 8.0 => {
+                            if !metadata.favored() {
+                                factor = 0.4
+                            }
                         }
                         _ => {
-                            factor = 0.4;
+                            factor = 1.0;
                         }
+                    }
+
+                    if metadata.favored() {
+                        factor *= 1.15;
                     }
                 }
             }
