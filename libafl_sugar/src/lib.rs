@@ -3,7 +3,9 @@
 pub mod inmemory;
 pub use inmemory::InMemoryBytesCoverageSugar;
 
+#[cfg(target_os = "linux")]
 pub mod qemu;
+#[cfg(target_os = "linux")]
 pub use qemu::QemuBytesCoverageSugar;
 
 pub const DEFAULT_TIMEOUT_SECS: u64 = 1200;
