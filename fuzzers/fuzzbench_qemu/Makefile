@@ -33,6 +33,7 @@ target/$(BUILD_TARGET)/lib$(FUZZER_NAME).a: src/*
 
 qemu-libafl-bridge:
 	git clone git@github.com:AFLplusplus/qemu-libafl-bridge.git
+	cd qemu-libafl-bridge && git checkout 03dfdbd7da90b2d3b9e4df1a52b5a48e8d453a84
 
 build/config.status: qemu-libafl-bridge qemu-libafl-bridge/configure
 	mkdir -p build

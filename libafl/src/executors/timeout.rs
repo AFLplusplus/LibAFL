@@ -1,5 +1,6 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
+#[cfg(any(windows, unix))]
 use core::time::Duration;
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
 };
 
 #[cfg(unix)]
-use core::ptr::null_mut;
+use core::{mem::zeroed, ptr::null_mut};
 #[cfg(unix)]
 use libc::c_int;
 
@@ -36,13 +37,24 @@ extern "C" {
 #[cfg(unix)]
 const ITIMER_REAL: c_int = 0;
 
+/// Reset and remove the timeout
+pub fn remove_timeout() {
+    #[cfg(unix)]
+    unsafe {
+        let mut itimerval_zero: Itimerval = zeroed();
+        setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+    }
+    #[cfg(windows)]
+    {
+        // TODO
+    }
+}
+
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]
     itimerval: Itimerval,
-    #[cfg(unix)]
-    itimerval_zero: Itimerval,
 }
 
 impl<E> TimeoutExecutor<E> {
@@ -51,34 +63,21 @@ impl<E> TimeoutExecutor<E> {
     #[cfg(unix)]
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
-        let it_value_some = Timeval {
+        let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,
             tv_usec: (milli_sec % 1000) as i64,
         };
-        let it_value_zero = Timeval {
-            tv_sec: 0,
-            tv_usec: 0,
-        };
-        let it_interval_some = Timeval {
-            tv_sec: 0,
-            tv_usec: 0,
-        };
-        let it_interval_zero = Timeval {
+        let it_interval = Timeval {
             tv_sec: 0,
             tv_usec: 0,
         };
         let itimerval = Itimerval {
-            it_value: it_value_some,
-            it_interval: it_interval_some,
-        };
-        let itimerval_zero = Itimerval {
-            it_value: it_value_zero,
-            it_interval: it_interval_zero,
+            it_interval,
+            it_value,
         };
         Self {
             executor,
             itimerval,
-            itimerval_zero,
         }
     }
 
@@ -115,16 +114,7 @@ where
         }
 
         let ret = self.executor.run_target(fuzzer, state, mgr, input);
-
-        #[cfg(unix)]
-        unsafe {
-            setitimer(ITIMER_REAL, &mut self.itimerval_zero, null_mut());
-        }
-        #[cfg(windows)]
-        {
-            // TODO
-        }
-
+        remove_timeout();
         ret
     }
 }

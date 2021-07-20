@@ -19,7 +19,7 @@ RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
 RUN rustup component add rustfmt clippy
 
 # Install clang 11, common build tools
-RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev
+RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev llvm
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
@@ -37,8 +37,14 @@ COPY libafl_frida/Cargo.toml libafl_frida/build.rs libafl_frida/
 COPY scripts/dummy.rs libafl_frida/src/lib.rs
 COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
+COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
+COPY scripts/dummy.rs libafl_qemu/src/lib.rs
+COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
+
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
 COPY scripts/dummy.rs libafl_cc/src/lib.rs
+COPY libafl_cc/build.rs libafl_cc/build.rs
+COPY libafl_cc/src/cmplog-routines-pass.cc libafl_cc/src/cmplog-routines-pass.cc
 
 COPY libafl_targets/Cargo.toml libafl_targets/build.rs libafl_targets/
 COPY libafl_targets/src libafl_targets/src
@@ -73,6 +79,8 @@ RUN touch libafl/src/lib.rs
 COPY libafl_targets/src libafl_targets/src
 RUN touch libafl_targets/src/lib.rs
 COPY libafl_frida/src libafl_frida/src
+RUN touch libafl_qemu/src/lib.rs
+COPY libafl_qemu/src libafl_qemu/src
 RUN touch libafl_frida/src/lib.rs
 RUN cargo build && cargo build --release
 

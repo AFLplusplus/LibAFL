@@ -3,9 +3,10 @@ use alloc::{string::ToString, vec::Vec};
 
 use crate::{
     bolts::{rands::Rand, rands::StdRand},
+    corpus::Corpus,
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
-    state::{HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
 };
 use core::{
@@ -25,23 +26,21 @@ pub struct MOpt {
     pub rand: StdRand,
     /// The number of total findings (unique crashes and unique interesting paths). This is equivalent to `state.corpus().count() + state.solutions().count()`;
     pub total_finds: usize,
-    /// The number of finds before switching to this mode.
-    pub finds_before_switch: usize,
-    /// The MOpt mode that we are currently using the pilot fuzzing mode or the core_fuzzing mode
-    pub key_module: MOptMode,
+    /// The number of finds before until last swarm.
+    pub finds_until_last_swarm: usize,
     /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
     pub w_init: f64,
     pub w_end: f64,
     pub w_now: f64,
-    pub g_now: i32,
-    pub g_max: i32,
+    pub g_now: f64,
+    pub g_max: f64,
     /// The number of mutation operators
     pub operator_num: usize,
     /// The number of swarms that we want to employ during the pilot fuzzing mode
     pub swarm_num: usize,
-    /// We'll generate testcases for `period_pilot` times before we call pso_update in core fuzzing module
+    /// We'll generate inputs for `period_pilot` times before we call pso_update in pilot fuzzing module
     pub period_pilot: usize,
-    /// We'll generate testcases for `period_core` times before we call pso_update in core fuzzing module
+    /// We'll generate inputs for `period_core` times before we call pso_update in core fuzzing module
     pub period_core: usize,
     /// The number of testcases generated during this pilot fuzzing mode
     pub pilot_time: usize,
@@ -60,27 +59,27 @@ pub struct MOpt {
     /// The fitness for each swarm, we'll calculate the fitness in the pilot fuzzing mode and use the best one in the core fuzzing mode
     pub swarm_fitness: Vec<f64>,
     /// (Pilot Mode) Finds by each operators. This vector is used in pso_update
-    pub pilot_operator_finds_pso: Vec<Vec<usize>>,
+    pub pilot_operator_finds: Vec<Vec<u64>>,
     /// (Pilot Mode) Finds by each operator till now.
-    pub pilot_operator_finds_this: Vec<Vec<usize>>,
+    pub pilot_operator_finds_v2: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used. This vector is used in pso_update
-    pub pilot_operator_ctr_pso: Vec<Vec<usize>>,
+    pub pilot_operator_cycles: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used till now
-    pub pilot_operator_ctr_this: Vec<Vec<usize>>,
+    pub pilot_operator_cycles_v2: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used till last execution
-    pub pilot_operator_ctr_last: Vec<Vec<usize>>,
+    pub pilot_operator_cycles_v3: Vec<Vec<u64>>,
     /// Vector used in pso_update
-    pub operator_finds_puppet: Vec<usize>,
+    pub operator_finds_puppet: Vec<u64>,
     /// (Core Mode) Finds by each operators. This vector is used in pso_update
-    pub core_operator_finds_pso: Vec<usize>,
+    pub core_operator_finds: Vec<u64>,
     /// (Core Mode) Finds by each operator till now.
-    pub core_operator_finds_this: Vec<usize>,
+    pub core_operator_finds_v2: Vec<u64>,
     /// (Core Mode) The number of mutation operator used. This vector is used in pso_update
-    pub core_operator_ctr_pso: Vec<usize>,
+    pub core_operator_cycles: Vec<u64>,
     /// (Core Mode) The number of mutation operator used till now
-    pub core_operator_ctr_this: Vec<usize>,
+    pub core_operator_cycles_v2: Vec<u64>,
     /// (Core Mode) The number of mutation operator used till last execution
-    pub core_operator_ctr_last: Vec<usize>,
+    pub core_operator_cycles_v3: Vec<u64>,
 }
 
 crate::impl_serdeany!(MOpt);
@@ -89,8 +88,7 @@ impl fmt::Debug for MOpt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MOpt")
             .field("\ntotal_finds", &self.total_finds)
-            .field("\nfinds_before_switch", &self.finds_before_switch)
-            .field("\nkey_module", &self.key_module)
+            .field("\nfinds_until_last_swarm", &self.finds_until_last_swarm)
             .field("\nw_init", &self.w_init)
             .field("\nw_end", &self.w_end)
             .field("\nw_now", &self.g_now)
@@ -104,42 +102,43 @@ impl fmt::Debug for MOpt {
             .field("\n\nv_now", &self.v_now)
             .field("\n\nprobability_now", &self.probability_now)
             .field("\n\nswarm_fitness", &self.swarm_fitness)
-            .field(
-                "\n\npilot_operator_finds_pso",
-                &self.pilot_operator_finds_pso,
-            )
+            .field("\n\npilot_operator_finds", &self.pilot_operator_finds)
             .field(
                 "\n\npilot_operator_finds_this",
-                &self.pilot_operator_finds_this,
+                &self.pilot_operator_finds_v2,
             )
-            .field("\n\npilot_operator_ctr_pso", &self.pilot_operator_ctr_pso)
-            .field("\n\npilot_operator_ctr_this", &self.pilot_operator_ctr_this)
-            .field("\n\npilot_operator_ctr_last", &self.pilot_operator_ctr_last)
-            .field("\n\noperator_finds_puppuet", &self.operator_finds_puppet)
-            .field("\n\ncore_operator_finds_pso", &self.core_operator_finds_pso)
+            .field("\n\npilot_operator_cycles", &self.pilot_operator_cycles)
             .field(
-                "\n\ncore_operator_finds_this",
-                &self.core_operator_finds_this,
+                "\n\npilot_operator_cycles_v2",
+                &self.pilot_operator_cycles_v2,
             )
-            .field("\n\ncore_operator_ctr_pso", &self.core_operator_ctr_pso)
-            .field("\n\ncore_operator_ctr_this", &self.core_operator_ctr_this)
-            .field("\n\ncore_operator_ctr_last", &self.core_operator_ctr_last)
+            .field(
+                "\n\npilot_operator_cycles_v3",
+                &self.pilot_operator_cycles_v3,
+            )
+            .field("\n\noperator_finds_puppuet", &self.operator_finds_puppet)
+            .field("\n\ncore_operator_finds", &self.core_operator_finds)
+            .field("\n\ncore_operator_finds_v2", &self.core_operator_finds_v2)
+            .field("\n\ncore_operator_cycles", &self.core_operator_cycles)
+            .field("\n\ncore_operator_cycles_v2", &self.core_operator_cycles_v2)
+            .field("\n\ncore_operator_cycles_v3", &self.core_operator_cycles_v3)
             .finish()
     }
 }
+
+const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 impl MOpt {
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
         let mut mopt = Self {
             rand: StdRand::with_seed(0),
             total_finds: 0,
-            finds_before_switch: 0,
-            key_module: MOptMode::Pilotfuzzing,
+            finds_until_last_swarm: 0,
             w_init: 0.9,
             w_end: 0.3,
             w_now: 0.0,
-            g_now: 0,
-            g_max: 5000,
+            g_now: 0.0,
+            g_max: 5000.0,
             operator_num,
             swarm_num,
             period_pilot: 50000,
@@ -154,100 +153,29 @@ impl MOpt {
             v_now: vec![vec![0.0; operator_num]; swarm_num],
             probability_now: vec![vec![0.0; operator_num]; swarm_num],
             swarm_fitness: vec![0.0; swarm_num],
-            pilot_operator_finds_pso: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_finds_this: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_ctr_pso: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_ctr_this: vec![vec![0; operator_num]; swarm_num],
-            pilot_operator_ctr_last: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_finds: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_finds_v2: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_cycles: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_cycles_v2: vec![vec![0; operator_num]; swarm_num],
+            pilot_operator_cycles_v3: vec![vec![0; operator_num]; swarm_num],
             operator_finds_puppet: vec![0; operator_num],
-            core_operator_finds_pso: vec![0; operator_num],
-            core_operator_finds_this: vec![0; operator_num],
-            core_operator_ctr_pso: vec![0; operator_num],
-            core_operator_ctr_this: vec![0; operator_num],
-            core_operator_ctr_last: vec![0; operator_num],
+            core_operator_finds: vec![0; operator_num],
+            core_operator_finds_v2: vec![0; operator_num],
+            core_operator_cycles: vec![0; operator_num],
+            core_operator_cycles_v2: vec![0; operator_num],
+            core_operator_cycles_v3: vec![0; operator_num],
         };
         mopt.pso_initialize()?;
         Ok(mopt)
     }
 
-    /// Initialize `core_operator_*` values
-    pub fn init_core_module(&mut self) -> Result<(), Error> {
-        for i in 0..self.operator_num {
-            self.core_operator_ctr_this[i] = self.core_operator_ctr_pso[i];
-            self.core_operator_ctr_last[i] = self.core_operator_ctr_pso[i];
-            self.core_operator_finds_this[i] = self.core_operator_finds_pso[i]
-        }
-
-        let mut swarm_eff = 0.0;
-        let mut best_swarm = 0;
-        for i in 0..self.swarm_num {
-            if self.swarm_fitness[i] > swarm_eff {
-                swarm_eff = self.swarm_fitness[i];
-                best_swarm = i;
-            }
-        }
-
-        self.swarm_now = best_swarm;
-        Ok(())
-    }
-
-    #[inline]
-    pub fn update_pilot_operator_ctr_last(&mut self, swarm_now: usize) {
-        for i in 0..self.operator_num {
-            self.pilot_operator_ctr_last[swarm_now][i] = self.pilot_operator_ctr_this[swarm_now][i]
-        }
-    }
-
-    #[inline]
-    pub fn update_core_operator_ctr_last(&mut self) {
-        for i in 0..self.operator_num {
-            self.core_operator_ctr_last[i] = self.core_operator_ctr_this[i];
-        }
-    }
-
-    /// Finds the local optimum for each operator
-    /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L8709>
-
-    #[allow(clippy::cast_precision_loss)]
-    pub fn update_pilot_operator_ctr_pso(&mut self, swarm_now: usize) {
-        let mut eff = 0.0;
-        for i in 0..self.operator_num {
-            if self.pilot_operator_ctr_this[swarm_now][i]
-                > self.pilot_operator_ctr_pso[swarm_now][i]
-            {
-                eff = ((self.pilot_operator_finds_this[swarm_now][i]
-                    - self.pilot_operator_finds_pso[swarm_now][i]) as f64)
-                    / ((self.pilot_operator_ctr_this[swarm_now][i]
-                        - self.pilot_operator_ctr_pso[swarm_now][i]) as f64)
-            }
-
-            if self.eff_best[swarm_now][i] < eff {
-                self.eff_best[swarm_now][i] = eff;
-                self.l_best[swarm_now][i] = self.x_now[swarm_now][i];
-            }
-
-            self.pilot_operator_finds_pso[swarm_now][i] =
-                self.pilot_operator_finds_this[swarm_now][i];
-            self.pilot_operator_ctr_pso[swarm_now][i] = self.pilot_operator_ctr_this[swarm_now][i];
-        }
-    }
-
-    #[inline]
-    pub fn update_core_operator_ctr_pso(&mut self) {
-        for i in 0..self.operator_num {
-            self.core_operator_finds_pso[i] = self.core_operator_finds_this[i];
-            self.core_operator_ctr_pso[i] = self.core_operator_ctr_this[i];
-        }
-    }
-
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_initialize(&mut self) -> Result<(), Error> {
         if self.g_now > self.g_max {
-            self.g_now = 0;
+            self.g_now = 0.0;
         }
-        self.w_now = (self.w_init - self.w_end) * f64::from(self.g_max - self.g_now)
-            / f64::from(self.g_max)
-            + self.w_end;
+        self.w_now =
+            (self.w_init - self.w_end) * (self.g_max - self.g_now) / self.g_max + self.w_end;
 
         for swarm in 0..self.swarm_num {
             let mut total_x_now = 0.0;
@@ -305,29 +233,28 @@ impl MOpt {
     /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L10623>
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
-        self.g_now += 1;
+        self.g_now += 1.0;
         if self.g_now > self.g_max {
-            self.g_now = 0;
+            self.g_now = 0.0;
         }
-        self.w_now = (self.w_init - self.w_end) * f64::from(self.g_max - self.g_now)
-            / f64::from(self.g_max)
-            + self.w_end;
+        self.w_now =
+            ((self.w_init - self.w_end) * (self.g_max - self.g_now) / self.g_max) + self.w_end;
 
-        let mut operator_find_sum = 0;
+        let mut operator_finds_sum = 0;
 
         for i in 0..self.operator_num {
-            self.operator_finds_puppet[i] = self.core_operator_ctr_pso[i];
+            self.operator_finds_puppet[i] = self.core_operator_finds[i];
 
             for j in 0..self.swarm_num {
-                self.operator_finds_puppet[i] += self.pilot_operator_finds_pso[j][i];
+                self.operator_finds_puppet[i] += self.pilot_operator_finds[j][i];
             }
-            operator_find_sum += self.operator_finds_puppet[i];
+            operator_finds_sum += self.operator_finds_puppet[i];
         }
 
         for i in 0..self.operator_num {
             if self.operator_finds_puppet[i] > 0 {
                 self.g_best[i] =
-                    (self.operator_finds_puppet[i] as f64) / (operator_find_sum as f64);
+                    (self.operator_finds_puppet[i] as f64) / (operator_finds_sum as f64);
             }
         }
 
@@ -369,8 +296,7 @@ impl MOpt {
         }
         self.swarm_now = 0;
 
-        self.key_module = MOptMode::Pilotfuzzing;
-        //println!("Mopt struct:\n{:?}", self);
+        // After pso_update, go back to pilot-fuzzing module
         Ok(())
     }
 
@@ -419,23 +345,29 @@ pub enum MOptMode {
     Corefuzzing,
 }
 
-pub struct StdMOptMutator<I, MT, R, S>
+pub struct StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
+    mode: MOptMode,
+    finds_before: usize,
     mutations: MT,
-    phantom: PhantomData<(I, R, S)>,
+    phantom: PhantomData<(C, I, R, S, SC)>,
 }
 
-impl<I, MT, R, S> Debug for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> Debug for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -447,12 +379,14 @@ where
     }
 }
 
-impl<I, MT, R, S> Mutator<I, S> for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> Mutator<I, S> for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     #[inline]
     fn mutate(
@@ -461,22 +395,145 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
+        self.finds_before = state.corpus().count() + state.solutions().count();
         self.scheduled_mutate(state, input, stage_idx)
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        _stage_idx: i32,
+        _corpus_idx: Option<usize>,
+    ) -> Result<(), Error> {
+        let before = self.finds_before;
+        let after = state.corpus().count() + state.solutions().count();
+
+        let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+        let key_module = self.mode;
+        match key_module {
+            MOptMode::Corefuzzing => {
+                mopt.core_time += 1;
+
+                if after > before {
+                    let diff = after - before;
+                    mopt.total_finds += diff;
+                    for i in 0..mopt.operator_num {
+                        if mopt.core_operator_cycles_v2[i] > mopt.core_operator_cycles_v3[i] {
+                            mopt.core_operator_finds_v2[i] += diff as u64;
+                        }
+                    }
+                }
+
+                if mopt.core_time > mopt.period_core {
+                    mopt.core_time = 0;
+                    let total_finds = mopt.total_finds;
+                    mopt.finds_until_last_swarm = total_finds;
+                    for i in 0..mopt.operator_num {
+                        mopt.core_operator_finds[i] = mopt.core_operator_finds_v2[i];
+                        mopt.core_operator_cycles[i] = mopt.core_operator_cycles_v2[i];
+                    }
+                    mopt.pso_update()?;
+                    self.mode = MOptMode::Pilotfuzzing;
+                }
+            }
+            MOptMode::Pilotfuzzing => {
+                mopt.pilot_time += 1;
+                let swarm_now = mopt.swarm_now;
+
+                if after > before {
+                    let diff = after - before;
+                    mopt.total_finds += diff;
+                    for i in 0..mopt.operator_num {
+                        if mopt.pilot_operator_cycles_v2[swarm_now][i]
+                            > mopt.pilot_operator_cycles_v3[swarm_now][i]
+                        {
+                            mopt.pilot_operator_finds_v2[swarm_now][i] += diff as u64;
+                        }
+                    }
+                }
+
+                if mopt.pilot_time > mopt.period_pilot {
+                    let new_finds = mopt.total_finds - mopt.finds_until_last_swarm;
+                    let f = (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));
+                    mopt.swarm_fitness[swarm_now] = f;
+                    mopt.pilot_time = 0;
+                    let total_finds = mopt.total_finds;
+                    mopt.finds_until_last_swarm = total_finds;
+
+                    for i in 0..mopt.operator_num {
+                        let mut eff = 0.0;
+                        if mopt.pilot_operator_cycles_v2[swarm_now][i]
+                            > mopt.pilot_operator_cycles[swarm_now][i]
+                        {
+                            eff = ((mopt.pilot_operator_finds_v2[swarm_now][i]
+                                - mopt.pilot_operator_finds[swarm_now][i])
+                                as f64)
+                                / ((mopt.pilot_operator_cycles_v2[swarm_now][i]
+                                    - mopt.pilot_operator_cycles[swarm_now][i])
+                                    as f64)
+                        }
+
+                        if mopt.eff_best[swarm_now][i] < eff {
+                            mopt.eff_best[swarm_now][i] = eff;
+                            mopt.l_best[swarm_now][i] = mopt.x_now[swarm_now][i];
+                        }
+
+                        mopt.pilot_operator_finds[swarm_now][i] =
+                            mopt.pilot_operator_finds_v2[swarm_now][i];
+                        mopt.pilot_operator_cycles[swarm_now][i] =
+                            mopt.pilot_operator_cycles_v2[swarm_now][i];
+                    }
+
+                    mopt.swarm_now += 1;
+
+                    if mopt.swarm_num == 1 {
+                        // If there's only 1 swarm, then no core_fuzzing mode.
+                        mopt.pso_update()?;
+                    } else if mopt.swarm_now == mopt.swarm_num {
+                        self.mode = MOptMode::Corefuzzing;
+
+                        for i in 0..mopt.operator_num {
+                            mopt.core_operator_cycles_v2[i] = mopt.core_operator_cycles[i];
+                            mopt.core_operator_cycles_v3[i] = mopt.core_operator_cycles[i];
+                            mopt.core_operator_finds_v2[i] = mopt.core_operator_finds[i]
+                        }
+
+                        let mut swarm_eff = 0.0;
+                        let mut best_swarm = 0;
+                        for i in 0..mopt.swarm_num {
+                            if mopt.swarm_fitness[i] > swarm_eff {
+                                swarm_eff = mopt.swarm_fitness[i];
+                                best_swarm = i;
+                            }
+                        }
+
+                        mopt.swarm_now = best_swarm;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
-impl<I, MT, R, S> StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
-    pub fn new(mutations: MT) -> Self {
-        Self {
+    pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
+        state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
+        Ok(Self {
+            mode: MOptMode::Pilotfuzzing,
+            finds_before: 0,
             mutations,
             phantom: PhantomData,
-        }
+        })
     }
     fn core_mutate(
         &mut self,
@@ -484,13 +541,11 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        // TODO
         let mut r = MutationResult::Skipped;
-        state
-            .metadata_mut()
-            .get_mut::<MOpt>()
-            .unwrap()
-            .update_core_operator_ctr_last();
+        let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+        for i in 0..mopt.operator_num {
+            mopt.core_operator_cycles_v3[i] = mopt.core_operator_cycles_v2[i];
+        }
 
         for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
@@ -505,9 +560,8 @@ where
                 .metadata_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .core_operator_ctr_this[idx] += 1;
+                .core_operator_cycles_v2[idx] += 1;
         }
-
         Ok(r)
     }
 
@@ -522,7 +576,11 @@ where
         {
             let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
             swarm_now = mopt.swarm_now;
-            mopt.update_pilot_operator_ctr_last(swarm_now);
+
+            for i in 0..mopt.operator_num {
+                mopt.pilot_operator_cycles_v3[swarm_now][i] =
+                    mopt.pilot_operator_cycles_v2[swarm_now][i];
+            }
         }
 
         for _i in 0..self.iterations(state, input) {
@@ -538,19 +596,21 @@ where
                 .metadata_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .pilot_operator_ctr_this[swarm_now][idx] += 1;
+                .pilot_operator_cycles_v2[swarm_now][idx] += 1;
         }
 
         Ok(r)
     }
 }
 
-impl<I, MT, R, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> ComposedByMutations<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     /// Get the mutations
     #[inline]
@@ -565,12 +625,14 @@ where
     }
 }
 
-impl<I, MT, R, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, R, S>
+impl<C, I, MT, R, S, SC> ScheduledMutator<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
 where
+    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
     R: Rand,
-    S: HasRand<R> + HasMetadata,
+    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
@@ -593,28 +655,10 @@ where
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let mode = state.metadata().get::<MOpt>().unwrap().key_module;
+        let mode = self.mode;
         match mode {
             MOptMode::Corefuzzing => self.core_mutate(state, input, stage_idx),
             MOptMode::Pilotfuzzing => self.pilot_mutate(state, input, stage_idx),
         }
     }
-}
-
-pub trait MOptMutator<I, MT, R, S>: ScheduledMutator<I, MT, S>
-where
-    I: Input,
-    MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata,
-{
-}
-
-impl<I, MT, R, S> MOptMutator<I, MT, R, S> for StdMOptMutator<I, MT, R, S>
-where
-    I: Input,
-    MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata,
-{
 }

@@ -48,6 +48,7 @@ impl CmpValues {
 #[derive(Default, Serialize, Deserialize)]
 pub struct CmpValuesMetadata {
     /// A `list` of values.
+    #[serde(skip)]
     pub list: Vec<CmpValues>,
 }
 

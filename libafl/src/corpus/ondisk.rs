@@ -3,9 +3,10 @@
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write, path::PathBuf};
+use std::{fs, fs::File, io::Write};
 
 use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, state::HasMetadata, Error};
 
