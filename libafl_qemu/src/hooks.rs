@@ -65,11 +65,11 @@ where
     }
 }
 
-pub extern "C" fn trace_edge_hitcount(id: u32) {
+pub extern "C" fn trace_edge_hitcount(id: u64) {
     unsafe { EDGES_MAP[id as usize] += 1 };
 }
 
-pub extern "C" fn trace_edge_single(id: u32) {
+pub extern "C" fn trace_edge_single(id: u64) {
     unsafe { EDGES_MAP[id as usize] = 1 };
 }
 
