@@ -41,6 +41,9 @@ COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
 COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
 
+COPY libafl_sugar/Cargo.toml libafl_sugar/
+COPY scripts/dummy.rs libafl_sugar/src/lib.rs
+
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
 COPY scripts/dummy.rs libafl_cc/src/lib.rs
 COPY libafl_cc/build.rs libafl_cc/build.rs
