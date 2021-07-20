@@ -26,19 +26,6 @@ pub enum MmapPerms {
     ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
 }
 
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
-#[repr(i32)]
-#[allow(clippy::pub_enum_variant_names)]
-pub enum MmapPerms {
-    Read = libc::PROT_READ,
-    Write = libc::PROT_WRITE,
-    Execute = libc::PROT_EXEC,
-    ReadWrite = libc::PROT_READ | libc::PROT_WRITE,
-    ReadExecute = libc::PROT_READ | libc::PROT_EXEC,
-    WriteExecute = libc::PROT_WRITE | libc::PROT_EXEC,
-    ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
-}
-
 #[repr(C)]
 pub struct SyscallHookResult {
     retval: u64,
