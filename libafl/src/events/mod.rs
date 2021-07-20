@@ -13,7 +13,7 @@ use crate::{
     executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
 };
 
-/// A per-fuzzer unique ID, usually starting with `0` and increasing
+/// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct EventManagerId {
@@ -209,7 +209,14 @@ pub trait EventFirer<I, S>
 where
     I: Input,
 {
-    /// Send off an event to the broker
+    /// Send off an [`Event`] to the broker
+    ///
+    /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
+    /// this serializes the [`Event`] and commits it to the [`llmp`] page.
+    /// In this case, if you `fire` faster than the broker can consume
+    /// (for example for each [`Input`], on multiple cores)
+    /// the [`llmp`] [`ShMem`] may fill up and the client will eventually OOM or [`panic`].
+    /// This should not happen for a normal use-cases.
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
     /// Serialize all observers for this type and manager
