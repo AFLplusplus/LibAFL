@@ -216,7 +216,17 @@ where
     #[allow(clippy::unused_self)]
     pub fn hook_syscalls(
         &self,
-        hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
+        hook: extern "C" fn(
+            sys_num: i32,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+        ) -> SyscallHookResult,
     ) {
         emu::set_syscall_hook(hook);
     }

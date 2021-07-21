@@ -273,14 +273,16 @@ fn fuzz(
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
-        if buf.len() > 4096 {
+        let mut len = buf.len();
+        if len > 4096 {
             buf = &buf[0..4096];
+            len = 4096;
         }
 
         emu::write_mem(input_addr, buf);
 
         emu::write_reg(Amd64Regs::Rdi, input_addr).unwrap();
-        emu::write_reg(Amd64Regs::Rsi, buf.len()).unwrap();
+        emu::write_reg(Amd64Regs::Rsi, len).unwrap();
         emu::write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
         emu::write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
 

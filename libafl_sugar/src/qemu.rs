@@ -65,6 +65,21 @@ where
     /// Bytes harness    
     #[builder(setter(strip_option))]
     harness: Option<H>,
+    // Syscall hook
+    #[builder(default = None, setter(strip_option))]
+    syscall_hook: Option<
+        extern "C" fn(
+            sys_num: i32,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+        ) -> emu::SyscallHookResult,
+    >,
 }
 
 impl<'a, H> QemuBytesCoverageSugar<'a, H>
@@ -170,6 +185,11 @@ where
             // Track edge coverage
             executor.hook_edge_generation(hooks::gen_unique_edge_ids);
             executor.hook_edge_execution(hooks::trace_edge_hitcount);
+
+            // Hook the syscalls
+            if let Some(hook) = self.syscall_hook {
+                executor.hook_syscalls(hook);
+            }
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = TimeoutExecutor::new(executor, timeout);
