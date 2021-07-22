@@ -79,7 +79,7 @@ where
 
             let filename = format!("{:016x}.libafl_state", hasher.finish());
             let tmpfile = temp_dir().join(&filename);
-            File::open(tmpfile)?.write_all(&serialized)?;
+            File::create(tmpfile)?.write_all(&serialized)?;
 
             // write the filename to shmem
             let filename_buf = postcard::to_allocvec(&filename)?;
