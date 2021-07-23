@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::{Corpus, CorpusScheduler, PowerScheduleTestData},
     inputs::Input,
-    stages::PowerScheduleStats,
+    stages::PowerScheduleMetadata,
     state::{HasCorpus, HasMetadata},
     Error,
 };
@@ -70,9 +70,9 @@ where
                     if *cur + 1 >= state.corpus().count() {
                         let psstats = state
                             .metadata_mut()
-                            .get_mut::<PowerScheduleStats>()
+                            .get_mut::<PowerScheduleMetadata>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("PowerScheduleStats not found".to_string())
+                                Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
                             })?;
                         psstats.set_queue_cycles(psstats.queue_cycles() + 1);
                         0

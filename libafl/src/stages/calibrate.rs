@@ -61,8 +61,8 @@ where
         let iter = self.stage_max;
         let handicap = state
             .metadata()
-            .get::<PowerScheduleStats>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleStats not found".to_string()))?
+            .get::<PowerScheduleMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
             .queue_cycles;
 
         // Timer start
@@ -89,8 +89,8 @@ where
 
         let calstat = state
             .metadata_mut()
-            .get_mut::<PowerScheduleStats>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleStats not found".to_string()))?;
+            .get_mut::<PowerScheduleMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         calstat.set_exec_time(calstat.exec_time() + (end - start));
         calstat.set_cycles(calstat.cycles() + (iter as u64));
@@ -117,7 +117,7 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PowerScheduleStats {
+pub struct PowerScheduleMetadata {
     exec_time: Duration,
     cycles: u64,
     bitmap_size: u64,
@@ -125,7 +125,7 @@ pub struct PowerScheduleStats {
     queue_cycles: u64,
 }
 
-impl PowerScheduleStats {
+impl PowerScheduleMetadata {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -183,7 +183,7 @@ impl PowerScheduleStats {
     }
 }
 
-crate::impl_serdeany!(PowerScheduleStats);
+crate::impl_serdeany!(PowerScheduleMetadata);
 
 impl<C, E, I, EM, O, OT, S, T, Z> CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
@@ -197,7 +197,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     pub fn new(state: &mut S, map_observer_name: &O) -> Self {
-        state.add_metadata::<PowerScheduleStats>(PowerScheduleStats::new());
+        state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new());
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             stage_max: CAL_STAGE_MAX,
@@ -206,7 +206,7 @@ where
     }
 }
 
-impl Default for PowerScheduleStats {
+impl Default for PowerScheduleMetadata {
     fn default() -> Self {
         Self::new()
     }

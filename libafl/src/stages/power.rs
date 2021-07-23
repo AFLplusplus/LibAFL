@@ -12,7 +12,7 @@ use crate::{
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    stages::{MutationalStage, PowerScheduleStats, Stage},
+    stages::{MutationalStage, PowerScheduleMetadata, Stage},
     state::{HasClientPerfStats, HasCorpus, HasMetadata},
     Error,
 };
@@ -84,8 +84,8 @@ where
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let statsdata = state
             .metadata()
-            .get::<PowerScheduleStats>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleStats not found".to_string()))?;
+            .get::<PowerScheduleMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         let mut fuzz_mu = 0.0;
         if let PowerSchedule::COE = self.strat {
@@ -242,7 +242,7 @@ where
     fn calculate_score(
         &self,
         testcase: &mut Testcase<I>,
-        statsdata: &PowerScheduleStats,
+        statsdata: &PowerScheduleMetadata,
         fuzz_mu: f64,
     ) -> Result<usize, Error> {
         let mut perf_score = 100.0;
