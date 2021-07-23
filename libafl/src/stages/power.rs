@@ -314,6 +314,8 @@ where
 
         let mut factor: f64 = 1.0;
 
+        // COE and Fast schedule are fairly different from what are described in the original thesis,
+        // This implementation follows the changes made in this pull request https://github.com/AFLplusplus/AFLplusplus/pull/568
         match &self.strat {
             PowerSchedule::EXPLORE => {
                 // Nothing happens in EXPLORE
