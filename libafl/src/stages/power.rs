@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use num::Integer;
 
 use crate::{
-    corpus::{Corpus, PowerScheduleTestData, Testcase},
+    corpus::{Corpus, PowerScheduleTestData, Testcase, IsFavoredMetadata},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -254,6 +254,7 @@ where
         let avg_exec_us = statsdata.exec_time().as_nanos() as f64 / statsdata.cycles() as f64;
         let avg_bitmap_size = statsdata.bitmap_size() / statsdata.bitmap_entries();
 
+        let favored = testcase.has_metadata::<IsFavoredMetadata>();
         let metadata = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestData>()
@@ -337,17 +338,17 @@ where
                             factor = 2.0;
                         }
                         f if (6.0..7.0).contains(&f) => {
-                            if !metadata.favored() {
+                            if !favored {
                                 factor = 0.8;
                             }
                         }
                         f if (7.0..8.0).contains(&f) => {
-                            if !metadata.favored() {
+                            if !favored {
                                 factor = 0.6;
                             }
                         }
                         f if f >= 8.0 => {
-                            if !metadata.favored() {
+                            if !favored {
                                 factor = 0.4
                             }
                         }
@@ -356,7 +357,7 @@ where
                         }
                     }
 
-                    if metadata.favored() {
+                    if favored {
                         factor *= 1.15;
                     }
                 }
