@@ -1,3 +1,5 @@
+//! The queue corpus scheduler for power schedules.
+
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
@@ -51,7 +53,7 @@ where
             None => 0,
         };
 
-        // Update depth
+        // Attach a `PowerScheduleTestData` to the queue entry.
         depth += 1;
         state
             .corpus()

@@ -1,3 +1,5 @@
+//! The power schedules. This stage should be invoked after the calibration stage.
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -88,7 +90,7 @@ where
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         let mut fuzz_mu = 0.0;
-        if let PowerSchedule::COE = self.strat {
+        if self.strat == PowerSchedule::COE {
             fuzz_mu = self.fuzz_mu(state)?;
         }
 
@@ -117,7 +119,6 @@ where
 
             self.mutator_mut().mutate(state, &mut input, i as i32)?;
 
-            // Time is measured directly the `evaluate_input` function
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
             let observer = executor
@@ -144,8 +145,7 @@ where
                     self.n_fuzz[hash] += 1;
                 }
                 None => {
-                    // self.n_fuzz[hash] can be 0 here when the MapObserver.map() is different it's not deemed as interesting
-                    // when the map goes through the AFL's bucket.s
+                    // self.n_fuzz[hash] can be 0 here because we are looking at the MapObserver, not the HitcountsMapObserver
                     self.n_fuzz[hash] += 1;
                 }
             }
@@ -197,7 +197,6 @@ where
     S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
-    /// Creates a new default mutational stage
     pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
@@ -208,6 +207,7 @@ where
         }
     }
 
+    /// Compute the parameter `μ` used in the COE schedule.
     #[inline]
     pub fn fuzz_mu(&self, state: &S) -> Result<f64, Error> {
         let corpus = state.corpus();
@@ -233,6 +233,7 @@ where
         Ok(fuzz_mu)
     }
 
+    /// Compute the `power` we assign to each corpus entry
     #[inline]
     #[allow(
         clippy::cast_precision_loss,

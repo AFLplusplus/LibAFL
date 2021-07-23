@@ -1,3 +1,5 @@
+//! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
+
 use crate::{
     bolts::current_time,
     corpus::{Corpus, PowerScheduleTestData},
@@ -14,7 +16,6 @@ use core::{marker::PhantomData, time::Duration};
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
-/// The default mutational stage
 #[derive(Clone, Debug)]
 pub struct CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
@@ -33,7 +34,6 @@ where
     phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
 }
 
-// The number of times we run the program in the calibration stage
 const CAL_STAGE_MAX: usize = 8;
 
 impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
