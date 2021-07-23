@@ -75,7 +75,7 @@ where
                 .borrow_mut()
                 .load_input()?
                 .clone();
-            let _ = executor.run_target(fuzzer, state, manager, &input);
+            let _ = executor.run_target(fuzzer, state, manager, &input)?;
         }
         // Timer end
         let end = current_time();
