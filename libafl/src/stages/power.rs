@@ -322,7 +322,8 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if libm::log2(f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()])) > fuzz_mu {
+                if libm::log2(f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()])) > fuzz_mu && !favored {
+                    // Never skip favorites.
                     factor = 0.0;
                 }
             }
@@ -375,11 +376,13 @@ where
             }
         }
 
-        if factor > MAX_FACTOR {
-            factor = MAX_FACTOR;
-        }
+        if self.strat != PowerSchedule::EXPLORE {
+            if factor > MAX_FACTOR {
+                factor = MAX_FACTOR;
+            }
 
-        perf_score *= factor / POWER_BETA;
+            perf_score *= factor / POWER_BETA;
+        }
 
         // Lower bound if the strat is not COE.
         if self.strat == PowerSchedule::COE && perf_score < 1.0 {
