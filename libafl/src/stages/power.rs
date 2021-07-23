@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use num::Integer;
 
 use crate::{
-    corpus::{Corpus, PowerScheduleTestData, Testcase, IsFavoredMetadata},
+    corpus::{Corpus, IsFavoredMetadata, PowerScheduleTestData, Testcase},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
