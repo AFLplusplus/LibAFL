@@ -213,7 +213,7 @@ where
     }
 }
 
-/// The Metadata for each testcase used in power-schedule.
+/// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleTestData {
     /// Number of bits set in bitmap, updated in calibrate_case

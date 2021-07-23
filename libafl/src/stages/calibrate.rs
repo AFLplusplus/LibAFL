@@ -125,6 +125,7 @@ pub struct PowerScheduleMetadata {
     queue_cycles: u64,
 }
 
+/// The metadata for runs in the calibration stage.
 impl PowerScheduleMetadata {
     #[must_use]
     pub fn new() -> Self {
