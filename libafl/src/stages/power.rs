@@ -322,7 +322,7 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()]) > fuzz_mu {
+                if libm::log2(f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()])) > fuzz_mu {
                     factor = 0.0;
                 }
             }
