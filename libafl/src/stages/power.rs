@@ -375,6 +375,10 @@ where
             }
         }
 
+        if factor > MAX_FACTOR {
+            factor = MAX_FACTOR;
+        }
+
         perf_score *= factor / POWER_BETA;
 
         // Lower bound if the strat is not COE.
