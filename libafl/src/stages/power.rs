@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use num::Integer;
 
 use crate::{
-    corpus::{Corpus, IsFavoredMetadata, PowerScheduleTestData, Testcase},
+    corpus::{Corpus, IsFavoredMetadata, PowerScheduleTestcaseMetaData, Testcase},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -50,7 +50,9 @@ where
 {
     map_observer_name: String,
     mutator: M,
+    /// The vector to contain the frequency of each execution path.
     n_fuzz: Vec<u32>,
+    /// The employed power schedule strategy
     strat: PowerSchedule,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
@@ -84,7 +86,7 @@ where
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let statsdata = state
+        let psmeta = state
             .metadata()
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
@@ -95,7 +97,7 @@ where
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        self.calculate_score(&mut testcase, statsdata, fuzz_mu)
+        self.calculate_score(&mut testcase, psmeta, fuzz_mu)
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -136,7 +138,7 @@ where
                         .get(idx)?
                         .borrow_mut()
                         .metadata_mut()
-                        .get_mut::<PowerScheduleTestData>()
+                        .get_mut::<PowerScheduleTestcaseMetaData>()
                         .ok_or_else(|| {
                             Error::KeyNotFound("PowerScheduleTestData not found".to_string())
                         })?
@@ -218,7 +220,7 @@ where
                 .get(idx)?
                 .borrow()
                 .metadata()
-                .get::<PowerScheduleTestData>()
+                .get::<PowerScheduleTestcaseMetaData>()
                 .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
                 .n_fuzz_entry();
             fuzz_mu += libm::log2(f64::from(self.n_fuzz[n_fuzz_entry]));
@@ -243,7 +245,7 @@ where
     fn calculate_score(
         &self,
         testcase: &mut Testcase<I>,
-        statsdata: &PowerScheduleMetadata,
+        psmeta: &PowerScheduleMetadata,
         fuzz_mu: f64,
     ) -> Result<usize, Error> {
         let mut perf_score = 100.0;
@@ -252,13 +254,13 @@ where
             .ok_or_else(|| Error::KeyNotFound("exec_time not set".to_string()))?
             .as_nanos() as f64;
 
-        let avg_exec_us = statsdata.exec_time().as_nanos() as f64 / statsdata.cycles() as f64;
-        let avg_bitmap_size = statsdata.bitmap_size() / statsdata.bitmap_entries();
+        let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
+        let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
 
         let favored = testcase.has_metadata::<IsFavoredMetadata>();
-        let metadata = testcase
+        let tcmeta = testcase
             .metadata_mut()
-            .get_mut::<PowerScheduleTestData>()
+            .get_mut::<PowerScheduleTestcaseMetaData>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
 
         if q_exec_us * 0.1 > avg_exec_us {
@@ -277,7 +279,7 @@ where
             perf_score = 150.0;
         }
 
-        let q_bitmap_size = metadata.bitmap_size() as f64;
+        let q_bitmap_size = tcmeta.bitmap_size() as f64;
         if q_bitmap_size * 0.3 > avg_bitmap_size as f64 {
             perf_score *= 3.0;
         } else if q_bitmap_size * 0.5 > avg_bitmap_size as f64 {
@@ -292,21 +294,21 @@ where
             perf_score *= 0.75;
         }
 
-        if metadata.handicap() >= 4 {
+        if tcmeta.handicap() >= 4 {
             perf_score *= 4.0;
-            metadata.set_handicap(metadata.handicap() - 4);
-        } else if metadata.handicap() > 0 {
+            tcmeta.set_handicap(tcmeta.handicap() - 4);
+        } else if tcmeta.handicap() > 0 {
             perf_score *= 2.0;
-            metadata.set_handicap(metadata.handicap() - 1);
+            tcmeta.set_handicap(tcmeta.handicap() - 1);
         }
 
-        if metadata.depth() >= 4 && metadata.depth() < 8 {
+        if tcmeta.depth() >= 4 && tcmeta.depth() < 8 {
             perf_score *= 2.0;
-        } else if metadata.depth() >= 8 && metadata.depth() < 14 {
+        } else if tcmeta.depth() >= 8 && tcmeta.depth() < 14 {
             perf_score *= 3.0;
-        } else if metadata.depth() >= 14 && metadata.depth() < 25 {
+        } else if tcmeta.depth() >= 14 && tcmeta.depth() < 25 {
             perf_score *= 4.0;
-        } else if metadata.depth() >= 25 {
+        } else if tcmeta.depth() >= 25 {
             perf_score *= 5.0;
         }
 
@@ -320,13 +322,13 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if f64::from(self.n_fuzz[metadata.n_fuzz_entry()]) > fuzz_mu {
+                if f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()]) > fuzz_mu {
                     factor = 0.0;
                 }
             }
             PowerSchedule::FAST => {
-                if metadata.fuzz_level() != 0 {
-                    let lg = libm::log2(f64::from(self.n_fuzz[metadata.n_fuzz_entry()]));
+                if tcmeta.fuzz_level() != 0 {
+                    let lg = libm::log2(f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()]));
 
                     match lg {
                         f if f < 2.0 => {
@@ -364,12 +366,12 @@ where
                 }
             }
             PowerSchedule::LIN => {
-                factor = (metadata.fuzz_level() as f64)
-                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry()] + 1);
+                factor = (tcmeta.fuzz_level() as f64)
+                    / f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()] + 1);
             }
             PowerSchedule::QUAD => {
-                factor = ((metadata.fuzz_level() * metadata.fuzz_level()) as f64)
-                    / f64::from(self.n_fuzz[metadata.n_fuzz_entry()] + 1);
+                factor = ((tcmeta.fuzz_level() * tcmeta.fuzz_level()) as f64)
+                    / f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()] + 1);
             }
         }
 

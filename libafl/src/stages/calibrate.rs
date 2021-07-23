@@ -2,7 +2,7 @@
 
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, PowerScheduleTestData},
+    corpus::{Corpus, PowerScheduleTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -65,7 +65,6 @@ where
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
             .queue_cycles;
 
-        // Timer start
         let start = current_time();
 
         for _i in 0..iter {
@@ -77,7 +76,7 @@ where
                 .clone();
             let _ = executor.run_target(fuzzer, state, manager, &input)?;
         }
-        // Timer end
+
         let end = current_time();
 
         let map = executor
@@ -87,24 +86,24 @@ where
 
         let bitmap_size = map.count_bytes();
 
-        let calstat = state
+        let psmeta = state
             .metadata_mut()
             .get_mut::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
-        calstat.set_exec_time(calstat.exec_time() + (end - start));
-        calstat.set_cycles(calstat.cycles() + (iter as u64));
-        calstat.set_bitmap_size(calstat.bitmap_size() + bitmap_size);
-        calstat.set_bitmap_entries(calstat.bitmap_entries() + 1);
+        psmeta.set_exec_time(psmeta.exec_time() + (end - start));
+        psmeta.set_cycles(psmeta.cycles() + (iter as u64));
+        psmeta.set_bitmap_size(psmeta.bitmap_size() + bitmap_size);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
-        // println!("calstat: {:#?}", calstat);
+        // println!("psmeta: {:#?}", psmeta);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
         testcase.set_exec_time((end - start) / (iter as u32));
         // println!("time: {:#?}", testcase.exec_time());
         let data = testcase
             .metadata_mut()
-            .get_mut::<PowerScheduleTestData>()
+            .get_mut::<PowerScheduleTestcaseMetaData>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
 
         data.set_bitmap_size(bitmap_size);

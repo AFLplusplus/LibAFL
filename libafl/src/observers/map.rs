@@ -50,6 +50,7 @@ where
         res
     }
 
+    /// Compute the hash of the map
     fn hash(&self) -> u64 {
         let mut hasher = AHasher::new_with_keys(0, 0);
         let ptr = self.map().as_ptr() as *const u8;

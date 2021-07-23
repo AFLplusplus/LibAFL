@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusScheduler, PowerScheduleTestData},
+    corpus::{Corpus, CorpusScheduler, PowerScheduleTestcaseMetaData},
     inputs::Input,
     stages::PowerScheduleMetadata,
     state::{HasCorpus, HasMetadata},
@@ -47,7 +47,7 @@ where
                 .get(idx)?
                 .borrow_mut()
                 .metadata_mut()
-                .get_mut::<PowerScheduleTestData>()
+                .get_mut::<PowerScheduleTestcaseMetaData>()
                 .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
                 .depth(),
             None => 0,
@@ -59,7 +59,7 @@ where
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(PowerScheduleTestData::new(depth));
+            .add_metadata(PowerScheduleTestcaseMetaData::new(depth));
         Ok(())
     }
 
@@ -70,13 +70,13 @@ where
             let id = match state.corpus().current() {
                 Some(cur) => {
                     if *cur + 1 >= state.corpus().count() {
-                        let psstats = state
+                        let psmeta = state
                             .metadata_mut()
                             .get_mut::<PowerScheduleMetadata>()
                             .ok_or_else(|| {
                                 Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
                             })?;
-                        psstats.set_queue_cycles(psstats.queue_cycles() + 1);
+                        psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
                         0
                     } else {
                         *cur + 1
