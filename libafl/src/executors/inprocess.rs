@@ -426,8 +426,8 @@ mod unix_signal_handler {
         remove_timeout();
 
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-        let _context = *(((_context as *mut _ as *mut c_void as usize) + 128) as *mut c_void
-            as *mut ucontext_t);
+        let _context = *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
+            as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]
         println!("Crashed with {}", _signal);

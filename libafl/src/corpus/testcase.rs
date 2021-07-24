@@ -63,21 +63,22 @@ where
 
     /// Store the input to disk if possible
     pub fn store_input(&mut self) -> Result<bool, Error> {
-        let fname;
         match self.filename() {
-            Some(f) => {
-                fname = f.clone();
+            Some(fname) => {
+                let saved = match self.input() {
+                    None => false,
+                    Some(i) => {
+                        i.to_file(fname)?;
+                        true
+                    }
+                };
+                if saved {
+                    // remove the input from memory
+                    *self.input_mut() = None;
+                }
+                Ok(saved)
             }
-            None => {
-                return Ok(false);
-            }
-        };
-        match self.input_mut() {
             None => Ok(false),
-            Some(i) => {
-                i.to_file(fname)?;
-                Ok(true)
-            }
         }
     }
 

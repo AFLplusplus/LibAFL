@@ -1,8 +1,9 @@
 [package]
-name = "fuzzbench_qemu"
+name = "libfuzzer_stb_image"
 version = "0.5.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 [features]
 default = ["std"]
@@ -16,10 +17,9 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_qemu = { path = "../../libafl_qemu/" }
-clap = { version = "3.0.0-beta.2", features = ["default"] }
-nix = "0.20.0"
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
+libafl_sugar = { path = "../../libafl_sugar/" }
 
-[lib]
-name = "fuzzbench_qemu"
-crate-type = ["staticlib"]
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+num_cpus = "1.0"

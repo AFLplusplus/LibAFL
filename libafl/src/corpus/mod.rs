@@ -11,6 +11,11 @@ pub mod ondisk;
 #[cfg(feature = "std")]
 pub use ondisk::OnDiskCorpus;
 
+#[cfg(feature = "std")]
+pub mod cached;
+#[cfg(feature = "std")]
+pub use cached::CachedOnDiskCorpus;
+
 pub mod queue;
 pub use queue::QueueCorpusScheduler;
 
