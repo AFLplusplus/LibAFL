@@ -144,11 +144,15 @@ where
                         })?
                         .set_n_fuzz_entry(hash);
 
-                    self.n_fuzz[hash] += 1;
+                    if self.n_fuzz[hash] < u32::MAX {
+                        self.n_fuzz[hash] += 1;
+                    }
                 }
                 None => {
                     // self.n_fuzz[hash] can be 0 here because we are looking at the MapObserver, not the HitcountsMapObserver
-                    self.n_fuzz[hash] += 1;
+                    if self.n_fuzz[hash] < u32::MAX {
+                        self.n_fuzz[hash] += 1;
+                    }
                 }
             }
 
