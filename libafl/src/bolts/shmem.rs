@@ -3,35 +3,44 @@
 
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
-/// The default [`ShMemProvider`] for this os.
+
+use crate::Error;
+
 #[cfg(all(feature = "std", unix))]
-pub type OsShMemProvider = UnixShMemProvider;
-/// The default [`ShMem`] for this os.
-#[cfg(all(feature = "std", unix))]
-pub type OsShMem = UnixShMem;
+pub use crate::bolts::os::unix_shmem_server::ServedShMemProvider;
 
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 #[cfg(all(windows, feature = "std"))]
-pub type OsShMemProvider = Win32ShMemProvider;
+pub type StdShMemProvider = Win32ShMemProvider;
 #[cfg(all(windows, feature = "std"))]
-pub type OsShMem = Win32ShMem;
-
-use crate::Error;
+pub type StdShMem = Win32ShMem;
 
 #[cfg(all(target_os = "android", feature = "std"))]
-use crate::bolts::os::ashmem_server::ServedShMemProvider;
+pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider>;
-#[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMem = RcShMem<ServedShMemProvider>;
+pub type StdShMem = RcShMem<ServedShMem<AshmemShMem>>;
+
+#[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
+pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<UnixShMemProvider>>;
+
+#[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
+pub type StdShMem = RcShMem<ServedShMem<UnixShMem>>;
 
 /// The default [`ShMemProvider`] for this os.
-#[cfg(all(feature = "std", not(target_os = "android")))]
-pub type StdShMemProvider = OsShMemProvider;
-/// The default [`ShMem`] for this os.
-#[cfg(all(feature = "std", not(target_os = "android")))]
-pub type StdShMem = OsShMem;
+#[cfg(all(
+    feature = "std",
+    unix,
+    not(any(target_os = "android", target_os = "ios", target_os = "macos"))
+))]
+pub type StdShMemProvider = UnixShMemProvider;
+/// The default [`ShMemProvider`] for this os.
+#[cfg(all(
+    feature = "std",
+    unix,
+    not(any(target_os = "android", target_os = "ios", target_os = "macos"))
+))]
+pub type StdShMem = UnixShMem;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -48,6 +57,10 @@ use core::{
 use crate::bolts::os::pipes::Pipe;
 #[cfg(all(unix, feature = "std"))]
 use std::io::{Read, Write};
+
+use self::unix_shmem::ashmem::{AshmemShMem, AshmemShMemProvider};
+
+use super::os::unix_shmem_server::ServedShMem;
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
@@ -433,14 +446,19 @@ where
 /// A Unix sharedmem implementation.
 ///
 /// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
-/// Although for an [`unix_shmem::ashmem::AshmemShMemProvider`] using a unix domain socket
+/// Although for an [`unix_shmem::ashmem::ServedShMemProvider`] using a unix domain socket
 /// Is needed on top.
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
+    use std::marker::PhantomData;
+
+    use crate::{bolts::os::unix_shmem_server::ServedShMem, Error};
+
+    use super::{ShMem, ShMemId, ShMemProvider};
 
     /// Shared memory provider for Android, allocating and forwarding maps over unix domain sockets.
     #[cfg(target_os = "android")]
-    pub type UnixShMemProvider = ashmem::AshmemShMemProvider;
+    pub type UnixShMemProvider = ashmem::ServedShMemProvider;
     /// Shared memory for Android
     #[cfg(target_os = "android")]
     pub type UnixShMem = ashmem::AshmemShMem;

@@ -7,7 +7,7 @@ use crate::Error;
 use std::{env, process::Command};
 
 #[cfg(all(unix, feature = "std"))]
-pub mod ashmem_server;
+pub mod unix_shmem_server;
 
 #[cfg(unix)]
 pub mod unix_signals;

@@ -3,8 +3,8 @@
 
 use clap::{App, Arg};
 
-#[cfg(target_os = "android")]
-use libafl::bolts::os::ashmem_server::AshmemService;
+#[cfg(all(cfg = "std", unix))]
+use libafl::bolts::os::unix_shmem_server::ServedShMemService;
 
 use libafl::{
     bolts::{
