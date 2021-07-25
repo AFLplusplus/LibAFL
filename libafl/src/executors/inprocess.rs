@@ -9,7 +9,7 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
-#[cfg(unix)]
+#[cfg(all(feature = "std", unix))]
 use nix::{
     sys::wait::{waitpid, WaitStatus},
     unistd::{fork, ForkResult},
