@@ -1,6 +1,6 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
-use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM, EDGES_MAP_PTR};
+use crate::coverage::{EDGES_MAP, EDGES_MAP_PTR, MAX_EDGES_NUM};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
