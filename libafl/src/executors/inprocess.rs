@@ -714,6 +714,7 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
+#[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessForkExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -754,6 +755,7 @@ where
     }
 }
 
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S> InProcessForkExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -794,6 +796,7 @@ where
     }
 }
 
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
