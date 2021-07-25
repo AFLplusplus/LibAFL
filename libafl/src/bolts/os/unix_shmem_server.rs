@@ -15,8 +15,10 @@ use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
     io::{Read, Write},
+    marker::PhantomData,
     rc::{Rc, Weak},
     sync::{Arc, Condvar, Mutex},
+    thread::JoinHandle,
 };
 
 #[cfg(all(feature = "std", unix))]
@@ -34,7 +36,12 @@ use std::{
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
-const ASHMEM_SERVER_NAME: &str = "@unix_shmem_server";
+/// The default server name for our abstract shmem server
+#[cfg(all(unix, not(any(target_os = "ios", target_os = "macos"))))]
+const UNIX_SERVER_NAME: &str = "@libafl_unix_shmem_server";
+/// MacOS server name is on disk, since MacOS doesn't support abtract domain sockets.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
 
 /// Hands out served shared maps, as used on Android.
 #[derive(Debug)]
@@ -130,7 +137,7 @@ where
     /// Connect to the server and return a new [`ServedShMemProvider`]
     fn new() -> Result<Self, Error> {
         let mut res = Self {
-            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(ASHMEM_SERVER_NAME)?)?,
+            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
             inner: SP::new()?,
             id: -1,
         };
@@ -169,7 +176,7 @@ where
         if is_child {
             // After fork, the child needs to reconnect as to not share the fds with the parent.
             self.stream =
-                UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(ASHMEM_SERVER_NAME)?)?;
+                UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?;
             let (id, _) = self.send_receive(ServedShMemRequest::Hello(Some(self.id)))?;
             self.id = id;
         }
@@ -200,6 +207,8 @@ pub enum ServedShMemRequest {
     /// A message that tells us hello, and optionally which other client we were created from, we
     /// return a client id.
     Hello(Option<i32>),
+    /// The ShMem Service should exit. This is sually sent internally on `drop`, but feel free to do whatever with it?
+    Exit,
 }
 
 #[derive(Debug)]
@@ -230,9 +239,8 @@ pub struct ServedShMemService<SP>
 where
     SP: ShMemProvider,
 {
-    provider: ServedShMemProvider<SP>,
-    clients: HashMap<RawFd, SharedShMemClient<SP::Mem>>,
-    all_maps: HashMap<i32, Weak<RefCell<ServedShMem<SP::Mem>>>>,
+    join_handle: Option<JoinHandle<Result<(), Error>>>,
+    phantom: PhantomData<*const SP>,
 }
 
 #[derive(Debug)]
@@ -249,9 +257,81 @@ impl<SP> ServedShMemService<SP>
 where
     SP: ShMemProvider,
 {
+    /// Create a new [`ServedShMemService`], then listen and service incoming connections in a new thread.
+    #[must_use]
+    pub fn start() -> Result<Self, Error> {
+        #[allow(clippy::mutex_atomic)]
+        let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
+        let childsyncpair = Arc::clone(&syncpair);
+        let join_handle = thread::spawn(move || {
+            SevedShMemServiceWorker::<SP>::new()?.listen(UNIX_SERVER_NAME, &childsyncpair)
+        });
+
+        let (lock, cvar) = &*syncpair;
+        let mut started = lock.lock().unwrap();
+        while !*started {
+            started = cvar.wait(started).unwrap();
+        }
+
+        Ok(Self {
+            join_handle: Some(join_handle),
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl<SP> Drop for ServedShMemService<SP>
+where
+    SP: ShMemProvider,
+{
+    fn drop(&mut self) {
+        let join_handle = self.join_handle.take();
+        // TODO: Guess we could use the `cvar` // Mutex here instead?
+        match join_handle {
+            Some(join_handle) => {
+                let mut stream = match UnixStream::connect_to_unix_addr(
+                    &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
+                ) {
+                    Ok(stream) => stream,
+                    Err(_) => return, // ignoring non-started server
+                };
+
+                let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
+
+                let header = (body.len() as u32).to_be_bytes();
+                let mut message = header.to_vec();
+                message.extend(body);
+
+                stream
+                    .write_all(&message)
+                    .expect("Failed to send bye-message to ShMemService");
+                join_handle
+                    .join()
+                    .expect("Failed to join ShMemService thread!")
+                    .expect("Error in ShMemService thread!");
+            }
+            None => (),
+        }
+    }
+}
+
+/// The struct for the worker, handling incoming requests for [`ShMem`].
+struct SevedShMemServiceWorker<SP>
+where
+    SP: ShMemProvider,
+{
+    provider: ServedShMemProvider<SP>,
+    clients: HashMap<RawFd, SharedShMemClient<SP::Mem>>,
+    all_maps: HashMap<i32, Weak<RefCell<ServedShMem<SP::Mem>>>>,
+}
+
+impl<SP> SevedShMemServiceWorker<SP>
+where
+    SP: ShMemProvider,
+{
     /// Create a new [`ServedShMemService`]
     fn new() -> Result<Self, Error> {
-        Ok(ServedShMemService {
+        Ok(Self {
             provider: ServedShMemProvider::new()?,
             clients: HashMap::new(),
             all_maps: HashMap::new(),
@@ -324,6 +404,10 @@ where
                     ))
                 }
             }
+            ServedShMemRequest::Exit => {
+                // stopping the server
+                return Err(Error::ShuttingDown);
+            }
         };
         //println!("send ashmem client: {}, response: {:?}", client_id, &response);
 
@@ -372,23 +456,6 @@ where
             }
         }
         Ok(())
-    }
-
-    /// Create a new [`AshmemService`], then listen and service incoming connections in a new thread.
-    pub fn start() -> Result<thread::JoinHandle<Result<(), Error>>, Error> {
-        #[allow(clippy::mutex_atomic)]
-        let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
-        let childsyncpair = Arc::clone(&syncpair);
-        let join_handle =
-            thread::spawn(move || Self::new()?.listen(ASHMEM_SERVER_NAME, &childsyncpair));
-
-        let (lock, cvar) = &*syncpair;
-        let mut started = lock.lock().unwrap();
-        while !*started {
-            started = cvar.wait(started).unwrap();
-        }
-
-        Ok(join_handle)
     }
 
     /// Listen on a filename (or abstract name) for new connections and serve them. This function
@@ -465,6 +532,10 @@ where
                         self.clients.insert(client_id, client);
                         match self.handle_client(client_id) {
                             Ok(()) => (),
+                            Err(Error::ShuttingDown) => {
+                                dbg!("Shutting down");
+                                return Ok(());
+                            }
                             Err(e) => {
                                 dbg!("Ignoring failed read from client", e);
                             }

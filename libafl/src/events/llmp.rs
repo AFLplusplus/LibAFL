@@ -689,8 +689,10 @@ where
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Error starting Ashmem Service");
+    use crate::bolts::{os::unix_shmem_server::ServedShMemService, shmem::UnixShMemProvider};
+
+    let _service =
+        ServedShMemService::<UnixShMemProvider>::start().expect("Error starting Ashmem Service");
 
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)

@@ -2629,10 +2629,15 @@ mod tests {
         Tag,
     };
 
-    use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
+    use crate::bolts::{
+        os::unix_shmem_server::ServedShMemService,
+        shmem::{ShMemProvider, StdShMemProvider, UnixShMemProvider},
+    };
 
     #[test]
     pub fn llmp_connection() {
+        let service = ServedShMemService::<UnixShMemProvider>::start().unwrap();
+
         let shmem_provider = StdShMemProvider::new().unwrap();
         let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
