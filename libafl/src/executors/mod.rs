@@ -1,7 +1,7 @@
 //! Executors take input, and run it in the target.
 
 pub mod inprocess;
-pub use inprocess::InProcessExecutor;
+pub use inprocess::{InProcessExecutor, InProcessForkExecutor};
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
 

@@ -1,6 +1,6 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
-use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
+use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM, EDGES_MAP_PTR};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -19,12 +19,12 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     let pos = *guard as usize;
     #[cfg(feature = "sancov_pcguard_edges")]
     {
-        *EDGES_MAP.get_unchecked_mut(pos) = 1;
+        (EDGES_MAP_PTR as *mut u8).add(pos).write_volatile(1);
     }
     #[cfg(feature = "sancov_pcguard_hitcounts")]
     {
-        let val = (*EDGES_MAP.get_unchecked(pos) as u8).wrapping_add(1);
-        *EDGES_MAP.get_unchecked_mut(pos) = val;
+        let val = (EDGES_MAP_PTR as *mut u8).add(pos).read_volatile();
+        (EDGES_MAP_PTR as *mut u8).add(pos).write_volatile(val + 1);
     }
 }
 
