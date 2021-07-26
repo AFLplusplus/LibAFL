@@ -49,7 +49,7 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{fork, ForkResult};
 
 #[cfg(all(target_os = "android", feature = "std"))]
-use crate::bolts::os::unix_shmem_server::ServedShMemService;
+use crate::bolts::os::unix_shmem_server::ShMemService;
 
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
@@ -689,10 +689,9 @@ where
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
-    use crate::bolts::{os::unix_shmem_server::ServedShMemService, shmem::UnixShMemProvider};
+    use crate::bolts::shmem::StdShMemService;
 
-    let _service =
-        ServedShMemService::<UnixShMemProvider>::start().expect("Error starting Ashmem Service");
+    let _service = StdShMemService::start().expect("Error starting ShMem Service");
 
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)

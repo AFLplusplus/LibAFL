@@ -1,7 +1,7 @@
 /*!
-On Android, we can only share maps between processes by serializing fds over sockets.
-On MacOS, we cannot rely on reference counting for Maps.
-Hence, the `unix_shmem_server` keeps track of existing maps, creates new maps for clients,
+On `Android`, we can only share maps between processes by serializing fds over sockets.
+On `MacOS`, we cannot rely on reference counting for Maps.
+Hence, the [`unix_shmem_server`] keeps track of existing maps, creates new maps for clients,
 and forwards them over unix domain sockets.
 */
 
@@ -39,7 +39,7 @@ use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 /// The default server name for our abstract shmem server
 #[cfg(all(unix, not(any(target_os = "ios", target_os = "macos"))))]
 const UNIX_SERVER_NAME: &str = "@libafl_unix_shmem_server";
-/// MacOS server name is on disk, since MacOS doesn't support abtract domain sockets.
+/// `MacOS` server name is on disk, since `MacOS` doesn't support abtract domain sockets.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
 
@@ -232,10 +232,24 @@ where
     }
 }
 
+/// A `ShMemService` dummy, that does nothing on start.
+/// Drop in for targets that don't need a server for ref counting and page creation.
+#[derive(Debug)]
+pub struct DummyShMemService {}
+
+impl DummyShMemService {
+    /// Create a new [`DummyShMemService`] that does nothing.
+    /// Useful only to have the same API for [`StdShMemService`] on Operating Systems that don't need it.
+    #[inline]
+    pub fn start() -> Result<Self, Error> {
+        Ok(Self {})
+    }
+}
+
 /// The [`AshmemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
 /// It is mainly used and needed on Android.
 #[derive(Debug)]
-pub struct ServedShMemService<SP>
+pub struct ShMemService<SP>
 where
     SP: ShMemProvider,
 {
@@ -253,12 +267,11 @@ where
     RefCount(u32),
 }
 
-impl<SP> ServedShMemService<SP>
+impl<SP> ShMemService<SP>
 where
     SP: ShMemProvider,
 {
-    /// Create a new [`ServedShMemService`], then listen and service incoming connections in a new thread.
-    #[must_use]
+    /// Create a new [`ShMemService`], then listen and service incoming connections in a new thread.
     pub fn start() -> Result<Self, Error> {
         #[allow(clippy::mutex_atomic)]
         let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
@@ -280,37 +293,34 @@ where
     }
 }
 
-impl<SP> Drop for ServedShMemService<SP>
+impl<SP> Drop for ShMemService<SP>
 where
     SP: ShMemProvider,
 {
     fn drop(&mut self) {
         let join_handle = self.join_handle.take();
         // TODO: Guess we could use the `cvar` // Mutex here instead?
-        match join_handle {
-            Some(join_handle) => {
-                let mut stream = match UnixStream::connect_to_unix_addr(
-                    &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
-                ) {
-                    Ok(stream) => stream,
-                    Err(_) => return, // ignoring non-started server
-                };
+        if let Some(join_handle) = join_handle {
+            let mut stream = match UnixStream::connect_to_unix_addr(
+                &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
+            ) {
+                Ok(stream) => stream,
+                Err(_) => return, // ignoring non-started server
+            };
 
-                let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
+            let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
 
-                let header = (body.len() as u32).to_be_bytes();
-                let mut message = header.to_vec();
-                message.extend(body);
+            let header = (body.len() as u32).to_be_bytes();
+            let mut message = header.to_vec();
+            message.extend(body);
 
-                stream
-                    .write_all(&message)
-                    .expect("Failed to send bye-message to ShMemService");
-                join_handle
-                    .join()
-                    .expect("Failed to join ShMemService thread!")
-                    .expect("Error in ShMemService thread!");
-            }
-            None => (),
+            stream
+                .write_all(&message)
+                .expect("Failed to send bye-message to ShMemService");
+            join_handle
+                .join()
+                .expect("Failed to join ShMemService thread!")
+                .expect("Error in ShMemService thread!");
         }
     }
 }
@@ -329,7 +339,7 @@ impl<SP> SevedShMemServiceWorker<SP>
 where
     SP: ShMemProvider,
 {
-    /// Create a new [`ServedShMemService`]
+    /// Create a new [`ShMemService`]
     fn new() -> Result<Self, Error> {
         Ok(Self {
             provider: ServedShMemProvider::new()?,

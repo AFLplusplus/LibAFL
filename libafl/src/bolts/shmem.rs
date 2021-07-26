@@ -20,12 +20,15 @@ pub type StdShMem = Win32ShMem;
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMem = RcShMem<ServedShMem<AshmemShMem>>;
+#[cfg(all(target_os = "android", feature = "std"))]
+pub type StdShMemService = ShMemService<AshmemShMemProvider>;
 
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<UnixShMemProvider>>;
-
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
 pub type StdShMem = RcShMem<ServedShMem<UnixShMem>>;
+#[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
+pub type StdShMemService = ShMemService<UnixShMemProvider>;
 
 /// The default [`ShMemProvider`] for this os.
 #[cfg(all(
@@ -41,6 +44,12 @@ pub type StdShMemProvider = UnixShMemProvider;
     not(any(target_os = "android", target_os = "ios", target_os = "macos"))
 ))]
 pub type StdShMem = UnixShMem;
+
+#[cfg(all(
+    not(any(target_os = "android", target_os = "macos", target_os = "ios")),
+    feature = "std"
+))]
+pub type StdShMemService = DummyShMemService;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -58,9 +67,7 @@ use crate::bolts::os::pipes::Pipe;
 #[cfg(all(unix, feature = "std"))]
 use std::io::{Read, Write};
 
-use self::unix_shmem::ashmem::{AshmemShMem, AshmemShMemProvider};
-
-use super::os::unix_shmem_server::ServedShMem;
+use super::os::unix_shmem_server::{ServedShMem, ShMemService};
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
@@ -450,12 +457,6 @@ where
 /// Is needed on top.
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
-    use std::marker::PhantomData;
-
-    use crate::{bolts::os::unix_shmem_server::ServedShMem, Error};
-
-    use super::{ShMem, ShMemId, ShMemProvider};
-
     /// Shared memory provider for Android, allocating and forwarding maps over unix domain sockets.
     #[cfg(target_os = "android")]
     pub type UnixShMemProvider = ashmem::ServedShMemProvider;

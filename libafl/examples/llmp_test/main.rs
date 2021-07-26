@@ -13,7 +13,7 @@ use libafl::bolts::llmp::Tag;
 use libafl::{
     bolts::{
         llmp,
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
     },
     Error,
 };

@@ -7,7 +7,7 @@ use libafl::{
         current_nanos,
         launcher::Launcher,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -70,6 +70,7 @@ impl<'a, H> InMemoryBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
+    #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = self
             .configuration

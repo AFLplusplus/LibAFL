@@ -4,7 +4,7 @@
 use clap::{App, Arg};
 
 #[cfg(all(cfg = "std", unix))]
-use libafl::bolts::os::unix_shmem_server::ServedShMemService;
+use libafl::bolts::os::unix_shmem_server::ShMemService;
 
 use libafl::{
     bolts::{
@@ -12,7 +12,7 @@ use libafl::{
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -292,8 +292,7 @@ unsafe fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = MultiStats::new(|s| println!("{}", s));
 
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Failed to start Ashmem service");
+    StdShMemService::start().expect("Failed to start Ashmem service");
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {

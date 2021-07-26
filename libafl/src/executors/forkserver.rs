@@ -616,8 +616,7 @@ where
 mod tests {
     use crate::{
         bolts::{
-            os::unix_shmem_server::ServedShMemService,
-            shmem::{ShMem, ShMemProvider, StdShMemProvider, UnixShMemProvider},
+            shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService},
             tuples::tuple_list,
         },
         executors::ForkserverExecutor,
@@ -631,7 +630,7 @@ mod tests {
         let bin = "echo";
         let args = vec![String::from("@@")];
 
-        let service = ServedShMemService::<UnixShMemProvider>::start().unwrap();
+        let _service = StdShMemService::start().unwrap();
 
         let mut shmem = StdShMemProvider::new()
             .unwrap()
