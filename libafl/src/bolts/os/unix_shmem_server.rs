@@ -232,20 +232,6 @@ where
     }
 }
 
-/// A `ShMemService` dummy, that does nothing on start.
-/// Drop in for targets that don't need a server for ref counting and page creation.
-#[derive(Debug)]
-pub struct DummyShMemService {}
-
-impl DummyShMemService {
-    /// Create a new [`DummyShMemService`] that does nothing.
-    /// Useful only to have the same API for [`StdShMemService`] on Operating Systems that don't need it.
-    #[inline]
-    pub fn start() -> Result<Self, Error> {
-        Ok(Self {})
-    }
-}
-
 /// The [`AshmemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
 /// It is mainly used and needed on Android.
 #[derive(Debug)]
@@ -277,7 +263,7 @@ where
         let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle = thread::spawn(move || {
-            SevedShMemServiceWorker::<SP>::new()?.listen(UNIX_SERVER_NAME, &childsyncpair)
+            ServedShMemServiceWorker::<SP>::new()?.listen(UNIX_SERVER_NAME, &childsyncpair)
         });
 
         let (lock, cvar) = &*syncpair;
@@ -326,7 +312,7 @@ where
 }
 
 /// The struct for the worker, handling incoming requests for [`ShMem`].
-struct SevedShMemServiceWorker<SP>
+struct ServedShMemServiceWorker<SP>
 where
     SP: ShMemProvider,
 {
@@ -335,7 +321,7 @@ where
     all_maps: HashMap<i32, Weak<RefCell<ServedShMem<SP::Mem>>>>,
 }
 
-impl<SP> SevedShMemServiceWorker<SP>
+impl<SP> ServedShMemServiceWorker<SP>
 where
     SP: ShMemProvider,
 {

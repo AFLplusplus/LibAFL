@@ -15,7 +15,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(feature = "std")]
 use crate::bolts::{
     llmp::{LlmpClient, LlmpConnection},
-    shmem::StdShMemProvider,
+    shmem::{StdShMemProvider, StdShMemService},
     staterestore::StateRestorer,
 };
 
@@ -689,8 +689,6 @@ where
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
-    use crate::bolts::shmem::StdShMemService;
-
     let _service = StdShMemService::start().expect("Error starting ShMem Service");
 
     RestartingMgr::builder()

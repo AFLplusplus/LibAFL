@@ -7,7 +7,7 @@ pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 use crate::Error;
 
 #[cfg(all(feature = "std", unix))]
-pub use crate::bolts::os::unix_shmem_server::ServedShMemProvider;
+pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
 
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
@@ -45,9 +45,9 @@ pub type StdShMemProvider = UnixShMemProvider;
 ))]
 pub type StdShMem = UnixShMem;
 
-#[cfg(all(
+#[cfg(any(
     not(any(target_os = "android", target_os = "macos", target_os = "ios")),
-    feature = "std"
+    not(feature = "std")
 ))]
 pub type StdShMemService = DummyShMemService;
 
@@ -63,11 +63,11 @@ use core::{
 };
 
 #[cfg(all(unix, feature = "std"))]
+use super::os::unix_shmem_server::ServedShMem;
+#[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
 #[cfg(all(unix, feature = "std"))]
 use std::io::{Read, Write};
-
-use super::os::unix_shmem_server::{ServedShMem, ShMemService};
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
@@ -1012,5 +1012,19 @@ pub mod win32_shmem {
         fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
             Win32ShMem::from_id_and_size(id, size)
         }
+    }
+}
+
+/// A `ShMemService` dummy, that does nothing on start.
+/// Drop in for targets that don't need a server for ref counting and page creation.
+#[derive(Debug)]
+pub struct DummyShMemService {}
+
+impl DummyShMemService {
+    /// Create a new [`DummyShMemService`] that does nothing.
+    /// Useful only to have the same API for [`StdShMemService`] on Operating Systems that don't need it.
+    #[inline]
+    pub fn start() -> Result<Self, Error> {
+        Ok(Self {})
     }
 }

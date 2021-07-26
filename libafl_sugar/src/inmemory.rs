@@ -7,7 +7,7 @@ use libafl::{
         current_nanos,
         launcher::Launcher,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{
