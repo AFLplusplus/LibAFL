@@ -2633,7 +2633,7 @@ mod tests {
 
     #[test]
     pub fn llmp_connection() {
-        let _service = StdShMemService::start().unwrap();
+        let service = StdShMemService::start().unwrap();
 
         let shmem_provider = StdShMemProvider::new().unwrap();
         let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
@@ -2681,5 +2681,7 @@ mod tests {
 
         // We want at least the tcp and sender clients.
         assert_eq!(broker.llmp_clients.len(), 2);
+
+        drop(service);
     }
 }

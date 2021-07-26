@@ -1028,3 +1028,18 @@ impl DummyShMemService {
         Ok(Self {})
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService};
+
+    #[test]
+    fn test_shmem_service() {
+        let service = StdShMemService::start().unwrap();
+        let mut provider = StdShMemProvider::new().unwrap();
+        let mut map = provider.new_map(1024).unwrap();
+        map.map_mut()[0] = 1;
+        assert!(map.map()[0] == 1);
+        drop(service);
+    }
+}

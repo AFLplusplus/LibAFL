@@ -14,6 +14,7 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
+    fs::File,
     io::{Read, Write},
     marker::PhantomData,
     rc::{Rc, Weak},
@@ -217,7 +218,7 @@ where
     SH: ShMem,
 {
     stream: UnixStream,
-    maps: HashMap<i32, Vec<Rc<RefCell<ServedShMem<SH>>>>>,
+    maps: HashMap<i32, Vec<Rc<RefCell<SH>>>>,
 }
 
 impl<SH> SharedShMemClient<SH>
@@ -248,7 +249,7 @@ enum ServedShMemResponse<SP>
 where
     SP: ShMemProvider,
 {
-    Mapping(Rc<RefCell<ServedShMem<SP::Mem>>>),
+    Mapping(Rc<RefCell<SP::Mem>>),
     Id(i32),
     RefCount(u32),
 }
@@ -259,18 +260,43 @@ where
 {
     /// Create a new [`ShMemService`], then listen and service incoming connections in a new thread.
     pub fn start() -> Result<Self, Error> {
+        println!("Starting ShMemService");
+
         #[allow(clippy::mutex_atomic)]
         let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle = thread::spawn(move || {
-            ServedShMemServiceWorker::<SP>::new()?.listen(UNIX_SERVER_NAME, &childsyncpair)
+            println!("Thread...");
+
+            let mut worker = match ServedShMemServiceWorker::<SP>::new() {
+                Ok(worker) => worker,
+                Err(e) => {
+                    // Make sure the parent processes can continue
+                    let (lock, cvar) = &*childsyncpair;
+                    *lock.lock().unwrap() = true;
+                    cvar.notify_one();
+
+                    println!("Error creating ShMemService: {:?}", e);
+                    return Err(e);
+                }
+            };
+            if let Err(e) = worker.listen(UNIX_SERVER_NAME, &childsyncpair) {
+                println!("Error spawning ShMemService: {:?}", e);
+                Err(e)
+            } else {
+                Ok(())
+            }
         });
 
         let (lock, cvar) = &*syncpair;
         let mut started = lock.lock().unwrap();
         while !*started {
+            println!("Waiting...");
             started = cvar.wait(started).unwrap();
+            println!("Done");
         }
+
+        println!("Started ShMemService");
 
         Ok(Self {
             join_handle: Some(join_handle),
@@ -284,9 +310,11 @@ where
     SP: ShMemProvider,
 {
     fn drop(&mut self) {
+        println!("Droping ShMemService");
         let join_handle = self.join_handle.take();
         // TODO: Guess we could use the `cvar` // Mutex here instead?
         if let Some(join_handle) = join_handle {
+            println!("Droping ShMemService - connecting");
             let mut stream = match UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) {
@@ -294,6 +322,7 @@ where
                 Err(_) => return, // ignoring non-started server
             };
 
+            println!("Droping ShMemService - sending exit request");
             let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
 
             let header = (body.len() as u32).to_be_bytes();
@@ -316,9 +345,9 @@ struct ServedShMemServiceWorker<SP>
 where
     SP: ShMemProvider,
 {
-    provider: ServedShMemProvider<SP>,
+    provider: SP,
     clients: HashMap<RawFd, SharedShMemClient<SP::Mem>>,
-    all_maps: HashMap<i32, Weak<RefCell<ServedShMem<SP::Mem>>>>,
+    all_maps: HashMap<i32, Weak<RefCell<SP::Mem>>>,
 }
 
 impl<SP> ServedShMemServiceWorker<SP>
@@ -328,7 +357,7 @@ where
     /// Create a new [`ShMemService`]
     fn new() -> Result<Self, Error> {
         Ok(Self {
-            provider: ServedShMemProvider::new()?,
+            provider: SP::new()?,
             clients: HashMap::new(),
             all_maps: HashMap::new(),
         })
@@ -401,6 +430,7 @@ where
                 }
             }
             ServedShMemRequest::Exit => {
+                println!("ShMemService - Exiting");
                 // stopping the server
                 return Err(Error::ShuttingDown);
             }
@@ -461,18 +491,26 @@ where
         filename: &str,
         syncpair: &Arc<(Mutex<bool>, Condvar)>,
     ) -> Result<(), Error> {
+        println!("ShMem ARE YOU LISTENING");
+
         let listener = if let Ok(listener) =
             UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?)
         {
+            println!("ShMem Worker bound");
             listener
         } else {
+            println!("ShMem Worker not Working");
             let (lock, cvar) = &**syncpair;
             *lock.lock().unwrap() = true;
             cvar.notify_one();
+
+            println!("Error in ShMem Worker");
             return Err(Error::Unknown(
                 "The server appears to already be running. We are probably a client".to_string(),
             ));
         };
+
+        println!("Started ShMem Worker");
         let mut poll_fds: Vec<PollFd> = vec![PollFd::new(
             listener.as_raw_fd(),
             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,

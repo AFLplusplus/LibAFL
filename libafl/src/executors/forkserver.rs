@@ -630,7 +630,7 @@ mod tests {
         let bin = "echo";
         let args = vec![String::from("@@")];
 
-        let _service = StdShMemService::start().unwrap();
+        let service = StdShMemService::start().unwrap();
 
         let mut shmem = StdShMemProvider::new()
             .unwrap()
@@ -659,5 +659,6 @@ mod tests {
             },
         };
         assert!(result);
+        drop(service);
     }
 }
