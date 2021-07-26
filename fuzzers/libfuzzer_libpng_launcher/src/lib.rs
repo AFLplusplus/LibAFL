@@ -13,7 +13,7 @@ use libafl::{
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemService, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
         tuples::{tuple_list, Merge},
     },
     corpus::{

@@ -97,7 +97,7 @@ pub fn main() {
         #[cfg(any(windows, unix))]
         unsafe {
             printf(
-                [b'%' as c_char, b's' as c_char, b'\n' as c_char, 0 as c_char].as_ptr(),
+                b"%s\n\0".as_ptr() as *const c_char,
                 CString::new(s).unwrap().as_ptr() as *const c_char,
             );
         }
