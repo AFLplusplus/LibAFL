@@ -1,4 +1,9 @@
-use std::{collections::{hash_map::DefaultHasher, HashSet}, env, hash::{BuildHasher, BuildHasherDefault, Hash, Hasher}, io, slice};
+use std::{
+    collections::{hash_map::DefaultHasher, HashSet},
+    env,
+    hash::BuildHasherDefault,
+    io, slice,
+};
 
 use ctor::ctor;
 
@@ -8,26 +13,29 @@ use concolic::{
     SELECTIVE_SYMBOLICATION_ENV_NAME,
 };
 use expression_filters::{
-    coverage::CallStackCoverage, AndOpt, ExpressionFilterExt, NoFloat, Nop, SelectiveSymbolication,
+    coverage::{CallStackCoverage, HitmapFilter},
+    AndOpt, ExpressionFilterExt, NoFloat, Nop, SelectiveSymbolication,
 };
-use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
+use libafl::bolts::shmem::{ShMemProvider, StdShMemProvider};
 
 mod expression_filters;
 
 use crate::expression_filters::ExpressionFilter;
 
-struct State<Filter: ExpressionFilter, HashBuilder: BuildHasher = BuildHasherDefault<DefaultHasher>>
-{
+pub struct Runtime<Filter: ExpressionFilter> {
     writer: StdShMemMessageFileWriter,
     filter: Filter,
-    hitcounts_map: Option<<StdShMemProvider as ShMemProvider>::Mem>,
-    hasher_builder: HashBuilder,
 }
 
-type DefaultExpressionFilter =
-    AndOpt<AndOpt<AndOpt<Nop, SelectiveSymbolication>, NoFloat>, CallStackCoverage>;
+type DefaultExpressionFilter = AndOpt<
+    AndOpt<
+        AndOpt<AndOpt<Nop, SelectiveSymbolication>, NoFloat>,
+        CallStackCoverage<DefaultHasher, BuildHasherDefault<DefaultHasher>>,
+    >,
+    HitmapFilter<<StdShMemProvider as ShMemProvider>::Mem, BuildHasherDefault<DefaultHasher>>,
+>;
 
-impl State<DefaultExpressionFilter> {
+impl Runtime<DefaultExpressionFilter> {
     fn parse_env_bool(env_name: &str) -> bool {
         env::var(env_name)
             .ok()
@@ -51,24 +59,22 @@ impl State<DefaultExpressionFilter> {
             .and_optionally(Self::parse_env_bool(NO_FLOAT_ENV_NAME).then(|| NoFloat))
             .and_optionally(
                 Self::parse_env_bool(EXPRESSION_PRUNING).then(CallStackCoverage::default),
+            )
+            .and_optionally(
+                StdShMemProvider::new()
+                    .unwrap()
+                    .existing_from_env(HITMAP_ENV_NAME)
+                    .ok()
+                    .map(HitmapFilter::new),
             );
-        let hitcounts_map = StdShMemProvider::new()
-            .unwrap()
-            .existing_from_env(HITMAP_ENV_NAME)
-            .ok();
 
         let writer =
             MessageFileWriter::from_stdshmem_default_env().expect("unable to initialise writer");
-        Self {
-            writer,
-            filter,
-            hitcounts_map,
-            hasher_builder: BuildHasherDefault::default(),
-        }
+        Self { writer, filter }
     }
 }
 
-impl<Filter: ExpressionFilter> State<Filter> {
+impl<Filter: ExpressionFilter> Runtime<Filter> {
     /// Logs the message to the trace. This is a convenient place to debug the expressions if necessary.
     fn log_message(&mut self, message: SymExpr) -> Option<SymExprRef> {
         if self.filter.symbolize(&message) {
@@ -101,22 +107,7 @@ impl<Filter: ExpressionFilter> State<Filter> {
     }
 
     fn notify_basic_block(&mut self, location_id: usize) {
-        self.register_location_on_hitmap(location_id);
         self.filter.notify_basic_block(location_id)
-    }
-
-    fn register_location_on_hitmap(&mut self, location: usize) {
-        if let Some(m) = &mut self.hitcounts_map {
-            let mut hasher = self.hasher_builder.build_hasher();
-            location.hash(&mut hasher);
-            let hash = hasher.finish() as usize;
-            let val = unsafe {
-                // SAFETY: the index is modulo by the length, therefore it is always in bounds
-                let len = m.len();
-                m.map_mut().get_unchecked_mut(hash % len)
-            };
-            *val = val.saturating_add(1);
-        }
     }
 
     /// This is called at the end of the process, giving us the opprtunity to signal the end of the trace.
@@ -133,13 +124,13 @@ impl<Filter: ExpressionFilter> State<Filter> {
 // however, this is not really supported in SymCC yet.
 // Therefore we make the assumption that there is only ever a single thread, which should
 // mean that this is 'safe'.
-static mut GLOBAL_DATA: Option<State<DefaultExpressionFilter>> = None;
+static mut GLOBAL_DATA: Option<Runtime<DefaultExpressionFilter>> = None;
 
 #[ctor]
 fn init() {
     // See comment on GLOBAL_DATA declaration.
     unsafe {
-        GLOBAL_DATA = Some(State::new());
+        GLOBAL_DATA = Some(Runtime::new());
         libc::atexit(fini);
     }
 }
@@ -155,7 +146,7 @@ extern "C" fn fini() {
 }
 
 /// A little helper function that encapsulates access to the shared mutable state.
-fn with_state<R>(cb: impl FnOnce(&mut State<DefaultExpressionFilter>) -> R) -> R {
+fn with_state<R>(cb: impl FnOnce(&mut Runtime<DefaultExpressionFilter>) -> R) -> R {
     use unchecked_unwrap::UncheckedUnwrap;
     let s = unsafe { GLOBAL_DATA.as_mut().unchecked_unwrap() };
     cb(s)
@@ -187,7 +178,9 @@ pub unsafe extern "C" fn _rsym_expression_unreachable(
 ) {
     let slice = slice::from_raw_parts(expressions_ptr, expressions_len);
     with_state(|s| {
-        s.log_message(SymExpr::ExpressionsUnreachable { exprs: slice.to_owned() });
+        s.log_message(SymExpr::ExpressionsUnreachable {
+            exprs: slice.to_owned(),
+        });
     })
 }
 

@@ -14,7 +14,7 @@ use concolic::SymExpr;
 ///
 /// An expression filter also receives code locations (`notifiy_*` methods) as they are visited in between operations
 /// and these code locations are typically used to decide whether an expression should be concretized.
-pub(crate) trait ExpressionFilter {
+pub trait ExpressionFilter {
     /// Decides whether the expression should continue to be symbolic. If this method returns `true` the expression will
     /// continue to be symbolic, else the value will be concretized in future expressions.
     fn symbolize(&mut self, msg: &SymExpr) -> bool;
@@ -39,7 +39,7 @@ pub(crate) trait ExpressionFilter {
 }
 
 /// An expression filter that always keeps expressions symbolic.
-pub(crate) struct Nop;
+pub struct Nop;
 
 impl ExpressionFilter for Nop {
     fn symbolize(&mut self, _msg: &SymExpr) -> bool {
@@ -52,7 +52,7 @@ impl ExpressionFilter for Nop {
 
 /// An [`ExpressionFilter`] that concretizes all input byte expressions that are not included in a predetermined set of
 /// of input byte offsets.
-pub(crate) struct SelectiveSymbolication {
+pub struct SelectiveSymbolication {
     bytes_to_symbolize: HashSet<usize>,
 }
 
@@ -79,7 +79,7 @@ impl ExpressionFilter for SelectiveSymbolication {
 
 /// An [`ExpressionFilter`] that combines two expression filters and decides to symbolize expressions where both filters
 /// decide to symbolize.
-pub(crate) struct And<A: ExpressionFilter, B: ExpressionFilter> {
+pub struct And<A: ExpressionFilter, B: ExpressionFilter> {
     a: A,
     b: B,
 }
@@ -102,7 +102,7 @@ impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for And<A, B> {
     }
 }
 
-pub(crate) struct AndOpt<A: ExpressionFilter, B: ExpressionFilter> {
+pub struct AndOpt<A: ExpressionFilter, B: ExpressionFilter> {
     a: A,
     b: Option<B>,
 }
@@ -131,7 +131,7 @@ impl<A: ExpressionFilter, B: ExpressionFilter> ExpressionFilter for AndOpt<A, B>
     }
 }
 
-pub(crate) trait ExpressionFilterExt: ExpressionFilter {
+pub trait ExpressionFilterExt: ExpressionFilter {
     /// Combines two filters into a new filter that decides to symbolize if _both_ this filter and the given filter
     /// decide to symbolize.
     fn and<Other: ExpressionFilter>(self, other: Other) -> And<Self, Other>
@@ -162,7 +162,7 @@ impl<F: ExpressionFilter> ExpressionFilterExt for F {
 }
 
 /// Concretizes all floating point operations.
-pub(crate) struct NoFloat;
+pub struct NoFloat;
 
 impl ExpressionFilter for NoFloat {
     fn symbolize(&mut self, msg: &SymExpr) -> bool {
@@ -205,13 +205,15 @@ impl ExpressionFilter for NoFloat {
     fn notify_basic_block(&mut self, _location_id: usize) {}
 }
 
-pub(crate) mod coverage {
+pub mod coverage {
     use std::{
         collections::hash_map::DefaultHasher,
         convert::TryInto,
         hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
         marker::PhantomData,
     };
+
+    use libafl::bolts::shmem::ShMem;
 
     use super::ExpressionFilter;
 
@@ -320,6 +322,77 @@ pub(crate) mod coverage {
 
         fn notify_basic_block(&mut self, location_id: usize) {
             self.visit_basic_block(location_id)
+        }
+    }
+
+    /// An expression filter that just observers Basic Block locations and updates a given Hitmap as a [`ShMem`].
+    pub struct HitmapFilter<M, BH: BuildHasher = BuildHasherDefault<DefaultHasher>> {
+        hitcounts_map: M,
+        build_hasher: BH,
+    }
+
+    impl<M> HitmapFilter<M, BuildHasherDefault<DefaultHasher>>
+    where
+        M: ShMem,
+    {
+        /// Creates a new HitmapFilter using the given map and the [`DefaultHasher`].
+        pub fn new(hitcounts_map: M) -> Self {
+            Self::new_with_default_hasher_builder(hitcounts_map)
+        }
+    }
+
+    impl<M, H> HitmapFilter<M, BuildHasherDefault<H>>
+    where
+        M: ShMem,
+        H: Hasher + Default,
+    {
+        /// Creates a new HitmapFilter using the given map and [`Hasher`] (as type argument) using the [`BuildHasherDefault`].
+        pub fn new_with_default_hasher_builder(hitcounts_map: M) -> Self {
+            Self::new_with_build_hasher(hitcounts_map, BuildHasherDefault::default())
+        }
+    }
+
+    impl<M, BH> HitmapFilter<M, BH>
+    where
+        M: ShMem,
+        BH: BuildHasher,
+    {
+        /// Creates a new HitmapFilter using the given map and [`BuildHasher`] (as type argument).
+        pub fn new_with_build_hasher(hitcounts_map: M, build_hasher: BH) -> Self {
+            Self {
+                hitcounts_map,
+                build_hasher,
+            }
+        }
+
+        fn register_location_on_hitmap(&mut self, location: usize) {
+            let mut hasher = self.build_hasher.build_hasher();
+            location.hash(&mut hasher);
+            let hash = hasher.finish() as usize;
+            let val = unsafe {
+                // SAFETY: the index is modulo by the length, therefore it is always in bounds
+                let len = self.hitcounts_map.len();
+                self.hitcounts_map.map_mut().get_unchecked_mut(hash % len)
+            };
+            *val = val.saturating_add(1);
+        }
+    }
+
+    impl<M, BH> ExpressionFilter for HitmapFilter<M, BH>
+    where
+        M: ShMem,
+        BH: BuildHasher,
+    {
+        fn symbolize(&mut self, _msg: &concolic::SymExpr) -> bool {
+            true
+        }
+
+        fn notify_call(&mut self, _location_id: usize) {}
+
+        fn notify_return(&mut self, _location_id: usize) {}
+
+        fn notify_basic_block(&mut self, location_id: usize) {
+            self.register_location_on_hitmap(location_id)
         }
     }
 }
