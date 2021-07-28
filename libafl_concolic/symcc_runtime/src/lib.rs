@@ -1,3 +1,5 @@
+pub mod tracing;
+
 #[doc(hidden)]
 pub mod cpp_runtime {
     #![allow(non_upper_case_globals)]
