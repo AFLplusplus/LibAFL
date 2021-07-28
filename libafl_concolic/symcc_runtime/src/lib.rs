@@ -80,18 +80,10 @@ macro_rules! export_rust_runtime_fn {
             })
         }
     };
-    (pub fn push_path_constraint(
-        constraint: RSymExpr,
-        taken: ::std::os::raw::c_int,
-        site_id: usize,
-    ), $c_name:ident; $rt_cb:path) => {
+    (pub fn push_path_constraint(constraint: RSymExpr, taken: bool, site_id: usize), $c_name:ident; $rt_cb:path) => {
         #[allow(clippy::missing_safety_doc)]
         #[no_mangle]
-        pub unsafe extern "C" fn _rsym_push_path_constraint(
-            constraint: Option<RSymExpr>,
-            taken: ::std::os::raw::c_int,
-            site_id: usize,
-        ) {
+        pub unsafe extern "C" fn _rsym_push_path_constraint(constraint: Option<RSymExpr>, taken: bool, site_id: usize) {
             if let Some(constraint) = constraint {
                 $rt_cb(|rt| {
                     rt.push_path_constraint(constraint, taken, site_id);
