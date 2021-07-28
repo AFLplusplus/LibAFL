@@ -10,6 +10,7 @@ concolic = {path = "../concolic"}
 unchecked_unwrap = "3"
 ctor = "0.1"
 libc = "0.2"
+libafl = {path = "../../libafl"}
 
 [build-dependencies]
 cmake = "0.1"

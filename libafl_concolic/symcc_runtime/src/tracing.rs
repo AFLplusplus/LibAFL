@@ -47,17 +47,6 @@ macro_rules! binary_expression_builder {
 }
 
 impl Runtime for TracingRuntime {
-    fn new() -> Self {
-        Self {
-            writer: MessageFileWriter::from_stdshmem_default_env()
-                .expect("unable to initialise writer"),
-        }
-    }
-
-    fn end(self) {
-        self.writer.end().unwrap()
-    }
-
     expression_builder!(get_input_byte(offset: usize) => GetInputByte);
 
     expression_builder!(build_integer(value: u64, bits: u8) => BuildInteger);
@@ -172,5 +161,11 @@ impl Runtime for TracingRuntime {
             taken,
             site_id,
         });
+    }
+}
+
+impl Drop for TracingRuntime {
+    fn drop(&mut self) {
+        self.writer.end();
     }
 }

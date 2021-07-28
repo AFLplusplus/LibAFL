@@ -188,7 +188,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         Ok(())
     }
 
-    pub fn end(mut self) -> io::Result<()> {
+    pub fn end(&mut self) -> io::Result<()> {
         self.write_trace_size()?;
         Ok(())
     }

@@ -1,3 +1,4 @@
+pub mod filter;
 pub mod tracing;
 
 #[doc(hidden)]
@@ -10,6 +11,7 @@ pub mod cpp_runtime {
 
 #[doc(hidden)]
 pub use ctor::ctor;
+use filter::{Filter, FilterRuntime};
 #[doc(hidden)]
 pub use libc::atexit;
 #[doc(hidden)]
@@ -46,9 +48,6 @@ macro_rules! rust_runtime_function_declaration {
 pub type RSymExpr = concolic::SymExprRef;
 
 pub trait Runtime {
-    fn new() -> Self;
-    fn end(self);
-
     invoke_macro_with_rust_runtime_exports!(rust_runtime_function_declaration;);
 }
 
@@ -119,18 +118,34 @@ macro_rules! impl_nop_runtime_fn {
 pub struct NopRuntime;
 
 impl Runtime for NopRuntime {
-    fn new() -> Self {
-        Self
-    }
-
-    fn end(self) {}
-
     invoke_macro_with_rust_runtime_exports!(impl_nop_runtime_fn;);
 }
 
 #[macro_export]
 macro_rules! export_runtime {
-    ($rt:ty) => {
+    ($filter_constructor:expr => $filter:ty ; $($constructor:expr => $rt:ty);+) => {
+        export_runtime!(@final export_runtime!(@combine_constructor $filter_constructor; $($constructor);+) => export_runtime!(@combine_type $filter; $($rt);+));
+    };
+
+    ($constructor:expr => $rt:ty) => {
+        export_runtime!(@final $constructor => $rt);
+    };
+
+    (@combine_constructor $filter_constructor:expr ; $($constructor:expr);+) => {
+        $crate::filter::FilterRuntime::new($filter_constructor, export_runtime!(@combine_constructor $($constructor);+))
+    };
+    (@combine_constructor $constructor:expr) => {
+        $constructor
+    };
+
+    (@combine_type $filter:ty ; $($rt:ty);+) => {
+        $crate::filter::FilterRuntime<$filter, export_runtime!(@combine_type $($rt);+)>
+    };
+    (@combine_type $rt:ty) => {
+        $rt
+    };
+
+    (@final $constructor:expr => $rt:ty) => {
         // We are creating a piece of shared mutable state here for our runtime, which is used unsafely.
         // The correct solution here would be to either use a mutex or have per-thread state,
         // however, this is not really supported in SymCC yet.
@@ -142,7 +157,7 @@ macro_rules! export_runtime {
         fn init() {
             // See comment on GLOBAL_DATA declaration.
             unsafe {
-                GLOBAL_DATA = Some(<$rt as $crate::Runtime>::new());
+                GLOBAL_DATA = Some($constructor);
                 $crate::atexit(fini);
             }
         }
@@ -152,7 +167,6 @@ macro_rules! export_runtime {
             // drops the global data object
             unsafe {
                 if let Some(state) = GLOBAL_DATA.take() {
-                    state.end()
                 }
             }
         }
