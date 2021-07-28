@@ -120,13 +120,20 @@ where
     }
 
     /// Get the execution time of the testcase
+    #[inline]
     pub fn exec_time(&self) -> &Option<Duration> {
         &self.exec_time
     }
 
     /// Get the execution time of the testcase (mut)
+    #[inline]
     pub fn exec_time_mut(&mut self) -> &mut Option<Duration> {
         &mut self.exec_time
+    }
+
+    #[inline]
+    pub fn set_exec_time(&mut self, time: Duration) {
+        self.exec_time = Some(time);
     }
 
     /// Create a new Testcase instace given an input
@@ -206,3 +213,78 @@ where
         Testcase::new(input)
     }
 }
+
+/// The Metadata for each testcase used in power schedules.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PowerScheduleTestcaseMetaData {
+    /// Number of bits set in bitmap, updated in calibrate_case
+    bitmap_size: u64,
+    /// Number of fuzzing iterations, updated in perform_mutational
+    fuzz_level: u64,
+    /// Number of queue cycles behind
+    handicap: u64,
+    /// Path depth, initialized in on_add
+    depth: u64,
+    /// Offset in n_fuzz
+    n_fuzz_entry: usize,
+}
+
+impl PowerScheduleTestcaseMetaData {
+    #[must_use]
+    pub fn new(depth: u64) -> Self {
+        Self {
+            bitmap_size: 0,
+            fuzz_level: 0,
+            handicap: 0,
+            depth,
+            n_fuzz_entry: 0,
+        }
+    }
+
+    #[must_use]
+    pub fn bitmap_size(&self) -> u64 {
+        self.bitmap_size
+    }
+
+    pub fn set_bitmap_size(&mut self, val: u64) {
+        self.bitmap_size = val;
+    }
+
+    #[must_use]
+    pub fn fuzz_level(&self) -> u64 {
+        self.fuzz_level
+    }
+
+    pub fn set_fuzz_level(&mut self, val: u64) {
+        self.fuzz_level = val;
+    }
+
+    #[must_use]
+    pub fn handicap(&self) -> u64 {
+        self.handicap
+    }
+
+    pub fn set_handicap(&mut self, val: u64) {
+        self.handicap = val;
+    }
+
+    #[must_use]
+    pub fn depth(&self) -> u64 {
+        self.depth
+    }
+
+    pub fn set_depth(&mut self, val: u64) {
+        self.depth = val;
+    }
+
+    #[must_use]
+    pub fn n_fuzz_entry(&self) -> usize {
+        self.n_fuzz_entry
+    }
+
+    pub fn set_n_fuzz_entry(&mut self, val: usize) {
+        self.n_fuzz_entry = val;
+    }
+}
+
+crate::impl_serdeany!(PowerScheduleTestcaseMetaData);

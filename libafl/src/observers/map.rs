@@ -1,10 +1,15 @@
 //! The `MapObserver` provides access a map, usually injected into the target
 
+use ahash::AHasher;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::slice::from_raw_parts_mut;
+use core::{
+    hash::Hasher,
+    slice::{from_raw_parts, from_raw_parts_mut},
+};
+use num::Integer;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -19,7 +24,7 @@ use crate::{
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>: Named + serde::Serialize + serde::de::DeserializeOwned
 where
-    T: Default + Copy,
+    T: Integer + Default + Copy,
 {
     /// Get the map
     fn map(&self) -> &[T];
@@ -30,6 +35,31 @@ where
     /// Get the number of usable entries in the map (all by default)
     fn usable_count(&self) -> usize {
         self.map().len()
+    }
+
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let mut res = 0;
+        for x in self.map()[0..cnt].iter() {
+            if *x != initial {
+                res += 1;
+            }
+        }
+        res
+    }
+
+    /// Compute the hash of the map
+    fn hash(&self) -> u64 {
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        let ptr = self.map().as_ptr() as *const u8;
+        let map_size = self.map().len() / core::mem::size_of::<T>();
+        unsafe {
+            hasher.write(from_raw_parts(ptr, map_size));
+        }
+
+        hasher.finish()
     }
 
     /// Get the initial value for reset()
@@ -62,7 +92,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
@@ -71,7 +101,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -82,7 +112,7 @@ where
 
 impl<'a, T> Named for StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -92,7 +122,7 @@ where
 
 impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn map(&self) -> &[T] {
@@ -122,7 +152,7 @@ where
 
 impl<'a, T> StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
     #[must_use]
@@ -167,7 +197,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct ConstMapObserver<'a, T, const N: usize>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
@@ -176,7 +206,7 @@ where
 
 impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -187,7 +217,7 @@ where
 
 impl<'a, T, const N: usize> Named for ConstMapObserver<'a, T, N>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -197,7 +227,7 @@ where
 
 impl<'a, T, const N: usize> MapObserver<T> for ConstMapObserver<'a, T, N>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn usable_count(&self) -> usize {
@@ -232,7 +262,7 @@ where
 
 impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
     #[must_use]
@@ -278,7 +308,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
     size: OwnedRefMut<'a, usize>,
@@ -288,7 +318,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -299,7 +329,7 @@ where
 
 impl<'a, T> Named for VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -309,7 +339,7 @@ where
 
 impl<'a, T> MapObserver<T> for VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn map(&self) -> &[T] {
@@ -344,7 +374,7 @@ where
 
 impl<'a, T> VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
     pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
