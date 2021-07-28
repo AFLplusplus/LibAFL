@@ -1,3 +1,3 @@
-use symcc_runtime::{EmptyRuntime, Runtime, export_runtime};
+use symcc_runtime::{NopRuntime, Runtime, export_runtime};
 
-export_runtime!(EmptyRuntime);
+export_runtime!(NopRuntime);

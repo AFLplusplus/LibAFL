@@ -103,30 +103,27 @@ macro_rules! export_rust_runtime_fn {
     };
 }
 
-macro_rules! impl_todo_runtime_fn {
+macro_rules! impl_nop_runtime_fn {
     (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident;) => {
-        fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {todo!()}
+        fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {std::default::Default::default()}
     };
 
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?)$( -> $ret:ty)?, $c_name:ident;) => {
-        fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {todo!()}
+        fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {std::default::Default::default()}
     };
 }
 
-pub struct EmptyRuntime;
+pub struct NopRuntime;
 
-impl Runtime for EmptyRuntime {
+impl Runtime for NopRuntime {
     fn new() -> Self {
-        todo!()
+        Self
     }
 
-    fn end(self) {
-        todo!()
-    }
+    fn end(self) {}
 
-    invoke_macro_with_rust_runtime_exports!(impl_todo_runtime_fn;);
+    invoke_macro_with_rust_runtime_exports!(impl_nop_runtime_fn;);
 }
-
 
 #[macro_export]
 macro_rules! export_runtime {
