@@ -1,9 +1,6 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 use num::Integer;
 
@@ -31,7 +28,6 @@ pub enum PowerSchedule {
 
 const POWER_BETA: f64 = 1.0;
 const MAX_FACTOR: f64 = POWER_BETA * 32.0;
-const N_FUZZ_SIZE: usize = 1 << 21;
 const HAVOC_MAX_MULT: f64 = 64.0;
 
 /// The mutational stage using power schedules
@@ -50,8 +46,6 @@ where
 {
     map_observer_name: String,
     mutator: M,
-    /// The vector to contain the frequency of each execution path.
-    n_fuzz: Vec<u32>,
     /// The employed power schedule strategy
     strat: PowerSchedule,
     #[allow(clippy::type_complexity)]
@@ -93,7 +87,7 @@ where
 
         let mut fuzz_mu = 0.0;
         if self.strat == PowerSchedule::COE {
-            fuzz_mu = self.fuzz_mu(state)?;
+            fuzz_mu = self.fuzz_mu(state, psmeta)?;
         }
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
@@ -129,27 +123,27 @@ where
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
 
             let mut hash = observer.hash() as usize;
-            hash %= N_FUZZ_SIZE;
 
-            match corpus_idx {
-                Some(idx) => {
-                    state
-                        .corpus()
-                        .get(idx)?
-                        .borrow_mut()
-                        .metadata_mut()
-                        .get_mut::<PowerScheduleTestcaseMetaData>()
-                        .ok_or_else(|| {
-                            Error::KeyNotFound("PowerScheduleTestData not found".to_string())
-                        })?
-                        .set_n_fuzz_entry(hash);
+            let psmeta = state
+                .metadata_mut()
+                .get_mut::<PowerScheduleMetadata>()
+                .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
-                    self.n_fuzz[hash] = self.n_fuzz[hash].saturating_add(1);
-                }
-                None => {
-                    // self.n_fuzz[hash] can be 0 here because we are looking at the MapObserver, not the HitcountsMapObserver
-                    self.n_fuzz[hash] = self.n_fuzz[hash].saturating_add(1);
-                }
+            hash %= psmeta.n_fuzz().len();
+            // Update the path frequency
+            psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
+
+            if let Some(idx) = corpus_idx {
+                state
+                    .corpus()
+                    .get(idx)?
+                    .borrow_mut()
+                    .metadata_mut()
+                    .get_mut::<PowerScheduleTestcaseMetaData>()
+                    .ok_or_else(|| {
+                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                    })?
+                    .set_n_fuzz_entry(hash);
             }
 
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
@@ -203,7 +197,6 @@ where
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,
-            n_fuzz: vec![0; N_FUZZ_SIZE],
             strat,
             phantom: PhantomData,
         }
@@ -211,7 +204,7 @@ where
 
     /// Compute the parameter `μ` used in the COE schedule.
     #[inline]
-    pub fn fuzz_mu(&self, state: &S) -> Result<f64, Error> {
+    pub fn fuzz_mu(&self, state: &S, psmeta: &PowerScheduleMetadata) -> Result<f64, Error> {
         let corpus = state.corpus();
         let mut n_paths = 0;
         let mut fuzz_mu = 0.0;
@@ -223,7 +216,7 @@ where
                 .get::<PowerScheduleTestcaseMetaData>()
                 .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
                 .n_fuzz_entry();
-            fuzz_mu += libm::log2(f64::from(self.n_fuzz[n_fuzz_entry]));
+            fuzz_mu += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
             n_paths += 1;
         }
 
@@ -324,14 +317,16 @@ where
                 factor = MAX_FACTOR;
             }
             PowerSchedule::COE => {
-                if libm::log2(f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()])) > fuzz_mu && !favored {
+                if libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()])) > fuzz_mu
+                    && !favored
+                {
                     // Never skip favorites.
                     factor = 0.0;
                 }
             }
             PowerSchedule::FAST => {
                 if tcmeta.fuzz_level() != 0 {
-                    let lg = libm::log2(f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()]));
+                    let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
 
                     match lg {
                         f if f < 2.0 => {
@@ -370,11 +365,11 @@ where
             }
             PowerSchedule::LIN => {
                 factor = (tcmeta.fuzz_level() as f64)
-                    / f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()] + 1);
+                    / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
             }
             PowerSchedule::QUAD => {
                 factor = ((tcmeta.fuzz_level() * tcmeta.fuzz_level()) as f64)
-                    / f64::from(self.n_fuzz[tcmeta.n_fuzz_entry()] + 1);
+                    / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
             }
         }
 

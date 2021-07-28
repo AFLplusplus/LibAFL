@@ -11,7 +11,10 @@ use crate::{
     state::{HasCorpus, HasMetadata},
     Error,
 };
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{marker::PhantomData, time::Duration};
 use num::Integer;
 use serde::{Deserialize, Serialize};
@@ -115,13 +118,22 @@ where
     }
 }
 
+pub const N_FUZZ_SIZE: usize = 1 << 21;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleMetadata {
+    /// Measured exec time during calibration
     exec_time: Duration,
+    /// Calibration cycles
     cycles: u64,
+    /// Size of the observer map
     bitmap_size: u64,
+    /// Number of filled map entries
     bitmap_entries: u64,
+    /// Queue cycles
     queue_cycles: u64,
+    /// The vector to contain the frequency of each execution path.
+    n_fuzz: Vec<u32>,
 }
 
 /// The metadata for runs in the calibration stage.
@@ -134,6 +146,7 @@ impl PowerScheduleMetadata {
             bitmap_size: 0,
             bitmap_entries: 0,
             queue_cycles: 0,
+            n_fuzz: vec![0; N_FUZZ_SIZE],
         }
     }
 
@@ -180,6 +193,16 @@ impl PowerScheduleMetadata {
 
     pub fn set_queue_cycles(&mut self, val: u64) {
         self.queue_cycles = val;
+    }
+
+    #[must_use]
+    pub fn n_fuzz(&self) -> &[u32] {
+        &self.n_fuzz
+    }
+
+    #[must_use]
+    pub fn n_fuzz_mut(&mut self) -> &mut [u32] {
+        &mut self.n_fuzz
     }
 }
 
