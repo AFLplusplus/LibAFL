@@ -377,8 +377,8 @@ where
             } => {
                 #[cfg(feature = "std")]
                 println!(
-                    "Received new Testcase from {} ({}) {:?}",
-                    _client_id, client_config, input
+                    "Received new Testcase from {} ({})",
+                    _client_id, client_config
                 );
 
                 let _res = if client_config == self.configuration {
