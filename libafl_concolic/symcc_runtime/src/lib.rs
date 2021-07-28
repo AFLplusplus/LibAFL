@@ -1,3 +1,4 @@
+#[doc(hidden)]
 pub mod cpp_runtime {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -6,11 +7,11 @@ pub mod cpp_runtime {
 }
 
 #[doc(hidden)]
-pub use unchecked_unwrap;
+pub use ctor::ctor;
 #[doc(hidden)]
 pub use libc::atexit;
 #[doc(hidden)]
-pub use ctor::ctor;
+pub use unchecked_unwrap;
 
 #[doc(hidden)]
 #[macro_export]
@@ -167,4 +168,3 @@ macro_rules! export_runtime {
         $crate::export_cpp_runtime_functions!();
     };
 }
-
