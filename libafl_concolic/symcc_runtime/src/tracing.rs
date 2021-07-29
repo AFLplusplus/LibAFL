@@ -1,7 +1,6 @@
-use concolic::{
-    serialization_format::{shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
-    SymExpr,
-};
+use concolic::{serialization_format::MessageFileWriter, SymExpr};
+
+pub use concolic::serialization_format::shared_memory::StdShMemMessageFileWriter;
 
 use crate::{RSymExpr, Runtime};
 
@@ -10,6 +9,10 @@ pub struct TracingRuntime {
 }
 
 impl TracingRuntime {
+    pub fn new(writer: StdShMemMessageFileWriter) -> Self {
+        Self { writer }
+    }
+
     fn write_message(&mut self, message: SymExpr) -> Option<RSymExpr> {
         Some(self.writer.write_message(message).unwrap())
     }

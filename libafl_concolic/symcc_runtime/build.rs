@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 
 const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
-const SYMCC_REPO_COMMIT: &str = "1a1bf95ac52fa3074acfb095ca91c45cfe6c35d4";
+const SYMCC_REPO_COMMIT: &str = "f44262f9304190a93e85d86530f4ae02ab8f391f";
 
 fn checkout_symcc(out_path: &Path) -> PathBuf {
     let repo_dir = out_path.join("libafl_symcc_src");
