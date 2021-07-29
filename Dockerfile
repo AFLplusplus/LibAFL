@@ -19,7 +19,7 @@ RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
 RUN rustup component add rustfmt clippy
 
 # Install clang 11, common build tools
-RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev
+RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev llvm
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
@@ -40,6 +40,9 @@ COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
 COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
+
+COPY libafl_sugar/Cargo.toml libafl_sugar/
+COPY scripts/dummy.rs libafl_sugar/src/lib.rs
 
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
 COPY scripts/dummy.rs libafl_cc/src/lib.rs

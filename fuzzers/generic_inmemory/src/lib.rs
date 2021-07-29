@@ -127,7 +127,7 @@ pub fn libafl_main() {
             )
         });
 
-        // Create a PNG dictionary if not existing
+        // Create a dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
             for tokens_file in &token_files {
                 state.add_metadata(Tokens::from_tokens_file(tokens_file)?);

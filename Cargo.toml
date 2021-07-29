@@ -12,6 +12,7 @@ members = [
     "libafl_targets",
     "libafl_frida",
     "libafl_qemu",
+    "libafl_sugar",
     "libafl_tests",
     "libafl_concolic/concolic",
     "libafl_concolic/symcc_runtime",

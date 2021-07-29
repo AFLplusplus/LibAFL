@@ -16,7 +16,14 @@ use crate::bolts::current_nanos;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 #[must_use]
 pub fn read_time_counter() -> u64 {
-    unsafe { core::arch::x86_64::_rdtsc() }
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        core::arch::x86_64::_rdtsc()
+    }
+    #[cfg(target_arch = "x86")]
+    unsafe {
+        core::arch::x86::_rdtsc()
+    }
 }
 
 /// Read a timestamp for measurements.
