@@ -126,6 +126,7 @@ impl<Filter: ExpressionFilter> Runtime<Filter> {
 // mean that this is 'safe'.
 static mut GLOBAL_DATA: Option<Runtime<DefaultExpressionFilter>> = None;
 
+#[cfg(not(test))]
 #[ctor]
 fn init() {
     // See comment on GLOBAL_DATA declaration.
