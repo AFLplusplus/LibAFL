@@ -10,10 +10,11 @@ rm -rf symcc_build
 mkdir symcc_build
 
 cd symcc_build
-cmake -G Ninja -DRUST_BACKEND=YES ../../libafl_symcc 
+cmake -G Ninja -DZ3_TRUST_SYSTEM_VERSION=on ../../libafl_symcc 
 ninja
 cd ..
-symcc_build/symcc ../libafl_symcc/test/if.c -o "if"
+cargo build -p runtime_test
+SYMCC_RUNTIME_DIR=../../target/debug/ symcc_build/symcc ../libafl_symcc/test/if.c -o "if"
 
 cargo run -p dump_constraints -- --plain-text --output constraints.txt -- ./if < if_test_input
 
