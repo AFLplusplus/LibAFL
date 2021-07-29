@@ -68,9 +68,13 @@ fn main() {
     write_cpp_function_export_macro(&out_path, &cpp_bindings);
 
     if std::env::var("CARGO_FEATURE_NO_CPP_RUNTIME").is_err() {
-        let rename_header_path = out_path.join("rename.h");
-        write_symcc_rename_header(&rename_header_path, &cpp_bindings);
-        build_and_link_symcc_runtime(&symcc_src_path, &rename_header_path);
+        if env::var("TARGET").unwrap().contains("linux") {
+            let rename_header_path = out_path.join("rename.h");
+            write_symcc_rename_header(&rename_header_path, &cpp_bindings);
+            build_and_link_symcc_runtime(&symcc_src_path, &rename_header_path);
+        } else {
+            println!("cargo:warning=Building SymCC is only supported on Linux")
+        }
     }
 }
 
