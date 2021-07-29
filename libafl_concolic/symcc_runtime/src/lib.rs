@@ -156,6 +156,7 @@ macro_rules! export_runtime {
         // mean that this is 'safe'.
         static mut GLOBAL_DATA: Option<$rt> = None;
 
+        #[cfg(not(test))]
         #[$crate::ctor]
         fn init() {
             // See comment on GLOBAL_DATA declaration.
