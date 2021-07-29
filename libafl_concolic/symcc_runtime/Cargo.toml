@@ -20,3 +20,4 @@ libafl = {path = "../../libafl"}
 cmake = "0.1"
 bindgen = "0.58"
 regex = "1"
+lazy_static = "1.4"

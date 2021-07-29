@@ -1,4 +1,4 @@
-use concolic::{serialization_format::MessageFileWriter, SymExpr};
+use concolic::SymExpr;
 
 pub use concolic::serialization_format::shared_memory::StdShMemMessageFileWriter;
 
@@ -169,6 +169,6 @@ impl Runtime for TracingRuntime {
 
 impl Drop for TracingRuntime {
     fn drop(&mut self) {
-        self.writer.end();
+        self.writer.end().expect("failed to shut down writer");
     }
 }

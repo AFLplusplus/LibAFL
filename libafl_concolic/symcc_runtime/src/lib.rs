@@ -11,7 +11,6 @@ pub mod cpp_runtime {
 
 #[doc(hidden)]
 pub use ctor::ctor;
-use filter::{Filter, FilterRuntime};
 #[doc(hidden)]
 pub use libc::atexit;
 #[doc(hidden)]

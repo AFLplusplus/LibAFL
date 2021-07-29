@@ -22,6 +22,7 @@ pub struct ConcolicFeedback {
 }
 
 impl ConcolicFeedback {
+    #[allow(unused)]
     pub fn from_observer(observer: &ConcolicObserver) -> Self {
         Self {
             name: observer.name().to_owned(),
