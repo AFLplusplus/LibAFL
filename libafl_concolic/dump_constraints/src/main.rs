@@ -129,12 +129,16 @@ fn main() {
                 MessageFileWriter::from_writer(output_file).expect("unable to create trace writer");
             while let Some(message) = reader.next_message() {
                 if let Ok((_, message)) = message {
-                    writer.write_message(message).expect("unable to write message");
+                    writer
+                        .write_message(message)
+                        .expect("unable to write message");
                 } else {
                     break;
                 }
             }
-            writer.write_message(SymExpr::End).expect("unable to write end message");
+            writer
+                .write_message(SymExpr::End)
+                .expect("unable to write end message");
         }
     }
 
