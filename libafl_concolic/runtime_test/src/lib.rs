@@ -1,12 +1,15 @@
-use symcc_runtime::{export_runtime, filter::NoFloat, Runtime};
-
-use symcc_runtime::tracing::{StdShMemMessageFileWriter, TracingRuntime};
+use symcc_runtime::{
+    export_runtime,
+    filter::NoFloat,
+    tracing::{self, StdShMemMessageFileWriter},
+    Runtime,
+};
 
 export_runtime!(
     NoFloat => NoFloat;
-    TracingRuntime::new(
+    tracing::TracingRuntime::new(
         StdShMemMessageFileWriter::from_stdshmem_default_env()
             .expect("unable to construct tracing runtime writer. (missing env?)")
         )
-        => TracingRuntime
+        => tracing::TracingRuntime
 );

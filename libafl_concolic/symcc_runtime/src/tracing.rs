@@ -9,10 +9,12 @@ pub struct TracingRuntime {
 }
 
 impl TracingRuntime {
+    #[must_use]
     pub fn new(writer: StdShMemMessageFileWriter) -> Self {
         Self { writer }
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn write_message(&mut self, message: SymExpr) -> Option<RSymExpr> {
         Some(self.writer.write_message(message).unwrap())
     }

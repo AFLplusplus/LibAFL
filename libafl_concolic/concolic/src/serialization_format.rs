@@ -145,7 +145,7 @@ impl<R: Read> MessageFileReader<R> {
                 }
             }
             SymExpr::End => {
-                panic!("should not pass End message to this function")
+                panic!("should not pass End message to this function");
             }
         }
         SymExprRef::new(ret).unwrap()
@@ -197,6 +197,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         SymExprRef::new(self.id_counter - expr.get()).unwrap()
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn write_message(&mut self, mut message: SymExpr) -> bincode::Result<SymExprRef> {
         let current_id = self.id_counter;
         match &mut message {

@@ -74,7 +74,7 @@ fn main() {
             build_and_link_symcc_runtime(&symcc_src_path, &rename_header_path);
         }
     } else {
-        println!("cargo:warning=Building SymCC is only supported on Linux")
+        println!("cargo:warning=Building SymCC is only supported on Linux");
     }
 }
 
@@ -210,8 +210,8 @@ fn write_symcc_runtime_bindings_file(out_path: &Path, cpp_bindings: &bindgen::Bi
             )
             .unwrap();
         }
-        writeln!(&mut bindings_file, "{}", l).unwrap()
-    })
+        writeln!(&mut bindings_file, "{}", l).unwrap();
+    });
 }
 
 fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::Bindings) {

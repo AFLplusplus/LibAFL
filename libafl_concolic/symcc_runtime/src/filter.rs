@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+#[allow(clippy::wildcard_imports)]
 use crate::*;
 
 macro_rules! rust_filter_function_declaration {
@@ -28,6 +29,7 @@ pub trait Filter {
     invoke_macro_with_rust_runtime_exports!(rust_filter_function_declaration;);
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct FilterRuntime<F, RT> {
     filter: F,
     runtime: RT,
@@ -87,6 +89,7 @@ pub struct SelectiveSymbolication {
 }
 
 impl SelectiveSymbolication {
+    #[must_use]
     pub fn new(offset: HashSet<usize>) -> Self {
         Self {
             bytes_to_symbolize: offset,
@@ -217,7 +220,7 @@ pub mod coverage {
     impl<THasher: Hasher, THashBuilder: BuildHasher> CallStackCoverage<THasher, THashBuilder> {
         pub fn visit_call(&mut self, location: usize) {
             self.call_stack.push(location);
-            self.update_call_stack_hash()
+            self.update_call_stack_hash();
         }
 
         pub fn visit_ret(&mut self, location: usize) {
@@ -310,6 +313,7 @@ pub mod coverage {
         };
     }
 
+    #[allow(clippy::wildcard_imports)]
     use crate::*;
 
     impl<THasher: Hasher, THashBuilder: BuildHasher> Filter
@@ -361,7 +365,7 @@ pub mod coverage {
         fn register_location_on_hitmap(&mut self, location: usize) {
             let mut hasher = self.build_hasher.build_hasher();
             location.hash(&mut hasher);
-            let hash = hasher.finish() as usize;
+            let hash = (hasher.finish() % usize::MAX as u64) as usize;
             let val = unsafe {
                 // SAFETY: the index is modulo by the length, therefore it is always in bounds
                 let len = self.hitcounts_map.len();
@@ -377,7 +381,7 @@ pub mod coverage {
         BH: BuildHasher,
     {
         fn notify_basic_block(&mut self, location_id: usize) {
-            self.register_location_on_hitmap(location_id)
+            self.register_location_on_hitmap(location_id);
         }
     }
 }
