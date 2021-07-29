@@ -110,10 +110,12 @@ macro_rules! export_rust_runtime_fn {
 
 macro_rules! impl_nop_runtime_fn {
     (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident;) => {
+        #[allow(clippy::default_trait_access)]
         fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {std::default::Default::default()}
     };
 
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?)$( -> $ret:ty)?, $c_name:ident;) => {
+        #[allow(clippy::default_trait_access)]
         fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {std::default::Default::default()}
     };
 }
