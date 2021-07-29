@@ -335,7 +335,7 @@ pub mod coverage {
     where
         M: ShMem,
     {
-        /// Creates a new HitmapFilter using the given map and the [`DefaultHasher`].
+        /// Creates a new `HitmapFilter` using the given map and the [`DefaultHasher`].
         pub fn new(hitcounts_map: M) -> Self {
             Self::new_with_default_hasher_builder(hitcounts_map)
         }
@@ -346,7 +346,7 @@ pub mod coverage {
         M: ShMem,
         H: Hasher + Default,
     {
-        /// Creates a new HitmapFilter using the given map and [`Hasher`] (as type argument) using the [`BuildHasherDefault`].
+        /// Creates a new `HitmapFilter` using the given map and [`Hasher`] (as type argument) using the [`BuildHasherDefault`].
         pub fn new_with_default_hasher_builder(hitcounts_map: M) -> Self {
             Self::new_with_build_hasher(hitcounts_map, BuildHasherDefault::default())
         }
@@ -357,7 +357,7 @@ pub mod coverage {
         M: ShMem,
         BH: BuildHasher,
     {
-        /// Creates a new HitmapFilter using the given map and [`BuildHasher`] (as type argument).
+        /// Creates a new `HitmapFilter` using the given map and [`BuildHasher`] (as type argument).
         pub fn new_with_build_hasher(hitcounts_map: M, build_hasher: BH) -> Self {
             Self {
                 hitcounts_map,
