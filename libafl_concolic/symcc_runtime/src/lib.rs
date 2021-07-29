@@ -2,7 +2,7 @@ pub mod filter;
 pub mod tracing;
 
 #[doc(hidden)]
-#[cfg(target_os="linux")]
+#[cfg(target_os = "linux")]
 pub mod cpp_runtime {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -18,7 +18,7 @@ pub use libc::atexit;
 pub use unchecked_unwrap;
 
 #[doc(hidden)]
-#[cfg(target_os="linux")]
+#[cfg(target_os = "linux")]
 #[macro_export]
 macro_rules! export_c_symbol {
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?) -> $ret:ty) => {
@@ -33,7 +33,7 @@ macro_rules! export_c_symbol {
     }
 }
 
-#[cfg(target_os="linux")]
+#[cfg(target_os = "linux")]
 include!(concat!(env!("OUT_DIR"), "/cpp_exports_macro.rs"));
 
 include!(concat!(env!("OUT_DIR"), "/rust_exports_macro.rs"));
