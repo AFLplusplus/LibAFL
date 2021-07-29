@@ -28,53 +28,53 @@ fn main() {
 
     write_rust_runtime_macro_file(&out_path, &symcc_src_path);
 
-    let cpp_bindings = bindgen::Builder::default()
-        .clang_arg(format!(
-            "-I{}",
-            symcc_src_path.join("runtime").to_str().unwrap()
-        ))
-        .clang_arg(format!(
-            "-I{}",
-            symcc_src_path
-                .join("runtime")
-                .join("rust_backend")
-                .to_str()
-                .unwrap()
-        ))
-        .clang_args(["-x", "c++", "-std=c++17"].iter())
-        .header(
-            symcc_src_path
-                .join("runtime")
-                .join("rust_backend")
-                .join("Runtime.h")
-                .to_str()
-                .unwrap(),
-        )
-        .header(
-            symcc_src_path
-                .join("runtime")
-                .join("LibcWrappers.cpp")
-                .to_str()
-                .unwrap(),
-        )
-        .allowlist_type("SymExpr")
-        .allowlist_function("(_sym_.*)|(.*_symbolized)")
-        .opaque_type("_.*")
-        .size_t_is_usize(true)
-        .generate()
-        .expect("Unable to generate bindings");
+    if env::var("TARGET").unwrap().contains("linux") {
+        let cpp_bindings = bindgen::Builder::default()
+            .clang_arg(format!(
+                "-I{}",
+                symcc_src_path.join("runtime").to_str().unwrap()
+            ))
+            .clang_arg(format!(
+                "-I{}",
+                symcc_src_path
+                    .join("runtime")
+                    .join("rust_backend")
+                    .to_str()
+                    .unwrap()
+            ))
+            .clang_args(["-x", "c++", "-std=c++17"].iter())
+            .header(
+                symcc_src_path
+                    .join("runtime")
+                    .join("rust_backend")
+                    .join("Runtime.h")
+                    .to_str()
+                    .unwrap(),
+            )
+            .header(
+                symcc_src_path
+                    .join("runtime")
+                    .join("LibcWrappers.cpp")
+                    .to_str()
+                    .unwrap(),
+            )
+            .allowlist_type("SymExpr")
+            .allowlist_function("(_sym_.*)|(.*_symbolized)")
+            .opaque_type("_.*")
+            .size_t_is_usize(true)
+            .generate()
+            .expect("Unable to generate bindings");
 
-    write_symcc_runtime_bindings_file(&out_path, &cpp_bindings);
-    write_cpp_function_export_macro(&out_path, &cpp_bindings);
+        write_symcc_runtime_bindings_file(&out_path, &cpp_bindings);
+        write_cpp_function_export_macro(&out_path, &cpp_bindings);
 
-    if std::env::var("CARGO_FEATURE_NO_CPP_RUNTIME").is_err() {
-        if env::var("TARGET").unwrap().contains("linux") {
+        if std::env::var("CARGO_FEATURE_NO_CPP_RUNTIME").is_err() {
             let rename_header_path = out_path.join("rename.h");
             write_symcc_rename_header(&rename_header_path, &cpp_bindings);
             build_and_link_symcc_runtime(&symcc_src_path, &rename_header_path);
-        } else {
-            println!("cargo:warning=Building SymCC is only supported on Linux")
         }
+    } else {
+        println!("cargo:warning=Building SymCC is only supported on Linux")
     }
 }
 
