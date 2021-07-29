@@ -249,17 +249,17 @@ fn build_and_link_symcc_runtime(symcc_src_path: &Path, rename_header_path: &Path
         ))
         .build()
         .join("lib");
-    link_with_cpp_runtime();
+    link_with_cpp_stdlib();
     println!("cargo:rustc-link-search=native={}", cpp_lib.display());
     println!("cargo:rustc-link-lib=static=SymRuntime");
 }
 
-fn link_with_cpp_runtime() {
+fn link_with_cpp_stdlib() {
     let target = env::var("TARGET").unwrap();
     if target.contains("apple") {
-        println!("cargo:rustc-link-lib=dylib:-as-needed=c++");
+        println!("cargo:rustc-link-lib=dylib=c++");
     } else if target.contains("linux") {
-        println!("cargo:rustc-link-lib=dylib:-as-needed=stdc++");
+        println!("cargo:rustc-link-lib=dylib=stdc++");
     } else {
         unimplemented!();
     }
