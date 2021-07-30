@@ -1,13 +1,9 @@
 use libafl::{
     corpus::Corpus,
-    executors::{Executor, HasObservers},
     inputs::{HasBytesVec, Input},
     mark_feature_time,
-    observers::{
-        concolic::{ConcolicMetadata, ConcolicObserver, SymExpr, SymExprRef},
-        ObserversTuple,
-    },
-    stages::{Stage, TracingStage},
+    observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
+    stages::Stage,
     start_timer,
     state::{HasClientPerfStats, HasCorpus, HasExecutions, HasMetadata},
     Error,
@@ -16,7 +12,10 @@ use libafl::{
 #[cfg(feature = "introspection")]
 use crate::stats::PerfFeature;
 
-use z3::{Config, Context, Solver, Symbol, ast::{Ast, Bool, Dynamic, BV}};
+use z3::{
+    ast::{Ast, Bool, Dynamic, BV},
+    Config, Context, Solver, Symbol,
+};
 
 use std::{collections::HashMap, convert::TryInto, marker::PhantomData, mem::size_of};
 
@@ -279,75 +278,6 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
     }
 
     res
-}
-
-/// Wraps a [`TracingStage`] to add concolic observing.
-#[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
-where
-    I: Input,
-    C: Corpus<I>,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
-{
-    inner: TracingStage<C, EM, I, OT, S, TE, Z>,
-    observer_name: String,
-}
-
-impl<E, C, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
-where
-    I: Input,
-    C: Corpus<I>,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
-{
-    #[inline]
-    fn perform(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
-        corpus_idx: usize,
-    ) -> Result<(), Error> {
-        self.inner
-            .perform(fuzzer, executor, state, manager, corpus_idx)?;
-        if let Some(observer) = self
-            .inner
-            .executor()
-            .observers()
-            .match_name::<ConcolicObserver>(&self.observer_name)
-        {
-            let metadata = observer.create_metadata_from_current_map();
-            state
-                .corpus_mut()
-                .get(corpus_idx)
-                .unwrap()
-                .borrow_mut()
-                .metadata_mut()
-                .insert(metadata);
-        }
-        Ok(())
-    }
-}
-
-impl<C, EM, I, OT, S, TE, Z> ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
-where
-    I: Input,
-    C: Corpus<I>,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
-{
-    /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<C, EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
-        Self {
-            inner,
-            observer_name,
-        }
-    }
 }
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`Testcase`] by the [`ConcolicTracingStage`].
