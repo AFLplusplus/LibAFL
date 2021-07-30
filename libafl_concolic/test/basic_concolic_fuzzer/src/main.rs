@@ -4,38 +4,37 @@ mod metadata;
 mod observer;
 mod stage;
 
-use concolic::serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE};
-use concolic::HITMAP_ENV_NAME;
-use libafl::bolts::tuples::Named;
-use libafl::feedbacks::{MapFeedbackState, MaxMapFeedback};
-use libafl::observers::{ConstMapObserver, HitcountsMapObserver};
-use libafl::stages::TracingStage;
+use concolic::{
+    serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
+    HITMAP_ENV_NAME,
+};
+
 use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
+        tuples::{tuple_list, Named},
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase},
     events::SimpleEventManager,
-    feedbacks::{CrashFeedback, TimeFeedback},
+    executors::command::CommandConfigurator,
+    feedback_and, feedback_or,
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::TimeObserver,
-    stages::mutational::StdMutationalStage,
+    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    stages::{mutational::StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
     stats::SimpleStats,
 };
-use libafl::{feedback_and, feedback_or};
+
 use std::path::PathBuf;
 
-use command_executor::generic::CommandConfigurator;
+use command_executor::MyCommandConfigurator;
 use observer::ConcolicObserver;
 use stage::{ConcolicTracingStage, SimpleConcolicMutationalStage};
-
-use crate::command_executor::MyCommandConfigurator;
 
 #[allow(clippy::similar_names)]
 pub fn main() {

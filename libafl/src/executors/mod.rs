@@ -19,6 +19,9 @@ pub use shadow::ShadowExecutor;
 pub mod with_observers;
 pub use with_observers::WithObservers;
 
+pub mod command;
+pub use command::CommandExecutor;
+
 use crate::{
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
