@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
 use bincode::{DefaultOptions, Options};
@@ -311,7 +313,7 @@ pub mod shared_memory {
         io::{self, Cursor, Read},
     };
 
-    use libafl::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
+    use crate::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
 
     use super::{MessageFileReader, MessageFileWriter};
 

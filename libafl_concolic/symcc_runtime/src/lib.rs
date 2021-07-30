@@ -12,6 +12,7 @@ pub mod cpp_runtime {
 
 #[doc(hidden)]
 pub use ctor::ctor;
+use libafl::observers::concolic;
 #[doc(hidden)]
 pub use libc::atexit;
 #[doc(hidden)]

@@ -1,4 +1,4 @@
-use concolic::serialization_format::MessageFileReader;
+use libafl::observers::concolic::serialization_format::MessageFileReader;
 use libafl::{bolts::tuples::Named, observers::Observer};
 use serde::{Deserialize, Serialize};
 

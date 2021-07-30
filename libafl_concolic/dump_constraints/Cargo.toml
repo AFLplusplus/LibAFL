@@ -7,5 +7,4 @@ edition = "2018"
 
 [dependencies]
 libafl = {path = "../../libafl"}
-concolic = {path = "../concolic"}
 structopt = "0.3.21"

@@ -5,18 +5,21 @@ use std::{
     io, slice,
 };
 
+#[cfg(not(test))]
 use ctor::ctor;
 
-use concolic::{
-    serialization_format::{self, shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
-    SymExpr, SymExprRef, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
-    SELECTIVE_SYMBOLICATION_ENV_NAME,
-};
 use expression_filters::{
     coverage::{CallStackCoverage, HitmapFilter},
     AndOpt, ExpressionFilterExt, NoFloat, Nop, SelectiveSymbolication,
 };
-use libafl::bolts::shmem::{ShMemProvider, StdShMemProvider};
+use libafl::{
+    bolts::shmem::{ShMemProvider, StdShMemProvider},
+    observers::concolic::{
+        serialization_format::{self, shared_memory::StdShMemMessageFileWriter, MessageFileWriter},
+        SymExpr, SymExprRef, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
+        SELECTIVE_SYMBOLICATION_ENV_NAME,
+    },
+};
 
 mod expression_filters;
 
@@ -43,6 +46,7 @@ impl Runtime<DefaultExpressionFilter> {
             .unwrap_or_default()
     }
 
+    #[allow(unused)]
     fn new() -> Self {
         let filter = Nop
             .and_optionally(
@@ -111,6 +115,7 @@ impl<Filter: ExpressionFilter> Runtime<Filter> {
     }
 
     /// This is called at the end of the process, giving us the opprtunity to signal the end of the trace.
+    #[allow(unused)]
     fn end(mut self) {
         self.log_message(SymExpr::End);
         self.writer
@@ -136,6 +141,7 @@ fn init() {
     }
 }
 
+#[cfg(not(test))]
 /// [`libc::atexit`] handler
 extern "C" fn fini() {
     // drops the global data object

@@ -1,8 +1,11 @@
+use core::num::NonZeroUsize;
+
+#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
-use std::num::NonZeroUsize;
 
 pub type SymExprRef = NonZeroUsize;
 
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug)]
 pub enum SymExpr {
     GetInputByte {
@@ -305,6 +308,7 @@ pub enum SymExpr {
     End,
 }
 
+#[cfg(feature = "std")]
 pub mod serialization_format;
 
 /// The environment name used to identify the hitmap for the concolic runtime.

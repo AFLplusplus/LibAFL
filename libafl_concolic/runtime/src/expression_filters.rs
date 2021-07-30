@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use concolic::SymExpr;
+use libafl::observers::concolic::SymExpr;
 
 /// An [`ExpressionFilter`] can decide for each expression whether the expression should be trace symbolically or be
 /// concretized. This allows to implement filtering mechanisms that reduce the amount of traced expressions by
@@ -213,7 +213,7 @@ pub mod coverage {
         marker::PhantomData,
     };
 
-    use libafl::bolts::shmem::ShMem;
+    use libafl::{bolts::shmem::ShMem, observers::concolic::SymExpr};
 
     use super::ExpressionFilter;
 
@@ -307,7 +307,7 @@ pub mod coverage {
     }
 
     impl ExpressionFilter for CallStackCoverage {
-        fn symbolize(&mut self, _msg: &concolic::SymExpr) -> bool {
+        fn symbolize(&mut self, _msg: &SymExpr) -> bool {
             self.update_bitmap();
             self.is_interesting()
         }
@@ -383,7 +383,7 @@ pub mod coverage {
         M: ShMem,
         BH: BuildHasher,
     {
-        fn symbolize(&mut self, _msg: &concolic::SymExpr) -> bool {
+        fn symbolize(&mut self, _msg: &SymExpr) -> bool {
             true
         }
 

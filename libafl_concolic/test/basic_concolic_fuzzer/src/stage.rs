@@ -1,10 +1,12 @@
-use concolic::{SymExpr, SymExprRef};
 use libafl::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     inputs::{HasBytesVec, Input},
     mark_feature_time,
-    observers::ObserversTuple,
+    observers::{
+        concolic::{SymExpr, SymExprRef},
+        ObserversTuple,
+    },
     stages::{Stage, TracingStage},
     start_timer,
     state::{HasClientPerfStats, HasCorpus, HasExecutions, HasMetadata},

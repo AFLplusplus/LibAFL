@@ -4,31 +4,12 @@ mod metadata;
 mod observer;
 mod stage;
 
-use concolic::{
-    serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
-    HITMAP_ENV_NAME,
-};
-
-use libafl::{
-    bolts::{
+use libafl::{bolts::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Named},
-    },
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase},
-    events::SimpleEventManager,
-    executors::command::CommandConfigurator,
-    feedback_and, feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
-    inputs::BytesInput,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
-    stages::{mutational::StdMutationalStage, TracingStage},
-    state::{HasCorpus, StdState},
-    stats::SimpleStats,
-};
+    }, corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase}, events::SimpleEventManager, executors::command::CommandConfigurator, feedback_and, feedback_or, feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback}, fuzzer::{Fuzzer, StdFuzzer}, inputs::BytesInput, mutators::scheduled::{havoc_mutations, StdScheduledMutator}, observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver, concolic::{HITMAP_ENV_NAME, serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE}}}, stages::{mutational::StdMutationalStage, TracingStage}, state::{HasCorpus, StdState}, stats::SimpleStats};
 
 use std::path::PathBuf;
 

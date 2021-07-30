@@ -7,14 +7,18 @@ use std::{
     string::ToString,
 };
 
-use concolic::{
-    serialization_format::{shared_memory::DEFAULT_ENV_NAME, MessageFileReader, MessageFileWriter},
-    SymExpr, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
-    SELECTIVE_SYMBOLICATION_ENV_NAME,
-};
 use structopt::StructOpt;
 
-use libafl::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
+use libafl::{
+    bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    observers::concolic::{
+        serialization_format::{
+            shared_memory::DEFAULT_ENV_NAME, MessageFileReader, MessageFileWriter,
+        },
+        SymExpr, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
+        SELECTIVE_SYMBOLICATION_ENV_NAME,
+    },
+};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
