@@ -1,4 +1,4 @@
-use libafl::{
+use crate::{
     bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
