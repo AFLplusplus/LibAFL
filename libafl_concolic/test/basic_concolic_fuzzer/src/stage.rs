@@ -4,7 +4,7 @@ use libafl::{
     inputs::{HasBytesVec, Input},
     mark_feature_time,
     observers::{
-        concolic::{SymExpr, SymExprRef},
+        concolic::{ConcolicMetadata, ConcolicObserver, SymExpr, SymExprRef},
         ObserversTuple,
     },
     stages::{Stage, TracingStage},
@@ -15,14 +15,10 @@ use libafl::{
 
 #[cfg(feature = "introspection")]
 use crate::stats::PerfFeature;
-use crate::{metadata::ConcolicMetadata, observer::ConcolicObserver};
 
-use z3::ast::{Ast, Bool, Dynamic, BV};
-use z3::{Config, Context, Solver, Symbol};
+use z3::{Config, Context, Solver, Symbol, ast::{Ast, Bool, Dynamic, BV}};
 
-use std::convert::TryInto;
-use std::mem::size_of;
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, convert::TryInto, marker::PhantomData, mem::size_of};
 
 #[allow(clippy::too_many_lines)]
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {

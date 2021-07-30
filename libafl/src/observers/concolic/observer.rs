@@ -1,8 +1,11 @@
-use libafl::observers::concolic::serialization_format::MessageFileReader;
-use libafl::{bolts::tuples::Named, observers::Observer};
+use crate::{
+    bolts::tuples::Named,
+    observers::{
+        concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
+        Observer,
+    },
+};
 use serde::{Deserialize, Serialize};
-
-use crate::metadata::ConcolicMetadata;
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.
 #[derive(Serialize, Deserialize, Debug)]

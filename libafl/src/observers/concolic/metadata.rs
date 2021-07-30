@@ -1,4 +1,4 @@
-use libafl::observers::concolic::{serialization_format::MessageFileReader, SymExpr, SymExprRef};
+use crate::observers::concolic::{serialization_format::MessageFileReader, SymExpr, SymExprRef};
 use serde::{Deserialize, Serialize};
 
 /// A metadata holding a buffer of a concolic trace.
@@ -20,4 +20,4 @@ impl ConcolicMetadata {
     }
 }
 
-libafl::impl_serdeany!(ConcolicMetadata);
+crate::impl_serdeany!(ConcolicMetadata);

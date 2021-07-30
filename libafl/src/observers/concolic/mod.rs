@@ -322,3 +322,13 @@ pub const NO_FLOAT_ENV_NAME: &str = "LIBAFL_CONCOLIC_NO_FLOAT";
 
 /// The name of the environment variable that contains the byte offsets to be symbolized.
 pub const EXPRESSION_PRUNING: &str = "LIBAFL_CONCOLIC_EXPRESSION_PRUNING";
+
+#[cfg(feature = "std")]
+mod metadata;
+#[cfg(feature = "std")]
+pub use metadata::ConcolicMetadata;
+
+#[cfg(feature = "std")]
+mod observer;
+#[cfg(feature = "std")]
+pub use observer::ConcolicObserver;

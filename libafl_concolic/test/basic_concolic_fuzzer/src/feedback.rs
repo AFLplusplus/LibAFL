@@ -5,12 +5,13 @@ use libafl::{
     executors::ExitKind,
     feedbacks::Feedback,
     inputs::Input,
-    observers::ObserversTuple,
+    observers::{
+        concolic::{ConcolicMetadata, ConcolicObserver},
+        ObserversTuple,
+    },
     state::{HasClientPerfStats, HasMetadata},
     Error,
 };
-
-use crate::{metadata::ConcolicMetadata, observer::ConcolicObserver};
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.
 /// This feedback should be used in combination with another feedback as this feedback always considers testcases
