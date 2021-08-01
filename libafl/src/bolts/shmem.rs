@@ -474,6 +474,7 @@ pub mod unix_shmem {
     mod default {
         use core::{ptr, slice};
         use libc::{c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
+        use std::ptr::null_mut;
 
         use crate::{
             bolts::shmem::{ShMem, ShMemId, ShMemProvider},
@@ -530,7 +531,11 @@ pub mod unix_shmem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let os_id = shmget(0, map_size as c_ulong, 0o1000 | 0o2000 | 0o600);
+                    let os_id = shmget(
+                        libc::IPC_PRIVATE,
+                        map_size as c_ulong,
+                        libc::IPC_CREAT | libc::IPC_EXCL | libc::SHM_R | libc::SHM_W,
+                    );
 
                     if os_id < 0_i32 {
                         return Err(Error::Unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
@@ -539,7 +544,7 @@ pub mod unix_shmem {
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
-                        shmctl(os_id, 0, ptr::null_mut());
+                        shmctl(os_id, libc::IPC_RMID, ptr::null_mut());
                         return Err(Error::Unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
@@ -559,7 +564,7 @@ pub mod unix_shmem {
                     let id_int: i32 = id.into();
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
-                    if map == usize::MAX as *mut c_void as *mut c_uchar || map.is_null() {
+                    if map.is_null() || map == null_mut::<c_uchar>().wrapping_sub(1) {
                         return Err(Error::Unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
@@ -595,7 +600,7 @@ pub mod unix_shmem {
             fn drop(&mut self) {
                 unsafe {
                     let id_int: i32 = self.id.into();
-                    shmctl(id_int, 0, ptr::null_mut());
+                    shmctl(id_int, libc::IPC_RMID, ptr::null_mut());
                 }
             }
         }
