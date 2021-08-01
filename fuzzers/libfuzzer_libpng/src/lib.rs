@@ -9,7 +9,7 @@ use libafl::{
     bolts::{current_nanos, rands::StdRand},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
+        PowerQueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
@@ -17,11 +17,13 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::mopt_mutator::StdMOptMutator,
-    mutators::scheduled::{havoc_mutations, tokens_mutations},
+    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    stages::mutational::StdMutationalStage,
+    stages::{
+        calibrate::CalibrationStage,
+        power::{PowerMutationalStage, PowerSchedule},
+    },
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
@@ -121,16 +123,15 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Setup a basic mutator with a mutational stage
 
-    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-    /*
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-    */
+
+    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+
+    let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
