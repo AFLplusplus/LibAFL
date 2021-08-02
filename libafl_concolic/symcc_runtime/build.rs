@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use regex::{Regex, RegexBuilder};
 
 const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
-const SYMCC_REPO_COMMIT: &str = "f44262f9304190a93e85d86530f4ae02ab8f391f";
+const SYMCC_REPO_COMMIT: &str = "45cde0269ae22aef4cca2e1fb98c3b24f7bb2984";
 
 const SYMCC_RUNTIME_FUNCTION_NAME_PREFIX: &str = "_cpp_";
 
