@@ -9,4 +9,3 @@ edition = "2018"
 libafl = { path = "../../../libafl/" }
 serde = "1.0"
 z3 = "0.10"
-wait-timeout = "0.2.0"
