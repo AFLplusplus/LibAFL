@@ -1,5 +1,8 @@
 set -eux;
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
+
 # this test intends to ...
 # 1. compile symcc with the rust/tracing backend
 # 2. compile a program using this symcc
