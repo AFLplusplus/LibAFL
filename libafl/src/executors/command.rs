@@ -10,7 +10,7 @@ use crate::{
     Error,
 };
 
-/// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process. 
+/// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 pub struct CommandExecutor<EM, I, S, Z, T, OT> {
     inner: T,
@@ -83,7 +83,7 @@ where
 /// # use std::{io::Write, process::{Stdio, Command, Child}};
 /// # use libafl::{Error, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
 /// struct MyExecutor;
-/// 
+///
 /// impl<EM, I: Input + HasTargetBytes, S, Z> CommandConfigurator<EM, I, S, Z> for MyExecutor {
 ///     fn spawn_child(
 ///        &mut self,
@@ -104,7 +104,7 @@ where
 ///         Ok(child)
 ///     }
 /// }
-/// 
+///
 /// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
 ///     MyExecutor.into_executor(())
 /// }

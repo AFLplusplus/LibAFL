@@ -1,4 +1,6 @@
-pub use libafl::observers::concolic::{SymExpr, serialization_format::shared_memory::StdShMemMessageFileWriter};
+pub use libafl::observers::concolic::{
+    serialization_format::shared_memory::StdShMemMessageFileWriter, SymExpr,
+};
 
 use crate::{RSymExpr, Runtime};
 
