@@ -1,6 +1,0 @@
-[submodule "libafl_concolic/libafl_symcc"]
-	path = libafl_concolic/libafl_symcc
-	url = ../symcc.git
-[submodule "libafl_concolic/symqemu"]
-	path = libafl_concolic/symqemu
-	url = ../../eurecom-s3/symqemu.git
