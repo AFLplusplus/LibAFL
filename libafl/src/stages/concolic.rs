@@ -344,7 +344,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                                         .unwrap();
                                 replacements.push((offset, value));
                             } else {
-                                panic!()
+                                panic!();
                             }
                         }
                         res.push(replacements);
