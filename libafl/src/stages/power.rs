@@ -350,7 +350,7 @@ where
                         }
                         f if f >= 8.0 => {
                             if !favored {
-                                factor = 0.4
+                                factor = 0.4;
                             }
                         }
                         _ => {
