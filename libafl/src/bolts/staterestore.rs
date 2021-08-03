@@ -173,7 +173,7 @@ where
                     &filename
                 )));
             }
-            state = &file_content
+            state = &file_content;
         }
         let deserialized = postcard::from_bytes(state)?;
         Ok(Some(deserialized))
