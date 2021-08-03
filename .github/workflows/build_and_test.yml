@@ -75,7 +75,7 @@ jobs:
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
     - name: Install smoke test deps
-      run: ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
+      run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
       run: ./libafl_concolic/test/smoke_test.sh 
   ubuntu-fuzzers:
