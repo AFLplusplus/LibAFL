@@ -25,11 +25,26 @@ macro_rules! rust_filter_function_declaration {
     };
 }
 
+/// A [`Filter`] can decide for each expression whether the expression should be trace symbolically or be
+/// concretized. This allows to implement filtering mechanisms that reduce the amount of traced expressions by
+/// concretizing uninteresting expressions.
+/// If a filter concretizes an expression that would have later been used as part of another expression that
+/// is still symbolic, a concrete instead of a symbolic value is received.
+///
+/// For example:
+/// Suppose there are symbolic expressions `a` and `b`. Expression `a` is concretized, `b` is still symbolic. If an add
+/// operation between `a` and `b` is encountered, it will receive `a`'s concrete value and `b` as a symbolic expression.
+///
+/// An expression filter also receives code locations (`visit_*` methods) as they are visited in between operations
+/// and these code locations are typically used to decide whether an expression should be concretized.
 pub trait Filter {
     invoke_macro_with_rust_runtime_exports!(rust_filter_function_declaration;);
 }
 
 #[allow(clippy::module_name_repetitions)]
+/// A `FilterRuntime` wraps a [`Runtime`] with a [`Filter`], applying the filter before passing expressions to the inner
+/// runtime.
+/// It also implements [`Runtime`], allowing for composing multiple [`Filter`]'s in a chain.
 pub struct FilterRuntime<F, RT> {
     filter: F,
     runtime: RT,
@@ -186,7 +201,7 @@ pub mod coverage {
 
     const MAP_SIZE: usize = 65536;
 
-    /// A coverage-based filter based on the expression pruning from [`QSym`](https://github.com/sslab-gatech/qsym)
+    /// A coverage-based [`Filter`] based on the expression pruning from [`QSym`](https://github.com/sslab-gatech/qsym)
     /// [here](https://github.com/sslab-gatech/qsym/blob/master/qsym/pintool/call_stack_manager.cpp).
     pub(crate) struct CallStackCoverage<
         THasher: Hasher = DefaultHasher,
@@ -322,7 +337,7 @@ pub mod coverage {
         invoke_macro_with_rust_runtime_exports!(call_stack_coverage_filter_function_implementation;);
     }
 
-    /// An expression filter that just observers Basic Block locations and updates a given Hitmap as a [`ShMem`].
+    /// A [`Filter`] that just observers Basic Block locations and updates a given Hitmap as a [`ShMem`].
     pub struct HitmapFilter<M, BH: BuildHasher = BuildHasherDefault<DefaultHasher>> {
         hitcounts_map: M,
         build_hasher: BH,
