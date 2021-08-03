@@ -46,7 +46,10 @@ where
 
     /// Create a [`StateRrestore`] from `env` variable name
     pub fn from_env(shmem_provider: &mut SP, env_name: &str) -> Result<Self, Error> {
-        Ok(Self::new(shmem_provider.existing_from_env(env_name)?))
+        Ok(Self {
+            shmem: shmem_provider.existing_from_env(env_name)?,
+            phantom: PhantomData,
+        })
     }
 
     /// Create a new [`StateRestorer`].
@@ -83,7 +86,17 @@ where
 
             // write the filename to shmem
             let filename_buf = postcard::to_allocvec(&filename)?;
+
             let len = filename_buf.len();
+            if len > self.shmem.len() {
+                return Err(Error::IllegalState(format!(
+                    "The state restorer map is too small to fit anything, even the filename! 
+                        It needs to be at least {} bytes. 
+                        The tmpfile was written to {:?}.",
+                    len,
+                    temp_dir().join(&filename)
+                )));
+            }
 
             /*println!(
                 "Storing {} bytes to tmpfile {} (larger than map of {} bytes)",
@@ -134,16 +147,19 @@ where
         }
     }
 
+    /// The content is either the name of the tmpfile, or the serialized bytes directly, if they fit on a single page.
     fn content(&self) -> &StateShMemContent {
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
         let ptr = self.shmem.map().as_ptr() as *const StateShMemContent;
         unsafe { &*(ptr) }
     }
 
+    /// Returns true, if this [`StateRestorer`] has contents.
     pub fn has_content(&self) -> bool {
         self.content().buf_len > 0
     }
 
+    /// Restores the contents saved in this [`StateRestorer`], if any are availiable.
     pub fn restore<S>(&self) -> Result<Option<S>, Error>
     where
         S: DeserializeOwned,

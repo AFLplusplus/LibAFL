@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use libafl::inputs::{BytesInput, HasTargetBytes};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
@@ -9,6 +8,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
+    inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
