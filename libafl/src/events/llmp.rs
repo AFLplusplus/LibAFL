@@ -1015,7 +1015,7 @@ mod tests {
 
         let (mut state_clone, mgr_description) = staterestorer.restore().unwrap().unwrap();
         let mut llmp_clone = LlmpEventManager::existing_client_from_description(
-            shmem_provider.clone(),
+            shmem_provider,
             &mgr_description,
             "fuzzer".to_string(),
         )

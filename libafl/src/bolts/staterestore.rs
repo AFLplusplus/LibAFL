@@ -89,16 +89,13 @@ where
 
             let len = filename_buf.len();
             if len > self.shmem.len() {
-                return Err(Error::IllegalState(
-                    format!(
-                        "The state restorer map is too small to fit anything, even the filename! 
+                return Err(Error::IllegalState(format!(
+                    "The state restorer map is too small to fit anything, even the filename! 
                         It needs to be at least {} bytes. 
                         The tmpfile was written to {:?}.",
-                        len,
-                        temp_dir().join(&filename)
-                    )
-                    .to_string(),
-                ));
+                    len,
+                    temp_dir().join(&filename)
+                )));
             }
 
             /*println!(

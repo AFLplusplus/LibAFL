@@ -807,10 +807,12 @@ where
         loop {
             if self.save_to_unmap() {
                 return;
-            } else if cfg!(feature = "std") {
+            }
+            // We log that we're looping -> see when we're blocking.
+            #[cfg(feature = "std")]
+            {
                 ctr = ctr.wrapping_add(1);
                 if ctr == 0 {
-                    #[cfg(feature = "std")]
                     println!("Awaiting save_to_unmap_blocking");
                 }
             }
@@ -2448,6 +2450,11 @@ where
     }
 
     /// For debug purposes: mark the client as save to unmap, even though it might not have been read.
+    ///
+    /// # Safety
+    /// This should only be called in a debug scenario.
+    /// Calling this in other contexts may lead to a premature page unmap and result in a crash in another process,
+    /// or an unexpected read from an empty page in a receiving process.
     pub unsafe fn mark_save_to_unmap(&mut self) {
         self.sender.mark_save_to_unmap();
     }
