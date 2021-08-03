@@ -203,7 +203,7 @@ pub mod coverage {
 
     /// A coverage-based [`Filter`] based on the expression pruning from [`QSym`](https://github.com/sslab-gatech/qsym)
     /// [here](https://github.com/sslab-gatech/qsym/blob/master/qsym/pintool/call_stack_manager.cpp).
-    pub(crate) struct CallStackCoverage<
+    struct CallStackCoverage<
         THasher: Hasher = DefaultHasher,
         THashBuilder: BuildHasher = BuildHasherDefault<THasher>,
     > {
