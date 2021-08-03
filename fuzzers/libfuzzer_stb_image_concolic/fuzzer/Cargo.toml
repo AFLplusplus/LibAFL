@@ -1,7 +1,7 @@
 [package]
-name = "libfuzzer_stb_image"
+name = "libfuzzer_stb_image_concolic"
 version = "0.5.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>", "Julius Hohnerlein"]
 edition = "2018"
 build = "build.rs"
 

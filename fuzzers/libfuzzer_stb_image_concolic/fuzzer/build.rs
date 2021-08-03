@@ -61,11 +61,11 @@ fn main() {
         .output()
         .expect("failed to execute symcc");
     if !output.status.success() {
-        println!("cargo:warning=Runtime not found. Build it first.");
+        println!("cargo:warning=Building the target with SymCC failed");
         let mut stdout = stdout();
         stdout
             .write_all(&output.stderr)
-            .expect("failed to write git error message to stdout");
+            .expect("failed to write cc error message to stdout");
         exit(1);
     }
 

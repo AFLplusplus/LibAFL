@@ -1,11 +1,20 @@
 [package]
-name = "runtime_test"
+name = "example_runtime"
 version = "0.1.0"
 edition = "2018"
 
 [lib]
+# the runtime needs to be a shared object -> cdylib
 crate-type   = ["cdylib"]
+# this is necessary for SymCC to find the runtime.
 name = "SymRuntime"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+# this is somewhat important to ensure the runtime does not unwind into the target program.
+panic = "abort"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

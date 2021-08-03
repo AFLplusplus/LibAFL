@@ -1,11 +1,8 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
 
-mod command_executor;
 mod stage;
 
-use command_executor::MyCommandConfigurator;
-use libafl::stages::TracingStage;
 use stage::SimpleConcolicMutationalStage;
 
 use std::{env, path::PathBuf};
@@ -28,7 +25,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, HasTargetBytes, Input},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::I2SRandReplace,
     observers::{
@@ -38,7 +35,7 @@ use libafl::{
         },
         StdMapObserver, TimeObserver,
     },
-    stages::{ConcolicTracingStage, ShadowTracingStage, StdMutationalStage},
+    stages::{ConcolicTracingStage, ShadowTracingStage, StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
     stats::MultiStats,
     Error,
@@ -185,24 +182,28 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mutational = StdMutationalStage::new(mutator);
 
+    // The shared memory for the concolic runtime to write its trace to
     let mut concolic_shmem = StdShMemProvider::new()
         .unwrap()
         .new_map(DEFAULT_SIZE)
         .unwrap();
     concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 
+    // The concolic observer observers the concolic shared memory map.
     let concolic_observer = ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
 
     let concolic_observer_name = concolic_observer.name().to_string();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(
+        // Create a concolic trace
         ConcolicTracingStage::new(
             TracingStage::new(
                 MyCommandConfigurator::default().into_executor(tuple_list!(concolic_observer))
             ),
             concolic_observer_name,
         ),
+        // Use the concolic trace for z3-based solving
         SimpleConcolicMutationalStage::default(),
         tracing,
         i2s,
@@ -213,4 +214,32 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Never reached
     Ok(())
+}
+
+use std::process::{Child, Command, Stdio};
+
+#[derive(Default)]
+pub struct MyCommandConfigurator;
+
+impl<EM, I, S, Z> CommandConfigurator<EM, I, S, Z> for MyCommandConfigurator
+where
+    I: HasTargetBytes + Input,
+{
+    fn spawn_child(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) -> Result<Child, Error> {
+        input.to_file("cur_input")?;
+
+        Ok(Command::new("./target_symcc.out")
+            .arg("cur_input")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("failed to start process"))
+    }
 }
