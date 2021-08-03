@@ -389,7 +389,7 @@ where
         corpus_idx: usize,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let testcase = state.corpus().get(corpus_idx)?;
+        let testcase = state.corpus().get(corpus_idx)?.clone();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         let mutations = if let Some(meta) = testcase.borrow().metadata().get::<ConcolicMetadata>() {
