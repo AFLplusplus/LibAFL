@@ -2,7 +2,6 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
-#[allow(clippy::pub_enum_variant_names)]
 pub enum X86Regs {
     Eax = 0,
     Ebx = 1,

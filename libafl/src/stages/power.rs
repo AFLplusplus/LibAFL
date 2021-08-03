@@ -204,6 +204,7 @@ where
 
     /// Compute the parameter `μ` used in the COE schedule.
     #[inline]
+    #[allow(clippy::unused_self)]
     pub fn fuzz_mu(&self, state: &S, psmeta: &PowerScheduleMetadata) -> Result<f64, Error> {
         let corpus = state.corpus();
         let mut n_paths = 0;
