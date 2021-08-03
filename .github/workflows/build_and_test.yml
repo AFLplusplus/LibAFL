@@ -65,6 +65,19 @@ jobs:
       run: cargo test --all-features --doc
     - name: Run clippy
       run: ./scripts/clippy.sh
+  ubuntu-concolic:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: Install smoke test deps
+      run: ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
+    - name: Run smoke test
+      run: ./libafl_concolic/test/smoke_test.sh 
   ubuntu-fuzzers:
     runs-on: ubuntu-latest
     steps:
