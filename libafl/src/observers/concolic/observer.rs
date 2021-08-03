@@ -18,6 +18,7 @@ pub struct ConcolicObserver<'map> {
 impl<'map, I, S> Observer<I, S> for ConcolicObserver<'map> {}
 
 impl<'map> ConcolicObserver<'map> {
+    #[must_use]
     pub fn create_metadata_from_current_map(&self) -> ConcolicMetadata {
         let reader = MessageFileReader::from_length_prefixed_buffer(self.map)
             .expect("constructing the message reader from a memory buffer should not fail");
