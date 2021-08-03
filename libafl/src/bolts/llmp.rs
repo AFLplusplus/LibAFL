@@ -803,7 +803,7 @@ where
     /// If a receiver is involved, this function should always be called.
     pub fn await_save_to_unmap_blocking(&self) {
         #[cfg(feature = "std")]
-        let mut ctr = 0_u8;
+        let mut ctr = 0_u16;
         loop {
             if self.save_to_unmap() {
                 return;
