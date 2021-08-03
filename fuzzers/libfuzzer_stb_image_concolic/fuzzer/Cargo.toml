@@ -16,9 +16,8 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl/" }
+libafl = { path = "../../../libafl/", features = ["concolic_mutation"] }
 libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
-z3 = "0.10"
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

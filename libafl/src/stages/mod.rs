@@ -22,6 +22,8 @@ pub use power::PowerMutationalStage;
 pub mod concolic;
 #[cfg(feature = "std")]
 pub use concolic::ConcolicTracingStage;
+#[cfg(feature = "std")]
+pub use concolic::SimpleConcolicMutationalStage;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.

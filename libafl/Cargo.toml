@@ -46,6 +46,7 @@ llmp_compression = ["miniz_oxide"] # llmp compression using GZip
 llmp_debug = ["backtrace"] # Enables debug output for LLMP
 llmp_small_maps = [] # reduces initial map size for llmp
 introspection = [] # Include performance statistics of the fuzzing pipeline
+concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
 
 [[example]]
 name = "llmp_test"
@@ -77,7 +78,9 @@ rand_core = { version = "0.6.2", optional = true } # This dependency allows us t
 nix = { version = "0.20.0", optional = true }
 libm = "0.2.1"
 
-wait-timeout = { version = "0.2.0", optional = true } # used by CommandExecutor to wait for child process
+wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
+
+z3 = { version = "0.10", optional = true } # for concolic mutation
 
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug

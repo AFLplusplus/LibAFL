@@ -1,10 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
 
-mod stage;
-
-use stage::SimpleConcolicMutationalStage;
-
 use std::{env, path::PathBuf};
 
 use libafl::{
@@ -35,7 +31,10 @@ use libafl::{
         },
         StdMapObserver, TimeObserver,
     },
-    stages::{ConcolicTracingStage, ShadowTracingStage, StdMutationalStage, TracingStage},
+    stages::{
+        ConcolicTracingStage, ShadowTracingStage, SimpleConcolicMutationalStage,
+        StdMutationalStage, TracingStage,
+    },
     state::{HasCorpus, StdState},
     stats::MultiStats,
     Error,
