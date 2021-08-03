@@ -17,7 +17,6 @@ members = [
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/runtime_test",
     "libafl_concolic/dump_constraints",
-    "libafl_concolic/test/basic_concolic_fuzzer",
     "libafl_concolic/runtime"
 ]
 default-members = [
