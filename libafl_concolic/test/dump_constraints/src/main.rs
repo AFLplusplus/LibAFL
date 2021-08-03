@@ -87,11 +87,11 @@ fn main() {
     }
 
     if opt.no_float {
-        std::env::set_var(NO_FLOAT_ENV_NAME, "1")
+        std::env::set_var(NO_FLOAT_ENV_NAME, "1");
     }
 
     if opt.prune {
-        std::env::set_var(EXPRESSION_PRUNING, "1")
+        std::env::set_var(EXPRESSION_PRUNING, "1");
     }
 
     let res = Command::new(&opt.program.first().expect("no program argument given"))
