@@ -126,7 +126,7 @@ impl FridaOptions {
                         }
 
                         if !cfg!(feature = "cmplog") && options.enable_cmplog {
-                            panic!("cmplog feature is disabled!")
+                            panic!("cmplog feature is disabled!");
                         }
                     }
                     "cmplog-cores" => {
