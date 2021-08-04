@@ -199,12 +199,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
+    use crate::bolts::shmem::{ShMemProvider, StdShMemProvider, StdShMemService};
 
     use super::StateRestorer;
 
     #[test]
     fn test_state_restore() {
+        StdShMemService::start().unwrap();
+
         const TESTMAP_SIZE: usize = 1024;
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
