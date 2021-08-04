@@ -27,7 +27,6 @@ struct StateShMemContent {
 
 impl StateShMemContent {
     /// Gets the (tmp-)filename, if the contents are stored on disk.
-    #[must_use]
     pub fn tmpfile(&self, shmem_size: usize) -> Result<Option<PathBuf>, Error> {
         Ok(if self.is_disk {
             let bytes = unsafe {
@@ -41,7 +40,6 @@ impl StateShMemContent {
     }
 
     /// Get a length that's safe to deref from this map, or error.
-    #[must_use]
     pub fn buf_len_checked(&self, shmem_size: usize) -> Result<usize, Error> {
         let buf_len = unsafe { read_volatile(&self.buf_len) };
         if size_of::<StateShMemContent>() + buf_len > shmem_size {
