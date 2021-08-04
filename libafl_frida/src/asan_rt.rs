@@ -164,6 +164,11 @@ impl AsanRuntime {
             .map_shadow_for_region(address, address + size, true);
     }
 
+    /// Make sure the specified memory is poisoned
+    pub fn poison(&mut self, address: usize, size: usize) {
+        Allocator::poison(self.allocator.map_to_shadow(address), size);
+    }
+
     /// Add a stalked address to real address mapping.
     #[inline]
     pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
@@ -1235,10 +1240,11 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     fn hook_strdup(&mut self, s: *const c_char) -> *mut c_char {
         extern "C" {
-            fn strdup(s: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
+            fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
         }
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        let size = unsafe { strlen(s) };
+        if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strdup".to_string(),
                 self.real_address_for_stalked(
@@ -1249,7 +1255,12 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        unsafe { strdup(s) }
+
+        unsafe {
+            let ret = self.allocator.alloc(size, 8) as *mut c_char;
+            strcpy(ret, s);
+            ret
+        }
     }
 
     #[inline]
@@ -2007,7 +2018,7 @@ impl AsanRuntime {
             ; mov x5, #1
             ; add x5, xzr, x5, lsl #shadow_bit
             ; add x5, x5, x0, lsr #3
-            ; ubfx x5, x5, #0, #(shadow_bit + 2)
+            ; ubfx x5, x5, #0, #(shadow_bit + 1)
 
             ; cmp x1, #0
             ; b.eq >return_success
@@ -2127,7 +2138,7 @@ impl AsanRuntime {
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 2)
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
@@ -2158,7 +2169,7 @@ impl AsanRuntime {
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 2)
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
