@@ -1,3 +1,7 @@
+//! This is a straight-forward command line utility that can dump constraints written by a tracing runtime.
+//! It achieves this by running an instrumented target program with the necessary environment variables set.
+//! When the program has finished executing, it dumps the traced constraints to a file.
+
 use std::{
     ffi::OsString,
     fs::File,
