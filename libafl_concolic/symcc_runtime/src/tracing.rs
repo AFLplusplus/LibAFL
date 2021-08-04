@@ -1,14 +1,18 @@
-pub use libafl::observers::concolic::{
-    serialization_format::shared_memory::StdShMemMessageFileWriter, SymExpr,
-};
+//! Tracing of expressions in a serialized form.
+
+pub use libafl::observers::concolic::serialization_format::shared_memory::StdShMemMessageFileWriter;
+use libafl::observers::concolic::SymExpr;
 
 use crate::{RSymExpr, Runtime};
 
+/// Traces the expressions according to the format described in [`libafl::observers::concolic::serialization_format`].
+/// The format can be read from elsewhere to perform processing of the expressions outside of the runtime.
 pub struct TracingRuntime {
     writer: StdShMemMessageFileWriter,
 }
 
 impl TracingRuntime {
+    /// Creates the runtime, tracing using the given writer.
     #[must_use]
     pub fn new(writer: StdShMemMessageFileWriter) -> Self {
         Self { writer }
@@ -171,6 +175,7 @@ impl Runtime for TracingRuntime {
 
 impl Drop for TracingRuntime {
     fn drop(&mut self) {
+        // manually end the writer to update the length prefix
         self.writer.end().expect("failed to shut down writer");
     }
 }
