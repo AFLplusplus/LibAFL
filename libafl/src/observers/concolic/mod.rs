@@ -278,9 +278,6 @@ pub enum SymExpr {
         first_bit: usize,
         last_bit: usize,
     },
-    Bswap {
-        op: SymExprRef,
-    },
     Insert {
         target: SymExprRef,
         to_insert: SymExprRef,

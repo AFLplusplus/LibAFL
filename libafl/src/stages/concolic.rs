@@ -229,16 +229,6 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 first_bit,
                 last_bit,
             } => Some(bv!(op).extract(first_bit as u32, last_bit as u32).into()),
-            SymExpr::Bswap { op } => {
-                let bv = bv!(op);
-                let bits = bv.get_size();
-                assert_eq!(
-                    bits % 16,
-                    0,
-                    "bswap is only compatible with an even number of bvytes in the BV"
-                );
-                Some(build_extract(&bv, 0, u64::from(bits) / 8, true).into())
-            }
             SymExpr::Insert {
                 target,
                 to_insert,

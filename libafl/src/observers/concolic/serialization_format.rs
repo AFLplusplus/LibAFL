@@ -77,8 +77,7 @@ impl<R: Read> MessageFileReader<R> {
             | SymExpr::FloatToSignedInteger { op, .. }
             | SymExpr::FloatToUnsignedInteger { op, .. }
             | SymExpr::BoolToBits { op, .. }
-            | SymExpr::Extract { op, .. }
-            | SymExpr::Bswap { op } => {
+            | SymExpr::Extract { op, .. } => {
                 *op = self.make_absolute(*op);
                 self.current_id += 1;
             }
@@ -225,8 +224,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             | SymExpr::FloatToSignedInteger { op, .. }
             | SymExpr::FloatToUnsignedInteger { op, .. }
             | SymExpr::BoolToBits { op, .. }
-            | SymExpr::Extract { op, .. }
-            | SymExpr::Bswap { op } => {
+            | SymExpr::Extract { op, .. } => {
                 *op = self.make_relative(*op);
                 self.id_counter += 1;
             }
