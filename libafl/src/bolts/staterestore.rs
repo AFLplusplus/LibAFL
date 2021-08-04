@@ -205,9 +205,9 @@ mod tests {
 
     #[test]
     fn test_state_restore() {
-        StdShMemService::start().unwrap();
-
         const TESTMAP_SIZE: usize = 1024;
+
+        StdShMemService::start().unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
         let shmem = shmem_provider.new_map(TESTMAP_SIZE).unwrap();

@@ -64,7 +64,11 @@ use core::{
     mem::ManuallyDrop,
 };
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(
+    unix,
+    feature = "std",
+    any(target_os = "ios", target_os = "macos", target_os = "android")
+))]
 use super::os::unix_shmem_server::ServedShMem;
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
@@ -596,7 +600,7 @@ pub mod unix_shmem {
                         shm_fd,
                         0,
                     );
-                    if map == libc::MAP_FAILED || map == ptr::null_mut() {
+                    if map == libc::MAP_FAILED || map.is_null() {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
@@ -629,7 +633,7 @@ pub mod unix_shmem {
                         shm_fd,
                         0,
                     );
-                    if map == libc::MAP_FAILED || map == ptr::null_mut() {
+                    if map == libc::MAP_FAILED || map.is_null() {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         return Err(Error::Unknown(format!(
