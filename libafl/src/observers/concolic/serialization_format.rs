@@ -30,12 +30,8 @@ impl<R: Read> MessageFileReader<R> {
     pub fn next_message(&mut self) -> Option<bincode::Result<(SymExprRef, SymExpr)>> {
         match self.deserializer_config.deserialize_from(&mut self.reader) {
             Ok(mut message) => {
-                if let SymExpr::End = message {
-                    None
-                } else {
-                    let message_id = self.transform_message(&mut message);
-                    Some(Ok((message_id, message)))
-                }
+                let message_id = self.transform_message(&mut message);
+                Some(Ok((message_id, message)))
             }
             Err(e) => match *e {
                 bincode::ErrorKind::Io(ref io_err) => match io_err.kind() {
@@ -143,9 +139,6 @@ impl<R: Read> MessageFileReader<R> {
                 for expr in exprs {
                     *expr = self.make_absolute(*expr);
                 }
-            }
-            SymExpr::End => {
-                panic!("should not pass End message to this function");
             }
         }
         SymExprRef::new(ret).unwrap()
@@ -291,7 +284,6 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                     *expr = self.make_relative(*expr);
                 }
             }
-            SymExpr::End => {}
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;

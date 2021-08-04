@@ -19,8 +19,7 @@ use libafl::{
         serialization_format::{
             shared_memory::DEFAULT_ENV_NAME, MessageFileReader, MessageFileWriter,
         },
-        SymExpr, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
-        SELECTIVE_SYMBOLICATION_ENV_NAME,
+        EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
     },
 };
 
@@ -144,9 +143,6 @@ fn main() {
                     break;
                 }
             }
-            writer
-                .write_message(SymExpr::End)
-                .expect("unable to write end message");
         }
     }
 

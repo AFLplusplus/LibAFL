@@ -295,8 +295,6 @@ pub enum SymExpr {
     ExpressionsUnreachable {
         exprs: Vec<SymExprRef>,
     },
-    /// This marks the end of the trace.
-    End,
 }
 
 #[cfg(feature = "std")]
