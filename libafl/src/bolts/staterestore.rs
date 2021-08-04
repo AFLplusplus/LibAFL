@@ -78,7 +78,8 @@ where
         if size_of::<StateShMemContent>() + serialized.len() > self.shmem.len() {
             // generate a filename
             let mut hasher = AHasher::new_with_keys(0, 0);
-            hasher.write(&serialized[serialized.len() - 1024..]);
+            // Using the last few k as randomness for a filename, hoping it's unique.
+            hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
 
             let filename = format!("{:016x}.libafl_state", hasher.finish());
             let tmpfile = temp_dir().join(&filename);

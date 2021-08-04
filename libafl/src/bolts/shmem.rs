@@ -1,6 +1,8 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
+#[cfg(all(feature = "std", unix, not(target_os = "android")))]
+pub use unix_shmem::{MmapShMem, MmapShMemProvider};
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 
@@ -24,11 +26,11 @@ pub type StdShMem = RcShMem<ServedShMem<AshmemShMem>>;
 pub type StdShMemService = ShMemService<AshmemShMemProvider>;
 
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
-pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<UnixShMemProvider>>;
+pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
-pub type StdShMem = RcShMem<ServedShMem<UnixShMem>>;
+pub type StdShMem = RcShMem<ServedShMem<MmapShMem>>;
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
-pub type StdShMemService = ShMemService<UnixShMemProvider>;
+pub type StdShMemService = ShMemService<MmapShMemProvider>;
 
 /// The default [`ShMemProvider`] for this os.
 #[cfg(all(
@@ -470,11 +472,22 @@ pub mod unix_shmem {
     #[cfg(not(target_os = "android"))]
     pub type UnixShMem = ashmem::AshmemShMem;
 
+    /// Mmap [`ShMem`] for Unix
+    #[cfg(not(target_os = "android"))]
+    pub use default::MmapShMem;
+    /// Mmap [`ShMemProvider`] for Unix
+    #[cfg(not(target_os = "android"))]
+    pub use default::MmapShMemProvider;
+
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
-        use core::{ptr, slice};
-        use libc::{c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
-        use std::ptr::null_mut;
+
+        use core::{convert::TryInto, ptr, slice};
+        use libc::{
+            c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void, close, ftruncate, mmap,
+            munmap, perror, shm_open, shm_unlink,
+        };
+        use std::{io::Write, process, ptr::null_mut};
 
         use crate::{
             bolts::shmem::{ShMem, ShMemId, ShMemProvider},
@@ -517,6 +530,197 @@ pub mod unix_shmem {
             fn shmctl(__shmid: c_int, __cmd: c_int, __buf: *mut shmid_ds) -> c_int;
             fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int;
             fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
+        }
+
+        const MAX_MMAP_FILENAME_LEN: usize = 256;
+
+        /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
+        /// Default on `MacOS` and `iOS`, where we need a central point to unmap
+        /// shared mem segments for dubious Mach kernel reasons.
+        #[derive(Clone, Debug)]
+        pub struct MmapShMem {
+            /// The path of this shared memory segment.
+            /// None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
+            filename_path: Option<[u8; MAX_MMAP_FILENAME_LEN]>,
+            /// The size of this map
+            map_size: usize,
+            /// The map ptr
+            map: *mut u8,
+            /// The shmem id, containing the file descriptor and size, to send over the wire
+            id: ShMemId,
+            /// The file descriptor of the shmem
+            shm_fd: c_int,
+        }
+
+        impl MmapShMem {
+            pub fn new(map_size: usize, shmem_ctr: usize) -> Result<Self, Error> {
+                unsafe {
+                    let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
+                    write!(
+                        &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
+                        "/libafl_{}_{}",
+                        process::id(),
+                        shmem_ctr
+                    )?;
+
+                    /* create the shared memory segment as if it was a file */
+                    let shm_fd = shm_open(
+                        filename_path.as_ptr() as *const _,
+                        libc::O_CREAT | libc::O_RDWR | libc::O_EXCL,
+                        0o600,
+                    );
+                    if shm_fd == -1 {
+                        perror(b"shm_open\0".as_ptr() as *const _);
+                        return Err(Error::Unknown(format!(
+                            "Failed to shm_open map with id {:?}",
+                            shmem_ctr
+                        )));
+                    }
+
+                    /* configure the size of the shared memory segment */
+                    if ftruncate(shm_fd, map_size.try_into()?) != 0 {
+                        perror(b"ftruncate\0".as_ptr() as *const _);
+                        shm_unlink(filename_path.as_ptr() as *const _);
+                        return Err(Error::Unknown(format!(
+                            "setup_shm(): ftruncate() failed for map with id {:?}",
+                            shmem_ctr
+                        )));
+                    }
+
+                    /* map the shared memory segment to the address space of the process */
+                    let map = mmap(
+                        null_mut(),
+                        map_size,
+                        libc::PROT_READ | libc::PROT_WRITE,
+                        libc::MAP_SHARED,
+                        shm_fd,
+                        0,
+                    );
+                    if map == libc::MAP_FAILED || map == ptr::null_mut() {
+                        perror(b"mmap\0".as_ptr() as *const _);
+                        close(shm_fd);
+                        shm_unlink(filename_path.as_ptr() as *const _);
+                        return Err(Error::Unknown(format!(
+                            "mmap() failed for map with id {:?}",
+                            shmem_ctr
+                        )));
+                    }
+
+                    Ok(Self {
+                        filename_path: Some(filename_path),
+                        map: map as *mut u8,
+                        map_size,
+                        shm_fd,
+                        id: ShMemId::from_string(&format!("{}", shm_fd)),
+                    })
+                }
+            }
+
+            fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+                unsafe {
+                    let shm_fd: i32 = id.to_string().parse().unwrap();
+
+                    /* map the shared memory segment to the address space of the process */
+                    let map = mmap(
+                        null_mut(),
+                        map_size,
+                        libc::PROT_READ | libc::PROT_WRITE,
+                        libc::MAP_SHARED,
+                        shm_fd,
+                        0,
+                    );
+                    if map == libc::MAP_FAILED || map == ptr::null_mut() {
+                        perror(b"mmap\0".as_ptr() as *const _);
+                        close(shm_fd);
+                        return Err(Error::Unknown(format!(
+                            "mmap() failed for map with fd {:?}",
+                            shm_fd
+                        )));
+                    }
+
+                    Ok(Self {
+                        filename_path: None,
+                        map: map as *mut u8,
+                        map_size,
+                        shm_fd,
+                        id: ShMemId::from_string(&format!("{}", shm_fd)),
+                    })
+                }
+            }
+        }
+
+        /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
+        #[cfg(unix)]
+        #[derive(Clone, Debug)]
+        pub struct MmapShMemProvider {
+            current_map_id: usize,
+        }
+
+        unsafe impl Send for MmapShMemProvider {}
+
+        #[cfg(unix)]
+        impl Default for MmapShMemProvider {
+            fn default() -> Self {
+                Self::new().unwrap()
+            }
+        }
+
+        /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
+        #[cfg(unix)]
+        impl ShMemProvider for MmapShMemProvider {
+            type Mem = MmapShMem;
+
+            fn new() -> Result<Self, Error> {
+                Ok(Self { current_map_id: 0 })
+            }
+            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+                self.current_map_id += 1;
+                MmapShMem::new(map_size, self.current_map_id)
+            }
+
+            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+                MmapShMem::from_id_and_size(id, size)
+            }
+        }
+
+        impl ShMem for MmapShMem {
+            fn id(&self) -> ShMemId {
+                self.id
+            }
+
+            fn len(&self) -> usize {
+                self.map_size
+            }
+
+            fn map(&self) -> &[u8] {
+                unsafe { slice::from_raw_parts(self.map, self.map_size) }
+            }
+
+            fn map_mut(&mut self) -> &mut [u8] {
+                unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+            }
+        }
+
+        impl Drop for MmapShMem {
+            fn drop(&mut self) {
+                unsafe {
+                    if self.map.is_null() {
+                        panic!("Map should never be null for MmapShMem (on Drop)");
+                    }
+
+                    munmap(self.map as *mut _, self.map_size);
+                    self.map = ptr::null_mut();
+
+                    if self.shm_fd == -1 {
+                        panic!("FD should never be -1 for MmapShMem (on Drop)");
+                    }
+
+                    // None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
+                    if let Some(filename_path) = self.filename_path {
+                        shm_unlink(filename_path.as_ptr() as *const _);
+                    }
+                }
+            }
         }
 
         /// The default sharedmap impl for unix using shmctl & shmget
