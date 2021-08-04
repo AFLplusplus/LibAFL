@@ -1,10 +1,19 @@
+//! # Concolic Tracing
 use core::num::NonZeroUsize;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
+/// A SymExprRef identifies a [`SymExpr`] in a trace. Reading a `SymExpr` from a trace will always also yield its 
+/// `SymExprRef`, which can be used later in the trace to identify the `SymExpr`.
+/// It is also never zero, which allows for efficient use of `Option<SymExprRef>`.
+///
+/// In a trace, `SymExprRef`s are monotonically increasing and start at 1.
+/// `SymExprRef`s are not valid across traces.
 pub type SymExprRef = NonZeroUsize;
 
+/// `SymExpr` represents a message in the serialization format.
+/// The messages in the format are a perfect mirror of the methods that are called on the runtime during execution.
 #[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SymExpr {

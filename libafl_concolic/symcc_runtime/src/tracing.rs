@@ -1,6 +1,6 @@
 //! Tracing of expressions in a serialized form.
 
-pub use libafl::observers::concolic::serialization_format::shared_memory::StdShMemMessageFileWriter;
+pub use libafl::observers::concolic::serialization_format::StdShMemMessageFileWriter;
 use libafl::observers::concolic::SymExpr;
 
 use crate::{RSymExpr, Runtime};

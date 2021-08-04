@@ -1,17 +1,64 @@
+//! # Concolic Tracing Serialization Format
+//! ## Design Goals
+//! * The serialization format for concolic tracing was developed with the goal of being space and time efficient.
+//! * Additionally, it should be easy to maintain and extend.
+//! * It does not have to be compatible with other programming languages.
+//! * It should be resilient to crashes. Since we are fuzzing, we are expecting the traced program to crash at some
+//! point.
+//!
+//! The format as implemented fulfils these design goals.
+//! Specifically:
+//! * it requires only constant memory space for serialization, which allows for tracing complex and/or
+//! long-running programs.
+//! * the trace itself requires little space. A typical binary operation (such as an add) typically takes just 3 bytes.
+//! * it easy to encode. There is no translation between the interface of the runtime itself and the trace it generates.
+//! * it is similarly easy to decode and can be easily translated into an in-memory AST without overhead, because
+//! expressions are decoded from leaf to root instead of root to leaf.
+//! * At its core, it is just [`SymExpr`]s, which can be added to, modified and removed from with ease. The
+//! definitions are automatically shared between the runtime and the consuming program, since both depend on the same
+//! LibAFL.
+//!
+//! ## Techniques
+//! The serialization format applies multiple techniques to achieve its goals.
+//! * It uses bincode for efficient binary serialization. Crucially, bincode uses variable length integer encoding,
+//! allowing it encode small integers use fewer bytes.
+//! * References to previous expressions are stored relative to the current expressions id. The vast majority of
+//! expressions refer to other expressions that were defined close to their use. Therefore, encoding relative references
+//! keeps references small. Therefore, they make optimal use of bincodes variable length integer encoding.
+//! * Ids of expressions ([`SymExprRef`]s) are implicitly derived by their position in the message stream. Effectively,
+//! a counter is used to identify expressions.
+//! * The current length of the trace in bytes in serialized in a fixed format at the beginning of the trace.
+//! This length is updated regularly when the trace is in a consistent state. This allows the reader to avoid reading
+//! malformed data if the traced process crashed.
+//!
+//! ## Example
+//! The expression `SymExpr::BoolAnd { a: SymExpr::True, b: SymExpr::False }` would be encoded as:
+//! 1. 1 byte to identify SymExpr::True (a)
+//! 2. 1 byte to identify SymExpr::False (b)
+//! 3. 1 byte to identify SymExpr::BoolAnd
+//! 4. 1 byte to reference a
+//! 5. 1 byte to reference b
+//!
+//! ... making for a total of 5 bytes.
+
 #![cfg(feature = "std")]
 
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::{
+    convert::TryFrom,
+    io::{self, Cursor, Read, Seek, SeekFrom, Write},
+};
 
 use bincode::{DefaultOptions, Options};
 
 use super::{SymExpr, SymExprRef};
 
-pub use bincode::ErrorKind;
-pub use bincode::Result;
+pub use bincode::{ErrorKind, Result};
 
 fn serialization_options() -> DefaultOptions {
     DefaultOptions::new()
 }
+
+/// A `MessageFileReader` reads a stream of [`SymExpr`] and their corresponding [`SymExprRef`]s from any [`Read`].
 pub struct MessageFileReader<R: Read> {
     reader: R,
     deserializer_config: bincode::DefaultOptions,
@@ -19,6 +66,7 @@ pub struct MessageFileReader<R: Read> {
 }
 
 impl<R: Read> MessageFileReader<R> {
+    /// Construct from the given reader.
     pub fn from_reader(reader: R) -> Self {
         Self {
             reader,
@@ -27,6 +75,12 @@ impl<R: Read> MessageFileReader<R> {
         }
     }
 
+    /// Parse the next message out of the stream.
+    /// [`Option::None`] is returned once the stream is depleted.
+    /// IO and serialization errors are passed to the caller using [`bincode::Result`].
+    /// Finally, the returned tuple contains the message itself as a [`SymExpr`] and the [`SymExprRef`] associated
+    /// with this message.
+    /// The `SymExprRef` may be used by following messages to refer back to this message.
     pub fn next_message(&mut self) -> Option<bincode::Result<(SymExprRef, SymExpr)>> {
         match self.deserializer_config.deserialize_from(&mut self.reader) {
             Ok(mut message) => {
@@ -43,10 +97,14 @@ impl<R: Read> MessageFileReader<R> {
         }
     }
 
+    /// Makes the given `SymExprRef` absolute accoring to the `current_id` counter.
+    /// See [`MessageFileWriter::make_relative`] for the inverse function.
     fn make_absolute(&self, expr: SymExprRef) -> SymExprRef {
         SymExprRef::new(self.current_id - expr.get()).unwrap()
     }
 
+    /// This transforms the given message from it's serialized form into its in-memory form, making relative references
+    /// absolute and counting the SymExprRefs.
     fn transform_message(&mut self, message: &mut SymExpr) -> SymExprRef {
         let ret = self.current_id;
         match message {
@@ -145,6 +203,8 @@ impl<R: Read> MessageFileReader<R> {
     }
 }
 
+/// A `MessageFileWriter` writes a stream of [`SymExpr`] to any [`Write`]. For each written expression, it returns
+/// a [`SymExprRef`] which should be used to refer back to it.
 pub struct MessageFileWriter<W: Write> {
     id_counter: usize,
     writer: W,
@@ -153,6 +213,7 @@ pub struct MessageFileWriter<W: Write> {
 }
 
 impl<W: Write + Seek> MessageFileWriter<W> {
+    /// Create a `MessageFileWriter` from the given [`Write`].
     pub fn from_writer(mut writer: W) -> io::Result<Self> {
         let writer_start_position = writer.stream_position()?;
         // write dummy trace length
@@ -181,6 +242,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         Ok(())
     }
 
+    /// Updates the trace header which stores the total length of the trace in bytes.
     pub fn update_trace_header(&mut self) -> io::Result<()> {
         self.write_trace_size()?;
         Ok(())
@@ -190,6 +252,8 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         SymExprRef::new(self.id_counter - expr.get()).unwrap()
     }
 
+    /// Writes a message to the stream and returns the [`SymExprRef`] that should be used to refer back to this message.
+    /// May error when the underlying `Write` errors or when there is a serialization error.
     #[allow(clippy::too_many_lines)]
     pub fn write_message(&mut self, mut message: SymExpr) -> bincode::Result<SymExprRef> {
         let current_id = self.id_counter;
@@ -354,62 +418,66 @@ mod serialization_tests {
     }
 }
 
-pub mod shared_memory {
-    use std::{
-        convert::TryFrom,
-        io::{self, Cursor, Read},
-    };
+use crate::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
 
-    use crate::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
+pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";
+pub const DEFAULT_SIZE: usize = 1024 * 1024 * 1024;
 
-    use super::{MessageFileReader, MessageFileWriter};
-
-    pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";
-    pub const DEFAULT_SIZE: usize = 1024 * 1024 * 1024;
-
-    impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
-        #[must_use]
-        pub fn from_buffer(buffer: &'buffer [u8]) -> Self {
-            Self::from_reader(Cursor::new(buffer))
-        }
-
-        pub fn from_length_prefixed_buffer(mut buffer: &'buffer [u8]) -> io::Result<Self> {
-            let mut len_buf = 0u64.to_le_bytes();
-            buffer.read_exact(&mut len_buf)?;
-            let buffer_len = u64::from_le_bytes(len_buf);
-            assert!(usize::try_from(buffer_len).is_ok());
-            let buffer_len = buffer_len as usize;
-            let (buffer, _) = buffer.split_at(buffer_len);
-            Ok(Self::from_buffer(buffer))
-        }
-
-        #[must_use]
-        pub fn get_buffer(&self) -> &[u8] {
-            self.reader.get_ref()
-        }
+impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
+    /// Creates a new `MessageFileReader` from the given buffer.
+    /// It is expected that trace in this buffer is not length prefixed and the buffer itself should have the exact
+    /// length of the trace (ie. contain no partial message).
+    /// See also [`MessageFileReader::from_length_prefixed_buffer`].
+    #[must_use]
+    pub fn from_buffer(buffer: &'buffer [u8]) -> Self {
+        Self::from_reader(Cursor::new(buffer))
     }
 
-    impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
-        pub fn from_shmem(shmem: T) -> io::Result<Self> {
-            Self::from_writer(ShMemCursor::new(shmem))
-        }
+    /// Creates a new `MessageFileReader` from the given buffer, expecting the contained trace to be prefixed by the
+    /// trace length (as generated by the [`MessageFileWriter`]).
+    /// See also [`MessageFileReader::from_buffer`].
+    pub fn from_length_prefixed_buffer(mut buffer: &'buffer [u8]) -> io::Result<Self> {
+        let mut len_buf = 0u64.to_le_bytes();
+        buffer.read_exact(&mut len_buf)?;
+        let buffer_len = u64::from_le_bytes(len_buf);
+        assert!(usize::try_from(buffer_len).is_ok());
+        let buffer_len = buffer_len as usize;
+        let (buffer, _) = buffer.split_at(buffer_len);
+        Ok(Self::from_buffer(buffer))
     }
 
-    impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
-        pub fn from_stdshmem_env_with_name(env_name: impl AsRef<str>) -> io::Result<Self> {
-            Self::from_shmem(
-                StdShMemProvider::new()
-                    .expect("unable to initialize StdShMemProvider")
-                    .existing_from_env(env_name.as_ref())
-                    .expect("unable to get shared memory from env"),
-            )
-        }
-
-        pub fn from_stdshmem_default_env() -> io::Result<Self> {
-            Self::from_stdshmem_env_with_name(DEFAULT_ENV_NAME)
-        }
+    /// Gets the currently used buffer. If the buffer was length prefixed, the returned buffer does not contain the
+    /// prefix and is exactly as many bytes long as the prefix specified. Effectively, the length prefix is removed and
+    /// used to limit the buffer.
+    #[must_use]
+    pub fn get_buffer(&self) -> &[u8] {
+        self.reader.get_ref()
     }
-
-    pub type StdShMemMessageFileWriter =
-        MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
 }
+
+impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
+    /// Creates a new `MessageFileWriter` from the given [`ShMemCursor`].
+    pub fn from_shmem(shmem: T) -> io::Result<Self> {
+        Self::from_writer(ShMemCursor::new(shmem))
+    }
+}
+
+impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
+    /// Creates a new `MessageFileWriter` by reading a [`StdShMem`] from the given environment variable.
+    pub fn from_stdshmem_env_with_name(env_name: impl AsRef<str>) -> io::Result<Self> {
+        Self::from_shmem(
+            StdShMemProvider::new()
+                .expect("unable to initialize StdShMemProvider")
+                .existing_from_env(env_name.as_ref())
+                .expect("unable to get shared memory from env"),
+        )
+    }
+
+    /// Creates a new `MessageFileWriter` by reading a [`StdShMem`] using [`DEFAULT_ENV_NAME`].
+    pub fn from_stdshmem_default_env() -> io::Result<Self> {
+        Self::from_stdshmem_env_with_name(DEFAULT_ENV_NAME)
+    }
+}
+
+pub type StdShMemMessageFileWriter =
+    MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
