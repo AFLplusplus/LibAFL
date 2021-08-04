@@ -6,7 +6,7 @@ use postcard;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     env::temp_dir,
-    fs::File,
+    fs::{self, File},
     io::{Read, Write},
 };
 
@@ -135,6 +135,16 @@ where
     /// Reset this [`StateRestorer`] to an empty state.
     pub fn reset(&mut self) {
         let content_mut = self.content_mut();
+        if content_mut.is_disk {
+            let bytes =
+                unsafe { slice::from_raw_parts(content_mut.buf.as_ptr(), content_mut.buf_len) };
+
+            // Remove tmpfile
+            if let Ok(filename) = postcard::from_bytes::<String>(bytes) {
+                let tmpfile = temp_dir().join(&filename);
+                let _ = fs::remove_file(tmpfile);
+            }
+        }
         content_mut.is_disk = false;
         content_mut.buf_len = 0;
     }
@@ -160,6 +170,7 @@ where
     }
 
     /// Restores the contents saved in this [`StateRestorer`], if any are availiable.
+    /// Can only be read once.
     pub fn restore<S>(&self) -> Result<Option<S>, Error>
     where
         S: DeserializeOwned,
@@ -198,6 +209,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use core::slice;
+    use std::env::temp_dir;
+
     use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
 
     use super::StateRestorer;
@@ -218,10 +232,12 @@ mod tests {
         let restored = state_restorer.restore::<String>().unwrap().unwrap();
         println!("Restored {}", restored);
         assert_eq!(restored, "hello world");
+        assert!(!state_restorer.content().is_disk);
 
         state_restorer.reset();
 
         assert!(!state_restorer.has_content());
+        assert!(!state_restorer.content().is_disk);
         assert!(state_restorer.restore::<String>().unwrap().is_none());
 
         let too_large = vec![4u8; TESTMAP_SIZE + 1];
@@ -232,5 +248,24 @@ mod tests {
         assert_eq!(large_restored, too_large);
         assert_eq!(large_restored.len(), too_large.len());
         assert_eq!(large_restored[TESTMAP_SIZE], 4u8);
+
+        assert!(state_restorer.content().is_disk);
+        assert_ne!(state_restorer.content().buf_len, 0);
+
+        // Check if file removal works.
+        let state_shmem_content = state_restorer.content();
+        let bytes = unsafe {
+            slice::from_raw_parts(
+                state_shmem_content.buf.as_ptr(),
+                state_shmem_content.buf_len,
+            )
+        };
+        let filename: String = postcard::from_bytes(bytes).unwrap();
+        let tmpfile = temp_dir().join(&filename);
+        assert!(tmpfile.exists());
+
+        state_restorer.reset();
+        assert!(!state_restorer.has_content());
+        assert!(!tmpfile.exists());
     }
 }
