@@ -105,7 +105,9 @@ where
 
     #[allow(clippy::unused_self)]
     pub fn hook_edge_generation(&self, hook: fn(&mut S, src: u64, dest: u64) -> Option<u64>) {
-        unsafe { GEN_EDGE_HOOK_PTR = hook as *const _ };
+        unsafe {
+            GEN_EDGE_HOOK_PTR = hook as *const _;
+        }
         emu::set_gen_edge_hook(gen_edge_hook_wrapper::<S>);
     }
 
@@ -116,7 +118,9 @@ where
 
     #[allow(clippy::unused_self)]
     pub fn hook_block_generation(&self, hook: fn(&mut S, pc: u64) -> Option<u64>) {
-        unsafe { GEN_BLOCK_HOOK_PTR = hook as *const _ };
+        unsafe {
+            GEN_BLOCK_HOOK_PTR = hook as *const _;
+        }
         emu::set_gen_block_hook(gen_block_hook_wrapper::<S>);
     }
 
@@ -127,7 +131,9 @@ where
 
     #[allow(clippy::unused_self)]
     pub fn hook_read_generation(&self, hook: fn(&mut S, size: usize) -> Option<u64>) {
-        unsafe { GEN_READ_HOOK_PTR = hook as *const _ };
+        unsafe {
+            GEN_READ_HOOK_PTR = hook as *const _;
+        }
         emu::set_gen_read_hook(gen_read_hook_wrapper::<S>);
     }
 
@@ -158,7 +164,9 @@ where
 
     #[allow(clippy::unused_self)]
     pub fn hook_write_generation(&self, hook: fn(&mut S, size: usize) -> Option<u64>) {
-        unsafe { GEN_WRITE_HOOK_PTR = hook as *const _ };
+        unsafe {
+            GEN_WRITE_HOOK_PTR = hook as *const _;
+        }
         emu::set_gen_write_hook(gen_write_hook_wrapper::<S>);
     }
 
@@ -189,7 +197,9 @@ where
 
     #[allow(clippy::unused_self)]
     pub fn hook_cmp_generation(&self, hook: fn(&mut S, pc: u64, size: usize) -> Option<u64>) {
-        unsafe { GEN_CMP_HOOK_PTR = hook as *const _ };
+        unsafe {
+            GEN_CMP_HOOK_PTR = hook as *const _;
+        }
         emu::set_gen_cmp_hook(gen_cmp_hook_wrapper::<S>);
     }
 

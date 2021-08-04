@@ -14,7 +14,6 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    fs::File,
     io::{Read, Write},
     marker::PhantomData,
     rc::{Rc, Weak},

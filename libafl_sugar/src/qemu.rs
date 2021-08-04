@@ -220,7 +220,7 @@ where
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &self.input_dirs)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &self.input_dirs)
+                            panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }

@@ -891,7 +891,7 @@ where
         // If we're restarting, deserialize the old state.
         let (state, mut mgr) = if let Some((state, mgr_description)) = staterestorer.restore()? {
             (
-                state,
+                Some(state),
                 LlmpRestartingEventManager::new(
                     LlmpEventManager::existing_client_from_description(
                         new_shmem_provider,
@@ -922,5 +922,113 @@ where
         */
 
         Ok((state, mgr))
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "std")]
+mod tests {
+    use crate::{
+        bolts::{
+            llmp::{LlmpClient, LlmpSharedMap},
+            rands::StdRand,
+            shmem::{ShMemProvider, StdShMemProvider},
+            staterestore::StateRestorer,
+            tuples::tuple_list,
+        },
+        corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
+        events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
+        executors::{ExitKind, InProcessExecutor},
+        inputs::BytesInput,
+        mutators::BitFlipMutator,
+        stages::StdMutationalStage,
+        state::StdState,
+        Fuzzer, StdFuzzer,
+    };
+    use core::sync::atomic::{compiler_fence, Ordering};
+
+    #[test]
+    fn test_mgr_state_restore() {
+        let rand = StdRand::with_seed(0);
+
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let testcase = Testcase::new(vec![0; 4]);
+        corpus.add(testcase).unwrap();
+
+        let solutions = InMemoryCorpus::<BytesInput>::new();
+
+        let mut state = StdState::new(rand, corpus, solutions, tuple_list!());
+
+        let mut shmem_provider = StdShMemProvider::new().unwrap();
+
+        let mut llmp_client = LlmpClient::new(
+            shmem_provider.clone(),
+            LlmpSharedMap::new(0, shmem_provider.new_map(1024).unwrap()),
+        )
+        .unwrap();
+
+        // A little hack for CI. Don't do that in a real-world scenario.
+        unsafe {
+            llmp_client.mark_save_to_unmap();
+        }
+
+        let mut llmp_mgr =
+            LlmpEventManager::<BytesInput, (), _, _>::new(llmp_client, "fuzzer".to_string())
+                .unwrap();
+
+        let scheduler = RandCorpusScheduler::new();
+
+        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+
+        let mut harness = |_buf: &BytesInput| ExitKind::Ok;
+        let mut executor = InProcessExecutor::new(
+            &mut harness,
+            tuple_list!(),
+            &mut fuzzer,
+            &mut state,
+            &mut llmp_mgr,
+        )
+        .unwrap();
+
+        let mutator = BitFlipMutator::new();
+        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
+        // First, create a channel from the current fuzzer to the next to store state between restarts.
+        let mut staterestorer = StateRestorer::<StdShMemProvider>::new(
+            shmem_provider.new_map(256 * 1024 * 1024).unwrap(),
+        );
+
+        staterestorer.reset();
+        staterestorer
+            .save(&(&mut state, &llmp_mgr.describe().unwrap()))
+            .unwrap();
+        assert!(staterestorer.has_content());
+
+        // Store the information to a map.
+        staterestorer.write_to_env(_ENV_FUZZER_SENDER).unwrap();
+
+        compiler_fence(Ordering::SeqCst);
+
+        let sc_cpy = StateRestorer::from_env(&mut shmem_provider, _ENV_FUZZER_SENDER).unwrap();
+        assert!(sc_cpy.has_content());
+
+        let (mut state_clone, mgr_description) = staterestorer.restore().unwrap().unwrap();
+        let mut llmp_clone = LlmpEventManager::existing_client_from_description(
+            shmem_provider,
+            &mgr_description,
+            "fuzzer".to_string(),
+        )
+        .unwrap();
+
+        if false {
+            fuzzer
+                .fuzz_one(
+                    &mut stages,
+                    &mut executor,
+                    &mut state_clone,
+                    &mut llmp_clone,
+                )
+                .unwrap();
+        }
     }
 }

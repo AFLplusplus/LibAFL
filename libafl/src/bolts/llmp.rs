@@ -802,9 +802,19 @@ where
     /// Waits for this sender to be save to unmap.
     /// If a receiver is involved, this function should always be called.
     pub fn await_save_to_unmap_blocking(&self) {
+        #[cfg(feature = "std")]
+        let mut ctr = 0_u16;
         loop {
             if self.save_to_unmap() {
                 return;
+            }
+            // We log that we're looping -> see when we're blocking.
+            #[cfg(feature = "std")]
+            {
+                ctr = ctr.wrapping_add(1);
+                if ctr == 0 {
+                    println!("Awaiting save_to_unmap_blocking");
+                }
             }
         }
     }
@@ -817,6 +827,14 @@ where
             // println!("Reading save_to_unmap from {:?}", current_out_map.page() as *const _);
             ptr::read_volatile(ptr::addr_of!((*current_out_map.page()).save_to_unmap)) != 0
         }
+    }
+
+    /// For debug purposes: Mark save to unmap, even though it might not have been read by a receiver yet.
+    /// # Safety
+    /// If this method is called, the page may be unmapped before it is read by any receiver.
+    pub unsafe fn mark_save_to_unmap(&mut self) {
+        // No need to do this volatile, as we should be the same thread in this scenario.
+        (*self.out_maps.last_mut().unwrap().page_mut()).save_to_unmap = 1;
     }
 
     /// Reattach to a vacant `out_map`.
@@ -2429,6 +2447,16 @@ where
     /// If we are allowed to unmap this client
     pub fn save_to_unmap(&self) -> bool {
         self.sender.save_to_unmap()
+    }
+
+    /// For debug purposes: mark the client as save to unmap, even though it might not have been read.
+    ///
+    /// # Safety
+    /// This should only be called in a debug scenario.
+    /// Calling this in other contexts may lead to a premature page unmap and result in a crash in another process,
+    /// or an unexpected read from an empty page in a receiving process.
+    pub unsafe fn mark_save_to_unmap(&mut self) {
+        self.sender.mark_save_to_unmap();
     }
 
     /// Creates a new [`LlmpClient`]

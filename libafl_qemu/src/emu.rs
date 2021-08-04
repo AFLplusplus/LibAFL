@@ -179,7 +179,9 @@ impl Iterator for GuestMaps {
 
 impl Drop for GuestMaps {
     fn drop(&mut self) {
-        unsafe { free_self_maps(self.orig_c_iter) }
+        unsafe {
+            free_self_maps(self.orig_c_iter);
+        }
     }
 }
 
@@ -190,7 +192,7 @@ pub fn write_mem<T>(addr: u64, buf: &[T]) {
             buf.as_ptr() as *const _ as *const u8,
             host_addr,
             buf.len() * size_of::<T>(),
-        )
+        );
     }
 }
 
@@ -201,7 +203,7 @@ pub fn read_mem<T>(addr: u64, buf: &mut [T]) {
             host_addr as *const u8,
             buf.as_mut_ptr() as *mut _ as *mut u8,
             buf.len() * size_of::<T>(),
-        )
+        );
     }
 }
 
@@ -240,15 +242,21 @@ where
 }
 
 pub fn set_breakpoint(addr: u64) {
-    unsafe { libafl_qemu_set_breakpoint(addr) };
+    unsafe {
+        libafl_qemu_set_breakpoint(addr);
+    }
 }
 
 pub fn remove_breakpoint(addr: u64) {
-    unsafe { libafl_qemu_remove_breakpoint(addr) };
+    unsafe {
+        libafl_qemu_remove_breakpoint(addr);
+    }
 }
 
 pub fn run() {
-    unsafe { libafl_qemu_run() };
+    unsafe {
+        libafl_qemu_run();
+    }
 }
 
 #[must_use]
@@ -298,91 +306,135 @@ pub fn unmap(addr: u64, size: usize) -> Result<(), String> {
 }
 
 pub fn set_exec_edge_hook(hook: extern "C" fn(id: u64)) {
-    unsafe { libafl_exec_edge_hook = hook };
+    unsafe {
+        libafl_exec_edge_hook = hook;
+    }
 }
 
 pub fn set_gen_edge_hook(hook: extern "C" fn(src: u64, dest: u64) -> u64) {
-    unsafe { libafl_gen_edge_hook = hook };
+    unsafe {
+        libafl_gen_edge_hook = hook;
+    }
 }
 
 pub fn set_exec_block_hook(hook: extern "C" fn(pc: u64)) {
-    unsafe { libafl_exec_block_hook = hook };
+    unsafe {
+        libafl_exec_block_hook = hook;
+    }
 }
 
 pub fn set_gen_block_hook(hook: extern "C" fn(pc: u64) -> u64) {
-    unsafe { libafl_gen_block_hook = hook };
+    unsafe {
+        libafl_gen_block_hook = hook;
+    }
 }
 
 pub fn set_exec_read1_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_read_hook1 = hook };
+    unsafe {
+        libafl_exec_read_hook1 = hook;
+    }
 }
 
 pub fn set_exec_read2_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_read_hook2 = hook };
+    unsafe {
+        libafl_exec_read_hook2 = hook;
+    }
 }
 
 pub fn set_exec_read4_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_read_hook4 = hook };
+    unsafe {
+        libafl_exec_read_hook4 = hook;
+    }
 }
 
 pub fn set_exec_read8_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_read_hook8 = hook };
+    unsafe {
+        libafl_exec_read_hook8 = hook;
+    }
 }
 
 pub fn set_exec_read_n_hook(hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
-    unsafe { libafl_exec_read_hookN = hook };
+    unsafe {
+        libafl_exec_read_hookN = hook;
+    }
 }
 
 pub fn set_gen_read_hook(hook: extern "C" fn(size: u32) -> u64) {
-    unsafe { libafl_gen_read_hook = hook };
+    unsafe {
+        libafl_gen_read_hook = hook;
+    }
 }
 
 pub fn set_exec_write1_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_write_hook1 = hook };
+    unsafe {
+        libafl_exec_write_hook1 = hook;
+    }
 }
 
 pub fn set_exec_write2_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_write_hook2 = hook };
+    unsafe {
+        libafl_exec_write_hook2 = hook;
+    }
 }
 
 pub fn set_exec_write4_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_write_hook4 = hook };
+    unsafe {
+        libafl_exec_write_hook4 = hook;
+    }
 }
 
 pub fn set_exec_write8_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe { libafl_exec_write_hook8 = hook };
+    unsafe {
+        libafl_exec_write_hook8 = hook;
+    }
 }
 
 pub fn set_exec_write_n_hook(hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
-    unsafe { libafl_exec_write_hookN = hook };
+    unsafe {
+        libafl_exec_write_hookN = hook;
+    }
 }
 
 pub fn set_gen_write_hook(hook: extern "C" fn(size: u32) -> u64) {
-    unsafe { libafl_gen_write_hook = hook };
+    unsafe {
+        libafl_gen_write_hook = hook;
+    }
 }
 
 pub fn set_exec_cmp1_hook(hook: extern "C" fn(id: u64, v0: u8, v1: u8)) {
-    unsafe { libafl_exec_cmp_hook1 = hook };
+    unsafe {
+        libafl_exec_cmp_hook1 = hook;
+    }
 }
 
 pub fn set_exec_cmp2_hook(hook: extern "C" fn(id: u64, v0: u16, v1: u16)) {
-    unsafe { libafl_exec_cmp_hook2 = hook };
+    unsafe {
+        libafl_exec_cmp_hook2 = hook;
+    }
 }
 
 pub fn set_exec_cmp4_hook(hook: extern "C" fn(id: u64, v0: u32, v1: u32)) {
-    unsafe { libafl_exec_cmp_hook4 = hook };
+    unsafe {
+        libafl_exec_cmp_hook4 = hook;
+    }
 }
 
 pub fn set_exec_cmp8_hook(hook: extern "C" fn(id: u64, v0: u64, v1: u64)) {
-    unsafe { libafl_exec_cmp_hook8 = hook };
+    unsafe {
+        libafl_exec_cmp_hook8 = hook;
+    }
 }
 
 pub fn set_gen_cmp_hook(hook: extern "C" fn(pc: u64, size: u32) -> u64) {
-    unsafe { libafl_gen_cmp_hook = hook };
+    unsafe {
+        libafl_gen_cmp_hook = hook;
+    }
 }
 
 pub fn set_syscall_hook(
     hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
 ) {
-    unsafe { libafl_syscall_hook = hook };
+    unsafe {
+        libafl_syscall_hook = hook;
+    }
 }
