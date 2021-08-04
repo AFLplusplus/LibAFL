@@ -167,6 +167,6 @@ impl Runtime for TracingRuntime {
 impl Drop for TracingRuntime {
     fn drop(&mut self) {
         // manually end the writer to update the length prefix
-        self.writer.end().expect("failed to shut down writer");
+        self.writer.update_trace_header().expect("failed to shut down writer");
     }
 }

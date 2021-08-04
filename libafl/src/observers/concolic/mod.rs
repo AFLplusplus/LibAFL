@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub type SymExprRef = NonZeroUsize;
 
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SymExpr {
     InputByte {
         offset: usize,

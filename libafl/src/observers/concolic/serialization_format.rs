@@ -189,7 +189,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         Ok(())
     }
 
-    pub fn end(&mut self) -> io::Result<()> {
+    pub fn update_trace_header(&mut self) -> io::Result<()> {
         self.write_trace_size()?;
         Ok(())
     }
@@ -302,6 +302,65 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             self.write_trace_size()?;
         }
         Ok(SymExprRef::new(current_id).unwrap())
+    }
+}
+
+#[cfg(test)]
+mod serialization_tests {
+    use std::io::Cursor;
+
+    use super::{MessageFileReader, MessageFileWriter, SymExpr};
+
+    /// This test intends to ensure that the serialization format can efficiently encode the required information.
+    /// This is mainly useful to fail if any changes should be made in the future that (inadvertently) reduce
+    /// serialization efficiency.
+    #[test]
+    fn efficient_serialization() {
+        let mut buf = Vec::new();
+        {
+            let mut cursor = Cursor::new(&mut buf);
+            let mut writer = MessageFileWriter::from_writer(&mut cursor).unwrap();
+            let a = writer.write_message(SymExpr::True).unwrap();
+            let b = writer.write_message(SymExpr::True).unwrap();
+            writer.write_message(SymExpr::And { a, b }).unwrap();
+            writer.update_trace_header().unwrap();
+        }
+        let expected_size = 8 + // the header takes 8 bytes to encode the length of the trace
+                            1 + // tag to create SymExpr::True (a)
+                            1 + // tag to create SymExpr::True (b)
+                            1 + // tag to create SymExpr::And
+                            1 + // reference to a
+                            1; // reference to b
+        assert_eq!(buf.len(), expected_size);
+    }
+
+    /// This test intends to verify that a trace written by [`MessageFileWriter`] can indeed be read back by
+    /// [`MessageFileReader`].
+    #[test]
+    fn serialization_roundtrip() {
+        let mut buf = Vec::new();
+        {
+            let mut cursor = Cursor::new(&mut buf);
+            let mut writer = MessageFileWriter::from_writer(&mut cursor).unwrap();
+            let a = writer.write_message(SymExpr::True).unwrap();
+            let b = writer.write_message(SymExpr::True).unwrap();
+            writer.write_message(SymExpr::And { a, b }).unwrap();
+            writer.update_trace_header().unwrap();
+        }
+        let mut reader = MessageFileReader::from_length_prefixed_buffer(&buf).unwrap();
+        let (first_bool_id, first_bool) = reader.next_message().unwrap().unwrap();
+        assert_eq!(first_bool, SymExpr::True);
+        let (second_bool_id, second_bool) = reader.next_message().unwrap().unwrap();
+        assert_eq!(second_bool, SymExpr::True);
+        let (_, and) = reader.next_message().unwrap().unwrap();
+        assert_eq!(
+            and,
+            SymExpr::And {
+                a: first_bool_id,
+                b: second_bool_id
+            }
+        );
+        assert!(reader.next_message().is_none());
     }
 }
 
