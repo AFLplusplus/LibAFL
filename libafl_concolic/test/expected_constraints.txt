@@ -1,30 +1,30 @@
-1	GetInputByte { offset: 0 }
-2	GetInputByte { offset: 1 }
-3	GetInputByte { offset: 2 }
-4	GetInputByte { offset: 3 }
-5	ConcatHelper { a: 2, b: 1 }
-6	ConcatHelper { a: 3, b: 5 }
-7	ConcatHelper { a: 4, b: 6 }
-8	ConcatHelper { a: 2, b: 1 }
-9	ConcatHelper { a: 3, b: 8 }
-10	ConcatHelper { a: 4, b: 9 }
-11	ExtractHelper { op: 10, first_bit: 7, last_bit: 0 }
-12	ExtractHelper { op: 10, first_bit: 15, last_bit: 8 }
-13	ExtractHelper { op: 10, first_bit: 23, last_bit: 16 }
-14	ExtractHelper { op: 10, first_bit: 31, last_bit: 24 }
-15	ConcatHelper { a: 12, b: 11 }
-16	ConcatHelper { a: 13, b: 15 }
-17	ConcatHelper { a: 14, b: 16 }
-18	BuildInteger { value: 2, bits: 32 }
-19	BuildMul { a: 18, b: 17 }
-20	BuildInteger { value: 7, bits: 32 }
-21	BuildSignedLessThan { a: 19, b: 20 }
-22	PushPathConstraint { constraint: 21, taken: false, site_id: 11229456 }
-22	ConcatHelper { a: 12, b: 11 }
-23	ConcatHelper { a: 13, b: 22 }
-24	ConcatHelper { a: 14, b: 23 }
-25	BuildInteger { value: 7, bits: 32 }
-26	BuildSignedRem { a: 24, b: 25 }
-27	BuildInteger { value: 0, bits: 32 }
-28	BuildNotEqual { a: 26, b: 27 }
-29	PushPathConstraint { constraint: 28, taken: true, site_id: 11122032 }
+1	InputByte { offset: 0 }
+2	InputByte { offset: 1 }
+3	InputByte { offset: 2 }
+4	InputByte { offset: 3 }
+5	Concat { a: 2, b: 1 }
+6	Concat { a: 3, b: 5 }
+7	Concat { a: 4, b: 6 }
+8	Concat { a: 2, b: 1 }
+9	Concat { a: 3, b: 8 }
+10	Concat { a: 4, b: 9 }
+11	Extract { op: 10, first_bit: 7, last_bit: 0 }
+12	Extract { op: 10, first_bit: 15, last_bit: 8 }
+13	Extract { op: 10, first_bit: 23, last_bit: 16 }
+14	Extract { op: 10, first_bit: 31, last_bit: 24 }
+15	Concat { a: 12, b: 11 }
+16	Concat { a: 13, b: 15 }
+17	Concat { a: 14, b: 16 }
+18	Integer { value: 2, bits: 32 }
+19	Mul { a: 18, b: 17 }
+20	Integer { value: 7, bits: 32 }
+21	SignedLessThan { a: 19, b: 20 }
+22	PathConstraint { constraint: 21, taken: false, site_id: 11229456 }
+22	Concat { a: 12, b: 11 }
+23	Concat { a: 13, b: 22 }
+24	Concat { a: 14, b: 23 }
+25	Integer { value: 7, bits: 32 }
+26	SignedRem { a: 24, b: 25 }
+27	Integer { value: 0, bits: 32 }
+28	NotEqual { a: 26, b: 27 }
+29	PathConstraint { constraint: 28, taken: true, site_id: 11122032 }

@@ -54,82 +54,81 @@ impl<R: Read> MessageFileReader<R> {
     fn transform_message(&mut self, message: &mut SymExpr) -> SymExprRef {
         let ret = self.current_id;
         match message {
-            SymExpr::GetInputByte { .. }
-            | SymExpr::BuildInteger { .. }
-            | SymExpr::BuildInteger128 { .. }
-            | SymExpr::BuildFloat { .. }
-            | SymExpr::BuildNullPointer
-            | SymExpr::BuildTrue
-            | SymExpr::BuildFalse
-            | SymExpr::BuildBool { .. } => {
+            SymExpr::InputByte { .. }
+            | SymExpr::Integer { .. }
+            | SymExpr::Integer128 { .. }
+            | SymExpr::Float { .. }
+            | SymExpr::NullPointer
+            | SymExpr::True
+            | SymExpr::False
+            | SymExpr::Bool { .. } => {
                 self.current_id += 1;
             }
-            SymExpr::BuildNeg { op }
-            | SymExpr::BuildFloatAbs { op }
-            | SymExpr::BuildNot { op }
-            | SymExpr::BuildSext { op, .. }
-            | SymExpr::BuildZext { op, .. }
-            | SymExpr::BuildTrunc { op, .. }
-            | SymExpr::BuildIntToFloat { op, .. }
-            | SymExpr::BuildFloatToFloat { op, .. }
-            | SymExpr::BuildBitsToFloat { op, .. }
-            | SymExpr::BuildFloatToBits { op }
-            | SymExpr::BuildFloatToSignedInteger { op, .. }
-            | SymExpr::BuildFloatToUnsignedInteger { op, .. }
-            | SymExpr::BuildBoolToBits { op, .. }
-            | SymExpr::ExtractHelper { op, .. }
-            | SymExpr::BuildExtract { op, .. }
-            | SymExpr::BuildBswap { op } => {
+            SymExpr::Neg { op }
+            | SymExpr::FloatAbs { op }
+            | SymExpr::Not { op }
+            | SymExpr::Sext { op, .. }
+            | SymExpr::Zext { op, .. }
+            | SymExpr::Trunc { op, .. }
+            | SymExpr::IntToFloat { op, .. }
+            | SymExpr::FloatToFloat { op, .. }
+            | SymExpr::BitsToFloat { op, .. }
+            | SymExpr::FloatToBits { op }
+            | SymExpr::FloatToSignedInteger { op, .. }
+            | SymExpr::FloatToUnsignedInteger { op, .. }
+            | SymExpr::BoolToBits { op, .. }
+            | SymExpr::Extract { op, .. }
+            | SymExpr::Bswap { op } => {
                 *op = self.make_absolute(*op);
                 self.current_id += 1;
             }
-            SymExpr::BuildAdd { a, b }
-            | SymExpr::BuildSub { a, b }
-            | SymExpr::BuildMul { a, b }
-            | SymExpr::BuildUnsignedDiv { a, b }
-            | SymExpr::BuildSignedDiv { a, b }
-            | SymExpr::BuildUnsignedRem { a, b }
-            | SymExpr::BuildSignedRem { a, b }
-            | SymExpr::BuildShiftLeft { a, b }
-            | SymExpr::BuildLogicalShiftRight { a, b }
-            | SymExpr::BuildArithmeticShiftRight { a, b }
-            | SymExpr::BuildSignedLessThan { a, b }
-            | SymExpr::BuildSignedLessEqual { a, b }
-            | SymExpr::BuildSignedGreaterThan { a, b }
-            | SymExpr::BuildSignedGreaterEqual { a, b }
-            | SymExpr::BuildUnsignedLessThan { a, b }
-            | SymExpr::BuildUnsignedLessEqual { a, b }
-            | SymExpr::BuildUnsignedGreaterThan { a, b }
-            | SymExpr::BuildUnsignedGreaterEqual { a, b }
-            | SymExpr::BuildEqual { a, b }
-            | SymExpr::BuildNotEqual { a, b }
-            | SymExpr::BuildBoolAnd { a, b }
-            | SymExpr::BuildBoolOr { a, b }
-            | SymExpr::BuildBoolXor { a, b }
-            | SymExpr::BuildAnd { a, b }
-            | SymExpr::BuildOr { a, b }
-            | SymExpr::BuildXor { a, b }
-            | SymExpr::BuildFloatOrdered { a, b }
-            | SymExpr::BuildFloatOrderedGreaterThan { a, b }
-            | SymExpr::BuildFloatOrderedGreaterEqual { a, b }
-            | SymExpr::BuildFloatOrderedLessThan { a, b }
-            | SymExpr::BuildFloatOrderedLessEqual { a, b }
-            | SymExpr::BuildFloatOrderedEqual { a, b }
-            | SymExpr::BuildFloatOrderedNotEqual { a, b }
-            | SymExpr::BuildFloatUnordered { a, b }
-            | SymExpr::BuildFloatUnorderedGreaterThan { a, b }
-            | SymExpr::BuildFloatUnorderedGreaterEqual { a, b }
-            | SymExpr::BuildFloatUnorderedLessThan { a, b }
-            | SymExpr::BuildFloatUnorderedLessEqual { a, b }
-            | SymExpr::BuildFloatUnorderedEqual { a, b }
-            | SymExpr::BuildFloatUnorderedNotEqual { a, b }
-            | SymExpr::BuildFloatAdd { a, b }
-            | SymExpr::BuildFloatSub { a, b }
-            | SymExpr::BuildFloatMul { a, b }
-            | SymExpr::BuildFloatDiv { a, b }
-            | SymExpr::BuildFloatRem { a, b }
-            | SymExpr::ConcatHelper { a, b }
-            | SymExpr::BuildInsert {
+            SymExpr::Add { a, b }
+            | SymExpr::Sub { a, b }
+            | SymExpr::Mul { a, b }
+            | SymExpr::UnsignedDiv { a, b }
+            | SymExpr::SignedDiv { a, b }
+            | SymExpr::UnsignedRem { a, b }
+            | SymExpr::SignedRem { a, b }
+            | SymExpr::ShiftLeft { a, b }
+            | SymExpr::LogicalShiftRight { a, b }
+            | SymExpr::ArithmeticShiftRight { a, b }
+            | SymExpr::SignedLessThan { a, b }
+            | SymExpr::SignedLessEqual { a, b }
+            | SymExpr::SignedGreaterThan { a, b }
+            | SymExpr::SignedGreaterEqual { a, b }
+            | SymExpr::UnsignedLessThan { a, b }
+            | SymExpr::UnsignedLessEqual { a, b }
+            | SymExpr::UnsignedGreaterThan { a, b }
+            | SymExpr::UnsignedGreaterEqual { a, b }
+            | SymExpr::Equal { a, b }
+            | SymExpr::NotEqual { a, b }
+            | SymExpr::BoolAnd { a, b }
+            | SymExpr::BoolOr { a, b }
+            | SymExpr::BoolXor { a, b }
+            | SymExpr::And { a, b }
+            | SymExpr::Or { a, b }
+            | SymExpr::Xor { a, b }
+            | SymExpr::FloatOrdered { a, b }
+            | SymExpr::FloatOrderedGreaterThan { a, b }
+            | SymExpr::FloatOrderedGreaterEqual { a, b }
+            | SymExpr::FloatOrderedLessThan { a, b }
+            | SymExpr::FloatOrderedLessEqual { a, b }
+            | SymExpr::FloatOrderedEqual { a, b }
+            | SymExpr::FloatOrderedNotEqual { a, b }
+            | SymExpr::FloatUnordered { a, b }
+            | SymExpr::FloatUnorderedGreaterThan { a, b }
+            | SymExpr::FloatUnorderedGreaterEqual { a, b }
+            | SymExpr::FloatUnorderedLessThan { a, b }
+            | SymExpr::FloatUnorderedLessEqual { a, b }
+            | SymExpr::FloatUnorderedEqual { a, b }
+            | SymExpr::FloatUnorderedNotEqual { a, b }
+            | SymExpr::FloatAdd { a, b }
+            | SymExpr::FloatSub { a, b }
+            | SymExpr::FloatMul { a, b }
+            | SymExpr::FloatDiv { a, b }
+            | SymExpr::FloatRem { a, b }
+            | SymExpr::Concat { a, b }
+            | SymExpr::Insert {
                 target: a,
                 to_insert: b,
                 ..
@@ -138,7 +137,7 @@ impl<R: Read> MessageFileReader<R> {
                 *b = self.make_absolute(*b);
                 self.current_id += 1;
             }
-            SymExpr::PushPathConstraint { constraint: op, .. } => {
+            SymExpr::PathConstraint { constraint: op, .. } => {
                 *op = self.make_absolute(*op);
             }
             SymExpr::ExpressionsUnreachable { exprs } => {
@@ -203,82 +202,81 @@ impl<W: Write + Seek> MessageFileWriter<W> {
     pub fn write_message(&mut self, mut message: SymExpr) -> bincode::Result<SymExprRef> {
         let current_id = self.id_counter;
         match &mut message {
-            SymExpr::GetInputByte { .. }
-            | SymExpr::BuildInteger { .. }
-            | SymExpr::BuildInteger128 { .. }
-            | SymExpr::BuildFloat { .. }
-            | SymExpr::BuildNullPointer
-            | SymExpr::BuildTrue
-            | SymExpr::BuildFalse
-            | SymExpr::BuildBool { .. } => {
+            SymExpr::InputByte { .. }
+            | SymExpr::Integer { .. }
+            | SymExpr::Integer128 { .. }
+            | SymExpr::Float { .. }
+            | SymExpr::NullPointer
+            | SymExpr::True
+            | SymExpr::False
+            | SymExpr::Bool { .. } => {
                 self.id_counter += 1;
             }
-            SymExpr::BuildNeg { op }
-            | SymExpr::BuildFloatAbs { op }
-            | SymExpr::BuildNot { op }
-            | SymExpr::BuildSext { op, .. }
-            | SymExpr::BuildZext { op, .. }
-            | SymExpr::BuildTrunc { op, .. }
-            | SymExpr::BuildIntToFloat { op, .. }
-            | SymExpr::BuildFloatToFloat { op, .. }
-            | SymExpr::BuildBitsToFloat { op, .. }
-            | SymExpr::BuildFloatToBits { op }
-            | SymExpr::BuildFloatToSignedInteger { op, .. }
-            | SymExpr::BuildFloatToUnsignedInteger { op, .. }
-            | SymExpr::BuildBoolToBits { op, .. }
-            | SymExpr::ExtractHelper { op, .. }
-            | SymExpr::BuildExtract { op, .. }
-            | SymExpr::BuildBswap { op } => {
+            SymExpr::Neg { op }
+            | SymExpr::FloatAbs { op }
+            | SymExpr::Not { op }
+            | SymExpr::Sext { op, .. }
+            | SymExpr::Zext { op, .. }
+            | SymExpr::Trunc { op, .. }
+            | SymExpr::IntToFloat { op, .. }
+            | SymExpr::FloatToFloat { op, .. }
+            | SymExpr::BitsToFloat { op, .. }
+            | SymExpr::FloatToBits { op }
+            | SymExpr::FloatToSignedInteger { op, .. }
+            | SymExpr::FloatToUnsignedInteger { op, .. }
+            | SymExpr::BoolToBits { op, .. }
+            | SymExpr::Extract { op, .. }
+            | SymExpr::Bswap { op } => {
                 *op = self.make_relative(*op);
                 self.id_counter += 1;
             }
-            SymExpr::BuildAdd { a, b }
-            | SymExpr::BuildSub { a, b }
-            | SymExpr::BuildMul { a, b }
-            | SymExpr::BuildUnsignedDiv { a, b }
-            | SymExpr::BuildSignedDiv { a, b }
-            | SymExpr::BuildUnsignedRem { a, b }
-            | SymExpr::BuildSignedRem { a, b }
-            | SymExpr::BuildShiftLeft { a, b }
-            | SymExpr::BuildLogicalShiftRight { a, b }
-            | SymExpr::BuildArithmeticShiftRight { a, b }
-            | SymExpr::BuildSignedLessThan { a, b }
-            | SymExpr::BuildSignedLessEqual { a, b }
-            | SymExpr::BuildSignedGreaterThan { a, b }
-            | SymExpr::BuildSignedGreaterEqual { a, b }
-            | SymExpr::BuildUnsignedLessThan { a, b }
-            | SymExpr::BuildUnsignedLessEqual { a, b }
-            | SymExpr::BuildUnsignedGreaterThan { a, b }
-            | SymExpr::BuildUnsignedGreaterEqual { a, b }
-            | SymExpr::BuildEqual { a, b }
-            | SymExpr::BuildNotEqual { a, b }
-            | SymExpr::BuildBoolAnd { a, b }
-            | SymExpr::BuildBoolOr { a, b }
-            | SymExpr::BuildBoolXor { a, b }
-            | SymExpr::BuildAnd { a, b }
-            | SymExpr::BuildOr { a, b }
-            | SymExpr::BuildXor { a, b }
-            | SymExpr::BuildFloatOrdered { a, b }
-            | SymExpr::BuildFloatOrderedGreaterThan { a, b }
-            | SymExpr::BuildFloatOrderedGreaterEqual { a, b }
-            | SymExpr::BuildFloatOrderedLessThan { a, b }
-            | SymExpr::BuildFloatOrderedLessEqual { a, b }
-            | SymExpr::BuildFloatOrderedEqual { a, b }
-            | SymExpr::BuildFloatOrderedNotEqual { a, b }
-            | SymExpr::BuildFloatUnordered { a, b }
-            | SymExpr::BuildFloatUnorderedGreaterThan { a, b }
-            | SymExpr::BuildFloatUnorderedGreaterEqual { a, b }
-            | SymExpr::BuildFloatUnorderedLessThan { a, b }
-            | SymExpr::BuildFloatUnorderedLessEqual { a, b }
-            | SymExpr::BuildFloatUnorderedEqual { a, b }
-            | SymExpr::BuildFloatUnorderedNotEqual { a, b }
-            | SymExpr::BuildFloatAdd { a, b }
-            | SymExpr::BuildFloatSub { a, b }
-            | SymExpr::BuildFloatMul { a, b }
-            | SymExpr::BuildFloatDiv { a, b }
-            | SymExpr::BuildFloatRem { a, b }
-            | SymExpr::ConcatHelper { a, b }
-            | SymExpr::BuildInsert {
+            SymExpr::Add { a, b }
+            | SymExpr::Sub { a, b }
+            | SymExpr::Mul { a, b }
+            | SymExpr::UnsignedDiv { a, b }
+            | SymExpr::SignedDiv { a, b }
+            | SymExpr::UnsignedRem { a, b }
+            | SymExpr::SignedRem { a, b }
+            | SymExpr::ShiftLeft { a, b }
+            | SymExpr::LogicalShiftRight { a, b }
+            | SymExpr::ArithmeticShiftRight { a, b }
+            | SymExpr::SignedLessThan { a, b }
+            | SymExpr::SignedLessEqual { a, b }
+            | SymExpr::SignedGreaterThan { a, b }
+            | SymExpr::SignedGreaterEqual { a, b }
+            | SymExpr::UnsignedLessThan { a, b }
+            | SymExpr::UnsignedLessEqual { a, b }
+            | SymExpr::UnsignedGreaterThan { a, b }
+            | SymExpr::UnsignedGreaterEqual { a, b }
+            | SymExpr::Equal { a, b }
+            | SymExpr::NotEqual { a, b }
+            | SymExpr::BoolAnd { a, b }
+            | SymExpr::BoolOr { a, b }
+            | SymExpr::BoolXor { a, b }
+            | SymExpr::And { a, b }
+            | SymExpr::Or { a, b }
+            | SymExpr::Xor { a, b }
+            | SymExpr::FloatOrdered { a, b }
+            | SymExpr::FloatOrderedGreaterThan { a, b }
+            | SymExpr::FloatOrderedGreaterEqual { a, b }
+            | SymExpr::FloatOrderedLessThan { a, b }
+            | SymExpr::FloatOrderedLessEqual { a, b }
+            | SymExpr::FloatOrderedEqual { a, b }
+            | SymExpr::FloatOrderedNotEqual { a, b }
+            | SymExpr::FloatUnordered { a, b }
+            | SymExpr::FloatUnorderedGreaterThan { a, b }
+            | SymExpr::FloatUnorderedGreaterEqual { a, b }
+            | SymExpr::FloatUnorderedLessThan { a, b }
+            | SymExpr::FloatUnorderedLessEqual { a, b }
+            | SymExpr::FloatUnorderedEqual { a, b }
+            | SymExpr::FloatUnorderedNotEqual { a, b }
+            | SymExpr::FloatAdd { a, b }
+            | SymExpr::FloatSub { a, b }
+            | SymExpr::FloatMul { a, b }
+            | SymExpr::FloatDiv { a, b }
+            | SymExpr::FloatRem { a, b }
+            | SymExpr::Concat { a, b }
+            | SymExpr::Insert {
                 target: a,
                 to_insert: b,
                 ..
@@ -287,7 +285,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 *b = self.make_relative(*b);
                 self.id_counter += 1;
             }
-            SymExpr::PushPathConstraint { constraint: op, .. } => {
+            SymExpr::PathConstraint { constraint: op, .. } => {
                 *op = self.make_relative(*op);
             }
             SymExpr::ExpressionsUnreachable { exprs } => {
@@ -300,7 +298,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;
         // for every path constraint, make sure we can later decode it in case we crash by updating the trace header
-        if let SymExpr::PushPathConstraint { .. } = &message {
+        if let SymExpr::PathConstraint { .. } = &message {
             self.write_trace_size()?;
         }
         Ok(SymExprRef::new(current_id).unwrap())

@@ -56,101 +56,92 @@ macro_rules! binary_expression_builder {
 }
 
 impl Runtime for TracingRuntime {
-    expression_builder!(get_input_byte(offset: usize) => GetInputByte);
+    expression_builder!(get_input_byte(offset: usize) => InputByte);
 
-    expression_builder!(build_integer(value: u64, bits: u8) => BuildInteger);
-    expression_builder!(build_integer128(high: u64, low: u64) => BuildInteger128);
-    expression_builder!(build_float(value: f64, is_double: bool) => BuildFloat);
-    expression_builder!(build_null_pointer() => BuildNullPointer);
-    expression_builder!(build_true() => BuildTrue);
-    expression_builder!(build_false() => BuildFalse);
-    expression_builder!(build_bool(value: bool) => BuildBool);
+    expression_builder!(build_integer(value: u64, bits: u8) => Integer);
+    expression_builder!(build_integer128(high: u64, low: u64) => Integer128);
+    expression_builder!(build_float(value: f64, is_double: bool) => Float);
+    expression_builder!(build_null_pointer() => NullPointer);
+    expression_builder!(build_true() => True);
+    expression_builder!(build_false() => False);
+    expression_builder!(build_bool(value: bool) => Bool);
 
-    unary_expression_builder!(build_neg, BuildNeg);
+    unary_expression_builder!(build_neg, Neg);
 
-    binary_expression_builder!(build_add, BuildAdd);
-    binary_expression_builder!(build_sub, BuildSub);
-    binary_expression_builder!(build_mul, BuildMul);
-    binary_expression_builder!(build_unsigned_div, BuildUnsignedDiv);
-    binary_expression_builder!(build_signed_div, BuildSignedDiv);
-    binary_expression_builder!(build_unsigned_rem, BuildUnsignedRem);
-    binary_expression_builder!(build_signed_rem, BuildSignedRem);
-    binary_expression_builder!(build_shift_left, BuildShiftLeft);
-    binary_expression_builder!(build_logical_shift_right, BuildLogicalShiftRight);
-    binary_expression_builder!(build_arithmetic_shift_right, BuildArithmeticShiftRight);
+    binary_expression_builder!(build_add, Add);
+    binary_expression_builder!(build_sub, Sub);
+    binary_expression_builder!(build_mul, Mul);
+    binary_expression_builder!(build_unsigned_div, UnsignedDiv);
+    binary_expression_builder!(build_signed_div, SignedDiv);
+    binary_expression_builder!(build_unsigned_rem, UnsignedRem);
+    binary_expression_builder!(build_signed_rem, SignedRem);
+    binary_expression_builder!(build_shift_left, ShiftLeft);
+    binary_expression_builder!(build_logical_shift_right, LogicalShiftRight);
+    binary_expression_builder!(build_arithmetic_shift_right, ArithmeticShiftRight);
 
-    binary_expression_builder!(build_signed_less_than, BuildSignedLessThan);
-    binary_expression_builder!(build_signed_less_equal, BuildSignedLessEqual);
-    binary_expression_builder!(build_signed_greater_than, BuildSignedGreaterThan);
-    binary_expression_builder!(build_signed_greater_equal, BuildSignedGreaterEqual);
-    binary_expression_builder!(build_unsigned_less_than, BuildUnsignedLessThan);
-    binary_expression_builder!(build_unsigned_less_equal, BuildUnsignedLessEqual);
-    binary_expression_builder!(build_unsigned_greater_than, BuildUnsignedGreaterThan);
-    binary_expression_builder!(build_unsigned_greater_equal, BuildUnsignedGreaterEqual);
+    binary_expression_builder!(build_signed_less_than, SignedLessThan);
+    binary_expression_builder!(build_signed_less_equal, SignedLessEqual);
+    binary_expression_builder!(build_signed_greater_than, SignedGreaterThan);
+    binary_expression_builder!(build_signed_greater_equal, SignedGreaterEqual);
+    binary_expression_builder!(build_unsigned_less_than, UnsignedLessThan);
+    binary_expression_builder!(build_unsigned_less_equal, UnsignedLessEqual);
+    binary_expression_builder!(build_unsigned_greater_than, UnsignedGreaterThan);
+    binary_expression_builder!(build_unsigned_greater_equal, UnsignedGreaterEqual);
 
-    binary_expression_builder!(build_and, BuildAnd);
-    binary_expression_builder!(build_or, BuildOr);
-    binary_expression_builder!(build_xor, BuildXor);
+    binary_expression_builder!(build_and, And);
+    binary_expression_builder!(build_or, Or);
+    binary_expression_builder!(build_xor, Xor);
 
-    binary_expression_builder!(build_float_ordered, BuildFloatOrdered);
-    binary_expression_builder!(
-        build_float_ordered_greater_than,
-        BuildFloatOrderedGreaterThan
-    );
-    binary_expression_builder!(
-        build_float_ordered_greater_equal,
-        BuildFloatOrderedGreaterEqual
-    );
-    binary_expression_builder!(build_float_ordered_less_than, BuildFloatOrderedLessThan);
-    binary_expression_builder!(build_float_ordered_less_equal, BuildFloatOrderedLessEqual);
-    binary_expression_builder!(build_float_ordered_equal, BuildFloatOrderedEqual);
-    binary_expression_builder!(build_float_ordered_not_equal, BuildFloatOrderedNotEqual);
+    binary_expression_builder!(build_float_ordered, FloatOrdered);
+    binary_expression_builder!(build_float_ordered_greater_than, FloatOrderedGreaterThan);
+    binary_expression_builder!(build_float_ordered_greater_equal, FloatOrderedGreaterEqual);
+    binary_expression_builder!(build_float_ordered_less_than, FloatOrderedLessThan);
+    binary_expression_builder!(build_float_ordered_less_equal, FloatOrderedLessEqual);
+    binary_expression_builder!(build_float_ordered_equal, FloatOrderedEqual);
+    binary_expression_builder!(build_float_ordered_not_equal, FloatOrderedNotEqual);
 
-    binary_expression_builder!(build_float_unordered, BuildFloatUnordered);
+    binary_expression_builder!(build_float_unordered, FloatUnordered);
     binary_expression_builder!(
         build_float_unordered_greater_than,
-        BuildFloatUnorderedGreaterThan
+        FloatUnorderedGreaterThan
     );
     binary_expression_builder!(
         build_float_unordered_greater_equal,
-        BuildFloatUnorderedGreaterEqual
+        FloatUnorderedGreaterEqual
     );
-    binary_expression_builder!(build_float_unordered_less_than, BuildFloatUnorderedLessThan);
-    binary_expression_builder!(
-        build_float_unordered_less_equal,
-        BuildFloatUnorderedLessEqual
-    );
-    binary_expression_builder!(build_float_unordered_equal, BuildFloatUnorderedEqual);
-    binary_expression_builder!(build_float_unordered_not_equal, BuildFloatUnorderedNotEqual);
+    binary_expression_builder!(build_float_unordered_less_than, FloatUnorderedLessThan);
+    binary_expression_builder!(build_float_unordered_less_equal, FloatUnorderedLessEqual);
+    binary_expression_builder!(build_float_unordered_equal, FloatUnorderedEqual);
+    binary_expression_builder!(build_float_unordered_not_equal, FloatUnorderedNotEqual);
 
-    binary_expression_builder!(build_fp_add, BuildFloatAdd);
-    binary_expression_builder!(build_fp_sub, BuildFloatSub);
-    binary_expression_builder!(build_fp_mul, BuildFloatMul);
-    binary_expression_builder!(build_fp_div, BuildFloatDiv);
-    binary_expression_builder!(build_fp_rem, BuildFloatRem);
+    binary_expression_builder!(build_fp_add, FloatAdd);
+    binary_expression_builder!(build_fp_sub, FloatSub);
+    binary_expression_builder!(build_fp_mul, FloatMul);
+    binary_expression_builder!(build_fp_div, FloatDiv);
+    binary_expression_builder!(build_fp_rem, FloatRem);
 
-    unary_expression_builder!(build_fp_abs, BuildFloatAbs);
+    unary_expression_builder!(build_fp_abs, FloatAbs);
 
-    unary_expression_builder!(build_not, BuildNot);
-    binary_expression_builder!(build_equal, BuildEqual);
-    binary_expression_builder!(build_not_equal, BuildNotEqual);
-    binary_expression_builder!(build_bool_and, BuildBoolAnd);
-    binary_expression_builder!(build_bool_or, BuildBoolOr);
-    binary_expression_builder!(build_bool_xor, BuildBoolXor);
+    unary_expression_builder!(build_not, Not);
+    binary_expression_builder!(build_equal, Equal);
+    binary_expression_builder!(build_not_equal, NotEqual);
+    binary_expression_builder!(build_bool_and, BoolAnd);
+    binary_expression_builder!(build_bool_or, BoolOr);
+    binary_expression_builder!(build_bool_xor, BoolXor);
 
-    expression_builder!(build_sext(op: RSymExpr, bits: u8) => BuildSext);
-    expression_builder!(build_zext(op: RSymExpr, bits: u8) => BuildZext);
-    expression_builder!(build_trunc(op: RSymExpr, bits: u8) => BuildTrunc);
-    expression_builder!(build_int_to_float(op: RSymExpr, is_double: bool, is_signed: bool) => BuildIntToFloat);
-    expression_builder!(build_float_to_float(op: RSymExpr, to_double: bool) => BuildFloatToFloat);
-    expression_builder!(build_bits_to_float(op: RSymExpr, to_double: bool) => BuildBitsToFloat);
-    expression_builder!(build_float_to_bits(op: RSymExpr) => BuildFloatToBits);
-    expression_builder!(build_float_to_signed_integer(op: RSymExpr, bits: u8) => BuildFloatToSignedInteger);
-    expression_builder!(build_float_to_unsigned_integer(op: RSymExpr, bits: u8) => BuildFloatToUnsignedInteger);
-    expression_builder!(build_bool_to_bits(op: RSymExpr, bits: u8) => BuildBoolToBits);
+    expression_builder!(build_sext(op: RSymExpr, bits: u8) => Sext);
+    expression_builder!(build_zext(op: RSymExpr, bits: u8) => Zext);
+    expression_builder!(build_trunc(op: RSymExpr, bits: u8) => Trunc);
+    expression_builder!(build_int_to_float(op: RSymExpr, is_double: bool, is_signed: bool) => IntToFloat);
+    expression_builder!(build_float_to_float(op: RSymExpr, to_double: bool) => FloatToFloat);
+    expression_builder!(build_bits_to_float(op: RSymExpr, to_double: bool) => BitsToFloat);
+    expression_builder!(build_float_to_bits(op: RSymExpr) => FloatToBits);
+    expression_builder!(build_float_to_signed_integer(op: RSymExpr, bits: u8) => FloatToSignedInteger);
+    expression_builder!(build_float_to_unsigned_integer(op: RSymExpr, bits: u8) => FloatToUnsignedInteger);
+    expression_builder!(build_bool_to_bits(op: RSymExpr, bits: u8) => BoolToBits);
 
-    binary_expression_builder!(concat_helper, ConcatHelper);
-    expression_builder!(extract_helper(op: RSymExpr, first_bit:usize, last_bit:usize) => ExtractHelper);
+    binary_expression_builder!(concat_helper, Concat);
+    expression_builder!(extract_helper(op: RSymExpr, first_bit:usize, last_bit:usize) => Extract);
 
     fn notify_call(&mut self, _site_id: usize) {}
 
@@ -165,7 +156,7 @@ impl Runtime for TracingRuntime {
     }
 
     fn push_path_constraint(&mut self, constraint: RSymExpr, taken: bool, site_id: usize) {
-        self.write_message(SymExpr::PushPathConstraint {
+        self.write_message(SymExpr::PathConstraint {
             constraint,
             taken,
             site_id,
