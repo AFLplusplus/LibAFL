@@ -117,6 +117,8 @@ fn main() {
 
 #[cfg(unix)]
 fn main() {
+    use libafl::bolts::shmem::StdShMemService;
+
     /* The main node has a broker, and a few worker threads */
 
     let mode = std::env::args()
@@ -137,6 +139,9 @@ fn main() {
 
     match mode.as_str() {
         "broker" => {
+            // The shmem service is needed on some platforms like Android and MacOS
+            let _service = StdShMemService::start().unwrap();
+
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
             broker.launch_tcp_listener_on(port).unwrap();
             broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))

@@ -21,7 +21,7 @@ libpng-harness.so: libpng-1.6.37/.libs/libpng16.a
 	$(CXX) -O3 -c -fPIC harness.cc -o harness.o
 	$(CXX) -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.so
 
-libafl_frida: libpng-1.6.37/.libs/libpng16.a target/release/frida_libpng
+libafl_frida: target/release/frida_libpng
 	cp target/release/frida_libpng libafl_frida
 
 clean:
@@ -32,7 +32,8 @@ run: all
 	./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0
 
 short_test: all
-	timeout 11s ./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0
+	# We allow exit code 124 too, which is sigterm
+	(timeout 3s ./libafl_frida ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1 || [ $$? -eq 124 ])
 
 test: all
-	timeout 60s ./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0
+	timeout 60s ./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1

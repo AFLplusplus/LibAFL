@@ -291,12 +291,8 @@ where
         let (lock, cvar) = &*syncpair;
         let mut started = lock.lock().unwrap();
         while !*started {
-            println!("Waiting...");
             started = cvar.wait(started).unwrap();
-            println!("Done");
         }
-
-        println!("Started ShMemService");
 
         Ok(Self {
             join_handle: Some(join_handle),
@@ -310,11 +306,9 @@ where
     SP: ShMemProvider,
 {
     fn drop(&mut self) {
-        println!("Dropping ShMemService");
         let join_handle = self.join_handle.take();
         // TODO: Guess we could use the `cvar` // Mutex here instead?
         if let Some(join_handle) = join_handle {
-            println!("Dropping ShMemService - connecting");
             let mut stream = match UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) {
@@ -322,7 +316,6 @@ where
                 Err(_) => return, // ignoring non-started server
             };
 
-            println!("Dropping ShMemService - sending exit request");
             let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
 
             let header = (body.len() as u32).to_be_bytes();
@@ -491,15 +484,11 @@ where
         filename: &str,
         syncpair: &Arc<(Mutex<bool>, Condvar)>,
     ) -> Result<(), Error> {
-        println!("ShMem ARE YOU LISTENING");
-
         let listener = if let Ok(listener) =
             UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?)
         {
-            println!("ShMem Worker bound");
             listener
         } else {
-            println!("ShMem Worker not Working");
             let (lock, cvar) = &**syncpair;
             *lock.lock().unwrap() = true;
             cvar.notify_one();
@@ -510,7 +499,6 @@ where
             ));
         };
 
-        println!("Started ShMem Worker");
         let mut poll_fds: Vec<PollFd> = vec![PollFd::new(
             listener.as_raw_fd(),
             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
@@ -547,7 +535,7 @@ where
                             }
                         };
                     } else {
-                        let (stream, addr) = match listener.accept_unix_addr() {
+                        let (stream, _addr) = match listener.accept_unix_addr() {
                             Ok(stream_val) => stream_val,
                             Err(e) => {
                                 println!("Error accepting client: {:?}", e);
@@ -555,7 +543,7 @@ where
                             }
                         };
 
-                        println!("Recieved connection from {:?}", addr);
+                        // println!("Recieved connection from {:?}", addr);
                         let pollfd = PollFd::new(
                             stream.as_raw_fd(),
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
@@ -567,7 +555,7 @@ where
                         match self.handle_client(client_id) {
                             Ok(()) => (),
                             Err(Error::ShuttingDown) => {
-                                dbg!("Shutting down");
+                                println!("Shutting down");
                                 return Ok(());
                             }
                             Err(e) => {
