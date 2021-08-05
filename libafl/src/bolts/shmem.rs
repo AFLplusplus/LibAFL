@@ -1245,12 +1245,14 @@ impl DummyShMemService {
     }
 }
 
+#[cfg(feature = "std")]
 /// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`] in std environments.
 pub struct ShMemCursor<T: ShMem> {
     inner: T,
     pos: usize,
 }
 
+#[cfg(feature = "std")]
 impl<T: ShMem> ShMemCursor<T> {
     pub fn new(shmem: T) -> Self {
         Self {
@@ -1302,6 +1304,7 @@ impl<T: ShMem> std::io::Write for ShMemCursor<T> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
     fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
         let effective_new_pos = match pos {
