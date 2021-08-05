@@ -1,16 +1,14 @@
 use std::{
     env,
     fs::File,
-    io::{stdout, Write},
+    io::Write,
     path::{Path, PathBuf},
-    process::{exit, Command},
+    process::exit,
 };
 
 use lazy_static::lazy_static;
 use regex::{Regex, RegexBuilder};
-
-const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
-const SYMCC_REPO_COMMIT: &str = "45cde0269ae22aef4cca2e1fb98c3b24f7bb2984";
+use symcc_libafl::clone_symcc;
 
 const SYMCC_RUNTIME_FUNCTION_NAME_PREFIX: &str = "_cpp_";
 
@@ -108,38 +106,10 @@ fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bind
 
 fn checkout_symcc(out_path: &Path) -> PathBuf {
     let repo_dir = out_path.join("libafl_symcc_src");
-    if repo_dir.exists() {
-        repo_dir
-    } else {
-        build_dep_check(&["git"]);
-        let mut cmd = Command::new("git");
-        cmd.arg("clone").arg(SYMCC_REPO_URL).arg(&repo_dir);
-        let output = cmd.output().expect("failed to execute git clone");
-        if output.status.success() {
-            let mut cmd = Command::new("git");
-            cmd.arg("checkout")
-                .arg(SYMCC_REPO_COMMIT)
-                .current_dir(&repo_dir);
-            let output = cmd.output().expect("failed to execute git checkout");
-            if output.status.success() {
-                repo_dir
-            } else {
-                println!("failed to checkout symcc git repository commit:");
-                let mut stdout = stdout();
-                stdout
-                    .write_all(&output.stderr)
-                    .expect("failed to write git error message to stdout");
-                exit(1)
-            }
-        } else {
-            println!("failed to clone symcc git repository:");
-            let mut stdout = stdout();
-            stdout
-                .write_all(&output.stderr)
-                .expect("failed to write git error message to stdout");
-            exit(1)
-        }
+    if !repo_dir.exists() {
+        clone_symcc(&repo_dir);
     }
+    repo_dir
 }
 
 fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {

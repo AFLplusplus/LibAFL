@@ -22,3 +22,4 @@ bindgen = "0.58"
 regex = "1"
 lazy_static = "1.4"
 which = "4.1"
+symcc_libafl = {path = "../symcc_libafl"}
