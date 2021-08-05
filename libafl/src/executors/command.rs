@@ -51,7 +51,7 @@ where
                 // if this fails, there is not much we can do. let's hope it failed because the process finished
                 // in the meantime.
                 drop(child.kill());
-                // finally, try to wait to properly clean up system ressources.
+                // finally, try to wait to properly clean up system resources.
                 drop(child.wait());
                 Ok(ExitKind::Timeout)
             }

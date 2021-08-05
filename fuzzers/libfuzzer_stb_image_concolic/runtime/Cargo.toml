@@ -2,6 +2,7 @@
 name = "example_runtime"
 version = "0.1.0"
 edition = "2018"
+authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 
 [lib]
 # the runtime needs to be a shared object -> cdylib

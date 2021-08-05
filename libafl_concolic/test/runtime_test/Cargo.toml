@@ -2,6 +2,7 @@
 name = "runtime_test"
 version = "0.1.0"
 edition = "2018"
+authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 
 [lib]
 crate-type   = ["cdylib"]

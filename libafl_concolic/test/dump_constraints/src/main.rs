@@ -1,3 +1,7 @@
+//! This is a straight-forward command line utility that can dump constraints written by a tracing runtime.
+//! It achieves this by running an instrumented target program with the necessary environment variables set.
+//! When the program has finished executing, it dumps the traced constraints to a file.
+
 use std::{
     ffi::OsString,
     fs::File,
@@ -12,11 +16,8 @@ use structopt::StructOpt;
 use libafl::{
     bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider},
     observers::concolic::{
-        serialization_format::{
-            shared_memory::DEFAULT_ENV_NAME, MessageFileReader, MessageFileWriter,
-        },
-        SymExpr, EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME,
-        SELECTIVE_SYMBOLICATION_ENV_NAME,
+        serialization_format::{MessageFileReader, MessageFileWriter, DEFAULT_ENV_NAME},
+        EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
     },
 };
 
@@ -113,7 +114,7 @@ fn main() {
             }
         }
 
-        // open a new scope to ensure our ressources get dropped before the exit call at the end
+        // open a new scope to ensure our resources get dropped before the exit call at the end
         let output_file_path = opt.output.unwrap_or_else(|| "trace".into());
         let mut output_file =
             BufWriter::new(File::create(output_file_path).expect("unable to open output file"));
@@ -140,9 +141,6 @@ fn main() {
                     break;
                 }
             }
-            writer
-                .write_message(SymExpr::End)
-                .expect("unable to write end message");
         }
     }
 
