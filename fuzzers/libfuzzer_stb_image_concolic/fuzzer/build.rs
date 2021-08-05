@@ -1,17 +1,33 @@
 // build.rs
 
-use std::env;
-use std::io::stdout;
-use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::exit;
-use std::process::Command;
+use std::{
+    env,
+    io::{stdout, Write},
+    path::{Path, PathBuf},
+    process::{exit, Command},
+};
+
+use which::which;
+
+fn build_dep_check(tools: &[&str]) {
+    for tool in tools {
+        println!("Checking for build tool {}...", tool);
+
+        if let Ok(path) = which(tool) {
+            println!("Found build tool {}", path.to_str().unwrap())
+        } else {
+            println!("ERROR: missing build tool {}", tool);
+            exit(1);
+        };
+    }
+}
 
 fn main() {
     let out_path = PathBuf::from(&env::var_os("OUT_DIR").unwrap());
 
     println!("cargo:rerun-if-changed=harness.c");
+
+    build_dep_check(&["clang", "clang++"]);
 
     // Enforce clang for its -fsanitize-coverage support.
     std::env::set_var("CC", "clang");
@@ -50,6 +66,8 @@ fn main() {
     std::env::set_var("CXX", symcc_dir.join("sym++"));
     std::env::set_var("SYMCC_RUNTIME_DIR", runtime_dir);
 
+    println!("cargo:rerun-if-changed=harness_symcc.c");
+
     let output = cc::Build::new()
         .flag("-Wno-sign-compare")
         .cargo_metadata(false)
@@ -79,8 +97,8 @@ const SYMCC_REPO_COMMIT: &str = "45cde0269ae22aef4cca2e1fb98c3b24f7bb2984";
 
 fn clone_and_build_symcc(out_path: &Path) -> PathBuf {
     let repo_dir = out_path.join("libafl_symcc_src");
-    if repo_dir.exists() {
-    } else {
+    if !repo_dir.exists() {
+        build_dep_check(&["git"]);
         let mut cmd = Command::new("git");
         cmd.arg("clone").arg(SYMCC_REPO_URL).arg(&repo_dir);
         let output = cmd.output().expect("failed to execute git clone");
@@ -108,6 +126,8 @@ fn clone_and_build_symcc(out_path: &Path) -> PathBuf {
             exit(1)
         }
     }
+
+    build_dep_check(&["cmake"]);
 
     use cmake::Config;
 

@@ -1,3 +1,4 @@
+#!/bin/bash
 # intends to install build dependencies for the smoke test on ubuntu
 set -eux;
 

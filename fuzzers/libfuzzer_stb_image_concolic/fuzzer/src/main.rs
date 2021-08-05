@@ -22,8 +22,10 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::I2SRandReplace,
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        token_mutations::I2SRandReplace,
+    },
     observers::{
         concolic::{
             serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE},

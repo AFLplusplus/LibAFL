@@ -41,10 +41,10 @@ pub trait Filter {
     invoke_macro_with_rust_runtime_exports!(rust_filter_function_declaration;);
 }
 
-#[allow(clippy::module_name_repetitions)]
 /// A `FilterRuntime` wraps a [`Runtime`] with a [`Filter`], applying the filter before passing expressions to the inner
 /// runtime.
 /// It also implements [`Runtime`], allowing for composing multiple [`Filter`]'s in a chain.
+#[allow(clippy::module_name_repetitions)]
 pub struct FilterRuntime<F, RT> {
     filter: F,
     runtime: RT,

@@ -111,6 +111,7 @@ fn checkout_symcc(out_path: &Path) -> PathBuf {
     if repo_dir.exists() {
         repo_dir
     } else {
+        build_dep_check(&["git"]);
         let mut cmd = Command::new("git");
         cmd.arg("clone").arg(SYMCC_REPO_URL).arg(&repo_dir);
         let output = cmd.output().expect("failed to execute git clone");
@@ -241,6 +242,7 @@ fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::
 }
 
 fn build_and_link_symcc_runtime(symcc_src_path: &Path, rename_header_path: &Path) {
+    build_dep_check(&["cmake"]);
     let cpp_lib = cmake::Config::new(symcc_src_path.join("runtime"))
         .define("RUST_BACKEND", "ON")
         .cxxflag(format!(
@@ -262,5 +264,18 @@ fn link_with_cpp_stdlib() {
         println!("cargo:rustc-link-lib=dylib=stdc++");
     } else {
         unimplemented!();
+    }
+}
+
+fn build_dep_check(tools: &[&str]) {
+    for tool in tools {
+        println!("Checking for build tool {}...", tool);
+
+        if let Ok(path) = which::which(tool) {
+            println!("Found build tool {}", path.to_str().unwrap())
+        } else {
+            println!("ERROR: missing build tool {}", tool);
+            exit(1);
+        };
     }
 }

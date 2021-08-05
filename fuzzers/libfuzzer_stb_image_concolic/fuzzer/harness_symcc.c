@@ -36,6 +36,4 @@ int main(int argc, char **argv) {
   // if (x > 10000) free(img); // free crash
 
   return 0;
-
-  return 0;
 }

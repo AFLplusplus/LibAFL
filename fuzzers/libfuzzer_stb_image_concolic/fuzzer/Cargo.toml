@@ -23,3 +23,4 @@ libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguar
 cc = { version = "1.0", features = ["parallel"] }
 num_cpus = "1.0"
 cmake = "0.1"
+which = "4.1"
