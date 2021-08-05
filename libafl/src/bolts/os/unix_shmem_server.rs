@@ -14,6 +14,7 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
+    fs,
     io::{Read, Write},
     marker::PhantomData,
     rc::{Rc, Weak},
@@ -309,11 +310,11 @@ where
     SP: ShMemProvider,
 {
     fn drop(&mut self) {
-        println!("Droping ShMemService");
+        println!("Dropping ShMemService");
         let join_handle = self.join_handle.take();
         // TODO: Guess we could use the `cvar` // Mutex here instead?
         if let Some(join_handle) = join_handle {
-            println!("Droping ShMemService - connecting");
+            println!("Dropping ShMemService - connecting");
             let mut stream = match UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) {
@@ -321,7 +322,7 @@ where
                 Err(_) => return, // ignoring non-started server
             };
 
-            println!("Droping ShMemService - sending exit request");
+            println!("Dropping ShMemService - sending exit request");
             let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
 
             let header = (body.len() as u32).to_be_bytes();
@@ -579,5 +580,16 @@ where
                 }
             }
         }
+    }
+}
+
+impl<SP> Drop for ServedShMemServiceWorker<SP>
+where
+    SP: ShMemProvider,
+{
+    fn drop(&mut self) {
+        // try to remove the file from fs, and ignore errors.
+        #[cfg(target_os = "macos")]
+        drop(fs::remove_file(&UNIX_SERVER_NAME));
     }
 }

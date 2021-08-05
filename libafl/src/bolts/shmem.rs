@@ -1244,15 +1244,18 @@ impl DummyShMemService {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService};
 
     #[test]
+    #[serial]
     fn test_shmem_service() {
+        #[allow(unused_variables)]
         let service = StdShMemService::start().unwrap();
         let mut provider = StdShMemProvider::new().unwrap();
         let mut map = provider.new_map(1024).unwrap();
         map.map_mut()[0] = 1;
         assert!(map.map()[0] == 1);
-        drop(service);
     }
 }

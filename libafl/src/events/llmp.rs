@@ -928,11 +928,13 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
+    use serial_test::serial;
+
     use crate::{
         bolts::{
             llmp::{LlmpClient, LlmpSharedMap},
             rands::StdRand,
-            shmem::{ShMemProvider, StdShMemProvider},
+            shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
             staterestore::StateRestorer,
             tuples::tuple_list,
         },
@@ -948,7 +950,10 @@ mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
     #[test]
+    #[serial]
     fn test_mgr_state_restore() {
+        let _service = StdShMemService::start().unwrap();
+
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();

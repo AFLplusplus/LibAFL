@@ -239,16 +239,19 @@ where
 #[cfg(test)]
 mod tests {
 
+    use serial_test::serial;
+
     use crate::bolts::{
         shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
         staterestore::StateRestorer,
     };
 
     #[test]
+    #[serial]
     fn test_state_restore() {
         const TESTMAP_SIZE: usize = 1024;
 
-        StdShMemService::start().unwrap();
+        let _service = StdShMemService::start().unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
         let shmem = shmem_provider.new_map(TESTMAP_SIZE).unwrap();

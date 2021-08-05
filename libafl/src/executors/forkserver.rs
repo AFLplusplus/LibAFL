@@ -614,6 +614,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService},
@@ -625,12 +627,13 @@ mod tests {
         Error,
     };
     #[test]
+    #[serial]
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
         let bin = "echo";
         let args = vec![String::from("@@")];
 
-        let service = StdShMemService::start().unwrap();
+        let _service = StdShMemService::start().unwrap();
 
         let mut shmem = StdShMemProvider::new()
             .unwrap()
@@ -659,6 +662,5 @@ mod tests {
             },
         };
         assert!(result);
-        drop(service);
     }
 }

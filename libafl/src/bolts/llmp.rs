@@ -2650,6 +2650,8 @@ mod tests {
 
     use std::{thread::sleep, time::Duration};
 
+    use serial_test::serial;
+
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
@@ -2660,7 +2662,9 @@ mod tests {
     use crate::bolts::shmem::{ShMemProvider, StdShMemProvider, StdShMemService};
 
     #[test]
+    #[serial]
     pub fn llmp_connection() {
+        #[allow(unused_variables)]
         let service = StdShMemService::start().unwrap();
 
         let shmem_provider = StdShMemProvider::new().unwrap();
@@ -2709,7 +2713,5 @@ mod tests {
 
         // We want at least the tcp and sender clients.
         assert_eq!(broker.llmp_clients.len(), 2);
-
-        drop(service);
     }
 }
