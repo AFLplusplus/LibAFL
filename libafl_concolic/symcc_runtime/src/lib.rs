@@ -1,10 +1,10 @@
-//! # SymCC Runtime Bindings
-//! This crate contains bindings to the [SymCC](https://github.com/eurecom-s3/symcc) [runtime interface](https://github.com/eurecom-s3/symcc/blob/master/runtime/RuntimeCommon.h) to be used from Rust.
-//! A SymCC runtime can be used with either SymCC or [SymQEMU](https://github.com/eurecom-s3/symqemu) to trace the execution of a target program.
+//! # `SymCC` Runtime Bindings
+//! This crate contains bindings to the [`SymCC`](https://github.com/eurecom-s3/symcc) [runtime interface](https://github.com/eurecom-s3/symcc/blob/master/runtime/RuntimeCommon.h) to be used from Rust.
+//! A `SymCC` runtime can be used with either `SymCC` or [`SymQEMU`](https://github.com/eurecom-s3/symqemu) to trace the execution of a target program.
 //!
 //! ## How to use
 //! On a high level, users of this crate can implement the [`Runtime`] trait and export the runtime interface as a `cdylib` using the [`export_runtime`] macro.
-//! On a technical level, a SymCC runtime is a dynamic library (/shared object) that exposes a set of symbols that the instrumentation layer of SymCC calls into during execution of the target.
+//! On a technical level, a `SymCC` runtime is a dynamic library (/shared object) that exposes a set of symbols that the instrumentation layer of `SymCC` calls into during execution of the target.
 //! Therefore, to create a runtime, a separate crate for the runtime is required, because this is the only way to create a separate dynamic library using cargo.
 //!
 //! ## Goodies

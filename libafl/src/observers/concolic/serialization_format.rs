@@ -16,7 +16,7 @@
 //! expressions are decoded from leaf to root instead of root to leaf.
 //! * At its core, it is just [`SymExpr`]s, which can be added to, modified and removed from with ease. The
 //! definitions are automatically shared between the runtime and the consuming program, since both depend on the same
-//! LibAFL.
+//! `LibAFL`.
 //!
 //! ## Techniques
 //! The serialization format applies multiple techniques to achieve its goals.
@@ -33,9 +33,9 @@
 //!
 //! ## Example
 //! The expression `SymExpr::BoolAnd { a: SymExpr::True, b: SymExpr::False }` would be encoded as:
-//! 1. 1 byte to identify SymExpr::True (a)
-//! 2. 1 byte to identify SymExpr::False (b)
-//! 3. 1 byte to identify SymExpr::BoolAnd
+//! 1. 1 byte to identify `SymExpr::True` (a)
+//! 2. 1 byte to identify `SymExpr::False` (b)
+//! 3. 1 byte to identify `SymExpr::BoolAnd`
 //! 4. 1 byte to reference a
 //! 5. 1 byte to reference b
 //!
@@ -104,7 +104,7 @@ impl<R: Read> MessageFileReader<R> {
     }
 
     /// This transforms the given message from it's serialized form into its in-memory form, making relative references
-    /// absolute and counting the SymExprRefs.
+    /// absolute and counting the `SymExprRef`s.
     fn transform_message(&mut self, message: &mut SymExpr) -> SymExprRef {
         let ret = self.current_id;
         match message {
