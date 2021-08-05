@@ -4,7 +4,7 @@ use core::num::NonZeroUsize;
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
-/// A SymExprRef identifies a [`SymExpr`] in a trace. Reading a `SymExpr` from a trace will always also yield its 
+/// A SymExprRef identifies a [`SymExpr`] in a trace. Reading a `SymExpr` from a trace will always also yield its
 /// `SymExprRef`, which can be used later in the trace to identify the `SymExpr`.
 /// It is also never zero, which allows for efficient use of `Option<SymExprRef>`.
 ///

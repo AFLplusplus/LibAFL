@@ -7,7 +7,6 @@ use symcc_runtime::{
     Runtime,
 };
 
-
 export_runtime!(
     NoFloat => NoFloat;
     tracing::TracingRuntime::new(

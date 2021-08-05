@@ -16,9 +16,7 @@ use structopt::StructOpt;
 use libafl::{
     bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider},
     observers::concolic::{
-        serialization_format::{
-            DEFAULT_ENV_NAME, MessageFileReader, MessageFileWriter,
-        },
+        serialization_format::{MessageFileReader, MessageFileWriter, DEFAULT_ENV_NAME},
         EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
     },
 };
