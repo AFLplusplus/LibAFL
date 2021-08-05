@@ -159,39 +159,39 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
     for (id, msg) in iter {
         let z3_expr: Option<Dynamic> = match msg {
-            SymExpr::GetInputByte { offset } => {
+            SymExpr::InputByte { offset } => {
                 Some(BV::new_const(&ctx, Symbol::Int(offset as u32), 8).into())
             }
-            SymExpr::BuildInteger { value, bits } => {
+            SymExpr::Integer { value, bits } => {
                 Some(BV::from_u64(&ctx, value, u32::from(bits)).into())
             }
-            SymExpr::BuildInteger128 { high: _, low: _ } => todo!(),
-            SymExpr::BuildNullPointer => {
+            SymExpr::Integer128 { high: _, low: _ } => todo!(),
+            SymExpr::NullPointer => {
                 Some(BV::from_u64(&ctx, 0, (8 * size_of::<usize>()) as u32).into())
             }
-            SymExpr::BuildTrue => Some(Bool::from_bool(&ctx, true).into()),
-            SymExpr::BuildFalse => Some(Bool::from_bool(&ctx, false).into()),
-            SymExpr::BuildBool { value } => Some(Bool::from_bool(&ctx, value).into()),
-            SymExpr::BuildNeg { op } => Some(bv!(op).bvneg().into()),
-            SymExpr::BuildAdd { a, b } => bv_binop!(a bvadd b),
-            SymExpr::BuildSub { a, b } => bv_binop!(a bvsub b),
-            SymExpr::BuildMul { a, b } => bv_binop!(a bvmul b),
-            SymExpr::BuildUnsignedDiv { a, b } => bv_binop!(a bvudiv b),
-            SymExpr::BuildSignedDiv { a, b } => bv_binop!(a bvsdiv b),
-            SymExpr::BuildUnsignedRem { a, b } => bv_binop!(a bvurem b),
-            SymExpr::BuildSignedRem { a, b } => bv_binop!(a bvsrem b),
-            SymExpr::BuildShiftLeft { a, b } => bv_binop!(a bvshl b),
-            SymExpr::BuildLogicalShiftRight { a, b } => bv_binop!(a bvlshr b),
-            SymExpr::BuildArithmeticShiftRight { a, b } => bv_binop!(a bvashr b),
-            SymExpr::BuildSignedLessThan { a, b } => bv_binop!(a bvslt b),
-            SymExpr::BuildSignedLessEqual { a, b } => bv_binop!(a bvsle b),
-            SymExpr::BuildSignedGreaterThan { a, b } => bv_binop!(a bvsgt b),
-            SymExpr::BuildSignedGreaterEqual { a, b } => bv_binop!(a bvsge b),
-            SymExpr::BuildUnsignedLessThan { a, b } => bv_binop!(a bvult b),
-            SymExpr::BuildUnsignedLessEqual { a, b } => bv_binop!(a bvule b),
-            SymExpr::BuildUnsignedGreaterThan { a, b } => bv_binop!(a bvugt b),
-            SymExpr::BuildUnsignedGreaterEqual { a, b } => bv_binop!(a bvuge b),
-            SymExpr::BuildNot { op } => {
+            SymExpr::True => Some(Bool::from_bool(&ctx, true).into()),
+            SymExpr::False => Some(Bool::from_bool(&ctx, false).into()),
+            SymExpr::Bool { value } => Some(Bool::from_bool(&ctx, value).into()),
+            SymExpr::Neg { op } => Some(bv!(op).bvneg().into()),
+            SymExpr::Add { a, b } => bv_binop!(a bvadd b),
+            SymExpr::Sub { a, b } => bv_binop!(a bvsub b),
+            SymExpr::Mul { a, b } => bv_binop!(a bvmul b),
+            SymExpr::UnsignedDiv { a, b } => bv_binop!(a bvudiv b),
+            SymExpr::SignedDiv { a, b } => bv_binop!(a bvsdiv b),
+            SymExpr::UnsignedRem { a, b } => bv_binop!(a bvurem b),
+            SymExpr::SignedRem { a, b } => bv_binop!(a bvsrem b),
+            SymExpr::ShiftLeft { a, b } => bv_binop!(a bvshl b),
+            SymExpr::LogicalShiftRight { a, b } => bv_binop!(a bvlshr b),
+            SymExpr::ArithmeticShiftRight { a, b } => bv_binop!(a bvashr b),
+            SymExpr::SignedLessThan { a, b } => bv_binop!(a bvslt b),
+            SymExpr::SignedLessEqual { a, b } => bv_binop!(a bvsle b),
+            SymExpr::SignedGreaterThan { a, b } => bv_binop!(a bvsgt b),
+            SymExpr::SignedGreaterEqual { a, b } => bv_binop!(a bvsge b),
+            SymExpr::UnsignedLessThan { a, b } => bv_binop!(a bvult b),
+            SymExpr::UnsignedLessEqual { a, b } => bv_binop!(a bvule b),
+            SymExpr::UnsignedGreaterThan { a, b } => bv_binop!(a bvugt b),
+            SymExpr::UnsignedGreaterEqual { a, b } => bv_binop!(a bvuge b),
+            SymExpr::Not { op } => {
                 let translated = &translation[&op];
                 Some(if let Some(bv) = translated.as_bv() {
                     bv.bvnot().into()
@@ -204,22 +204,18 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                     )
                 })
             }
-            SymExpr::BuildEqual { a, b } => Some(translation[&a]._eq(&translation[&b]).into()),
-            SymExpr::BuildNotEqual { a, b } => {
-                Some(translation[&a]._eq(&translation[&b]).not().into())
-            }
-            SymExpr::BuildBoolAnd { a, b } => Some(Bool::and(&ctx, &[&bool!(a), &bool!(b)]).into()),
-            SymExpr::BuildBoolOr { a, b } => Some(Bool::or(&ctx, &[&bool!(a), &bool!(b)]).into()),
-            SymExpr::BuildBoolXor { a, b } => Some(bool!(a).xor(&bool!(b)).into()),
-            SymExpr::BuildAnd { a, b } => bv_binop!(a bvand b),
-            SymExpr::BuildOr { a, b } => bv_binop!(a bvor b),
-            SymExpr::BuildXor { a, b } => bv_binop!(a bvxor b),
-            SymExpr::BuildSext { op, bits } => Some(bv!(op).sign_ext(u32::from(bits)).into()),
-            SymExpr::BuildZext { op, bits } => Some(bv!(op).zero_ext(u32::from(bits)).into()),
-            SymExpr::BuildTrunc { op, bits } => {
-                Some(bv!(op).extract(u32::from(bits - 1), 0).into())
-            }
-            SymExpr::BuildBoolToBits { op, bits } => Some(
+            SymExpr::Equal { a, b } => Some(translation[&a]._eq(&translation[&b]).into()),
+            SymExpr::NotEqual { a, b } => Some(translation[&a]._eq(&translation[&b]).not().into()),
+            SymExpr::BoolAnd { a, b } => Some(Bool::and(&ctx, &[&bool!(a), &bool!(b)]).into()),
+            SymExpr::BoolOr { a, b } => Some(Bool::or(&ctx, &[&bool!(a), &bool!(b)]).into()),
+            SymExpr::BoolXor { a, b } => Some(bool!(a).xor(&bool!(b)).into()),
+            SymExpr::And { a, b } => bv_binop!(a bvand b),
+            SymExpr::Or { a, b } => bv_binop!(a bvor b),
+            SymExpr::Xor { a, b } => bv_binop!(a bvxor b),
+            SymExpr::Sext { op, bits } => Some(bv!(op).sign_ext(u32::from(bits)).into()),
+            SymExpr::Zext { op, bits } => Some(bv!(op).zero_ext(u32::from(bits)).into()),
+            SymExpr::Trunc { op, bits } => Some(bv!(op).extract(u32::from(bits - 1), 0).into()),
+            SymExpr::BoolToBits { op, bits } => Some(
                 bool!(op)
                     .ite(
                         &BV::from_u64(&ctx, 1, u32::from(bits)),
@@ -227,29 +223,13 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                     )
                     .into(),
             ),
-            SymExpr::ConcatHelper { a, b } => bv_binop!(a concat b),
-            SymExpr::ExtractHelper {
+            SymExpr::Concat { a, b } => bv_binop!(a concat b),
+            SymExpr::Extract {
                 op,
                 first_bit,
                 last_bit,
             } => Some(bv!(op).extract(first_bit as u32, last_bit as u32).into()),
-            SymExpr::BuildExtract {
-                op,
-                offset,
-                length,
-                little_endian,
-            } => Some(build_extract(&(bv!(op)), offset, length, little_endian).into()),
-            SymExpr::BuildBswap { op } => {
-                let bv = bv!(op);
-                let bits = bv.get_size();
-                assert_eq!(
-                    bits % 16,
-                    0,
-                    "bswap is only compatible with an even number of bvytes in the BV"
-                );
-                Some(build_extract(&bv, 0, u64::from(bits) / 8, true).into())
-            }
-            SymExpr::BuildInsert {
+            SymExpr::Insert {
                 target,
                 to_insert,
                 offset,
@@ -297,7 +277,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
         };
         if let Some(expr) = z3_expr {
             translation.insert(id, expr);
-        } else if let SymExpr::PushPathConstraint {
+        } else if let SymExpr::PathConstraint {
             constraint,
             site_id: _,
             taken,

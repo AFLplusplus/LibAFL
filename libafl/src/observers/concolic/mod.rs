@@ -1,300 +1,300 @@
+//! # Concolic Tracing
 use core::num::NonZeroUsize;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
+/// A `SymExprRef` identifies a [`SymExpr`] in a trace. Reading a `SymExpr` from a trace will always also yield its
+/// `SymExprRef`, which can be used later in the trace to identify the `SymExpr`.
+/// It is also never zero, which allows for efficient use of `Option<SymExprRef>`.
+///
+/// In a trace, `SymExprRef`s are monotonically increasing and start at 1.
+/// `SymExprRef`s are not valid across traces.
 pub type SymExprRef = NonZeroUsize;
 
+/// `SymExpr` represents a message in the serialization format.
+/// The messages in the format are a perfect mirror of the methods that are called on the runtime during execution.
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SymExpr {
-    GetInputByte {
+    InputByte {
         offset: usize,
     },
 
-    BuildInteger {
+    Integer {
         value: u64,
         bits: u8,
     },
-    BuildInteger128 {
+    Integer128 {
         high: u64,
         low: u64,
     },
-    BuildFloat {
+    Float {
         value: f64,
         is_double: bool,
     },
-    BuildNullPointer,
-    BuildTrue,
-    BuildFalse,
-    BuildBool {
+    NullPointer,
+    True,
+    False,
+    Bool {
         value: bool,
     },
 
-    BuildNeg {
+    Neg {
         op: SymExprRef,
     },
-    BuildAdd {
+    Add {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildSub {
+    Sub {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildMul {
+    Mul {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildUnsignedDiv {
+    UnsignedDiv {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildSignedDiv {
+    SignedDiv {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildUnsignedRem {
+    UnsignedRem {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildSignedRem {
+    SignedRem {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildShiftLeft {
+    ShiftLeft {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildLogicalShiftRight {
+    LogicalShiftRight {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildArithmeticShiftRight {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-
-    BuildSignedLessThan {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildSignedLessEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildSignedGreaterThan {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildSignedGreaterEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildUnsignedLessThan {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildUnsignedLessEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildUnsignedGreaterThan {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildUnsignedGreaterEqual {
+    ArithmeticShiftRight {
         a: SymExprRef,
         b: SymExprRef,
     },
 
-    BuildNot {
+    SignedLessThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    SignedLessEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    SignedGreaterThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    SignedGreaterEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    UnsignedLessThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    UnsignedLessEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    UnsignedGreaterThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    UnsignedGreaterEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+
+    Not {
         op: SymExprRef,
     },
-    BuildEqual {
+    Equal {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildNotEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-
-    BuildBoolAnd {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildBoolOr {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildBoolXor {
+    NotEqual {
         a: SymExprRef,
         b: SymExprRef,
     },
 
-    BuildAnd {
+    BoolAnd {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildOr {
+    BoolOr {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildXor {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-
-    BuildFloatOrdered {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatOrderedGreaterThan {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatOrderedGreaterEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatOrderedLessThan {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatOrderedLessEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatOrderedEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatOrderedNotEqual {
+    BoolXor {
         a: SymExprRef,
         b: SymExprRef,
     },
 
-    BuildFloatUnordered {
+    And {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildFloatUnorderedGreaterThan {
+    Or {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildFloatUnorderedGreaterEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatUnorderedLessThan {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatUnorderedLessEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatUnorderedEqual {
-        a: SymExprRef,
-        b: SymExprRef,
-    },
-    BuildFloatUnorderedNotEqual {
+    Xor {
         a: SymExprRef,
         b: SymExprRef,
     },
 
-    BuildFloatAbs {
+    FloatOrdered {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatOrderedGreaterThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatOrderedGreaterEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatOrderedLessThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatOrderedLessEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatOrderedEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatOrderedNotEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+
+    FloatUnordered {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatUnorderedGreaterThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatUnorderedGreaterEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatUnorderedLessThan {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatUnorderedLessEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatUnorderedEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+    FloatUnorderedNotEqual {
+        a: SymExprRef,
+        b: SymExprRef,
+    },
+
+    FloatAbs {
         op: SymExprRef,
     },
-    BuildFloatAdd {
+    FloatAdd {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildFloatSub {
+    FloatSub {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildFloatMul {
+    FloatMul {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildFloatDiv {
+    FloatDiv {
         a: SymExprRef,
         b: SymExprRef,
     },
-    BuildFloatRem {
+    FloatRem {
         a: SymExprRef,
         b: SymExprRef,
     },
 
-    BuildSext {
-        op: SymExprRef,
-        bits: u8,
-    },
-    BuildZext {
+    Sext {
         op: SymExprRef,
         bits: u8,
     },
-    BuildTrunc {
+    Zext {
         op: SymExprRef,
         bits: u8,
     },
-    BuildIntToFloat {
+    Trunc {
+        op: SymExprRef,
+        bits: u8,
+    },
+    IntToFloat {
         op: SymExprRef,
         is_double: bool,
         is_signed: bool,
     },
-    BuildFloatToFloat {
+    FloatToFloat {
         op: SymExprRef,
         to_double: bool,
     },
-    BuildBitsToFloat {
+    BitsToFloat {
         op: SymExprRef,
         to_double: bool,
     },
-    BuildFloatToBits {
+    FloatToBits {
         op: SymExprRef,
     },
-    BuildFloatToSignedInteger {
-        op: SymExprRef,
-        bits: u8,
-    },
-    BuildFloatToUnsignedInteger {
+    FloatToSignedInteger {
         op: SymExprRef,
         bits: u8,
     },
-    BuildBoolToBits {
+    FloatToUnsignedInteger {
+        op: SymExprRef,
+        bits: u8,
+    },
+    BoolToBits {
         op: SymExprRef,
         bits: u8,
     },
 
-    ConcatHelper {
+    Concat {
         a: SymExprRef,
         b: SymExprRef,
     },
-    ExtractHelper {
+    Extract {
         op: SymExprRef,
         first_bit: usize,
         last_bit: usize,
     },
-    BuildExtract {
-        op: SymExprRef,
-        offset: u64,
-        length: u64,
-        little_endian: bool,
-    },
-    BuildBswap {
-        op: SymExprRef,
-    },
-    BuildInsert {
+    Insert {
         target: SymExprRef,
         to_insert: SymExprRef,
         offset: u64,
         little_endian: bool,
     },
 
-    PushPathConstraint {
+    PathConstraint {
         constraint: SymExprRef,
         taken: bool,
         site_id: usize,
@@ -304,8 +304,6 @@ pub enum SymExpr {
     ExpressionsUnreachable {
         exprs: Vec<SymExprRef>,
     },
-    /// This marks the end of the trace.
-    End,
 }
 
 #[cfg(feature = "std")]
@@ -317,10 +315,10 @@ pub const HITMAP_ENV_NAME: &str = "LIBAFL_CONCOLIC_HITMAP";
 /// The name of the environment variable that contains the byte offsets to be symbolized.
 pub const SELECTIVE_SYMBOLICATION_ENV_NAME: &str = "LIBAFL_SELECTIVE_SYMBOLICATION";
 
-/// The name of the environment variable that contains the byte offsets to be symbolized.
+/// The name of the environment variable that signals the runtime to concretize floating point operations.
 pub const NO_FLOAT_ENV_NAME: &str = "LIBAFL_CONCOLIC_NO_FLOAT";
 
-/// The name of the environment variable that contains the byte offsets to be symbolized.
+/// The name of the environment variable that signals the runtime to perform expression pruning.
 pub const EXPRESSION_PRUNING: &str = "LIBAFL_CONCOLIC_EXPRESSION_PRUNING";
 
 #[cfg(feature = "std")]

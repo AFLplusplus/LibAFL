@@ -1,9 +1,16 @@
-use symcc_runtime::{export_runtime, filter, tracing, Runtime};
+//! Just a small runtime to be used in the smoke test.
+
+use symcc_runtime::{
+    export_runtime,
+    filter::NoFloat,
+    tracing::{self, StdShMemMessageFileWriter},
+    Runtime,
+};
 
 export_runtime!(
-    filter::NoFloat => filter::NoFloat;
+    NoFloat => NoFloat;
     tracing::TracingRuntime::new(
-        tracing::StdShMemMessageFileWriter::from_stdshmem_default_env()
+        StdShMemMessageFileWriter::from_stdshmem_default_env()
             .expect("unable to construct tracing runtime writer. (missing env?)")
         )
         => tracing::TracingRuntime
