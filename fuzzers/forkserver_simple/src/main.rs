@@ -114,7 +114,12 @@ pub fn main() {
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Failed to load initial corpus at {:?}: {:?}",
+                    &corpus_dirs, err
+                )
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

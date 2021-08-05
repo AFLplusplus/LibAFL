@@ -484,19 +484,16 @@ where
         filename: &str,
         syncpair: &Arc<(Mutex<bool>, Condvar)>,
     ) -> Result<(), Error> {
-        let listener = if let Ok(listener) =
-            UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?)
-        {
-            listener
-        } else {
-            let (lock, cvar) = &**syncpair;
-            *lock.lock().unwrap() = true;
-            cvar.notify_one();
+        let listener = match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?) {
+            Ok(listener) => listener,
+            Err(err) => {
+                let (lock, cvar) = &**syncpair;
+                *lock.lock().unwrap() = true;
+                cvar.notify_one();
 
-            println!("Error in ShMem Worker");
-            return Err(Error::Unknown(
-                "The server appears to already be running. We are probably a client".to_string(),
-            ));
+                return Err(Error::Unknown(format!(
+                    "The ShMem server appears to already be running. We are probably a client. Error: {:?}", err)));
+            }
         };
 
         let mut poll_fds: Vec<PollFd> = vec![PollFd::new(
