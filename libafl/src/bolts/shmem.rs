@@ -1,8 +1,15 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
+use alloc::{rc::Rc, string::ToString};
+use core::{
+    cell::RefCell,
+    fmt::{self, Debug, Display},
+    mem::ManuallyDrop,
+};
 #[cfg(all(feature = "std", unix, not(target_os = "android")))]
 pub use unix_shmem::{MmapShMem, MmapShMemProvider};
+
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 
@@ -55,13 +62,9 @@ pub type StdShMemService = DummyShMemService;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::env;
-
-use alloc::{rc::Rc, string::ToString};
-use core::{
-    cell::RefCell,
-    fmt::{self, Debug, Display},
-    mem::ManuallyDrop,
+use std::{
+    convert::{TryFrom, TryInto},
+    env,
 };
 
 #[cfg(all(
@@ -1231,7 +1234,7 @@ pub mod win32_shmem {
 /// A `ShMemService` dummy, that does nothing on start.
 /// Drop in for targets that don't need a server for ref counting and page creation.
 #[derive(Debug)]
-pub struct DummyShMemService {}
+pub struct DummyShMemService;
 
 impl DummyShMemService {
     /// Create a new [`DummyShMemService`] that does nothing.
@@ -1239,6 +1242,90 @@ impl DummyShMemService {
     #[inline]
     pub fn start() -> Result<Self, Error> {
         Ok(Self {})
+    }
+}
+
+/// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`] in std environments.
+pub struct ShMemCursor<T: ShMem> {
+    inner: T,
+    pos: usize,
+}
+
+impl<T: ShMem> ShMemCursor<T> {
+    pub fn new(shmem: T) -> Self {
+        Self {
+            inner: shmem,
+            pos: 0,
+        }
+    }
+
+    /// Slice from the current location on this map to the end, mutable
+    fn empty_slice_mut(&mut self) -> &mut [u8] {
+        &mut (self.inner.map_mut()[self.pos..])
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: ShMem> std::io::Write for ShMemCursor<T> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self.empty_slice_mut().write(buf) {
+            Ok(w) => {
+                self.pos += w;
+                Ok(w)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
+        match self.empty_slice_mut().write_vectored(bufs) {
+            Ok(w) => {
+                self.pos += w;
+                Ok(w)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        match self.empty_slice_mut().write_all(buf) {
+            Ok(w) => {
+                self.pos += buf.len();
+                Ok(w)
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        let effective_new_pos = match pos {
+            std::io::SeekFrom::Start(s) => s,
+            std::io::SeekFrom::End(offset) => {
+                let map_len = self.inner.map().len();
+                assert!(i64::try_from(map_len).is_ok());
+                let signed_pos = map_len as i64;
+                let effective = signed_pos.checked_add(offset).unwrap();
+                assert!(effective >= 0);
+                effective.try_into().unwrap()
+            }
+            std::io::SeekFrom::Current(offset) => {
+                let current_pos = self.pos;
+                assert!(i64::try_from(current_pos).is_ok());
+                let signed_pos = current_pos as i64;
+                let effective = signed_pos.checked_add(offset).unwrap();
+                assert!(effective >= 0);
+                effective.try_into().unwrap()
+            }
+        };
+        assert!(usize::try_from(effective_new_pos).is_ok());
+        self.pos = effective_new_pos as usize;
+        Ok(effective_new_pos)
     }
 }
 

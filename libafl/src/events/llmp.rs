@@ -451,7 +451,7 @@ where
     /// Otherwise, the OS may already have removed the shared maps,
     fn await_restart_safe(&mut self) {
         // wait until we can drop the message safely.
-        self.llmp.await_save_to_unmap_blocking();
+        self.llmp.await_safe_to_unmap_blocking();
     }
 }
 
@@ -974,7 +974,7 @@ mod tests {
 
         // A little hack for CI. Don't do that in a real-world scenario.
         unsafe {
-            llmp_client.mark_save_to_unmap();
+            llmp_client.mark_safe_to_unmap();
         }
 
         let mut llmp_mgr =

@@ -6,6 +6,8 @@ pub use map::*;
 pub mod cmp;
 pub use cmp::*;
 
+pub mod concolic;
+
 use alloc::string::{String, ToString};
 use core::time::Duration;
 use serde::{Deserialize, Serialize};

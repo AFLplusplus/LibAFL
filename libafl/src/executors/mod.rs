@@ -16,6 +16,12 @@ pub use combined::CombinedExecutor;
 pub mod shadow;
 pub use shadow::ShadowExecutor;
 
+pub mod with_observers;
+pub use with_observers::WithObservers;
+
+pub mod command;
+pub use command::CommandExecutor;
+
 use crate::{
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
@@ -64,6 +70,18 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error>;
+
+    /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
+    ///
+    /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by
+    /// the implementation of this wrapper.
+    fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
+    where
+        Self: Sized,
+        OT: ObserversTuple<I, S>,
+    {
+        WithObservers::new(self, observers)
+    }
 }
 
 /// A simple executor that does nothing.

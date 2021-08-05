@@ -437,7 +437,7 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     (*page).size_used = 0;
     (*(*page).messages.as_mut_ptr()).message_id = 0;
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
-    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 0);
+    ptr::write_volatile(ptr::addr_of_mut!((*page).safe_to_unmap), 0);
     ptr::write_volatile(ptr::addr_of_mut!((*page).sender_dead), 0);
     assert!((*page).size_total != 0);
 }
@@ -672,7 +672,7 @@ pub struct LlmpPage {
     /// Set to != 1 by the receiver, once it got mapped
     /// It's not safe for the sender to unmap this page before
     /// (The os may have tidied up the memory when the receiver starts to map)
-    pub save_to_unmap: u16,
+    pub safe_to_unmap: u16,
     /// Not used at the moment (would indicate that the sender is no longer there)
     pub sender_dead: u16,
     /// The current message ID
@@ -801,11 +801,11 @@ where
 
     /// Waits for this sender to be save to unmap.
     /// If a receiver is involved, this function should always be called.
-    pub fn await_save_to_unmap_blocking(&self) {
+    pub fn await_safe_to_unmap_blocking(&self) {
         #[cfg(feature = "std")]
         let mut ctr = 0_u16;
         loop {
-            if self.save_to_unmap() {
+            if self.safe_to_unmap() {
                 return;
             }
             // We log that we're looping -> see when we're blocking.
@@ -813,28 +813,28 @@ where
             {
                 ctr = ctr.wrapping_add(1);
                 if ctr == 0 {
-                    println!("Awaiting save_to_unmap_blocking");
+                    println!("Awaiting safe_to_unmap_blocking");
                 }
             }
         }
     }
 
     /// If we are allowed to unmap this client
-    pub fn save_to_unmap(&self) -> bool {
+    pub fn safe_to_unmap(&self) -> bool {
         let current_out_map = self.out_maps.last().unwrap();
         unsafe {
             compiler_fence(Ordering::SeqCst);
-            // println!("Reading save_to_unmap from {:?}", current_out_map.page() as *const _);
-            ptr::read_volatile(ptr::addr_of!((*current_out_map.page()).save_to_unmap)) != 0
+            // println!("Reading safe_to_unmap from {:?}", current_out_map.page() as *const _);
+            ptr::read_volatile(ptr::addr_of!((*current_out_map.page()).safe_to_unmap)) != 0
         }
     }
 
     /// For debug purposes: Mark save to unmap, even though it might not have been read by a receiver yet.
     /// # Safety
     /// If this method is called, the page may be unmapped before it is read by any receiver.
-    pub unsafe fn mark_save_to_unmap(&mut self) {
+    pub unsafe fn mark_safe_to_unmap(&mut self) {
         // No need to do this volatile, as we should be the same thread in this scenario.
-        (*self.out_maps.last_mut().unwrap().page_mut()).save_to_unmap = 1;
+        (*self.out_maps.last_mut().unwrap().page_mut()).safe_to_unmap = 1;
     }
 
     /// Reattach to a vacant `out_map`.
@@ -864,12 +864,12 @@ where
 
     /// For non zero-copy, we want to get rid of old pages with duplicate messages in the client
     /// eventually. This function This funtion sees if we can unallocate older pages.
-    /// The broker would have informed us by setting the save_to_unmap-flag.
+    /// The broker would have informed us by setting the safe_to_unmap-flag.
     unsafe fn prune_old_pages(&mut self) {
         // Exclude the current page by splitting of the last element for this iter
         let mut unmap_until_excl = 0;
         for map in self.out_maps.split_last_mut().unwrap().1 {
-            if (*map.page_mut()).save_to_unmap == 0 {
+            if (*map.page_mut()).safe_to_unmap == 0 {
                 // The broker didn't read this page yet, no more pages to unmap.
                 break;
             }
@@ -1385,7 +1385,7 @@ where
                     self.last_msg_recvd = ptr::null();
 
                     // Mark the old page save to unmap, in case we didn't so earlier.
-                    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 1);
+                    ptr::write_volatile(ptr::addr_of_mut!((*page).safe_to_unmap), 1);
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_map =
@@ -1395,7 +1395,7 @@ where
                         )?);
                     page = self.current_recv_map.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
-                    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 1);
+                    ptr::write_volatile(ptr::addr_of_mut!((*page).safe_to_unmap), 1);
 
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
@@ -1570,11 +1570,11 @@ where
         ret
     }
 
-    /// Marks the containing page as `save_to_unmap`.
+    /// Marks the containing page as `safe_to_unmap`.
     /// This indicates, that the page may safely be unmapped by the sender.
-    pub fn mark_save_to_unmap(&mut self) {
+    pub fn mark_safe_to_unmap(&mut self) {
         unsafe {
-            ptr::write_volatile(ptr::addr_of_mut!((*self.page_mut()).save_to_unmap), 1);
+            ptr::write_volatile(ptr::addr_of_mut!((*self.page_mut()).safe_to_unmap), 1);
         }
     }
 
@@ -1750,7 +1750,7 @@ where
     /// Returns the id of the new client in [`broker.client_map`]
     pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::Mem>) {
         // Tell the client it may unmap this page now.
-        client_page.mark_save_to_unmap();
+        client_page.mark_safe_to_unmap();
 
         let id = self.llmp_clients.len() as u32;
         self.llmp_clients.push(LlmpReceiver {
@@ -2293,7 +2293,7 @@ where
                                 let mut new_page = LlmpSharedMap::existing(new_map);
                                 let id = next_id;
                                 next_id += 1;
-                                new_page.mark_save_to_unmap();
+                                new_page.mark_safe_to_unmap();
                                 self.llmp_clients.push(LlmpReceiver {
                                     id,
                                     current_recv_map: new_page,
@@ -2440,13 +2440,13 @@ where
 
     /// Waits for the sender to be save to unmap.
     /// If a receiver is involved on the other side, this function should always be called.
-    pub fn await_save_to_unmap_blocking(&self) {
-        self.sender.await_save_to_unmap_blocking();
+    pub fn await_safe_to_unmap_blocking(&self) {
+        self.sender.await_safe_to_unmap_blocking();
     }
 
     /// If we are allowed to unmap this client
-    pub fn save_to_unmap(&self) -> bool {
-        self.sender.save_to_unmap()
+    pub fn safe_to_unmap(&self) -> bool {
+        self.sender.safe_to_unmap()
     }
 
     /// For debug purposes: mark the client as save to unmap, even though it might not have been read.
@@ -2455,8 +2455,8 @@ where
     /// This should only be called in a debug scenario.
     /// Calling this in other contexts may lead to a premature page unmap and result in a crash in another process,
     /// or an unexpected read from an empty page in a receiving process.
-    pub unsafe fn mark_save_to_unmap(&mut self) {
-        self.sender.mark_save_to_unmap();
+    pub unsafe fn mark_safe_to_unmap(&mut self) {
+        self.sender.mark_safe_to_unmap();
     }
 
     /// Creates a new [`LlmpClient`]
