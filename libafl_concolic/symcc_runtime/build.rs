@@ -83,9 +83,9 @@ fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bind
     writeln!(
         &mut macro_file,
         "#[doc(hidden)]
-#[macro_export]
-macro_rules! export_cpp_runtime_functions {{
-    () => {{",
+        #[macro_export]
+        macro_rules! export_cpp_runtime_functions {{
+            () => {{",
     )
     .unwrap();
     EXPORTED_FUNCTION_REGEX
@@ -175,9 +175,9 @@ fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
     writeln!(
         &mut rust_runtime_macro,
         "#[doc(hidden)]
-#[macro_export]
-macro_rules! invoke_macro_with_rust_runtime_exports {{
-    ($macro:path; $($extra_ident:path),*) => {{",
+        #[macro_export]
+        macro_rules! invoke_macro_with_rust_runtime_exports {{
+            ($macro:path; $($extra_ident:path),*) => {{",
     )
     .unwrap();
     EXPORTED_FUNCTION_REGEX
@@ -220,7 +220,7 @@ fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::
     writeln!(
         &mut rename_header_file,
         "#ifndef PREFIX_EXPORTS_H
-#define PREFIX_EXPORTS_H",
+        #define PREFIX_EXPORTS_H",
     )
     .unwrap();
 
