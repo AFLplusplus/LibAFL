@@ -107,7 +107,12 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
+    #[cfg(not(target_arch = "aarch64"))]
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
+
+    #[cfg(target_arch = "aarch64")]
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
+        #[cfg(target_arch = "aarch64")]
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);

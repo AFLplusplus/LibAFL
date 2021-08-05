@@ -111,7 +111,8 @@ where
         if size_of::<StateShMemContent>() + serialized.len() > self.shmem.len() {
             // generate a filename
             let mut hasher = AHasher::new_with_keys(0, 0);
-            hasher.write(&serialized[serialized.len() - 1024..]);
+            // Using the last few k as randomness for a filename, hoping it's unique.
+            hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
 
             let filename = format!("{:016x}.libafl_state", hasher.finish());
             let tmpfile = temp_dir().join(&filename);
@@ -238,14 +239,19 @@ where
 #[cfg(test)]
 mod tests {
 
+    use serial_test::serial;
+
     use crate::bolts::{
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
         staterestore::StateRestorer,
     };
 
     #[test]
+    #[serial]
     fn test_state_restore() {
         const TESTMAP_SIZE: usize = 1024;
+
+        let _service = StdShMemService::start().unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
         let shmem = shmem_provider.new_map(TESTMAP_SIZE).unwrap();

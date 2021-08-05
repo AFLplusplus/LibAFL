@@ -3,6 +3,7 @@ use core::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::{process::Child, time::Duration};
 
+#[cfg(feature = "std")]
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,

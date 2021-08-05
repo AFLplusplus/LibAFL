@@ -15,7 +15,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(feature = "std")]
 use crate::bolts::{
     llmp::{LlmpClient, LlmpConnection},
-    shmem::StdShMemProvider,
+    shmem::{StdShMemProvider, StdShMemService},
     staterestore::StateRestorer,
 };
 
@@ -49,7 +49,7 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{fork, ForkResult};
 
 #[cfg(all(target_os = "android", feature = "std"))]
-use crate::bolts::os::ashmem_server::AshmemService;
+use crate::bolts::os::unix_shmem_server::ShMemService;
 
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
@@ -689,8 +689,7 @@ where
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Error starting Ashmem Service");
+    let _service = StdShMemService::start().expect("Error starting ShMem Service");
 
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -929,11 +928,13 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
+    use serial_test::serial;
+
     use crate::{
         bolts::{
             llmp::{LlmpClient, LlmpSharedMap},
             rands::StdRand,
-            shmem::{ShMemProvider, StdShMemProvider},
+            shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
             staterestore::StateRestorer,
             tuples::tuple_list,
         },
@@ -949,7 +950,10 @@ mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
     #[test]
+    #[serial]
     fn test_mgr_state_restore() {
+        let _service = StdShMemService::start().unwrap();
+
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();

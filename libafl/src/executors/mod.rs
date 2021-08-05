@@ -19,7 +19,9 @@ pub use shadow::ShadowExecutor;
 pub mod with_observers;
 pub use with_observers::WithObservers;
 
+#[cfg(feature = "std")]
 pub mod command;
+#[cfg(feature = "std")]
 pub use command::CommandExecutor;
 
 use crate::{

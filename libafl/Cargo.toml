@@ -21,6 +21,7 @@ fxhash = "0.2.1" # yet another hash
 xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
 serde_json = "1.0.60"
 num_cpus = "1.0" # cpu count, for llmp example
+serial_test = "0.5"
 
 [[bench]]
 name = "rand_speeds"

@@ -71,7 +71,7 @@ impl<'a, H> InMemoryBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = self
             .configuration
