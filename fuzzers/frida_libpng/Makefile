@@ -19,7 +19,7 @@ libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37
 
 libpng-harness.so: libpng-1.6.37/.libs/libpng16.a
 	$(CXX) -O3 -c -fPIC harness.cc -o harness.o
-	$(CXX) -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.so
+	$(CXX) -O3 harness.o libpng-1.6.37/.libs/libpng16.a -no-pie -shared -lz -o libpng-harness.so
 
 libafl_frida: libpng-1.6.37/.libs/libpng16.a target/release/frida_libpng
 	cp target/release/frida_libpng libafl_frida
