@@ -1242,6 +1242,7 @@ impl DummyShMemService {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use serial_test::serial;
