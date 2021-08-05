@@ -1,9 +1,9 @@
 //! This is a 'meta-package' for libafl that exposes a consistent URL and commit hash for the
 //! [`SymCC` fork](https://github.com/AFLplusplus/symcc).
 
-/// The URL of the LibAFL SymCC fork.
+/// The URL of the `LibAFL` `SymCC` fork.
 pub const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
-/// The commit of the LibAFL SymCC fork.
+/// The commit of the `LibAFL` `SymCC` fork.
 pub const SYMCC_REPO_COMMIT: &str = "45cde0269ae22aef4cca2e1fb98c3b24f7bb2984";
 
 #[cfg(feature = "clone")]
@@ -63,8 +63,9 @@ pub use clone::clone_symcc;
 mod build {
     use std::path::{Path, PathBuf};
 
-    /// Builds SymCC at the given directory using [`cmake`](https://crates.io/crates/cmake).
+    /// Builds `SymCC` at the given directory using [`cmake`](https://crates.io/crates/cmake).
     /// Returns the build artifact directory.
+    #[must_use]
     pub fn build_symcc(path: &Path) -> PathBuf {
         use cmake::Config;
 
