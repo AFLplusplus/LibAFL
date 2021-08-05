@@ -114,7 +114,7 @@ fn main() {
             }
         }
 
-        // open a new scope to ensure our ressources get dropped before the exit call at the end
+        // open a new scope to ensure our resources get dropped before the exit call at the end
         let output_file_path = opt.output.unwrap_or_else(|| "trace".into());
         let mut output_file =
             BufWriter::new(File::create(output_file_path).expect("unable to open output file"));
