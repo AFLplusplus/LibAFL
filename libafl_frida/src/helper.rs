@@ -362,7 +362,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             if let Ok((op1, op2)) =
                                 helper.cmplog_is_interesting_instruction(address, instr)
                             {
-                                println!("interesting instr: {}", instr);
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
                                 helper.emit_comparison_handling(address, &output, op1, op2);
                             }
@@ -1060,7 +1059,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         if operands.len() != 2 || !special_case {
             return Err(());
         }
-        // cbz needs special since there is only 1 operand
+        // cbz marked as special since there is only 1 operand
         let special_case = instr.mnemonic().unwrap() == "cbz";
 
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
