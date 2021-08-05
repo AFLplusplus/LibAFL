@@ -4,7 +4,7 @@
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    bolts::{current_nanos, rands::StdRand, shmem::StdShMemService, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::{setup_restarting_mgr_std, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -47,6 +47,9 @@ pub fn libafl_main() {
 
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
+    /// Needed for MacOS and Android to get sharedmaps working.
+    let _service = StdShMemService::start().expect("Error starting ShMem Service");
+
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = SimpleStats::new(|s| println!("{}", s));
 
