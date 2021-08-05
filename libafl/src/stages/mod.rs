@@ -18,6 +18,13 @@ pub mod power;
 use crate::Error;
 pub use power::PowerMutationalStage;
 
+#[cfg(feature = "std")]
+pub mod concolic;
+#[cfg(feature = "std")]
+pub use concolic::ConcolicTracingStage;
+#[cfg(feature = "std")]
+pub use concolic::SimpleConcolicMutationalStage;
+
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, S, Z> {

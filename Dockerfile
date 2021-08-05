@@ -56,6 +56,15 @@ COPY scripts/dummy.rs libafl_targets/src/lib.rs
 COPY libafl_tests/Cargo.toml libafl_tests/build.rs libafl_tests/
 COPY scripts/dummy.rs libafl_tests/src/lib.rs
 
+COPY libafl_concolic/test/dump_constraints/Cargo.toml libafl_concolic/test/dump_constraints/
+COPY scripts/dummy.rs libafl_concolic/test/dump_constraints/src/lib.rs
+
+COPY libafl_concolic/test/runtime_test/Cargo.toml libafl_concolic/test/runtime_test/
+COPY scripts/dummy.rs libafl_concolic/test/runtime_test/src/lib.rs
+
+COPY libafl_concolic/symcc_runtime/Cargo.toml libafl_concolic/symcc_runtime/build.rs libafl_concolic/symcc_runtime/
+COPY scripts/dummy.rs libafl_concolic/symcc_runtime/src/lib.rs
+
 RUN cargo build && cargo build --release
 
 COPY scripts scripts
