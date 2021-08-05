@@ -15,6 +15,7 @@ members = [
     "libafl_sugar",
     "libafl_tests",
     "libafl_concolic/symcc_runtime",
+    "libafl_concolic/symcc_libafl",
     "libafl_concolic/test/dump_constraints",
     "libafl_concolic/test/runtime_test",
 ]

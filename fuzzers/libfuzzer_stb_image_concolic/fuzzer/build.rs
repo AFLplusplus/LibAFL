@@ -92,48 +92,11 @@ fn main() {
     println!("cargo:rerun-if-changed=harness_symcc.c");
 }
 
-const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
-const SYMCC_REPO_COMMIT: &str = "45cde0269ae22aef4cca2e1fb98c3b24f7bb2984";
-
 fn clone_and_build_symcc(out_path: &Path) -> PathBuf {
     let repo_dir = out_path.join("libafl_symcc_src");
     if !repo_dir.exists() {
-        build_dep_check(&["git"]);
-        let mut cmd = Command::new("git");
-        cmd.arg("clone").arg(SYMCC_REPO_URL).arg(&repo_dir);
-        let output = cmd.output().expect("failed to execute git clone");
-        if output.status.success() {
-            let mut cmd = Command::new("git");
-            cmd.arg("checkout")
-                .arg(SYMCC_REPO_COMMIT)
-                .current_dir(&repo_dir);
-            let output = cmd.output().expect("failed to execute git checkout");
-            if output.status.success() {
-            } else {
-                println!("failed to checkout symcc git repository commit:");
-                let mut stdout = stdout();
-                stdout
-                    .write_all(&output.stderr)
-                    .expect("failed to write git error message to stdout");
-                exit(1)
-            }
-        } else {
-            println!("failed to clone symcc git repository:");
-            let mut stdout = stdout();
-            stdout
-                .write_all(&output.stderr)
-                .expect("failed to write git error message to stdout");
-            exit(1)
-        }
+        symcc_libafl::clone_symcc(&repo_dir);
     }
 
-    build_dep_check(&["cmake"]);
-
-    use cmake::Config;
-
-    Config::new(repo_dir)
-        .define("Z3_TRUST_SYSTEM_VERSION", "ON")
-        .no_build_target(true)
-        .build()
-        .join("build")
+    symcc_libafl::build_symcc(&repo_dir)
 }
