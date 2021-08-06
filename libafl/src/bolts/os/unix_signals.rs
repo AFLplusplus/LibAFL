@@ -26,7 +26,6 @@ pub use libc::{c_void, siginfo_t};
 /// All signals on this system, as `enum`.
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
-#[allow(clippy::pub_enum_variant_names)]
 pub enum Signal {
     /// `SIGABRT` signal id
     SigAbort = SIGABRT,

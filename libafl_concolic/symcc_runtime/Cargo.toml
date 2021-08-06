@@ -1,0 +1,25 @@
+[package]
+name = "symcc_runtime"
+version = "0.1.0"
+edition = "2018"
+authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+# skips building and linking the C++ part of the runtime
+no-cpp-runtime = []
+
+[dependencies]
+unchecked_unwrap = "3"
+ctor = "0.1"
+libc = "0.2"
+libafl = {path = "../../libafl"}
+
+[build-dependencies]
+cmake = "0.1"
+bindgen = "0.58"
+regex = "1"
+lazy_static = "1.4"
+which = "4.1"
+symcc_libafl = {path = "../symcc_libafl"}

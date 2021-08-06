@@ -4,6 +4,11 @@
 pub mod map;
 pub use map::*;
 
+#[cfg(feature = "std")]
+pub mod concolic;
+#[cfg(feature = "std")]
+pub use concolic::ConcolicFeedback;
+
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 

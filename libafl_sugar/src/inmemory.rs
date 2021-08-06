@@ -66,10 +66,12 @@ where
     harness: Option<H>,
 }
 
+#[allow(clippy::similar_names)]
 impl<'a, H> InMemoryBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
+    #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = self
             .configuration
@@ -192,9 +194,9 @@ where
                     println!("Loading from {:?}", &self.input_dirs);
                     // Load from disk
                     state
-                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &self.input_dirs)
+                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, self.input_dirs)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &self.input_dirs)
+                            panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -228,7 +230,7 @@ where
             .configuration(conf)
             .stats(stats)
             .run_client(&mut run_client)
-            .cores(&self.cores)
+            .cores(self.cores)
             .broker_port(self.broker_port)
             .remote_broker_addr(self.remote_broker_addr);
         #[cfg(unix)]

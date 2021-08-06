@@ -13,7 +13,7 @@ use libafl::{
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -54,8 +54,7 @@ pub fn libafl_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Failed to start Ashmem service");
+    let _service = StdShMemService::start().expect("Failed to start ShMem service");
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats = MultiStats::new(|s| println!("{}", s));

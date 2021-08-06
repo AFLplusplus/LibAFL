@@ -60,17 +60,23 @@ where
         Some(*meta.map.get(&(src, dest)).unwrap())
     } else {
         meta.current_id = ((id + 1) & (EDGES_MAP_SIZE - 1)) as u64;
-        unsafe { MAX_EDGES_NUM = meta.current_id as usize };
+        unsafe {
+            MAX_EDGES_NUM = meta.current_id as usize;
+        }
         Some(id as u64)
     }
 }
 
 pub extern "C" fn trace_edge_hitcount(id: u64) {
-    unsafe { EDGES_MAP[id as usize] += 1 };
+    unsafe {
+        EDGES_MAP[id as usize] += 1;
+    }
 }
 
 pub extern "C" fn trace_edge_single(id: u64) {
-    unsafe { EDGES_MAP[id as usize] = 1 };
+    unsafe {
+        EDGES_MAP[id as usize] = 1;
+    }
 }
 
 pub fn gen_unique_cmp_ids<S>(state: &mut S, pc: u64, _size: usize) -> Option<u64>
@@ -94,17 +100,25 @@ where
 }
 
 pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8) {
-    unsafe { __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1)) }
+    unsafe {
+        __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1));
+    }
 }
 
 pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16) {
-    unsafe { __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1)) }
+    unsafe {
+        __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1));
+    }
 }
 
 pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32) {
-    unsafe { __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1)) }
+    unsafe {
+        __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1));
+    }
 }
 
 pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64) {
-    unsafe { __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1) }
+    unsafe {
+        __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
+    }
 }

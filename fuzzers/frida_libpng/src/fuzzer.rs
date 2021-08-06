@@ -3,8 +3,8 @@
 
 use clap::{App, Arg};
 
-#[cfg(target_os = "android")]
-use libafl::bolts::os::ashmem_server::AshmemService;
+#[cfg(all(cfg = "std", unix))]
+use libafl::bolts::os::unix_shmem_server::ShMemService;
 
 use libafl::{
     bolts::{
@@ -12,7 +12,7 @@ use libafl::{
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -233,7 +233,7 @@ pub fn main() {
         .map(|addrstr| addrstr.parse().unwrap());
 
     unsafe {
-        fuzz(
+        match fuzz(
             matches.value_of("harness").unwrap(),
             matches.value_of("symbol").unwrap(),
             &matches
@@ -252,8 +252,10 @@ pub fn main() {
                 .value_of("configuration")
                 .unwrap_or("default launcher")
                 .to_string(),
-        )
-        .expect("An error occurred while fuzzing");
+        ) {
+            Ok(()) | Err(Error::ShuttingDown) => println!("Finished fuzzing. Good bye."),
+            Err(e) => panic!("Error during fuzzing: {:?}", e),
+        }
     }
 }
 
@@ -292,8 +294,7 @@ unsafe fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = MultiStats::new(|s| println!("{}", s));
 
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Failed to start Ashmem service");
+    let _service = StdShMemService::start().expect("Failed to start ShMem service");
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
@@ -317,7 +318,7 @@ unsafe fn fuzz(
             &gum,
             &frida_options,
             module_name,
-            &modules_to_instrument,
+            modules_to_instrument,
         );
 
         // Create an observation channel using the coverage map
@@ -411,7 +412,7 @@ unsafe fn fuzz(
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, corpus_dirs)
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
