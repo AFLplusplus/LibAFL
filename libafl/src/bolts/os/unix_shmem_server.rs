@@ -233,17 +233,6 @@ where
     }
 }
 
-/// The [`AshmemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
-/// It is mainly used and needed on Android.
-#[derive(Debug)]
-pub struct ShMemService<SP>
-where
-    SP: ShMemProvider,
-{
-    join_handle: Option<JoinHandle<Result<(), Error>>>,
-    phantom: PhantomData<*const SP>,
-}
-
 #[derive(Debug)]
 enum ServedShMemResponse<SP>
 where
@@ -252,6 +241,25 @@ where
     Mapping(Rc<RefCell<SP::Mem>>),
     Id(i32),
     RefCount(u32),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ShMemServiceSuccess {
+    Starting,
+    Started,
+    Failed,
+}
+
+/// The [`AshmemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
+/// It is mainly used and needed on Android.
+#[derive(Debug)]
+pub struct ShMemService<SP>
+where
+    SP: ShMemProvider,
+{
+    start_success: ShMemServiceSuccess,
+    join_handle: Option<JoinHandle<Result<(), Error>>>,
+    phantom: PhantomData<*const SP>,
 }
 
 impl<SP> ShMemService<SP>
@@ -263,7 +271,7 @@ where
         println!("Starting ShMemService");
 
         #[allow(clippy::mutex_atomic)]
-        let syncpair = Arc::new((Mutex::new(false), Condvar::new()));
+        let syncpair = Arc::new((Mutex::new(ShMemServiceSuccess::Starting), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle = thread::spawn(move || {
             println!("Thread...");
@@ -273,7 +281,7 @@ where
                 Err(e) => {
                     // Make sure the parent processes can continue
                     let (lock, cvar) = &*childsyncpair;
-                    *lock.lock().unwrap() = true;
+                    *lock.lock().unwrap() = ShMemServiceSuccess::Failed;
                     cvar.notify_one();
 
                     println!("Error creating ShMemService: {:?}", e);
@@ -289,12 +297,13 @@ where
         });
 
         let (lock, cvar) = &*syncpair;
-        let mut started = lock.lock().unwrap();
-        while !*started {
-            started = cvar.wait(started).unwrap();
+        let mut success = lock.lock().unwrap();
+        while *success == ShMemServiceSuccess::Starting {
+            success = cvar.wait(success).unwrap();
         }
 
         Ok(Self {
+            start_success: *success,
             join_handle: Some(join_handle),
             phantom: PhantomData,
         })
@@ -309,6 +318,10 @@ where
         let join_handle = self.join_handle.take();
         // TODO: Guess we could use the `cvar` // Mutex here instead?
         if let Some(join_handle) = join_handle {
+            if self.start_success != ShMemServiceSuccess::Started {
+                return;
+            }
+
             let mut stream = match UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) {
@@ -482,13 +495,13 @@ where
     fn listen(
         &mut self,
         filename: &str,
-        syncpair: &Arc<(Mutex<bool>, Condvar)>,
+        syncpair: &Arc<(Mutex<ShMemServiceSuccess>, Condvar)>,
     ) -> Result<(), Error> {
         let listener = match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?) {
             Ok(listener) => listener,
             Err(err) => {
                 let (lock, cvar) = &**syncpair;
-                *lock.lock().unwrap() = true;
+                *lock.lock().unwrap() = ShMemServiceSuccess::Failed;
                 cvar.notify_one();
 
                 return Err(Error::Unknown(format!(
@@ -502,7 +515,7 @@ where
         )];
 
         let (lock, cvar) = &**syncpair;
-        *lock.lock().unwrap() = true;
+        *lock.lock().unwrap() = ShMemServiceSuccess::Started;
         cvar.notify_one();
 
         loop {
