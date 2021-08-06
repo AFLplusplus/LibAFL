@@ -11,7 +11,7 @@ use libafl::{
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{

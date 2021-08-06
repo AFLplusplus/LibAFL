@@ -19,7 +19,7 @@ use libafl::{
         current_nanos, current_time,
         os::dup2,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},

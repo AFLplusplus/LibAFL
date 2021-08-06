@@ -7,7 +7,6 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::StdShMemService,
         tuples::{tuple_list, Merge},
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},

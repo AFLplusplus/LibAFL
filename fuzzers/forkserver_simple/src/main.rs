@@ -3,7 +3,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
     },
     corpus::{
