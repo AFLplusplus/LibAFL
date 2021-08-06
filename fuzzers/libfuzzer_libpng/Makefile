@@ -44,6 +44,7 @@ run: all
 	./$(FUZZER_NAME) >/dev/null 2>/dev/null &
 
 short_test: all
+	rm -rf libafl_unix_shmem_server || true
 	timeout 11s ./$(FUZZER_NAME) &
 	sleep 0.2
 	timeout 10s taskset -c 0 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &

@@ -42,6 +42,7 @@ run: all
 	./$(FUZZER_NAME) --cores 0 &
 
 short_test: all
+	rm -rf libafl_unix_shmem_server || true
 	timeout 10s ./$(FUZZER_NAME) --cores 0 &
 
 test: all

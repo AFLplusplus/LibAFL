@@ -13,6 +13,7 @@ use core::mem::ManuallyDrop;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::{Borrow, BorrowMut},
     cell::RefCell,
     fs,
     io::{Read, Write},
@@ -189,6 +190,10 @@ where
 
     fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
         if is_child {
+            // After fork, only the parent keeps the join handle.
+            if let ShMemService::Started { bg_thread, .. } = self.service {
+                bg_thread.borrow_mut().join_handle = None;
+            }
             // After fork, the child needs to reconnect as to not share the fds with the parent.
             self.stream =
                 UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?;
@@ -359,13 +364,16 @@ where
 
         let (lock, cvar) = &*syncpair;
         let mut success = lock.lock().unwrap();
+        println!("Waiting");
         while *success == ShMemServiceStatus::Starting {
             success = cvar.wait(success).unwrap();
         }
+        println!("fun");
 
         match *success {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
+                println!("what");
                 // We got a service
                 Self::Started {
                     bg_thread: Arc::new(ShMemServiceThread {
@@ -375,11 +383,13 @@ where
                 }
             }
             ShMemServiceStatus::Failed => {
+                println!("Joining");
                 // We ignore errors as multiple threads may call start.
-                let err = join_handle
-                    .join()
-                    .expect("Failed to join ShMemService thread!")
-                    .expect_err("Expected service start to have failed, but it didn't?");
+                let err = join_handle.join();
+                println!("more");
+                let err = err.expect("Failed to join ShMemService thread!");
+                println!("more");
+                let err = err.expect_err("Expected service start to have failed, but it didn't?");
 
                 Self::Failed {
                     err_msg: format!("{}", err),

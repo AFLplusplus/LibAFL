@@ -16,6 +16,7 @@ run:  all
 	taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
 
 short_test: all
+	rm -rf libafl_unix_shmem_server || true
 	timeout 10s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
 
 test: all

@@ -32,6 +32,7 @@ run: all
 	./$(FUZZER_NAME)
 
 short_test: all
+	rm -rf libafl_unix_shmem_server || true
 	mkdir in || true
 	echo a > in/a
 	# Allow sigterm as exit code 
