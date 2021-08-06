@@ -98,6 +98,8 @@ RUN touch libafl_qemu/src/lib.rs
 COPY libafl_qemu/src libafl_qemu/src
 RUN touch libafl_frida/src/lib.rs
 COPY libafl_concolic/symcc_libafl libafl_concolic/symcc_libafl
+COPY libafl_concolic/symcc_runtime libafl_concolic/symcc_runtime
+COPY libafl_concolic/test libafl_concolic/test
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over
