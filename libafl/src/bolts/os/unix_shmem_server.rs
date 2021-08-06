@@ -299,6 +299,7 @@ pub struct ShMemServiceThread {
 impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
+            println!("Dropping join_handles");
             let mut stream = match UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) {
@@ -375,7 +376,7 @@ where
         match *success {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
-                println!("what");
+                println!("started");
                 // We got a service
                 Self::Started {
                     bg_thread: Arc::new(Mutex::new(ShMemServiceThread {
