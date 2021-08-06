@@ -10,7 +10,6 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *const i32, argv: *const *const *const u8) -> i32;
 }
 
-use crate::coverage::{EDGES_MAP, EDGES_MAP_PTR};
 /// Calls the (native) libfuzzer initialize function.
 /// Returns the value returned by the init function.
 /// # Safety
@@ -18,11 +17,6 @@ use crate::coverage::{EDGES_MAP, EDGES_MAP_PTR};
 #[allow(clippy::similar_names)]
 #[allow(clippy::must_use_candidate)] // nobody uses that return code...
 pub fn libfuzzer_initialize(args: &[String]) -> i32 {
-    unsafe {
-        if EDGES_MAP_PTR.is_null() {
-            EDGES_MAP_PTR = EDGES_MAP.as_mut_ptr();
-        }
-    }
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
     assert!(argv.len() < i32::MAX as usize);
     #[allow(clippy::cast_possible_wrap)]

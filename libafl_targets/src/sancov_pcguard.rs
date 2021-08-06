@@ -36,6 +36,10 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 #[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
+    if EDGES_MAP_PTR.is_null() {
+        EDGES_MAP_PTR = EDGES_MAP.as_mut_ptr();
+    }
+
     if start == stop || *start != 0 {
         return;
     }
