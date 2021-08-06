@@ -28,7 +28,7 @@ use libafl::{
     },
     observers::{
         concolic::{
-            serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
+            serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
         },
         StdMapObserver, TimeObserver,
