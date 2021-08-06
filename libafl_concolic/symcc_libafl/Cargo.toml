@@ -6,7 +6,7 @@ authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fiora
 description = "Meta package for symcc_runtime"
 documentation = "https://docs.rs/symcc_libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
-readme = "../../README.md"
+readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 
