@@ -240,6 +240,7 @@ where
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
+            .env("SYMCC_INPUT_FILE", "cur_input")
             .spawn()
             .expect("failed to start process"))
     }
