@@ -18,6 +18,7 @@ debug = true
 [dependencies]
 libafl = { path = "../../../libafl/", features = ["concolic_mutation"] }
 libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
+structopt = "0.3.21"
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
