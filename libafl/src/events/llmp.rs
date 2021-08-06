@@ -932,7 +932,7 @@ mod tests {
         bolts::{
             llmp::{LlmpClient, LlmpSharedMap},
             rands::StdRand,
-            shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+            shmem::{ShMemProvider, StdShMemProvider},
             staterestore::StateRestorer,
             tuples::tuple_list,
         },
@@ -950,8 +950,6 @@ mod tests {
     #[test]
     #[serial]
     fn test_mgr_state_restore() {
-        let _service = StdShMemService::start().unwrap();
-
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();

@@ -46,10 +46,16 @@ const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
 
 /// Hands out served shared maps, as used on Android.
 #[derive(Debug)]
-pub struct ServedShMemProvider<SP> {
+pub struct ServedShMemProvider<SP>
+where
+    SP: ShMemProvider,
+{
     stream: UnixStream,
     inner: SP,
     id: i32,
+    /// A referencde to the [`ShMemService`] backing this provider.
+    /// It will be started only once for all processes and providers.
+    service: ShMemService<SP>,
 }
 
 /// [`ShMem`] that got served from a [`AshmemService`] via domain sockets and can now be used in this program.
@@ -85,7 +91,10 @@ where
     }
 }
 
-impl<SP> ServedShMemProvider<SP> {
+impl<SP> ServedShMemProvider<SP>
+where
+    SP: ShMemProvider,
+{
     /// Send a request to the server, and wait for a response
     #[allow(clippy::similar_names)] // id and fd
     fn send_receive(&mut self, request: ServedShMemRequest) -> Result<(i32, i32), Error> {
@@ -136,11 +145,16 @@ where
     type Mem = ServedShMem<SP::Mem>;
 
     /// Connect to the server and return a new [`ServedShMemProvider`]
+    /// Will try to spawn a [`ShMemService`]. This will only work for the first try.
     fn new() -> Result<Self, Error> {
+        // Needed for MacOS and Android to get sharedmaps working.
+        let service = ShMemService::start();
+
         let mut res = Self {
             stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
             inner: SP::new()?,
             id: -1,
+            service,
         };
         let (id, _) = res.send_receive(ServedShMemRequest::Hello(None))?;
         res.id = id;
@@ -212,6 +226,7 @@ pub enum ServedShMemRequest {
     Exit,
 }
 
+/// Client side communicating with the [`ShMemServer`]
 #[derive(Debug)]
 struct SharedShMemClient<SH>
 where
@@ -233,6 +248,7 @@ where
     }
 }
 
+/// Response from Server to Client
 #[derive(Debug)]
 enum ServedShMemResponse<SP>
 where
@@ -243,8 +259,9 @@ where
     RefCount(u32),
 }
 
+/// Report the status of the [`ShMem`] background thread start status
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ShMemServiceSuccess {
+enum ShMemServiceStatus {
     Starting,
     Started,
     Failed,
@@ -252,14 +269,56 @@ enum ShMemServiceSuccess {
 
 /// The [`AshmemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
 /// It is mainly used and needed on Android.
-#[derive(Debug)]
-pub struct ShMemService<SP>
+#[derive(Debug, Clone)]
+pub enum ShMemService<SP>
 where
     SP: ShMemProvider,
 {
-    start_success: ShMemServiceSuccess,
+    Started {
+        bg_thread: Arc<ShMemServiceThread>,
+        phantom: PhantomData<SP>,
+    },
+    Failed {
+        err_msg: String,
+        phantom: PhantomData<SP>,
+    },
+}
+
+/// Wrapper for the service background thread.
+/// When this is dropped, the background thread will get killed and joined.
+#[derive(Debug)]
+pub struct ShMemServiceThread {
     join_handle: Option<JoinHandle<Result<(), Error>>>,
-    phantom: PhantomData<*const SP>,
+}
+
+impl Drop for ShMemServiceThread {
+    fn drop(&mut self) {
+        let mut stream =
+            match UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap())
+            {
+                Ok(stream) => stream,
+                Err(_) => return, // ignoring non-started server
+            };
+
+        let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
+
+        let header = (body.len() as u32).to_be_bytes();
+        let mut message = header.to_vec();
+        message.extend(body);
+
+        stream
+            .write_all(&message)
+            .expect("Failed to send bye-message to ShMemService");
+        self.join_handle
+            .take()
+            .unwrap()
+            .join()
+            .expect("Failed to join ShMemService thread!")
+            .expect("Error in ShMemService thread!");
+        // try to remove the file from fs, and ignore errors.
+        #[cfg(target_os = "macos")]
+        drop(fs::remove_file(&UNIX_SERVER_NAME));
+    }
 }
 
 impl<SP> ShMemService<SP>
@@ -267,11 +326,13 @@ where
     SP: ShMemProvider,
 {
     /// Create a new [`ShMemService`], then listen and service incoming connections in a new thread.
-    pub fn start() -> Result<Self, Error> {
+    /// Returns [`ShMemService::Failed`] on error.
+    #[must_use]
+    pub fn start() -> Self {
         println!("Starting ShMemService");
 
         #[allow(clippy::mutex_atomic)]
-        let syncpair = Arc::new((Mutex::new(ShMemServiceSuccess::Starting), Condvar::new()));
+        let syncpair = Arc::new((Mutex::new(ShMemServiceStatus::Starting), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle = thread::spawn(move || {
             println!("Thread...");
@@ -281,7 +342,7 @@ where
                 Err(e) => {
                     // Make sure the parent processes can continue
                     let (lock, cvar) = &*childsyncpair;
-                    *lock.lock().unwrap() = ShMemServiceSuccess::Failed;
+                    *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                     cvar.notify_one();
 
                     println!("Error creating ShMemService: {:?}", e);
@@ -298,50 +359,33 @@ where
 
         let (lock, cvar) = &*syncpair;
         let mut success = lock.lock().unwrap();
-        while *success == ShMemServiceSuccess::Starting {
+        while *success == ShMemServiceStatus::Starting {
             success = cvar.wait(success).unwrap();
         }
 
-        Ok(Self {
-            start_success: *success,
-            join_handle: Some(join_handle),
-            phantom: PhantomData,
-        })
-    }
-}
-
-impl<SP> Drop for ShMemService<SP>
-where
-    SP: ShMemProvider,
-{
-    fn drop(&mut self) {
-        let join_handle = self.join_handle.take();
-        // TODO: Guess we could use the `cvar` // Mutex here instead?
-        if let Some(join_handle) = join_handle {
-            if self.start_success != ShMemServiceSuccess::Started {
-                return;
+        match *success {
+            ShMemServiceStatus::Starting => panic!("Unreachable"),
+            ShMemServiceStatus::Started => {
+                // We got a service
+                Self::Started {
+                    bg_thread: Arc::new(ShMemServiceThread {
+                        join_handle: Some(join_handle),
+                    }),
+                    phantom: PhantomData,
+                }
             }
+            ShMemServiceStatus::Failed => {
+                // We ignore errors as multiple threads may call start.
+                let err = join_handle
+                    .join()
+                    .expect("Failed to join ShMemService thread!")
+                    .expect_err("Expected service start to have failed, but it didn't?");
 
-            let mut stream = match UnixStream::connect_to_unix_addr(
-                &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
-            ) {
-                Ok(stream) => stream,
-                Err(_) => return, // ignoring non-started server
-            };
-
-            let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
-
-            let header = (body.len() as u32).to_be_bytes();
-            let mut message = header.to_vec();
-            message.extend(body);
-
-            stream
-                .write_all(&message)
-                .expect("Failed to send bye-message to ShMemService");
-            join_handle
-                .join()
-                .expect("Failed to join ShMemService thread!")
-                .expect("Error in ShMemService thread!");
+                Self::Failed {
+                    err_msg: format!("{}", err),
+                    phantom: PhantomData,
+                }
+            }
         }
     }
 }
@@ -495,13 +539,13 @@ where
     fn listen(
         &mut self,
         filename: &str,
-        syncpair: &Arc<(Mutex<ShMemServiceSuccess>, Condvar)>,
+        syncpair: &Arc<(Mutex<ShMemServiceStatus>, Condvar)>,
     ) -> Result<(), Error> {
         let listener = match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?) {
             Ok(listener) => listener,
             Err(err) => {
                 let (lock, cvar) = &**syncpair;
-                *lock.lock().unwrap() = ShMemServiceSuccess::Failed;
+                *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                 cvar.notify_one();
 
                 return Err(Error::Unknown(format!(
@@ -515,7 +559,7 @@ where
         )];
 
         let (lock, cvar) = &**syncpair;
-        *lock.lock().unwrap() = ShMemServiceSuccess::Started;
+        *lock.lock().unwrap() = ShMemServiceStatus::Started;
         cvar.notify_one();
 
         loop {
@@ -578,16 +622,5 @@ where
                 }
             }
         }
-    }
-}
-
-impl<SP> Drop for ServedShMemServiceWorker<SP>
-where
-    SP: ShMemProvider,
-{
-    fn drop(&mut self) {
-        // try to remove the file from fs, and ignore errors.
-        #[cfg(target_os = "macos")]
-        drop(fs::remove_file(&UNIX_SERVER_NAME));
     }
 }

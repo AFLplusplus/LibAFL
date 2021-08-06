@@ -30,8 +30,6 @@ pub fn main() {
 
     const MAP_SIZE: usize = 65536;
 
-    let _service = StdShMemService::start().unwrap();
-
     //Coverage map shared between observer and executor
     let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
     //let the forkserver know the shmid

@@ -300,9 +300,12 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 #[cfg(all(unix, feature = "std"))]
-pub struct RcShMemProvider<T: ShMemProvider> {
+pub struct RcShMemProvider<SP>
+where
+    SP: ShMemProvider,
+{
     /// The wrapped [`ShMemProvider`].
-    internal: Rc<RefCell<T>>,
+    internal: Rc<RefCell<SP>>,
     /// A pipe the child uses to communicate progress to the parent after fork.
     /// This prevents a potential race condition when using the [`AshmemService`].
     #[cfg(unix)]
@@ -1337,13 +1340,11 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 mod tests {
     use serial_test::serial;
 
-    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService};
+    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
 
     #[test]
     #[serial]
     fn test_shmem_service() {
-        #[allow(unused_variables)]
-        let service = StdShMemService::start().unwrap();
         let mut provider = StdShMemProvider::new().unwrap();
         let mut map = provider.new_map(1024).unwrap();
         map.map_mut()[0] = 1;

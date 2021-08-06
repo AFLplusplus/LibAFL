@@ -54,7 +54,6 @@ pub fn libafl_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let _service = StdShMemService::start();
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats = MultiStats::new(|s| println!("{}", s));

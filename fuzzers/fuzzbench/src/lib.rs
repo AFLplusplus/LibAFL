@@ -181,7 +181,6 @@ fn fuzz(
 
     // We need a shared map to store our state before a crash.
     // This way, we are able to continue fuzzing afterwards.
-    let _service = StdShMemService::start();
     let mut shmem_provider = StdShMemProvider::new()?;
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {

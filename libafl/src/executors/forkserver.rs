@@ -618,7 +618,7 @@ mod tests {
 
     use crate::{
         bolts::{
-            shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService},
+            shmem::{ShMem, ShMemProvider, StdShMemProvider},
             tuples::tuple_list,
         },
         executors::ForkserverExecutor,
@@ -632,8 +632,6 @@ mod tests {
         const MAP_SIZE: usize = 65536;
         let bin = "echo";
         let args = vec![String::from("@@")];
-
-        let _service = StdShMemService::start().unwrap();
 
         let mut shmem = StdShMemProvider::new()
             .unwrap()
