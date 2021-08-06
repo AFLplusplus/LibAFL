@@ -13,7 +13,7 @@ use core::mem::ManuallyDrop;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::{Borrow, BorrowMut},
+    borrow::BorrowMut,
     cell::RefCell,
     fs,
     io::{Read, Write},
@@ -149,7 +149,7 @@ where
     /// Will try to spawn a [`ShMemService`]. This will only work for the first try.
     fn new() -> Result<Self, Error> {
         // Needed for MacOS and Android to get sharedmaps working.
-        let service = ShMemService::start();
+        let service = ShMemService::<SP>::start();
 
         let mut res = Self {
             stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
@@ -191,8 +191,8 @@ where
     fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
         if is_child {
             // After fork, only the parent keeps the join handle.
-            if let ShMemService::Started { bg_thread, .. } = self.service {
-                bg_thread.borrow_mut().join_handle = None;
+            if let ShMemService::Started { bg_thread, .. } = &mut self.service {
+                drop(bg_thread.borrow_mut().lock().unwrap().join_handle.take());
             }
             // After fork, the child needs to reconnect as to not share the fds with the parent.
             self.stream =
@@ -280,7 +280,7 @@ where
     SP: ShMemProvider,
 {
     Started {
-        bg_thread: Arc<ShMemServiceThread>,
+        bg_thread: Arc<Mutex<ShMemServiceThread>>,
         phantom: PhantomData<SP>,
     },
     Failed {
@@ -376,9 +376,9 @@ where
                 println!("what");
                 // We got a service
                 Self::Started {
-                    bg_thread: Arc::new(ShMemServiceThread {
+                    bg_thread: Arc::new(Mutex::new(ShMemServiceThread {
                         join_handle: Some(join_handle),
-                    }),
+                    })),
                     phantom: PhantomData,
                 }
             }
@@ -522,7 +522,7 @@ where
 
         match response {
             ServedShMemResponse::Mapping(mapping) => {
-                let id = mapping.borrow().id();
+                let id = mapping.as_ref().borrow().id();
                 let server_fd: i32 = id.to_string().parse().unwrap();
                 let client = self.clients.get_mut(&client_id).unwrap();
                 client
