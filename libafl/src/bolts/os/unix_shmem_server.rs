@@ -298,31 +298,33 @@ pub struct ShMemServiceThread {
 
 impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
-        let mut stream =
-            match UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap())
-            {
+        if self.join_handle.is_some() {
+            let mut stream = match UnixStream::connect_to_unix_addr(
+                &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
+            ) {
                 Ok(stream) => stream,
                 Err(_) => return, // ignoring non-started server
             };
 
-        let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
+            let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
 
-        let header = (body.len() as u32).to_be_bytes();
-        let mut message = header.to_vec();
-        message.extend(body);
+            let header = (body.len() as u32).to_be_bytes();
+            let mut message = header.to_vec();
+            message.extend(body);
 
-        stream
-            .write_all(&message)
-            .expect("Failed to send bye-message to ShMemService");
-        self.join_handle
-            .take()
-            .unwrap()
-            .join()
-            .expect("Failed to join ShMemService thread!")
-            .expect("Error in ShMemService thread!");
-        // try to remove the file from fs, and ignore errors.
-        #[cfg(target_os = "macos")]
-        drop(fs::remove_file(&UNIX_SERVER_NAME));
+            stream
+                .write_all(&message)
+                .expect("Failed to send bye-message to ShMemService");
+            self.join_handle
+                .take()
+                .unwrap()
+                .join()
+                .expect("Failed to join ShMemService thread!")
+                .expect("Error in ShMemService background thread!");
+            // try to remove the file from fs, and ignore errors.
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            drop(fs::remove_file(&UNIX_SERVER_NAME));
+        }
     }
 }
 
