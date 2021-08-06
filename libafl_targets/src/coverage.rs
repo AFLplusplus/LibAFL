@@ -1,7 +1,7 @@
 //! Coverage maps as static mut array
 
 use crate::EDGES_MAP_SIZE;
-#[cfg(all(
+#[cfg(any(
     feature = "sancov_pcguard_edges_ptr",
     feature = "sancov_pcguard_hitcounts_ptr"
 ))]
@@ -9,11 +9,10 @@ use core::ptr;
 
 /// The map for edges.
 pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
-#[cfg(all(
+#[cfg(any(
     feature = "sancov_pcguard_edges_ptr",
     feature = "sancov_pcguard_hitcounts_ptr"
 ))]
-/// The pointer to the map.
 pub static mut EDGES_MAP_PTR: *mut u8 = ptr::null_mut();
 
 /// The max count of edges tracked.
