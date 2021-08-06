@@ -28,7 +28,7 @@ use libafl::{
     },
     observers::{
         concolic::{
-            serialization_format::shared_memory::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
+            serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
         },
         StdMapObserver, TimeObserver,
@@ -47,10 +47,21 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+struct Opt {
+    /// This node should do concolic tracing + solving instead of traditional fuzzing
+    #[structopt(short, long)]
+    concolic: bool,
+}
+
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
+
+    let opt = Opt::from_args();
 
     println!(
         "Workdir: {:?}",
@@ -60,12 +71,18 @@ pub fn main() {
         &[PathBuf::from("./corpus")],
         PathBuf::from("./crashes"),
         1337,
+        opt.concolic,
     )
     .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
-fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
+fn fuzz(
+    corpus_dirs: &[PathBuf],
+    objective_dir: PathBuf,
+    broker_port: u16,
+    concolic: bool,
+) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = MultiStats::new(|s| println!("{}", s));
 
@@ -183,35 +200,40 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mutational = StdMutationalStage::new(mutator);
 
-    // The shared memory for the concolic runtime to write its trace to
-    let mut concolic_shmem = StdShMemProvider::new()
-        .unwrap()
-        .new_map(DEFAULT_SIZE)
-        .unwrap();
-    concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
+    if concolic {
+        // The shared memory for the concolic runtime to write its trace to
+        let mut concolic_shmem = StdShMemProvider::new()
+            .unwrap()
+            .new_map(DEFAULT_SIZE)
+            .unwrap();
+        concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 
-    // The concolic observer observers the concolic shared memory map.
-    let concolic_observer = ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
+        // The concolic observer observers the concolic shared memory map.
+        let concolic_observer =
+            ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
 
-    let concolic_observer_name = concolic_observer.name().to_string();
+        let concolic_observer_name = concolic_observer.name().to_string();
 
-    // The order of the stages matter!
-    let mut stages = tuple_list!(
-        // Create a concolic trace
-        ConcolicTracingStage::new(
-            TracingStage::new(
-                MyCommandConfigurator::default().into_executor(tuple_list!(concolic_observer))
+        // The order of the stages matter!
+        let mut stages = tuple_list!(
+            // Create a concolic trace
+            ConcolicTracingStage::new(
+                TracingStage::new(
+                    MyCommandConfigurator::default().into_executor(tuple_list!(concolic_observer))
+                ),
+                concolic_observer_name,
             ),
-            concolic_observer_name,
-        ),
-        // Use the concolic trace for z3-based solving
-        SimpleConcolicMutationalStage::default(),
-        tracing,
-        i2s,
-        mutational
-    );
+            // Use the concolic trace for z3-based solving
+            SimpleConcolicMutationalStage::default(),
+        );
 
-    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+    } else {
+        // The order of the stages matter!
+        let mut stages = tuple_list!(tracing, i2s, mutational);
+
+        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+    }
 
     // Never reached
     Ok(())
@@ -240,6 +262,7 @@ where
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
+            .env("SYMCC_INPUT_FILE", "cur_input")
             .spawn()
             .expect("failed to start process"))
     }
