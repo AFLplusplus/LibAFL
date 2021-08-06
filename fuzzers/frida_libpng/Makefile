@@ -36,4 +36,4 @@ short_test: all
 	(timeout 3s ./libafl_frida ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1 || [ $$? -eq 124 ])
 
 test: all
-	timeout 60s ./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1
+	(timeout 60s ./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1 || [ $$? -eq 124 ])

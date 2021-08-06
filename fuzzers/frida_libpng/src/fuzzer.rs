@@ -294,7 +294,7 @@ unsafe fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = MultiStats::new(|s| println!("{}", s));
 
-    let _service = StdShMemService::start().expect("Failed to start ShMem service");
+    let _service = StdShMemService::start();
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {

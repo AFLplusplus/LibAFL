@@ -3,9 +3,9 @@ PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 PHONY: all
 
-all: fuzzer
+all: $(FUZZER_NAME)
 
-fuzzer:
+$(FUZZER_NAME):
 	cargo build --release
 	cp $(PROJECT_DIR)/target/release/$(FUZZER_NAME) .
 

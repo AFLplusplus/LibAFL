@@ -78,7 +78,7 @@ pub fn libafl_main() {
 
     println!("Workdir: {:?}", workdir.to_string_lossy().to_string());
 
-    let _service = StdShMemService::start().expect("Failed to start ShMem service");
+    let _service = StdShMemService::start();
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats = MultiStats::new(|s| println!("{}", s));
