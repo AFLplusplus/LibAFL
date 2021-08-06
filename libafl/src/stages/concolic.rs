@@ -134,7 +134,9 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
     let mut res = Vec::new();
 
-    let ctx = Context::new(&Config::new());
+    let mut cfg = Config::new();
+    cfg.set_timeout_msec(10_000);
+    let ctx = Context::new(&cfg);
     let solver = Solver::new(&ctx);
 
     let mut translation = HashMap::<SymExprRef, Dynamic>::new();
@@ -305,7 +307,6 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                     }
                     z3::SatResult::Unknown => {
                         // we've got a problem. ignore
-                        solver.pop(1);
                     }
                     z3::SatResult::Sat => {
                         let model = solver.get_model().unwrap();
