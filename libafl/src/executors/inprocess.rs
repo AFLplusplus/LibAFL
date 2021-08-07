@@ -15,6 +15,9 @@ use nix::{
     unistd::{fork, ForkResult},
 };
 
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::shmem::ShMemProvider;
+
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
@@ -703,23 +706,26 @@ mod windows_exception_handler {
 }
 
 #[cfg(all(feature = "std", unix))]
-pub struct InProcessForkExecutor<'a, H, I, OT, S>
+pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
     OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
 {
     harness_fn: &'a mut H,
+    shmem_provider: SP,
     observers: OT,
     phantom: PhantomData<(I, S)>,
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessForkExecutor<'a, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z, SP> Executor<EM, I, S, Z> for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
     OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -734,6 +740,8 @@ where
             match fork() {
                 Ok(ForkResult::Child) => {
                     // Child
+                    self.shmem_provider.post_fork(true)?;
+
                     (self.harness_fn)(input);
 
                     std::process::exit(0);
@@ -742,6 +750,7 @@ where
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
+                    self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
                     match res {
@@ -756,11 +765,12 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S> InProcessForkExecutor<'a, H, I, OT, S>
+impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
     OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
 {
     pub fn new<EM, OC, OF, Z>(
         harness_fn: &'a mut H,
@@ -768,6 +778,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut S,
         _event_mgr: &mut EM,
+        shmem_provider: SP,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
@@ -778,6 +789,7 @@ where
     {
         Ok(Self {
             harness_fn,
+            shmem_provider,
             observers,
             phantom: PhantomData,
         })
@@ -797,11 +809,12 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S>
+impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
     OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
 {
     #[inline]
     fn observers(&self) -> &OT {
