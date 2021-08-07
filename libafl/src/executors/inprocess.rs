@@ -861,7 +861,9 @@ mod tests {
             .run_target(&mut (), &mut (), &mut (), &input)
             .is_ok());
     }
+
     #[test]
+    #[cfg(all(feature = "std", unix))]
     fn test_inprocessfork_exec() {
         let provider = StdShMemProvider::new().unwrap();
 
