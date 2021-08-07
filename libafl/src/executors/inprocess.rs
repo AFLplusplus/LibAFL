@@ -720,7 +720,8 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, I, OT, S, Z, SP> Executor<EM, I, S, Z> for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, EM, H, I, OT, S, Z, SP> Executor<EM, I, S, Z>
+    for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
