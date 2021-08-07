@@ -317,18 +317,18 @@ where
 }
 
 #[cfg(all(unix, feature = "std"))]
-unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
+unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
 
 #[cfg(all(unix, feature = "std"))]
-impl<T> ShMemProvider for RcShMemProvider<T>
+impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
-    T: ShMemProvider + alloc::fmt::Debug,
+    SP: ShMemProvider + alloc::fmt::Debug,
 {
-    type Mem = RcShMem<T>;
+    type Mem = RcShMem<SP>;
 
     fn new() -> Result<Self, Error> {
         Ok(Self {
-            internal: Rc::new(RefCell::new(T::new()?)),
+            internal: Rc::new(RefCell::new(SP::new()?)),
             child_parent_pipe: None,
             parent_child_pipe: None,
         })
@@ -390,9 +390,9 @@ where
 }
 
 #[cfg(all(unix, feature = "std"))]
-impl<T> RcShMemProvider<T>
+impl<SP> RcShMemProvider<SP>
 where
-    T: ShMemProvider,
+    SP: ShMemProvider,
 {
     /// "set" the "latch"
     /// (we abuse `pipes` as `semaphores`, as they don't need an additional shared mem region.)
@@ -453,9 +453,9 @@ where
 }
 
 #[cfg(all(unix, feature = "std"))]
-impl<T> Default for RcShMemProvider<T>
+impl<SP> Default for RcShMemProvider<SP>
 where
-    T: ShMemProvider + alloc::fmt::Debug,
+    SP: ShMemProvider + alloc::fmt::Debug,
 {
     fn default() -> Self {
         Self::new().unwrap()

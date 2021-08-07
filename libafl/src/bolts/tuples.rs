@@ -394,8 +394,10 @@ where
 
 /// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
+#[allow(clippy::items_after_statements)]
 macro_rules! tuple_for_each {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
+        #[allow(clippy::items_after_statements)]
         mod $fn_name {
             pub trait ForEach {
                 fn for_each(&self);
@@ -410,6 +412,7 @@ macro_rules! tuple_for_each {
                 Head: $trait_name,
                 Tail: tuple_list::TupleList + ForEach,
             {
+                #[allow(clippy::redundant_closure_call)]
                 fn for_each(&self) {
                     ($body)(&self.0);
                     self.1.for_each();
@@ -428,6 +431,7 @@ macro_rules! tuple_for_each {
 #[macro_export]
 macro_rules! tuple_for_each_mut {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
+        #[allow(clippy::items_after_statements)]
         mod $fn_name {
             pub trait ForEachMut {
                 fn for_each_mut(&mut self);
@@ -442,6 +446,7 @@ macro_rules! tuple_for_each_mut {
                 Head: $trait_name,
                 Tail: tuple_list::TupleList + ForEachMut,
             {
+                #[allow(clippy::redundant_closure_call)]
                 fn for_each_mut(&mut self) {
                     ($body)(&mut self.0);
                     self.1.for_each_mut();
@@ -456,21 +461,21 @@ macro_rules! tuple_for_each_mut {
     };
 }
 
-/*
+#[cfg(test)]
+#[cfg(feature = "std")]
+#[test]
+#[allow(clippy::items_after_statements)]
 pub fn test_macros() {
+    let mut t = tuple_list!(1, "a");
 
-  let mut t = tuple_list!(1, "a");
+    tuple_for_each!(f1, std::fmt::Display, t, |x| {
+        println!("{}", x);
+    });
 
-  tuple_for_each!(f1, std::fmt::Display, t, |x| {
-      println!("{}", x);
-  });
-
-  tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
-      println!("{}", x);
-  });
-
+    tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
+        println!("{}", x);
+    });
 }
-*/
 
 /*
 

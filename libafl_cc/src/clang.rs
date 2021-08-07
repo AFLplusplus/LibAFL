@@ -129,6 +129,11 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push("-lBcrypt".into());
             new_args.push("-lAdvapi32".into());
         }
+        // MacOS has odd linker behavior sometimes
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if linking {
+            new_args.push("-undefined dynamic_lookup".into());
+        }
 
         self.base_args = new_args;
         Ok(self)

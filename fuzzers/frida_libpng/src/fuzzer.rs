@@ -250,7 +250,7 @@ pub fn main() {
                 .unwrap_or("default launcher")
                 .to_string(),
         ) {
-            Ok(()) | Err(Error::ShuttingDown) => println!("Finished fuzzing. Good bye."),
+            Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
             Err(e) => panic!("Error during fuzzing: {:?}", e),
         }
     }

@@ -5,15 +5,15 @@ PHONY: all
 
 all: libafl_frida libpng-harness.so
 
-libpng-1.6.37:
+libpng-1.6.37.tar.xz:
 	wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-	tar -xvf libpng-1.6.37.tar.xz
 
 target/release/frida_libpng: src/*
 	# Build the frida libpng libfuzzer fuzzer
 	cargo build --release
 
-libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37
+libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37.tar.xz
+	tar -xvf libpng-1.6.37.tar.xz
 	cd libpng-1.6.37 && ./configure --enable-hardware-optimizations=yes --with-pic=yes
 	$(MAKE) -C libpng-1.6.37
 

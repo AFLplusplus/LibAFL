@@ -111,6 +111,7 @@ where
                         println!("child spawned and bound to core {}", id);
                     }
                     ForkResult::Child => {
+                        println!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]

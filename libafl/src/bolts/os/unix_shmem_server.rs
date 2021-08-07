@@ -135,7 +135,9 @@ where
     SP: ShMemProvider,
 {
     fn clone(&self) -> Self {
-        Self::new().unwrap()
+        let mut cloned = Self::new().unwrap();
+        cloned.service = self.service.clone();
+        cloned
     }
 }
 
@@ -192,7 +194,7 @@ where
         if is_child {
             // After fork, only the parent keeps the join handle.
             if let ShMemService::Started { bg_thread, .. } = &mut self.service {
-                drop(bg_thread.borrow_mut().lock().unwrap().join_handle.take());
+                bg_thread.borrow_mut().lock().unwrap().join_handle = None;
             }
             // After fork, the child needs to reconnect as to not share the fds with the parent.
             self.stream =
@@ -299,7 +301,7 @@ pub struct ShMemServiceThread {
 impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
-            println!("Dropping join_handles");
+            println!("Stopping ShMemService");
             let mut stream = match UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) {
@@ -324,7 +326,7 @@ impl Drop for ShMemServiceThread {
                 .expect("Error in ShMemService background thread!");
             // try to remove the file from fs, and ignore errors.
             #[cfg(any(target_os = "macos", target_os = "ios"))]
-            drop(fs::remove_file(&UNIX_SERVER_NAME));
+            fs::remove_file(&UNIX_SERVER_NAME).unwrap();
         }
     }
 }
@@ -337,14 +339,10 @@ where
     /// Returns [`ShMemService::Failed`] on error.
     #[must_use]
     pub fn start() -> Self {
-        println!("Starting ShMemService");
-
         #[allow(clippy::mutex_atomic)]
         let syncpair = Arc::new((Mutex::new(ShMemServiceStatus::Starting), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle = thread::spawn(move || {
-            println!("Thread...");
-
             let mut worker = match ServedShMemServiceWorker::<SP>::new() {
                 Ok(worker) => worker,
                 Err(e) => {
@@ -367,16 +365,14 @@ where
 
         let (lock, cvar) = &*syncpair;
         let mut success = lock.lock().unwrap();
-        println!("Waiting");
         while *success == ShMemServiceStatus::Starting {
             success = cvar.wait(success).unwrap();
         }
-        println!("fun");
 
         match *success {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
-                println!("started");
+                println!("Started ShMem Service");
                 // We got a service
                 Self::Started {
                     bg_thread: Arc::new(Mutex::new(ShMemServiceThread {
@@ -386,12 +382,9 @@ where
                 }
             }
             ShMemServiceStatus::Failed => {
-                println!("Joining");
                 // We ignore errors as multiple threads may call start.
                 let err = join_handle.join();
-                println!("more");
                 let err = err.expect("Failed to join ShMemService thread!");
-                println!("more");
                 let err = err.expect_err("Expected service start to have failed, but it didn't?");
 
                 Self::Failed {
