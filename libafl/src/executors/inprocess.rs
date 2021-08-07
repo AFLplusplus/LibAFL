@@ -839,6 +839,12 @@ mod tests {
         inputs::NopInput,
     };
 
+    #[cfg(all(feature = "std", unix))]
+    use crate::{
+        bolts::shmem::{ShMemProvider, StdShMemProvider},
+        executors::InProcessForkExecutor,
+    };
+
     #[test]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
@@ -852,6 +858,22 @@ mod tests {
         };
         let input = NopInput {};
         assert!(in_process_executor
+            .run_target(&mut (), &mut (), &mut (), &input)
+            .is_ok());
+    }
+    #[test]
+    fn test_inprocessfork_exec() {
+        let provider = StdShMemProvider::new().unwrap();
+
+        let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let mut in_process_fork_executor = InProcessForkExecutor::<_, NopInput, (), (), _> {
+            harness_fn: &mut harness,
+            shmem_provider: provider,
+            observers: tuple_list!(),
+            phantom: PhantomData,
+        };
+        let input = NopInput {};
+        assert!(in_process_fork_executor
             .run_target(&mut (), &mut (), &mut (), &input)
             .is_ok());
     }
