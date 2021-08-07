@@ -738,6 +738,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         unsafe {
+            self.shmem_provider.pre_fork()?;
             match fork() {
                 Ok(ForkResult::Child) => {
                     // Child
