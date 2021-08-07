@@ -9,6 +9,15 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
+#[cfg(all(feature = "std", unix))]
+use nix::{
+    sys::wait::{waitpid, WaitStatus},
+    unistd::{fork, ForkResult},
+};
+
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::shmem::ShMemProvider;
+
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
@@ -696,6 +705,130 @@ mod windows_exception_handler {
     }
 }
 
+#[cfg(all(feature = "std", unix))]
+pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    harness_fn: &'a mut H,
+    shmem_provider: SP,
+    observers: OT,
+    phantom: PhantomData<(I, S)>,
+}
+
+#[cfg(all(feature = "std", unix))]
+impl<'a, EM, H, I, OT, S, Z, SP> Executor<EM, I, S, Z>
+    for InProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    #[allow(unreachable_code)]
+    #[inline]
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        unsafe {
+            self.shmem_provider.pre_fork()?;
+            match fork() {
+                Ok(ForkResult::Child) => {
+                    // Child
+                    self.shmem_provider.post_fork(true)?;
+
+                    (self.harness_fn)(input);
+
+                    std::process::exit(0);
+
+                    Ok(ExitKind::Ok)
+                }
+                Ok(ForkResult::Parent { child }) => {
+                    // Parent
+                    self.shmem_provider.post_fork(false)?;
+
+                    let res = waitpid(child, None)?;
+                    match res {
+                        WaitStatus::Signaled(_, _, _) => Ok(ExitKind::Crash),
+                        _ => Ok(ExitKind::Ok),
+                    }
+                }
+                Err(e) => Err(Error::from(e)),
+            }
+        }
+    }
+}
+
+#[cfg(all(feature = "std", unix))]
+impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    pub fn new<EM, OC, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OC: Corpus<I>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<OC, I> + HasClientPerfStats,
+        Z: HasObjective<I, OF, S>,
+    {
+        Ok(Self {
+            harness_fn,
+            shmem_provider,
+            observers,
+            phantom: PhantomData,
+        })
+    }
+
+    /// Retrieve the harness function.
+    #[inline]
+    pub fn harness(&self) -> &H {
+        self.harness_fn
+    }
+
+    /// Retrieve the harness function for a mutable reference.
+    #[inline]
+    pub fn harness_mut(&mut self) -> &mut H {
+        self.harness_fn
+    }
+}
+
+#[cfg(all(feature = "std", unix))]
+impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::{marker::PhantomData, ptr};
@@ -704,6 +837,12 @@ mod tests {
         bolts::tuples::tuple_list,
         executors::{Executor, ExitKind, InProcessExecutor},
         inputs::NopInput,
+    };
+
+    #[cfg(all(feature = "std", unix))]
+    use crate::{
+        bolts::shmem::{ShMemProvider, StdShMemProvider},
+        executors::InProcessForkExecutor,
     };
 
     #[test]
@@ -719,6 +858,24 @@ mod tests {
         };
         let input = NopInput {};
         assert!(in_process_executor
+            .run_target(&mut (), &mut (), &mut (), &input)
+            .is_ok());
+    }
+
+    #[test]
+    #[cfg(all(feature = "std", unix))]
+    fn test_inprocessfork_exec() {
+        let provider = StdShMemProvider::new().unwrap();
+
+        let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let mut in_process_fork_executor = InProcessForkExecutor::<_, NopInput, (), (), _> {
+            harness_fn: &mut harness,
+            shmem_provider: provider,
+            observers: tuple_list!(),
+            phantom: PhantomData,
+        };
+        let input = NopInput {};
+        assert!(in_process_fork_executor
             .run_target(&mut (), &mut (), &mut (), &input)
             .is_ok());
     }

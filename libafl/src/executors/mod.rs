@@ -2,6 +2,9 @@
 
 pub mod inprocess;
 pub use inprocess::InProcessExecutor;
+#[cfg(all(feature = "std", unix))]
+pub use inprocess::InProcessForkExecutor;
+
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
 
