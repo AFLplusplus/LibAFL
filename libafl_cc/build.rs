@@ -53,7 +53,7 @@ fn find_llvm_config() -> String {
             }
         }
         #[cfg(not(target_os = "macos"))]
-        "llvm-config"
+        "llvm-config".to_string()
     })
 }
 

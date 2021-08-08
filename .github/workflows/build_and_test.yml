@@ -157,6 +157,8 @@ jobs:
     - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+    - name: YOLO remove ancient libpng for mozjpeg build
+      run: sudo rm -rf /usr/local/lib/libpng.a
     - name: Install deps
       run: brew install llvm libpng nasm coreutils && brew link --force llvm
     - name: Increase map sizes
