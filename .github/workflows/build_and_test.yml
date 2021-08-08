@@ -158,7 +158,7 @@ jobs:
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
-      run: brew install llvm libpng nasm coreutils
+      run: brew install llvm libpng nasm coreutils && brew link --force llvm
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
     - name: Build and run example fuzzers
