@@ -88,7 +88,7 @@ use crate::{
     start_timer, Evaluator,
 };
 
-#[cfg(feature = "introspection")]
+#[cfg(feature = "concolic_mutation")]
 use crate::stats::PerfFeature;
 
 #[cfg(feature = "concolic_mutation")]

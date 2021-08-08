@@ -46,7 +46,7 @@ pub fn libafl_main() {
 
     let broker_port = 1337;
 
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap())
+    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
 
     println!(

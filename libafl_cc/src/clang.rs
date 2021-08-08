@@ -106,7 +106,7 @@ impl CompilerWrapper for ClangWrapper {
                 "-m64" => self.bit_mode = 64,
                 "-c" | "-S" | "-E" => linking = false,
                 "-shared" => linking = false, // TODO dynamic list?
-                "-Wl,-z,defs" | "-Wl,--no-undefined" => continue,
+                "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => continue,
                 _ => (),
             };
             new_args.push(arg.as_ref().to_string());

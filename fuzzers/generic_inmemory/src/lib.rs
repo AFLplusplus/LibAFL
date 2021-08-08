@@ -49,7 +49,7 @@ pub fn libafl_main() {
     let yaml = load_yaml!("clap-config.yaml");
     let matches = App::from(yaml).get_matches();
 
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap())
+    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
     let broker_port = matches
         .value_of("broker_port")

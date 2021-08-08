@@ -26,6 +26,7 @@ use libafl::{
     stages::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
+    Error,
 };
 
 use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
@@ -235,6 +236,10 @@ where
             .remote_broker_addr(self.remote_broker_addr);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
-        launcher.build().launch().expect("Launcher failed");
+        match launcher.build().launch() {
+            Ok(()) => (),
+            Err(Error::ShuttingDown) => println!("\nFuzzing stopped by user. Good Bye."),
+            Err(err) => panic!("Fuzzingg failed {:?}", err),
+        }
     }
 }

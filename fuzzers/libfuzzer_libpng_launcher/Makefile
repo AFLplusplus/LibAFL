@@ -1,5 +1,6 @@
 FUZZER_NAME="fuzzer_libpng"
 PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+UNAME := $(shell uname)
 
 PHONY: all
 
@@ -41,9 +42,16 @@ clean:
 run: all
 	./$(FUZZER_NAME) --cores 0 &
 
+ifeq ($(UNAME), Darwin)
+short_test: libafl_cc
+	$(warning "The libpng linking step is currently broken on MacOS! See Issue #246")
+
+else
 short_test: all
 	rm -rf libafl_unix_shmem_server || true
 	timeout 10s ./$(FUZZER_NAME) --cores 0 &
+
+endif
 
 test: all
 	timeout 60s ./$(FUZZER_NAME) --cores 0 &
