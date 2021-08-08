@@ -31,6 +31,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
+    Error,
 };
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
@@ -163,7 +164,7 @@ pub fn libafl_main() {
         Ok(())
     };
 
-    Launcher::builder()
+    match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration("launcher default".into())
         .stats(stats)
@@ -173,5 +174,9 @@ pub fn libafl_main() {
         .stdout_file(Some("/dev/null"))
         .build()
         .launch()
-        .expect("Launcher failed");
+    {
+        Ok(()) => (),
+        Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
+        Err(err) => panic!("Failed to run launcher: {:?}", err),
+    }
 }
