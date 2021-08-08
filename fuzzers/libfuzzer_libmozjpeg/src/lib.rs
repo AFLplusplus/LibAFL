@@ -60,8 +60,16 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        setup_restarting_mgr_std(stats, broker_port, "default".into())
-            .expect("Failed to setup the restarter");
+        match setup_restarting_mgr_std(stats, broker_port, "default".into()) {
+            Ok(tuple) => tuple,
+            Err(Error::ShuttingDown) => {
+                println!("\nFinished fuzzing. Good bye.");
+                return Ok(());
+            }
+            Err(err) => {
+                panic!("Failed to setup the restarter: {:?}", err);
+            }
+        };
 
     // Create an observation channel using the coverage map
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
@@ -156,12 +164,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut fuzzer,
-                &mut executor,
-                &mut restarting_mgr,
-                &corpus_dirs,
-            )
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }

@@ -15,7 +15,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(feature = "std")]
 use crate::bolts::{
     llmp::{LlmpClient, LlmpConnection},
-    shmem::{StdShMemProvider, StdShMemService},
+    shmem::StdShMemProvider,
     staterestore::StateRestorer,
 };
 
@@ -662,7 +662,7 @@ pub enum ManagerKind {
     Any,
     /// A client, getting messages from a local broker.
     Client { cpu_core: Option<CoreId> },
-    /// A [`LlmpBroker`], forwarding the packets of local clients.
+    /// A [`llmp::LlmpBroker`], forwarding the packets of local clients.
     Broker,
 }
 
@@ -689,8 +689,6 @@ where
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
-    let _service = StdShMemService::start().expect("Error starting ShMem Service");
-
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
         .stats(Some(stats))
@@ -934,7 +932,7 @@ mod tests {
         bolts::{
             llmp::{LlmpClient, LlmpSharedMap},
             rands::StdRand,
-            shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+            shmem::{ShMemProvider, StdShMemProvider},
             staterestore::StateRestorer,
             tuples::tuple_list,
         },
@@ -952,8 +950,6 @@ mod tests {
     #[test]
     #[serial]
     fn test_mgr_state_restore() {
-        let _service = StdShMemService::start().unwrap();
-
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();

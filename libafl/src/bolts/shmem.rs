@@ -300,32 +300,35 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 #[cfg(all(unix, feature = "std"))]
-pub struct RcShMemProvider<T: ShMemProvider> {
+pub struct RcShMemProvider<SP>
+where
+    SP: ShMemProvider,
+{
     /// The wrapped [`ShMemProvider`].
-    internal: Rc<RefCell<T>>,
+    internal: Rc<RefCell<SP>>,
     /// A pipe the child uses to communicate progress to the parent after fork.
-    /// This prevents a potential race condition when using the [`AshmemService`].
+    /// This prevents a potential race condition when using the [`ShMemService`].
     #[cfg(unix)]
     child_parent_pipe: Option<Pipe>,
     #[cfg(unix)]
     /// A pipe the parent uses to communicate progress to the child after fork.
-    /// This prevents a potential race condition when using the [`AshmemService`].
+    /// This prevents a potential race condition when using the [`ShMemService`].
     parent_child_pipe: Option<Pipe>,
 }
 
 #[cfg(all(unix, feature = "std"))]
-unsafe impl<T: ShMemProvider> Send for RcShMemProvider<T> {}
+unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
 
 #[cfg(all(unix, feature = "std"))]
-impl<T> ShMemProvider for RcShMemProvider<T>
+impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
-    T: ShMemProvider + alloc::fmt::Debug,
+    SP: ShMemProvider + alloc::fmt::Debug,
 {
-    type Mem = RcShMem<T>;
+    type Mem = RcShMem<SP>;
 
     fn new() -> Result<Self, Error> {
         Ok(Self {
-            internal: Rc::new(RefCell::new(T::new()?)),
+            internal: Rc::new(RefCell::new(SP::new()?)),
             child_parent_pipe: None,
             parent_child_pipe: None,
         })
@@ -387,9 +390,9 @@ where
 }
 
 #[cfg(all(unix, feature = "std"))]
-impl<T> RcShMemProvider<T>
+impl<SP> RcShMemProvider<SP>
 where
-    T: ShMemProvider,
+    SP: ShMemProvider,
 {
     /// "set" the "latch"
     /// (we abuse `pipes` as `semaphores`, as they don't need an additional shared mem region.)
@@ -450,9 +453,9 @@ where
 }
 
 #[cfg(all(unix, feature = "std"))]
-impl<T> Default for RcShMemProvider<T>
+impl<SP> Default for RcShMemProvider<SP>
 where
-    T: ShMemProvider + alloc::fmt::Debug,
+    SP: ShMemProvider + alloc::fmt::Debug,
 {
     fn default() -> Self {
         Self::new().unwrap()
@@ -462,7 +465,7 @@ where
 /// A Unix sharedmem implementation.
 ///
 /// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
-/// Although for an [`unix_shmem::ashmem::ServedShMemProvider`] using a unix domain socket
+/// Although for an [`ServedShMemProvider`] using a unix domain socket
 /// Is needed on top.
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
@@ -672,7 +675,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
+        /// Implement [`ShMemProvider`] for [`MmapShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for MmapShMemProvider {
             type Mem = MmapShMem;
@@ -1337,13 +1340,11 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 mod tests {
     use serial_test::serial;
 
-    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService};
+    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
 
     #[test]
     #[serial]
     fn test_shmem_service() {
-        #[allow(unused_variables)]
-        let service = StdShMemService::start().unwrap();
         let mut provider = StdShMemProvider::new().unwrap();
         let mut map = provider.new_map(1024).unwrap();
         map.map_mut()[0] = 1;

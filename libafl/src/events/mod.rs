@@ -215,7 +215,7 @@ where
     /// this serializes the [`Event`] and commits it to the [`llmp`] page.
     /// In this case, if you `fire` faster than the broker can consume
     /// (for example for each [`Input`], on multiple cores)
-    /// the [`llmp`] [`ShMem`] may fill up and the client will eventually OOM or [`panic`].
+    /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-cases.
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
@@ -267,7 +267,7 @@ pub trait HasEventManagerId {
 }
 
 /// [`EventManager`] is the main communications hub.
-/// For the "normal" multi-processed mode, you may want to look into [`RestartingEventManager`]
+/// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
 pub trait EventManager<E, I, S, Z>:
     EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S> + HasEventManagerId
 where

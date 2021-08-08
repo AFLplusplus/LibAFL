@@ -57,7 +57,7 @@ where
     configuration: String,
     /// The 'main' function to run for each client forked. This probably shouldn't return
     run_client: LauncherClientFnRef<'a, I, OT, S, SP>,
-    /// The broker port to use (or to attach to, in case [`Self::with_broker`] is `false`)
+    /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -111,6 +111,7 @@ where
                         println!("child spawned and bound to core {}", id);
                     }
                     ForkResult::Child => {
+                        println!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]

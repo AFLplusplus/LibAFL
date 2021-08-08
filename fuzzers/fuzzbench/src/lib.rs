@@ -19,7 +19,7 @@ use libafl::{
         current_nanos, current_time,
         os::dup2,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
@@ -181,7 +181,6 @@ fn fuzz(
 
     // We need a shared map to store our state before a crash.
     // This way, we are able to continue fuzzing afterwards.
-    let _service = StdShMemService::start().expect("Failed to start ShMem service");
     let mut shmem_provider = StdShMemProvider::new()?;
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {

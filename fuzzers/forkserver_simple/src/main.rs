@@ -3,7 +3,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
     },
     corpus::{
@@ -29,8 +29,6 @@ pub fn main() {
     let corpus_dirs = vec![PathBuf::from("./corpus")];
 
     const MAP_SIZE: usize = 65536;
-
-    let _service = StdShMemService::start().unwrap();
 
     //Coverage map shared between observer and executor
     let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
@@ -114,7 +112,12 @@ pub fn main() {
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Failed to load initial corpus at {:?}: {:?}",
+                    &corpus_dirs, err
+                )
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

@@ -3,16 +3,13 @@
 
 use clap::{App, Arg};
 
-#[cfg(all(cfg = "std", unix))]
-use libafl::bolts::os::unix_shmem_server::ShMemService;
-
 use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -253,7 +250,7 @@ pub fn main() {
                 .unwrap_or("default launcher")
                 .to_string(),
         ) {
-            Ok(()) | Err(Error::ShuttingDown) => println!("Finished fuzzing. Good bye."),
+            Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
             Err(e) => panic!("Error during fuzzing: {:?}", e),
         }
     }
@@ -294,7 +291,6 @@ unsafe fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = MultiStats::new(|s| println!("{}", s));
 
-    let _service = StdShMemService::start().expect("Failed to start ShMem service");
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {

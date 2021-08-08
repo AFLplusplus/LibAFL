@@ -13,7 +13,7 @@ use libafl::{
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -46,7 +46,7 @@ pub fn libafl_main() {
 
     let broker_port = 1337;
 
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap())
+    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
 
     println!(
@@ -54,7 +54,6 @@ pub fn libafl_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let _service = StdShMemService::start().expect("Failed to start ShMem service");
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats = MultiStats::new(|s| println!("{}", s));

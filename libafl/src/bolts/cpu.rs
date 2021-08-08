@@ -11,8 +11,8 @@ use crate::bolts::current_nanos;
 ///
 /// This function is a wrapper around different ways to get a timestamp, fast
 /// In this way, an experiment only has to
-/// change this implementation rather than every instead of [`cpu::read_time_counter`]
-/// It is using [`rdtsc`] on `x86_64` and `x86`.
+/// change this implementation rather than every instead of `read_time_counter`.
+/// It is using `rdtsc` on `x86_64` and `x86`.
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 #[must_use]
 pub fn read_time_counter() -> u64 {

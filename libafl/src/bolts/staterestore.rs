@@ -77,7 +77,7 @@ where
         self.shmem.write_to_env(env_name)
     }
 
-    /// Create a [`StateRrestore`] from `env` variable name
+    /// Create a [`StateRestorer`] from `env` variable name
     pub fn from_env(shmem_provider: &mut SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
             shmem: shmem_provider.existing_from_env(env_name)?,
@@ -242,7 +242,7 @@ mod tests {
     use serial_test::serial;
 
     use crate::bolts::{
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         staterestore::StateRestorer,
     };
 
@@ -250,8 +250,6 @@ mod tests {
     #[serial]
     fn test_state_restore() {
         const TESTMAP_SIZE: usize = 1024;
-
-        let _service = StdShMemService::start().unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
         let shmem = shmem_provider.new_map(TESTMAP_SIZE).unwrap();

@@ -11,7 +11,7 @@ use libafl::{
         launcher::Launcher,
         os::parse_core_bind_arg,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider, StdShMemService},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -49,7 +49,7 @@ pub fn libafl_main() {
     let yaml = load_yaml!("clap-config.yaml");
     let matches = App::from(yaml).get_matches();
 
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap())
+    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
     let broker_port = matches
         .value_of("broker_port")
@@ -78,7 +78,6 @@ pub fn libafl_main() {
 
     println!("Workdir: {:?}", workdir.to_string_lossy().to_string());
 
-    let _service = StdShMemService::start().expect("Failed to start ShMem service");
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats = MultiStats::new(|s| println!("{}", s));

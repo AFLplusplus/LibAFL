@@ -88,7 +88,7 @@ use crate::{
     start_timer, Evaluator,
 };
 
-#[cfg(feature = "introspection")]
+#[cfg(feature = "concolic_mutation")]
 use crate::stats::PerfFeature;
 
 #[cfg(feature = "concolic_mutation")]
@@ -341,7 +341,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
     res
 }
 
-/// A mutational stage that uses Z3 to solve concolic constraints attached to the [`Testcase`] by the [`ConcolicTracingStage`].
+/// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[derive(Clone, Debug)]
 pub struct SimpleConcolicMutationalStage<C, EM, I, S, Z>
 where

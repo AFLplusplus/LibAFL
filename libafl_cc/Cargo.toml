@@ -15,4 +15,7 @@ edition = "2018"
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 
+[target.'cfg(target_os = "macos")'.build-dependencies]
+glob = "0.3"
+
 [dependencies]

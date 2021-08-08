@@ -469,7 +469,7 @@ impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
 }
 
 impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
-    /// Creates a new `MessageFileWriter` by reading a [`StdShMem`] from the given environment variable.
+    /// Creates a new `MessageFileWriter` by reading a [`ShMem`] from the given environment variable.
     pub fn from_stdshmem_env_with_name(env_name: impl AsRef<str>) -> io::Result<Self> {
         Self::from_shmem(
             StdShMemProvider::new()
@@ -479,7 +479,7 @@ impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
         )
     }
 
-    /// Creates a new `MessageFileWriter` by reading a [`StdShMem`] using [`DEFAULT_ENV_NAME`].
+    /// Creates a new `MessageFileWriter` by reading a [`ShMem`] using [`DEFAULT_ENV_NAME`].
     pub fn from_stdshmem_default_env() -> io::Result<Self> {
         Self::from_stdshmem_env_with_name(DEFAULT_ENV_NAME)
     }
