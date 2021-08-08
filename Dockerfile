@@ -105,6 +105,6 @@ RUN cargo build && cargo build --release
 # Copy fuzzers over
 COPY fuzzers fuzzers
 
-# RUN ./scripts/build_all_fuzzers.sh --no-fmt
+# RUN ./scripts/test_all_fuzzers.sh --no-fmt
 
 ENTRYPOINT [ "/bin/bash" ]
