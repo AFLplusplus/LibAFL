@@ -1,7 +1,7 @@
 /*!
 On `Android`, we can only share maps between processes by serializing fds over sockets.
 On `MacOS`, we cannot rely on reference counting for Maps.
-Hence, the [`unix_shmem_server`] keeps track of existing maps, creates new maps for clients,
+Hence, the `unix_shmem_server` keeps track of existing maps, creates new maps for clients,
 and forwards them over unix domain sockets.
 */
 
@@ -15,13 +15,15 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
-    fs,
     io::{Read, Write},
     marker::PhantomData,
     rc::{Rc, Weak},
     sync::{Arc, Condvar, Mutex},
     thread::JoinHandle,
 };
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use std::fs;
 
 #[cfg(all(feature = "std", unix))]
 use nix::poll::{poll, PollFd, PollFlags};
@@ -59,7 +61,7 @@ where
     service: ShMemService<SP>,
 }
 
-/// [`ShMem`] that got served from a [`AshmemService`] via domain sockets and can now be used in this program.
+/// [`ShMem`] that got served from a [`ShMemService`] via domain sockets and can now be used in this program.
 /// It works around Android's lack of "proper" shared maps.
 #[derive(Clone, Debug)]
 pub struct ServedShMem<SH>
@@ -274,7 +276,7 @@ enum ShMemServiceStatus {
     Failed,
 }
 
-/// The [`AshmemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
+/// The [`ShMemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
 /// It is mainly used and needed on Android.
 #[derive(Debug, Clone)]
 pub enum ShMemService<SP>

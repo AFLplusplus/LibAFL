@@ -307,12 +307,12 @@ where
     /// The wrapped [`ShMemProvider`].
     internal: Rc<RefCell<SP>>,
     /// A pipe the child uses to communicate progress to the parent after fork.
-    /// This prevents a potential race condition when using the [`AshmemService`].
+    /// This prevents a potential race condition when using the [`ShMemService`].
     #[cfg(unix)]
     child_parent_pipe: Option<Pipe>,
     #[cfg(unix)]
     /// A pipe the parent uses to communicate progress to the child after fork.
-    /// This prevents a potential race condition when using the [`AshmemService`].
+    /// This prevents a potential race condition when using the [`ShMemService`].
     parent_child_pipe: Option<Pipe>,
 }
 
@@ -465,7 +465,7 @@ where
 /// A Unix sharedmem implementation.
 ///
 /// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
-/// Although for an [`unix_shmem::ashmem::ServedShMemProvider`] using a unix domain socket
+/// Although for an [`ServedShMemProvider`] using a unix domain socket
 /// Is needed on top.
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
@@ -675,7 +675,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
+        /// Implement [`ShMemProvider`] for [`MmapShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for MmapShMemProvider {
             type Mem = MmapShMem;

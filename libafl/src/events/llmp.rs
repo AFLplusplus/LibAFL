@@ -662,7 +662,7 @@ pub enum ManagerKind {
     Any,
     /// A client, getting messages from a local broker.
     Client { cpu_core: Option<CoreId> },
-    /// A [`LlmpBroker`], forwarding the packets of local clients.
+    /// A [`llmp::LlmpBroker`], forwarding the packets of local clients.
     Broker,
 }
 

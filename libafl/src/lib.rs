@@ -4,6 +4,7 @@ Welcome to `LibAFL`
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "RUSTC_IS_NIGHTLY", feature(specialization))]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 #[macro_use]
 extern crate alloc;

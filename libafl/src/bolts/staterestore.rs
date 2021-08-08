@@ -77,7 +77,7 @@ where
         self.shmem.write_to_env(env_name)
     }
 
-    /// Create a [`StateRrestore`] from `env` variable name
+    /// Create a [`StateRestorer`] from `env` variable name
     pub fn from_env(shmem_provider: &mut SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
             shmem: shmem_provider.existing_from_env(env_name)?,

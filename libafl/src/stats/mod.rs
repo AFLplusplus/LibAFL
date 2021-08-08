@@ -354,10 +354,10 @@ macro_rules! mark_feedback_time {
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClientPerfStats {
-    /// Starting counter (in clock cycles from [`cpu::read_time_counter`])
+    /// Starting counter (in clock cycles from `read_time_counter`)
     start_time: u64,
 
-    /// Current counter in the fuzzer (in clock cycles from [`cpu::read_time_counter`]
+    /// Current counter in the fuzzer (in clock cycles from `read_time_counter`
     current_time: u64,
 
     /// Clock cycles spent in the scheduler
@@ -399,22 +399,22 @@ pub enum PerfFeature {
     /// Actual time spent executing the target
     TargetExecution = 3,
 
-    /// Time spent in the [`pre_exec`](crate::executors::Executor::pre_exec) callback
+    /// Time spent in `pre_exec`
     PreExec = 4,
 
-    /// Time spent in the [`post_exec`](crate::executors::Executor::post_exec) callback
+    /// Time spent in `post_exec`
     PostExec = 5,
 
-    /// Time spent in the [`pre_exec_observers`](crate::executors::Executor::pre_exec_observers) callback
+    /// Time spent in `observer` `pre_exec_all`
     PreExecObservers = 6,
 
-    /// Time spent in the [`post_exec_observers`](crate::executors::Executor::post_exec_observers) callback
+    /// Time spent in `executor.observers_mut().post_exec_all`
     PostExecObservers = 7,
 
-    /// Time spent getting the feedback from [`is_interesting`] from all feedbacks
+    /// Time spent getting the feedback from `is_interesting` from all feedbacks
     GetFeedbackInterestingAll = 8,
 
-    /// Time spent getting the feedback from [`is_interesting`] from all objectives
+    /// Time spent getting the feedback from `is_interesting` from all objectives
     GetObjectivesInterestingAll = 9,
 
     /// Used as a counter to know how many elements are in [`PerfFeature`]. Must be the
