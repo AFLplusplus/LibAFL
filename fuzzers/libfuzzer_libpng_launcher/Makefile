@@ -19,7 +19,7 @@ libafl_cxx: target/release/libafl_cxx
 libafl_cc: target/release/libafl_cxx
 
 libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37 libafl_cc
-	cd libpng-1.6.37 && ./configure
+	cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 	$(MAKE) -C libpng-1.6.37 CC="$(PROJECT_DIR)/target/release/libafl_cc" CXX="$(PROJECT_DIR)/target/release/libafl_cxx"
 	
 
@@ -42,16 +42,9 @@ clean:
 run: all
 	./$(FUZZER_NAME) --cores 0 &
 
-ifeq ($(UNAME), Darwin)
-short_test: libafl_cc
-	$(warning "The libpng linking step is currently broken on MacOS! See Issue #246")
-
-else
 short_test: all
 	rm -rf libafl_unix_shmem_server || true
 	timeout 10s ./$(FUZZER_NAME) --cores 0 &
-
-endif
 
 test: all
 	timeout 60s ./$(FUZZER_NAME) --cores 0 &
