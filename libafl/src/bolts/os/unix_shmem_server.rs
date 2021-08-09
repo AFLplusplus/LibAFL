@@ -48,6 +48,9 @@ const UNIX_SERVER_NAME: &str = "@libafl_unix_shmem_server";
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
 
+/// Env variable. If set, we won't try to spawn the service
+const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
+
 /// Hands out served shared maps, as used on Android.
 #[derive(Debug)]
 pub struct ServedShMemProvider<SP>
@@ -331,7 +334,7 @@ impl Drop for ShMemServiceThread {
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             fs::remove_file(&UNIX_SERVER_NAME).unwrap();
 
-            env::remove_var("AFL_SHMEM_SERVICE_STARTED");
+            env::remove_var(AFL_SHMEM_SERVICE_STARTED);
         }
     }
 }
@@ -344,7 +347,6 @@ where
     /// Returns [`ShMemService::Failed`] on error.
     #[must_use]
     pub fn start() -> Self {
-        const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
 
         // Already running, no need to spawn additional thraeds anymore.
         if env::var(AFL_SHMEM_SERVICE_STARTED).is_ok() {
@@ -384,9 +386,9 @@ where
             success = cvar.wait(success).unwrap();
         }
 
-        // Optimization: Following calls or even child processe don't need to try to start a servicie anymore.
+        // Optimization: Following calls or even child processe don't need to try to start a service anymore.
         // It's either running at this point, or we won't be able to spawn it anyway.
-        env::set_var(AFL_SHMEM_SERVICE_STARTED, "1");
+        env::set_var(AFL_SHMEM_SERVICE_STARTED, "true");
 
         match *success {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
