@@ -347,7 +347,6 @@ where
     /// Returns [`ShMemService::Failed`] on error.
     #[must_use]
     pub fn start() -> Self {
-
         // Already running, no need to spawn additional thraeds anymore.
         if env::var(AFL_SHMEM_SERVICE_STARTED).is_ok() {
             return Self::Failed {
