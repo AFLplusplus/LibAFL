@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
+    env,
     io::{Read, Write},
     marker::PhantomData,
     rc::{Rc, Weak},
@@ -46,6 +47,9 @@ const UNIX_SERVER_NAME: &str = "@libafl_unix_shmem_server";
 /// `MacOS` server name is on disk, since `MacOS` doesn't support abtract domain sockets.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
+
+/// Env variable. If set, we won't try to spawn the service
+const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
 
 /// Hands out served shared maps, as used on Android.
 #[derive(Debug)]
@@ -329,6 +333,8 @@ impl Drop for ShMemServiceThread {
             // try to remove the file from fs, and ignore errors.
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             fs::remove_file(&UNIX_SERVER_NAME).unwrap();
+
+            env::remove_var(AFL_SHMEM_SERVICE_STARTED);
         }
     }
 }
@@ -341,6 +347,14 @@ where
     /// Returns [`ShMemService::Failed`] on error.
     #[must_use]
     pub fn start() -> Self {
+        // Already running, no need to spawn additional thraeds anymore.
+        if env::var(AFL_SHMEM_SERVICE_STARTED).is_ok() {
+            return Self::Failed {
+                err_msg: "ShMemService already started".to_string(),
+                phantom: PhantomData,
+            };
+        }
+
         #[allow(clippy::mutex_atomic)]
         let syncpair = Arc::new((Mutex::new(ShMemServiceStatus::Starting), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
@@ -370,6 +384,10 @@ where
         while *success == ShMemServiceStatus::Starting {
             success = cvar.wait(success).unwrap();
         }
+
+        // Optimization: Following calls or even child processe don't need to try to start a service anymore.
+        // It's either running at this point, or we won't be able to spawn it anyway.
+        env::set_var(AFL_SHMEM_SERVICE_STARTED, "true");
 
         match *success {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
