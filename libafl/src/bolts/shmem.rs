@@ -494,8 +494,8 @@ pub mod unix_shmem {
 
         use core::{convert::TryInto, ptr, slice};
         use libc::{
-            c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void, close, ftruncate, mmap,
-            munmap, perror, shm_open, shm_unlink,
+            c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
+            perror, shm_open, shm_unlink, shmat, shmctl, shmget,
         };
         use std::{io::Write, process, ptr::null_mut};
 
@@ -534,12 +534,6 @@ pub mod unix_shmem {
             pub shm_nattch: c_ulong,
             pub __glibc_reserved4: c_ulong,
             pub __glibc_reserved5: c_ulong,
-        }
-
-        extern "C" {
-            fn shmctl(__shmid: c_int, __cmd: c_int, __buf: *mut shmid_ds) -> c_int;
-            fn shmget(__key: c_int, __size: c_ulong, __shmflg: c_int) -> c_int;
-            fn shmat(__shmid: c_int, __shmaddr: *const c_void, __shmflg: c_int) -> *mut c_void;
         }
 
         const MAX_MMAP_FILENAME_LEN: usize = 256;
@@ -747,7 +741,7 @@ pub mod unix_shmem {
                 unsafe {
                     let os_id = shmget(
                         libc::IPC_PRIVATE,
-                        map_size as c_ulong,
+                        map_size,
                         libc::IPC_CREAT | libc::IPC_EXCL | libc::SHM_R | libc::SHM_W,
                     );
 
@@ -856,7 +850,7 @@ pub mod unix_shmem {
     pub mod ashmem {
         use core::slice;
         use libc::{
-            c_char, c_int, c_long, c_uint, c_void, off_t, size_t, MAP_SHARED, O_RDWR, PROT_READ,
+            c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
             PROT_WRITE,
         };
         use std::ffi::CString;
@@ -865,21 +859,6 @@ pub mod unix_shmem {
             bolts::shmem::{ShMem, ShMemId, ShMemProvider},
             Error,
         };
-
-        extern "C" {
-            fn ioctl(fd: c_int, request: c_long, ...) -> c_int;
-            fn open(path: *const c_char, oflag: c_int, ...) -> c_int;
-            fn close(fd: c_int) -> c_int;
-            fn mmap(
-                addr: *mut c_void,
-                len: size_t,
-                prot: c_int,
-                flags: c_int,
-                fd: c_int,
-                offset: off_t,
-            ) -> *mut c_void;
-
-        }
 
         /// An ashmem based impl for linux/android
         #[cfg(unix)]
@@ -897,10 +876,10 @@ pub mod unix_shmem {
             pub len: c_uint,
         }
 
-        const ASHMEM_GET_SIZE: c_long = 0x00007704;
-        const ASHMEM_UNPIN: c_long = 0x40087708;
+        const ASHMEM_GET_SIZE: c_ulong = 0x00007704;
+        const ASHMEM_UNPIN: c_ulong = 0x40087708;
         //const ASHMEM_SET_NAME: c_long = 0x41007701;
-        const ASHMEM_SET_SIZE: c_long = 0x40087703;
+        const ASHMEM_SET_SIZE: c_ulong = 0x40087703;
 
         impl AshmemShMem {
             /// Create a new shared memory mapping, using shmget/shmat
