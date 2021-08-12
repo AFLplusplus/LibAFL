@@ -9,6 +9,7 @@ extern "C" {
 
 pub struct CmpLogRuntime {
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
+    ops_handle_tbz_masking: Option<Box<[u8]>>,
 }
 
 impl CmpLogRuntime {
@@ -16,6 +17,7 @@ impl CmpLogRuntime {
     pub fn new() -> CmpLogRuntime {
         Self {
             ops_save_register_and_blr_to_populate: None,
+            ops_handle_tbz_masking: None,
         }
     }
 
@@ -72,9 +74,30 @@ impl CmpLogRuntime {
             );};
         }
 
+        macro_rules! tbz_masking {
+            ($ops:ident) => {dynasm!($ops
+                ; .arch aarch64
+                ; lsr x0, x0, x1
+                ; and x0, x0, #1
+                ; mov x1, #0
+            );};
+
+        }
+
+        let mut ops_handle_tbz_masking =
+            dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        tbz_masking!(ops_handle_tbz_masking);
+
         let mut ops_save_register_and_blr_to_populate =
             dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         blr_to_populate!(ops_save_register_and_blr_to_populate);
+
+        self.ops_handle_tbz_masking = Some(
+            ops_handle_tbz_masking
+                .finalize()
+                .unwrap()
+                .into_boxed_slice(),
+        );
 
         self.ops_save_register_and_blr_to_populate = Some(
             ops_save_register_and_blr_to_populate
@@ -92,6 +115,13 @@ impl CmpLogRuntime {
     #[must_use]
     pub fn ops_save_register_and_blr_to_populate(&self) -> &[u8] {
         self.ops_save_register_and_blr_to_populate.as_ref().unwrap()
+    }
+
+    /// Get the blob which handles the tbz opcode masking
+    #[inline]
+    #[must_use]
+    pub fn ops_handle_tbz_masking(&self) -> &[u8] {
+        self.ops_handle_tbz_masking.as_ref().unwrap()
     }
 }
 
