@@ -421,17 +421,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             todo!("Implement cmplog for non-aarch64 targets");
                             #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                             // check if this instruction is a compare instruction and if so save the registers values
-                            if let Ok((op1, op2, special_case)) =
+                            if let Ok((op1, op2, tbz)) =
                                 helper.cmplog_is_interesting_instruction(address, instr)
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                                helper.emit_comparison_handling(
-                                    address,
-                                    &output,
-                                    op1,
-                                    op2,
-                                    special_case,
-                                );
+                                helper.emit_comparison_handling(address, &output, op1, op2, tbz);
                             }
                         }
 
@@ -527,7 +521,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         output: &StalkerOutput,
         op1: CmplogOperandType,
         op2: CmplogOperandType,
-        special_case: Option<SpecialCmpLogCase>,
+        tbz: bool,
     ) {
         let writer = output.writer();
 
@@ -609,16 +603,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
         match op2 {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
                 writer.put_ldr_reg_u64(Aarch64Register::X1, value);
-                match special_case {
-                    Some(inst) => match inst {
-                        SpecialCmpLogCase::Tbz => {
-                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbz_masking());
-                        }
-                        SpecialCmpLogCase::Tbnz => {
-                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbnz_masking());
-                        }
-                    },
-                    None => (),
+                if tbz {
+                    writer.put_bytes(&self.cmplog_runtime.ops_handle_tbz_masking());
                 }
             }
             CmplogOperandType::Regid(reg) => {
@@ -1390,14 +1376,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         &self,
         _address: u64,
         instr: &Insn,
-    ) -> Result<
-        (
-            CmplogOperandType,
-            CmplogOperandType,
-            Option<SpecialCmpLogCase>,
-        ),
-        (),
-    > {
+    ) -> Result<(CmplogOperandType, CmplogOperandType, bool), ()> {
         // We only care for compare instrunctions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
             "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls"
@@ -1457,6 +1436,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 }
             }
         };
+
+        // tbz will need to have special handling at emit time(masking operand1 value with operand2)
+        let special_case = instr.mnemonic().unwrap() == "tbz";
+
         if operand1.is_some() && operand2.is_some() {
             Ok((operand1.unwrap(), operand2.unwrap(), special_case))
         } else {
