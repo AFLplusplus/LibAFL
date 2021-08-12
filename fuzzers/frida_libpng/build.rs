@@ -26,7 +26,7 @@ fn build_dep_check(tools: &[&str]) {
 
 fn main() {
     if cfg!(windows) {
-        println!("cargo:warning=Skipping libpng frida example on Windows");
+        println!("cargo:warning=You have to compile the hareness manually on Windows.");
         exit(0);
     }
 
