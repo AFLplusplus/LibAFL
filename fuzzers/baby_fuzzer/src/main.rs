@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+#[cfg(windows)]
+use std::ptr::write_volatile;
+
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
@@ -36,7 +39,12 @@ pub fn main() {
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
                 if buf.len() > 2 && buf[2] == b'c' {
-                    panic!("=)");
+                    unsafe{
+                        #[cfg(unix)]
+                        panic!("=(");
+                        #[cfg(windows)]
+                        write_volatile(0 as *mut u32, 0);
+                    }
                 }
             }
         }
