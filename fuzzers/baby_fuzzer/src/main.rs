@@ -39,7 +39,7 @@ pub fn main() {
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
                 if buf.len() > 2 && buf[2] == b'c' {
-                    unsafe{
+                    unsafe {
                         #[cfg(unix)]
                         panic!("=(");
                         #[cfg(windows)]
