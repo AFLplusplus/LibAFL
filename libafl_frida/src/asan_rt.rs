@@ -399,7 +399,7 @@ impl AsanRuntime {
         }
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
     #[inline]
     fn hook_memalign(&mut self, alignment: usize, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
@@ -420,7 +420,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
     fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
         self.allocator.get_usable_size(ptr)
     }
@@ -708,7 +708,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
     fn hook_mempcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
@@ -810,7 +810,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
     fn hook_memrchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
@@ -891,7 +891,11 @@ impl AsanRuntime {
         unsafe { bzero(s, n) }
     }
 
-    #[cfg(all(not(target_os = "android"), target_arch = "aarch64"))]
+    #[cfg(all(
+        not(target_os = "android"),
+        target_arch = "aarch64",
+        not(target_os = "macos")
+    ))]
     #[inline]
     fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) {
         extern "C" {
@@ -1590,6 +1594,7 @@ impl AsanRuntime {
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
         hook_func_with_check!(None, free, (ptr: *mut c_void), ());
+        #[cfg(not(target_os = "macos"))]
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
         hook_func!(
             None,
@@ -1597,6 +1602,7 @@ impl AsanRuntime {
             (pptr: *mut *mut c_void, size: usize, alignment: usize),
             i32
         );
+        #[cfg(not(target_os = "macos"))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
         hook_func!(None, _Znam, (size: usize), *mut c_void);
         hook_func!(
@@ -1730,6 +1736,7 @@ impl AsanRuntime {
             (dest: *mut c_void, src: *const c_void, n: usize),
             *mut c_void
         );
+        #[cfg(not(target_os = "macos"))]
         hook_func!(
             None,
             mempcpy,
@@ -1754,6 +1761,7 @@ impl AsanRuntime {
             (s: *mut c_void, c: i32, n: usize),
             *mut c_void
         );
+        #[cfg(not(target_os = "macos"))]
         hook_func!(
             None,
             memrchr,
@@ -1773,7 +1781,7 @@ impl AsanRuntime {
         );
         #[cfg(not(target_os = "android"))]
         hook_func!(None, bzero, (s: *mut c_void, n: usize), ());
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "macos", target_os = "android")))]
         hook_func!(None, explicit_bzero, (s: *mut c_void, n: usize), ());
         #[cfg(not(target_os = "android"))]
         hook_func!(
