@@ -32,7 +32,9 @@ use nix::{
 };
 
 const FORKSRV_FD: i32 = 198;
+#[allow(clippy::cast_possible_wrap)]
 const FS_OPT_ENABLED: i32 = 0x80000001u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000u32 as i32;
 const MAX_FILE: usize = 1 * 1024 * 1024;
 
@@ -485,24 +487,23 @@ where
             return Err(Error::Forkserver(
                 "Failed to start a forkserver".to_string(),
             ));
-        } else {
-            println!("All right - fork server is up.");
-            // If forkserver is responding, we then check if there's any option enabled.
-            if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
-                if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & use_shmem_testcase {
-                    println!("Using SHARED MEMORY FUZZING feature.");
-                    let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+        }
+        println!("All right - fork server is up.");
+        // If forkserver is responding, we then check if there's any option enabled.
+        if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
+            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & use_shmem_testcase {
+                println!("Using SHARED MEMORY FUZZING feature.");
+                let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
 
-                    let send_len = forkserver.write_ctl(send_status)?;
-                    if send_len != 4 {
-                        return Err(Error::Forkserver(
-                            "Writing to forkserver failed.".to_string(),
-                        ));
-                    }
+                let send_len = forkserver.write_ctl(send_status)?;
+                if send_len != 4 {
+                    return Err(Error::Forkserver(
+                        "Writing to forkserver failed.".to_string(),
+                    ));
                 }
-            } else {
-                println!("Forkserver Options are not available.");
             }
+        } else {
+            println!("Forkserver Options are not available.");
         }
 
         Ok(Self {

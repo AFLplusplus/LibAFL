@@ -480,7 +480,7 @@ pub mod unix_shmem {
     pub type UnixShMemProvider = default::CommonUnixShMemProvider;
     /// Shared memory for Unix
     #[cfg(not(target_os = "android"))]
-    pub type UnixShMem = ashmem::AshmemShMem;
+    pub type UnixShMem = default::CommonUnixShMem;
 
     /// Mmap [`ShMem`] for Unix
     #[cfg(not(target_os = "android"))]
