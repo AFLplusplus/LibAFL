@@ -10,6 +10,10 @@ pub mod asan_errors;
 /// The frida address sanitizer runtime
 pub mod asan_rt;
 
+/// Hooking thread lifecycle events. Seems like this is apple-only for now.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub mod pthread_hook;
+
 #[cfg(feature = "cmplog")]
 /// The frida cmplog runtime
 pub mod cmplog_rt;

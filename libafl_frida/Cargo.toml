@@ -39,3 +39,7 @@ backtrace = { version = "0.3.58", default-features = false, features = ["std", "
 num-traits = "0.2.14"
 ahash = "0.7"
 paste = "1.0"
+lazy_static = "1.4"
+
+[dev-dependencies]
+serial_test = "*"
