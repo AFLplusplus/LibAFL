@@ -12,12 +12,16 @@ use std::{
 };
 
 use crate::{
-    bolts::os::{dup2, pipes::Pipe},
+    bolts::{
+        os::{dup2, pipes::Pipe},
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
+
 use nix::{
     sys::{
         select::{select, FdSet},
@@ -28,6 +32,9 @@ use nix::{
 };
 
 const FORKSRV_FD: i32 = 198;
+const FS_OPT_ENABLED: i32 = 0x80000001u32 as i32;
+const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000u32 as i32;
+const MAX_FILE: usize = 1 * 1024 * 1024;
 
 // Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
 pub trait ConfigTarget {
@@ -411,6 +418,7 @@ where
 }
 
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
+/// Shared memory feature can be enabled by inserting `int __afl_map_shm_fuzz = 1` into the target program.
 pub struct ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
@@ -429,7 +437,12 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
 {
-    pub fn new(target: String, arguments: &[String], observers: OT) -> Result<Self, Error> {
+    pub fn new(
+        target: String,
+        arguments: &[String],
+        use_shmem_testcase: bool,
+        observers: OT,
+    ) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = ".cur_input".to_string();
@@ -445,6 +458,19 @@ where
 
         let out_file = OutFile::new(&out_filename)?;
 
+        if use_shmem_testcase {
+            // setup shared memory
+            let mut provider = StdShMemProvider::new()?;
+            let mut map = provider.new_map(MAX_FILE + 4)?;
+            map.write_to_env("__AFL_SHM_FUZZ_ID")?;
+
+            let size_in_bytes = (MAX_FILE + 4).to_ne_bytes();
+            let slice = map.map_mut();
+            for i in 0..4 {
+                slice[i] = size_in_bytes[i];
+            }
+        }
+
         let mut forkserver = Forkserver::new(
             target.clone(),
             args.clone(),
@@ -453,16 +479,29 @@ where
             0,
         )?;
 
-        let (rlen, _) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
+        let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
-        match rlen {
-            4 => {
-                println!("All right - fork server is up.");
-            }
-            _ => {
-                return Err(Error::Forkserver(
-                    "Failed to start a forkserver".to_string(),
-                ))
+        if rlen != 4 {
+            return Err(Error::Forkserver(
+                "Failed to start a forkserver".to_string(),
+            ));
+        } else {
+            println!("All right - fork server is up.");
+            // If forkserver is responding, we then check if there's any option enabled.
+            if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
+                if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & use_shmem_testcase {
+                    println!("Using SHARED MEMORY FUZZING feature.");
+                    let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+
+                    let send_len = forkserver.write_ctl(send_status)?;
+                    if send_len != 4 {
+                        return Err(Error::Forkserver(
+                            "Writing to forkserver failed.".to_string(),
+                        ));
+                    }
+                }
+            } else {
+                println!("Forkserver Options are not available.");
             }
         }
 
@@ -648,6 +687,7 @@ mod tests {
         let executor = ForkserverExecutor::<NopInput, _, ()>::new(
             bin.to_string(),
             &args,
+            false,
             tuple_list!(edges_observer),
         );
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+int __afl_sharedmem_fuzzing = 1;
 int main(int argc, char **argv){
 
     FILE* file = stdin;
