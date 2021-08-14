@@ -14,7 +14,7 @@ use std::{
 use crate::{
     bolts::{
         os::{dup2, pipes::Pipe},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{unix_shmem, ShMem, ShMemProvider, StdShMemProvider},
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
@@ -36,7 +36,8 @@ const FORKSRV_FD: i32 = 198;
 const FS_OPT_ENABLED: i32 = 0x80000001u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000u32 as i32;
-const MAX_FILE: usize = 1 * 1024 * 1024;
+const SHMEM_FUZZ_HDR_SIZE: usize = 4;
+const MAX_FILE: usize = 1024 * 1024;
 
 // Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
 pub trait ConfigTarget {
@@ -431,6 +432,7 @@ where
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
+    map: Option<unix_shmem::UnixShMem>,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -460,17 +462,17 @@ where
 
         let out_file = OutFile::new(&out_filename)?;
 
+        let mut map = None;
         if use_shmem_testcase {
             // setup shared memory
             let mut provider = StdShMemProvider::new()?;
-            let mut map = provider.new_map(MAX_FILE + 4)?;
-            map.write_to_env("__AFL_SHM_FUZZ_ID")?;
+            let mut shmem = provider.new_map(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+            shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
 
-            let size_in_bytes = (MAX_FILE + 4).to_ne_bytes();
-            let slice = map.map_mut();
-            for i in 0..4 {
-                slice[i] = size_in_bytes[i];
-            }
+            let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+            let slice = shmem.map_mut();
+            slice[..4].clone_from_slice(&size_in_bytes[..4]);
+            map = Some(shmem);
         }
 
         let mut forkserver = Forkserver::new(
@@ -512,6 +514,7 @@ where
             out_file,
             forkserver,
             observers,
+            map,
             phantom: PhantomData,
         })
     }
@@ -549,7 +552,19 @@ where
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase
-        self.out_file.write_buf(input.target_bytes().as_slice());
+
+        match &mut self.map {
+            Some(map) => {
+                let size = input.target_bytes().as_slice().len();
+                // The first four bytes tells the size of the shmem.
+                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..]
+                    .copy_from_slice(input.target_bytes().as_slice());
+                map.map_mut()[(SHMEM_FUZZ_HDR_SIZE + size)..].fill(0x00);
+            }
+            None => {
+                self.out_file.write_buf(input.target_bytes().as_slice());
+            }
+        }
 
         let send_len = self
             .forkserver
