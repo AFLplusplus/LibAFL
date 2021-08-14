@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+#[cfg(windows)]
+use std::ptr::write_volatile;
+
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
@@ -36,7 +39,17 @@ pub fn main() {
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
                 if buf.len() > 2 && buf[2] == b'c' {
-                    panic!("=)");
+                    unsafe {
+                        #[cfg(unix)]
+                        panic!("=(");
+
+                        // panic!() raises a STATUS_STACK_BUFFER_OVERRUN exception which cannot be caught by the exception handler.
+                        // Here we make it raise STATUS_ACCESS_VIOLATION instead.
+                        // Extending the windows exception handler is a TODO. Maybe we can refer to what winafl code does.
+                        // https://github.com/googleprojectzero/winafl/blob/ea5f6b85572980bb2cf636910f622f36906940aa/winafl.c#L728
+                        #[cfg(windows)]
+                        write_volatile(0 as *mut u32, 0);
+                    }
                 }
             }
         }

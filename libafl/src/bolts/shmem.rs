@@ -1061,11 +1061,11 @@ pub mod win32_shmem {
     use crate::{
         bolts::{
             bindings::{
-                windows::win32::system_services::{
-                    CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+                Windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
+                Windows::Win32::System::Memory::{
+                    CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile, FILE_MAP,
+                    FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
                 },
-                windows::win32::system_services::{BOOL, HANDLE, PAGE_TYPE, PSTR},
-                windows::win32::windows_programming::CloseHandle,
             },
             shmem::{ShMem, ShMemId, ShMemProvider},
         },
@@ -1077,7 +1077,6 @@ pub mod win32_shmem {
     use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: isize = -1;
-    const FILE_MAP_ALL_ACCESS: u32 = 0xf001f;
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
@@ -1098,7 +1097,7 @@ pub mod win32_shmem {
                 let handle = CreateFileMappingA(
                     HANDLE(INVALID_HANDLE_VALUE),
                     ptr::null_mut(),
-                    PAGE_TYPE::PAGE_READWRITE,
+                    PAGE_READWRITE,
                     0,
                     map_size as u32,
                     PSTR(map_str_bytes.as_mut_ptr()),
@@ -1129,9 +1128,9 @@ pub mod win32_shmem {
         fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let map_str_bytes = id.id;
-
+                // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
-                    FILE_MAP_ALL_ACCESS,
+                    FILE_MAP_ALL_ACCESS.0,
                     BOOL(0),
                     PSTR(&map_str_bytes as *const u8 as *mut u8),
                 );

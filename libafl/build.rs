@@ -7,11 +7,12 @@ fn main() {
     #[cfg(target_os = "windows")]
     #[allow(clippy::ptr_arg, clippy::upper_case_acronyms)]
     windows::build!(
-        windows::win32::system_services::{HANDLE, BOOL, PAGE_TYPE, PSTR, ExitProcess},
-        windows::win32::windows_programming::CloseHandle,
-        // API needed for the shared memory
-        windows::win32::system_services::{CreateFileMappingA, OpenFileMappingA, MapViewOfFile, UnmapViewOfFile},
-        windows::win32::debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD, LPTOP_LEVEL_EXCEPTION_FILTER}
+        Windows::Win32::Foundation::{HANDLE, BOOL, PSTR, CloseHandle, NTSTATUS},
+        Windows::Win32::System::{
+            Memory::{CreateFileMappingA, OpenFileMappingA, MapViewOfFile, UnmapViewOfFile, FILE_MAP, PAGE_TYPE},
+            Diagnostics::Debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD, LPTOP_LEVEL_EXCEPTION_FILTER},
+            Threading::ExitProcess,
+        }
     );
 
     // Set cfg flags depending on release channel
