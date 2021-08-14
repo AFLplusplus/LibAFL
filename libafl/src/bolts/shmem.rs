@@ -1062,10 +1062,9 @@ pub mod win32_shmem {
         bolts::{
             bindings::{
                 Windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
-                Windows::Win32::System::Memory::PAGE_READWRITE,
                 Windows::Win32::System::Memory::{
                     CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile, FILE_MAP,
-                    FILE_MAP_ALL_ACCESS,
+                    FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
                 },
             },
             shmem::{ShMem, ShMemId, ShMemProvider},
