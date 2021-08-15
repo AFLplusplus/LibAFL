@@ -408,7 +408,7 @@ where
         if let Some(status) = self
             .executor
             .forkserver_mut()
-            .read_st_timed(&mut self.timeout)?
+            .read_st_timed(&self.timeout)?
         {
             self.executor.forkserver_mut().set_status(status);
             if libc::WIFSIGNALED(self.executor.forkserver().status()) {
