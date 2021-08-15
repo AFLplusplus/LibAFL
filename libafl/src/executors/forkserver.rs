@@ -14,7 +14,7 @@ use std::{
 use crate::{
     bolts::{
         os::{dup2, pipes::Pipe},
-        shmem::{unix_shmem, ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{unix_shmem, ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
@@ -432,7 +432,7 @@ where
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
-    map: Option<unix_shmem::UnixShMem>,
+    map: Option<StdShMem>,
     phantom: PhantomData<(I, S)>,
 }
 
