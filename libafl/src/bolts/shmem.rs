@@ -28,7 +28,7 @@ pub type StdShMem = Win32ShMem;
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMem = RcShMem<ServedShMem<AshmemShMem>>;
+pub type StdShMem = RcShMem<ServedShMemProvider<AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemService = ShMemService<AshmemShMemProvider>;
 
