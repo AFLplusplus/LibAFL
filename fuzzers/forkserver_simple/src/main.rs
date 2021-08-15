@@ -97,17 +97,12 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for the forkserver
-    let mut executor = TimeoutForkserverExecutor::new(
-        ForkserverExecutor::new(
-            "../../libafl_tests/src/forkserver_test".to_string(),
+    let mut executor = ForkserverExecutor::new(
+            "../../libafl_tests/src/forkserver_test.o".to_string(),
             &[],
             true,
             tuple_list!(edges_observer, time_observer),
-        )
-        .unwrap(),
-        Duration::from_millis(5000),
-    )
-    .expect("Failed to create the executor.");
+        ).expect("Failed to create the executor.");
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {

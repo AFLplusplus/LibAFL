@@ -14,7 +14,7 @@ use std::{
 use crate::{
     bolts::{
         os::{dup2, pipes::Pipe},
-        shmem::{unix_shmem, ShMem, ShMemProvider, StdShMem, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
@@ -421,7 +421,8 @@ where
 }
 
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
-/// Shared memory feature can be enabled by inserting `int __afl_map_shm_fuzz = 1` into the target program.
+/// Shared memory feature is also available, but you have to set things up in your code.
+/// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
@@ -551,13 +552,13 @@ where
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase
-
         match &mut self.map {
             Some(map) => {
-                let size_in_bytes = input.target_bytes().as_slice().len().to_ne_bytes();
+                let size = input.target_bytes().as_slice().len();
+                let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
                 map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
-                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..]
+                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE+size)]
                     .copy_from_slice(input.target_bytes().as_slice());
             }
             None => {
