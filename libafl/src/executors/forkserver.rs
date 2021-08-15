@@ -14,16 +14,13 @@ use std::{
 use crate::{
     bolts::{
         os::{dup2, pipes::Pipe},
-        shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
+        shmem::{unix_shmem, ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
-
-#[cfg(target_os = "macos")]
-use crate::bolts::shmem::RcShMemProvider;
 
 use nix::{
     sys::{
