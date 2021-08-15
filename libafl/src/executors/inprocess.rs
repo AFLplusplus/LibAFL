@@ -563,7 +563,7 @@ mod windows_exception_handler {
 
     use crate::{
         bolts::{
-            bindings::windows::win32::system_services::ExitProcess,
+            bindings::Windows::Win32::System::Threading::ExitProcess,
             os::windows_exceptions::{
                 ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
             },
@@ -680,10 +680,10 @@ mod windows_exception_handler {
                 let crash_addr = exception_pointers
                     .as_mut()
                     .unwrap()
-                    .exception_record
+                    .ExceptionRecord
                     .as_mut()
                     .unwrap()
-                    .exception_address as usize;
+                    .ExceptionAddress as usize;
 
                 println!(
                 "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",

@@ -96,8 +96,8 @@ lock_api = "0.4.3"
 regex = "1.4.5"
 
 [target.'cfg(windows)'.dependencies]
-windows = "0.4.0"
+windows = "0.18.0"
 uuid = { version = "0.8", features = ["v4"] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows = "0.4.0"
+windows = "0.18.0"
