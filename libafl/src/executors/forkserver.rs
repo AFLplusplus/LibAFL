@@ -470,8 +470,7 @@ where
             shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
 
             let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-            let slice = shmem.map_mut();
-            slice[..4].clone_from_slice(&size_in_bytes[..4]);
+            shmem.map_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
             map = Some(shmem);
         }
 
@@ -555,11 +554,11 @@ where
 
         match &mut self.map {
             Some(map) => {
-                let size = input.target_bytes().as_slice().len();
+                let size_in_bytes = input.target_bytes().as_slice().len().to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
+                map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
                 map.map_mut()[SHMEM_FUZZ_HDR_SIZE..]
                     .copy_from_slice(input.target_bytes().as_slice());
-                map.map_mut()[(SHMEM_FUZZ_HDR_SIZE + size)..].fill(0x00);
             }
             None => {
                 self.out_file.write_buf(input.target_bytes().as_slice());
