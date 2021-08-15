@@ -24,9 +24,9 @@ use crate::{
 
 use nix::{
     sys::{
-        select::{select, FdSet},
-        signal::{kill, Signal},
-        time::{TimeVal, TimeValLike},
+        select::{pselect, FdSet},
+        signal::{kill, SigSet, Signal},
+        time::{TimeSpec, TimeValLike},
     },
     unistd::Pid,
 };
@@ -277,7 +277,7 @@ impl Forkserver {
         Ok(slen)
     }
 
-    pub fn read_st_timed(&mut self, timeout: &mut TimeVal) -> Result<Option<i32>, Error> {
+    pub fn read_st_timed(&mut self, timeout: &TimeSpec) -> Result<Option<i32>, Error> {
         let mut buf: [u8; 4] = [0u8; 4];
         let st_read = match self.st_pipe.read_end() {
             Some(fd) => fd,
@@ -289,15 +289,15 @@ impl Forkserver {
             }
         };
         let mut readfds = FdSet::new();
-        let mut copy = *timeout;
         readfds.insert(st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
-        let sret = select(
+        let sret = pselect(
             Some(readfds.highest().unwrap() + 1),
             &mut readfds,
             None,
             None,
-            &mut copy,
+            Some(timeout),
+            Some(&SigSet::empty()),
         )?;
         if sret > 0 {
             if self.st_pipe.read_exact(&mut buf).is_ok() {
@@ -331,13 +331,13 @@ pub trait HasForkserver {
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
 pub struct TimeoutForkserverExecutor<E> {
     executor: E,
-    timeout: TimeVal,
+    timeout: TimeSpec,
 }
 
 impl<E> TimeoutForkserverExecutor<E> {
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis() as i64;
-        let timeout = TimeVal::milliseconds(milli_sec);
+        let timeout = TimeSpec::milliseconds(milli_sec);
         Ok(Self { executor, timeout })
     }
 }
