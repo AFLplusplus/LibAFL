@@ -322,6 +322,10 @@ pub trait HasForkserver {
     fn out_file(&self) -> &OutFile;
 
     fn out_file_mut(&mut self) -> &mut OutFile;
+
+    fn map(&self) -> &Option<StdShMem>;
+
+    fn map_mut(&mut self) -> &mut Option<StdShMem>;
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
@@ -355,9 +359,21 @@ where
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
 
-        self.executor
-            .out_file_mut()
-            .write_buf(input.target_bytes().as_slice());
+        match &mut self.executor.map_mut() {
+            Some(map) => {
+                let size = input.target_bytes().as_slice().len();
+                let size_in_bytes = size.to_ne_bytes();
+                // The first four bytes tells the size of the shmem.
+                map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
+                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                    .copy_from_slice(input.target_bytes().as_slice());
+            }
+            None => {
+                self.executor
+                    .out_file_mut()
+                    .write_buf(input.target_bytes().as_slice());
+            }
+        }
 
         let send_len = self
             .executor
@@ -558,7 +574,7 @@ where
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
                 map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
-                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE+size)]
+                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                     .copy_from_slice(input.target_bytes().as_slice());
             }
             None => {
@@ -648,6 +664,16 @@ where
     #[inline]
     fn out_file_mut(&mut self) -> &mut OutFile {
         &mut self.out_file
+    }
+
+    #[inline]
+    fn map(&self) -> &Option<StdShMem> {
+        &self.map
+    }
+
+    #[inline]
+    fn map_mut(&mut self) -> &mut Option<StdShMem> {
+        &mut self.map
     }
 }
 
