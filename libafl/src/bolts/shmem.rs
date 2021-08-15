@@ -35,7 +35,7 @@ pub type StdShMemService = ShMemService<AshmemShMemProvider>;
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
-pub type StdShMem = RcShMem<ServedShMem<MmapShMem>>;
+pub type StdShMem = RcShMem<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
 pub type StdShMemService = ShMemService<MmapShMemProvider>;
 
