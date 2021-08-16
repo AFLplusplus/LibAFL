@@ -28,14 +28,14 @@ pub type StdShMem = Win32ShMem;
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMem = RcShMem<ServedShMem<AshmemShMem>>;
+pub type StdShMem = RcShMem<ServedShMemProvider<AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemService = ShMemService<AshmemShMemProvider>;
 
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
-pub type StdShMem = RcShMem<ServedShMem<MmapShMem>>;
+pub type StdShMem = RcShMem<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
 pub type StdShMemService = ShMemService<MmapShMemProvider>;
 
@@ -480,7 +480,7 @@ pub mod unix_shmem {
     pub type UnixShMemProvider = default::CommonUnixShMemProvider;
     /// Shared memory for Unix
     #[cfg(not(target_os = "android"))]
-    pub type UnixShMem = ashmem::AshmemShMem;
+    pub type UnixShMem = default::CommonUnixShMem;
 
     /// Mmap [`ShMem`] for Unix
     #[cfg(not(target_os = "android"))]

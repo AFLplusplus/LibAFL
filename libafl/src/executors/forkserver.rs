@@ -12,22 +12,32 @@ use std::{
 };
 
 use crate::{
-    bolts::os::{dup2, pipes::Pipe},
+    bolts::{
+        os::{dup2, pipes::Pipe},
+        shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
+    },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
+
 use nix::{
     sys::{
-        select::{select, FdSet},
-        signal::{kill, Signal},
-        time::{TimeVal, TimeValLike},
+        select::{pselect, FdSet},
+        signal::{kill, SigSet, Signal},
+        time::{TimeSpec, TimeValLike},
     },
     unistd::Pid,
 };
 
 const FORKSRV_FD: i32 = 198;
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_ENABLED: i32 = 0x80000001u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000u32 as i32;
+const SHMEM_FUZZ_HDR_SIZE: usize = 4;
+const MAX_FILE: usize = 1024 * 1024;
 
 // Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
 pub trait ConfigTarget {
@@ -267,7 +277,7 @@ impl Forkserver {
         Ok(slen)
     }
 
-    pub fn read_st_timed(&mut self, timeout: &mut TimeVal) -> Result<Option<i32>, Error> {
+    pub fn read_st_timed(&mut self, timeout: &TimeSpec) -> Result<Option<i32>, Error> {
         let mut buf: [u8; 4] = [0u8; 4];
         let st_read = match self.st_pipe.read_end() {
             Some(fd) => fd,
@@ -279,15 +289,15 @@ impl Forkserver {
             }
         };
         let mut readfds = FdSet::new();
-        let mut copy = *timeout;
         readfds.insert(st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
-        let sret = select(
+        let sret = pselect(
             Some(readfds.highest().unwrap() + 1),
             &mut readfds,
             None,
             None,
-            &mut copy,
+            Some(timeout),
+            Some(&SigSet::empty()),
         )?;
         if sret > 0 {
             if self.st_pipe.read_exact(&mut buf).is_ok() {
@@ -312,18 +322,22 @@ pub trait HasForkserver {
     fn out_file(&self) -> &OutFile;
 
     fn out_file_mut(&mut self) -> &mut OutFile;
+
+    fn map(&self) -> &Option<StdShMem>;
+
+    fn map_mut(&mut self) -> &mut Option<StdShMem>;
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
 pub struct TimeoutForkserverExecutor<E> {
     executor: E,
-    timeout: TimeVal,
+    timeout: TimeSpec,
 }
 
 impl<E> TimeoutForkserverExecutor<E> {
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis() as i64;
-        let timeout = TimeVal::milliseconds(milli_sec);
+        let timeout = TimeSpec::milliseconds(milli_sec);
         Ok(Self { executor, timeout })
     }
 }
@@ -345,9 +359,21 @@ where
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
 
-        self.executor
-            .out_file_mut()
-            .write_buf(input.target_bytes().as_slice());
+        match &mut self.executor.map_mut() {
+            Some(map) => {
+                let size = input.target_bytes().as_slice().len();
+                let size_in_bytes = size.to_ne_bytes();
+                // The first four bytes tells the size of the shmem.
+                map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
+                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                    .copy_from_slice(input.target_bytes().as_slice());
+            }
+            None => {
+                self.executor
+                    .out_file_mut()
+                    .write_buf(input.target_bytes().as_slice());
+            }
+        }
 
         let send_len = self
             .executor
@@ -382,7 +408,7 @@ where
         if let Some(status) = self
             .executor
             .forkserver_mut()
-            .read_st_timed(&mut self.timeout)?
+            .read_st_timed(&self.timeout)?
         {
             self.executor.forkserver_mut().set_status(status);
             if libc::WIFSIGNALED(self.executor.forkserver().status()) {
@@ -411,6 +437,8 @@ where
 }
 
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
+/// Shared memory feature is also available, but you have to set things up in your code.
+/// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
@@ -421,6 +449,7 @@ where
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
+    map: Option<StdShMem>,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -429,7 +458,12 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
 {
-    pub fn new(target: String, arguments: &[String], observers: OT) -> Result<Self, Error> {
+    pub fn new(
+        target: String,
+        arguments: &[String],
+        use_shmem_testcase: bool,
+        observers: OT,
+    ) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = ".cur_input".to_string();
@@ -445,6 +479,18 @@ where
 
         let out_file = OutFile::new(&out_filename)?;
 
+        let mut map = None;
+        if use_shmem_testcase {
+            // setup shared memory
+            let mut provider = StdShMemProvider::new()?;
+            let mut shmem = provider.new_map(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+            shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
+
+            let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+            shmem.map_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
+            map = Some(shmem);
+        }
+
         let mut forkserver = Forkserver::new(
             target.clone(),
             args.clone(),
@@ -453,17 +499,29 @@ where
             0,
         )?;
 
-        let (rlen, _) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
+        let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
-        match rlen {
-            4 => {
-                println!("All right - fork server is up.");
+        if rlen != 4 {
+            return Err(Error::Forkserver(
+                "Failed to start a forkserver".to_string(),
+            ));
+        }
+        println!("All right - fork server is up.");
+        // If forkserver is responding, we then check if there's any option enabled.
+        if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
+            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & use_shmem_testcase {
+                println!("Using SHARED MEMORY FUZZING feature.");
+                let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+
+                let send_len = forkserver.write_ctl(send_status)?;
+                if send_len != 4 {
+                    return Err(Error::Forkserver(
+                        "Writing to forkserver failed.".to_string(),
+                    ));
+                }
             }
-            _ => {
-                return Err(Error::Forkserver(
-                    "Failed to start a forkserver".to_string(),
-                ))
-            }
+        } else {
+            println!("Forkserver Options are not available.");
         }
 
         Ok(Self {
@@ -472,6 +530,7 @@ where
             out_file,
             forkserver,
             observers,
+            map,
             phantom: PhantomData,
         })
     }
@@ -509,7 +568,19 @@ where
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase
-        self.out_file.write_buf(input.target_bytes().as_slice());
+        match &mut self.map {
+            Some(map) => {
+                let size = input.target_bytes().as_slice().len();
+                let size_in_bytes = size.to_ne_bytes();
+                // The first four bytes tells the size of the shmem.
+                map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
+                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                    .copy_from_slice(input.target_bytes().as_slice());
+            }
+            None => {
+                self.out_file.write_buf(input.target_bytes().as_slice());
+            }
+        }
 
         let send_len = self
             .forkserver
@@ -594,6 +665,16 @@ where
     fn out_file_mut(&mut self) -> &mut OutFile {
         &mut self.out_file
     }
+
+    #[inline]
+    fn map(&self) -> &Option<StdShMem> {
+        &self.map
+    }
+
+    #[inline]
+    fn map_mut(&mut self) -> &mut Option<StdShMem> {
+        &mut self.map
+    }
 }
 
 impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutForkserverExecutor<E>
@@ -648,6 +729,7 @@ mod tests {
         let executor = ForkserverExecutor::<NopInput, _, ()>::new(
             bin.to_string(),
             &args,
+            false,
             tuple_list!(edges_observer),
         );
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
