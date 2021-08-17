@@ -39,7 +39,6 @@ use crate::{
 use core::mem::transmute;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-#[cfg(unix)]
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct InProcessExecutor<'a, H, I, OT, S>
@@ -58,26 +57,6 @@ where
     timeout_handler: *const c_void,
     phantom: PhantomData<(I, S)>,
 }
-
-#[cfg(windows)]
-#[allow(dead_code)]
-pub struct InProcessExecutor<'a, H, I, OT, S>
-where
-    H: FnMut(&I) -> ExitKind,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a mut H,
-    /// The observers, observing each run
-    observers: OT,
-    /// On crash C function pointer
-    crash_handler: *const c_void,
-    /// On timeout C function pointer
-    timeout_handler: *const c_void,
-    phantom: PhantomData<(I, S)>,
-}
-
 
 impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
 where
