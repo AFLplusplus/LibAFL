@@ -566,7 +566,7 @@ mod unix_signal_handler {
 }
 
 #[cfg(all(windows, feature = "std"))]
-pub mod windows_exception_handler {
+mod windows_exception_handler {
     use alloc::vec::Vec;
     use core::ffi::c_void;
     use core::{mem::transmute, ptr};

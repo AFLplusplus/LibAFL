@@ -7,7 +7,6 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
-    state::HasClientPerfStats,
     Error,
 };
 
@@ -92,10 +91,10 @@ impl<E> TimeoutExecutor<E> {
             it_interval,
             it_value,
         };
-        Ok(Self {
+        Self {
             executor,
             itimerval,
-        })
+        }
     }
 
     #[cfg(windows)]
@@ -103,12 +102,12 @@ impl<E> TimeoutExecutor<E> {
         let milli_sec = exec_tmout.as_millis() as u32;
         let timer_queue = CreateTimerQueue();
         let ph_new_timer = HANDLE::NULL;
-        Ok(Self {
+        Self {
             executor,
             milli_sec,
             ph_new_timer,
             timer_queue,
-        })
+        }
     }
 
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
@@ -133,7 +132,6 @@ impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z> + HasTimeoutHandler,
     I: Input,
-    S: HasClientPerfStats,
 {
     fn run_target(
         &mut self,
@@ -168,7 +166,6 @@ impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z>,
     I: Input,
-    S: HasClientPerfStats,
 {
     fn run_target(
         &mut self,
