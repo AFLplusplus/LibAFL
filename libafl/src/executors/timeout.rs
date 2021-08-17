@@ -4,8 +4,6 @@
 use core::time::Duration;
 
 use crate::{
-    corpus::Corpus,
-    feedbacks::Feedback,
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
@@ -14,8 +12,9 @@ use crate::{
 };
 
 #[cfg(windows)]
-use crate::executors::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE, HasTimeoutHandler};
+use crate::executors::inprocess::{HasTimeoutHandler, GLOBAL_STATE};
 
+#[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
 #[cfg(unix)]
 use libc::c_int;
@@ -30,8 +29,6 @@ use crate::bolts::bindings::Windows::Win32::{
 
 #[cfg(windows)]
 use core::ffi::c_void;
-
-
 
 #[repr(C)]
 #[cfg(unix)]
@@ -54,12 +51,6 @@ extern "C" {
 
 #[cfg(unix)]
 const ITIMER_REAL: c_int = 0;
-
-unsafe extern "system" fn wintimer_handler(gloabl_state: *mut c_void, _p1: u8)
-where
-{
-    println!("TIMER INVOKED!");
-}
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
@@ -153,15 +144,7 @@ where
         state: &mut S,
         mgr: &mut EM,
         input: &I,
-    ) -> Result<ExitKind, Error> 
-    {
-        #[cfg(unix)]
-        unsafe {
-            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
-            let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            self.remove_timeout()?;
-            ret
-        }
+    ) -> Result<ExitKind, Error> {
         #[cfg(windows)]
         unsafe {
             let code = CreateTimerQueueTimer(
@@ -176,6 +159,30 @@ where
             if !code.as_bool() {
                 return Err(Error::Unknown("CreateTimerQueue failed.".to_string()));
             }
+            let ret = self.executor.run_target(fuzzer, state, mgr, input);
+            self.remove_timeout()?;
+            ret
+        }
+    }
+}
+
+#[cfg(unix)]
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+where
+    E: Executor<EM, I, S, Z>,
+    I: Input,
+    S: HasClientPerfStats,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        #[cfg(unix)]
+        unsafe {
+            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
             self.remove_timeout()?;
             ret

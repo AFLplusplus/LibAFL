@@ -130,8 +130,6 @@ where
     }
 }
 
-
-
 impl<'a, H, I, OT, S> HasObservers<I, OT, S> for InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -216,7 +214,15 @@ where
                     S,
                     Z,
                 > as *const _,
-                timeout_handler: windows_exception_handler::inproc_timeout_handler::<EM, I, OC, OF, OT, S, Z> as WAITORTIMERCALLBACK as *const c_void,
+                timeout_handler: windows_exception_handler::inproc_timeout_handler::<
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                > as *const c_void,
                 // timeout_handler: ptr::null(),
                 phantom: PhantomData,
             })
@@ -272,10 +278,7 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     /// The crash handler fn
     crash_handler: ptr::null(),
     /// The timeout handler fn
-    #[cfg(unix)]
     timeout_handler: ptr::null(),
-    #[cfg(windows)]
-    timeout_handler: ptr::null()
 };
 
 #[cfg(unix)]
@@ -565,11 +568,10 @@ mod unix_signal_handler {
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_exception_handler {
     use alloc::vec::Vec;
+    use core::ffi::c_void;
     use core::{mem::transmute, ptr};
     #[cfg(feature = "std")]
     use std::io::{stdout, Write};
-    use core::ffi::c_void;
-
 
     use crate::{
         bolts::{
@@ -618,8 +620,10 @@ pub mod windows_exception_handler {
         }
     }
 
-    pub unsafe extern "system" fn inproc_timeout_handler<EM, I, OC, OF, OT, S, Z>(gloabl_state: *mut c_void, _p1: u8)
-    where
+    pub unsafe extern "system" fn inproc_timeout_handler<EM, I, OC, OF, OT, S, Z>(
+        gloabl_state: *mut c_void,
+        _p1: u8,
+    ) where
         EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
@@ -629,34 +633,64 @@ pub mod windows_exception_handler {
         Z: HasObjective<I, OF, S>,
     {
         let data: &mut InProcessExecutorHandlerData =
-            unsafe { &mut *(gloabl_state as *mut InProcessExecutorHandlerData) };
-        
+            &mut *(gloabl_state as *mut InProcessExecutorHandlerData);
+
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
         let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
         let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
-        println!("But this time... inproc_timeout_handler!");
 
-        if data.current_input_ptr.is_null(){
+        if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
             dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
-        }
-        else{
+        } else {
             #[cfg(feature = "std")]
             println!("Timeout in fuzz run.");
             #[cfg(feature = "std")]
             let _res = stdout().flush();
 
-
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
-            println!("input: {:#?}", input);
 
+            let interesting = fuzzer
+                .objective_mut()
+                .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+                .expect("In timeout handler objective failure.");
 
+            if interesting {
+                let mut new_testcase = Testcase::new(input.clone());
+                fuzzer
+                    .objective_mut()
+                    .append_metadata(state, &mut new_testcase)
+                    .expect("Failed adding metadata");
+                state
+                    .solutions_mut()
+                    .add(new_testcase)
+                    .expect("In timeout handler solutions failure.");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Could not send timeouting input");
+            }
+
+            event_mgr.on_restart(state).unwrap();
+
+            #[cfg(feature = "std")]
+            println!("Waiting for broker...");
+            event_mgr.await_restart_safe();
+            #[cfg(feature = "std")]
+            println!("Bye!");
+
+            event_mgr.await_restart_safe();
+
+            ExitProcess(1);
         }
-        println!("TIMER INVOKED!");
+        // println!("TIMER INVOKED!");
     }
-
 
     pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S, Z>(
         code: ExceptionCode,
@@ -759,8 +793,8 @@ pub mod windows_exception_handler {
 type WAITORTIMERCALLBACK = unsafe extern "system" fn(param0: *mut c_void, param1: u8);
 
 #[cfg(windows)]
-pub trait HasTimeoutHandler{
-    unsafe fn timeout_handler(&self) -> WAITORTIMERCALLBACK;   
+pub trait HasTimeoutHandler {
+    unsafe fn timeout_handler(&self) -> WAITORTIMERCALLBACK;
 }
 
 #[cfg(windows)]
@@ -776,7 +810,6 @@ where
         func
     }
 }
-
 
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>

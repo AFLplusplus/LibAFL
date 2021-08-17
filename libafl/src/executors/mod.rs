@@ -35,9 +35,6 @@ use crate::{
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(windows)]
-use core::ffi::c_void;
-
 /// How an execution finished.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExitKind {
