@@ -4,14 +4,17 @@
 use core::time::Duration;
 
 use crate::{
+    corpus::Corpus,
+    feedbacks::Feedback,
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
+    state::HasClientPerfStats,
     Error,
 };
 
 #[cfg(windows)]
-use crate::executors::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE};
+use crate::executors::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE, HasTimeoutHandler};
 
 use core::{mem::zeroed, ptr::null_mut};
 #[cfg(unix)]
@@ -27,6 +30,8 @@ use crate::bolts::bindings::Windows::Win32::{
 
 #[cfg(windows)]
 use core::ffi::c_void;
+
+
 
 #[repr(C)]
 #[cfg(unix)]
@@ -50,14 +55,9 @@ extern "C" {
 #[cfg(unix)]
 const ITIMER_REAL: c_int = 0;
 
-unsafe extern "system" fn wintimer_handler<I>(gloabl_state: *mut c_void, _p1: u8)
+unsafe extern "system" fn wintimer_handler(gloabl_state: *mut c_void, _p1: u8)
 where
-    I: Input,
 {
-    let data: &mut InProcessExecutorHandlerData =
-        unsafe { &mut *(gloabl_state as *mut InProcessExecutorHandlerData) };
-    let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-    println!("input: {:#?}", input);
     println!("TIMER INVOKED!");
 }
 
@@ -143,8 +143,9 @@ impl<E> TimeoutExecutor<E> {
 
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
+    E: Executor<EM, I, S, Z> + HasTimeoutHandler,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn run_target(
         &mut self,
@@ -152,7 +153,8 @@ where
         state: &mut S,
         mgr: &mut EM,
         input: &I,
-    ) -> Result<ExitKind, Error> {
+    ) -> Result<ExitKind, Error> 
+    {
         #[cfg(unix)]
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
@@ -165,7 +167,7 @@ where
             let code = CreateTimerQueueTimer(
                 &mut self.ph_new_timer,
                 &self.timer_queue,
-                Some(wintimer_handler::<I>),
+                Some(self.executor.timeout_handler()),
                 &mut GLOBAL_STATE as *mut _ as *mut c_void,
                 self.milli_sec,
                 0,
