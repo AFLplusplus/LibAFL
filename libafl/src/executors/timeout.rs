@@ -78,7 +78,7 @@ impl<E> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     #[cfg(unix)]
-    pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
+    pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
         let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,
@@ -99,12 +99,9 @@ impl<E> TimeoutExecutor<E> {
     }
 
     #[cfg(windows)]
-    pub unsafe fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
+    pub unsafe fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as u32;
         let timer_queue = CreateTimerQueue();
-        if timer_queue == HANDLE::NULL {
-            return Err(Error::Unknown("CreateTimerQueue failed.".to_string()));
-        }
         let ph_new_timer = HANDLE::NULL;
         Ok(Self {
             executor,
