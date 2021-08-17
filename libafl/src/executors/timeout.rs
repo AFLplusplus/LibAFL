@@ -10,12 +10,20 @@ use crate::{
     Error,
 };
 
+#[cfg(windows)]
+use crate::executors::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE};
+
 use core::{mem::zeroed, ptr::null_mut};
 #[cfg(unix)]
 use libc::c_int;
 
 #[cfg(windows)]
-use crate::bolts::bindings::Windows::Win32::{Foundation::HANDLE, System::Threading::{CreateTimerQueue, CreateTimerQueueTimer, WORKER_THREAD_FLAGS}};
+use crate::bolts::bindings::Windows::Win32::{
+    Foundation::HANDLE,
+    System::Threading::{
+        CreateTimerQueue, CreateTimerQueueTimer, DeleteTimerQueueTimer, WORKER_THREAD_FLAGS,
+    },
+};
 
 #[cfg(windows)]
 use core::ffi::c_void;
@@ -42,23 +50,14 @@ extern "C" {
 #[cfg(unix)]
 const ITIMER_REAL: c_int = 0;
 
-/// Reset and remove the timeout
-#[cfg(unix)]
-pub fn remove_timeout() {
-    #[cfg(unix)]
-    unsafe {
-        let mut itimerval_zero: Itimerval = zeroed();
-        setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
-    }
-}
-
-#[cfg(windows)]
-pub fn remove_timeout() {
-    unsafe{
-    }
-}
-
-unsafe extern "system" fn wintimer_handler(p0: *mut c_void, p1: u8){
+unsafe extern "system" fn wintimer_handler<I>(gloabl_state: *mut c_void, _p1: u8)
+where
+    I: Input,
+{
+    let data: &mut InProcessExecutorHandlerData =
+        unsafe { &mut *(gloabl_state as *mut InProcessExecutorHandlerData) };
+    let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+    println!("input: {:#?}", input);
     println!("TIMER INVOKED!");
 }
 
@@ -70,16 +69,16 @@ pub struct TimeoutExecutor<E> {
     #[cfg(windows)]
     milli_sec: u32,
     #[cfg(windows)]
-    phnewtimer: HANDLE,
+    ph_new_timer: HANDLE,
     #[cfg(windows)]
-    timerqueue: HANDLE,
+    timer_queue: HANDLE,
 }
 
 impl<E> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     #[cfg(unix)]
-    pub fn new(executor: E, exec_tmout: Duration) -> Self {
+    pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis();
         let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,
@@ -93,28 +92,52 @@ impl<E> TimeoutExecutor<E> {
             it_interval,
             it_value,
         };
-        Self {
+        Ok(Self {
             executor,
             itimerval,
-        }
+        })
     }
 
     #[cfg(windows)]
-    pub unsafe fn new(executor: E, exec_tmout: Duration) -> Self {
+    pub unsafe fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis() as u32;
-        let timerqueue = CreateTimerQueue();
-        let phnewtimer = HANDLE::NULL;
-        Self { 
+        let timer_queue = CreateTimerQueue();
+        if timer_queue == HANDLE::NULL {
+            return Err(Error::Unknown("CreateTimerQueue failed.".to_string()));
+        }
+        let ph_new_timer = HANDLE::NULL;
+        Ok(Self {
             executor,
             milli_sec,
-            phnewtimer,
-            timerqueue,
-        }
+            ph_new_timer,
+            timer_queue,
+        })
     }
 
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
     pub fn inner(&mut self) -> &mut E {
         &mut self.executor
+    }
+
+    /// Reset and remove the timeout
+    #[cfg(unix)]
+    pub fn remove_timeout(&self) -> Result<(), Error> {
+        unsafe {
+            let mut itimerval_zero: Itimerval = zeroed();
+            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    pub fn remove_timeout(&self) -> Result<(), Error> {
+        unsafe {
+            let code = DeleteTimerQueueTimer(self.timer_queue, self.ph_new_timer, HANDLE::NULL);
+            if !code.as_bool() {
+                return Err(Error::Unknown(format!("DeleteTimerQueueTimer failed.")));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -134,14 +157,25 @@ where
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            remove_timeout();
+            self.remove_timeout()?;
             ret
         }
         #[cfg(windows)]
         unsafe {
-            let code = CreateTimerQueueTimer(&mut self.phnewtimer, &self.timerqueue, Some(wintimer_handler), null_mut(), self.milli_sec, 0, WORKER_THREAD_FLAGS::default());
+            let code = CreateTimerQueueTimer(
+                &mut self.ph_new_timer,
+                &self.timer_queue,
+                Some(wintimer_handler::<I>),
+                &mut GLOBAL_STATE as *mut _ as *mut c_void,
+                self.milli_sec,
+                0,
+                WORKER_THREAD_FLAGS::default(),
+            );
+            if !code.as_bool() {
+                return Err(Error::Unknown("CreateTimerQueue failed.".to_string()));
+            }
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            remove_timeout();
+            self.remove_timeout()?;
             ret
         }
     }

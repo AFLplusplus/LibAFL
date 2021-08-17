@@ -11,7 +11,7 @@ fn main() {
         Windows::Win32::System::{
             Memory::{CreateFileMappingA, OpenFileMappingA, MapViewOfFile, UnmapViewOfFile, FILE_MAP, PAGE_TYPE},
             Diagnostics::Debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD, LPTOP_LEVEL_EXCEPTION_FILTER},
-            Threading::{CreateTimerQueue, CreateTimerQueueTimer, ExitProcess},
+            Threading::{CreateTimerQueue, CreateTimerQueueTimer, DeleteTimerQueueTimer, ExitProcess},
         },
     );
 

@@ -109,7 +109,7 @@ pub fn main() {
             &mut mgr,
         ).unwrap()
         ,Duration::from_millis(100)
-    )
+    ).unwrap()
     };
 
     // Generator of printable bytearrays of max size 32
