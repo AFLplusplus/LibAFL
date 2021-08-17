@@ -3,14 +3,11 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 
-use core::time::Duration;
-
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    executors::timeout::TimeoutExecutor,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
@@ -30,15 +27,12 @@ fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
-
 #[allow(clippy::similar_names)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        // #[cfg(windows)]
-        // std::thread::sleep(Duration::from_millis(150));
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);
@@ -102,16 +96,14 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = unsafe {TimeoutExecutor::new(InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        ).unwrap()
-        ,Duration::from_millis(100)
-    ).unwrap()
-    };
+    let mut executor = InProcessExecutor::new(
+        &mut harness,
+        tuple_list!(observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )
+    .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
