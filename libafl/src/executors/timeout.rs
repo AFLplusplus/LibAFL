@@ -10,10 +10,15 @@ use crate::{
     Error,
 };
 
-#[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
 #[cfg(unix)]
 use libc::c_int;
+
+#[cfg(windows)]
+use crate::bolts::bindings::Windows::Win32::{Foundation::HANDLE, System::Threading::{CreateTimerQueue, CreateTimerQueueTimer, WORKER_THREAD_FLAGS}};
+
+#[cfg(windows)]
+use core::ffi::c_void;
 
 #[repr(C)]
 #[cfg(unix)]
@@ -38,16 +43,23 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// Reset and remove the timeout
+#[cfg(unix)]
 pub fn remove_timeout() {
     #[cfg(unix)]
     unsafe {
         let mut itimerval_zero: Itimerval = zeroed();
         setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
     }
-    #[cfg(windows)]
-    {
-        // TODO
+}
+
+#[cfg(windows)]
+pub fn remove_timeout() {
+    unsafe{
     }
+}
+
+unsafe extern "system" fn wintimer_handler(p0: *mut c_void, p1: u8){
+    println!("TIMER INVOKED!");
 }
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
@@ -55,6 +67,12 @@ pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]
     itimerval: Itimerval,
+    #[cfg(windows)]
+    milli_sec: u32,
+    #[cfg(windows)]
+    phnewtimer: HANDLE,
+    #[cfg(windows)]
+    timerqueue: HANDLE,
 }
 
 impl<E> TimeoutExecutor<E> {
@@ -82,8 +100,16 @@ impl<E> TimeoutExecutor<E> {
     }
 
     #[cfg(windows)]
-    pub fn new(executor: E, exec_tmout: Duration) -> Self {
-        Self { executor }
+    pub unsafe fn new(executor: E, exec_tmout: Duration) -> Self {
+        let milli_sec = exec_tmout.as_millis() as u32;
+        let timerqueue = CreateTimerQueue();
+        let phnewtimer = HANDLE::NULL;
+        Self { 
+            executor,
+            milli_sec,
+            phnewtimer,
+            timerqueue,
+        }
     }
 
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
@@ -107,15 +133,17 @@ where
         #[cfg(unix)]
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+            let ret = self.executor.run_target(fuzzer, state, mgr, input);
+            remove_timeout();
+            ret
         }
         #[cfg(windows)]
-        {
-            // TODO
+        unsafe {
+            let code = CreateTimerQueueTimer(&mut self.phnewtimer, &self.timerqueue, Some(wintimer_handler), null_mut(), self.milli_sec, 0, WORKER_THREAD_FLAGS::default());
+            let ret = self.executor.run_target(fuzzer, state, mgr, input);
+            remove_timeout();
+            ret
         }
-
-        let ret = self.executor.run_target(fuzzer, state, mgr, input);
-        remove_timeout();
-        ret
     }
 }
 

@@ -7,12 +7,12 @@ fn main() {
     #[cfg(target_os = "windows")]
     #[allow(clippy::ptr_arg, clippy::upper_case_acronyms)]
     windows::build!(
-        Windows::Win32::Foundation::{HANDLE, BOOL, PSTR, CloseHandle, NTSTATUS},
+        Windows::Win32::Foundation::{HANDLE, HWND, BOOL, PSTR, CloseHandle, NTSTATUS},
         Windows::Win32::System::{
             Memory::{CreateFileMappingA, OpenFileMappingA, MapViewOfFile, UnmapViewOfFile, FILE_MAP, PAGE_TYPE},
             Diagnostics::Debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD, LPTOP_LEVEL_EXCEPTION_FILTER},
-            Threading::ExitProcess,
-        }
+            Threading::{CreateTimerQueue, CreateTimerQueueTimer, ExitProcess},
+        },
     );
 
     // Set cfg flags depending on release channel
