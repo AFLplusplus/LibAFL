@@ -295,7 +295,7 @@ mod unix_signal_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            timeout::remove_timeout,
+            timeout::unix_remove_timeout,
             ExitKind,
         },
         feedbacks::Feedback,
@@ -443,7 +443,7 @@ mod unix_signal_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
-        remove_timeout();
+        unix_remove_timeout();
 
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
@@ -705,6 +705,8 @@ pub mod windows_exception_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
+        // TODO windows_remove_timeout()
+        // We can use DeleteTimerQueueEx, but you need a pointer to the timer_queue, which is not accessible from inproc_crash_handler.
         #[cfg(feature = "std")]
         println!("Crashed with {}", code);
         if !data.current_input_ptr.is_null() {

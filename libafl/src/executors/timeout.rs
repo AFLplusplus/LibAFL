@@ -52,6 +52,15 @@ extern "C" {
 #[cfg(unix)]
 const ITIMER_REAL: c_int = 0;
 
+/// Reset and remove the timeout
+#[cfg(unix)]
+pub fn unix_remove_timeout() {
+    unsafe {
+        let mut itimerval_zero: Itimerval = zeroed();
+        setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+    }
+}
+
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
@@ -110,18 +119,8 @@ impl<E> TimeoutExecutor<E> {
         &mut self.executor
     }
 
-    /// Reset and remove the timeout
-    #[cfg(unix)]
-    pub fn remove_timeout(&self) -> Result<(), Error> {
-        unsafe {
-            let mut itimerval_zero: Itimerval = zeroed();
-            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
-        }
-        Ok(())
-    }
-
     #[cfg(windows)]
-    pub fn remove_timeout(&self) -> Result<(), Error> {
+    pub fn windows_remove_timeout(&self) -> Result<(), Error> {
         unsafe {
             let code = DeleteTimerQueueTimer(self.timer_queue, self.ph_new_timer, HANDLE::NULL);
             if !code.as_bool() {
@@ -161,7 +160,7 @@ where
                 return Err(Error::Unknown("CreateTimerQueue failed.".to_string()));
             }
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            self.remove_timeout()?;
+            self.windows_remove_timeout()?;
             ret
         }
     }
@@ -185,7 +184,7 @@ where
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            self.remove_timeout()?;
+            unix_remove_timeout();
             ret
         }
     }
