@@ -132,6 +132,7 @@ impl<E> TimeoutExecutor<E> {
     }
 }
 
+#[cfg(windows)]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z> + HasTimeoutHandler,

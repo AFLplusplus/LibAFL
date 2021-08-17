@@ -37,8 +37,8 @@ pub fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        #[cfg(windows)]
-        std::thread::sleep(Duration::from_millis(150));
+        // #[cfg(windows)]
+        // std::thread::sleep(Duration::from_millis(150));
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);
