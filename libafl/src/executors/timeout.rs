@@ -22,12 +22,13 @@ use libc::c_int;
 use crate::bolts::bindings::Windows::Win32::{
     Foundation::HANDLE,
     System::Threading::{
-        CreateTimerQueue, CreateTimerQueueTimer, DeleteTimerQueueTimer, WORKER_THREAD_FLAGS,
+        CreateTimerQueue, CreateTimerQueueTimer, DeleteTimerQueueEx, DeleteTimerQueueTimer,
+        WORKER_THREAD_FLAGS,
     },
 };
 
 #[cfg(windows)]
-use core::ffi::c_void;
+use core::{ffi::c_void, ptr::write_volatile};
 
 #[repr(C)]
 #[cfg(unix)]
@@ -57,6 +58,13 @@ pub fn unix_remove_timeout() {
     unsafe {
         let mut itimerval_zero: Itimerval = zeroed();
         setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+    }
+}
+
+#[cfg(windows)]
+pub fn windows_delete_timer_queue(timer_queue: HANDLE) {
+    unsafe {
+        DeleteTimerQueueEx(timer_queue, HANDLE::NULL);
     }
 }
 
@@ -116,7 +124,7 @@ impl<E> TimeoutExecutor<E> {
     }
 
     #[cfg(windows)]
-    pub fn windows_remove_timeout(&self) -> Result<(), Error> {
+    pub fn windows_reset_timeout(&self) -> Result<(), Error> {
         unsafe {
             let code = DeleteTimerQueueTimer(self.timer_queue, self.ph_new_timer, HANDLE::NULL);
             if !code.as_bool() {
@@ -140,8 +148,12 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        #[cfg(windows)]
         unsafe {
+            let data = &mut GLOBAL_STATE;
+            write_volatile(
+                &mut data.timer_queue,
+                &mut self.timer_queue as *mut _ as *mut c_void,
+            );
             let code = CreateTimerQueueTimer(
                 &mut self.ph_new_timer,
                 &self.timer_queue,
@@ -155,7 +167,7 @@ where
                 return Err(Error::Unknown("CreateTimerQueue failed.".to_string()));
             }
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            self.windows_remove_timeout()?;
+            self.windows_reset_timeout()?;
             ret
         }
     }

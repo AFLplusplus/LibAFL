@@ -258,6 +258,8 @@ pub struct InProcessExecutorHandlerData {
     pub current_input_ptr: *const c_void,
     pub crash_handler: *const c_void,
     pub timeout_handler: *const c_void,
+    #[cfg(windows)]
+    pub timer_queue: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
@@ -279,6 +281,8 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     crash_handler: ptr::null(),
     /// The timeout handler fn
     timeout_handler: ptr::null(),
+    #[cfg(windows)]
+    timer_queue: ptr::null_mut(),
 };
 
 #[cfg(unix)]
@@ -575,7 +579,7 @@ mod windows_exception_handler {
 
     use crate::{
         bolts::{
-            bindings::Windows::Win32::System::Threading::ExitProcess,
+            bindings::Windows::Win32::{Foundation::HANDLE, System::Threading::ExitProcess},
             os::windows_exceptions::{
                 ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
             },
@@ -584,6 +588,7 @@ mod windows_exception_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            timeout::windows_delete_timer_queue,
             ExitKind,
         },
         feedbacks::Feedback,
@@ -621,7 +626,7 @@ mod windows_exception_handler {
     }
 
     pub unsafe extern "system" fn inproc_timeout_handler<EM, I, OC, OF, OT, S, Z>(
-        gloabl_state: *mut c_void,
+        global_state: *mut c_void,
         _p1: u8,
     ) where
         EM: EventFirer<I, S> + EventRestarter<S>,
@@ -633,7 +638,7 @@ mod windows_exception_handler {
         Z: HasObjective<I, OF, S>,
     {
         let data: &mut InProcessExecutorHandlerData =
-            &mut *(gloabl_state as *mut InProcessExecutorHandlerData);
+            &mut *(global_state as *mut InProcessExecutorHandlerData);
 
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
@@ -705,8 +710,14 @@ mod windows_exception_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
-        // TODO windows_remove_timeout()
-        // We can use DeleteTimerQueueEx, but you need a pointer to the timer_queue, which is not accessible from inproc_crash_handler.
+        // Have we set a timer_before?
+        match (data.timer_queue as *mut HANDLE).as_mut() {
+            Some(x) => {
+                windows_delete_timer_queue(*x);
+            }
+            None => {}
+        }
+
         #[cfg(feature = "std")]
         println!("Crashed with {}", code);
         if !data.current_input_ptr.is_null() {
