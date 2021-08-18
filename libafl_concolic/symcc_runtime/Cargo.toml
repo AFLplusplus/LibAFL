@@ -21,7 +21,7 @@ no-cpp-runtime = []
 unchecked_unwrap = "3"
 ctor = "0.1"
 libc = "0.2"
-libafl = {path = "../../libafl", version="0.5"}
+libafl = {path = "../../libafl", version="0.6"}
 
 [build-dependencies]
 cmake = "0.1"

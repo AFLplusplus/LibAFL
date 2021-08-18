@@ -1,6 +1,6 @@
 [package]
 name = "forkserver_simple"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["tokatoka <tokazerkje@outlook.com>"]
 edition = "2018"
 
