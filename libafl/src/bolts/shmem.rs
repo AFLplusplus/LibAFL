@@ -1063,7 +1063,7 @@ pub mod win32_shmem {
             bindings::{
                 Windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
                 Windows::Win32::System::Memory::{
-                    CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile, FILE_MAP,
+                    CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
                     FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
                 },
             },
