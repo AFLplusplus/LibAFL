@@ -43,3 +43,15 @@ sleep 20
 cd libafl_frida
 cargo publish $@
 cd ..
+
+sleep 20
+
+cd libafl_qemu
+cargo publish $@
+cd ..
+
+sleep 20
+
+cd libafl_sugar
+cargo publish $@
+cd ..
