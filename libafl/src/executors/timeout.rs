@@ -98,9 +98,9 @@ impl<E> TimeoutExecutor<E> {
     }
 
     #[cfg(windows)]
-    pub unsafe fn new(executor: E, exec_tmout: Duration) -> Self {
+    pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as u32;
-        let timer_queue = CreateTimerQueue();
+        let timer_queue = unsafe { CreateTimerQueue() };
         let ph_new_timer = HANDLE::NULL;
         Self {
             executor,
