@@ -171,6 +171,10 @@ impl EncodedInput {
     pub fn codes(&self) -> &[u32] {
         &self.codes
     }
+
+    pub fn codes_mut(&mut self) -> &mut [u32] {
+        &mut self.codes
+    }
 }
 
 #[cfg(test)]
