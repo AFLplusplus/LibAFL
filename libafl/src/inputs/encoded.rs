@@ -83,13 +83,31 @@ impl TokenInputEncoderDecoder {
 #[cfg(feature = "std")]
 pub struct NaiveTokenizer {
     ident_re: Regex,
+    comment_re: Regex,
+    string_re: Regex,
 }
 
 #[cfg(feature = "std")]
 impl NaiveTokenizer {
-    pub fn new() -> Self {
+    pub fn new(ident_re: Regex, comment_re: Regex, string_re: Regex) -> Self {
         Self {
+            ident_re,
+            comment_re,
+            string_re,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl Default for NaiveTokenizer {
+    fn default() -> Self {
+        Self {
+            // Generic identifier regex
             ident_re: Regex::new("[A-Za-z0-9_$]+").unwrap(),
+            // C++ style comments
+            comment_re: Regex::new(r"(/\*[^*]*\*/)|(//[^*]*)").unwrap(),
+            // " and ' string regex
+            string_re: Regex::new("\"(\\\\|\\\\\"|[^\"])*\"|'(\\\\|\\\\'|[^'])*'").unwrap(),
         }
     }
 }
@@ -100,17 +118,40 @@ impl Tokenizer for NaiveTokenizer {
         let mut tokens = vec![];
         let string =
             from_utf8(bytes).map_err(|_| Error::IllegalArgument("Invalid UTF-8".to_owned()))?;
-        for ws_tok in string.split_whitespace() {
-            let mut prev = 0;
-            for pair in self.ident_re.find_iter(ws_tok) {
-                if pair.start() > prev {
-                    tokens.push(ws_tok[prev..pair.start()].to_owned());
+        let string = self.comment_re.replace_all(string, "").to_string();
+        let mut str_prev = 0;
+        for str_match in self.string_re.find_iter(&string) {
+            if str_match.start() > str_prev {
+                for ws_tok in string[str_prev..str_match.start()].split_whitespace() {
+                    let mut ident_prev = 0;
+                    for ident_match in self.ident_re.find_iter(ws_tok) {
+                        if ident_match.start() > ident_prev {
+                            tokens.push(ws_tok[ident_prev..ident_match.start()].to_owned());
+                        }
+                        tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
+                        ident_prev = ident_match.end();
+                    }
+                    if ident_prev < ws_tok.len() {
+                        tokens.push(ws_tok[ident_prev..].to_owned());
+                    }
                 }
-                tokens.push(ws_tok[pair.start()..pair.end()].to_owned());
-                prev = pair.end();
             }
-            if prev < ws_tok.len() {
-                tokens.push(ws_tok[prev..].to_owned());
+            tokens.push(string[str_match.start()..str_match.end()].to_owned());
+            str_prev = str_match.end();
+        }
+        if str_prev < string.len() {
+            for ws_tok in string[str_prev..].split_whitespace() {
+                let mut ident_prev = 0;
+                for ident_match in self.ident_re.find_iter(ws_tok) {
+                    if ident_match.start() > ident_prev {
+                        tokens.push(ws_tok[ident_prev..ident_match.start()].to_owned());
+                    }
+                    tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
+                    ident_prev = ident_match.end();
+                }
+                if ident_prev < ws_tok.len() {
+                    tokens.push(ws_tok[ident_prev..].to_owned());
+                }
             }
         }
         Ok(tokens)
@@ -186,11 +227,16 @@ mod tests {
 
     #[test]
     fn test_input() {
-        let mut t = NaiveTokenizer::new();
+        let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();
-        let input = ed.encode("a = 1; b=c+a\n".as_bytes(), &mut t).unwrap();
+        let input = ed
+            .encode("/* test */a = 'pippo baudo'; b=c+a\n".as_bytes(), &mut t)
+            .unwrap();
         let mut bytes = vec![];
         ed.decode(&input, &mut bytes).unwrap();
-        assert_eq!(from_utf8(&bytes).unwrap(), "a = 1 ; b = c + a ".to_owned());
+        assert_eq!(
+            from_utf8(&bytes).unwrap(),
+            "a = 'pippo baudo' ; b = c + a ".to_owned()
+        );
     }
 }
