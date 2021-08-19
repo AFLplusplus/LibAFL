@@ -211,3 +211,10 @@ where
         self.executor.observers_mut()
     }
 }
+
+#[cfg(windows)]
+impl<E> Drop for TimeoutExecutor<E> {
+    fn drop(&mut self) {
+        windows_delete_timer_queue(self.timer_queue);
+    }
+}

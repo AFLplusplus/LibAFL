@@ -1,15 +1,16 @@
 use core::marker::PhantomData;
 
 #[cfg(feature = "std")]
-use std::{process::Child, time::Duration};
+use std::process::Child;
 
 #[cfg(feature = "std")]
-use crate::{
-    executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
-    observers::ObserversTuple,
-    Error,
-};
+use crate::{executors::HasObservers, inputs::Input, observers::ObserversTuple, Error};
+
+#[cfg(all(feature = "std", unix))]
+use crate::executors::{Executor, ExitKind};
+
+#[cfg(all(feature = "std", unix))]
+use std::time::Duration;
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
@@ -17,6 +18,12 @@ pub struct CommandExecutor<EM, I, S, Z, T, OT> {
     inner: T,
     observers: OT,
     phantom: PhantomData<(EM, I, S, Z)>,
+}
+
+impl<EM, I, S, Z, T, OT> CommandExecutor<EM, I, S, Z, T, OT> {
+    pub fn inner(&mut self) -> &mut T {
+        &mut self.inner
+    }
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
