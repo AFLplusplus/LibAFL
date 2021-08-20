@@ -2,6 +2,12 @@
 name = "libafl_sugar"
 version = "0.6.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+description = "Sugar builders to create common fuzzers with LibAFL"
+documentation = "https://docs.rs/libafl_sugar"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
