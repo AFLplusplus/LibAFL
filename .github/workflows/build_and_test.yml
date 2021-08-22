@@ -165,8 +165,8 @@ jobs:
       run: ./scripts/shmem_limits_macos.sh
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
-other_targets:
- runs-on: macOS-latest
+  other_targets:
+    runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
