@@ -26,11 +26,12 @@ pub type StdShMemProvider = Win32ShMemProvider;
 pub type StdShMem = Win32ShMem;
 
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<AshmemShMemProvider>>;
+pub type StdShMemProvider =
+    RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMem = RcShMem<ServedShMemProvider<AshmemShMemProvider>>;
+pub type StdShMem = RcShMem<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMemService = ShMemService<AshmemShMemProvider>;
+pub type StdShMemService = ShMemService<unix_shmem::ashmem::AshmemShMemProvider>;
 
 #[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
@@ -471,7 +472,7 @@ where
 pub mod unix_shmem {
     /// Shared memory provider for Android, allocating and forwarding maps over unix domain sockets.
     #[cfg(target_os = "android")]
-    pub type UnixShMemProvider = ashmem::ServedShMemProvider;
+    pub type UnixShMemProvider = ashmem::AshmemShMemProvider;
     /// Shared memory for Android
     #[cfg(target_os = "android")]
     pub type UnixShMem = ashmem::AshmemShMem;
@@ -850,7 +851,7 @@ pub mod unix_shmem {
     pub mod ashmem {
         use core::slice;
         use libc::{
-            c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
+            c_uint, c_int, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
             PROT_WRITE,
         };
         use std::ffi::CString;
@@ -876,10 +877,10 @@ pub mod unix_shmem {
             pub len: c_uint,
         }
 
-        const ASHMEM_GET_SIZE: c_ulong = 0x00007704;
-        const ASHMEM_UNPIN: c_ulong = 0x40087708;
+        const ASHMEM_GET_SIZE: c_int = 0x00007704;
+        const ASHMEM_UNPIN: c_int = 0x40087708;
         //const ASHMEM_SET_NAME: c_long = 0x41007701;
-        const ASHMEM_SET_SIZE: c_ulong = 0x40087703;
+        const ASHMEM_SET_SIZE: c_int = 0x40087703;
 
         impl AshmemShMem {
             /// Create a new shared memory mapping, using shmget/shmat
