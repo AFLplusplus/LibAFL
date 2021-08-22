@@ -23,7 +23,7 @@ use std::{
     thread::JoinHandle,
 };
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_vendor = "apple")]
 use std::fs;
 
 #[cfg(all(feature = "std", unix))]
@@ -42,10 +42,10 @@ use std::{
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 /// The default server name for our abstract shmem server
-#[cfg(all(unix, not(any(target_os = "ios", target_os = "macos"))))]
+#[cfg(all(unix, not(target_vendor = "apple")))]
 const UNIX_SERVER_NAME: &str = "@libafl_unix_shmem_server";
 /// `MacOS` server name is on disk, since `MacOS` doesn't support abtract domain sockets.
-#[cfg(any(target_os = "ios", target_os = "macos"))]
+#[cfg(target_vendor = "apple")]
 const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
 
 /// Env variable. If set, we won't try to spawn the service
@@ -331,7 +331,7 @@ impl Drop for ShMemServiceThread {
                 .expect("Failed to join ShMemService thread!")
                 .expect("Error in ShMemService background thread!");
             // try to remove the file from fs, and ignore errors.
-            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            #[cfg(target_vendor = "apple")]
             fs::remove_file(&UNIX_SERVER_NAME).unwrap();
 
             env::remove_var(AFL_SHMEM_SERVICE_STARTED);

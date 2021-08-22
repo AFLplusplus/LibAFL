@@ -524,11 +524,7 @@ mod unix_signal_handler {
             }
 
             #[allow(clippy::non_ascii_literal)]
-            #[cfg(all(
-                feature = "std",
-                any(target_os = "macos", target_os = "ios"),
-                target_arch = "aarch64"
-            ))]
+            #[cfg(all(feature = "std", target_vendor = "apple", target_arch = "aarch64"))]
             {
                 let mcontext = *_context.uc_mcontext;
                 println!("{:━^100}", " CRASH ");
