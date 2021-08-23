@@ -4,18 +4,6 @@ cd "$SCRIPT_DIR/.."
 
 set -e
 
-cd libafl_concolic/symcc_libafl
-cargo publish $@
-cd ../..
-
-sleep 20
-
-cd libafl_concolic/symcc_runtime
-cargo publish $@
-cd ../..
-
-sleep 20
-
 cd libafl_derive
 cargo publish $@
 cd ..
@@ -55,3 +43,15 @@ sleep 20
 cd libafl_sugar
 cargo publish $@
 cd ..
+
+sleep 20
+
+cd libafl_concolic/symcc_libafl
+cargo publish $@
+cd ../..
+
+sleep 20
+
+cd libafl_concolic/symcc_runtime
+cargo publish $@
+cd ../..

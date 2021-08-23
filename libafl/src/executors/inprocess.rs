@@ -523,6 +523,28 @@ mod unix_signal_handler {
                 //println!("{:?}", backtrace::Backtrace::new())
             }
 
+            #[allow(clippy::non_ascii_literal)]
+            #[cfg(all(feature = "std", target_vendor = "apple", target_arch = "aarch64"))]
+            {
+                let mcontext = *_context.uc_mcontext;
+                println!("{:━^100}", " CRASH ");
+                println!(
+                    "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
+                    _signal, mcontext.__ss.__pc, mcontext.__es.__far
+                );
+
+                println!("{:━^100}", " REGISTERS ");
+                for reg in 0..29 {
+                    print!("x{:02}: 0x{:016x} ", reg, mcontext.__ss.__x[reg as usize]);
+                    if reg % 4 == 3 {
+                        println!();
+                    }
+                }
+                print!("fp: 0x{:016x} ", mcontext.__ss.__fp);
+                print!("lr: 0x{:016x} ", mcontext.__ss.__lr);
+                print!("pc: 0x{:016x} ", mcontext.__ss.__pc);
+            }
+
             #[cfg(feature = "std")]
             let _res = stdout().flush();
 
