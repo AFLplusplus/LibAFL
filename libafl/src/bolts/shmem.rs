@@ -851,7 +851,7 @@ pub mod unix_shmem {
     pub mod ashmem {
         use core::slice;
         use libc::{
-            c_uint, c_int, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
+            c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
             PROT_WRITE,
         };
         use std::ffi::CString;
@@ -877,10 +877,10 @@ pub mod unix_shmem {
             pub len: c_uint,
         }
 
-        const ASHMEM_GET_SIZE: c_int = 0x00007704;
-        const ASHMEM_UNPIN: c_int = 0x40087708;
+        const ASHMEM_GET_SIZE: c_ulong = 0x00007704;
+        const ASHMEM_UNPIN: c_ulong = 0x40087708;
         //const ASHMEM_SET_NAME: c_long = 0x41007701;
-        const ASHMEM_SET_SIZE: c_int = 0x40087703;
+        const ASHMEM_SET_SIZE: c_ulong = 0x40087703;
 
         impl AshmemShMem {
             /// Create a new shared memory mapping, using shmget/shmat
@@ -916,7 +916,7 @@ pub mod unix_shmem {
                     //return Err(Error::Unknown("Failed to set the ashmem mapping's name".to_string()));
                     //};
 
-                    if ioctl(fd, ASHMEM_SET_SIZE, map_size) != 0 {
+                    if ioctl(fd, ASHMEM_SET_SIZE as _, map_size) != 0 {
                         close(fd);
                         return Err(Error::Unknown(
                             "Failed to set the ashmem mapping's size".to_string(),
@@ -951,7 +951,7 @@ pub mod unix_shmem {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
                     #[allow(clippy::cast_sign_loss)]
-                    if ioctl(fd, ASHMEM_GET_SIZE) as u32 as usize != map_size {
+                    if ioctl(fd, ASHMEM_GET_SIZE as _) as u32 as usize != map_size {
                         return Err(Error::Unknown(
                             "The mapping's size differs from the requested size".to_string(),
                         ));
@@ -1008,14 +1008,14 @@ pub mod unix_shmem {
                     let fd: i32 = self.id.to_string().parse().unwrap();
 
                     #[allow(clippy::cast_sign_loss)]
-                    let length = ioctl(fd, ASHMEM_GET_SIZE) as u32;
+                    let length = ioctl(fd, ASHMEM_GET_SIZE as _) as u32;
 
                     let ap = ashmem_pin {
                         offset: 0,
                         len: length,
                     };
 
-                    ioctl(fd, ASHMEM_UNPIN, &ap);
+                    ioctl(fd, ASHMEM_UNPIN as _, &ap);
                     close(fd);
                 }
             }
