@@ -10,7 +10,7 @@ Suppose you want to fuzz the following program:
 ```rust
 fn main(input: &[u8]) -> i32 {
     match &input {
-        // ficticious crashing input
+        // fictitious crashing input
         &[1, 3, 3, 7] => 1337,
         // standard error handling code
         &[] => -1,
@@ -19,7 +19,7 @@ fn main(input: &[u8]) -> i32 {
     }
 }
 ```
-A simple coverage-maximizing fuzzer that generates new inputs somewhat randomly will have a hard time finding an input that triggers the fictious crashing input.
+A simple coverage-maximizing fuzzer that generates new inputs somewhat randomly will have a hard time finding an input that triggers the fictitious crashing input.
 Many techniques have been proposed to make fuzzing less random and more directly attempt to mutate the input to flip specific branches, such as the ones involved in crashing the above program.
 
 Concolic tracing allows us to construct an input that exercises a new path in the program (such as the crashing one in the example) **analytically** instead of **stochastically** (ie. guessing).
@@ -86,7 +86,7 @@ SymCC is a compiler plugin for clang that can be used as a drop-in replacement f
 SymCC will instrument the compiled code with callbacks into a runtime that can be supplied by the user.
 These callbacks allow the runtime to construct a trace that similar to the previous example.
 
-### SymCC and it's Runtimes
+### SymCC and its Runtimes
 SymCC ships with 2 runtimes: 
  * a 'simple' runtime that attempts to solve any branches it comes across using [Z3](https://github.com/Z3Prover/z3/wiki) and
  * a [QSym](https://github.com/sslab-gatech/qsym)-based runtime, which does a bit more filtering on the expressions and also solves using Z3.
@@ -118,12 +118,12 @@ Note, that a custom runtime is a separate shared object file, which means that w
 Check out the [example hybrid fuzzer's runtime](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/libfuzzer_stb_image_concolic/runtime) and the [`symcc_runtime` docs](https://docs.rs/symcc_runtime/0.1/symcc_runtime) for inspiration.
 
 ### Instrumentation
-There are two main instrumentation methods to make use of conolic tracing in LibAFL:
+There are two main instrumentation methods to make use of concolic tracing in LibAFL:
 * Using an **compile-time** instrumented target with **SymCC**. 
 This only works when the source is available for the target and the target is reasonably easy to build using the SymCC compiler wrapper.
 * Using **SymQEMU** to dynamically instrument the target at **runtime**.
 This avoids a separate instrumented target with concolic tracing instrumentation and does not require source code.
-It should be noted, however, that the 'quality' of the generated expressions can be significantly worse and SymQEMU generally produces significantly more and signficantly more convoluted expressions than SymCC.
+It should be noted, however, that the 'quality' of the generated expressions can be significantly worse and SymQEMU generally produces significantly more and significantly more convoluted expressions than SymCC.
 Therefore, it is recommended to use SymCC over SymQEMU when possible.
 
 #### Using SymCC
@@ -132,15 +132,16 @@ How exactly this is done does not matter.
 However, the SymCC compiler needs to be made aware of the location of the runtime that it should instrument against.
 This is done by setting the `SYMCC_RUNTIME_DIR` environment variable to the directory which contains the runtime (typically the `target/(debug|release)` folder of your runtime crate).
 
-The example hybrid fuzzer instruments the target in it's [`build.rs` build script](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/libfuzzer_stb_image_concolic/fuzzer/build.rs#L50).
+The example hybrid fuzzer instruments the target in its [`build.rs` build script](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/libfuzzer_stb_image_concolic/fuzzer/build.rs#L50).
 It does this by cloning and building a copy of SymCC and then using this version to instrument the target.
 The [`symcc_libafl` crate](https://docs.rs/symcc_libafl) contains helper functions for cloning and building SymCC.
 
 Make sure you satisfy the [build requirements](https://github.com/eurecom-s3/symcc#readme) of SymCC before attempting to build it.
 
 #### Using SymQEMU
-Build SymQEMU according to it's [build instructions](https://github.com/eurecom-s3/symqemu#readme).
-Make sure to let it know the path to your runtime by setting `--symcc-build` argument to the `configure` script to the path of your runtime.
+Build SymQEMU according to its [build instructions](https://github.com/eurecom-s3/symqemu#readme).
+By default, SymQEMU looks for the runtime in a sibling directory.
+Since we don't have a runtime there, we need to let it know the path to your runtime by setting `--symcc-build` argument of the `configure` script to the path of your runtime.
 
 ### Building the Fuzzer
 No matter the instrumentation method, the interface between the fuzzer and the instrumented target should now be consistent.
