@@ -1,9 +1,9 @@
 use std::{env, fs::File, io::Write, path::Path, process::Command, str};
 
-#[cfg(target_os = "macos")]
+#[cfg(target_vendor = "apple")]
 use glob::glob;
 
-#[cfg(target_os = "macos")]
+#[cfg(target_vendor = "apple")]
 use std::path::PathBuf;
 
 fn dll_extension<'a>() -> &'a str {
@@ -16,7 +16,7 @@ fn dll_extension<'a>() -> &'a str {
 
 /// Github Actions for `MacOS` seems to have troubles finding `llvm-config`.
 /// Hence, we go look for it ourselves.
-#[cfg(target_os = "macos")]
+#[cfg(target_vendor = "apple")]
 fn find_llvm_config_brew() -> Result<PathBuf, String> {
     match Command::new("brew").arg("--cellar").output() {
         Ok(output) => {
@@ -43,7 +43,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
 fn find_llvm_config() -> String {
     env::var("LLVM_CONFIG").unwrap_or_else(|_| {
         // for Ghithub Actions, we check if we find llvm-config in brew.
-        #[cfg(target_os = "macos")]
+        #[cfg(target_vendor = "apple")]
         match find_llvm_config_brew() {
             Ok(llvm_dir) => llvm_dir.to_str().unwrap().to_string(),
             Err(err) => {
@@ -52,7 +52,7 @@ fn find_llvm_config() -> String {
                 "llvm-config".to_string()
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(target_vendor = "apple"))]
         "llvm-config".to_string()
     })
 }
@@ -103,10 +103,10 @@ fn main() {
         let cxxflags: Vec<&str> = cxxflags.trim().split_whitespace().collect();
         let mut ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
 
-        match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+        match env::var("CARGO_CFG_TARGET_VENDOR").unwrap().as_str() {
             // Needed on macos.
             // Explanation at https://github.com/banach-space/llvm-tutor/blob/787b09ed31ff7f0e7bdd42ae20547d27e2991512/lib/CMakeLists.txt#L59
-            "macos" | "ios" => {
+            "apple" => {
                 ldflags.push("-undefined");
                 ldflags.push("dynamic_lookup");
             }

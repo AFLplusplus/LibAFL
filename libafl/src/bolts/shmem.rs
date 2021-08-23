@@ -32,30 +32,30 @@ pub type StdShMem = RcShMem<ServedShMemProvider<AshmemShMemProvider>>;
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemService = ShMemService<AshmemShMemProvider>;
 
-#[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
+#[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
-#[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
+#[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMem = RcShMem<ServedShMemProvider<MmapShMemProvider>>;
-#[cfg(all(feature = "std", any(target_os = "ios", target_os = "macos")))]
+#[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMemService = ShMemService<MmapShMemProvider>;
 
 /// The default [`ShMemProvider`] for this os.
 #[cfg(all(
     feature = "std",
     unix,
-    not(any(target_os = "android", target_os = "ios", target_os = "macos"))
+    not(any(target_os = "android", target_vendor = "apple"))
 ))]
 pub type StdShMemProvider = UnixShMemProvider;
 /// The default [`ShMemProvider`] for this os.
 #[cfg(all(
     feature = "std",
     unix,
-    not(any(target_os = "android", target_os = "ios", target_os = "macos"))
+    not(any(target_os = "android", target_vendor = "apple"))
 ))]
 pub type StdShMem = UnixShMem;
 
 #[cfg(any(
-    not(any(target_os = "android", target_os = "macos", target_os = "ios")),
+    not(any(target_os = "android", target_vendor = "apple")),
     not(feature = "std")
 ))]
 pub type StdShMemService = DummyShMemService;
@@ -67,12 +67,6 @@ use std::{
     env,
 };
 
-#[cfg(all(
-    unix,
-    feature = "std",
-    any(target_os = "ios", target_os = "macos", target_os = "android")
-))]
-use super::os::unix_shmem_server::ServedShMem;
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
 #[cfg(all(unix, feature = "std"))]
