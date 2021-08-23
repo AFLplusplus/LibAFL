@@ -177,8 +177,6 @@ jobs:
     - uses: nttld/setup-ndk@v1
       with:
         ndk-version: r21e
-    - name: more ndk
-      run: ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk NDK_APPLICATION_MK=./Application.mk
     - name: install ios
       run: rustup target add aarch64-apple-ios
     - name: install android
