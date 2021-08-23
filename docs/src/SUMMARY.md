@@ -15,3 +15,7 @@
   - [Core Concepts](./design/core_concepts.md)
   - [Architecture](./design/architecture.md)
   - [Metadata](./design/metadata.md)
+
+
+- [Advanced Features](./advanced_features/advanced_features.md)
+  - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic/concolic.md)
