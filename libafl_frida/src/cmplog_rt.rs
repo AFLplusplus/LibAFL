@@ -81,6 +81,7 @@ impl CmpLogRuntime {
                 ; .arch aarch64
                 ; mov x5, #1
                 ; lsl x5, x5, x1
+                ; eor x5, x5, #255
                 ; orr x1, x0, x5
             );};
         }
@@ -90,7 +91,6 @@ impl CmpLogRuntime {
                 ; .arch aarch64
                 ; mov x5, #1
                 ; lsl x5, x5, x1
-                ; eor x5, x5, #255
                 ; orr x1, x0, x5
             );};
 
