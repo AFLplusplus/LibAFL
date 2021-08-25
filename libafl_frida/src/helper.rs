@@ -62,13 +62,11 @@ enum CmplogOperandType {
     Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 enum SpecialCmpLogCase {
     Tbz,
     Tbnz,
 }
 
-#[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
@@ -421,11 +419,17 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             todo!("Implement cmplog for non-aarch64 targets");
                             #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                             // check if this instruction is a compare instruction and if so save the registers values
-                            if let Ok((op1, op2, tbz)) =
+                            if let Ok((op1, op2, special_case)) =
                                 helper.cmplog_is_interesting_instruction(address, instr)
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                                helper.emit_comparison_handling(address, &output, op1, op2, tbz);
+                                helper.emit_comparison_handling(
+                                    address,
+                                    &output,
+                                    op1,
+                                    op2,
+                                    special_case,
+                                );
                             }
                         }
 
@@ -521,7 +525,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         output: &StalkerOutput,
         op1: CmplogOperandType,
         op2: CmplogOperandType,
-        tbz: bool,
+        special_case: Option<SpecialCmpLogCase>,
     ) {
         let writer = output.writer();
 
@@ -603,8 +607,16 @@ impl<'a> FridaInstrumentationHelper<'a> {
         match op2 {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
                 writer.put_ldr_reg_u64(Aarch64Register::X1, value);
-                if tbz {
-                    writer.put_bytes(&self.cmplog_runtime.ops_handle_tbz_masking());
+                match special_case {
+                    Some(inst) => match inst {
+                        SpecialCmpLogCase::Tbz => {
+                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbz_masking());
+                        }
+                        SpecialCmpLogCase::Tbnz => {
+                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbnz_masking());
+                        }
+                    },
+                    None => (),
                 }
             }
             CmplogOperandType::Regid(reg) => {
@@ -1376,11 +1388,18 @@ impl<'a> FridaInstrumentationHelper<'a> {
         &self,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(CmplogOperandType, CmplogOperandType, bool), ()> {
+    ) -> Result<
+        (
+            CmplogOperandType,
+            CmplogOperandType,
+            Option<SpecialCmpLogCase>,
+        ),
+        (),
+    > {
         // We only care for compare instrunctions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
             "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls"
-            | "cbz" | "tbz" => (),
+            | "cbz" | "tbz" | "tbnz" => (),
             _ => return Err(()),
         }
         let operands = self
@@ -1391,7 +1410,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .operands();
 
         // cbz - 1 operand, tbz - 3 operands
-        let special_case = ["cbz", "tbz"].contains(&instr.mnemonic().unwrap());
+        let special_case = ["cbz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 || !special_case {
             return Err(());
         }
@@ -1438,7 +1457,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
         };
 
         // tbz will need to have special handling at emit time(masking operand1 value with operand2)
-        let special_case = instr.mnemonic().unwrap() == "tbz";
+        let special_case = match instr.mnemonic().unwrap() {
+            "tbz" => Some(SpecialCmpLogCase::Tbz),
+            "tbnz" => Some(SpecialCmpLogCase::Tbnz),
+            _ => None,
+        };
 
         if operand1.is_some() && operand2.is_some() {
             Ok((operand1.unwrap(), operand2.unwrap(), special_case))
