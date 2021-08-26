@@ -10,6 +10,7 @@ if [ "$1" != "--no-clean" ]; then
 fi
 RUST_BACKTRACE=full cargo clippy --all --all-features --tests -- \
    -D clippy::pedantic \
+   -W clippy::similar_names \
    -A clippy::type_repetition_in_bounds \
    -A clippy::missing-errors-doc \
    -A clippy::cast-possible-truncation \
