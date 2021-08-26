@@ -364,7 +364,7 @@ where
         manager: &mut EM,
         in_dir: &Path,
         forced: bool,
-        loader: &dyn Fn(&mut Z, &mut Self, &Path) -> Result<I, Error>,
+        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
@@ -414,9 +414,14 @@ where
         EM: EventFirer<I, Self>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(fuzzer, executor, manager, in_dir, forced, &|_, _, path| {
-                I::from_file(&path)
-            })?;
+            self.load_from_directory(
+                fuzzer,
+                executor,
+                manager,
+                in_dir,
+                forced,
+                &mut |_, _, path| I::from_file(&path),
+            )?;
         }
         manager.fire(
             self,

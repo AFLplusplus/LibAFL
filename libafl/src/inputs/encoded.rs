@@ -30,6 +30,7 @@ pub trait Tokenizer {
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error>;
 }
 
+#[derive(Clone, Debug)]
 pub struct TokenInputEncoderDecoder {
     token_table: HashMap<String, u32>,
     id_table: HashMap<u32, String>,
