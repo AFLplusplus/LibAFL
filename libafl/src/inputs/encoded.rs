@@ -30,7 +30,7 @@ pub trait Tokenizer {
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TokenInputEncoderDecoder {
     token_table: HashMap<String, u32>,
     id_table: HashMap<u32, String>,
@@ -48,8 +48,8 @@ where
             if let Some(id) = self.token_table.get(&tok) {
                 codes.push(*id);
             } else {
-                self.token_table.insert(tok.to_owned(), self.next_id);
-                self.id_table.insert(self.next_id, tok.to_owned());
+                self.token_table.insert(tok.clone(), self.next_id);
+                self.id_table.insert(self.next_id, tok.clone());
                 codes.push(self.next_id);
                 self.next_id += 1;
             }
@@ -72,6 +72,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
 }
 
 impl TokenInputEncoderDecoder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             token_table: HashMap::default(),
@@ -90,6 +91,7 @@ pub struct NaiveTokenizer {
 
 #[cfg(feature = "std")]
 impl NaiveTokenizer {
+    #[must_use]
     pub fn new(ident_re: Regex, comment_re: Regex, string_re: Regex) -> Self {
         Self {
             ident_re,
@@ -168,6 +170,7 @@ pub struct EncodedInput {
 
 impl Input for EncodedInput {
     /// Generate a name for this input
+    #[must_use]
     fn generate_name(&self, _idx: usize) -> String {
         let mut hasher = AHasher::new_with_keys(0, 0);
         for code in &self.codes {
@@ -192,12 +195,14 @@ impl HasLen for EncodedInput {
 }
 
 impl From<Vec<u32>> for EncodedInput {
+    #[must_use]
     fn from(codes: Vec<u32>) -> Self {
         Self::new(codes)
     }
 }
 
 impl From<&[u32]> for EncodedInput {
+    #[must_use]
     fn from(codes: &[u32]) -> Self {
         Self::new(codes.to_owned())
     }
@@ -210,10 +215,12 @@ impl EncodedInput {
         Self { codes }
     }
 
+    #[must_use]
     pub fn codes(&self) -> &[u32] {
         &self.codes
     }
 
+    #[must_use]
     pub fn codes_mut(&mut self) -> &mut Vec<u32> {
         &mut self.codes
     }
