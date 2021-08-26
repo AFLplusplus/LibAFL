@@ -1,6 +1,6 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::string::{String, ToString};
+use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
 #[cfg(feature = "std")]
@@ -25,8 +25,8 @@ use crate::{
         shmem::ShMemProvider,
     },
     events::{
-        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId,
+        BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -257,7 +257,7 @@ where
     llmp: llmp::LlmpClient<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
-    configuration: String,
+    configuration: EventConfig,
     phantom: PhantomData<(I, OT, S)>,
 }
 
@@ -280,7 +280,7 @@ where
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw llmp client
-    pub fn new(llmp: llmp::LlmpClient<SP>, configuration: String) -> Result<Self, Error> {
+    pub fn new(llmp: llmp::LlmpClient<SP>, configuration: EventConfig) -> Result<Self, Error> {
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -297,7 +297,7 @@ where
     pub fn new_on_port(
         shmem_provider: SP,
         port: u16,
-        configuration: String,
+        configuration: EventConfig,
     ) -> Result<Self, Error> {
         Ok(Self {
             llmp: llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
@@ -313,7 +313,7 @@ where
     pub fn existing_client_from_env(
         shmem_provider: SP,
         env_name: &str,
-        configuration: String,
+        configuration: EventConfig,
     ) -> Result<Self, Error> {
         Ok(Self {
             llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
@@ -333,7 +333,7 @@ where
     pub fn existing_client_from_description(
         shmem_provider: SP,
         description: &LlmpClientDescription,
-        configuration: String,
+        configuration: EventConfig,
     ) -> Result<Self, Error> {
         Ok(Self {
             llmp: llmp::LlmpClient::existing_client_from_description(shmem_provider, description)?,
@@ -377,12 +377,14 @@ where
             } => {
                 #[cfg(feature = "std")]
                 println!(
-                    "Received new Testcase from {} ({})",
+                    "Received new Testcase from {} ({:?})",
                     _client_id, client_config
                 );
 
-                let _res = if client_config == self.configuration {
-                    let observers: OT = postcard::from_bytes(&observers_buf)?;
+                let _res = if client_config.match_with(&self.configuration)
+                    && observers_buf.is_some()
+                {
+                    let observers: OT = postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
                     fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
@@ -435,8 +437,8 @@ where
         Ok(())
     }
 
-    fn configuration(&self) -> &str {
-        &self.configuration
+    fn configuration(&self) -> EventConfig {
+        self.configuration
     }
 }
 
@@ -550,7 +552,7 @@ where
         self.llmp_mgr.fire(state, event)
     }
 
-    fn configuration(&self) -> &str {
+    fn configuration(&self) -> EventConfig {
         self.llmp_mgr.configuration()
     }
 }
@@ -674,7 +676,7 @@ pub enum ManagerKind {
 pub fn setup_restarting_mgr_std<I, OT, S, ST>(
     stats: ST,
     broker_port: u16,
-    configuration: String,
+    configuration: EventConfig,
 ) -> Result<
     (
         Option<S>,
@@ -717,7 +719,7 @@ where
     /// manager.
     shmem_provider: SP,
     /// The configuration
-    configuration: String,
+    configuration: EventConfig,
     /// The stats to use
     #[builder(default = None)]
     stats: Option<ST>,
@@ -783,10 +785,8 @@ where
                             return Err(Error::ShuttingDown);
                         }
                         LlmpConnection::IsClient { client } => {
-                            let mgr = LlmpEventManager::<I, OT, S, SP>::new(
-                                client,
-                                self.configuration.clone(),
-                            )?;
+                            let mgr =
+                                LlmpEventManager::<I, OT, S, SP>::new(client, self.configuration)?;
                             (mgr, None)
                         }
                     }
@@ -807,7 +807,7 @@ where
                     let mgr = LlmpEventManager::<I, OT, S, SP>::new_on_port(
                         self.shmem_provider.clone(),
                         self.broker_port,
-                        self.configuration.clone(),
+                        self.configuration,
                     )?;
 
                     (mgr, cpu_core)
@@ -894,7 +894,7 @@ where
                     LlmpEventManager::existing_client_from_description(
                         new_shmem_provider,
                         &mgr_description,
-                        self.configuration.clone(),
+                        self.configuration,
                     )?,
                     staterestorer,
                 ),
@@ -905,7 +905,7 @@ where
             let mgr = LlmpEventManager::<I, OT, S, SP>::existing_client_from_env(
                 new_shmem_provider,
                 _ENV_FUZZER_BROKER_CLIENT_INITIAL,
-                self.configuration.clone(),
+                self.configuration,
             )?;
 
             (None, LlmpRestartingEventManager::new(mgr, staterestorer))
