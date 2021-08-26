@@ -10,7 +10,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
-    events::setup_restarting_mgr_std,
+    events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
@@ -60,7 +60,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, "default".into()) {
+        match setup_restarting_mgr_std(stats, broker_port, EventConfig::from_name("default")) {
             Ok(tuple) => tuple,
             Err(Error::ShuttingDown) => {
                 println!("\nFinished fuzzing. Good bye.");
