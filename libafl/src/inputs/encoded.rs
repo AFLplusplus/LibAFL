@@ -85,6 +85,12 @@ impl TokenInputEncoderDecoder {
     }
 }
 
+impl Default for TokenInputEncoderDecoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(feature = "std")]
 pub struct NaiveTokenizer {
     ident_re: Regex,
