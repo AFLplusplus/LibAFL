@@ -91,6 +91,18 @@ impl EventConfig {
     }
 }
 
+impl From<&str> for EventConfig {
+    fn from(name: &str) -> Self {
+        Self::from_name(name)
+    }
+}
+
+impl From<String> for EventConfig {
+    fn from(name: String) -> Self {
+        Self::from_name(&name)
+    }
+}
+
 /*
 /// A custom event, for own messages, with own handler.
 pub trait CustomEvent<I>: SerdeAny
@@ -365,7 +377,7 @@ mod tests {
             observers_buf: Some(observers_buf),
             exit_kind: ExitKind::Ok,
             corpus_size: 123,
-            client_config: EventConfig::AlwaysSame,
+            client_config: EventConfig::AlwaysUnique,
             time: current_time(),
             executions: 0,
         };

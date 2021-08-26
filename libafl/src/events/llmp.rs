@@ -974,8 +974,7 @@ mod tests {
         }
 
         let mut llmp_mgr =
-            LlmpEventManager::<BytesInput, (), _, _>::new(llmp_client, "fuzzer".to_string())
-                .unwrap();
+            LlmpEventManager::<BytesInput, (), _, _>::new(llmp_client, "fuzzer".into()).unwrap();
 
         let scheduler = RandCorpusScheduler::new();
 
@@ -1017,7 +1016,7 @@ mod tests {
         let mut llmp_clone = LlmpEventManager::existing_client_from_description(
             shmem_provider,
             &mgr_description,
-            "fuzzer".to_string(),
+            "fuzzer".into(),
         )
         .unwrap();
 
