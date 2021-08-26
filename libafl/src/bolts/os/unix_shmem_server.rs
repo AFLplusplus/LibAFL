@@ -207,6 +207,9 @@ where
             if let ShMemService::Started { bg_thread, .. } = &mut self.service {
                 bg_thread.borrow_mut().lock().unwrap().join_handle = None;
             }
+            //fn connect(&mut self) -> Result<Self, Error> {
+            //self.stream = UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
+
             // After fork, the child needs to reconnect as to not share the fds with the parent.
             self.stream =
                 UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?;
