@@ -1282,7 +1282,7 @@ where
         let max_size = state.max_size();
         let from = state.rand_mut().below(other_size as u64) as usize;
         let to = state.rand_mut().below(size as u64) as usize;
-        let mut len = state.rand_mut().below((other_size - from) as u64) as usize;
+        let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
@@ -1357,6 +1357,9 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
 
         // We don't want to use the testcase we're already using for splicing
         let count = state.corpus().count();
