@@ -1,5 +1,5 @@
-use std::{fs, path::PathBuf};
 use std::io::Read;
+use std::{fs, path::PathBuf};
 
 #[cfg(windows)]
 use std::ptr::write_volatile;
@@ -11,8 +11,8 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::{InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder, EncodedInput},
-    mutators::{encoded_mutations::EncodedRandMutator, scheduled::{StdScheduledMutator}},
+    inputs::{EncodedInput, InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
+    mutators::{encoded_mutations::encoded_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -21,11 +21,12 @@ use libafl::{
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
-
+/*
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
+*/
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -47,16 +48,20 @@ pub fn main() {
             let mut file = fs::File::open(path).expect("no file found");
             let mut buffer = vec![];
             file.read_to_end(&mut buffer).expect("buffer overflow");
-            let input = encoder_decoder.encode(&buffer, &mut tokenizer).expect("encoding failed");
+            let input = encoder_decoder
+                .encode(&buffer, &mut tokenizer)
+                .expect("encoding failed");
             initial_inputs.push(input);
         }
     }
-    
+
     // The closure that we want to fuzz
     let mut harness = |input: &EncodedInput| {
         decoded_bytes.clear();
         encoder_decoder.decode(input, &mut decoded_bytes).unwrap();
-        unsafe { println!("BEGIN\n{}\nEND\n", std::str::from_utf8_unchecked(&decoded_bytes)); }
+        unsafe {
+            println!("{}", std::str::from_utf8_unchecked(&decoded_bytes));
+        }
         ExitKind::Ok
     };
 
@@ -110,23 +115,18 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mut mutator = StdScheduledMutator::with_max_iterations(tuple_list!(EncodedRandMutator::new()), 2);
-    //let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-    
+    let mutator = StdScheduledMutator::with_max_iterations(encoded_mutations(), 2);
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
     println!("Decoder {:?} ...", &encoder_decoder);
-    
+
     for input in initial_inputs {
-        use libafl::mutators::Mutator;
-        println!("Processing file {:?} ...", &input);
-        let mut cloned = input.clone();
-        fuzzer.evaluate_input(&mut state, &mut executor, &mut mgr, input).unwrap();
-        
-        mutator.mutate(&mut state, &mut cloned, 0).unwrap();
-        println!("Mutated file {:?} ...", &cloned);
-        fuzzer.evaluate_input(&mut state, &mut executor, &mut mgr, cloned).unwrap();
+        fuzzer
+            .add_input(&mut state, &mut executor, &mut mgr, input)
+            .unwrap();
     }
 
-    /*fuzzer
+    fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-        .expect("Error in the fuzzing loop");*/
+        .expect("Error in the fuzzing loop");
 }

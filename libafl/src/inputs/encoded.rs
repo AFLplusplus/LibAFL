@@ -214,7 +214,7 @@ impl EncodedInput {
         &self.codes
     }
 
-    pub fn codes_mut(&mut self) -> &mut [u32] {
+    pub fn codes_mut(&mut self) -> &mut Vec<u32> {
         &mut self.codes
     }
 }
