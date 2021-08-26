@@ -527,7 +527,7 @@ where
     R: Rand,
     S: HasRand<R> + HasCorpus<C, EncodedInput> + HasMaxSize,
 {
-    /// Creates a new [`CrossoverInsertMutator`].
+    /// Creates a new [`EncodedCrossoverInsertMutator`].
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -614,7 +614,7 @@ where
     R: Rand,
     S: HasRand<R> + HasCorpus<C, EncodedInput>,
 {
-    /// Creates a new [`CrossoverReplaceMutator`].
+    /// Creates a new [`EncodedCrossoverReplaceMutator`].
     #[must_use]
     pub fn new() -> Self {
         Self {
