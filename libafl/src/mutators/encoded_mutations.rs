@@ -10,12 +10,15 @@ use crate::{
     },
     corpus::Corpus,
     inputs::EncodedInput,
-    mutators::{
-        mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
-        MutationResult, Mutator, Named,
-    },
-    state::{HasCorpus, HasMaxSize, HasRand},
+    mutators::{mutations::ARITH_MAX, MutationResult, Mutator, Named},
+    state::HasRand,
     Error,
+};
+
+#[cfg(feature = "std")]
+use crate::{
+    mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
+    state::HasMaxSize,
 };
 
 /// Set a code in the input as a random value

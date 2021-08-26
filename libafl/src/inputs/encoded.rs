@@ -5,15 +5,18 @@ use ahash::AHasher;
 use core::hash::Hasher;
 
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From, str::from_utf8};
+#[cfg(feature = "std")]
+use core::str::from_utf8;
+use core::{cell::RefCell, convert::From};
 use hashbrown::HashMap;
 #[cfg(feature = "std")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::{HasLen, Input};
-#[cfg(feature = "std")]
-use crate::Error;
+use crate::{
+    inputs::{HasLen, Input},
+    Error,
+};
 
 pub trait InputEncoder<T>
 where
@@ -226,6 +229,7 @@ impl EncodedInput {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use crate::inputs::encoded::{
