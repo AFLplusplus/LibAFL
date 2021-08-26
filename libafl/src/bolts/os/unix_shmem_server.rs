@@ -240,7 +240,7 @@ pub enum ServedShMemRequest {
     /// A message that tells us hello, and optionally which other client we were created from, we
     /// return a client id.
     Hello(),
-    /// A client tells us that it's about to fork. Until we receive a [`PostFork`] with its id, we won't remove it from our map.
+    /// A client tells us that it's about to fork. Already clone all of the maps now so that they will be available by the time the child sends a [`ServedShMemRequest::PostForkChildHello`] request.
     PreFork(),
     /// The client's child re-registers with us after it forked.
     PostForkChildHello(i32),
