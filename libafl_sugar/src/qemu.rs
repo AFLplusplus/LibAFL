@@ -87,7 +87,7 @@ impl<'a, H> QemuBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
-    #[allow(clippy::clippy::too_many_lines, clippy::similar_names)]
+    #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
