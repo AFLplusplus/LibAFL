@@ -5,10 +5,10 @@ pub use simple::*;
 pub mod llmp;
 pub use llmp::*;
 
+use ahash::AHasher;
 use alloc::{string::String, vec::Vec};
-use core::{fmt, marker::PhantomData, time::Duration};
+use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
-use xxhash_rust::xxh3::xxh3_64;
 
 use crate::{
     executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
@@ -76,8 +76,10 @@ pub enum EventConfig {
 impl EventConfig {
     #[must_use]
     pub fn from_name(name: &str) -> Self {
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        hasher.write(name.as_bytes());
         EventConfig::FromName {
-            name_hash: xxh3_64(name.as_bytes()),
+            name_hash: hasher.finish(),
         }
     }
 
