@@ -74,12 +74,14 @@ pub enum EventConfig {
 }
 
 impl EventConfig {
+    #[must_use]
     pub fn from_name(name: &str) -> Self {
         EventConfig::FromName {
             name_hash: xxh3_64(name.as_bytes()),
         }
     }
 
+    #[must_use]
     pub fn match_with(&self, other: &EventConfig) -> bool {
         match self {
             EventConfig::AlwaysUnique => false,
@@ -92,12 +94,14 @@ impl EventConfig {
 }
 
 impl From<&str> for EventConfig {
+    #[must_use]
     fn from(name: &str) -> Self {
         Self::from_name(name)
     }
 }
 
 impl From<String> for EventConfig {
+    #[must_use]
     fn from(name: String) -> Self {
         Self::from_name(&name)
     }

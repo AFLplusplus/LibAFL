@@ -377,7 +377,9 @@ where
                     // TODO set None for fast targets
                     let observers_buf = match manager.configuration() {
                         EventConfig::AlwaysUnique => None,
-                        _ => Some(manager.serialize_observers(observers)?),
+                        EventConfig::FromName { .. } => {
+                            Some(manager.serialize_observers(observers)?)
+                        }
                     };
                     manager.fire(
                         state,
@@ -500,7 +502,7 @@ where
 
         let observers_buf = match manager.configuration() {
             EventConfig::AlwaysUnique => None,
-            _ => Some(manager.serialize_observers(observers)?),
+            EventConfig::FromName { .. } => Some(manager.serialize_observers(observers)?),
         };
         manager.fire(
             state,
