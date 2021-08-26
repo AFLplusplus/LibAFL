@@ -103,14 +103,11 @@ fn main() {
         let cxxflags: Vec<&str> = cxxflags.trim().split_whitespace().collect();
         let mut ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
 
-        match env::var("CARGO_CFG_TARGET_VENDOR").unwrap().as_str() {
+        if env::var("CARGO_CFG_TARGET_VENDOR").unwrap().as_str() == "apple" {
             // Needed on macos.
             // Explanation at https://github.com/banach-space/llvm-tutor/blob/787b09ed31ff7f0e7bdd42ae20547d27e2991512/lib/CMakeLists.txt#L59
-            "apple" => {
-                ldflags.push("-undefined");
-                ldflags.push("dynamic_lookup");
-            }
-            _ => (),
+            ldflags.push("-undefined");
+            ldflags.push("dynamic_lookup");
         };
 
         let _ = Command::new(llvm_bindir.join("clang++"))

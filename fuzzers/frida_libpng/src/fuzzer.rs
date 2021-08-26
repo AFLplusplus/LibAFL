@@ -16,6 +16,7 @@ use libafl::{
         ondisk::OnDiskMetadataFormat, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
+    events::EventConfig,
     executors::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
         ShadowExecutor,
@@ -442,7 +443,7 @@ unsafe fn fuzz(
     };
 
     Launcher::builder()
-        .configuration(configuration)
+        .configuration(EventConfig::from_name(&configuration))
         .shmem_provider(shmem_provider)
         .stats(stats)
         .run_client(&mut run_client)

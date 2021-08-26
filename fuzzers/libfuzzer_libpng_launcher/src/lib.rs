@@ -20,6 +20,7 @@ use libafl::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
+    events::EventConfig,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -166,7 +167,7 @@ pub fn libafl_main() {
 
     match Launcher::builder()
         .shmem_provider(shmem_provider)
-        .configuration("launcher default".into())
+        .configuration(EventConfig::from_name("default"))
         .stats(stats)
         .run_client(&mut run_client)
         .cores(&cores)
