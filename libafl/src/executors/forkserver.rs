@@ -128,6 +128,9 @@ impl ConfigTarget for Command {
                 rlim_max: 0,
             };
 
+            #[cfg(target_os = "openbsd")]
+            let mut ret = unsafe { libc::setrlimit(libc::RLIMIT_RSS, &r) };
+            #[cfg(not(target_os = "openbsd"))]
             let mut ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
