@@ -31,7 +31,7 @@ The broker reas from all client's `ShMem` maps.
 It checks all incoming client maps periodically, and then forwards new messages to its outgoing broadcast-`ShMem`, mapped by all connected clients.
 
 To send new messages, a client places a new message at the end of their map, and then updates a static field to notify the broker.
-If the outgoing map is full, the sender allocates a new `ShMem` using the respective `ShMemProvider`.
+Once the outgoing map is full, the sender allocates a new `ShMem` using the respective `ShMemProvider`.
 It then sends the information needed to map the newly-allocated page in connected processes to the old page, using an end of page (`EOP`) message.
 Once the receiver maps the new page, flags it as safe for unmapping from the sending process (to avoid race conditions if we have more than a single EOP in a short time), and then continues to read from the new `ShMem`.
 
