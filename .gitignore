@@ -13,6 +13,7 @@ Cargo.lock
 *.dSYM
 
 .cur_input
+.venv
 
 crashes
 
