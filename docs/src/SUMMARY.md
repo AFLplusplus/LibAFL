@@ -16,6 +16,9 @@
   - [Architecture](./design/architecture.md)
   - [Metadata](./design/metadata.md)
 
+- [Message Passing](./message_passing/message_passing.md)
+  - [Spawning Instances](./message_passing/llmp.md)
+  - [Configurations](./message_passing/configurations.md)
 
 - [Advanced Features](./advanced_features/advanced_features.md)
   - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic/concolic.md)
