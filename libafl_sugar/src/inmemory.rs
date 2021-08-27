@@ -244,3 +244,63 @@ where
         }
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::inmemory;
+    use pyo3::prelude::*;
+    use pyo3::{
+        buffer::PyBuffer,
+        types::{PyBytes, PyFunction},
+    };
+    use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+
+    #[pyclass(unsendable)]
+    struct InMemoryBytesCoverageSugar {
+        input_dirs: Vec<PathBuf>,
+        output_dir: PathBuf,
+        broker_port: u16,
+        cores: Vec<usize>,
+    }
+
+    #[pymethods]
+    impl InMemoryBytesCoverageSugar {
+        #[new]
+        fn new(
+            input_dirs: Vec<PathBuf>,
+            output_dir: PathBuf,
+            broker_port: u16,
+            cores: Vec<usize>,
+        ) -> Self {
+            Self {
+                input_dirs,
+                output_dir,
+                broker_port,
+                cores,
+            }
+        }
+
+        pub fn run(&self, harness: PyObject) {
+            inmemory::InMemoryBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .harness(|buf| {
+                    Python::with_gil(|py| -> PyResult<()> {
+                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        harness.call1(py, args)?;
+                        Ok(())
+                    })
+                    .unwrap();
+                })
+                .build()
+                .run();
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<InMemoryBytesCoverageSugar>()?;
+        Ok(())
+    }
+}
