@@ -16,6 +16,13 @@
   - [Architecture](./design/architecture.md)
   - [Metadata](./design/metadata.md)
 
+- [Core Concepts](./core_concepts/core_concepts.md)
+  - [Observer](./core_concepts/observer.md)
+  - [Executor](./core_concepts/executor.md)
+  - [Feedback](./core_concepts/feedback.md)
+  - [Input](./core_concepts/input.md)
+  - [Corpus](./core_concepts/corpus.md)
+
 - [Message Passing](./message_passing/message_passing.md)
   - [Spawning Instances](./message_passing/llmp.md)
   - [Configurations](./message_passing/configurations.md)
