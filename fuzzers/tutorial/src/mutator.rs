@@ -5,7 +5,6 @@ use crate::input::PacketData;
 use lain::{rand::Rng, traits::Mutatable};
 use core::marker::PhantomData;
 
-#[derive(Default)]
 pub struct LainMutator<R, S>
 where
     S: HasRand<R>,
@@ -26,7 +25,7 @@ where
         input: &mut PacketData,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        self.inner.rng_mut().set_seed(state.rand().next());
+        self.inner.rng_mut().set_seed(state.rand_mut().next());
         input.mutate(&mut self.inner, None);
         Ok(MutationResult::Mutated)
     }
@@ -53,5 +52,16 @@ where
             inner: lain::mutator::Mutator::new(StdRand::with_seed(0)),
             phantom: PhantomData,
         }
+    }
+}
+
+impl<R, S> Default for LainMutator<R, S>
+where
+    S: HasRand<R>,
+    R: Rand,
+{
+    #[must_use]
+    fn default() -> Self {
+        Self::new()
     }
 }

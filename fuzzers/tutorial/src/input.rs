@@ -1,4 +1,4 @@
-use libafl::{bolts::ownedref::OwnedSlice, inputs::{HasTargetBytes, Input}};
+use libafl::{bolts::ownedref::OwnedSlice, inputs::{HasTargetBytes, HasLen, Input}};
 
 use lain::prelude::*;
 
@@ -16,7 +16,7 @@ pub struct PacketData {
 }
 
 impl Fixup for PacketData {
-    fn fixup<R: Rng>(&mut self, mutator: &mut Mutator<R>) {
+    fn fixup<R: Rng>(&mut self, _mutator: &mut Mutator<R>) {
         self.length = self.data.len() as u64;
     }
 }
@@ -47,5 +47,11 @@ impl HasTargetBytes for PacketData {
         let mut serialized_data = Vec::with_capacity(self.serialized_size());
         self.binary_serialize::<_, LittleEndian>(&mut serialized_data);
         OwnedSlice::Owned(serialized_data)
+    }
+}
+
+impl HasLen for PacketData {
+    fn len(&self) -> usize {
+        self.serialized_size()
     }
 }
