@@ -37,7 +37,7 @@ harness = false
 #debug = true
 
 [features]
-default = ["std", "anymap_debug", "derive", "llmp_compression"]
+default = ["std", "anymap_debug", "derive", "llmp_compression", "rand_trait"]
 std = ["serde_json", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex"] # print, env, launcher ... support
 anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
@@ -74,8 +74,7 @@ serde_json = { version = "1.0", optional = true, default-features = false, featu
 miniz_oxide = { version = "0.4.4", optional = true}
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", optional = true }
 hostname = { version = "^0.3", optional = true } # Is there really no gethostname in the stdlib?
-rand = { version = "0.8.1", optional = true } #
-rand_core = { version = "0.6.2", optional = true } # This dependency allows us to export our RomuRand as rand::Rng.
+rand_core = { version = "0.5.1", optional = true } # This dependency allows us to export our RomuRand as rand::Rng.
 nix = { version = "0.20.0", optional = true }
 regex = { version = "1", optional = true }
 libm = "0.2.1"
