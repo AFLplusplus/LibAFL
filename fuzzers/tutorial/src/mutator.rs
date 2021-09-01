@@ -1,9 +1,17 @@
-use libafl::{bolts::{tuples::Named, rands::{Rand, StdRand}}, mutators::{MutationResult, Mutator}, state::HasRand, Error};
+use libafl::{
+    bolts::{
+        rands::{Rand, StdRand},
+        tuples::Named,
+    },
+    mutators::{MutationResult, Mutator},
+    state::HasRand,
+    Error,
+};
 
 use crate::input::PacketData;
 
-use lain::{rand::Rng, traits::Mutatable};
 use core::marker::PhantomData;
+use lain::traits::Mutatable;
 
 pub struct LainMutator<R, S>
 where

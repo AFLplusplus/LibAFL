@@ -1,10 +1,23 @@
-use libafl::{bolts::ownedref::OwnedSlice, inputs::{HasTargetBytes, HasLen, Input}};
+use libafl::{
+    bolts::ownedref::OwnedSlice,
+    inputs::{HasLen, HasTargetBytes, Input},
+};
 
 use lain::prelude::*;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone, NewFuzzed, Mutatable, VariableSizeObject, BinarySerialize)]
+#[derive(
+    Serialize,
+    Deserialize,
+    Debug,
+    Default,
+    Clone,
+    NewFuzzed,
+    Mutatable,
+    VariableSizeObject,
+    BinarySerialize,
+)]
 pub struct PacketData {
     typ: UnsafeEnum<PacketType, u32>,
 
@@ -21,7 +34,9 @@ impl Fixup for PacketData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, FuzzerObject, ToPrimitiveU32, BinarySerialize)]
+#[derive(
+    Serialize, Deserialize, Debug, Copy, Clone, FuzzerObject, ToPrimitiveU32, BinarySerialize,
+)]
 #[repr(u32)]
 pub enum PacketType {
     Read = 0x0,

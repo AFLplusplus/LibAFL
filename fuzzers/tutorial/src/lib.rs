@@ -1,18 +1,13 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 
-
-#![feature(specialization)]
-#![feature(min_const_generics)]
+#![feature(min_specialization)]
+//#![feature(min_const_generics)]
 
 use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        tuples::{tuple_list},
-    },
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         PowerQueueCorpusScheduler,
@@ -22,7 +17,7 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{HasTargetBytes},
+    inputs::HasTargetBytes,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
         calibrate::CalibrationStage,
