@@ -19,7 +19,7 @@ where
     R: Rand,
 {
     inner: lain::mutator::Mutator<StdRand>,
-    phantom: PhantomData<(R, S)>,
+    phantom: PhantomData<*const (R, S)>,
 }
 
 impl<R, S> Mutator<PacketData, S> for LainMutator<R, S>
