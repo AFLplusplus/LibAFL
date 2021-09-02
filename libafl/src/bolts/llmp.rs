@@ -137,7 +137,7 @@ const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(3_000);
 
 /// If broker2broker is enabled, bind to public IP
 #[cfg(feature = "llmp_bind_public")]
-const _LLMP_BIND_ADDR: &str = "0.0.0.0";
+const _LLMP_BIND_ADDR: &str = "::1";
 /// If broker2broker is disabled, bind to localhost
 #[cfg(not(feature = "llmp_bind_public"))]
 const _LLMP_BIND_ADDR: &str = "127.0.0.1";
