@@ -9,9 +9,6 @@ use nix::{
 #[cfg(windows)]
 use frida_gum_sys::memset;
 
-#[cfg(windows)]
-use uuid::Uuid;
-
 use backtrace::Backtrace;
 #[cfg(unix)]
 use libc::{sysconf, _SC_PAGESIZE};
@@ -98,16 +95,6 @@ impl Allocator {
                 shadow_bit = *try_shadow_bit;
                 break;
             }
-
-            #[cfg(windows)]
-            unsafe{
-                // Shmem for windows, I'm following shmem.rs
-                let uuid = Uuid::new_v4();
-                let mut map_str = format!("libafl_frida_{}", uuid.to_simple());
-                let map_str_bytes =
-                
-            }
-
         }
         assert!(shadow_bit != 0);
 

@@ -53,7 +53,7 @@ enum CmplogOperandType {
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(target_vendor = "apple"))]
+#[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
@@ -260,6 +260,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         modules_to_instrument: &'a [&str],
     ) -> Self {
         // workaround frida's frida-gum-allocate-near bug:
+        #[cfg(unix)]
         unsafe {
             for _ in 0..512 {
                 mmap(
