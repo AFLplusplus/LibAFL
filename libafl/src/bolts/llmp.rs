@@ -2577,6 +2577,8 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        eprintln!("test");
+        eprintln!("addr {} port {}", _LLMP_BIND_ADDR, port);
         let mut stream = match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
             Ok(stream) => stream,
             Err(e) => {
@@ -2592,7 +2594,7 @@ where
                             }
                         }
                     }
-                    _ => return Err(Error::IllegalState(e.to_string())),
+                    _ => return Err(Error::IllegalState(format!("Error in create_attach_to_tcp :{}", e.to_string()))),
                 }
             }
         };

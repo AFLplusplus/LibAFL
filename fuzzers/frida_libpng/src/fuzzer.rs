@@ -52,10 +52,13 @@ use std::{
 };
 
 use libafl_frida::{
-    asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
     helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     FridaOptions,
 };
+
+#[cfg(not(windows))]
+use libafl_frida::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
+
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
@@ -107,6 +110,7 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
+        #[cfg(not(windows))]
         if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
             println!("Crashing target as it had ASAN errors");
             unsafe {
@@ -257,6 +261,7 @@ pub fn main() {
     }
 }
 
+/*
 /// Not supported on windows right now
 #[cfg(windows)]
 #[allow(clippy::too_many_arguments)]
@@ -273,9 +278,9 @@ fn fuzz(
 ) -> Result<(), ()> {
     todo!("Example not supported on Windows");
 }
+*/
 
 /// The actual fuzzer
-#[cfg(unix)]
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 unsafe fn fuzz(
     module_name: &str,
@@ -339,10 +344,18 @@ unsafe fn fuzz(
         );
 
         // Feedbacks to recognize an input as solution
+
+        #[cfg(unix)]
         let objective = feedback_or_fast!(
             CrashFeedback::new(),
             TimeoutFeedback::new(),
             AsanErrorsFeedback::new()
+        );
+
+        #[cfg(windows)]
+        let objective = feedback_or_fast!(
+            CrashFeedback::new(),
+            TimeoutFeedback::new()
         );
 
         // If not restarting, create a State from scratch
@@ -387,8 +400,11 @@ unsafe fn fuzz(
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+        #[cfg(not(windows))]
         frida_helper.register_thread();
         // Create the executor for an in-process function with just one observer for edge coverage
+
+        #[cfg(unix)]
         let mut executor = FridaInProcessExecutor::new(
             &gum,
             InProcessExecutor::new(
@@ -397,6 +413,23 @@ unsafe fn fuzz(
                     edges_observer,
                     time_observer,
                     AsanErrorsObserver::new(&ASAN_ERRORS)
+                ),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+            )?,
+            &mut frida_helper,
+            Duration::new(30, 0),
+        );
+
+        #[cfg(windows)]
+        let mut executor = FridaInProcessExecutor::new(
+            &gum,
+            InProcessExecutor::new(
+                &mut frida_harness,
+                tuple_list!(
+                    edges_observer,
+                    time_observer,
                 ),
                 &mut fuzzer,
                 &mut state,
