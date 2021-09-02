@@ -19,13 +19,13 @@ use serde::{Deserialize, Serialize};
     BinarySerialize,
 )]
 pub struct PacketData {
-    typ: UnsafeEnum<PacketType, u32>,
+    pub typ: UnsafeEnum<PacketType, u32>,
 
-    offset: u64,
-    length: u64,
+    pub offset: u64,
+    pub length: u64,
 
     #[lain(min = 0, max = 10)]
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 impl Fixup for PacketData {

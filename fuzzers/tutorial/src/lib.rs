@@ -9,8 +9,7 @@ use std::{env, path::PathBuf};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        PowerQueueCorpusScheduler,
+        Corpus, InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
@@ -35,6 +34,9 @@ use input::*;
 
 mod mutator;
 use mutator::*;
+
+mod metadata;
+use metadata::*;
 
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
@@ -99,7 +101,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::new_with_observer(&time_observer)
+        TimeFeedback::new_with_observer(&time_observer),
+        PacketLenFeedback::new()
     );
 
     // A feedback to choose if an input is a solution or not
@@ -132,7 +135,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+    let scheduler = PacketLenMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
