@@ -38,7 +38,7 @@ fn main() {
 
         Command::new(afl_gcc_path)
             .args(&["src/forkserver_test.c", "-o"])
-            .arg(&format!("{}/forkserver_test.o", "src"))
+            .arg(&format!("{}/forkserver_test", "src"))
             .status()
             .unwrap();
 

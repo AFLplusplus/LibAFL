@@ -16,7 +16,8 @@ EXT_FUNC_IMPL(LLVMFuzzerTestOneInput, int, (uint8_t *Data, size_t Size), false) 
   return 0;
 }
 
-void libafl_main(void);
+EXT_FUNC_IMPL(libafl_main, void, (void), false) {
+}
 EXT_FUNC_IMPL(main, int, (int argc, char** argv), false) {
   libafl_main();
   return 0;

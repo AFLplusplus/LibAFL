@@ -5,8 +5,9 @@ pub use simple::*;
 pub mod llmp;
 pub use llmp::*;
 
+use ahash::AHasher;
 use alloc::{string::String, vec::Vec};
-use core::{fmt, marker::PhantomData, time::Duration};
+use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -65,6 +66,49 @@ pub enum BrokerEventResult {
     Forward,
 }
 
+/// Distinguish a fuzzer by its config
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum EventConfig {
+    AlwaysUnique,
+    FromName { name_hash: u64 },
+}
+
+impl EventConfig {
+    #[must_use]
+    pub fn from_name(name: &str) -> Self {
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        hasher.write(name.as_bytes());
+        EventConfig::FromName {
+            name_hash: hasher.finish(),
+        }
+    }
+
+    #[must_use]
+    pub fn match_with(&self, other: &EventConfig) -> bool {
+        match self {
+            EventConfig::AlwaysUnique => false,
+            EventConfig::FromName { name_hash: a } => match other {
+                EventConfig::AlwaysUnique => false,
+                EventConfig::FromName { name_hash: b } => (a == b),
+            },
+        }
+    }
+}
+
+impl From<&str> for EventConfig {
+    #[must_use]
+    fn from(name: &str) -> Self {
+        Self::from_name(name)
+    }
+}
+
+impl From<String> for EventConfig {
+    #[must_use]
+    fn from(name: String) -> Self {
+        Self::from_name(&name)
+    }
+}
+
 /*
 /// A custom event, for own messages, with own handler.
 pub trait CustomEvent<I>: SerdeAny
@@ -94,13 +138,13 @@ where
         /// The input for the new testcase
         input: I,
         /// The state of the observers when this testcase was found
-        observers_buf: Vec<u8>,
+        observers_buf: Option<Vec<u8>>,
         /// The exit kind
         exit_kind: ExitKind,
         /// The new corpus size of this client
         corpus_size: usize,
         /// The client config for this observers/testcase combination
-        client_config: String,
+        client_config: EventConfig,
         /// The time of generation of the event
         time: Duration,
         /// The executions of this client
@@ -228,8 +272,8 @@ where
     }
 
     /// Get the configuration
-    fn configuration(&self) -> &str {
-        "<default>"
+    fn configuration(&self) -> EventConfig {
+        EventConfig::AlwaysUnique
     }
 }
 
@@ -319,7 +363,7 @@ mod tests {
             current_time,
             tuples::{tuple_list, Named},
         },
-        events::Event,
+        events::{Event, EventConfig},
         executors::ExitKind,
         inputs::bytes::BytesInput,
         observers::StdMapObserver,
@@ -336,10 +380,10 @@ mod tests {
         let i = BytesInput::new(vec![0]);
         let e = Event::NewTestcase {
             input: i,
-            observers_buf,
+            observers_buf: Some(observers_buf),
             exit_kind: ExitKind::Ok,
             corpus_size: 123,
-            client_config: "conf".into(),
+            client_config: EventConfig::AlwaysUnique,
             time: current_time(),
             executions: 0,
         };
@@ -358,7 +402,7 @@ mod tests {
                 executions: _,
             } => {
                 let o: tuple_list_type!(StdMapObserver::<u32>) =
-                    postcard::from_bytes(&observers_buf).unwrap();
+                    postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());
             }
             _ => panic!("mistmatch"),

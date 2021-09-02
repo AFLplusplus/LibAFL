@@ -14,7 +14,7 @@ use libafl::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         PowerQueueCorpusScheduler,
     },
-    events::{setup_restarting_mgr_std, EventRestarter},
+    events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -61,7 +61,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, "default".into()) {
+        match setup_restarting_mgr_std(stats, broker_port, EventConfig::AlwaysUnique) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {

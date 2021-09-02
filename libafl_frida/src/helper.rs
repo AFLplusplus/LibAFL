@@ -46,9 +46,9 @@ enum CmplogOperandType {
     Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation

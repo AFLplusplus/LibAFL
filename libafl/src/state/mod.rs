@@ -357,13 +357,14 @@ where
     /// loads inputs from a directory
     /// If `forced` is `true`, the value will be loaded,
     /// even if it's not considered to be `interesting`.
-    fn load_from_directory<E, EM, Z>(
+    pub fn load_from_directory<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
         in_dir: &Path,
         forced: bool,
+        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
@@ -381,7 +382,7 @@ where
 
             if attr.is_file() && attr.len() > 0 {
                 println!("Loading file {:?} ...", &path);
-                let input = I::from_file(&path)?;
+                let input = loader(fuzzer, self, &path)?;
                 if forced {
                     let _ = fuzzer.add_input(self, executor, manager, input)?;
                 } else {
@@ -391,7 +392,7 @@ where
                     }
                 }
             } else if attr.is_dir() {
-                self.load_from_directory(fuzzer, executor, manager, &path, forced)?;
+                self.load_from_directory(fuzzer, executor, manager, &path, forced, loader)?;
             }
         }
 
@@ -413,7 +414,14 @@ where
         EM: EventFirer<I, Self>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(fuzzer, executor, manager, in_dir, forced)?;
+            self.load_from_directory(
+                fuzzer,
+                executor,
+                manager,
+                in_dir,
+                forced,
+                &mut |_, _, path| I::from_file(&path),
+            )?;
         }
         manager.fire(
             self,

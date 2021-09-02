@@ -165,6 +165,29 @@ jobs:
       run: ./scripts/shmem_limits_macos.sh
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
+  other_targets:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r21e
+    - name: install ios
+      run: rustup target add aarch64-apple-ios
+    - name: install android
+      run: rustup target add aarch64-linux-android
+    - name: install cargo ndk
+      run: cargo install cargo-ndk
+    - name: Build iOS
+      run: cargo build --target aarch64-apple-ios
+    - name: Build Android
+      run: cargo ndk -t arm64-v8a build --release 
+    #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
     #- name: Add clang path to $PATH env
     #  if: runner.os == 'Windows'

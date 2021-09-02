@@ -1,6 +1,6 @@
 [package]
 name = "libafl_frida"
-version = "0.5.0"
+version = "0.6.1"
 authors = ["s1341 <github@shmarya.net>"]
 description = "Frida backend library for LibAFL"
 documentation = "https://docs.rs/libafl_frida"
@@ -19,8 +19,8 @@ cmplog = []
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.5.0", features = ["std", "libafl_derive"] }
-libafl_targets = { path = "../libafl_targets", version = "0.5.0", features = ["sancov_cmplog"] }
+libafl = { path = "../libafl", version = "0.6.1", features = ["std", "libafl_derive"] }
+libafl_targets = { path = "../libafl_targets", version = "0.6.1", features = ["sancov_cmplog"] }
 nix = "0.20.0"
 libc = "0.2.92"
 hashbrown = "0.11"

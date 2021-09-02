@@ -66,7 +66,9 @@ fn main() {
         write_symcc_runtime_bindings_file(&out_path, &cpp_bindings);
         write_cpp_function_export_macro(&out_path, &cpp_bindings);
 
-        if std::env::var("CARGO_FEATURE_NO_CPP_RUNTIME").is_err() {
+        if std::env::var("CARGO_FEATURE_NO_CPP_RUNTIME").is_err()
+            && std::env::var("DOCS_RS").is_err()
+        {
             let rename_header_path = out_path.join("rename.h");
             write_symcc_rename_header(&rename_header_path, &cpp_bindings);
             build_and_link_symcc_runtime(&symcc_src_path, &rename_header_path);
@@ -105,11 +107,15 @@ fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bind
 }
 
 fn checkout_symcc(out_path: &Path) -> PathBuf {
-    let repo_dir = out_path.join("libafl_symcc_src");
-    if !repo_dir.exists() {
-        clone_symcc(&repo_dir);
+    if std::env::var("DOCS_RS").is_ok() {
+        "symcc".into()
+    } else {
+        let repo_dir = out_path.join("libafl_symcc_src");
+        if !repo_dir.exists() {
+            clone_symcc(&repo_dir);
+        }
+        repo_dir
     }
-    repo_dir
 }
 
 fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {

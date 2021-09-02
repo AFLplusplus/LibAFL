@@ -1,4 +1,4 @@
-use core::cmp::max;
+use core::{cell::UnsafeCell, cmp::max};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +44,15 @@ impl QemuCmpsMapMetadata {
 
 libafl::impl_serdeany!(QemuCmpsMapMetadata);
 
+thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
+
+fn hash_me(mut x: u64) -> u64 {
+    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
+    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
+    x = (x.overflowing_shr(16).0 ^ x) ^ x;
+    x
+}
+
 pub fn gen_unique_edge_ids<S>(state: &mut S, src: u64, dest: u64) -> Option<u64>
 where
     S: HasMetadata,
@@ -67,6 +76,10 @@ where
     }
 }
 
+pub fn gen_hashed_edge_ids<S>(_state: &mut S, src: u64, dest: u64) -> Option<u64> {
+    Some(hash_me(src) ^ hash_me(dest))
+}
+
 pub extern "C" fn trace_edge_hitcount(id: u64) {
     unsafe {
         EDGES_MAP[id as usize] += 1;
@@ -76,6 +89,34 @@ pub extern "C" fn trace_edge_hitcount(id: u64) {
 pub extern "C" fn trace_edge_single(id: u64) {
     unsafe {
         EDGES_MAP[id as usize] = 1;
+    }
+}
+
+pub fn gen_addr_block_ids<S>(_state: &mut S, pc: u64) -> Option<u64> {
+    Some(pc)
+}
+
+pub fn gen_hashed_block_ids<S>(_state: &mut S, pc: u64) -> Option<u64> {
+    Some(hash_me(pc))
+}
+
+pub extern "C" fn trace_block_transition_hitcount(id: u64) {
+    unsafe {
+        PREV_LOC.with(|prev_loc| {
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE - 1);
+            EDGES_MAP[x] += 1;
+            *prev_loc.get() = id.overflowing_shr(1).0;
+        });
+    }
+}
+
+pub extern "C" fn trace_block_transition_single(id: u64) {
+    unsafe {
+        PREV_LOC.with(|prev_loc| {
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE - 1);
+            EDGES_MAP[x] = 1;
+            *prev_loc.get() = id.overflowing_shr(1).0;
+        });
     }
 }
 

@@ -14,6 +14,7 @@ use libafl::{
         CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
+    events::EventConfig,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -74,10 +75,10 @@ where
 {
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
-        let conf = self
-            .configuration
-            .take()
-            .unwrap_or_else(|| "default".into());
+        let conf = match self.configuration.as_ref() {
+            Some(name) => EventConfig::from_name(name),
+            None => EventConfig::AlwaysUnique,
+        };
 
         let timeout = Duration::from_secs(self.timeout.unwrap_or(DEFAULT_TIMEOUT_SECS));
 

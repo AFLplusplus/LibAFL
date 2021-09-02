@@ -15,7 +15,6 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
-#[allow(clippy::pub_enum_variant_names)]
 pub enum MmapPerms {
     Read = libc::PROT_READ,
     Write = libc::PROT_WRITE,

@@ -14,6 +14,7 @@ use libafl::{
         CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
+    events::EventConfig,
     executors::{ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -86,11 +87,12 @@ impl<'a, H> QemuBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
+    #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
-        let conf = self
-            .configuration
-            .take()
-            .unwrap_or_else(|| "default".into());
+        let conf = match self.configuration.as_ref() {
+            Some(name) => EventConfig::from_name(name),
+            None => EventConfig::AlwaysUnique,
+        };
 
         let timeout = Duration::from_secs(self.timeout.unwrap_or(DEFAULT_TIMEOUT_SECS));
 
@@ -218,7 +220,7 @@ where
                     println!("Loading from {:?}", &self.input_dirs);
                     // Load from disk
                     state
-                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &self.input_dirs)
+                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, self.input_dirs)
                         .unwrap_or_else(|_| {
                             panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
                         });
@@ -254,7 +256,7 @@ where
             .configuration(conf)
             .stats(stats)
             .run_client(&mut run_client)
-            .cores(&self.cores)
+            .cores(self.cores)
             .broker_port(self.broker_port)
             .remote_broker_addr(self.remote_broker_addr);
         #[cfg(unix)]

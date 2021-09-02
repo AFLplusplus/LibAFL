@@ -1899,11 +1899,8 @@ where
             }
 
             #[cfg(not(feature = "std"))]
-            match sleep_time {
-                Some(_) => {
-                    panic!("Cannot sleep on no_std platform");
-                }
-                None => (),
+            if let Some(time) = sleep_time {
+                panic!("Cannot sleep on no_std platform (requested {:?})", time);
             }
         }
         self.llmp_out

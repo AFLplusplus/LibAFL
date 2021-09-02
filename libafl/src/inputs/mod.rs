@@ -3,6 +3,9 @@
 pub mod bytes;
 pub use bytes::BytesInput;
 
+pub mod encoded;
+pub use encoded::*;
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,
