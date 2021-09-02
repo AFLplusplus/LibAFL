@@ -11,6 +11,7 @@ use frida_gum::NativePointer;
 use frida_gum::RangeDetails;
 use hashbrown::HashMap;
 
+#[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 #[cfg(target_arch = "aarch64")]

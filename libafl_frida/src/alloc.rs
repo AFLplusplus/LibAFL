@@ -1,9 +1,16 @@
 use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
+#[cfg(unix)]
 use nix::{
     libc::memset,
     sys::mman::{mmap, MapFlags, ProtFlags},
 };
+
+#[cfg(windows)]
+use frida_gum_sys::memset;
+
+#[cfg(windows)]
+use uuid::Uuid;
 
 use backtrace::Backtrace;
 #[cfg(unix)]
@@ -11,6 +18,7 @@ use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 use std::{ffi::c_void, io};
+
 
 use crate::{
     asan_errors::{AsanError, AsanErrors},
@@ -70,6 +78,8 @@ impl Allocator {
 
         for try_shadow_bit in &[46usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
+
+            #[cfg(unix)]
             if unsafe {
                 mmap(
                     addr as *mut c_void,
@@ -88,6 +98,16 @@ impl Allocator {
                 shadow_bit = *try_shadow_bit;
                 break;
             }
+
+            #[cfg(windows)]
+            unsafe{
+                // Shmem for windows, I'm following shmem.rs
+                let uuid = Uuid::new_v4();
+                let mut map_str = format!("libafl_frida_{}", uuid.to_simple());
+                let map_str_bytes =
+                
+            }
+
         }
         assert!(shadow_bit != 0);
 
@@ -337,7 +357,10 @@ impl Allocator {
         //println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             //println!("memset: {:?}", start as *mut c_void);
+            #[cfg(unix)]
             memset(start as *mut c_void, 0xff, size / 8);
+            #[cfg(windows)]
+            memset(start as *mut c_void, 0xff, (size / 8) as u64);
 
             let remainder = size % 8;
             if remainder > 0 {
@@ -355,7 +378,11 @@ impl Allocator {
         //println!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             //println!("memset: {:?}", start as *mut c_void);
+            #[cfg(unix)]
             memset(start as *mut c_void, 0x00, size / 8);
+
+            #[cfg(windows)]
+            memset(start as *mut c_void, 0x00, (size / 8) as u64);
 
             let remainder = size % 8;
             if remainder > 0 {
