@@ -6,3 +6,4 @@ For instance, a Mutational Stage, given an input of the corpus, applies a Mutato
 
 A stage can also be an analysis stage, for instance, the Colorization stage of Redqueen that aims to introduce more entropy in a testcase or the Trimming stage of AFL that aims to reduce the size of a testcase.
 
+There are several stages in the LibAFL codebases implementing the [`Stage`](https://docs.rs/libafl/0/libafl/stages/trait.Stage.html) trait.

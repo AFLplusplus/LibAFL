@@ -13,4 +13,6 @@ As an example, given an Observer that reports all the sizes of memory allocation
 In terms of code, the library offers the [`Feedback`](https://docs.rs/libafl/0/libafl/feedbacks/trait.Feedback.html) and the [`FeedbackState`](https://docs.rs/libafl/0/libafl/feedbacks/trait.FeedbackState.html) traits.
 The first is used to implement functors that, given the state of the obversers from the last execution, tells if the execution was interesting. The second is tied with `Feedback` and it is the state of the data that the feedback wants to persist in the fuzzers's state, for instance the cumulative map holding all the edges seen so far in the case of a feedback based on edge coverage.
 
-Multiple Feedbacks can be combined into boolean formula, considering for instance an execution as interesting if it triggers new code paths or execute in less time compared to the average execution time usinf [`feedback_or`](https://docs.rs/libafl/0/libafl/macro.feedback_or.html).
+Multiple Feedbacks can be combined into boolean formula, considering for instance an execution as interesting if it triggers new code paths or execute in less time compared to the average execution time using [`feedback_or`](https://docs.rs/libafl/0/libafl/macro.feedback_or.html).
+
+TODO objective feedbacks and fast feedback logic operators
