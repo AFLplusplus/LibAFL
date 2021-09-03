@@ -137,11 +137,17 @@ const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(3_000);
 
 /// If broker2broker is enabled, bind to public IP
 #[cfg(feature = "llmp_bind_public")]
-const _LLMP_BIND_ADDR: &str = "::";
+const _LLMP_BIND_ADDR_V6: &str = "::";
+
+#[cfg(feature = "llmp_bind_public")]
+const _LLMP_BIND_ADDR: &str = "0.0.0.0";
 
 /// If broker2broker is disabled, bind to localhost
 #[cfg(not(feature = "llmp_bind_public"))]
 const _LLMP_BIND_ADDR: &str = "localhost";
+
+#[cfg(not(feature = "llmp_bind_public"))]
+const _LLMP_BIND_ADDR_V6: &str = "localhost";
 
 /// LLMP Client connects to this address
 const _LLMP_CONNECT_ADDR: &str = "localhost";
@@ -344,7 +350,10 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
 /// Will set `SO_REUSEPORT` on unix.
 #[cfg(feature = "std")]
 fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
-    let listener = TcpListener::bind((_LLMP_BIND_ADDR, port))?;
+    let listener = match TcpListener::bind((_LLMP_BIND_ADDR_V6, port)) {
+        Ok(l) => l,
+        Err(_) => TcpListener::bind((_LLMP_BIND_ADDR, port))?,
+    };
 
     #[cfg(unix)]
     socket::setsockopt(listener.as_raw_fd(), ReusePort, &true)?;
