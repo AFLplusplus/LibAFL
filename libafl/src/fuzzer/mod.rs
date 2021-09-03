@@ -375,11 +375,10 @@ where
 
                 if send_events {
                     // TODO set None for fast targets
-                    let observers_buf = match manager.configuration() {
-                        EventConfig::AlwaysUnique => None,
-                        EventConfig::FromName { .. } => {
-                            Some(manager.serialize_observers(observers)?)
-                        }
+                    let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
+                        None
+                    } else {
+                        Some(manager.serialize_observers(observers)?)
                     };
                     manager.fire(
                         state,
@@ -500,9 +499,10 @@ where
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 
-        let observers_buf = match manager.configuration() {
-            EventConfig::AlwaysUnique => None,
-            EventConfig::FromName { .. } => Some(manager.serialize_observers(observers)?),
+        let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
+            None
+        } else {
+            Some(manager.serialize_observers(observers)?)
         };
         manager.fire(
             state,
