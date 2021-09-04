@@ -138,9 +138,13 @@ const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(3_000);
 /// If broker2broker is enabled, bind to public IP
 #[cfg(feature = "llmp_bind_public")]
 const _LLMP_BIND_ADDR: &str = "0.0.0.0";
+
 /// If broker2broker is disabled, bind to localhost
 #[cfg(not(feature = "llmp_bind_public"))]
 const _LLMP_BIND_ADDR: &str = "127.0.0.1";
+
+/// LLMP Client connects to this address
+const _LLMP_CONNECT_ADDR: &str = "localhost";
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -2577,16 +2581,14 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        eprintln!("test");
-        eprintln!("addr {} port {}", _LLMP_BIND_ADDR, port);
-        let mut stream = match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+        let mut stream = match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
             Ok(stream) => stream,
             Err(e) => {
                 match e.kind() {
                     std::io::ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
-                            match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+                            match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
                                 Ok(stream) => break stream,
                                 Err(_) => {
                                     dbg!("Connection Refused.. Retrying");
