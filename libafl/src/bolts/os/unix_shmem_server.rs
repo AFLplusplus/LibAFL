@@ -105,6 +105,9 @@ where
     /// Send a request to the server, and wait for a response
     #[allow(clippy::similar_names)] // id and fd
     fn send_receive(&mut self, request: ServedShMemRequest) -> Result<(i32, i32), Error> {
+        //let bt = Backtrace::new();
+        //println!("Sending {:?} with bt:\n{:?}", request, bt);
+
         let body = postcard::to_allocvec(&request)?;
 
         let header = (body.len() as u32).to_be_bytes();
@@ -429,6 +432,7 @@ where
 }
 
 /// The struct for the worker, handling incoming requests for [`ShMem`].
+#[allow(clippy::type_complexity)]
 struct ServedShMemServiceWorker<SP>
 where
     SP: ShMemProvider,
@@ -458,7 +462,8 @@ where
     fn handle_request(&mut self, client_id: RawFd) -> Result<ServedShMemResponse<SP>, Error> {
         let request = self.read_request(client_id)?;
 
-        println!("got ashmem client: {}, request:{:?}", client_id, request);
+        // println!("got ashmem client: {}, request:{:?}", client_id, request);
+
         // Handle the client request
         let response = match request {
             ServedShMemRequest::Hello() => Ok(ServedShMemResponse::Id(client_id)),
@@ -470,6 +475,18 @@ where
                 self.forking_clients
                     .insert(client_id, self.clients[&client_id].maps.clone());
                 // Technically, no need to send the client_id here but it keeps the code easier.
+
+                /*
+                // remove temporarily
+                let client = self.clients.remove(&client_id);
+                let mut forking_maps = HashMap::new();
+                for (id, map) in client.as_ref().unwrap().maps.iter() {
+                    forking_maps.insert(*id, map.clone());
+                }
+                self.forking_clients.insert(client_id, forking_maps);
+                self.clients.insert(client_id, client.unwrap());
+                */
+
                 Ok(ServedShMemResponse::Id(client_id))
             }
             ServedShMemRequest::PostForkChildHello(other_id) => {
@@ -490,15 +507,23 @@ where
                 let description_id: i32 = description.id.into();
                 if client.maps.contains_key(&description_id) {
                     Ok(ServedShMemResponse::Mapping(
-                        client
+                        if let Some(map) = client
                             .maps
                             .get_mut(&description_id)
                             .as_mut()
                             .unwrap()
                             .first()
                             .as_mut()
-                            .unwrap()
-                            .clone(),
+                        {
+                            map.clone()
+                        } else {
+                            self.all_maps
+                                .get_mut(&description_id)
+                                .unwrap()
+                                .clone()
+                                .upgrade()
+                                .unwrap()
+                        },
                     ))
                 } else {
                     Ok(ServedShMemResponse::Mapping(
@@ -528,7 +553,7 @@ where
                 return Err(Error::ShuttingDown);
             }
         };
-        //println!("send ashmem client: {}, response: {:?}", client_id, &response);
+        // println!("send ashmem client: {}, response: {:?}", client_id, &response);
 
         response
     }
