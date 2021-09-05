@@ -19,7 +19,7 @@ use core::{
 
 /// Mem move in the own vec
 #[inline]
-pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
+pub fn buffer_self_copy<T>(data: &mut [T], from: usize, to: usize, len: usize) {
     debug_assert!(!data.is_empty());
     debug_assert!(from + len <= data.len());
     debug_assert!(to + len <= data.len());
@@ -33,7 +33,7 @@ pub fn buffer_self_copy(data: &mut [u8], from: usize, to: usize, len: usize) {
 
 /// Mem move between vecs
 #[inline]
-pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usize) {
+pub fn buffer_copy<T>(dst: &mut [T], src: &[T], from: usize, to: usize, len: usize) {
     debug_assert!(!dst.is_empty());
     debug_assert!(!src.is_empty());
     debug_assert!(from + len <= src.len());
@@ -51,21 +51,21 @@ pub fn buffer_copy(dst: &mut [u8], src: &[u8], from: usize, to: usize, len: usiz
 /// The compiler does the heavy lifting.
 /// see <https://stackoverflow.com/a/51732799/1345238/>
 #[inline]
-fn buffer_set(data: &mut [u8], from: usize, len: usize, val: u8) {
+pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
     debug_assert!(from + len <= data.len());
     for p in &mut data[from..(from + len)] {
-        *p = val;
+        *p = val.clone();
     }
 }
 
 /// The max value that will be added or subtracted during add mutations
-const ARITH_MAX: u64 = 35;
+pub const ARITH_MAX: u64 = 35;
 
-const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
-const INTERESTING_16: [i16; 19] = [
+pub const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
+pub const INTERESTING_16: [i16; 19] = [
     -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767,
 ];
-const INTERESTING_32: [i32; 27] = [
+pub const INTERESTING_32: [i32; 27] = [
     -128,
     -1,
     0,
@@ -1082,6 +1082,90 @@ where
     }
 }
 
+/// Bytes insert and self copy mutation for inputs with a bytes vector
+#[derive(Default)]
+pub struct BytesInsertCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    tmp_buf: Vec<u8>,
+    phantom: PhantomData<(I, R, S)>,
+}
+
+impl<I, R, S> Mutator<I, S> for BytesInsertCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let max_size = state.max_size();
+        let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        let off = state.rand_mut().below((size + 1) as u64) as usize;
+        let mut len = 1 + state.rand_mut().below(min(16, size as u64)) as usize;
+
+        if size + len > max_size {
+            if max_size > size {
+                len = max_size - size;
+            } else {
+                return Ok(MutationResult::Skipped);
+            }
+        }
+
+        let from = if size == len {
+            0
+        } else {
+            state.rand_mut().below((size - len) as u64) as usize
+        };
+
+        input.bytes_mut().resize(size + len, 0);
+        self.tmp_buf.resize(len, 0);
+        buffer_copy(&mut self.tmp_buf, input.bytes(), from, 0, len);
+
+        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+        buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, off, len);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, R, S> Named for BytesInsertCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "BytesInsertCopyMutator"
+    }
+}
+
+impl<I, R, S> BytesInsertCopyMutator<I, R, S>
+where
+    I: Input + HasBytesVec,
+    S: HasRand<R> + HasMaxSize,
+    R: Rand,
+{
+    /// Creates a new [`BytesInsertCopyMutator`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            tmp_buf: vec![],
+            phantom: PhantomData,
+        }
+    }
+}
+
 /// Bytes swap mutation for inputs with a bytes vector
 #[derive(Default)]
 pub struct BytesSwapMutator<I, R, S>
@@ -1198,7 +1282,7 @@ where
         let max_size = state.max_size();
         let from = state.rand_mut().below(other_size as u64) as usize;
         let to = state.rand_mut().below(size as u64) as usize;
-        let mut len = state.rand_mut().below((other_size - from) as u64) as usize;
+        let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
@@ -1273,6 +1357,9 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
 
         // We don't want to use the testcase we're already using for splicing
         let count = state.corpus().count();
