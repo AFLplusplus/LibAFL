@@ -458,6 +458,15 @@ where
         })
     }
 
+    fn upgrade_map_with_id(&mut self, description_id: i32) -> Rc<RefCell<SP::Mem>> {
+        self.all_maps
+            .get_mut(&description_id)
+            .unwrap()
+            .clone()
+            .upgrade()
+            .unwrap()
+    }
+
     /// Read and handle the client request, send the answer over unix fd.
     fn handle_request(&mut self, client_id: RawFd) -> Result<ServedShMemResponse<SP>, Error> {
         let request = self.read_request(client_id)?;
@@ -506,6 +515,8 @@ where
                 let client = self.clients.get_mut(&client_id).unwrap();
                 let description_id: i32 = description.id.into();
                 if client.maps.contains_key(&description_id) {
+                    // Using let else here as self needs to be accessed in the else branch.
+                    #[allow(clippy::option_if_let_else)]
                     Ok(ServedShMemResponse::Mapping(
                         if let Some(map) = client
                             .maps
@@ -517,22 +528,12 @@ where
                         {
                             map.clone()
                         } else {
-                            self.all_maps
-                                .get_mut(&description_id)
-                                .unwrap()
-                                .clone()
-                                .upgrade()
-                                .unwrap()
+                            self.upgrade_map_with_id(description_id)
                         },
                     ))
                 } else {
                     Ok(ServedShMemResponse::Mapping(
-                        self.all_maps
-                            .get_mut(&description_id)
-                            .unwrap()
-                            .clone()
-                            .upgrade()
-                            .unwrap(),
+                        self.upgrade_map_with_id(description_id),
                     ))
                 }
             }
