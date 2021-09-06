@@ -10,6 +10,9 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
+use uuid::Uuid;
+
 use crate::{
     executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
 };
@@ -67,10 +70,16 @@ pub enum BrokerEventResult {
 }
 
 /// Distinguish a fuzzer by its config
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum EventConfig {
     AlwaysUnique,
-    FromName { name_hash: u64 },
+    FromName {
+        name_hash: u64,
+    },
+    #[cfg(feature = "std")]
+    BuildID {
+        id: Uuid,
+    },
 }
 
 impl EventConfig {
@@ -83,13 +92,29 @@ impl EventConfig {
         }
     }
 
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn from_build_id() -> Self {
+        EventConfig::BuildID {
+            id: build_id::get(),
+        }
+    }
+
     #[must_use]
     pub fn match_with(&self, other: &EventConfig) -> bool {
         match self {
             EventConfig::AlwaysUnique => false,
             EventConfig::FromName { name_hash: a } => match other {
+                #[cfg(not(feature = "std"))]
                 EventConfig::AlwaysUnique => false,
                 EventConfig::FromName { name_hash: b } => (a == b),
+                #[cfg(feature = "std")]
+                EventConfig::AlwaysUnique | EventConfig::BuildID { id: _ } => false,
+            },
+            #[cfg(feature = "std")]
+            EventConfig::BuildID { id: a } => match other {
+                EventConfig::AlwaysUnique | EventConfig::FromName { name_hash: _ } => false,
+                EventConfig::BuildID { id: b } => (a == b),
             },
         }
     }
