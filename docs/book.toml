@@ -4,3 +4,7 @@ language = "en"
 multilingual = false
 src = "src"
 title = "The LibAFL Fuzzing Library"
+
+[output.html]
+
+[output.linkcheck]
