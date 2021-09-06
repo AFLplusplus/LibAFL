@@ -48,9 +48,6 @@ use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::os::{fork, ForkResult};
 
-#[cfg(all(target_os = "android", feature = "std"))]
-use crate::bolts::os::unix_shmem_server::ShMemService;
-
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
