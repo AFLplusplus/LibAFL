@@ -46,6 +46,14 @@ fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
+/// Provide custom time in no_std environment
+/// Use a time provider of your choice
+#[no_mangle]
+pub extern "C" fn external_current_millis() -> u64 {
+    // TODO: use "real" time here
+    1000
+}
+
 #[allow(clippy::similar_names)]
 pub fn main() {
     // The closure that we want to fuzz
