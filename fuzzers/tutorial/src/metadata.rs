@@ -1,13 +1,12 @@
 use libafl::{
-    corpus::{MinimizerCorpusScheduler, FavFactor, Testcase},
     bolts::tuples::Named,
-    feedbacks::{Feedback, MapIndexesMetadata},
+    corpus::{FavFactor, MinimizerCorpusScheduler, Testcase},
     events::EventFirer,
-    observers::ObserversTuple,
     executors::ExitKind,
-    state::{HasMetadata, HasClientPerfStats},
-    SerdeAny,
-    Error,
+    feedbacks::{Feedback, MapIndexesMetadata},
+    observers::ObserversTuple,
+    state::{HasClientPerfStats, HasMetadata},
+    Error, SerdeAny,
 };
 
 use crate::input::PacketData;
@@ -23,7 +22,10 @@ pub struct PacketLenFavFactor {}
 
 impl FavFactor<PacketData> for PacketLenFavFactor {
     fn compute(entry: &mut Testcase<PacketData>) -> Result<u64, Error> {
-        Ok(entry.metadata().get::<PacketLenMetadata>().map_or(1, |m| m.length))
+        Ok(entry
+            .metadata()
+            .get::<PacketLenMetadata>()
+            .map_or(1, |m| m.length))
     }
 }
 
@@ -36,7 +38,8 @@ pub struct PacketLenFeedback {
 }
 
 impl<S> Feedback<PacketData, S> for PacketLenFeedback
-where S: HasClientPerfStats
+where
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -55,8 +58,14 @@ where S: HasClientPerfStats
     }
 
     #[inline]
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<PacketData>) -> Result<(), Error> {
-        testcase.metadata_mut().insert(PacketLenMetadata { length: self.len });
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        testcase: &mut Testcase<PacketData>,
+    ) -> Result<(), Error> {
+        testcase
+            .metadata_mut()
+            .insert(PacketLenMetadata { length: self.len });
         Ok(())
     }
 

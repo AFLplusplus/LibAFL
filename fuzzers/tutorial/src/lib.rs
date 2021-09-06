@@ -8,9 +8,7 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{
-        Corpus, InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler,
-    },
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
