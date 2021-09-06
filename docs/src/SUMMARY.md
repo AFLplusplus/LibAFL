@@ -29,5 +29,8 @@
   - [Spawning Instances](./message_passing/llmp.md)
   - [Configurations](./message_passing/configurations.md)
 
+- [Tutorial](./tutorial/tutorial.md)
+  - [Introduction](./tutorial/intro.md)
+
 - [Advanced Features](./advanced_features/advanced_features.md)
   - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic/concolic.md)
