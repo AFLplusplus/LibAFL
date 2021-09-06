@@ -66,8 +66,8 @@ debug = true
 
 ## The function under test
 
-Opening `src/main.rs` we have an empty main function.
-To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with "abc".
+Opening `src/main.rs`, we have an empty main function.
+To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`.
 
 ```rust
 let mut harness = |buf: &[u8]| {
@@ -89,7 +89,7 @@ let mut harness = |buf: &[u8]| {
 One of the main components that a LibAFL-based fuzzer uses is the State, a container of the data that is evolved during the fuzzing process, such as the Corpus of inputs.
 In our main so we create a basic State instance like the following:
 
-```rust
+```rust,ignore
 // create a State from scratch
 let mut state = StdState::new(
     // RNG
@@ -111,7 +111,7 @@ We will discuss later the last parameter. The third is another corpus, in this c
 
 Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a Stats instance.
 
-```rust
+```rust,ignore
 // The Stats trait define how the fuzzer stats are reported to the user
 let stats = SimpleStats::new(|s| println!("{}", s));
 
@@ -123,7 +123,7 @@ let mut mgr = SimpleEventManager::new(stats);
 In addition, we have the Fuzzer, an entity that contains some actions that alter the State. On of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
 We create it as QueueCorpusScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
-```rust
+```rust,ignore
 // A queue policy to get testcasess from the corpus
 let scheduler = QueueCorpusScheduler::new();
 
@@ -133,7 +133,7 @@ let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 
 Last but not least, we need an Executor that is the entity responsible to run our program under test. In this example, we want to run the harness function in process, and so we use the InProcessExecutor.
 
-```rust
+```rust,ignore
 // Create the executor for an in-process function
 let mut executor = InProcessExecutor::new(
     &mut harness,
@@ -152,7 +152,9 @@ Now we have the 4 major entities ready for running our tests, but we still canno
 
 For this purpose, we use a Generator, RandPrintablesGenerator that generates a string of printable bytes.
 
-```rust
+```rust,ignore
+use libafl::generators::RandPrintablesGenerator;
+
 // Generator of printable bytearrays of max size 32
 let mut generator = RandPrintablesGenerator::new(32);
 
@@ -192,7 +194,7 @@ Now you simply ran 8 randomly generated testcases but none of them has been stor
 
 Now we want to turn our simple fuzzer into a feedback-based one and increase the chance to generate the right input to trigger the panic. We are going to implement a simple feedback based on the 3 conditions that are needed to reach the panic.
 
-To do that, we need a way to keep track of if a condition is satisfied. The component that feeds the fuzzer with information about properties of a fuzzing run, the satisfied conditions in our case, is the Observer. We use the StdMapObserver, the default observer that uses a map to keep track of covered elements. In our fuzzer, each condition is mapped to an entry of such map.
+To do that, we need a way to keep track of if a condition is satisfied. The component that feeds the fuzzer with information about properties of a fuzzing run, the satisfied conditions in our case, is the Observer. We use the `StdMapObserver`, the default observer that uses a map to keep track of covered elements. In our fuzzer, each condition is mapped to an entry of such map.
 
 We represent such map as a `static mut` variable:
 
@@ -226,14 +228,14 @@ let mut harness = |buf: &[u8]| {
 
 The observer can be created directly from the `SIGNALS` map, in the following way:
 
-```rust
+```rust,ignore
 // Create an observation channel using the signals map
 let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 ```
 
 The observers are usually kept in the corresponding executor as they keep track of information that is valid for just one run. We have then to modify our InProcessExecutor creation to include the observer as follows:
 
-```rust
+```rust,ignore
 // Create the executor for an in-process function with just one observer
 let mut executor =
     InProcessExecutor::new(&mut harness, tuple_list!(observer), &mut state, &mut mgr)
@@ -249,6 +251,14 @@ Feedbacks are used also to decide if an input is a "solution". The feedback that
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
 ```rust
+use libafl::{
+    bolts::rands::StdRand,
+    corpus::{InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
+    events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
+    feedbacks::{MapFeedbackState, MaxMapFeedback, CrashFeedback},
+    fuzzer::{StdFuzzer},
+};
+
 // The state of the edges feedback.
 let feedback_state = MapFeedbackState::with_observer(&observer);
 
@@ -286,7 +296,7 @@ Another central component of LibAFL are the Stages, that are actions done on ind
 
 As the last step, we create a MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
 
-```rust
+```rust,ignore
 // Setup a mutational stage with a basic bytes mutator
 let mutator = StdScheduledMutator::new(havoc_mutations());
 let mut stages = tuple_list!(StdMutationalStage::new(mutator));
@@ -300,7 +310,7 @@ fuzzer
 
 After adding this code, we have a proper fuzzer, that can run a find the input that panics the function in less than a second.
 
-```
+```text
 $ cargo run
    Compiling baby_fuzzer v0.1.0 (/home/andrea/Desktop/baby_fuzzer)
     Finished dev [unoptimized + debuginfo] target(s) in 1.56s

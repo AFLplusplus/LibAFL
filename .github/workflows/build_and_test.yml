@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
+  book:
     strategy:
       matrix:
           os: [ubuntu-latest, windows-latest, macOS-latest]
@@ -22,13 +22,15 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
-      - name: Add clippy
-        run: rustup component add clippy
-      #- name: Run clippy
-      #  uses: actions-rs/cargo@v1
-      #  with:
-      #    command: clippy
-      #    args: --all
+      - name: Build debug
+        run: cargo build 
+      - name: Install mdbook
+        run: cargo install mdbook
+      - name: Build the book
+        run: cd docs && mdbook build
+      - name: Test the book
+        run: cd docs && mdbook test -L ../target/debug/deps
+      - name: install linkcheck"
 
   ubuntu:
     runs-on: ubuntu-latest
