@@ -367,8 +367,8 @@ where
     fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
         if is_child {
             self.await_parent_done()?;
-            let child_shmem = self.internal.borrow_mut().clone();
-            self.internal = Rc::new(RefCell::new(child_shmem));
+            //let child_shmem = self.internal.borrow_mut().clone();
+            //self.internal = Rc::new(RefCell::new(child_shmem));
         }
         self.internal.borrow_mut().post_fork(is_child)?;
         if is_child {
