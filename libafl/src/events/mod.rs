@@ -9,6 +9,8 @@ use ahash::AHasher;
 use alloc::{string::String, vec::Vec};
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
 use uuid::Uuid;
 
 use crate::{
