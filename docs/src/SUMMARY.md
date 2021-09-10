@@ -19,7 +19,7 @@
   - [Corpus](./core_concepts/corpus.md)
   - [Mutator](./core_concepts/mutator.md)
   - [Generator](./core_concepts/generator.md)
-  - [Stage](./core_concepts/corpus.md)
+  - [Stage](./core_concepts/stage.md)
 
 - [Design](./design/design.md)
   - [Architecture](./design/architecture.md)
