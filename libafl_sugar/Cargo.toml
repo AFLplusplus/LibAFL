@@ -11,7 +11,7 @@ keywords = ["fuzzing"]
 edition = "2018"
 
 [features]
-python = ["pyo3"]
+python = ["pyo3", "libafl_qemu/python"]
 default = ["python"]
 
 [dependencies]
