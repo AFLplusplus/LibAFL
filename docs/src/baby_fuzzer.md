@@ -7,6 +7,11 @@ We are going to fuzz a simple Rust function that panics under a condition. The f
 
 You can find a complete version of this tutorial as an example fuzzer in [`fuzzers/baby_fuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/baby_fuzzer).
 
+> ### Warning
+>
+> This example fuzzer is too naive for any real-world usage.
+> Its purpose is solely to show the main components of the library, for a more in-depth walkthrough on building a custom fuzzer go to the Tutorial chapter.
+
 ## Creating a project
 
 We use cargo to create a new Rust project with LibAFL as a dependency. 
@@ -70,7 +75,9 @@ Opening `src/main.rs`, we have an empty main function.
 To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`.
 
 ```rust
-let mut harness = |buf: &[u8]| {
+let mut harness = |input: &BytesInput| {
+    let target = input.target_bytes();
+    let buf = target.as_slice();
     if buf.len() > 0 && buf[0] == 'a' as u8 {
         if buf.len() > 1 && buf[1] == 'b' as u8 {
             if buf.len() > 2 && buf[2] == 'c' as u8 {
@@ -80,7 +87,7 @@ let mut harness = |buf: &[u8]| {
     }
 };
 // To test the panic:
-// let input = "abc".as_bytes();
+// let input = BytesInput::new("abc".as_bytes());
 // harness(&input);
 ```
 
@@ -174,6 +181,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     generators::RandPrintablesGenerator,
+    inputs::{BytesInput, HasTargetBytes},
     state::StdState,
     stats::SimpleStats,
 };
@@ -211,7 +219,9 @@ As we don't rely on any instrumentation engine, we have to manually track the sa
 
 ```rust
 // The closure that we want to fuzz
-let mut harness = |buf: &[u8]| {
+let mut harness = |input: &BytesInput| {
+    let target = input.target_bytes();
+    let buf = target.as_slice();
     signals_set(0);
     if buf.len() > 0 && buf[0] == 'a' as u8 {
         signals_set(1);
