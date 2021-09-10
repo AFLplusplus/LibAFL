@@ -34,7 +34,7 @@ use typed_builder::TypedBuilder;
 /// The Launcher client callback type reference
 #[cfg(feature = "std")]
 pub type LauncherClientFnRef<'a, I, OT, S, SP> =
-    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>) -> Result<(), Error>;
+    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>;
 
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
@@ -133,7 +133,7 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client)(state, mgr)?;
+                        (self.run_client)(state, mgr, bind_to.id)?;
                         break;
                     }
                 };
@@ -200,7 +200,7 @@ where
                     .build()
                     .launch()?;
 
-                (self.run_client)(state, mgr)?;
+                (self.run_client)(state, mgr, core_conf.parse()?.id)?;
 
                 unreachable!("Fuzzer client code should never get here!");
             }
