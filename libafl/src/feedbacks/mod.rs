@@ -96,18 +96,33 @@ where
 
 /// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
 /// of the fuzzer State
-pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {}
+pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {
+    /// Reset the internal state
+    fn reset(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
 
 /// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {}
+pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {
+    fn reset_all(&mut self) -> Result<(), Error>;
+}
 
-impl FeedbackStatesTuple for () {}
+impl FeedbackStatesTuple for () {
+    fn reset_all(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
 
 impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
 where
     Head: FeedbackState,
     Tail: FeedbackStatesTuple,
 {
+    fn reset_all(&mut self) -> Result<(), Error> {
+        self.0.reset()?;
+        self.1.reset_all()
+    }
 }
 
 pub struct CombinedFeedback<A, B, I, S, FL>
