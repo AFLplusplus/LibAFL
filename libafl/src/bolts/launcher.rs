@@ -203,7 +203,8 @@ where
                     .build()
                     .launch()?;
 
-                (self.run_client)(state, mgr, core_conf.parse()?.id)?;
+                let core_id: CoreId = core_conf.parse()?;
+                (self.run_client)(state, mgr, core_id.id)?;
 
                 unreachable!("Fuzzer client code should never get here!");
             }
