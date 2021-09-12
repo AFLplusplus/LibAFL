@@ -16,7 +16,7 @@ use libafl::{
         ondisk::OnDiskMetadataFormat, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::EventConfig,
+    events::{llmp::LlmpRestartingEventManager, EventConfig, HasEventManagerId},
     executors::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
         ShadowExecutor,
@@ -294,8 +294,12 @@ unsafe fn fuzz(
 
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                          _core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+
+        // println!("{:?}", mgr.mgr_id());
 
         let lib = libloading::Library::new(module_name).unwrap();
         let target_func: libloading::Symbol<
