@@ -80,7 +80,11 @@ where
             testcase.set_filename(filename_str.into());
         };
         if self.meta_format.is_some() {
-            let filename: String = testcase.filename().as_ref().unwrap().clone() + ".metadata";
+            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
+            filename.set_file_name(format!(
+                ".{}.metadata",
+                filename.file_name().unwrap().to_string_lossy()
+            ));
             let mut tmpfile_name = PathBuf::from(&filename);
             tmpfile_name.set_file_name(format!(
                 ".{}.tmp",
