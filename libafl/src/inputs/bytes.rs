@@ -9,7 +9,7 @@ use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{Read, Write},
     path::Path,
 };
@@ -35,9 +35,20 @@ impl Input for BytesInput {
     where
         P: AsRef<Path>,
     {
-        let mut file = File::create(path)?;
-        file.write_all(&self.bytes)?;
-        Ok(())
+        fn inner(path: &Path, bytes: &[u8]) -> Result<(), Error> {
+            let mut tmpfile_name = path.to_path_buf();
+            tmpfile_name.set_file_name(format!(
+                ".{}.tmp",
+                tmpfile_name.file_name().unwrap().to_string_lossy()
+            ));
+            let mut tmpfile = File::create(&tmpfile_name)?;
+
+            tmpfile.write_all(bytes)?;
+            fs::rename(&tmpfile_name, path)?;
+            Ok(())
+        }
+
+        inner(path.as_ref(), &self.bytes)
     }
 
     /// Load the contents of this input from a file

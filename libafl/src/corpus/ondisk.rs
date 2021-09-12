@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{fs::OpenOptions, path::PathBuf};
 
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -51,26 +51,51 @@ where
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
-            let filename = self.dir_path.join(
-                testcase
-                    .input()
-                    .as_ref()
-                    .unwrap()
-                    .generate_name(self.entries.len()),
-            );
+            let file_orig = testcase
+                .input()
+                .as_ref()
+                .unwrap()
+                .generate_name(self.entries.len());
+            let mut file = file_orig.clone();
+
+            let mut ctr = 1;
+            let filename = loop {
+                let lockfile = format!(".{}.lafl_lock", file);
+                // try to create lockfile.
+
+                if OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(self.dir_path.join(lockfile))
+                    .is_ok()
+                {
+                    break self.dir_path.join(file);
+                }
+
+                file = format!("{}-{}", ctr, &file_orig);
+                ctr += 1;
+            };
+
             let filename_str = filename.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into());
         };
         if self.meta_format.is_some() {
-            let filename = testcase.filename().as_ref().unwrap().clone() + ".metadata";
-            let mut file = File::create(filename)?;
+            let filename: String = testcase.filename().as_ref().unwrap().clone() + ".metadata";
+            let mut tmpfile_name = PathBuf::from(&filename);
+            tmpfile_name.set_file_name(format!(
+                ".{}.tmp",
+                tmpfile_name.file_name().unwrap().to_string_lossy()
+            ));
+
+            let mut tmpfile = File::create(&tmpfile_name)?;
 
             let serialized = match self.meta_format.as_ref().unwrap() {
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(testcase.metadata())?,
                 OnDiskMetadataFormat::Json => serde_json::to_vec(testcase.metadata())?,
                 OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(testcase.metadata())?,
             };
-            file.write_all(&serialized)?;
+            tmpfile.write_all(&serialized)?;
+            fs::rename(&tmpfile_name, &filename)?;
         }
         testcase
             .store_input()
