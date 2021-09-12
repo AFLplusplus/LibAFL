@@ -33,8 +33,11 @@ use typed_builder::TypedBuilder;
 
 /// The Launcher client callback type reference
 #[cfg(feature = "std")]
-pub type LauncherClientFnRef<'a, I, OT, S, SP> =
-    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>) -> Result<(), Error>;
+pub type LauncherClientFnRef<'a, I, OT, S, SP> = &'a mut dyn FnMut(
+    Option<S>,
+    LlmpRestartingEventManager<I, OT, S, SP>,
+    usize,
+) -> Result<(), Error>;
 
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
@@ -100,7 +103,7 @@ where
             .map(|filename| File::create(filename).unwrap());
 
         // Spawn clients
-        for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
+        for (index, (id, bind_to)) in core_ids.iter().enumerate().take(num_cores).enumerate() {
             if self.cores.iter().any(|&x| x == id) {
                 self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {
@@ -115,7 +118,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_secs((id + 1) as u64));
+                        std::thread::sleep(std::time::Duration::from_secs((index + 1) as u64));
 
                         #[cfg(feature = "std")]
                         if file.is_some() {
@@ -133,7 +136,7 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client)(state, mgr)?;
+                        (self.run_client)(state, mgr, bind_to.id)?;
                         break;
                     }
                 };
@@ -200,7 +203,7 @@ where
                     .build()
                     .launch()?;
 
-                (self.run_client)(state, mgr)?;
+                (self.run_client)(state, mgr, core_conf.parse()?)?;
 
                 unreachable!("Fuzzer client code should never get here!");
             }

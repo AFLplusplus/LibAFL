@@ -63,7 +63,7 @@ where
     /// clusters.
     #[builder(default = None, setter(strip_option))]
     remote_broker_addr: Option<SocketAddr>,
-    /// Bytes harness    
+    /// Bytes harness
     #[builder(setter(strip_option))]
     harness: Option<H>,
     // Syscall hook
@@ -113,7 +113,7 @@ where
 
         let stats = MultiStats::new(|s| println!("{}", s));
 
-        let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
+        let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut hooks::EDGES_MAP };
             let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
