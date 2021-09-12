@@ -31,7 +31,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasSolutions},
+    state::{HasClientPerfStats, HasMetadata, HasSolutions},
     Error,
 };
 
@@ -306,7 +306,7 @@ mod unix_signal_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasClientPerfStats, HasSolutions},
+        state::{HasClientPerfStats, HasMetadata, HasSolutions},
     };
 
     pub type HandlerFuncPtr =
@@ -397,6 +397,7 @@ mod unix_signal_handler {
 
             if interesting {
                 let mut new_testcase = Testcase::new(input.clone());
+                new_testcase.add_metadata(ExitKind::Timeout);
                 fuzzer
                     .objective_mut()
                     .append_metadata(state, &mut new_testcase)
@@ -560,6 +561,7 @@ mod unix_signal_handler {
             if interesting {
                 let new_input = input.clone();
                 let mut new_testcase = Testcase::new(new_input);
+                new_testcase.add_metadata(ExitKind::Crash);
                 fuzzer
                     .objective_mut()
                     .append_metadata(state, &mut new_testcase)
@@ -686,6 +688,7 @@ mod windows_exception_handler {
 
             if interesting {
                 let mut new_testcase = Testcase::new(input.clone());
+                new_testcase.add_metadata(ExitKind::Timeout);
                 fuzzer
                     .objective_mut()
                     .append_metadata(state, &mut new_testcase)
@@ -765,6 +768,7 @@ mod windows_exception_handler {
             if interesting {
                 let new_input = input.clone();
                 let mut new_testcase = Testcase::new(new_input);
+                new_testcase.add_metadata(ExitKind::Crash);
                 fuzzer
                     .objective_mut()
                     .append_metadata(state, &mut new_testcase)

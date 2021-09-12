@@ -50,7 +50,7 @@ where
     #[inline]
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
         if testcase.filename().is_none() {
-            // TODO walk entry metadata to ask for pices of filename (e.g. :havoc in AFL)
+            // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase
                 .input()
                 .as_ref()
@@ -58,7 +58,7 @@ where
                 .generate_name(self.entries.len());
             let mut file = file_orig.clone();
 
-            let mut ctr = 1;
+            let mut ctr = 2;
             let filename = loop {
                 let lockfile = format!(".{}.lafl_lock", file);
                 // try to create lockfile.
@@ -72,7 +72,7 @@ where
                     break self.dir_path.join(file);
                 }
 
-                file = format!("{}-{}", ctr, &file_orig);
+                file = format!("{}-{}", &file_orig, ctr);
                 ctr += 1;
             };
 
