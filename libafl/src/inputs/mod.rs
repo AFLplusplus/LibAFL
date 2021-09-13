@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
 
-use crate::{bolts::ownedref::OwnedSlice, Error};
 #[cfg(feature = "std")]
-use create::bolts::fs::write_file_atomic;
+use crate::bolts::fs::write_file_atomic;
+use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
 pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug {

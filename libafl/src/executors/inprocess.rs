@@ -619,7 +619,7 @@ mod windows_exception_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasClientPerfStats, HasSolutions},
+        state::{HasClientPerfStats, HasMetadata, HasSolutions},
     };
 
     pub type HandlerFuncPtr =
