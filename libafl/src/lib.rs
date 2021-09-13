@@ -242,3 +242,11 @@ mod tests {
         assert_eq!(state.corpus().count(), corpus_deserialized.count());
     }
 }
+
+#[cfg(all(test, not(feature = "std")))]
+/// Provide custom time in `no_std` tests.
+#[no_mangle]
+pub extern "C" fn external_current_millis() -> u64 {
+    // TODO: use "real" time here
+    1000
+}
