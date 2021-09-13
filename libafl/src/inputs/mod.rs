@@ -12,15 +12,14 @@ use alloc::{
 };
 use core::{clone::Clone, fmt::Debug};
 #[cfg(feature = "std")]
-use std::{
-    fs::{self, File},
-    io::{Read, Write},
-    path::Path,
-};
+use std::{fs::File, io::Read, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::ownedref::OwnedSlice, Error};
+use crate::{
+    bolts::{fs::write_file_atomic, ownedref::OwnedSlice},
+    Error,
+};
 
 /// An input for the target
 pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug {
@@ -30,19 +29,7 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
     where
         P: AsRef<Path>,
     {
-        fn inner(path: &Path, serialized: &[u8]) -> Result<(), Error> {
-            let mut tmpfile_name = path.to_path_buf();
-            tmpfile_name.set_file_name(format!(
-                ".{}.tmp",
-                tmpfile_name.file_name().unwrap().to_string_lossy()
-            ));
-            let mut tmpfile = File::create(&tmpfile_name)?;
-
-            tmpfile.write_all(&serialized)?;
-            fs::rename(&tmpfile_name, path)?;
-            Ok(())
-        }
-        inner(path.as_ref(), &postcard::to_allocvec(self)?)
+        write_file_atomic(path, &postcard::to_allocvec(self)?)
     }
 
     #[cfg(not(feature = "std"))]

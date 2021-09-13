@@ -1,7 +1,11 @@
 //! Bolts are no conceptual fuzzing elements, but they keep libafl-based fuzzers together.
 
 pub mod bindings;
+#[cfg(feature = "llmp_compression")]
+pub mod compress;
 pub mod cpu;
+#[cfg(feature = "std")]
+pub mod fs;
 pub mod launcher;
 pub mod llmp;
 pub mod os;
@@ -12,9 +16,6 @@ pub mod shmem;
 #[cfg(feature = "std")]
 pub mod staterestore;
 pub mod tuples;
-
-#[cfg(feature = "llmp_compression")]
-pub mod compress;
 
 use core::time;
 #[cfg(feature = "std")]

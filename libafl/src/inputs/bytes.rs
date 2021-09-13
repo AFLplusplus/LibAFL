@@ -8,16 +8,12 @@ use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::{
-    fs::{self, File},
-    io::{Read, Write},
-    path::Path,
-};
+use std::{fs::File, io::Read, path::Path};
 
 #[cfg(feature = "std")]
 use crate::Error;
 use crate::{
-    bolts::ownedref::OwnedSlice,
+    bolts::{fs::write_file_atomic, ownedref::OwnedSlice},
     inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
 };
 
@@ -35,20 +31,7 @@ impl Input for BytesInput {
     where
         P: AsRef<Path>,
     {
-        fn inner(path: &Path, bytes: &[u8]) -> Result<(), Error> {
-            let mut tmpfile_name = path.to_path_buf();
-            tmpfile_name.set_file_name(format!(
-                ".{}.tmp",
-                tmpfile_name.file_name().unwrap().to_string_lossy()
-            ));
-            let mut tmpfile = File::create(&tmpfile_name)?;
-
-            tmpfile.write_all(bytes)?;
-            fs::rename(&tmpfile_name, path)?;
-            Ok(())
-        }
-
-        inner(path.as_ref(), &self.bytes)
+        write_file_atomic(path, &self.bytes)
     }
 
     /// Load the contents of this input from a file
