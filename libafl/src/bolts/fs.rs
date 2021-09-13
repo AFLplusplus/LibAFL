@@ -1,4 +1,4 @@
-//! LibAFL methods for filesystem interaction
+//! LibAFL functionality for filesystem interaction
 
 use std::{
     fs::{self, OpenOptions},

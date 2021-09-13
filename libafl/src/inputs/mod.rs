@@ -11,15 +11,13 @@ use alloc::{
     vec::Vec,
 };
 use core::{clone::Clone, fmt::Debug};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
 
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    bolts::{fs::write_file_atomic, ownedref::OwnedSlice},
-    Error,
-};
+use crate::{bolts::ownedref::OwnedSlice, Error};
+#[cfg(feature = "std")]
+use create::bolts::fs::write_file_atomic;
 
 /// An input for the target
 pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug {

@@ -41,7 +41,7 @@ pub fn current_time() -> time::Duration {
 /// which is linked into the binary and called from here.
 #[cfg(not(feature = "std"))]
 extern "C" {
-    #[no_mangle]
+    //#[no_mangle]
     fn external_current_millis() -> u64;
 }
 
