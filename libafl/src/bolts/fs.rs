@@ -1,4 +1,4 @@
-//! LibAFL functionality for filesystem interaction
+//! `LibAFL` functionality for filesystem interaction
 
 use std::{
     fs::{self, OpenOptions},
@@ -10,7 +10,7 @@ use crate::Error;
 
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.
-/// This way, on the majority of OSses, the final file will never be incomplete or racey.
+/// This way, on the majority of operating systems, the final file will never be incomplete or racey.
 /// It will overwrite existing files with the same filename.
 ///
 /// # Errors
@@ -31,7 +31,7 @@ where
             .create_new(true)
             .open(&tmpfile_name)?;
 
-        tmpfile.write_all(&bytes)?;
+        tmpfile.write_all(bytes)?;
         fs::rename(&tmpfile_name, path)?;
         Ok(())
     }
