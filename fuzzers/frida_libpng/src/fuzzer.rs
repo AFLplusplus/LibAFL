@@ -16,7 +16,7 @@ use libafl::{
         ondisk::OnDiskMetadataFormat, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::{llmp::LlmpRestartingEventManager, EventConfig, HasEventManagerId},
+    events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
         ShadowExecutor,

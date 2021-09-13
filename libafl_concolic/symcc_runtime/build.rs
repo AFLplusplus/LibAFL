@@ -200,6 +200,7 @@ fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::
     )
     .unwrap();
 
+    #[allow(clippy::filter_map)]
     cpp_bindings
         .to_string()
         .lines()

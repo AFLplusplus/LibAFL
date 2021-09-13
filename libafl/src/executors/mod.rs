@@ -50,6 +50,8 @@ pub enum ExitKind {
     // Custom(Box<dyn SerdeAny>),
 }
 
+crate::impl_serdeany!(ExitKind);
+
 /// Holds a tuple of Observers
 pub trait HasObservers<I, OT, S>
 where

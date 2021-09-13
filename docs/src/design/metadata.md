@@ -32,7 +32,7 @@ By default, Testcase and State implement it and hold a SerdeAnyMap testcase.
 
 We are interested to store State's Metadata to not lose them in case of crash or stop of a fuzzer. To do that, they must be serialized and unserialized using Serde.
 
-As Metadata are stored in a SerdeAnyMap as trait objects, they cannot be deserialized using Serde by default.
+As Metadata is stored in a SerdeAnyMap as trait objects, they cannot be deserialized using Serde by default.
 
 To cope with this problem, in LibAFL each SerdeAny struct must be registered in a global registry that keeps track of types and allows the (de)serialization of the registered types.
 
