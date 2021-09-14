@@ -12,10 +12,51 @@ use core::{
 #[cfg(feature = "std")]
 use std::ffi::CString;
 
+/// armv7 `libc` does not feature a `uncontext_t` implementation
+#[cfg(target_arch = "arm")]
+pub use libc::c_ulong;
+
+#[cfg(target_arch = "arm")]
+pub struct mcontext_t {
+    pub trap_no: c_ulong,
+    pub error_code: c_ulong,
+    pub oldmask: c_ulong,
+    pub arm_r0: c_ulong,
+    pub arm_r1: c_ulong,
+    pub arm_r2: c_ulong,
+    pub arm_r3: c_ulong,
+    pub arm_r4: c_ulong,
+    pub arm_r5: c_ulong,
+    pub arm_r6: c_ulong,
+    pub arm_r7: c_ulong,
+    pub arm_r8: c_ulong,
+    pub arm_r9: c_ulong,
+    pub arm_r10: c_ulong,
+    pub arm_fp: c_ulong,
+    pub arm_ip: c_ulong,
+    pub arm_sp: c_ulong,
+    pub arm_lr: c_ulong,
+    pub arm_pc: c_ulong,
+    pub arm_cpsr: c_ulong,
+    pub fault_address: c_ulong,
+}
+
+#[cfg(target_arch = "arm")]
+pub struct ucontext_t {
+    pub uc_flags: u32,
+    pub uc_link: *mut ucontext_t,
+    pub uc_stack: stack_t,
+    pub uc_mcontext: mcontext_t,
+    pub uc_sigmask: nix::sys::signal::SigSet,
+}
+
+#[cfg(not(target_arch = "arm"))]
+pub use libc::ucontext_t;
+
 use libc::{
-    c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, ucontext_t, SA_NODEFER,
-    SA_ONSTACK, SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL,
-    SIGPIPE, SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
+    c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
+    SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
