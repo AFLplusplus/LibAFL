@@ -84,13 +84,13 @@ use std::{
 use backtrace::Backtrace;
 
 #[cfg(unix)]
+use crate::bolts::os::unix_signals::ucontext_t;
+#[cfg(unix)]
 use crate::bolts::os::unix_signals::{setup_signal_handler, siginfo_t, Handler, Signal};
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
-#[cfg(unix)]
-use crate::bolts::os::unix_signals::ucontext_t;
 #[cfg(all(unix, feature = "std"))]
 use nix::sys::socket::{self, sockopt::ReusePort};
 #[cfg(all(unix, feature = "std"))]

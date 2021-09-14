@@ -13,10 +13,10 @@ use core::{
 use std::ffi::CString;
 
 /// armv7 `libc` does not feature a `uncontext_t` implementation
-#[cfg(target_arch = "arm")] 
+#[cfg(target_arch = "arm")]
 pub use libc::c_ulong;
 
-#[cfg(target_arch = "arm")] 
+#[cfg(target_arch = "arm")]
 pub struct mcontext_t {
     pub trap_no: c_ulong,
     pub error_code: c_ulong,
@@ -54,9 +54,9 @@ pub struct ucontext_t {
 pub use libc::ucontext_t;
 
 use libc::{
-    c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER,
-    SA_ONSTACK, SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL,
-    SIGPIPE, SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
+    c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
+    SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 

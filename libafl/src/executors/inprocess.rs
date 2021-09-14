@@ -287,10 +287,10 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
 
 #[cfg(unix)]
 mod unix_signal_handler {
+    use crate::bolts::os::unix_signals::ucontext_t;
     use alloc::vec::Vec;
     use core::{mem::transmute, ptr};
     use libc::siginfo_t;
-    use crate::bolts::os::unix_signals::ucontext_t;
     #[cfg(feature = "std")]
     use std::io::{stdout, Write};
 
