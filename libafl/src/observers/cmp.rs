@@ -48,6 +48,7 @@ impl CmpValues {
 #[derive(Default, Serialize, Deserialize)]
 pub struct CmpValuesMetadata {
     /// A `list` of values.
+    #[serde(skip)]
     pub list: Vec<CmpValues>,
 }
 
@@ -70,7 +71,7 @@ impl CmpValuesMetadata {
 }
 
 /// A [`CmpMap`] traces comparisons during the current execution
-pub trait CmpMap: Serialize + DeserializeOwned {
+pub trait CmpMap {
     /// Get the number of cmps
     fn len(&self) -> usize;
 
@@ -107,13 +108,13 @@ where
     /// Get the `CmpMap` (mut)
     fn map_mut(&mut self) -> &mut CM;
 
-    /// Add [`CmpValuesMetadata`] to the State including the logged values.
+    /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
     fn add_cmpvalues_meta(&mut self, state: &mut S)
     where
         S: HasMetadata,
     {
-        #[allow(clippy::clippy::option_if_let_else)] // we can't mutate state in a closure
+        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
         let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {
             meta
         } else {
@@ -176,7 +177,7 @@ where
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
 pub struct StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
@@ -185,7 +186,7 @@ where
 
 impl<'a, CM, I, S> CmpObserver<CM, I, S> for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -206,7 +207,7 @@ where
 
 impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
@@ -216,7 +217,7 @@ where
 
 impl<'a, CM> Named for StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     fn name(&self) -> &str {
         &self.name
@@ -225,7 +226,7 @@ where
 
 impl<'a, CM> StdCmpObserver<'a, CM>
 where
-    CM: CmpMap,
+    CM: CmpMap + Serialize + DeserializeOwned,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]

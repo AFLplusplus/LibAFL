@@ -1,0 +1,27 @@
+[package]
+name = "libafl_qemu"
+version = "0.6.1"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+description = "QEMU user backend library for LibAFL"
+documentation = "https://docs.rs/libafl_qemu"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "qemu", "instrumentation"]
+edition = "2018"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libafl = { path = "../libafl", version = "0.6.1" }
+libafl_targets = { path = "../libafl_targets", version = "0.6.1" }
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
+num = "0.4"
+num_enum = "0.5.1"
+goblin = "0.4.2"
+libc = "0.2.97"
+
+[build-dependencies]
+cc = { version = "1.0" }

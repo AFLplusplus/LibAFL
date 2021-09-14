@@ -80,7 +80,7 @@ where
         {
             // Print the client performance stats. Skip the Client 0 which is the broker
             for (i, client) in self.client_stats.iter().skip(1).enumerate() {
-                let fmt = format!("Client {:03}: {}", i + 1, client.introspection_stats);
+                let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_stats);
                 (self.print_fn)(fmt);
             }
 

@@ -17,13 +17,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - name: Cache cargo registry
-        uses: actions/cache@v2
+      - uses: actions-rs/toolchain@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: clippy-cargo-${{ hashFiles('**/Cargo.toml') }}
+          profile: minimal
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
       - name: Add clippy
         run: rustup component add clippy
       #- name: Run clippy
@@ -36,6 +34,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: Install deps
+      run: sudo apt-get install -y llvm llvm-dev clang
+    - name: get clang version
+      run: command -v llvm-config && clang -v
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
     - name: Run a normal build
@@ -58,12 +65,64 @@ jobs:
       run: cargo test --all-features --doc
     - name: Run clippy
       run: ./scripts/clippy.sh
-    - name: Build fuzzers
-      run: ./scripts/build_all_fuzzers.sh
+  ubuntu-concolic:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: Install smoke test deps
+      run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
+    - name: Run smoke test
+      run: ./libafl_concolic/test/smoke_test.sh 
+  ubuntu-fuzzers:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+    - name: Install deps
+      run: sudo apt-get install -y llvm llvm-dev clang nasm
+    - name: Build and run example fuzzers
+      run: ./scripts/test_all_fuzzers.sh
+  nostd-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+    - uses: Swatinem/rust-cache@v1
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly rust-src 
+    - name: Build aarch64-unknown-none
+      run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+    - name: run x86_64 until panic!
+      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build docker
+      run: docker build -t libafl .
   windows:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
     - name: Windows Build
       run: cargo build --verbose
     - name: Run clippy
@@ -74,16 +133,61 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
     - name: MacOS Build
       run: cargo build --verbose
     - name: Run clippy
       run: ./scripts/clippy.sh
-    - name: Build fuzzers
-      run: ./scripts/build_all_fuzzers.sh
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
+  macos-fuzzers:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+    - name: YOLO remove ancient libpng for mozjpeg build
+      run: rm -rf /usr/local/lib/libpng.a
+    - name: Install deps
+      run: brew install llvm libpng nasm coreutils && brew link --force llvm
+    - name: Increase map sizes
+      run: ./scripts/shmem_limits_macos.sh
+    - name: Build and run example fuzzers
+      run: ./scripts/test_all_fuzzers.sh
+  other_targets:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r21e
+    - name: install ios
+      run: rustup target add aarch64-apple-ios
+    - name: install android
+      run: rustup target add aarch64-linux-android
+    - name: install cargo ndk
+      run: cargo install cargo-ndk
+    - name: Build iOS
+      run: cargo build --target aarch64-apple-ios
+    - name: Build Android
+      run: cargo ndk -t arm64-v8a build --release 
+    #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
     #- name: Add clang path to $PATH env
     #  if: runner.os == 'Windows'

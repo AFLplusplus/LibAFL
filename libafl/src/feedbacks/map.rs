@@ -16,7 +16,7 @@ use crate::{
     feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    state::{HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfStats, HasFeedbackStates, HasMetadata},
     stats::UserStats,
     Error,
 };
@@ -132,9 +132,14 @@ where
     pub name: String,
 }
 
-impl<T> FeedbackState for MapFeedbackState<T> where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
+impl<T> FeedbackState for MapFeedbackState<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
+    fn reset(&mut self) -> Result<(), Error> {
+        self.history_map.iter_mut().for_each(|x| *x = T::default());
+        Ok(())
+    }
 }
 
 impl<T> Named for MapFeedbackState<T>
@@ -211,7 +216,7 @@ where
     R: Reducer<T>,
     O: MapObserver<T>,
     I: Input,
-    S: HasFeedbackStates<FT>,
+    S: HasFeedbackStates<FT> + HasClientPerfStats,
     FT: FeedbackStatesTuple,
 {
     fn is_interesting<EM, OT>(
@@ -430,6 +435,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<usize>,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,

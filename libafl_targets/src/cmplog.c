@@ -205,3 +205,4 @@ void __cmplog_rtn_llvm_stdstring_stdstring(uint8_t *stdstring1, uint8_t *stdstri
                     get_llvm_stdstring(stdstring2));
 
 }
+

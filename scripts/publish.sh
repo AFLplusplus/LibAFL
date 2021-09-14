@@ -8,26 +8,50 @@ cd libafl_derive
 cargo publish $@
 cd ..
 
-sleep 2
+sleep 20
 
 cd libafl_cc
 cargo publish $@
 cd ..
 
-sleep 2
+sleep 20
 
 cd libafl
 cargo publish $@
 cd ..
 
-sleep 2
+sleep 20
 
 cd libafl_targets
 cargo publish $@
 cd ..
 
-sleep 2
+sleep 20
 
 cd libafl_frida
 cargo publish $@
 cd ..
+
+sleep 20
+
+cd libafl_qemu
+cargo publish $@
+cd ..
+
+sleep 20
+
+cd libafl_sugar
+cargo publish $@
+cd ..
+
+sleep 20
+
+cd libafl_concolic/symcc_libafl
+cargo publish $@
+cd ../..
+
+sleep 20
+
+cd libafl_concolic/symcc_runtime
+cargo publish $@
+cd ../..

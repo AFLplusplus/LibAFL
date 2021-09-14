@@ -6,6 +6,8 @@ pub use map::*;
 pub mod cmp;
 pub use cmp::*;
 
+pub mod concolic;
+
 use alloc::string::{String, ToString};
 use core::time::Duration;
 use serde::{Deserialize, Serialize};
@@ -20,7 +22,7 @@ use crate::{
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer<I, S>: Named + serde::Serialize + serde::de::DeserializeOwned {
+pub trait Observer<I, S>: Named {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
@@ -42,7 +44,7 @@ pub trait Observer<I, S>: Named + serde::Serialize + serde::de::DeserializeOwned
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<I, S>: MatchName + serde::Serialize + serde::de::DeserializeOwned {
+pub trait ObserversTuple<I, S>: MatchName {
     /// This is called right before the next execution.
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 

@@ -4,6 +4,7 @@ Welcome to `LibAFL`
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "RUSTC_IS_NIGHTLY", feature(specialization))]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 #[macro_use]
 extern crate alloc;
@@ -43,7 +44,7 @@ use alloc::string::String;
 use core::fmt;
 
 #[cfg(feature = "std")]
-use std::{env::VarError, io, num::ParseIntError, string::FromUtf8Error};
+use std::{env::VarError, io, num::ParseIntError, num::TryFromIntError, string::FromUtf8Error};
 
 /// Main error struct for AFL
 #[derive(Debug)]
@@ -72,6 +73,8 @@ pub enum Error {
     IllegalArgument(String),
     /// Forkserver related Error
     Forkserver(String),
+    /// MOpt related Error
+    MOpt(String),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -96,6 +99,7 @@ impl fmt::Display for Error {
             Self::IllegalState(s) => write!(f, "Illegal state: {0}", &s),
             Self::IllegalArgument(s) => write!(f, "Illegal argument: {0}", &s),
             Self::Forkserver(s) => write!(f, "Forkserver : {0}", &s),
+            Self::MOpt(s) => write!(f, "MOpt: {0}", &s),
             Self::ShuttingDown => write!(f, "Shutting down!"),
             Self::Unknown(s) => write!(f, "Unknown error: {0}", &s),
         }
@@ -117,7 +121,7 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
         Self::Unknown(format!("{:?}", err))
@@ -150,6 +154,13 @@ impl From<VarError> for Error {
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
         Self::Unknown(format!("Failed to parse Int: {:?}", err))
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<TryFromIntError> for Error {
+    fn from(err: TryFromIntError) -> Self {
+        Self::IllegalState(format!("Expected conversion failed: {:?}", err))
     }
 }
 

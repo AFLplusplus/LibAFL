@@ -25,7 +25,7 @@ use libafl::{
     corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
-    feedback_or,
+    feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -181,8 +181,6 @@ fn fuzz(
 
     // We need a shared map to store our state before a crash.
     // This way, we are able to continue fuzzing afterwards.
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Failed to start Ashmem service");
     let mut shmem_provider = StdShMemProvider::new()?;
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
@@ -222,7 +220,7 @@ fn fuzz(
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
+    let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {

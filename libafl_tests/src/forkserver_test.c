@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+// The following line is needed for shared memeory testcase fuzzing
+__AFL_FUZZ_INIT();
+
 int main(int argc, char **argv){
 
     FILE* file = stdin;
@@ -8,12 +12,19 @@ int main(int argc, char **argv){
         file = fopen(argv[1], "rb");
     }
 
+    // The following three lines are for normal fuzzing.
+    /*
     char buf[16];
     char* p = fgets(buf, 16, file);
     buf[15] = 0;
-    
-    printf("input: %s\n", p);
-    
+    */
+
+    // The following line is also needed for shared memory testcase fuzzing
+    unsigned char *buf = __AFL_FUZZ_TESTCASE_BUF;
+
+
+    printf("input: %s\n", buf);
+
     if(buf[0] == 'b'){
         if(buf[1] == 'a'){
             if(buf[2] == 'd'){

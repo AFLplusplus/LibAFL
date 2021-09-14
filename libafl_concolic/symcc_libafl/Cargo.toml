@@ -1,0 +1,22 @@
+[package]
+name = "symcc_libafl"
+version = "0.1.0"
+edition = "2018"
+authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+description = "Meta package for symcc_runtime"
+documentation = "https://docs.rs/symcc_libafl"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "testing", "security"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["build", "clone"]
+build = ["which", "cmake"] # common functionality to build symcc
+clone = ["which"] # common functionality to check out the symcc repo using git
+
+[dependencies]
+which = { version = "4.1", optional = true }
+cmake = { version = "0.1", optional = true }

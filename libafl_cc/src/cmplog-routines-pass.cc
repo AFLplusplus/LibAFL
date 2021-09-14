@@ -247,7 +247,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
 
-    if (!isIgnoreFunction(&F)) continue;
+    if (isIgnoreFunction(&F)) continue;
 
     for (auto &BB : F) {
 

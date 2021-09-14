@@ -62,6 +62,15 @@
                                Name) "=" WIN_SYM_PREFIX STRINGIFY(Default)))
 
 #define CHECK_WEAK_FN(Name) ((void*)Name != (void*)&Name##Def)
+
+#define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+  RETURN_TYPE NAME##Def FUNC_SIG;                           \
+  EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG; \
+  RETURN_TYPE NAME##Def FUNC_SIG                            \
+
+#define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)         \
+  RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
+  EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
 #else
 // Declare external functions as weak to allow them to default to a specified
 // function if not defined explicitly. We must use weak symbols because clang's
@@ -71,26 +80,31 @@
   __attribute__((weak, alias(STRINGIFY(Default))))
 
 #define CHECK_WEAK_FN(Name) (Name != NULL)
-#endif  // _MSC_VER
 
-#define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+#define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
   EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
 
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)         \
   RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
   EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
+#endif  // _MSC_VER
+
 #else
 
 #if defined(__APPLE__)
-  // TODO: Find a proper way to deal with weak fns on Apple!
-  #define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-    EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) { return 0; }
+  // On Apple, weak_import and weak attrs behave differently to linux.
 
-  #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)           \
-  RETURN_TYPE NAME FUNC_SIG __attribute__((weak_import))
+  #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)      \
+  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG { \
+      return (RETURN_TYPE) 0;                              \
+  }
+
+  #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
+
 #else
 
-#define EXT_FUNC_DEF(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+#define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
   EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
 
 // Declare these symbols as weak to allow them to be optionally defined.
@@ -99,6 +113,6 @@
 #endif
 
 #define CHECK_WEAK_FN(Name) (Name != NULL)
-#endif
+#endif // _WIN32
 
 #endif

@@ -2,12 +2,23 @@
 
 use std::{
     convert::Into,
+    env,
     path::{Path, PathBuf},
     string::String,
     vec::Vec,
 };
 
 use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX};
+
+fn dll_extension<'a>() -> &'a str {
+    if cfg!(target_os = "windows") {
+        "dll"
+    } else if cfg!(target_vendor = "apple") {
+        "dylib"
+    } else {
+        "so"
+    }
+}
 
 include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 
@@ -21,7 +32,8 @@ impl LLVMPasses {
     #[must_use]
     pub fn path(&self) -> PathBuf {
         match self {
-            LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR")).join("cmplog-routines-pass.so"),
+            LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("cmplog-routines-pass.{}", dll_extension())),
         }
     }
 }
@@ -94,7 +106,7 @@ impl CompilerWrapper for ClangWrapper {
                 "-m64" => self.bit_mode = 64,
                 "-c" | "-S" | "-E" => linking = false,
                 "-shared" => linking = false, // TODO dynamic list?
-                "-Wl,-z,defs" | "-Wl,--no-undefined" => continue,
+                "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => continue,
                 _ => (),
             };
             new_args.push(arg.as_ref().to_string());
@@ -116,6 +128,12 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push("-lws2_32".into());
             new_args.push("-lBcrypt".into());
             new_args.push("-lAdvapi32".into());
+        }
+        // MacOS has odd linker behavior sometimes
+        #[cfg(target_vendor = "apple")]
+        if linking {
+            new_args.push("-undefined".into());
+            new_args.push("dynamic_lookup".into());
         }
 
         self.base_args = new_args;
@@ -150,7 +168,7 @@ impl CompilerWrapper for ClangWrapper {
     where
         S: AsRef<str>,
     {
-        if cfg!(any(target_os = "macos", target_os = "ios")) {
+        if cfg!(target_vendor = "apple") {
             //self.add_link_arg("-force_load".into())?;
         } else {
             self.add_link_arg("-Wl,--whole-archive");
@@ -161,7 +179,7 @@ impl CompilerWrapper for ClangWrapper {
                 .into_string()
                 .unwrap(),
         );
-        if cfg!(any(target_os = "macos", target_os = "ios")) {
+        if cfg!(target_vendor = "apple") {
             self
         } else {
             self.add_link_arg("-Wl,-no-whole-archive")
@@ -176,6 +194,9 @@ impl CompilerWrapper for ClangWrapper {
             args.push(self.wrapped_cc.clone());
         }
         args.extend_from_slice(self.base_args.as_slice());
+        if !self.passes.is_empty() {
+            args.push("-fno-experimental-new-pass-manager".into());
+        }
         for pass in &self.passes {
             args.push("-Xclang".into());
             args.push("-load".into());

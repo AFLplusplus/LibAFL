@@ -357,13 +357,14 @@ where
     /// loads inputs from a directory
     /// If `forced` is `true`, the value will be loaded,
     /// even if it's not considered to be `interesting`.
-    fn load_from_directory<E, EM, Z>(
+    pub fn load_from_directory<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
         in_dir: &Path,
         forced: bool,
+        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
@@ -381,7 +382,7 @@ where
 
             if attr.is_file() && attr.len() > 0 {
                 println!("Loading file {:?} ...", &path);
-                let input = I::from_file(&path)?;
+                let input = loader(fuzzer, self, &path)?;
                 if forced {
                     let _ = fuzzer.add_input(self, executor, manager, input)?;
                 } else {
@@ -391,7 +392,7 @@ where
                     }
                 }
             } else if attr.is_dir() {
-                self.load_from_directory(fuzzer, executor, manager, &path, forced)?;
+                self.load_from_directory(fuzzer, executor, manager, &path, forced, loader)?;
             }
         }
 
@@ -413,7 +414,14 @@ where
         EM: EventFirer<I, Self>,
     {
         for in_dir in in_dirs {
-            self.load_from_directory(fuzzer, executor, manager, in_dir, forced)?;
+            self.load_from_directory(
+                fuzzer,
+                executor,
+                manager,
+                in_dir,
+                forced,
+                &mut |_, _, path| I::from_file(&path),
+            )?;
         }
         manager.fire(
             self,
@@ -467,6 +475,61 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    fn generate_initial_internal<G, E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        generator: &mut G,
+        manager: &mut EM,
+        num: usize,
+        forced: bool,
+    ) -> Result<(), Error>
+    where
+        G: Generator<I, R>,
+        Z: Evaluator<E, EM, I, Self>,
+        EM: EventFirer<I, Self>,
+    {
+        let mut added = 0;
+        for _ in 0..num {
+            let input = generator.generate(self.rand_mut())?;
+            if forced {
+                let _ = fuzzer.add_input(self, executor, manager, input)?;
+                added += 1;
+            } else {
+                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                if res != ExecuteInputResult::None {
+                    added += 1;
+                }
+            }
+        }
+        manager.fire(
+            self,
+            Event::Log {
+                severity_level: LogSeverity::Debug,
+                message: format!("Loaded {} over {} initial testcases", added, num),
+                phantom: PhantomData,
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Generate `num` initial inputs, using the passed-in generator and force the addition to corpus.
+    pub fn generate_initial_inputs_forced<G, E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        generator: &mut G,
+        manager: &mut EM,
+        num: usize,
+    ) -> Result<(), Error>
+    where
+        G: Generator<I, R>,
+        Z: Evaluator<E, EM, I, Self>,
+        EM: EventFirer<I, Self>,
+    {
+        self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
+    }
+
     /// Generate `num` initial inputs, using the passed-in generator.
     pub fn generate_initial_inputs<G, E, EM, Z>(
         &mut self,
@@ -481,23 +544,7 @@ where
         Z: Evaluator<E, EM, I, Self>,
         EM: EventFirer<I, Self>,
     {
-        let mut added = 0;
-        for _ in 0..num {
-            let input = generator.generate(self.rand_mut())?;
-            let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-            if res != ExecuteInputResult::None {
-                added += 1;
-            }
-        }
-        manager.fire(
-            self,
-            Event::Log {
-                severity_level: LogSeverity::Debug,
-                message: format!("Loaded {} over {} initial testcases", added, num),
-                phantom: PhantomData,
-            },
-        )?;
-        Ok(())
+        self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.

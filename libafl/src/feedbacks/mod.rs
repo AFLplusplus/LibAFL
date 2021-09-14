@@ -4,6 +4,11 @@
 pub mod map;
 pub use map::*;
 
+#[cfg(feature = "std")]
+pub mod concolic;
+#[cfg(feature = "std")]
+pub use concolic::ConcolicFeedback;
+
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
@@ -14,11 +19,9 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     observers::{ObserversTuple, TimeObserver},
+    state::HasClientPerfStats,
     Error,
 };
-
-#[cfg(feature = "introspection")]
-use crate::stats::NUM_FEEDBACKS;
 
 use core::{marker::PhantomData, time::Duration};
 
@@ -28,6 +31,7 @@ use core::{marker::PhantomData, time::Duration};
 pub trait Feedback<I, S>: Named
 where
     I: Input,
+    S: HasClientPerfStats,
 {
     /// `is_interesting ` return if an input is worth the addition to the corpus
     fn is_interesting<EM, OT>(
@@ -44,15 +48,13 @@ where
 
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
-    fn is_interesting_with_perf<EM, OT>(
+    fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-        feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
@@ -67,10 +69,10 @@ where
         // Get the elapsed time for checking this feedback
         let elapsed = crate::bolts::cpu::read_time_counter() - start_time;
 
-        // TODO: A more meaningful way to get perf for each feedback
-
         // Add this stat to the feedback metrics
-        feedback_stats[feedback_index] = elapsed;
+        state
+            .introspection_stats_mut()
+            .update_feedback(self.name(), elapsed);
 
         ret
     }
@@ -94,18 +96,33 @@ where
 
 /// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
 /// of the fuzzer State
-pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {}
+pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {
+    /// Reset the internal state
+    fn reset(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
 
 /// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {}
+pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {
+    fn reset_all(&mut self) -> Result<(), Error>;
+}
 
-impl FeedbackStatesTuple for () {}
+impl FeedbackStatesTuple for () {
+    fn reset_all(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
 
 impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
 where
     Head: FeedbackState,
     Tail: FeedbackStatesTuple,
 {
+    fn reset_all(&mut self) -> Result<(), Error> {
+        self.0.reset()?;
+        self.1.reset_all()
+    }
 }
 
 pub struct CombinedFeedback<A, B, I, S, FL>
@@ -114,6 +131,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     pub first: A,
     pub second: B,
@@ -127,6 +145,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn name(&self) -> &str {
         self.name.as_ref()
@@ -139,6 +158,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     pub fn new(first: A, second: B) -> Self {
         let name = format!("{} ({},{})", FL::name(), first.name(), second.name());
@@ -157,6 +177,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -182,21 +203,19 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    fn is_interesting_with_perf<EM, OT>(
+    fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-        feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
         OT: ObserversTuple<I, S>,
     {
-        FL::is_pair_interesting_with_perf(
+        FL::is_pair_interesting_introspection(
             &mut self.first,
             &mut self.second,
             state,
@@ -204,8 +223,6 @@ where
             input,
             observers,
             exit_kind,
-            feedback_stats,
-            feedback_index,
         )
     }
 
@@ -227,6 +244,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn name() -> &'static str;
 
@@ -245,7 +263,7 @@ where
 
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
-    fn is_pair_interesting_with_perf<EM, OT>(
+    fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
@@ -253,8 +271,6 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-        feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
@@ -271,6 +287,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn name() -> &'static str {
         "Eager OR"
@@ -295,7 +312,7 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    fn is_pair_interesting_with_perf<EM, OT>(
+    fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
@@ -303,33 +320,15 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-        feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index,
-        )?;
+        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
 
-        let b = second.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index + 1,
-        )?;
+        let b = second.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
         Ok(a || b)
     }
 }
@@ -339,6 +338,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn name() -> &'static str {
         "Fast OR"
@@ -366,7 +366,7 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    fn is_pair_interesting_with_perf<EM, OT>(
+    fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
@@ -374,37 +374,19 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-        feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index,
-        )?;
+        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
 
         if a {
             return Ok(true);
         }
 
-        second.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index + 1,
-        )
+        second.is_interesting_introspection(state, manager, input, observers, exit_kind)
     }
 }
 
@@ -413,6 +395,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn name() -> &'static str {
         "Eager AND"
@@ -437,7 +420,7 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    fn is_pair_interesting_with_perf<EM, OT>(
+    fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
@@ -445,33 +428,15 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-        feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index,
-        )?;
+        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
 
-        let b = second.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index + 1,
-        )?;
+        let b = second.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
         Ok(a && b)
     }
 }
@@ -481,6 +446,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn name() -> &'static str {
         "Fast AND"
@@ -508,7 +474,7 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    fn is_pair_interesting_with_perf<EM, OT>(
+    fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
@@ -516,37 +482,19 @@ where
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-        feedback_stats: &mut [u64; NUM_FEEDBACKS],
-        feedback_index: usize,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I, S>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index,
-        )?;
+        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
 
         if !a {
             return Ok(false);
         }
 
-        second.is_interesting_with_perf(
-            state,
-            manager,
-            input,
-            observers,
-            exit_kind,
-            feedback_stats,
-            feedback_index + 1,
-        )
+        second.is_interesting_introspection(state, manager, input, observers, exit_kind)
     }
 }
 
@@ -573,6 +521,7 @@ pub struct NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     /// The feedback to invert
     pub first: A,
@@ -585,6 +534,7 @@ impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -618,6 +568,7 @@ impl<A, I, S> Named for NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -629,6 +580,7 @@ impl<A, I, S> NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
+    S: HasClientPerfStats,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
@@ -696,6 +648,7 @@ macro_rules! feedback_not {
 impl<I, S> Feedback<I, S> for ()
 where
     I: Input,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -727,6 +680,7 @@ pub struct CrashFeedback {}
 impl<I, S> Feedback<I, S> for CrashFeedback
 where
     I: Input,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -776,6 +730,7 @@ pub struct TimeoutFeedback {}
 impl<I, S> Feedback<I, S> for TimeoutFeedback
 where
     I: Input,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -830,6 +785,7 @@ pub struct TimeFeedback {
 impl<I, S> Feedback<I, S> for TimeFeedback
 where
     I: Input,
+    S: HasClientPerfStats,
 {
     fn is_interesting<EM, OT>(
         &mut self,

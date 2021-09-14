@@ -318,4 +318,4 @@ Waiting for broker...
 Bye!
 ```
 
-As you can see, after the panic message, the `objectives` count of the log increased by one and you will find the crashing input in `crashes/id_0`.
+As you can see, after the panic message, the `objectives` count of the log increased by one and you will find the crashing input in `crashes/`.

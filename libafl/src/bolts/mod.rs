@@ -9,6 +9,8 @@ pub mod ownedref;
 pub mod rands;
 pub mod serdeany;
 pub mod shmem;
+#[cfg(feature = "std")]
+pub mod staterestore;
 pub mod tuples;
 
 #[cfg(feature = "llmp_compression")]
@@ -32,13 +34,22 @@ pub fn current_time() -> time::Duration {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
 }
 
+/// external defined function in case of no_std
+///
+/// Define your own `external_current_millis()` function via `extern "C"`
+/// which is linked into the binary and called from here.
+#[cfg(not(feature = "std"))]
+extern "C" {
+    #[no_mangle]
+    fn external_current_millis() -> u64;
+}
+
 /// Current time (fixed fallback for no_std)
 #[cfg(not(feature = "std"))]
 #[inline]
 pub fn current_time() -> time::Duration {
-    // We may not have a rt clock available.
-    // TODO: Make it somehow plugin-able
-    time::Duration::from_millis(1)
+    let millis = unsafe { external_current_millis() };
+    time::Duration::from_millis(millis)
 }
 
 /// Gets current nanoseconds since [`UNIX_EPOCH`]

@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
-    events::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+    events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
     observers::ObserversTuple,
     stats::Stats,
@@ -54,10 +54,10 @@ where
     /// The stats instance to use
     stats: ST,
     /// The configuration
-    configuration: String,
+    configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
     run_client: LauncherClientFnRef<'a, I, OT, S, SP>,
-    /// The broker port to use (or to attach to, in case [`Self::with_broker`] is `false`)
+    /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -81,7 +81,7 @@ where
 impl<'a, I, OT, S, SP, ST> Launcher<'a, I, OT, S, SP, ST>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     ST: Stats + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,
@@ -111,6 +111,7 @@ where
                         println!("child spawned and bound to core {}", id);
                     }
                     ForkResult::Child => {
+                        println!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
@@ -128,7 +129,7 @@ where
                             .kind(ManagerKind::Client {
                                 cpu_core: Some(*bind_to),
                             })
-                            .configuration(self.configuration.clone())
+                            .configuration(self.configuration)
                             .build()
                             .launch()?;
 
@@ -150,7 +151,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
-                .configuration(self.configuration.clone())
+                .configuration(self.configuration)
                 .build()
                 .launch()?;
 
@@ -195,7 +196,7 @@ where
                             id: core_conf.parse()?,
                         }),
                     })
-                    .configuration(self.configuration.clone())
+                    .configuration(self.configuration)
                     .build()
                     .launch()?;
 
@@ -251,7 +252,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
-                .configuration(self.configuration.clone())
+                .configuration(self.configuration)
                 .build()
                 .launch()?;
 

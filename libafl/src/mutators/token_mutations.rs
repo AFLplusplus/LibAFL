@@ -443,9 +443,25 @@ where
                     }
                 }
             }
-            CmpValues::Bytes(_v) => {
-                // TODO
-                // buffer_copy(input.bytes_mut(), token, 0, off, len);
+            CmpValues::Bytes(v) => {
+                'outer: for i in off..len {
+                    let mut size = core::cmp::min(v.0.len(), len - i);
+                    while size != 0 {
+                        if v.0[0..size] == input.bytes()[i..i + size] {
+                            buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
+                            break 'outer;
+                        }
+                        size -= 1;
+                    }
+                    size = core::cmp::min(v.1.len(), len - i);
+                    while size != 0 {
+                        if v.1[0..size] == input.bytes()[i..i + size] {
+                            buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
+                            break 'outer;
+                        }
+                        size -= 1;
+                    }
+                }
             }
         }
 

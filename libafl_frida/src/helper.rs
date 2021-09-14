@@ -51,9 +51,9 @@ enum SpecialCmpLogCase {
     Tbnz,
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
@@ -112,12 +112,20 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
+    #[cfg(not(target_arch = "aarch64"))]
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
+
+    #[cfg(target_arch = "aarch64")]
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
+        #[cfg(target_arch = "aarch64")]
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
-        //println!("target_bytes: {:02x?}", slice);
-        self.asan_runtime
-            .unpoison(slice.as_ptr() as usize, slice.len());
+        //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);
+        #[cfg(target_arch = "aarch64")]
+        if self.options.asan_enabled() {
+            self.asan_runtime
+                .unpoison(slice.as_ptr() as usize, slice.len());
+        }
     }
 
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
@@ -129,10 +137,16 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
+        #[cfg(target_arch = "aarch64")]
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
                 self.asan_runtime.check_for_leaks();
             }
+
+            let target_bytes = input.target_bytes();
+            let slice = target_bytes.as_slice();
+            self.asan_runtime
+                .poison(slice.as_ptr() as usize, slice.len());
             self.asan_runtime.reset_allocations();
         }
     }

@@ -1,5 +1,6 @@
-PWD=`pwd`
 FUZZER_NAME="fuzzer_mozjpeg"
+PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+UNAME := $(shell uname)
 
 PHONY: all
 
@@ -18,8 +19,8 @@ libafl_cxx: target/release/libafl_cxx
 libafl_cc: target/release/libafl_cxx
 
 mozjpeg-4.0.3-compiled: mozjpeg-4.0.3 libafl_cc
-	cd $(PWD)/mozjpeg-4.0.3 && cmake --disable-shared . -DCMAKE_C_COMPILER=$(abspath $(PWD)/../target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(abspath $(PWD)/../target/release/libafl_cxx) -G "Unix Makefiles"
-	$(MAKE) -C $(PWD)/mozjpeg-4.0.3
+	cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DCMAKE_C_COMPILER=$(abspath $(PROJECT_DIR)/target/release/libafl_cc) -DCMAKE_CXX_COMPILER=$(abspath $(PROJECT_DIR)/target/release/libafl_cxx) -G "Unix Makefiles"
+	$(MAKE) -C mozjpeg-4.0.3
 	
 
 fuzzer: mozjpeg-4.0.3-compiled libafl_cxx
@@ -28,9 +29,9 @@ fuzzer: mozjpeg-4.0.3-compiled libafl_cxx
 
   # Build the mozjpeg harness	
 	target/release/libafl_cxx \
-		$(PWD)/harness.cc \
-		$(PWD)/mozjpeg-4.0.3/*.a \
-		-I$(PWD)/mozjpeg-4.0.3/ \
+		$(PROJECT_DIR)/harness.cc \
+		$(PROJECT_DIR)/mozjpeg-4.0.3/*.a \
+		-I$(PROJECT_DIR)/mozjpeg-4.0.3/ \
 		-o $(FUZZER_NAME) \
 		-lm -lz
 
@@ -43,13 +44,21 @@ run: all
 	sleep 0.2
 	./$(FUZZER_NAME) >/dev/null 2>/dev/null &
 
+ifeq ($(UNAME), Darwin)
+short_test: libafl_cc
+	$(warning "Skipping build on MacOS as libpng in Github is ancient, see LibAFL GH issue #254")
+
+else
 short_test: all
+	rm -rf libafl_unix_shmem_server || true
 	timeout 11s ./$(FUZZER_NAME) &
 	sleep 0.2
 	timeout 10s taskset -c 0 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
 	timeout 10s taskset -c 1 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
 	timeout 10s taskset -c 2 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
 	timeout 10s taskset -c 3 ./$(FUZZER_NAME) >/dev/null 2>/dev/null &
+
+endif
 
 test: all
 	timeout 60s ./$(FUZZER_NAME) &

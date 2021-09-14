@@ -14,8 +14,8 @@
 - [Design](./design/design.md)
   - [Core Concepts](./design/core_concepts.md)
   - [Architecture](./design/architecture.md)
+  - [Metadata](./design/metadata.md)
 
-- [Understanding Metadata](./medatata/metadata.md)
-  - [Definition](./medatata/definition.md)
-  - [(De)Serialization](./medatata/de_serialization.md)
-  - [Usage](./medatata/usage.md)
+
+- [Advanced Features](./advanced_features/advanced_features.md)
+  - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic/concolic.md)

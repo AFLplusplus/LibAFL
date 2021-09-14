@@ -6,7 +6,7 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     //let out_dir_path = Path::new(&out_dir);
-    let _src_dir = Path::new("src");
+    let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("constants.rs");
     let mut constants_file = File::create(&dest_path).expect("Could not create file");
@@ -72,7 +72,7 @@ pub const CMPLOG_MAP_H: usize = {};
             .define("CMP_MAP_SIZE", Some(&*format!("{}", cmp_map_size)))
             .define("CMPLOG_MAP_W", Some(&*format!("{}", cmplog_map_w)))
             .define("CMPLOG_MAP_H", Some(&*format!("{}", cmplog_map_h)))
-            .file(_src_dir.join("sancov_cmp.c"))
+            .file(src_dir.join("sancov_cmp.c"))
             .compile("sancov_cmp");
     }
 
@@ -81,7 +81,7 @@ pub const CMPLOG_MAP_H: usize = {};
         println!("cargo:rerun-if-changed=src/libfuzzer_compatibility.c");
 
         cc::Build::new()
-            .file(_src_dir.join("libfuzzer_compatibility.c"))
+            .file(src_dir.join("libfuzzer_compatibility.c"))
             .compile("libfuzzer_compatibility");
     }
 
@@ -91,7 +91,7 @@ pub const CMPLOG_MAP_H: usize = {};
     cc::Build::new()
         .define("CMPLOG_MAP_W", Some(&*format!("{}", cmplog_map_w)))
         .define("CMPLOG_MAP_H", Some(&*format!("{}", cmplog_map_h)))
-        .file(_src_dir.join("cmplog.c"))
+        .file(src_dir.join("cmplog.c"))
         .compile("cmplog");
 
     println!("cargo:rustc-link-search=native={}", &out_dir);

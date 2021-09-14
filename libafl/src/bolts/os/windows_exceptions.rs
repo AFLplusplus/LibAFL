@@ -1,8 +1,11 @@
 //! Exception handling for Windows
 
-pub use crate::bolts::bindings::windows::win32::debug::{
+pub use crate::bolts::bindings::Windows::Win32::System::Diagnostics::Debug::{
     SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
 };
+
+pub use crate::bolts::bindings::Windows::Win32::Foundation::NTSTATUS;
+
 use crate::Error;
 use std::os::raw::{c_long, c_void};
 
@@ -315,11 +318,11 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
     let code = exception_pointers
         .as_mut()
         .unwrap()
-        .exception_record
+        .ExceptionRecord
         .as_mut()
         .unwrap()
-        .exception_code;
-    let exception_code = ExceptionCode::try_from(code).unwrap();
+        .ExceptionCode;
+    let exception_code = ExceptionCode::try_from(code.0).unwrap();
     // println!("Received {}", exception_code);
     let ret = internal_handle_exception(exception_code, exception_pointers);
     if let Some(prev_handler) = PREVIOUS_HANDLER {

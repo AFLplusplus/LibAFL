@@ -1,6 +1,6 @@
 [package]
 name = "libafl"
-version = "0.4.0"
+version = "0.6.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
@@ -21,6 +21,7 @@ fxhash = "0.2.1" # yet another hash
 xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
 serde_json = "1.0.60"
 num_cpus = "1.0" # cpu count, for llmp example
+serial_test = "0.5"
 
 [[bench]]
 name = "rand_speeds"
@@ -37,7 +38,7 @@ harness = false
 
 [features]
 default = ["std", "anymap_debug", "derive", "llmp_compression"]
-std = ["serde_json"] # print, env, launcher ... support
+std = ["serde_json", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid"] # print, env, launcher ... support
 anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
@@ -46,6 +47,7 @@ llmp_compression = ["miniz_oxide"] # llmp compression using GZip
 llmp_debug = ["backtrace"] # Enables debug output for LLMP
 llmp_small_maps = [] # reduces initial map size for llmp
 introspection = [] # Include performance statistics of the fuzzing pipeline
+concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
 
 [[example]]
 name = "llmp_test"
@@ -53,25 +55,36 @@ path = "./examples/llmp_test/main.rs"
 required-features = ["std"]
 
 [dependencies]
-libafl_derive = { optional = true, path = "../libafl_derive", version = "0.4.0" }
-tuple_list = "0.1.2"
-hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
-num = "0.4.0"
+tuple_list = { version = "0.1.2", git = "https://github.com/domenukk/tuple_list", branch = "main" }
+hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"], default-features=false } # A faster hashmap, nostd compatible
+num = { version = "0.4.0", default-features = false }
 xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
-erased-serde = "0.3.12"
+erased-serde = { version = "0.3.12", default-features = false, features = ["alloc"] } # erased serde
 postcard = { version = "0.5.1", features = ["alloc"] } # no_std compatible serde serialization fromat
+bincode = {version = "1.3", optional = true }
 static_assertions = "1.1.0"
 ctor = "0.1.20"
+num_enum = { version = "0.5.1", default-features = false }
+typed-builder = "0.9.0" # Implement the builder pattern at compiletime
+ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
+
+libafl_derive = { version = "0.6.1", optional = true, path = "../libafl_derive" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] } # an easy way to debug print SerdeAnyMap
 miniz_oxide = { version = "0.4.4", optional = true}
-core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs" }
-num_enum = "0.5.1" # compression/decomrpession lib
-hostname = "^0.3" # Is there really no gethostname in the stdlib?
-typed-builder = "0.9.0" # Implement the builder pattern at compiletime
-ahash ="0.7" # The hash function already used in hashbrown
+core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", optional = true }
+hostname = { version = "^0.3", optional = true } # Is there really no gethostname in the stdlib?
 rand = { version = "0.8.1", optional = true } #
 rand_core = { version = "0.6.2", optional = true } # This dependency allows us to export our RomuRand as rand::Rng.
+nix = { version = "0.20.0", optional = true }
+regex = { version = "1", optional = true }
+build_id = { version = "0.2.1", git = "https://github.com/domenukk/build_id", branch = "main", optional = true }
+uuid = { version = "0.8.2", optional = true, features = ["serde"] }
+libm = "0.2.1"
+
+wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
+
+z3 = { version = "0.10", optional = true } # for concolic mutation
 
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug
@@ -81,14 +94,13 @@ backtrace = { version = "0.3", optional = true } # for llmp_debug
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
-nix = "0.20.0"
 uds = "0.2.3"
 lock_api = "0.4.3"
 regex = "1.4.5"
 
 [target.'cfg(windows)'.dependencies]
-windows = "0.4.0"
+windows = "0.18.0"
 uuid = { version = "0.8", features = ["v4"] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows = "0.4.0"
+windows = "0.18.0"

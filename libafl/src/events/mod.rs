@@ -5,13 +5,31 @@ pub use simple::*;
 pub mod llmp;
 pub use llmp::*;
 
+use ahash::AHasher;
 use alloc::{string::String, vec::Vec};
-use core::{fmt, marker::PhantomData, time::Duration};
+use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use uuid::Uuid;
 
 use crate::{
     executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
 };
+
+/// A per-fuzzer unique `ID`, usually starting with `0` and increasing
+/// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct EventManagerId {
+    /// The id
+    pub id: usize,
+}
+
+impl Default for EventManagerId {
+    fn default() -> Self {
+        Self { id: 0 }
+    }
+}
 
 #[cfg(feature = "introspection")]
 use crate::stats::ClientPerfStats;
@@ -51,6 +69,71 @@ pub enum BrokerEventResult {
     Forward,
 }
 
+/// Distinguish a fuzzer by its config
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub enum EventConfig {
+    AlwaysUnique,
+    FromName {
+        name_hash: u64,
+    },
+    #[cfg(feature = "std")]
+    BuildID {
+        id: Uuid,
+    },
+}
+
+impl EventConfig {
+    #[must_use]
+    pub fn from_name(name: &str) -> Self {
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        hasher.write(name.as_bytes());
+        EventConfig::FromName {
+            name_hash: hasher.finish(),
+        }
+    }
+
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn from_build_id() -> Self {
+        EventConfig::BuildID {
+            id: build_id::get(),
+        }
+    }
+
+    #[must_use]
+    pub fn match_with(&self, other: &EventConfig) -> bool {
+        match self {
+            EventConfig::AlwaysUnique => false,
+            EventConfig::FromName { name_hash: a } => match other {
+                #[cfg(not(feature = "std"))]
+                EventConfig::AlwaysUnique => false,
+                EventConfig::FromName { name_hash: b } => (a == b),
+                #[cfg(feature = "std")]
+                EventConfig::AlwaysUnique | EventConfig::BuildID { id: _ } => false,
+            },
+            #[cfg(feature = "std")]
+            EventConfig::BuildID { id: a } => match other {
+                EventConfig::AlwaysUnique | EventConfig::FromName { name_hash: _ } => false,
+                EventConfig::BuildID { id: b } => (a == b),
+            },
+        }
+    }
+}
+
+impl From<&str> for EventConfig {
+    #[must_use]
+    fn from(name: &str) -> Self {
+        Self::from_name(name)
+    }
+}
+
+impl From<String> for EventConfig {
+    #[must_use]
+    fn from(name: String) -> Self {
+        Self::from_name(&name)
+    }
+}
+
 /*
 /// A custom event, for own messages, with own handler.
 pub trait CustomEvent<I>: SerdeAny
@@ -80,13 +163,13 @@ where
         /// The input for the new testcase
         input: I,
         /// The state of the observers when this testcase was found
-        observers_buf: Vec<u8>,
+        observers_buf: Option<Vec<u8>>,
         /// The exit kind
         exit_kind: ExitKind,
         /// The new corpus size of this client
         corpus_size: usize,
         /// The client config for this observers/testcase combination
-        client_config: String,
+        client_config: EventConfig,
         /// The time of generation of the event
         time: Duration,
         /// The executions of this client
@@ -195,20 +278,27 @@ pub trait EventFirer<I, S>
 where
     I: Input,
 {
-    /// Send off an event to the broker
+    /// Send off an [`Event`] to the broker
+    ///
+    /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
+    /// this serializes the [`Event`] and commits it to the [`llmp`] page.
+    /// In this case, if you `fire` faster than the broker can consume
+    /// (for example for each [`Input`], on multiple cores)
+    /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
+    /// This should not happen for a normal use-cases.
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
 
     /// Get the configuration
-    fn configuration(&self) -> &str {
-        "<default>"
+    fn configuration(&self) -> EventConfig {
+        EventConfig::AlwaysUnique
     }
 }
 
@@ -233,16 +323,22 @@ pub trait EventProcessor<E, I, S, Z> {
     /// Deserialize all observers for this type and manager
     fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
 }
 
+pub trait HasEventManagerId {
+    /// The id of this manager. For Multiprocessed [`EventManager`]s,
+    /// each client sholud have a unique ids.
+    fn mgr_id(&self) -> EventManagerId;
+}
+
 /// [`EventManager`] is the main communications hub.
-/// For the "normal" multi-processed mode, you may want to look into `RestartingEventManager`
+/// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
 pub trait EventManager<E, I, S, Z>:
-    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S>
+    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S> + HasEventManagerId
 where
     I: Input,
 {
@@ -276,6 +372,12 @@ impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
 
 impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
 
+impl HasEventManagerId for NopEventManager {
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -286,7 +388,7 @@ mod tests {
             current_time,
             tuples::{tuple_list, Named},
         },
-        events::Event,
+        events::{Event, EventConfig},
         executors::ExitKind,
         inputs::bytes::BytesInput,
         observers::StdMapObserver,
@@ -303,10 +405,10 @@ mod tests {
         let i = BytesInput::new(vec![0]);
         let e = Event::NewTestcase {
             input: i,
-            observers_buf,
+            observers_buf: Some(observers_buf),
             exit_kind: ExitKind::Ok,
             corpus_size: 123,
-            client_config: "conf".into(),
+            client_config: EventConfig::AlwaysUnique,
             time: current_time(),
             executions: 0,
         };
@@ -325,7 +427,7 @@ mod tests {
                 executions: _,
             } => {
                 let o: tuple_list_type!(StdMapObserver::<u32>) =
-                    postcard::from_bytes(&observers_buf).unwrap();
+                    postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());
             }
             _ => panic!("mistmatch"),

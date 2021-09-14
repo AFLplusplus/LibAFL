@@ -1,10 +1,20 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
+use crate::{
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
+    inputs::Input,
+    stats::Stats,
+    Error,
+};
 use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 use core::{
+    convert::TryInto,
     marker::PhantomData,
-    ptr::{addr_of, read_volatile},
+    sync::atomic::{compiler_fence, Ordering},
 };
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
@@ -14,16 +24,10 @@ use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(feature = "std")]
-use crate::bolts::{
-    llmp::{LlmpReceiver, LlmpSender},
-    shmem::ShMemProvider,
-};
 use crate::{
-    bolts::llmp,
-    events::{BrokerEventResult, Event, EventFirer, EventManager, EventProcessor, EventRestarter},
-    inputs::Input,
-    stats::Stats,
-    Error,
+    bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
+    corpus::Corpus,
+    state::{HasCorpus, HasSolutions},
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -31,9 +35,6 @@ const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
 const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
-
-/// We're restarting right now.
-const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
@@ -94,6 +95,16 @@ where
     I: Input,
     ST: Stats, //CE: CustomEvent<I, OT>,
 {
+}
+
+impl<I, ST> HasEventManagerId for SimpleEventManager<I, ST>
+where
+    I: Input,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        EventManagerId { id: 0 }
+    }
 }
 
 impl<I, ST> SimpleEventManager<I, ST>
@@ -163,7 +174,8 @@ where
             } => {
                 // TODO: The stats buffer should be added on client add.
                 stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                stats.client_stats_mut()[0].update_introspection_stats(**introspection_stats);
+                stats.client_stats_mut()[0]
+                    .update_introspection_stats((**introspection_stats).clone());
                 stats.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
@@ -197,13 +209,14 @@ where
     }
 }
 
-/// Provides a `builder` which can be used to build a [`RestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`SimpleRestartingEventManager`], which is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-pub struct SimpleRestartingEventManager<I, S, SP, ST>
+pub struct SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -211,15 +224,17 @@ where
 {
     /// The actual simple event mgr
     simple_event_mgr: SimpleEventManager<I, ST>,
-    /// [`LlmpSender`] for restarts
-    sender: LlmpSender<SP>,
+    /// [`StateRestorer`] for restarts
+    staterestorer: StateRestorer<SP>,
     /// Phantom data
-    _phantom: PhantomData<(I, S)>,
+    _phantom: PhantomData<&'a (C, I, S, SC)>,
 }
 
 #[cfg(feature = "std")]
-impl<I, S, SP, ST> EventFirer<I, S> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, I, S, SC, SP, ST> EventFirer<I, S>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -231,8 +246,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, S, SP, ST> EventRestarter<S> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, I, S, SC, SP, ST> EventRestarter<S>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -241,17 +258,16 @@ where
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        unsafe {
-            self.sender.reset();
-        }
-        self.sender
-            .send_buf(_LLMP_TAG_RESTART, &postcard::to_allocvec(state)?)
+        self.staterestorer.reset();
+        self.staterestorer.save(state)
     }
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, ST, Z> EventProcessor<E, I, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, E, I, S, SC, SP, ST, Z> EventProcessor<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -263,8 +279,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, ST, Z> EventManager<E, I, S, Z> for SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, E, I, S, SC, SP, ST, Z> EventManager<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
@@ -273,18 +291,35 @@ where
 }
 
 #[cfg(feature = "std")]
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, S, SP, ST> SimpleRestartingEventManager<I, S, SP, ST>
+impl<'a, C, I, S, SC, SP, ST> HasEventManagerId
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
+    C: Corpus<I>,
     I: Input,
-    S: DeserializeOwned + Serialize,
+    S: Serialize,
+    SP: ShMemProvider,
+    ST: Stats,
+{
+    fn mgr_id(&self) -> EventManagerId {
+        self.simple_event_mgr.mgr_id()
+    }
+}
+
+#[cfg(feature = "std")]
+#[allow(clippy::type_complexity, clippy::too_many_lines)]
+impl<'a, C, I, S, SC, SP, ST> SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+where
+    C: Corpus<I>,
+    I: Input,
+    S: DeserializeOwned + Serialize + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
     SP: ShMemProvider,
     ST: Stats, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    fn new_launched(stats: ST, sender: LlmpSender<SP>) -> Self {
+    fn new_launched(stats: ST, staterestorer: StateRestorer<SP>) -> Self {
         Self {
-            sender,
+            staterestorer,
             simple_event_mgr: SimpleEventManager::new(stats),
             _phantom: PhantomData {},
         }
@@ -294,20 +329,14 @@ where
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     #[allow(clippy::similar_names)]
-    pub fn launch(
-        stats: ST,
-        shmem_provider: &mut SP,
-    ) -> Result<(Option<S>, SimpleRestartingEventManager<I, S, SP, ST>), Error> {
+    pub fn launch(mut stats: ST, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error> {
         // We start ourself as child process to actually fuzz
-        let (mut sender, mut receiver) = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
-            // First, create a channel from the fuzzer (sender) to us (receiver) to report its state for restarts.
-            let sender = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
-
-            let map = { shmem_provider.clone_ref(&sender.out_maps.last().unwrap().shmem)? };
-            let receiver = LlmpReceiver::on_existing_map(shmem_provider.clone(), map, None)?;
-            // Store the information to a map.
-            sender.to_env(_ENV_FUZZER_SENDER)?;
-            receiver.to_env(_ENV_FUZZER_RECEIVER)?;
+        let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
+            // First, create a place to store state in, for restarts.
+            let staterestorer: StateRestorer<SP> =
+                StateRestorer::new(shmem_provider.new_map(256 * 1024 * 1024)?);
+            //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
+            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
             let mut ctr: u64 = 0;
             // Client->parent loop
@@ -325,7 +354,7 @@ where
                         }
                         ForkResult::Child => {
                             shmem_provider.post_fork(true)?;
-                            break (sender, receiver);
+                            break staterestorer;
                         }
                     }
                 };
@@ -334,9 +363,9 @@ where
                 #[cfg(windows)]
                 let child_status = startable_self()?.status()?;
 
-                if unsafe { read_volatile(addr_of!((*receiver.current_recv_map.page()).size_used)) }
-                    == 0
-                {
+                compiler_fence(Ordering::SeqCst);
+
+                if !staterestorer.has_content() {
                     #[cfg(unix)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
@@ -353,37 +382,36 @@ where
         } else {
             // We are the newly started fuzzing instance (i.e. on Windows), first, connect to our own restore map.
             // We get here *only on Windows*, if we were started by a restarting fuzzer.
-            // A sender and a receiver for single communication
-            (
-                LlmpSender::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_SENDER)?,
-                LlmpReceiver::on_existing_from_env(shmem_provider.clone(), _ENV_FUZZER_RECEIVER)?,
-            )
+            // A staterestorer and a receiver for single communication
+            StateRestorer::from_env(shmem_provider, _ENV_FUZZER_SENDER)?
         };
 
         println!("We're a client, let's fuzz :)");
 
         // If we're restarting, deserialize the old state.
-        let (state, mgr) = match receiver.recv_buf()? {
+        let (state, mgr) = match staterestorer.restore::<S>()? {
             None => {
                 println!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    SimpleRestartingEventManager::new_launched(stats, sender),
+                    SimpleRestartingEventManager::new_launched(stats, staterestorer),
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
-            Some((_sender, _tag, msg)) => {
-                println!("Subsequent run. Let's load all data from shmem (received {} bytes from previous instance)", msg.len());
-                let state: S = postcard::from_bytes(msg)?;
-                // We reset the sender, the next sender and receiver (after crash) will reuse the page from the initial message.
-                unsafe {
-                    sender.reset();
-                }
+            Some(state) => {
+                println!("Subsequent run. Loaded previous state.");
+                // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
+                staterestorer.reset();
+
+                // load the corpus size into stats to still display the correct numbers after restart.
+                let client_stats = stats.client_stats_mut_for(0);
+                client_stats.update_corpus_size(state.corpus().count().try_into()?);
+                client_stats.update_objective_size(state.solutions().count().try_into()?);
 
                 (
                     Some(state),
-                    SimpleRestartingEventManager::new_launched(stats, sender),
+                    SimpleRestartingEventManager::new_launched(stats, staterestorer),
                 )
             }
         };
@@ -391,7 +419,7 @@ where
         /* TODO: Not sure if this is needed
         // We commit an empty NO_RESTART message to this buf, against infinite loops,
         // in case something crashes in the fuzzer.
-        sender.send_buf(_LLMP_TAG_NO_RESTART, []);
+        staterestorer.send_buf(_LLMP_TAG_NO_RESTART, []);
         */
 
         Ok((state, mgr))

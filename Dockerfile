@@ -19,7 +19,7 @@ RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
 RUN rustup component add rustfmt clippy
 
 # Install clang 11, common build tools
-RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev
+RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev llvm
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
@@ -37,8 +37,17 @@ COPY libafl_frida/Cargo.toml libafl_frida/build.rs libafl_frida/
 COPY scripts/dummy.rs libafl_frida/src/lib.rs
 COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
+COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
+COPY scripts/dummy.rs libafl_qemu/src/lib.rs
+COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
+
+COPY libafl_sugar/Cargo.toml libafl_sugar/
+COPY scripts/dummy.rs libafl_sugar/src/lib.rs
+
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
 COPY scripts/dummy.rs libafl_cc/src/lib.rs
+COPY libafl_cc/build.rs libafl_cc/build.rs
+COPY libafl_cc/src/cmplog-routines-pass.cc libafl_cc/src/cmplog-routines-pass.cc
 
 COPY libafl_targets/Cargo.toml libafl_targets/build.rs libafl_targets/
 COPY libafl_targets/src libafl_targets/src
@@ -46,6 +55,18 @@ COPY scripts/dummy.rs libafl_targets/src/lib.rs
 
 COPY libafl_tests/Cargo.toml libafl_tests/build.rs libafl_tests/
 COPY scripts/dummy.rs libafl_tests/src/lib.rs
+
+COPY libafl_concolic/test/dump_constraints/Cargo.toml libafl_concolic/test/dump_constraints/
+COPY scripts/dummy.rs libafl_concolic/test/dump_constraints/src/lib.rs
+
+COPY libafl_concolic/test/runtime_test/Cargo.toml libafl_concolic/test/runtime_test/
+COPY scripts/dummy.rs libafl_concolic/test/runtime_test/src/lib.rs
+
+COPY libafl_concolic/symcc_runtime/Cargo.toml libafl_concolic/symcc_runtime/build.rs libafl_concolic/symcc_runtime/
+COPY scripts/dummy.rs libafl_concolic/symcc_runtime/src/lib.rs
+
+COPY libafl_concolic/symcc_libafl/Cargo.toml libafl_concolic/symcc_libafl/
+COPY scripts/dummy.rs libafl_concolic/symcc_libafl/src/lib.rs
 
 RUN cargo build && cargo build --release
 
@@ -73,12 +94,17 @@ RUN touch libafl/src/lib.rs
 COPY libafl_targets/src libafl_targets/src
 RUN touch libafl_targets/src/lib.rs
 COPY libafl_frida/src libafl_frida/src
+RUN touch libafl_qemu/src/lib.rs
+COPY libafl_qemu/src libafl_qemu/src
 RUN touch libafl_frida/src/lib.rs
+COPY libafl_concolic/symcc_libafl libafl_concolic/symcc_libafl
+COPY libafl_concolic/symcc_runtime libafl_concolic/symcc_runtime
+COPY libafl_concolic/test libafl_concolic/test
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over
 COPY fuzzers fuzzers
 
-# RUN ./scripts/build_all_fuzzers.sh --no-fmt
+# RUN ./scripts/test_all_fuzzers.sh --no-fmt
 
 ENTRYPOINT [ "/bin/bash" ]
