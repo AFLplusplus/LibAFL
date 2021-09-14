@@ -90,7 +90,7 @@ use crate::{
     Error,
 };
 #[cfg(unix)]
-use libc::ucontext_t;
+use crate::bolts::os::unix_signals::ucontext_t;
 #[cfg(all(unix, feature = "std"))]
 use nix::sys::socket::{self, sockopt::ReusePort};
 #[cfg(all(unix, feature = "std"))]
