@@ -84,9 +84,9 @@ use std::{
 use backtrace::Backtrace;
 
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::ucontext_t;
-#[cfg(unix)]
-use crate::bolts::os::unix_signals::{setup_signal_handler, siginfo_t, Handler, Signal};
+use crate::bolts::os::unix_signals::{
+    setup_signal_handler, siginfo_t, ucontext_t, Handler, Signal,
+};
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
