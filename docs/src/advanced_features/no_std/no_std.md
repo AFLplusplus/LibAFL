@@ -15,4 +15,19 @@ cargo build --no-default-features --target aarch64-unknown-none
 
 ## Use custom timing
 
-TODO: add here how to implement custom timing function when [PR](https://github.com/AFLplusplus/LibAFL/pull/281) is ready.
+You need to add anywhere in your project a `external_current_millis` function, which returns the current time in milliseconds.
+
+// Assume this a clock source from a custom stdlib, which you want to use, which returns current time in seconds.
+```c
+int my_real_ms_clock(void)
+{
+    return *CLOCK;
+}
+```
+and here we use it in Rust. `external_current_millis` is then called from LibAFL.
+```rust
+#[no_mangle]
+pub extern "C" fn external_current_millis() -> u64 {
+    unsafe { my_real_ms_clock()*1000 }
+}
+```
