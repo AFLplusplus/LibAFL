@@ -44,12 +44,15 @@ use libafl_qemu::{
     QemuExecutor,
 };
 
-/// The fuzzer main (as `no_mangle` C function)
-#[no_mangle]
-pub fn libafl_qemu_main() {
+/// The fuzzer main
+pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
+    
+    let args: Vec<String> = env::args().collect();
+    let env: Vec<(String, String)> = env::vars().collect();
+    emu::init(&args, &env);
 
     let res = match App::new("libafl_qemu_fuzzbench")
         .version("0.4.0")

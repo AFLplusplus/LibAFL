@@ -5,7 +5,7 @@ use core::{
     convert::TryFrom,
     ffi::c_void,
     mem::{size_of, transmute, MaybeUninit},
-    ptr::copy_nonoverlapping,
+    ptr::{copy_nonoverlapping, null},
 };
 use num::Num;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -83,6 +83,8 @@ impl MapInfo {
 }
 
 extern "C" {
+    fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
+
     fn libafl_qemu_write_reg(reg: i32, val: *const u8) -> i32;
     fn libafl_qemu_read_reg(reg: i32, val: *mut u8) -> i32;
     fn libafl_qemu_num_regs() -> i32;
@@ -135,6 +137,23 @@ extern "C" {
 
     static mut libafl_syscall_hook:
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
+}
+
+pub fn init(args: &[String], env: &[(String, String)]) -> i32 {
+    let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
+    assert!(argv.len() < i32::MAX as usize);
+    let env_strs: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", &k, &v)).collect();
+    let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
+    envp.push(null());
+    #[allow(clippy::cast_possible_wrap)]
+    let argc = argv.len() as i32;
+    unsafe {
+        qemu_user_init(
+            argc,
+            argv.as_ptr() as *const *const u8,
+            envp.as_ptr() as *const *const u8,
+        )
+    }
 }
 
 pub struct GuestMaps {
