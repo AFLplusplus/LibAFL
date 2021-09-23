@@ -2,7 +2,7 @@
 //! The `launcher` will spawn new processes for each cpu core.
 
 use clap::{load_yaml, App};
-use core::{slice, time::Duration};
+use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
 use std::{
     env,
     os::raw::{c_char, c_int},
@@ -39,6 +39,13 @@ use libafl::{
 
 use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP_PTR, MAX_EDGES_NUM};
 
+extern "C" {
+    pub fn __sanitizer_cov_trace_cmp1(v0: u8, v1: u8);
+    pub fn __sanitizer_cov_trace_cmp2(v0: u16, v1: u16);
+    pub fn __sanitizer_cov_trace_cmp4(v0: u32, v1: u32);
+    pub fn __sanitizer_cov_trace_cmp8(v0: u64, v1: u64);
+}
+
 /// This seems to be unused by atheris, so we can ignore it.
 #[no_mangle]
 pub fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
@@ -51,6 +58,40 @@ pub fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
         EDGES_MAP_PTR = start;
         MAX_EDGES_NUM = (stop as usize - start as usize) / 8;
+    }
+}
+
+/// There must be a better way to `cmplog` this, but for now this should be fine(?)
+#[no_mangle]
+pub fn __sanitizer_weak_hook_memcmp(
+    _caller_pc: *const c_void,
+    s1: *const c_void,
+    s2: *const c_void,
+    n: usize,
+    _result: c_int,
+) {
+    unsafe {
+        let s1 = slice::from_raw_parts(s1 as *const u8, n);
+        let s2 = slice::from_raw_parts(s2 as *const u8, n);
+        match n {
+            0 => (),
+            1 => __sanitizer_cov_trace_cmp1(
+                u8::from_ne_bytes(s1.try_into().unwrap()),
+                u8::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+            2..=3 => __sanitizer_cov_trace_cmp2(
+                u16::from_ne_bytes(s1.try_into().unwrap()),
+                u16::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+            4..=7 => __sanitizer_cov_trace_cmp4(
+                u32::from_ne_bytes(s1.try_into().unwrap()),
+                u32::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+            _ => __sanitizer_cov_trace_cmp8(
+                u64::from_ne_bytes(s1.try_into().unwrap()),
+                u64::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+        }
     }
 }
 
