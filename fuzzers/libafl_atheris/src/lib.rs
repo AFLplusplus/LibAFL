@@ -208,6 +208,8 @@ pub fn LLVMFuzzerRunDriver(
 
     let stats = MultiStats::new(|s| println!("{}", s));
 
+    // TODO: we need to handle Atheris calls to `exit` on errors somhow.
+
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
         let edges = unsafe { slice::from_raw_parts_mut(EDGES_MAP_PTR, MAX_EDGES_NUM) };
@@ -335,8 +337,9 @@ pub fn LLVMFuzzerRunDriver(
             } else {
                 println!("Loading from {:?}", &input_dirs);
                 // Load from disk
+                // we used _forced since some Atheris testcases don't touch the map at all, hence, wolud not load any data.
                 state
-                    .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &input_dirs)
+                    .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &input_dirs)
                     .unwrap_or_else(|_| {
                         panic!("Failed to load initial corpus at {:?}", &input_dirs)
                     });
