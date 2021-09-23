@@ -61,7 +61,7 @@ fn main() {
     let build_dir = qemu_path.join("build");
     let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
     if !output_lib.is_file() {
-        let _ = Command::new("make")
+        Command::new("make")
             .current_dir(&qemu_path)
             .arg("distclean")
             .status();
