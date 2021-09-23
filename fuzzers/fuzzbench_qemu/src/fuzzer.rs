@@ -49,7 +49,7 @@ pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-    
+
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
     emu::init(&args, &env);

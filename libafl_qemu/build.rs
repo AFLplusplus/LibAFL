@@ -1,9 +1,10 @@
-use std::{env, fs::read_dir, path::Path, process::Command};
+use std::{env, fs::copy, path::Path, process::Command};
+//use std::fs::read_dir;
 use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "a1bc8ba0ab12775ef56b67cd2b762a05e0678020";
+const QEMU_REVISION: &str = "22daaa7d0c76b32f8391bad40c0b220f3e659f66";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -29,6 +30,10 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
+    let mut target_dir = out_dir_path.to_path_buf();
+    target_dir.pop();
+    target_dir.pop();
+    target_dir.pop();
     //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
     build_dep_check(&["git", "make"]);
@@ -54,7 +59,7 @@ fn main() {
     }
 
     let build_dir = qemu_path.join("build");
-    let output_lib = build_dir.join(&format!("libqemu-{}.a", cpu_target));
+    let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
     if !output_lib.is_file() {
         let _ = Command::new("make")
             .current_dir(&qemu_path)
@@ -62,7 +67,7 @@ fn main() {
             .status();
         Command::new("./configure")
             .current_dir(&qemu_path)
-            .arg("--as-static-lib")
+            //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-linux-user", cpu_target))
             .args(&[
@@ -142,6 +147,22 @@ fn main() {
         //let _ = remove_file(build_dir.join(&format!("libqemu-{}.so", cpu_target)));
     }
 
+    copy(
+        build_dir.join(&format!("libqemu-{}.so", cpu_target)),
+        target_dir.join(&format!("libqemu-{}.so", cpu_target)),
+    )
+    .expect("Failed to copy the QEMU shared object");
+
+    println!(
+        "cargo:rustc-link-search=native={}",
+        &target_dir.to_string_lossy().to_string()
+    );
+    println!("cargo:rustc-link-lib=qemu-{}", cpu_target);
+
+    println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
+
+    /*
+    // Build a static library
     let mut objects = vec![];
     for dir in &[
         build_dir.join("libcommon.fa.p"),
@@ -167,8 +188,8 @@ fn main() {
             }
         }
     }
-    
-    
+
+
     Command::new("ar")
         .current_dir(&out_dir_path)
         .arg("crus")
@@ -185,4 +206,5 @@ fn main() {
     println!("cargo:rustc-link-lib=gthread-2.0");
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
+    */
 }
