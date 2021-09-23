@@ -35,6 +35,7 @@ use libafl::{
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
+    Error,
 };
 
 use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP_PTR, MAX_EDGES_NUM};
@@ -297,7 +298,7 @@ pub fn LLVMFuzzerRunDriver(
         Ok(())
     };
 
-    Launcher::builder()
+    match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .stats(stats)
@@ -308,5 +309,8 @@ pub fn LLVMFuzzerRunDriver(
         //.stdout_file(Some("/dev/null"))
         .build()
         .launch()
-        .expect("Launcher failed");
+    {
+        Ok(_) | Err(Error::ShuttingDown) => (),
+        Err(e) => panic!("Error in fuzzer: {}", e),
+    };
 }
