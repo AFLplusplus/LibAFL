@@ -37,7 +37,6 @@ use libafl::{
     stats::MultiStats,
     Error,
 };
-
 use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP_PTR, MAX_EDGES_NUM};
 
 extern "C" {
@@ -102,7 +101,7 @@ pub fn __sanitizer_weak_hook_memcmp(
 #[allow(non_snake_case)]
 pub fn LLVMFuzzerRunDriver(
     _argc: *const c_int,
-    _argv: *const c_char,
+    _argv: *const *const c_char,
     harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
 ) {
     // Registry the metadata types used in this fuzzer
@@ -120,24 +119,30 @@ pub fn LLVMFuzzerRunDriver(
         );
     }
 
+    println!("Args: {:?}", std::env::args());
+
     let matches = App::new("libafl_atheris")
         .version("0.1.0")
         .setting(AppSettings::AllowExternalSubcommands)
+        .arg(Arg::new("script")) // The python script is the first arg
         .arg(
             Arg::new("cores")
                 .short('c')
+                .long("cores")
                 .required(true)
                 .takes_value(true),
         )
         .arg(
             Arg::new("broker_port")
-                .short('b')
+                .short('p')
+                .long("broker-port")
                 .required(false)
                 .takes_value(true),
         )
         .arg(
             Arg::new("output")
                 .short('o')
+                .long("output")
                 .required(false)
                 .takes_value(true),
         )
@@ -151,6 +156,7 @@ pub fn LLVMFuzzerRunDriver(
         .arg(
             Arg::new("remote_broker_addr")
                 .short('B')
+                .long("remote-broker-addr")
                 .required(false)
                 .takes_value(true),
         )
