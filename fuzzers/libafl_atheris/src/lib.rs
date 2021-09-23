@@ -1,7 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The `launcher` will spawn new processes for each cpu core.
 
-use clap::{load_yaml, App};
+use clap::{App, AppSettings, Arg};
 use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
 use std::{
     env,
@@ -120,10 +120,54 @@ pub fn LLVMFuzzerRunDriver(
         );
     }
 
-    let workdir = env::current_dir().unwrap();
+    let matches = App::new("libafl_atheris")
+        .version("0.1.0")
+        .setting(AppSettings::AllowExternalSubcommands)
+        .arg(
+            Arg::new("cores")
+                .short('c')
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("broker_port")
+                .short('b')
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("output")
+                .short('o')
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("input")
+                .short('i')
+                .long("input")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("remote_broker_addr")
+                .short('B')
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("timeout")
+                .short('t')
+                .long("timeout")
+                .required(false)
+                .takes_value(true),
+        )
+        .get_matches();
 
-    let yaml = load_yaml!("clap-config.yaml");
-    let matches = App::from(yaml).get_matches();
+    let workdir = env::current_dir().unwrap();
+    println!(
+        "Workdir: {:?}",
+        env::current_dir().unwrap().to_string_lossy().to_string()
+    );
 
     let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");

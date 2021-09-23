@@ -42,5 +42,5 @@ test: all
 	(\
 	rm -rf libafl_unix_shmem_server || true; \
 	source env/bin/activate; \
-	RUST_BACKTRACE=1 timeout 60s python3 ./atheris/example_fuzzers/fuzzing_example.py --cores 0; \
+	RUST_BACKTRACE=1 timeout 60s python3 ./atheris/example_fuzzers/fuzzing_example.py --cores 0 --input in; \
 	)

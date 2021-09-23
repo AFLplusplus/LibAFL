@@ -1,3 +1,4 @@
-# Generic In-Memory Fuzzer
+# Atheris Pyhton Fuzzer
 
-This is a generic in-memory fuzzer based on LibAFL
+This is a LibAFL-based Python fuzzer using [Atheris](https://github.com/google/atheris) for instrumentation.
+We switch out Atheris' libfuzzer implementation with LibAFL, by mimicking its API.
