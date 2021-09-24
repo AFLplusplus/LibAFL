@@ -60,7 +60,7 @@ pub fn libafl_main() {
 
     let stats = MultiStats::new(|s| println!("{}", s));
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
         let corpus_dirs = &[PathBuf::from("./corpus")];
         let objective_dir = PathBuf::from("./crashes");
 

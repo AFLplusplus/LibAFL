@@ -79,7 +79,6 @@ where
 
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let psmeta = state
             .metadata()
             .get::<PowerScheduleMetadata>()
@@ -89,6 +88,7 @@ where
         if self.strat == PowerSchedule::COE {
             fuzz_mu = self.fuzz_mu(state, psmeta)?;
         }
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
         self.calculate_score(&mut testcase, psmeta, fuzz_mu)

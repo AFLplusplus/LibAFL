@@ -2,20 +2,15 @@
 //! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
 
 use ahash::AHasher;
-use core::hash::Hasher;
-
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
+use core::hash::Hasher;
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::{
-    fs::File,
-    io::{Read, Write},
-    path::Path,
-};
+use std::{fs::File, io::Read, path::Path};
 
 #[cfg(feature = "std")]
-use crate::Error;
+use crate::{bolts::fs::write_file_atomic, Error};
 use crate::{
     bolts::ownedref::OwnedSlice,
     inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
@@ -35,9 +30,7 @@ impl Input for BytesInput {
     where
         P: AsRef<Path>,
     {
-        let mut file = File::create(path)?;
-        file.write_all(&self.bytes)?;
-        Ok(())
+        write_file_atomic(path, &self.bytes)
     }
 
     /// Load the contents of this input from a file

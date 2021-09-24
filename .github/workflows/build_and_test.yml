@@ -112,6 +112,8 @@ jobs:
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
       run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
+    - name: no_std tests
+      run: cd ./libafl && cargo test --no-default-features 
   build-docker:
     runs-on: ubuntu-latest
     steps:
