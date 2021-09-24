@@ -46,6 +46,7 @@ enum CmplogOperandType {
     Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 enum SpecialCmpLogCase {
     Tbz,
     Tbnz,
