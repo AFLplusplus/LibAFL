@@ -25,3 +25,7 @@ libc = "0.2.97"
 
 [build-dependencies]
 cc = { version = "1.0" }
+which = "4.1"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
