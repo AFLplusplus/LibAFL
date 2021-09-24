@@ -8,10 +8,11 @@ const QEMU_REVISION: &str = "22daaa7d0c76b32f8391bad40c0b220f3e659f66";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
-        which(tool).expect(&format!("Build tool {} not found", tool));
+        which(tool).unwrap_or_else(|_| panic!("Build tool {} not found", tool));
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
@@ -21,7 +22,7 @@ fn main() {
         return;
     }
 
-    let jobs = env::var("CARGO_BUILD_JOBS").unwrap_or("1".to_owned());
+    let jobs = env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| "1".to_owned());
     let cpu_target = env::var("CPU_TARGET").unwrap_or_else(|_| {
         println!("cargo:warning=CPU_TARGET is not set, default to x86_64");
         "x86_64".to_owned()
@@ -64,7 +65,8 @@ fn main() {
         Command::new("make")
             .current_dir(&qemu_path)
             .arg("distclean")
-            .status();
+            .status()
+            .expect("Make distclean failed");
         Command::new("./configure")
             .current_dir(&qemu_path)
             //.arg("--as-static-lib")
@@ -160,8 +162,9 @@ fn main() {
     println!("cargo:rustc-link-lib=qemu-{}", cpu_target);
 
     println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
+}
 
-    /*
+/*
     // Build a static library
     let mut objects = vec![];
     for dir in &[
@@ -206,5 +209,6 @@ fn main() {
     println!("cargo:rustc-link-lib=gthread-2.0");
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
-    */
+
 }
+*/
