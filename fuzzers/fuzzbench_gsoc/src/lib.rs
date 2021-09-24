@@ -260,7 +260,7 @@ fn fuzz(
         havoc_mutations()
             .merge(tokens_mutations())
             .merge(tuple_list!(I2SRandReplace::new())),
-        16,
+        5,
     )?;
 
     let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
