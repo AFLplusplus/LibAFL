@@ -1,4 +1,4 @@
-//! A singlethreaded QEMU fuzzer that can auto-restart.
+//! A singlethreade libfuzzer-like fuzzer that can auto-restart.
 
 use clap::{App, Arg};
 use core::{cell::RefCell, time::Duration};
@@ -22,80 +22,86 @@ use libafl::{
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
-    corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{
+        Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
+    },
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
-        tokens_mutations, I2SRandReplace, Tokens,
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    observers::{StdMapObserver, TimeObserver},
+    stages::{
+        calibrate::CalibrationStage,
+        power::{PowerMutationalStage, PowerSchedule},
+        TracingStage,
+    },
     state::{HasCorpus, HasMetadata, StdState},
     stats::SimpleStats,
     Error,
 };
-use libafl_qemu::{
-    amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, hooks, hooks::CmpLogObserver, MmapPerms,
-    QemuExecutor,
+use libafl_targets::{
+    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
+    MAX_EDGES_NUM,
 };
 
-/// The fuzzer main
-pub fn main() {
+/// The fuzzer main (as `no_mangle` C function)
+#[no_mangle]
+pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-    emu::init(&args, &env);
-
-    let res = match App::new("libafl_qemu_fuzzbench")
+    let res = match App::new("libafl_fuzzbench")
         .version("0.4.0")
         .author("AFLplusplus team")
-        .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
+        .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
             Arg::new("out")
                 .about("The directory to place finds in ('corpus')")
-                .long("libafl-out")
                 .required(true)
+                .index(1)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
                 .about("The directory to read initial inputs from ('seeds')")
-                .long("libafl-in")
                 .required(true)
+                .index(2)
                 .takes_value(true),
         )
         .arg(
             Arg::new("tokens")
-                .long("libafl-tokens")
+                .short('x')
+                .long("tokens")
                 .about("A file to read tokens from, to be used during fuzzing")
                 .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
-                .long("libafl-logfile")
+                .short('l')
+                .long("logfile")
                 .about("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
         .arg(
             Arg::new("timeout")
-                .long("libafl-timeout")
+                .short('t')
+                .long("timeout")
                 .about("Timeout for each individual execution, in milliseconds")
                 .default_value("1000"),
         )
-        .try_get_matches_from(filter_qemu_args())
+        .try_get_matches()
     {
         Ok(res) => res,
         Err(err) => {
             println!(
-                "Syntax: {}, --libafl-in <input> --libafl-out <output>\n{:?}",
+                "Syntax: {}, [-x dictionary] corpus_dir seed_dir\n{:?}",
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
@@ -154,36 +160,6 @@ fn fuzz(
     logfile: PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
-    let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu::binary_path(), &mut elf_buffer)?;
-
-    let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu::load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
-
-    emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::run();
-
-    println!(
-        "Break at {:#x}",
-        emu::read_reg::<_, u64>(Amd64Regs::Rip).unwrap()
-    );
-
-    let stack_ptr: u64 = emu::read_reg(Amd64Regs::Rsp).unwrap();
-    let mut ret_addr = [0u64];
-    emu::read_mem(stack_ptr, &mut ret_addr);
-    let ret_addr = ret_addr[0];
-
-    println!("Stack pointer = {:#x}", stack_ptr);
-    println!("Return address = {:#x}", ret_addr);
-
-    emu::remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
-
-    let input_addr = emu::map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
-    println!("Placing input at {:#x}", input_addr);
-
     let log = RefCell::new(
         OpenOptions::new()
             .append(true)
@@ -208,6 +184,8 @@ fn fuzz(
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
+    // We need a shared map to store our state before a crash.
+    // This way, we are able to continue fuzzing afterwards.
     let mut shmem_provider = StdShMemProvider::new()?;
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
@@ -224,16 +202,15 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut hooks::EDGES_MAP };
-    let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
-    let edges_observer =
-        HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+    // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
+    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+    let edges_observer = StdMapObserver::new("edges", edges);
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut hooks::CMPLOG_MAP }, true);
+    let cmplog = unsafe { &mut CMPLOG_MAP };
+    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
@@ -250,7 +227,7 @@ fn fuzz(
     // A feedback to choose if an input is a solution or not
     let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
-    // create a State from scratch
+    // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
@@ -266,8 +243,30 @@ fn fuzz(
         )
     });
 
+    println!("Let's fuzz :)");
+
+    // The actual target run starts here.
+    // Call LLVMFUzzerInitialize() if present.
+    let args: Vec<String> = env::args().collect();
+    if libfuzzer_initialize(&args) == -1 {
+        println!("Warning: LLVMFuzzerInitialize failed with -1")
+    }
+
+    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+
+    // Setup a MOPT mutator
+    let mutator = StdMOptMutator::new(
+        &mut state,
+        havoc_mutations()
+            .merge(tokens_mutations())
+            .merge(tuple_list!(I2SRandReplace::new())),
+        5,
+    )?;
+
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -275,46 +274,40 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let mut buf = target.as_slice();
-        let mut len = buf.len();
-        if len > 4096 {
-            buf = &buf[0..4096];
-            len = 4096;
-        }
-
-        emu::write_mem(input_addr, buf);
-
-        emu::write_reg(Amd64Regs::Rdi, input_addr).unwrap();
-        emu::write_reg(Amd64Regs::Rsi, len).unwrap();
-        emu::write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
-        emu::write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
-
-        emu::run();
-
+        let buf = target.as_slice();
+        libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
 
-    let executor = QemuExecutor::new(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )?;
-
-    // Track edge coverage
-    executor.hook_edge_generation(hooks::gen_unique_edge_ids);
-    executor.hook_edge_execution(hooks::trace_edge_hitcount);
-    // Track 2-4-8 cmps with CmpLog
-    executor.hook_cmp_generation(hooks::gen_unique_cmp_ids);
-    executor.hook_cmp8_execution(hooks::trace_cmp8_cmplog);
-    executor.hook_cmp4_execution(hooks::trace_cmp4_cmplog);
-    executor.hook_cmp2_execution(hooks::trace_cmp2_cmplog);
+    let mut tracing_harness = harness;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = TimeoutExecutor::new(executor, timeout);
-    // Show the cmplog observer
-    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+    let mut executor = TimeoutExecutor::new(
+        InProcessExecutor::new(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+        )?,
+        timeout,
+    );
+
+    // Setup a tracing stage in which we log comparisons
+    let tracing = TracingStage::new(TimeoutExecutor::new(
+        InProcessExecutor::new(
+            &mut tracing_harness,
+            tuple_list!(cmplog_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+        )?,
+        // Give it more time!
+        timeout * 10,
+    ));
+
+    // The order of the stages matter!
+    let mut stages = tuple_list!(calibration, tracing, power);
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
@@ -323,6 +316,7 @@ fn fuzz(
         }
     }
 
+    // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
@@ -332,16 +326,6 @@ fn fuzz(
             });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
-
-    let tracing = ShadowTracingStage::new(&mut executor);
-
-    // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(I2SRandReplace::new());
-
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-
-    let mut stages = tuple_list!(tracing, i2s, StdMutationalStage::new(mutator));
 
     // Remove target ouput (logs still survive)
     #[cfg(unix)]
@@ -358,9 +342,7 @@ fn fuzz(
             .open(&logfile)?,
     );
 
-    fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-        .expect("Error in the fuzzing loop");
+    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
     // Never reached
     Ok(())
