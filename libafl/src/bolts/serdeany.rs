@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use alloc;
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 

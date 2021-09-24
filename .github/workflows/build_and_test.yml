@@ -40,7 +40,7 @@ jobs:
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -90,7 +90,7 @@ jobs:
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang nasm
+      run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
   nostd-build:
@@ -108,6 +108,8 @@ jobs:
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
       run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
+    - name: no_std tests
+      run: cd ./libafl && cargo test --no-default-features 
   build-docker:
     runs-on: ubuntu-latest
     steps:

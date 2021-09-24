@@ -31,3 +31,5 @@ AFLplusplus
 # Ignore common dummy and logfiles
 *.log
 a
+
+forkserver_test

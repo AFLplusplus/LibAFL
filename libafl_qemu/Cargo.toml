@@ -31,3 +31,4 @@ cc = { version = "1.0" }
 [lib]
 name = "libafl_qemu"
 crate-type = ["cdylib", "rlib"]
+which = "4.1"
