@@ -37,7 +37,7 @@ env:
 	python3 -m pip install --user virtualenv
 	python3 -m venv env
 
-short_test: #all
+short_test: all
 	(\
 	rm -rf libafl_unix_shmem_server || true; \
 	source env/bin/activate; \
@@ -45,7 +45,7 @@ short_test: #all
 	rm -rf out; \
 	)
 
-test: #all
+test: all
 	(\
 	rm -rf libafl_unix_shmem_server || true; \
 	source env/bin/activate; \
