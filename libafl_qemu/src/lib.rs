@@ -44,6 +44,11 @@ fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     use core::mem::transmute;
 
     #[pyfn(m)]
+    fn init(args: Vec<String>, env: Vec<(String, String)>) -> i32 {
+        emu::init(&args, &env)
+    }
+
+    #[pyfn(m)]
     fn write_mem(addr: u64, buf: &[u8]) {
         emu::write_mem(addr, buf)
     }

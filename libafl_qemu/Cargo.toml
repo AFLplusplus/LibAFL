@@ -12,7 +12,7 @@ edition = "2018"
 
 [features]
 python = ["pyo3"]
-default = []
+default = ["python"]
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.6.1" }
@@ -27,8 +27,8 @@ pyo3 = { version = "0.14.3", features = ["extension-module"], optional = true }
 
 [build-dependencies]
 cc = { version = "1.0" }
+which = "4.1"
 
 [lib]
 name = "libafl_qemu"
 crate-type = ["cdylib", "rlib"]
-which = "4.1"
