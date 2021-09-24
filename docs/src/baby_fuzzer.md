@@ -75,6 +75,9 @@ Opening `src/main.rs`, we have an empty main function.
 To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`.
 
 ```rust
+extern crate libafl;
+use libafl::inputs::{BytesInput, HasTargetBytes};
+
 let mut harness = |input: &BytesInput| {
     let target = input.target_bytes();
     let buf = target.as_slice();
@@ -160,6 +163,8 @@ Now we have the 4 major entities ready for running our tests, but we still canno
 For this purpose, we use a Generator, RandPrintablesGenerator that generates a string of printable bytes.
 
 ```rust,ignore
+extern crate libafl;
+
 use libafl::generators::RandPrintablesGenerator;
 
 // Generator of printable bytearrays of max size 32
@@ -174,6 +179,8 @@ state
 Now you can prepend the following `use` directives to your main.rs and compile it.
 
 ```rust 
+extern crate libafl;
+
 use std::path::PathBuf;
 use libafl::{
     bolts::{current_nanos, rands::StdRand},
@@ -204,20 +211,23 @@ Now we want to turn our simple fuzzer into a feedback-based one and increase the
 
 To do that, we need a way to keep track of if a condition is satisfied. The component that feeds the fuzzer with information about properties of a fuzzing run, the satisfied conditions in our case, is the Observer. We use the `StdMapObserver`, the default observer that uses a map to keep track of covered elements. In our fuzzer, each condition is mapped to an entry of such map.
 
-We represent such map as a `static mut` variable:
+We represent such map as a `static mut` variable.
+As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions in a map modyfing our tested function:
 
 ```rust
+extern crate libafl;
+use libafl::{
+    inputs::{BytesInput, HasTargetBytes},
+    executors::ExitKind,
+};
+
 // Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
 
 fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
-```
 
-As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions in a map modyfing our tested function:
-
-```rust
 // The closure that we want to fuzz
 let mut harness = |input: &BytesInput| {
     let target = input.target_bytes();
@@ -260,9 +270,10 @@ Feedbacks are used also to decide if an input is a "solution". The feedback that
 
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
-```rust
+```rust,ignore
+extern crate libafl;
 use libafl::{
-    bolts::rands::StdRand,
+    bolts::{rands::StdRand,
     corpus::{InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     feedbacks::{MapFeedbackState, MaxMapFeedback, CrashFeedback},
