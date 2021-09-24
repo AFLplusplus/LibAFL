@@ -297,6 +297,7 @@ pub mod pybind {
             }
         }
 
+        #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
