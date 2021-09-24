@@ -1,5 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The `launcher` will spawn new processes for each cpu core.
+//! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
+//! for python instrumentation and fuzzing.
 
 use clap::{App, AppSettings, Arg};
 use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
@@ -37,20 +39,11 @@ use libafl::{
     stats::MultiStats,
     Error,
 };
-use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP_PTR, MAX_EDGES_NUM};
-
-extern "C" {
-    pub fn __sanitizer_cov_trace_cmp1(v0: u8, v1: u8);
-    pub fn __sanitizer_cov_trace_cmp2(v0: u16, v1: u16);
-    pub fn __sanitizer_cov_trace_cmp4(v0: u32, v1: u32);
-    pub fn __sanitizer_cov_trace_cmp8(v0: u64, v1: u64);
-}
-
-/// This seems to be unused by atheris, so we can ignore it.
-#[no_mangle]
-pub fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
-    // noop
-}
+use libafl_targets::{
+    CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
+    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, CMPLOG_MAP, EDGES_MAP_PTR,
+    MAX_EDGES_NUM,
+};
 
 /// Set up our coverage map.
 #[no_mangle]
@@ -61,7 +54,16 @@ pub fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     }
 }
 
-/// There must be a better way to `cmplog` this, but for now this should be fine(?)
+/// `pcs` tables seem to be unused by `Atheris`, so we can ignore this setup function,
+/// but the symbol is still being called and, hence, required.
+#[no_mangle]
+pub fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
+    // noop
+}
+
+/// Allow the python code to use `cmplog`.
+/// This is a PoC implementation and could be improved.
+/// For example, it only takes up to 8 bytes into consideration.
 #[no_mangle]
 pub fn __sanitizer_weak_hook_memcmp(
     _caller_pc: *const c_void,
@@ -95,8 +97,10 @@ pub fn __sanitizer_weak_hook_memcmp(
     }
 }
 
-/// The main fn, `no_mangle` as it is a C symbol
 /// It's called by Atheris after the fuzzer has been initialized.
+/// The main entrypoint to our fuzzer, which will be called by `Atheris` when fuzzing starts.
+/// The `harness_fn` parameter is the function that will be called by `LibAFL` for each iteration
+/// and jumps back into `Atheris'` instrumented python code.
 #[no_mangle]
 #[allow(non_snake_case)]
 pub fn LLVMFuzzerRunDriver(
@@ -351,6 +355,7 @@ pub fn LLVMFuzzerRunDriver(
         Ok(())
     };
 
+    // Let's go. Python fuzzing ftw!
     match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
@@ -359,6 +364,7 @@ pub fn LLVMFuzzerRunDriver(
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(remote_broker_addr)
+        // remove this comment to sience the target.
         //.stdout_file(Some("/dev/null"))
         .build()
         .launch()
