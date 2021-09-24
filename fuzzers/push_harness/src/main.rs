@@ -1,3 +1,5 @@
+//! [`Klo-routines`](https://github.com/andreafioraldi/klo-routines/) based fuzzer.
+//! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
 use klo_routines::*;
 use libafl::inputs::{BytesInput, HasTargetBytes};
 use libafl::{
@@ -29,6 +31,8 @@ fn signals_set(idx: usize) {
 fn input_generator() {
     // The closure that produced the input for the generator
     let mut harness = |input: &BytesInput| {
+        // The `yield_` switches execution context back to the loop in `main`.
+        // When `resume` is called, we return to this function.
         yield_(input);
         ExitKind::Ok
     };
@@ -99,11 +103,15 @@ fn input_generator() {
         .expect("Error in the fuzzing loop");
 }
 
+/// the main function loops independently of the fuzzer.
+/// `Klo` internally switches between the `LibAFL` and harness coroutines to generate the inputs.
 pub fn main() {
+    // Set up the Klo-routines harness
     let mut input_generator = input_generator;
     let mut klo =
         KloRoutine::<_, &BytesInput>::with_stack_size(&mut input_generator, 512 * 1024 * 1024);
 
+    // Loop, calling `klo.resume` repeatedly. This will switch execution to the loop in the `input_generator` function.
     while let Some(input) = klo.resume() {
         let target = input.target_bytes();
         let buf = target.as_slice();
