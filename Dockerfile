@@ -70,6 +70,7 @@ COPY scripts/dummy.rs libafl_concolic/symcc_libafl/src/lib.rs
 
 RUN cargo build && cargo build --release
 
+COPY utils utils
 COPY scripts scripts
 COPY docs docs
 
