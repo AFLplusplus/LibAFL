@@ -139,6 +139,7 @@ extern "C" {
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
 }
 
+#[allow(clippy::must_use_candidate, clippy::similar_names)]
 pub fn init(args: &[String], env: &[(String, String)]) -> i32 {
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
     assert!(argv.len() < i32::MAX as usize);
