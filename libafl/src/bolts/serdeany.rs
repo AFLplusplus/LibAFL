@@ -35,6 +35,8 @@ pub trait SerdeAny: Any + erased_serde::Serialize {
     fn as_any(&self) -> &dyn Any;
     /// returns this as mutable Any trait
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// returns this as boxed Any trait
+    fn as_any_boxed(self: Box<Self>) -> Box<dyn Any>;
 }
 
 /// Wrap a type for serialization
@@ -239,6 +241,18 @@ macro_rules! create_serde_registry_for_trait {
                         .map(|x| x.as_mut().as_any_mut().downcast_mut::<T>().unwrap())
                 }
 
+                /// Remove an element in the map. Returns the removed element.
+                #[must_use]
+                #[inline]
+                pub fn remove<T>(&mut self) -> Option<Box<T>>
+                where
+                    T: $trait_name,
+                {
+                    self.map
+                        .remove(&unpack_type_id(TypeId::of::<T>()))
+                        .map(|x| x.as_any_boxed().downcast::<T>().unwrap())
+                }
+
                 /// Insert an element into the map.
                 #[inline]
                 pub fn insert<T>(&mut self, t: T)
@@ -247,6 +261,15 @@ macro_rules! create_serde_registry_for_trait {
                 {
                     self.map
                         .insert(unpack_type_id(TypeId::of::<T>()), Box::new(t));
+                }
+
+                /// Insert a boxed element into the map.
+                #[inline]
+                pub fn insert_boxed<T>(&mut self, t: Box<T>)
+                where
+                    T: $trait_name,
+                {
+                    self.map.insert(unpack_type_id(TypeId::of::<T>()), t);
                 }
 
                 /// Returns the count of elements in this map.
@@ -574,11 +597,17 @@ pub use serdeany_registry::*;
 macro_rules! impl_serdeany {
     ($struct_name:ident) => {
         impl $crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn core::any::Any {
+            fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
 
-            fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
+                self
+            }
+
+            fn as_any_boxed(
+                self: ::std::boxed::Box<Self>,
+            ) -> ::std::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }
@@ -596,11 +625,17 @@ macro_rules! impl_serdeany {
 macro_rules! impl_serdeany {
     ($struct_name:ident) => {
         impl $crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn core::any::Any {
+            fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
 
-            fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
+                self
+            }
+
+            fn as_any_boxed(
+                self: ::alloc::boxed::Box<Self>,
+            ) -> ::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }

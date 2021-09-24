@@ -3,7 +3,7 @@
 use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusScheduler, Testcase},
-    events::{Event, EventFirer, EventManager},
+    events::{Event, EventConfig, EventFirer, EventManager},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
@@ -337,7 +337,7 @@ where
         #[cfg(feature = "introspection")]
         let is_solution = self
             .objective_mut()
-            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
 
         if is_solution {
             res = ExecuteInputResult::Solution;
@@ -350,7 +350,7 @@ where
             #[cfg(feature = "introspection")]
             let is_corpus = self
                 .feedback_mut()
-                .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+                .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
 
             if is_corpus {
                 res = ExecuteInputResult::Corpus;
@@ -374,7 +374,12 @@ where
                 self.scheduler_mut().on_add(state, idx)?;
 
                 if send_events {
-                    let observers_buf = manager.serialize_observers(observers)?;
+                    // TODO set None for fast targets
+                    let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
+                        None
+                    } else {
+                        Some(manager.serialize_observers(observers)?)
+                    };
                     manager.fire(
                         state,
                         Event::NewTestcase {
@@ -382,7 +387,7 @@ where
                             observers_buf,
                             exit_kind: exit_kind.clone(),
                             corpus_size: state.corpus().count(),
-                            client_config: manager.configuration().to_string(),
+                            client_config: manager.configuration(),
                             time: current_time(),
                             executions: *state.executions(),
                         },
@@ -494,7 +499,11 @@ where
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 
-        let observers_buf = manager.serialize_observers(observers)?;
+        let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
+            None
+        } else {
+            Some(manager.serialize_observers(observers)?)
+        };
         manager.fire(
             state,
             Event::NewTestcase {
@@ -502,7 +511,7 @@ where
                 observers_buf,
                 exit_kind,
                 corpus_size: state.corpus().count(),
-                client_config: manager.configuration().to_string(),
+                client_config: manager.configuration(),
                 time: current_time(),
                 executions: *state.executions(),
             },

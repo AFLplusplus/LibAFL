@@ -209,12 +209,12 @@ where
     }
 }
 
-/// Provides a `builder` which can be used to build a [`RestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`SimpleRestartingEventManager`], which is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-pub struct SimpleRestartingEventManager<'a, C, I, S, SP, ST>
+pub struct SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
     C: Corpus<I>,
     I: Input,
@@ -227,11 +227,12 @@ where
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SP>,
     /// Phantom data
-    _phantom: PhantomData<&'a (C, I, S)>,
+    _phantom: PhantomData<&'a (C, I, S, SC)>,
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, I, S, SP, ST> EventFirer<I, S> for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
+impl<'a, C, I, S, SC, SP, ST> EventFirer<I, S>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
     C: Corpus<I>,
     I: Input,
@@ -245,7 +246,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, I, S, SP, ST> EventRestarter<S> for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
+impl<'a, C, I, S, SC, SP, ST> EventRestarter<S>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
     C: Corpus<I>,
     I: Input,
@@ -262,8 +264,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, E, I, S, SP, ST, Z> EventProcessor<E, I, S, Z>
-    for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
+impl<'a, C, E, I, S, SC, SP, ST, Z> EventProcessor<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
     C: Corpus<I>,
     I: Input,
@@ -277,8 +279,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, E, I, S, SP, ST, Z> EventManager<E, I, S, Z>
-    for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
+impl<'a, C, E, I, S, SC, SP, ST, Z> EventManager<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
     C: Corpus<I>,
     I: Input,
@@ -289,7 +291,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, I, S, SP, ST> HasEventManagerId for SimpleRestartingEventManager<'a, C, I, S, SP, ST>
+impl<'a, C, I, S, SC, SP, ST> HasEventManagerId
+    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
     C: Corpus<I>,
     I: Input,
@@ -304,11 +307,12 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<'a, C, I, S, SP, ST> SimpleRestartingEventManager<'a, C, I, S, SP, ST>
+impl<'a, C, I, S, SC, SP, ST> SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
 where
     C: Corpus<I>,
     I: Input,
-    S: DeserializeOwned + Serialize + HasCorpus<C, I> + HasSolutions<C, I>,
+    S: DeserializeOwned + Serialize + HasCorpus<C, I> + HasSolutions<SC, I>,
+    SC: Corpus<I>,
     SP: ShMemProvider,
     ST: Stats, //TODO CE: CustomEvent,
 {

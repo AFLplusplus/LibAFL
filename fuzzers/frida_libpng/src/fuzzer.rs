@@ -3,9 +3,6 @@
 
 use clap::{App, Arg};
 
-#[cfg(target_os = "android")]
-use libafl::bolts::os::ashmem_server::AshmemService;
-
 use libafl::{
     bolts::{
         current_nanos,
@@ -19,6 +16,7 @@ use libafl::{
         ondisk::OnDiskMetadataFormat, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
+    events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{
         inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
         ShadowExecutor,
@@ -233,7 +231,7 @@ pub fn main() {
         .map(|addrstr| addrstr.parse().unwrap());
 
     unsafe {
-        fuzz(
+        match fuzz(
             matches.value_of("harness").unwrap(),
             matches.value_of("symbol").unwrap(),
             &matches
@@ -252,8 +250,10 @@ pub fn main() {
                 .value_of("configuration")
                 .unwrap_or("default launcher")
                 .to_string(),
-        )
-        .expect("An error occurred while fuzzing");
+        ) {
+            Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
+            Err(e) => panic!("Error during fuzzing: {:?}", e),
+        }
     }
 }
 
@@ -292,12 +292,14 @@ unsafe fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let stats = MultiStats::new(|s| println!("{}", s));
 
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Failed to start Ashmem service");
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                          _core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+
+        // println!("{:?}", mgr.mgr_id());
 
         let lib = libloading::Library::new(module_name).unwrap();
         let target_func: libloading::Symbol<
@@ -317,7 +319,7 @@ unsafe fn fuzz(
             &gum,
             &frida_options,
             module_name,
-            &modules_to_instrument,
+            modules_to_instrument,
         );
 
         // Create an observation channel using the coverage map
@@ -411,7 +413,7 @@ unsafe fn fuzz(
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, corpus_dirs)
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
@@ -445,7 +447,7 @@ unsafe fn fuzz(
     };
 
     Launcher::builder()
-        .configuration(configuration)
+        .configuration(EventConfig::from_name(&configuration))
         .shmem_provider(shmem_provider)
         .stats(stats)
         .run_client(&mut run_client)

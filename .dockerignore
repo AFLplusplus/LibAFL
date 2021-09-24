@@ -29,3 +29,7 @@ AFLplusplus
 # Ignore common dummy and logfiles
 *.log
 a
+
+# ignore files from concolic tests
+symcc_build
+symcc

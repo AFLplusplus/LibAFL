@@ -21,7 +21,7 @@ do
         echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
     fi
 
-    if [ -e ./Makefile ] && [ "$(uname)" == "Linux" ]; then
+    if [ -e ./Makefile ]; then
         echo "[*] Testing $fuzzer"
         make short_test || exit 1
 	    echo "[+] Done testing $fuzzer"

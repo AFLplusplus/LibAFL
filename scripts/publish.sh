@@ -31,3 +31,27 @@ sleep 20
 cd libafl_frida
 cargo publish $@
 cd ..
+
+sleep 20
+
+cd libafl_qemu
+cargo publish $@
+cd ..
+
+sleep 20
+
+cd libafl_sugar
+cargo publish $@
+cd ..
+
+sleep 20
+
+cd libafl_concolic/symcc_libafl
+cargo publish $@
+cd ../..
+
+sleep 20
+
+cd libafl_concolic/symcc_runtime
+cargo publish $@
+cd ../..

@@ -18,6 +18,7 @@ use libafl::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
+    events::EventConfig,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -49,7 +50,7 @@ pub fn libafl_main() {
     let yaml = load_yaml!("clap-config.yaml");
     let matches = App::from(yaml).get_matches();
 
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap())
+    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
     let broker_port = matches
         .value_of("broker_port")
@@ -78,13 +79,11 @@ pub fn libafl_main() {
 
     println!("Workdir: {:?}", workdir.to_string_lossy().to_string());
 
-    #[cfg(target_os = "android")]
-    AshmemService::start().expect("Failed to start Ashmem service");
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let stats = MultiStats::new(|s| println!("{}", s));
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
         let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
@@ -127,7 +126,7 @@ pub fn libafl_main() {
             )
         });
 
-        // Create a PNG dictionary if not existing
+        // Create a dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
             for tokens_file in &token_files {
                 state.add_metadata(Tokens::from_tokens_file(tokens_file)?);
@@ -233,7 +232,7 @@ pub fn libafl_main() {
 
     Launcher::builder()
         .shmem_provider(shmem_provider)
-        .configuration("launcher default".into())
+        .configuration(EventConfig::from_name("default"))
         .stats(stats)
         .run_client(&mut run_client)
         .cores(&cores)

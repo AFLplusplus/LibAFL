@@ -132,9 +132,14 @@ where
     pub name: String,
 }
 
-impl<T> FeedbackState for MapFeedbackState<T> where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned
+impl<T> FeedbackState for MapFeedbackState<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
+    fn reset(&mut self) -> Result<(), Error> {
+        self.history_map.iter_mut().for_each(|x| *x = T::default());
+        Ok(())
+    }
 }
 
 impl<T> Named for MapFeedbackState<T>

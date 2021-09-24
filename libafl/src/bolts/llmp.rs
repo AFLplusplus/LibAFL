@@ -84,18 +84,22 @@ use std::{
 use backtrace::Backtrace;
 
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{setup_signal_handler, siginfo_t, Handler, Signal};
+use crate::bolts::os::unix_signals::{
+    setup_signal_handler, siginfo_t, ucontext_t, Handler, Signal,
+};
 use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
-#[cfg(unix)]
-use libc::ucontext_t;
 #[cfg(all(unix, feature = "std"))]
 use nix::sys::socket::{self, sockopt::ReusePort};
 #[cfg(all(unix, feature = "std"))]
 use std::os::unix::io::AsRawFd;
 
+/// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
+/// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
+/// Instead of increasing this value, you may consider sending new messages at a lower rate, else your Sender will eventually `OOM`.
+const LLMP_CFG_MAX_PENDING_UNREAD_PAGES: usize = 3;
 /// We'll start off with 256 megabyte maps per fuzzer client
 #[cfg(not(feature = "llmp_small_maps"))]
 const LLMP_CFG_INITIAL_MAP_SIZE: usize = 1 << 28;
@@ -117,6 +121,8 @@ const LLMP_TAG_END_OF_PAGE: Tag = 0xAF1E0F1;
 const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
 /// The sender on this map is exiting (if broker exits, clients should exit gracefully);
 const LLMP_TAG_EXITING: Tag = 0x13C5171;
+/// Client gave up as the receiver/broker was too slow
+const LLMP_SLOW_RECEIVER_PANIC: Tag = 0x70051041;
 
 /// Unused...
 pub const LLMP_FLAG_INITIALIZED: Flags = 0x0;
@@ -132,9 +138,13 @@ const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(3_000);
 /// If broker2broker is enabled, bind to public IP
 #[cfg(feature = "llmp_bind_public")]
 const _LLMP_BIND_ADDR: &str = "0.0.0.0";
+
 /// If broker2broker is disabled, bind to localhost
 #[cfg(not(feature = "llmp_bind_public"))]
 const _LLMP_BIND_ADDR: &str = "127.0.0.1";
+
+/// LLMP Client connects to this address
+const _LLMP_CONNECT_ADDR: &str = "localhost";
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -431,7 +441,7 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     (*page).size_used = 0;
     (*(*page).messages.as_mut_ptr()).message_id = 0;
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
-    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 0);
+    ptr::write_volatile(ptr::addr_of_mut!((*page).safe_to_unmap), 0);
     ptr::write_volatile(ptr::addr_of_mut!((*page).sender_dead), 0);
     assert!((*page).size_total != 0);
 }
@@ -666,7 +676,7 @@ pub struct LlmpPage {
     /// Set to != 1 by the receiver, once it got mapped
     /// It's not safe for the sender to unmap this page before
     /// (The os may have tidied up the memory when the receiver starts to map)
-    pub save_to_unmap: u16,
+    pub safe_to_unmap: u16,
     /// Not used at the moment (would indicate that the sender is no longer there)
     pub sender_dead: u16,
     /// The current message ID
@@ -795,22 +805,40 @@ where
 
     /// Waits for this sender to be save to unmap.
     /// If a receiver is involved, this function should always be called.
-    pub fn await_save_to_unmap_blocking(&self) {
+    pub fn await_safe_to_unmap_blocking(&self) {
+        #[cfg(feature = "std")]
+        let mut ctr = 0_u16;
         loop {
-            if self.save_to_unmap() {
+            if self.safe_to_unmap() {
                 return;
+            }
+            // We log that we're looping -> see when we're blocking.
+            #[cfg(feature = "std")]
+            {
+                ctr = ctr.wrapping_add(1);
+                if ctr == 0 {
+                    println!("Awaiting safe_to_unmap_blocking");
+                }
             }
         }
     }
 
     /// If we are allowed to unmap this client
-    pub fn save_to_unmap(&self) -> bool {
+    pub fn safe_to_unmap(&self) -> bool {
         let current_out_map = self.out_maps.last().unwrap();
         unsafe {
             compiler_fence(Ordering::SeqCst);
-            // println!("Reading save_to_unmap from {:?}", current_out_map.page() as *const _);
-            ptr::read_volatile(ptr::addr_of!((*current_out_map.page()).save_to_unmap)) != 0
+            // println!("Reading safe_to_unmap from {:?}", current_out_map.page() as *const _);
+            ptr::read_volatile(ptr::addr_of!((*current_out_map.page()).safe_to_unmap)) != 0
         }
+    }
+
+    /// For debug purposes: Mark save to unmap, even though it might not have been read by a receiver yet.
+    /// # Safety
+    /// If this method is called, the page may be unmapped before it is read by any receiver.
+    pub unsafe fn mark_safe_to_unmap(&mut self) {
+        // No need to do this volatile, as we should be the same thread in this scenario.
+        (*self.out_maps.last_mut().unwrap().page_mut()).safe_to_unmap = 1;
     }
 
     /// Reattach to a vacant `out_map`.
@@ -840,17 +868,24 @@ where
 
     /// For non zero-copy, we want to get rid of old pages with duplicate messages in the client
     /// eventually. This function This funtion sees if we can unallocate older pages.
-    /// The broker would have informed us by setting the save_to_unmap-flag.
+    /// The broker would have informed us by setting the safe_to_unmap-flag.
     unsafe fn prune_old_pages(&mut self) {
         // Exclude the current page by splitting of the last element for this iter
         let mut unmap_until_excl = 0;
         for map in self.out_maps.split_last_mut().unwrap().1 {
-            if (*map.page_mut()).save_to_unmap == 0 {
+            if (*map.page_mut()).safe_to_unmap == 0 {
                 // The broker didn't read this page yet, no more pages to unmap.
                 break;
             }
             unmap_until_excl += 1;
         }
+
+        if unmap_until_excl == 0 && self.out_maps.len() > LLMP_CFG_MAX_PENDING_UNREAD_PAGES {
+            // We send one last information to the broker before quitting.
+            self.send_buf(LLMP_SLOW_RECEIVER_PANIC, &[]).unwrap();
+            panic!("The receiver/broker could not process our sent llmp messages in time. Either we're sending too many messages too fast, the broker got stuck, or it crashed. Giving up.");
+        }
+
         // Remove all maps that the broker already mapped
         // simply removing them from the vec should then call drop and unmap them.
         self.out_maps.drain(0..unmap_until_excl);
@@ -1354,7 +1389,7 @@ where
                     self.last_msg_recvd = ptr::null();
 
                     // Mark the old page save to unmap, in case we didn't so earlier.
-                    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 1);
+                    ptr::write_volatile(ptr::addr_of_mut!((*page).safe_to_unmap), 1);
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_map =
@@ -1364,7 +1399,7 @@ where
                         )?);
                     page = self.current_recv_map.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
-                    ptr::write_volatile(ptr::addr_of_mut!((*page).save_to_unmap), 1);
+                    ptr::write_volatile(ptr::addr_of_mut!((*page).safe_to_unmap), 1);
 
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
@@ -1539,11 +1574,11 @@ where
         ret
     }
 
-    /// Marks the containing page as `save_to_unmap`.
+    /// Marks the containing page as `safe_to_unmap`.
     /// This indicates, that the page may safely be unmapped by the sender.
-    pub fn mark_save_to_unmap(&mut self) {
+    pub fn mark_safe_to_unmap(&mut self) {
         unsafe {
-            ptr::write_volatile(ptr::addr_of_mut!((*self.page_mut()).save_to_unmap), 1);
+            ptr::write_volatile(ptr::addr_of_mut!((*self.page_mut()).safe_to_unmap), 1);
         }
     }
 
@@ -1719,7 +1754,7 @@ where
     /// Returns the id of the new client in [`broker.client_map`]
     pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::Mem>) {
         // Tell the client it may unmap this page now.
-        client_page.mark_save_to_unmap();
+        client_page.mark_safe_to_unmap();
 
         let id = self.llmp_clients.len() as u32;
         self.llmp_clients.push(LlmpReceiver {
@@ -1868,11 +1903,8 @@ where
             }
 
             #[cfg(not(feature = "std"))]
-            match sleep_time {
-                Some(_) => {
-                    panic!("Cannot sleep on no_std platform");
-                }
-                None => (),
+            if let Some(time) = sleep_time {
+                panic!("Cannot sleep on no_std platform (requested {:?})", time);
             }
         }
         self.llmp_out
@@ -2231,64 +2263,72 @@ where
                 }
             };
 
-            if (*msg).tag == LLMP_TAG_NEW_SHM_CLIENT {
-                /* This client informs us about yet another new client
-                add it to the list! Also, no need to forward this msg. */
-                let msg_buf_len_padded = (*msg).buf_len_padded;
-                if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
-                    #[cfg(feature = "std")]
-                    println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
-                        msg_buf_len_padded,
-                        size_of::<LlmpPayloadSharedMapInfo>()
-                    );
-                    #[cfg(not(feature = "std"))]
-                    return Err(Error::Unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
-                        msg_buf_len_padded,
-                        size_of::<LlmpPayloadSharedMapInfo>()
-                    )));
-                } else {
-                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-
-                    match self.shmem_provider.from_id_and_size(
-                        ShMemId::from_slice(&(*pageinfo).shm_str),
-                        (*pageinfo).map_size,
-                    ) {
-                        Ok(new_map) => {
-                            let mut new_page = LlmpSharedMap::existing(new_map);
-                            let id = next_id;
-                            next_id += 1;
-                            new_page.mark_save_to_unmap();
-                            self.llmp_clients.push(LlmpReceiver {
-                                id,
-                                current_recv_map: new_page,
-                                last_msg_recvd: ptr::null_mut(),
-                                shmem_provider: self.shmem_provider.clone(),
-                            });
-                        }
-                        Err(e) => {
-                            #[cfg(feature = "std")]
-                            println!("Error adding client! Ignoring: {:?}", e);
-                            #[cfg(not(feature = "std"))]
-                            return Err(Error::Unknown(format!(
-                                "Error adding client! PANIC! {:?}",
-                                e
-                            )));
-                        }
-                    };
+            match (*msg).tag {
+                // first, handle the special, llmp-internal messages
+                LLMP_SLOW_RECEIVER_PANIC => {
+                    return Err(Error::Unknown(format!("The broker was too slow to handle messages of client {} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!", client_id)));
                 }
-            } else {
-                // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
-                let mut should_forward_msg = true;
+                LLMP_TAG_NEW_SHM_CLIENT => {
+                    /* This client informs us about yet another new client
+                    add it to the list! Also, no need to forward this msg. */
+                    let msg_buf_len_padded = (*msg).buf_len_padded;
+                    if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
+                        #[cfg(feature = "std")]
+                        println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
+                            msg_buf_len_padded,
+                            size_of::<LlmpPayloadSharedMapInfo>()
+                        );
+                        #[cfg(not(feature = "std"))]
+                        return Err(Error::Unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
+                            msg_buf_len_padded,
+                            size_of::<LlmpPayloadSharedMapInfo>()
+                        )));
+                    } else {
+                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
-                let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
-                let msg_buf = (*msg).as_slice(map)?;
-                if let LlmpMsgHookResult::Handled =
-                    (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
-                {
-                    should_forward_msg = false;
+                        match self.shmem_provider.from_id_and_size(
+                            ShMemId::from_slice(&(*pageinfo).shm_str),
+                            (*pageinfo).map_size,
+                        ) {
+                            Ok(new_map) => {
+                                let mut new_page = LlmpSharedMap::existing(new_map);
+                                let id = next_id;
+                                next_id += 1;
+                                new_page.mark_safe_to_unmap();
+                                self.llmp_clients.push(LlmpReceiver {
+                                    id,
+                                    current_recv_map: new_page,
+                                    last_msg_recvd: ptr::null_mut(),
+                                    shmem_provider: self.shmem_provider.clone(),
+                                });
+                            }
+                            Err(e) => {
+                                #[cfg(feature = "std")]
+                                println!("Error adding client! Ignoring: {:?}", e);
+                                #[cfg(not(feature = "std"))]
+                                return Err(Error::Unknown(format!(
+                                    "Error adding client! PANIC! {:?}",
+                                    e
+                                )));
+                            }
+                        };
+                    }
                 }
-                if should_forward_msg {
-                    self.forward_msg(msg)?;
+                // handle all other messages
+                _ => {
+                    // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
+                    let mut should_forward_msg = true;
+
+                    let map = &mut self.llmp_clients[client_id as usize].current_recv_map;
+                    let msg_buf = (*msg).as_slice(map)?;
+                    if let LlmpMsgHookResult::Handled =
+                        (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
+                    {
+                        should_forward_msg = false;
+                    }
+                    if should_forward_msg {
+                        self.forward_msg(msg)?;
+                    }
                 }
             }
         }
@@ -2401,13 +2441,23 @@ where
 
     /// Waits for the sender to be save to unmap.
     /// If a receiver is involved on the other side, this function should always be called.
-    pub fn await_save_to_unmap_blocking(&self) {
-        self.sender.await_save_to_unmap_blocking();
+    pub fn await_safe_to_unmap_blocking(&self) {
+        self.sender.await_safe_to_unmap_blocking();
     }
 
     /// If we are allowed to unmap this client
-    pub fn save_to_unmap(&self) -> bool {
-        self.sender.save_to_unmap()
+    pub fn safe_to_unmap(&self) -> bool {
+        self.sender.safe_to_unmap()
+    }
+
+    /// For debug purposes: mark the client as save to unmap, even though it might not have been read.
+    ///
+    /// # Safety
+    /// This should only be called in a debug scenario.
+    /// Calling this in other contexts may lead to a premature page unmap and result in a crash in another process,
+    /// or an unexpected read from an empty page in a receiving process.
+    pub unsafe fn mark_safe_to_unmap(&mut self) {
+        self.sender.mark_safe_to_unmap();
     }
 
     /// Creates a new [`LlmpClient`]
@@ -2531,14 +2581,14 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        let mut stream = match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+        let mut stream = match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
             Ok(stream) => stream,
             Err(e) => {
                 match e.kind() {
                     std::io::ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
-                            match TcpStream::connect(format!("{}:{}", _LLMP_BIND_ADDR, port)) {
+                            match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
                                 Ok(stream) => break stream,
                                 Err(_) => {
                                     dbg!("Connection Refused.. Retrying");
@@ -2601,6 +2651,8 @@ mod tests {
 
     use std::{thread::sleep, time::Duration};
 
+    use serial_test::serial;
+
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
@@ -2611,7 +2663,9 @@ mod tests {
     use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
 
     #[test]
+    #[serial]
     pub fn llmp_connection() {
+        #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
         let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),

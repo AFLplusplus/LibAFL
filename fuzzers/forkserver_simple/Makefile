@@ -3,9 +3,9 @@ PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 PHONY: all
 
-all: fuzzer
+all: $(FUZZER_NAME)
 
-fuzzer:
+$(FUZZER_NAME):
 	cargo build --release
 	cp $(PROJECT_DIR)/target/release/$(FUZZER_NAME) .
 
@@ -16,6 +16,7 @@ run:  all
 	taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
 
 short_test: all
+	rm -rf libafl_unix_shmem_server || true
 	timeout 10s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
 
 test: all

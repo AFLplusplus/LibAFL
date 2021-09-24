@@ -16,7 +16,7 @@ fn build_dep_check(tools: &[&str]) {
         println!("Checking for build tool {}...", tool);
 
         if let Ok(path) = which(tool) {
-            println!("Found build tool {}", path.to_str().unwrap())
+            println!("Found build tool {}", path.to_str().unwrap());
         } else {
             println!("ERROR: missing build tool {}", tool);
             exit(1);

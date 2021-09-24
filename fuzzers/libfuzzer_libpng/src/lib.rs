@@ -5,23 +5,28 @@ use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::tuples::{tuple_list, Merge},
-    bolts::{current_nanos, rands::StdRand},
+    bolts::{
+        current_nanos,
+        rands::StdRand,
+        tuples::{tuple_list, Merge},
+    },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
+        PowerQueueCorpusScheduler,
     },
-    events::{setup_restarting_mgr_std, EventRestarter},
+    events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::mopt_mutator::StdMOptMutator,
-    mutators::scheduled::{havoc_mutations, tokens_mutations},
+    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    stages::mutational::StdMutationalStage,
+    stages::{
+        calibrate::CalibrationStage,
+        power::{PowerMutationalStage, PowerSchedule},
+    },
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
@@ -56,7 +61,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, "default".into()) {
+        match setup_restarting_mgr_std(stats, broker_port, EventConfig::AlwaysUnique) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
@@ -121,16 +126,15 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Setup a basic mutator with a mutational stage
 
-    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-    /*
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-    */
+
+    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+
+    let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -166,12 +170,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(
-                &mut fuzzer,
-                &mut executor,
-                &mut restarting_mgr,
-                &corpus_dirs,
-            )
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }

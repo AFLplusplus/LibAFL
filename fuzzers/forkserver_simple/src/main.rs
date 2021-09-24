@@ -29,6 +29,7 @@ pub fn main() {
     let corpus_dirs = vec![PathBuf::from("./corpus")];
 
     const MAP_SIZE: usize = 65536;
+
     //Coverage map shared between observer and executor
     let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
@@ -98,8 +99,9 @@ pub fn main() {
     // Create the executor for the forkserver
     let mut executor = TimeoutForkserverExecutor::new(
         ForkserverExecutor::new(
-            "../../libafl_tests/src/forkserver_test.o".to_string(),
+            "../../libafl_tests/src/forkserver_test".to_string(),
             &[],
+            true,
             tuple_list!(edges_observer, time_observer),
         )
         .unwrap(),
@@ -111,7 +113,12 @@ pub fn main() {
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Failed to load initial corpus at {:?}: {:?}",
+                    &corpus_dirs, err
+                )
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

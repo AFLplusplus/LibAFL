@@ -13,7 +13,7 @@ use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX};
 fn dll_extension<'a>() -> &'a str {
     if cfg!(target_os = "windows") {
         "dll"
-    } else if cfg!(any(target_os = "ios", target_os = "macos")) {
+    } else if cfg!(target_vendor = "apple") {
         "dylib"
     } else {
         "so"
@@ -106,7 +106,7 @@ impl CompilerWrapper for ClangWrapper {
                 "-m64" => self.bit_mode = 64,
                 "-c" | "-S" | "-E" => linking = false,
                 "-shared" => linking = false, // TODO dynamic list?
-                "-Wl,-z,defs" | "-Wl,--no-undefined" => continue,
+                "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => continue,
                 _ => (),
             };
             new_args.push(arg.as_ref().to_string());
@@ -128,6 +128,12 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push("-lws2_32".into());
             new_args.push("-lBcrypt".into());
             new_args.push("-lAdvapi32".into());
+        }
+        // MacOS has odd linker behavior sometimes
+        #[cfg(target_vendor = "apple")]
+        if linking {
+            new_args.push("-undefined".into());
+            new_args.push("dynamic_lookup".into());
         }
 
         self.base_args = new_args;
@@ -162,7 +168,7 @@ impl CompilerWrapper for ClangWrapper {
     where
         S: AsRef<str>,
     {
-        if cfg!(any(target_os = "macos", target_os = "ios")) {
+        if cfg!(target_vendor = "apple") {
             //self.add_link_arg("-force_load".into())?;
         } else {
             self.add_link_arg("-Wl,--whole-archive");
@@ -173,7 +179,7 @@ impl CompilerWrapper for ClangWrapper {
                 .into_string()
                 .unwrap(),
         );
-        if cfg!(any(target_os = "macos", target_os = "ios")) {
+        if cfg!(target_vendor = "apple") {
             self
         } else {
             self.add_link_arg("-Wl,-no-whole-archive")

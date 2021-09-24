@@ -189,7 +189,7 @@ impl MOpt {
             }
 
             for i in 0..self.operator_num {
-                self.x_now[swarm][i] /= total_x_now
+                self.x_now[swarm][i] /= total_x_now;
             }
 
             for i in 0..self.operator_num {
@@ -208,7 +208,7 @@ impl MOpt {
                     self.x_now[swarm][i] = V_MIN;
                 }
 
-                x_sum += self.x_now[swarm][i]
+                x_sum += self.x_now[swarm][i];
             }
 
             for i in 0..self.operator_num {
@@ -471,7 +471,7 @@ where
                                 as f64)
                                 / ((mopt.pilot_operator_cycles_v2[swarm_now][i]
                                     - mopt.pilot_operator_cycles[swarm_now][i])
-                                    as f64)
+                                    as f64);
                         }
 
                         if mopt.eff_best[swarm_now][i] < eff {
@@ -496,7 +496,7 @@ where
                         for i in 0..mopt.operator_num {
                             mopt.core_operator_cycles_v2[i] = mopt.core_operator_cycles[i];
                             mopt.core_operator_cycles_v3[i] = mopt.core_operator_cycles[i];
-                            mopt.core_operator_finds_v2[i] = mopt.core_operator_finds[i]
+                            mopt.core_operator_finds_v2[i] = mopt.core_operator_finds[i];
                         }
 
                         let mut swarm_eff = 0.0;

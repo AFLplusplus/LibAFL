@@ -1,6 +1,6 @@
 [package]
 name = "libafl_targets"
-version = "0.5.0"
+version = "0.6.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Common code for target instrumentation that can be used combined with LibAFL"
 documentation = "https://docs.rs/libafl_targets"
@@ -15,6 +15,8 @@ default = []
 libfuzzer = []
 sancov_pcguard_edges = []
 sancov_pcguard_hitcounts = []
+sancov_pcguard_edges_ptr = []
+sancov_pcguard_hitcounts_ptr = []
 sancov_value_profile = []
 sancov_cmplog = []
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
@@ -25,6 +27,6 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 rangemap = "0.1.10"
-libafl = { path = "../libafl", version = "0.5.0", features = [] }
+libafl = { path = "../libafl", version = "0.6.1", features = [] }
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 # serde-big-array = "0.3.2"

@@ -108,7 +108,7 @@ where
     /// Get the `CmpMap` (mut)
     fn map_mut(&mut self) -> &mut CM;
 
-    /// Add [`CmpValuesMetadata`] to the State including the logged values.
+    /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
     fn add_cmpvalues_meta(&mut self, state: &mut S)
     where

@@ -1,5 +1,6 @@
 FUZZER_NAME="fuzzer_libpng"
 PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+UNAME := $(shell uname)
 
 PHONY: all
 
@@ -18,7 +19,7 @@ libafl_cxx: target/release/libafl_cxx
 libafl_cc: target/release/libafl_cxx
 
 libpng-1.6.37/.libs/libpng16.a: libpng-1.6.37 libafl_cc
-	cd libpng-1.6.37 && ./configure
+	cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 	$(MAKE) -C libpng-1.6.37 CC="$(PROJECT_DIR)/target/release/libafl_cc" CXX="$(PROJECT_DIR)/target/release/libafl_cxx"
 	
 
@@ -42,6 +43,7 @@ run: all
 	./$(FUZZER_NAME) --cores 0 &
 
 short_test: all
+	rm -rf libafl_unix_shmem_server || true
 	timeout 10s ./$(FUZZER_NAME) --cores 0 &
 
 test: all

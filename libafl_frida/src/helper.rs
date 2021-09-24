@@ -46,9 +46,14 @@ enum CmplogOperandType {
     Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+enum SpecialCmpLogCase {
+    Tbz,
+    Tbnz,
+}
+
+#[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
@@ -107,12 +112,20 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
+    #[cfg(not(target_arch = "aarch64"))]
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
+
+    #[cfg(target_arch = "aarch64")]
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
+        #[cfg(target_arch = "aarch64")]
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
-        //println!("target_bytes: {:02x?}", slice);
-        self.asan_runtime
-            .unpoison(slice.as_ptr() as usize, slice.len());
+        //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);
+        #[cfg(target_arch = "aarch64")]
+        if self.options.asan_enabled() {
+            self.asan_runtime
+                .unpoison(slice.as_ptr() as usize, slice.len());
+        }
     }
 
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
@@ -124,10 +137,16 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
+        #[cfg(target_arch = "aarch64")]
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
                 self.asan_runtime.check_for_leaks();
             }
+
+            let target_bytes = input.target_bytes();
+            let slice = target_bytes.as_slice();
+            self.asan_runtime
+                .poison(slice.as_ptr() as usize, slice.len());
             self.asan_runtime.reset_allocations();
         }
     }
@@ -359,11 +378,17 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             todo!("Implement cmplog for non-aarch64 targets");
                             #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                             // check if this instruction is a compare instruction and if so save the registers values
-                            if let Ok((op1, op2)) =
+                            if let Ok((op1, op2, special_case)) =
                                 helper.cmplog_is_interesting_instruction(address, instr)
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                                helper.emit_comparison_handling(address, &output, op1, op2);
+                                helper.emit_comparison_handling(
+                                    address,
+                                    &output,
+                                    op1,
+                                    op2,
+                                    special_case,
+                                );
                             }
                         }
 
@@ -409,6 +434,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         output: &StalkerOutput,
         op1: CmplogOperandType,
         op2: CmplogOperandType,
+        special_case: Option<SpecialCmpLogCase>,
     ) {
         let writer = output.writer();
 
@@ -490,6 +516,17 @@ impl<'a> FridaInstrumentationHelper<'a> {
         match op2 {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
                 writer.put_ldr_reg_u64(Aarch64Register::X1, value);
+                match special_case {
+                    Some(inst) => match inst {
+                        SpecialCmpLogCase::Tbz => {
+                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbz_masking());
+                        }
+                        SpecialCmpLogCase::Tbnz => {
+                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbnz_masking());
+                        }
+                    },
+                    None => (),
+                }
             }
             CmplogOperandType::Regid(reg) => {
                 let reg = self.writer_register(reg);
@@ -1040,10 +1077,18 @@ impl<'a> FridaInstrumentationHelper<'a> {
         &self,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(CmplogOperandType, CmplogOperandType), ()> {
+    ) -> Result<
+        (
+            CmplogOperandType,
+            CmplogOperandType,
+            Option<SpecialCmpLogCase>,
+        ),
+        (),
+    > {
         // We only care for compare instrunctions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
-            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls" => (),
+            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls"
+            | "cbz" | "tbz" | "tbnz" => (),
             _ => return Err(()),
         }
         let operands = self
@@ -1052,9 +1097,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .unwrap()
             .arch_detail()
             .operands();
-        if operands.len() != 2 {
+
+        // cbz - 1 operand, tbz - 3 operands
+        let special_case = ["cbz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
+        if operands.len() != 2 || !special_case {
             return Err(());
         }
+        // cbz marked as special since there is only 1 operand
+        let special_case = instr.mnemonic().unwrap() == "cbz";
 
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
             match arm64operand.op_type {
@@ -1073,25 +1123,37 @@ impl<'a> FridaInstrumentationHelper<'a> {
             None
         };
 
-        let operand2 = if let Arm64Operand(arm64operand2) = operands.last().unwrap() {
-            match arm64operand2.op_type {
-                Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
-                Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
-                Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
-                    opmem.base(),
-                    opmem.index(),
-                    opmem.disp(),
-                    self.instruction_width(instr, &operands),
-                )),
-                Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
-                _ => return Err(()),
+        let operand2 = match special_case {
+            true => Some(CmplogOperandType::Imm(0)),
+            false => {
+                if let Arm64Operand(arm64operand2) = &operands[1] {
+                    match arm64operand2.op_type {
+                        Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
+                        Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
+                        Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
+                            opmem.base(),
+                            opmem.index(),
+                            opmem.disp(),
+                            self.instruction_width(instr, &operands),
+                        )),
+                        Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
+                        _ => return Err(()),
+                    }
+                } else {
+                    None
+                }
             }
-        } else {
-            None
+        };
+
+        // tbz will need to have special handling at emit time(masking operand1 value with operand2)
+        let special_case = match instr.mnemonic().unwrap() {
+            "tbz" => Some(SpecialCmpLogCase::Tbz),
+            "tbnz" => Some(SpecialCmpLogCase::Tbnz),
+            _ => None,
         };
 
         if operand1.is_some() && operand2.is_some() {
-            Ok((operand1.unwrap(), operand2.unwrap()))
+            Ok((operand1.unwrap(), operand2.unwrap(), special_case))
         } else {
             Err(())
         }

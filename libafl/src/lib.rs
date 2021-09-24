@@ -4,6 +4,7 @@ Welcome to `LibAFL`
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "RUSTC_IS_NIGHTLY", feature(specialization))]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 #[macro_use]
 extern crate alloc;
@@ -240,4 +241,12 @@ mod tests {
             postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
         assert_eq!(state.corpus().count(), corpus_deserialized.count());
     }
+}
+
+#[cfg(all(test, not(feature = "std")))]
+/// Provide custom time in `no_std` tests.
+#[no_mangle]
+pub extern "C" fn external_current_millis() -> u64 {
+    // TODO: use "real" time here
+    1000
 }

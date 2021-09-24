@@ -2,6 +2,9 @@
 
 pub mod inprocess;
 pub use inprocess::InProcessExecutor;
+#[cfg(all(feature = "std", unix))]
+pub use inprocess::InProcessForkExecutor;
+
 pub mod timeout;
 pub use timeout::TimeoutExecutor;
 
@@ -15,6 +18,14 @@ pub use combined::CombinedExecutor;
 
 pub mod shadow;
 pub use shadow::ShadowExecutor;
+
+pub mod with_observers;
+pub use with_observers::WithObservers;
+
+#[cfg(feature = "std")]
+pub mod command;
+#[cfg(feature = "std")]
+pub use command::CommandExecutor;
 
 use crate::{
     inputs::{HasTargetBytes, Input},
@@ -38,6 +49,8 @@ pub enum ExitKind {
     // The run resulted in a custom `ExitKind`.
     // Custom(Box<dyn SerdeAny>),
 }
+
+crate::impl_serdeany!(ExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers<I, OT, S>
@@ -64,6 +77,18 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error>;
+
+    /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
+    ///
+    /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by
+    /// the implementation of this wrapper.
+    fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
+    where
+        Self: Sized,
+        OT: ObserversTuple<I, S>,
+    {
+        WithObservers::new(self, observers)
+    }
 }
 
 /// A simple executor that does nothing.

@@ -29,9 +29,9 @@ use frida_gum::{Gum, ModuleMap};
 use libc::RLIMIT_STACK;
 #[cfg(target_arch = "aarch64")]
 use libc::{c_char, wchar_t};
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_vendor = "apple")]
 use libc::{getrlimit, rlimit};
-#[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+#[cfg(all(unix, not(target_vendor = "apple")))]
 use libc::{getrlimit64, rlimit64};
 use std::{ffi::c_void, ptr::write_volatile};
 
@@ -50,9 +50,9 @@ extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// The frida address sanitizer runtime, providing address sanitization.
@@ -164,6 +164,12 @@ impl AsanRuntime {
             .map_shadow_for_region(address, address + size, true);
     }
 
+    /// Make sure the specified memory is poisoned
+    #[cfg(target_arch = "aarch64")]
+    pub fn poison(&mut self, address: usize, size: usize) {
+        Allocator::poison(self.allocator.map_to_shadow(address), size);
+    }
+
     /// Add a stalked address to real address mapping.
     #[inline]
     pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
@@ -204,7 +210,7 @@ impl AsanRuntime {
 
     /// Get the maximum stack size for the current stack
     #[must_use]
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[cfg(target_vendor = "apple")]
     fn max_stack_size() -> usize {
         let mut stack_rlimit = rlimit {
             rlim_cur: 0,
@@ -217,7 +223,7 @@ impl AsanRuntime {
 
     /// Get the maximum stack size for the current stack
     #[must_use]
-    #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+    #[cfg(all(unix, not(target_vendor = "apple")))]
     fn max_stack_size() -> usize {
         let mut stack_rlimit = rlimit64 {
             rlim_cur: 0,
@@ -248,7 +254,7 @@ impl AsanRuntime {
         let max_start = end - Self::max_stack_size();
 
         let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
-        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        #[cfg(not(target_vendor = "apple"))]
         let flags = flags | MapFlags::MAP_STACK;
 
         if start != max_start {
@@ -393,7 +399,7 @@ impl AsanRuntime {
         }
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
     #[inline]
     fn hook_memalign(&mut self, alignment: usize, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
@@ -414,7 +420,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
     fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
         self.allocator.get_usable_size(ptr)
     }
@@ -702,7 +708,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
     fn hook_mempcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
@@ -804,7 +810,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
     fn hook_memrchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
@@ -885,7 +891,11 @@ impl AsanRuntime {
         unsafe { bzero(s, n) }
     }
 
-    #[cfg(all(not(target_os = "android"), target_arch = "aarch64"))]
+    #[cfg(all(
+        not(target_os = "android"),
+        target_arch = "aarch64",
+        not(target_vendor = "apple")
+    ))]
     #[inline]
     fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) {
         extern "C" {
@@ -1235,10 +1245,11 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     fn hook_strdup(&mut self, s: *const c_char) -> *mut c_char {
         extern "C" {
-            fn strdup(s: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
+            fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
         }
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        let size = unsafe { strlen(s) };
+        if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strdup".to_string(),
                 self.real_address_for_stalked(
@@ -1249,7 +1260,12 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        unsafe { strdup(s) }
+
+        unsafe {
+            let ret = self.allocator.alloc(size, 8) as *mut c_char;
+            strcpy(ret, s);
+            ret
+        }
     }
 
     #[inline]
@@ -1578,6 +1594,7 @@ impl AsanRuntime {
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
         hook_func_with_check!(None, free, (ptr: *mut c_void), ());
+        #[cfg(not(target_vendor = "apple"))]
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
         hook_func!(
             None,
@@ -1585,6 +1602,7 @@ impl AsanRuntime {
             (pptr: *mut *mut c_void, size: usize, alignment: usize),
             i32
         );
+        #[cfg(not(target_vendor = "apple"))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
         hook_func!(None, _Znam, (size: usize), *mut c_void);
         hook_func!(
@@ -1718,6 +1736,7 @@ impl AsanRuntime {
             (dest: *mut c_void, src: *const c_void, n: usize),
             *mut c_void
         );
+        #[cfg(not(target_vendor = "apple"))]
         hook_func!(
             None,
             mempcpy,
@@ -1742,6 +1761,7 @@ impl AsanRuntime {
             (s: *mut c_void, c: i32, n: usize),
             *mut c_void
         );
+        #[cfg(not(target_vendor = "apple"))]
         hook_func!(
             None,
             memrchr,
@@ -1761,7 +1781,7 @@ impl AsanRuntime {
         );
         #[cfg(not(target_os = "android"))]
         hook_func!(None, bzero, (s: *mut c_void, n: usize), ());
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_vendor = "apple")))]
         hook_func!(None, explicit_bzero, (s: *mut c_void, n: usize), ());
         #[cfg(not(target_os = "android"))]
         hook_func!(
@@ -2007,7 +2027,7 @@ impl AsanRuntime {
             ; mov x5, #1
             ; add x5, xzr, x5, lsl #shadow_bit
             ; add x5, x5, x0, lsr #3
-            ; ubfx x5, x5, #0, #(shadow_bit + 2)
+            ; ubfx x5, x5, #0, #(shadow_bit + 1)
 
             ; cmp x1, #0
             ; b.eq >return_success
@@ -2127,7 +2147,7 @@ impl AsanRuntime {
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 2)
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
@@ -2158,7 +2178,7 @@ impl AsanRuntime {
                 ; mov x1, #1
                 ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 2)
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1

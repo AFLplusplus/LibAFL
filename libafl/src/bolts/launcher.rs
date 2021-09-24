@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
-    events::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+    events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
     observers::ObserversTuple,
     stats::Stats,
@@ -33,8 +33,11 @@ use typed_builder::TypedBuilder;
 
 /// The Launcher client callback type reference
 #[cfg(feature = "std")]
-pub type LauncherClientFnRef<'a, I, OT, S, SP> =
-    &'a mut dyn FnMut(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>) -> Result<(), Error>;
+pub type LauncherClientFnRef<'a, I, OT, S, SP> = &'a mut dyn FnMut(
+    Option<S>,
+    LlmpRestartingEventManager<I, OT, S, SP>,
+    usize,
+) -> Result<(), Error>;
 
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
@@ -54,10 +57,10 @@ where
     /// The stats instance to use
     stats: ST,
     /// The configuration
-    configuration: String,
+    configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
     run_client: LauncherClientFnRef<'a, I, OT, S, SP>,
-    /// The broker port to use (or to attach to, in case [`Self::with_broker`] is `false`)
+    /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -100,7 +103,7 @@ where
             .map(|filename| File::create(filename).unwrap());
 
         // Spawn clients
-        for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
+        for (index, (id, bind_to)) in core_ids.iter().enumerate().take(num_cores).enumerate() {
             if self.cores.iter().any(|&x| x == id) {
                 self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {
@@ -111,10 +114,11 @@ where
                         println!("child spawned and bound to core {}", id);
                     }
                     ForkResult::Child => {
+                        println!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_secs((id + 1) as u64));
+                        std::thread::sleep(std::time::Duration::from_secs((index + 1) as u64));
 
                         #[cfg(feature = "std")]
                         if file.is_some() {
@@ -128,11 +132,11 @@ where
                             .kind(ManagerKind::Client {
                                 cpu_core: Some(*bind_to),
                             })
-                            .configuration(self.configuration.clone())
+                            .configuration(self.configuration)
                             .build()
                             .launch()?;
 
-                        (self.run_client)(state, mgr)?;
+                        (self.run_client)(state, mgr, bind_to.id)?;
                         break;
                     }
                 };
@@ -150,7 +154,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
-                .configuration(self.configuration.clone())
+                .configuration(self.configuration)
                 .build()
                 .launch()?;
 
@@ -195,11 +199,11 @@ where
                             id: core_conf.parse()?,
                         }),
                     })
-                    .configuration(self.configuration.clone())
+                    .configuration(self.configuration)
                     .build()
                     .launch()?;
 
-                (self.run_client)(state, mgr)?;
+                (self.run_client)(state, mgr, core_conf.parse()?)?;
 
                 unreachable!("Fuzzer client code should never get here!");
             }
@@ -251,7 +255,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
-                .configuration(self.configuration.clone())
+                .configuration(self.configuration)
                 .build()
                 .launch()?;
 
