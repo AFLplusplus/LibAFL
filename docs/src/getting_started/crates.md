@@ -5,7 +5,7 @@ A crate is an individual library in Rust's Cargo build system, that you can use 
 
 ```toml
 [dependencies]
-libafl = { version = "0.6.0" }
+libafl = { version = "*" }
 ```
 
 For LibAFL, each crate has its self-contained purpose, and the user may not need to use all of them in its project.

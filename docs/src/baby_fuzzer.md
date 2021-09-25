@@ -135,13 +135,7 @@ let mut mgr = SimpleEventManager::new(stats);
 In addition, we have the Fuzzer, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
 We create it as QueueCorpusScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
-```rust
-extern crate libafl;
-use libaf::{
-    schedulers::QueueCorpusScheduler,
-    fuzzer::{StdFuzzer},
-};
-
+```rust,ignore
 // A queue policy to get testcasess from the corpus
 let scheduler = QueueCorpusScheduler::new();
 
