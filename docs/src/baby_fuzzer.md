@@ -136,7 +136,7 @@ In addition, we have the Fuzzer, an entity that contains some actions that alter
 We create it as QueueCorpusScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
 ```rust
-extern crate libaf;
+extern crate libafl;
 use libaf::{
     schedulers::QueueCorpusScheduler,
     fuzzer::{StdFuzzer},
