@@ -1,4 +1,4 @@
-# Using LibAFL in no_std environments
+# Using LibAFL in `no_std` environments
 
 It is possible to use LibAFL in `no_std` environments e.g. custom platforms like microcontrolles, kernels, hypervisors, and more.
 
@@ -9,7 +9,7 @@ libafl = { path = "path/to/libafl/", default-features = false}
 ```
 
 Then build your project e.g. for `aarch64-unknown-none` using
-```bash
+```sh
 cargo build --no-default-features --target aarch64-unknown-none
 ```
 

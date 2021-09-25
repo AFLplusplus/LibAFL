@@ -1,16 +1,17 @@
-# Baby Fuzzer
+# A Simple LibAFL Fuzzer
 
-This chapter will teach you how to create a naive fuzzer using the LibAFL API, you will learn about basic entities such as `State`, `Observer`, and `Executor`.
-The following chapters will discuss in detail the components of LibAFL, while here we will just scratch the fundamentals.
+This chapter discusses a naive fuzzer using the LibAFL API.
+You will learn about basic entities such as `State`, `Observer`, and `Executor`.
+While the following chapters discuss the components of LibAFL in detail, here we introduce the fundamentals.
 
-We are going to fuzz a simple Rust function that panics under a condition. The fuzzer will be single-threaded and will stop after the crash like libFuzzer does normally.
+We are going to fuzz a simple Rust function that panics under a condition. The fuzzer will be single-threaded and will stop after the crash, just like libFuzzer normally does.
 
 You can find a complete version of this tutorial as an example fuzzer in [`fuzzers/baby_fuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/baby_fuzzer).
 
 > ### Warning
 >
 > This example fuzzer is too naive for any real-world usage.
-> Its purpose is solely to show the main components of the library, for a more in-depth walkthrough on building a custom fuzzer go to the Tutorial chapter.
+> Its purpose is solely to show the main components of the library, for a more in-depth walkthrough on building a custom fuzzer go to the [Tutorial chapter](./tutorial/intro.md) directly.
 
 ## Creating a project
 
@@ -21,7 +22,7 @@ $ cargo new baby_fuzzer
 $ cd baby_fuzzer
 ```
 
-The generated _Cargo.toml_ looks like the following:
+The generated `Cargo.toml` looks like the following:
 
 ```toml
 [package]
@@ -36,14 +37,14 @@ edition = "2018"
 ```
 
 In order to use LibAFl we must add it as dependency adding `libafl = { path = "path/to/libafl/" }` under `[dependencies]`.
-You can use the LibAFL version from crates.io if you want, in this case, you have to use `libafl = "*"` to get the latest version.
+You can use the LibAFL version from crates.io if you want, in this case, you have to use `libafl = "*"` to get the latest version (or set it to the current version).
 
-As we are going to fuzz Rust code, we want that a panic does not simply cause the program exit, but an abort that can be caught by the fuzzer.
+As we are going to fuzz Rust code, we want that a panic does not simply cause the program to exit, but raise an `abort` that can then be caught by the fuzzer.
 To do that, we specify `panic = "abort"` in the [profiles](https://doc.rust-lang.org/cargo/reference/profiles.html).
 
 Alongside this setting, we add some optimization flags for the compile when building in release mode.
 
-The final _Cargo.toml_ should look similar to the following:
+The final `Cargo.toml` should look similar to the following:
 
 
 ```toml
@@ -71,7 +72,7 @@ debug = true
 
 ## The function under test
 
-Opening `src/main.rs`, we have an empty main function.
+Opening `src/main.rs`, we have an empty `main` function.
 To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`.
 
 ```rust
@@ -96,8 +97,9 @@ let mut harness = |input: &BytesInput| {
 
 ## Generating and running some tests
 
-One of the main components that a LibAFL-based fuzzer uses is the State, a container of the data that is evolved during the fuzzing process, such as the Corpus of inputs.
-In our main so we create a basic State instance like the following:
+One of the main components that a LibAFL-based fuzzer uses is the State, a container of the data that is evolved during the fuzzing process.
+Includes all State, such as the Corpus of inputs, the current rng state, and potential Metadata for the testcases and run.
+In our `main` we create a basic State instance like the following:
 
 ```rust,ignore
 // create a State from scratch
@@ -117,7 +119,7 @@ It takes a random number generator, that is part of the fuzzer state, in this ca
 
 As the second parameter, it takes an instance of something implementing the Corpus trait, InMemoryCorpus in this case. The corpus is the container of the testcases evolved by the fuzzer, in this case, we keep it all in memory.
 
-We will discuss later the last parameter. The third is another corpus, in this case, to store the testcases that are considered as "solutions" for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory so we can inspect it.
+We will discuss the last parameter later. The third parameter is another corpus, in this case, to store the testcases that are considered as "solutions" for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
 
 Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a Stats instance.
 
@@ -130,10 +132,16 @@ let stats = SimpleStats::new(|s| println!("{}", s));
 let mut mgr = SimpleEventManager::new(stats);
 ```
 
-In addition, we have the Fuzzer, an entity that contains some actions that alter the State. On of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
+In addition, we have the Fuzzer, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
 We create it as QueueCorpusScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
-```rust,ignore
+```rust
+extern crate libaf;
+use libaf::{
+    schedulers::QueueCorpusScheduler,
+    fuzzer::{StdFuzzer},
+};
+
 // A queue policy to get testcasess from the corpus
 let scheduler = QueueCorpusScheduler::new();
 
@@ -141,7 +149,7 @@ let scheduler = QueueCorpusScheduler::new();
 let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 ```
 
-Last but not least, we need an Executor that is the entity responsible to run our program under test. In this example, we want to run the harness function in process, and so we use the InProcessExecutor.
+Last but not least, we need an Executor that is the entity responsible to run our program under test. In this example, we want to run the harness function in-process (without forking off a child, for example), and so we use the `InProcessExecutor`.
 
 ```rust,ignore
 // Create the executor for an in-process function
@@ -160,11 +168,9 @@ As the executor expects that the harness returns an ExitKind object, we add `Exi
 
 Now we have the 4 major entities ready for running our tests, but we still cannot generate testcases.
 
-For this purpose, we use a Generator, RandPrintablesGenerator that generates a string of printable bytes.
+For this purpose, we use a Generator, `RandPrintablesGenerator` that generates a string of printable bytes.
 
 ```rust,ignore
-extern crate libafl;
-
 use libafl::generators::RandPrintablesGenerator;
 
 // Generator of printable bytearrays of max size 32
@@ -176,7 +182,7 @@ state
     .expect("Failed to generate the initial corpus".into());
 ```
 
-Now you can prepend the following `use` directives to your main.rs and compile it.
+Now you can prepend the necessary `use` directives to your main.rs and compile the fuzzer.
 
 ```rust 
 extern crate libafl;
@@ -205,7 +211,7 @@ $ cargo run
 
 ## Evolving the corpus with feedbacks
 
-Now you simply ran 8 randomly generated testcases but none of them has been stored in the corpus. If you are very lucky, maybe you triggered the panic by chance but you don't see any saved file in `crashes`.
+Now you simply ran 8 randomly generated testcases, but none of them has been stored in the corpus. If you are very lucky, maybe you triggered the panic by chance but you don't see any saved file in `crashes`.
 
 Now we want to turn our simple fuzzer into a feedback-based one and increase the chance to generate the right input to trigger the panic. We are going to implement a simple feedback based on the 3 conditions that are needed to reach the panic.
 

@@ -76,9 +76,9 @@ They are the default if using LibAFL's `Launcher`.
 
 If you should want to use `LLMP` in its raw form, without any `LibAFL` abstractions, take a look at the `llmp_test` example in [./libafl/examples](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/examples/llmp_test/main.rs).
 You can run the example using `cargo run --example llmp_test` with the appropriate modes, as indicated by its help output.
-First, you will have to create a broker using [`LlmpBroker::new()`].
-Then, create some [`LlmpClient`]`s` in other threads and register them with the main thread using [`LlmpBroker::register_client`].
-Finally, call [`LlmpBroker::loop_forever()`].
+First, you will have to create a broker using `LlmpBroker::new()`.
+Then, create some `LlmpClient``s` in other threads and register them with the main thread using `LlmpBroker::register_client`.
+Finally, call `LlmpBroker::loop_forever()`.
 
 ### B2B: Connecting Fuzzers via TCP
 
