@@ -26,7 +26,7 @@
   - [Metadata](./design/metadata.md)
 
 - [Message Passing](./message_passing/message_passing.md)
-  - [Spawning Instances](./message_passing/llmp.md)
+  - [Spawning Instances](./message_passing/spawn_instances.md)
   - [Configurations](./message_passing/configurations.md)
 
 - [Tutorial](./tutorial/tutorial.md)
