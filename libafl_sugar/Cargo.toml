@@ -9,11 +9,24 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing"]
 edition = "2018"
+build = "build.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
+default = []
+
+[build-dependencies]
+pyo3-build-config = { version = "0.14.2", optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.6.1" }
 libafl_targets = { path = "../libafl_targets", version = "0.6.1" }
 libafl_qemu = { path = "../libafl_qemu", version = "0.6.1" }
 typed-builder = "0.9.0" # Implement the builder pattern at compiletime
+pyo3 = { version = "0.14.5", features = ["extension-module"], optional = true }
+
+
+[lib]
+name = "libafl_sugar"
+crate-type = ["cdylib", "rlib"]
+

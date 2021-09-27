@@ -15,22 +15,22 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::EventConfig,
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::token_mutations::{I2SRandReplace, Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    stages::StdMutationalStage,
+    stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
 };
 
-use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP, MAX_EDGES_NUM};
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
@@ -53,8 +53,8 @@ where
     #[builder(default = None, setter(strip_option))]
     tokens_file: Option<PathBuf>,
     /// Flag if use CmpLog
-    //#[builder(default = false)]
-    //use_cmplog: bool,
+    #[builder(default = false)]
+    use_cmplog: bool,
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -106,6 +106,9 @@ where
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
+
+            let cmplog = unsafe { &mut CMPLOG_MAP };
+            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
             // The state of the edges feedback.
             let feedback_state = MapFeedbackState::with_observer(&edges_observer);
@@ -161,15 +164,18 @@ where
             };
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = TimeoutExecutor::new(
-                InProcessExecutor::new(
-                    &mut harness,
-                    tuple_list!(edges_observer, time_observer),
-                    &mut fuzzer,
-                    &mut state,
-                    &mut mgr,
-                )?,
-                timeout,
+            let mut executor = ShadowExecutor::new(
+                TimeoutExecutor::new(
+                    InProcessExecutor::new(
+                        &mut harness,
+                        tuple_list!(edges_observer, time_observer),
+                        &mut fuzzer,
+                        &mut state,
+                        &mut mgr,
+                    )?,
+                    timeout,
+                ),
+                tuple_list!(cmplog_observer),
             );
 
             // In case the corpus is empty (on first run), reset
@@ -204,24 +210,40 @@ where
                 }
             }
 
+            // Setup a tracing stage in which we log comparisons
+            let tracing = ShadowTracingStage::new(&mut executor);
+
+            // Setup a randomic Input2State stage
+            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+                I2SRandReplace::new()
+            )));
+
             if self.tokens_file.is_some() {
                 // Setup a basic mutator
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                let mut stages = tuple_list!(mutational);
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                if self.use_cmplog {
+                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                } else {
+                    let mut stages = tuple_list!(mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                }
             } else {
                 // Setup a basic mutator
                 let mutator = StdScheduledMutator::new(havoc_mutations());
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                let mut stages = tuple_list!(mutational);
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                if self.use_cmplog {
+                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                } else {
+                    let mut stages = tuple_list!(mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                }
             }
 
             Ok(())
@@ -242,5 +264,63 @@ where
             Err(Error::ShuttingDown) => println!("\nFuzzing stopped by user. Good Bye."),
             Err(err) => panic!("Fuzzingg failed {:?}", err),
         }
+    }
+}
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::inmemory;
+    use pyo3::prelude::*;
+    use pyo3::types::PyBytes;
+    use std::path::PathBuf;
+
+    #[pyclass(unsendable)]
+    struct InMemoryBytesCoverageSugar {
+        input_dirs: Vec<PathBuf>,
+        output_dir: PathBuf,
+        broker_port: u16,
+        cores: Vec<usize>,
+    }
+
+    #[pymethods]
+    impl InMemoryBytesCoverageSugar {
+        #[new]
+        fn new(
+            input_dirs: Vec<PathBuf>,
+            output_dir: PathBuf,
+            broker_port: u16,
+            cores: Vec<usize>,
+        ) -> Self {
+            Self {
+                input_dirs,
+                output_dir,
+                broker_port,
+                cores,
+            }
+        }
+
+        #[allow(clippy::needless_pass_by_value)]
+        pub fn run(&self, harness: PyObject) {
+            inmemory::InMemoryBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .harness(|buf| {
+                    Python::with_gil(|py| -> PyResult<()> {
+                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        harness.call1(py, args)?;
+                        Ok(())
+                    })
+                    .unwrap();
+                })
+                .build()
+                .run();
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<InMemoryBytesCoverageSugar>()?;
+        Ok(())
     }
 }
