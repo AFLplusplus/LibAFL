@@ -45,13 +45,15 @@ pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     use pyo3::exceptions::PyValueError;
 
     #[pyfn(m)]
+    #[allow(clippy::needless_pass_by_value)]
     fn init(args: Vec<String>, env: Vec<(String, String)>) -> i32 {
         emu::init(&args, &env)
     }
 
     #[pyfn(m)]
+    #[allow(clippy::needless_pass_by_value)]
     fn write_mem(addr: u64, buf: &[u8]) {
-        emu::write_mem(addr, buf)
+        emu::write_mem(addr, buf);
     }
     #[pyfn(m)]
     fn read_mem(addr: u64, size: usize) -> Vec<u8> {
@@ -65,27 +67,27 @@ pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     }
     #[pyfn(m)]
     fn write_reg(reg: i32, val: u64) -> PyResult<()> {
-        emu::write_reg(reg, val).map_err(|e| PyValueError::new_err(e))
+        emu::write_reg(reg, val).map_err(PyValueError::new_err)
     }
     #[pyfn(m)]
     fn read_reg(reg: i32) -> PyResult<u64> {
-        emu::read_reg(reg).map_err(|e| PyValueError::new_err(e))
+        emu::read_reg(reg).map_err(PyValueError::new_err)
     }
     #[pyfn(m)]
     fn set_breakpoint(addr: u64) {
-        emu::set_breakpoint(addr)
+        emu::set_breakpoint(addr);
     }
     #[pyfn(m)]
     fn remove_breakpoint(addr: u64) {
-        emu::remove_breakpoint(addr)
+        emu::remove_breakpoint(addr);
     }
     #[pyfn(m)]
     fn run() {
-        emu::run()
+        emu::run();
     }
     #[pyfn(m)]
     fn g2h(addr: u64) -> u64 {
-        unsafe { transmute(emu::g2h::<*const u8>(addr)) }
+        unsafe { emu::g2h::<*const u8>(addr) as u64 }
     }
     #[pyfn(m)]
     fn h2g(addr: u64) -> u64 {
