@@ -17,6 +17,7 @@ extern "C" {
 #[allow(clippy::similar_names)]
 #[allow(clippy::must_use_candidate)] // nobody uses that return code...
 pub fn libfuzzer_initialize(args: &[String]) -> i32 {
+    let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
     assert!(argv.len() < i32::MAX as usize);
     #[allow(clippy::cast_possible_wrap)]
