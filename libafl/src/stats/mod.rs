@@ -247,7 +247,6 @@ where
 {
     print_fn: F,
     start_time: Duration,
-    corpus_size: usize,
     client_stats: Vec<ClientStats>,
 }
 
@@ -308,7 +307,6 @@ where
         Self {
             print_fn,
             start_time: current_time(),
-            corpus_size: 0,
             client_stats: vec![],
         }
     }
@@ -318,7 +316,6 @@ where
         Self {
             print_fn,
             start_time,
-            corpus_size: 0,
             client_stats: vec![],
         }
     }

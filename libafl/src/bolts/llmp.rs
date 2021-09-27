@@ -1675,11 +1675,6 @@ where
     /// This allows us to intercept messages right in the broker
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SP>>,
-    /// This is the socket name, when unix domain sockets are used.
-    socket_name: Option<String>,
-    /// This flag is used to indicate that shutdown has been requested by the SIGINT and SIGTERM
-    /// handlers
-    shutting_down: bool,
     /// The ShMemProvider to use
     shmem_provider: SP,
 }
@@ -1726,8 +1721,6 @@ where
                 shmem_provider: shmem_provider.clone(),
             },
             llmp_clients: vec![],
-            socket_name: None,
-            shutting_down: false,
             shmem_provider,
         })
     }
@@ -2350,7 +2343,6 @@ pub struct LlmpClient<SP>
 where
     SP: ShMemProvider,
 {
-    shmem_provider: SP,
     /// Outgoing channel to the broker
     pub sender: LlmpSender<SP>,
     /// Incoming (broker) broadcast map
@@ -2381,11 +2373,10 @@ where
                 last_msg_recvd_offset,
             )?,
             sender: LlmpSender::on_existing_map(
-                shmem_provider.clone(),
+                shmem_provider,
                 current_broker_map,
                 last_msg_recvd_offset,
             )?,
-            shmem_provider,
         })
     }
 
@@ -2398,10 +2389,9 @@ where
                 &format!("{}_SENDER", env_name),
             )?,
             receiver: LlmpReceiver::on_existing_from_env(
-                shmem_provider.clone(),
+                shmem_provider,
                 &format!("{}_RECEIVER", env_name),
             )?,
-            shmem_provider,
         })
     }
 
@@ -2432,10 +2422,9 @@ where
                 &description.sender,
             )?,
             receiver: LlmpReceiver::on_existing_from_description(
-                shmem_provider.clone(),
+                shmem_provider,
                 &description.receiver,
             )?,
-            shmem_provider,
         })
     }
 
@@ -2484,7 +2473,6 @@ where
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider: shmem_provider.clone(),
             },
-            shmem_provider,
         })
     }
 

@@ -39,7 +39,6 @@ COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
-COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
 
 COPY libafl_sugar/Cargo.toml libafl_sugar/
 COPY scripts/dummy.rs libafl_sugar/src/lib.rs
