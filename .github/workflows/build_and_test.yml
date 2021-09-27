@@ -52,11 +52,12 @@ jobs:
     - name: Run a normal build
       run: cargo build --verbose
     # cargo-hack tests/checks each crate in the workspace
-    - name: Run tests
-      run: cargo hack test --all-features
+    #- name: Run tests
+    #  run: cargo hack test --all-features
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
     - name: Check each feature
-      run: cargo hack check --each-feature
+      # Skipping python as it has to be built with the `maturin` tool
+      run: cargo hack check --feature-powerset --skip-features=python
     - name: Build examples
       run: cargo build --examples --verbose
     - uses: actions/checkout@v2
