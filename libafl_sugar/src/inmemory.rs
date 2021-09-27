@@ -267,6 +267,75 @@ where
     }
 }
 
+pub mod cbind {
+    use crate::inmemory;
+    use std::{ffi::CStr, path::PathBuf, slice::from_raw_parts};
+
+    #[repr(C)]
+    pub struct C_InMemoryBytesCoverageSugar {
+        pub input_dirs: *const *const i8,
+        pub input_dirs_len: usize,
+        pub output_dir: *const i8,
+        pub broker_port: u16,
+        pub cores: *const usize,
+        pub cores_len: usize,
+    }
+
+    #[no_mangle]
+    #[allow(non_snake_case)]
+    pub unsafe fn libafl_sugar_InMemoryBytesCoverageSugar_new(
+        input_dirs: *const *const i8,
+        output_dir: *const i8,
+        broker_port: u16,
+        cores: *const usize,
+    ) -> C_InMemoryBytesCoverageSugar {
+        let mut input_dirs_len = 0;
+        let mut input_dirs_iter = input_dirs;
+        while !input_dirs_iter.is_null() {
+            input_dirs_len += 1;
+            input_dirs_iter = input_dirs_iter.add(1);
+        }
+        let mut cores_len = 0;
+        let mut cores_iter = cores;
+        while !cores_iter.is_null() {
+            cores_len += 1;
+            cores_iter = cores_iter.add(1);
+        }
+        C_InMemoryBytesCoverageSugar {
+            input_dirs,
+            input_dirs_len,
+            output_dir,
+            broker_port,
+            cores,
+            cores_len,
+        }
+    }
+
+    #[no_mangle]
+    #[allow(non_snake_case)]
+    pub unsafe fn libafl_sugar_InMemoryBytesCoverageSugar_run(
+        instance: *const C_InMemoryBytesCoverageSugar,
+        harness: extern "C" fn(*const u8, usize),
+    ) {
+        let instance = instance.as_ref().unwrap();
+        let mut input_dirs = vec![];
+        for ptr in from_raw_parts(instance.input_dirs, instance.input_dirs_len) {
+            let cstr = CStr::from_ptr(*ptr);
+            input_dirs.push(PathBuf::from(cstr.to_str().unwrap()));
+        }
+        let output_dir = PathBuf::from(CStr::from_ptr(instance.output_dir).to_str().unwrap());
+
+        inmemory::InMemoryBytesCoverageSugar::builder()
+            .input_dirs(&input_dirs)
+            .output_dir(output_dir)
+            .broker_port(instance.broker_port)
+            .cores(from_raw_parts(instance.cores, instance.cores_len))
+            .harness(|buf| harness(buf.as_ptr(), buf.len()))
+            .build()
+            .run();
+    }
+}
+
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::inmemory;
