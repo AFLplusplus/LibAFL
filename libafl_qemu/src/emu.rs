@@ -144,7 +144,10 @@ pub fn init(args: &[String], env: &[(String, String)]) -> i32 {
     let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
     assert!(argv.len() < i32::MAX as usize);
-    let env_strs: Vec<String> = env.iter().map(|(k, v)| format!("{}={}\0", &k, &v)).collect();
+    let env_strs: Vec<String> = env
+        .iter()
+        .map(|(k, v)| format!("{}={}\0", &k, &v))
+        .collect();
     let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
     envp.push(null());
     #[allow(clippy::cast_possible_wrap)]
