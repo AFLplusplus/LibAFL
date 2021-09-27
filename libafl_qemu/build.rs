@@ -1,5 +1,8 @@
-use std::{env, fs::copy, path::Path, process::Command};
-//use std::fs::read_dir;
+#[cfg(not(feature = "python"))]
+use std::fs::copy;
+#[cfg(feature = "python")]
+use std::fs::read_dir;
+use std::{env, path::Path, process::Command};
 use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
@@ -150,19 +153,91 @@ fn main() {
         //let _ = remove_file(build_dir.join(&format!("libqemu-{}.so", cpu_target)));
     }
 
-    copy(
-        build_dir.join(&format!("libqemu-{}.so", cpu_target)),
-        target_dir.join(&format!("libqemu-{}.so", cpu_target)),
-    )
-    .expect("Failed to copy the QEMU shared object");
+    #[cfg(feature = "python")]
+    {
+        let mut objects = vec![];
+        for dir in &[
+            build_dir.join("libcommon.fa.p"),
+            build_dir.join(&format!("libqemu-{}-linux-user.fa.p", cpu_target)),
+            //build_dir.join("libqemuutil.a.p"),
+            //build_dir.join("libqom.fa.p"),
+            //build_dir.join("libhwcore.fa.p"),
+            //build_dir.join("libcapstone.a.p"),
+        ] {
+            for path in read_dir(dir).unwrap() {
+                let path = path.unwrap().path();
+                if path.is_file() {
+                    if let Some(name) = path.file_name() {
+                        if name.to_string_lossy().starts_with("stubs") {
+                            continue;
+                        } else if let Some(ext) = path.extension() {
+                            if ext == "o" {
+                                objects.push(path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-    println!(
-        "cargo:rustc-link-search=native={}",
-        &target_dir.to_string_lossy().to_string()
-    );
-    println!("cargo:rustc-link-lib=qemu-{}", cpu_target);
+        for obj in &objects {
+            println!("cargo:rustc-cdylib-link-arg={}", obj.display());
+        }
 
-    println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
+        println!("cargo:rustc-cdylib-link-arg=-Wl,--start-group");
+
+        println!("cargo:rustc-cdylib-link-arg=-Wl,--whole-archive");
+        println!(
+            "cargo:rustc-cdylib-link-arg={}/libhwcore.fa",
+            build_dir.display()
+        );
+        println!(
+            "cargo:rustc-cdylib-link-arg={}/libqom.fa",
+            build_dir.display()
+        );
+        println!("cargo:rustc-cdylib-link-arg=-Wl,--no-whole-archive");
+        println!(
+            "cargo:rustc-cdylib-link-arg={}/libcapstone.a",
+            build_dir.display()
+        );
+        println!(
+            "cargo:rustc-cdylib-link-arg={}/libqemuutil.a",
+            build_dir.display()
+        );
+        println!(
+            "cargo:rustc-cdylib-link-arg={}/libhwcore.fa",
+            build_dir.display()
+        );
+        println!(
+            "cargo:rustc-cdylib-link-arg={}/libqom.fa",
+            build_dir.display()
+        );
+
+        println!("cargo:rustc-cdylib-link-arg=-lrt");
+        println!("cargo:rustc-cdylib-link-arg=-lutil");
+        println!("cargo:rustc-cdylib-link-arg=-lgthread-2.0");
+        println!("cargo:rustc-cdylib-link-arg=-lglib-2.0");
+        println!("cargo:rustc-cdylib-link-arg=-lstdc++");
+
+        println!("cargo:rustc-cdylib-link-arg=-Wl,--end-group");
+    }
+
+    #[cfg(not(feature = "python"))]
+    {
+        copy(
+            build_dir.join(&format!("libqemu-{}.so", cpu_target)),
+            target_dir.join(&format!("libqemu-{}.so", cpu_target)),
+        )
+        .expect("Failed to copy the QEMU shared object");
+
+        println!(
+            "cargo:rustc-link-search=native={}",
+            &target_dir.to_string_lossy().to_string()
+        );
+        println!("cargo:rustc-link-lib=qemu-{}", cpu_target);
+
+        println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
+    }
 }
 
 /*

@@ -11,7 +11,7 @@ keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2018"
 
 [features]
-python = ["pyo3"]
+python = ["pyo3", "pyo3-build-config"]
 default = []
 
 [dependencies]
@@ -23,11 +23,13 @@ num = "0.4"
 num_enum = "0.5.1"
 goblin = "0.4.2"
 libc = "0.2.97"
-pyo3 = { version = "0.14.3", features = ["extension-module"], optional = true }
+#pyo3 = { version = "0.14.3", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.14.3", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0" }
 which = "4.1"
+pyo3-build-config = { version = "0.14.5", optional = true }
 
 [lib]
 name = "libafl_qemu"

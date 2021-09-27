@@ -28,4 +28,5 @@ default-members = [
 ]
 exclude = [
     "fuzzers",
+    "bindings",
 ]

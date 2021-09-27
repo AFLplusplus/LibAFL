@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl_sugar")]
-fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     inmemory::pybind::register(py, m)?;
     #[cfg(target_os = "linux")]
     {

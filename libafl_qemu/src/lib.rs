@@ -33,14 +33,14 @@ pub fn filter_qemu_args() -> Vec<String> {
     args
 }
 
-#[cfg(all(target_od = "linux", feature = "python"))]
+#[cfg(all(target_os = "linux", feature = "python"))]
 use pyo3::prelude::*;
 
-#[cfg(all(target_od = "linux", feature = "python"))]
+#[cfg(all(target_os = "linux", feature = "python"))]
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
 #[allow(clippy::items_after_statements)]
-fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     use core::mem::transmute;
     use pyo3::exceptions::PyValueError;
 
