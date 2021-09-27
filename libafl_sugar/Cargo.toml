@@ -13,7 +13,7 @@ build = "build.rs"
 
 [features]
 python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
-default = ["python"]
+default = []
 
 [build-dependencies]
 pyo3-build-config = { version = "0.14.2", optional = true }

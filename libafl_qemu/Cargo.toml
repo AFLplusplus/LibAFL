@@ -12,7 +12,7 @@ edition = "2018"
 
 [features]
 python = ["pyo3"]
-default = ["python"]
+default = []
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.6.1" }
