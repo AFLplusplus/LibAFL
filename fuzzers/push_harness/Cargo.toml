@@ -1,0 +1,23 @@
+[package]
+name = "push_harness"
+version = "0.5.0"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2018"
+
+[features]
+default = ["std"]
+std = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../libafl/" }
+klo-routines = { version = "0.1.0", git = "https://github.com/andreafioraldi/klo-routines.git" }

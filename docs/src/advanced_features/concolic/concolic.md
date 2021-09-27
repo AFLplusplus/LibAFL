@@ -8,14 +8,14 @@ Finally, we'll walk through building a basic hybrid fuzzer using LibAFL.
 ## Concolic Tracing by Example
 Suppose you want to fuzz the following program:
 ```rust
-fn main(input: &[u8]) -> i32 {
+fn target(input: &[u8]) -> i32 {
     match &input {
         // fictitious crashing input
         &[1, 3, 3, 7] => 1337,
         // standard error handling code
         &[] => -1,
         // representative of normal execution
-        .. => 0 
+        _ => 0 
     }
 }
 ```
@@ -28,7 +28,7 @@ To understand what this entails, we'll run an example with the above program.
 
 First, we'll simplify the program to simple if-then-else-statements:
 ```rust
-fn main(input: &[u8]) -> i32 {
+fn target(input: &[u8]) -> i32 {
     if input.len() == 4 {
         if input[0] == 1 {
             if input[1] == 3 {
@@ -58,7 +58,7 @@ fn main(input: &[u8]) -> i32 {
 ```
 Next, we'll trace the program on the input `[]`.
 The trace would look like this:
-```rust
+```rust,ignore
 Branch { // if input.len() == 4
     condition: Equals { 
         left: Variable { name: "input_len" }, 

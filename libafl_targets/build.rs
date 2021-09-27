@@ -46,8 +46,6 @@ pub const CMPLOG_MAP_H: usize = {};
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
 
-    println!("cargo:rerun-if-changed=src/common.h");
-
     //std::env::set_var("CC", "clang");
     //std::env::set_var("CXX", "clang++");
 
@@ -78,12 +76,19 @@ pub const CMPLOG_MAP_H: usize = {};
 
     #[cfg(feature = "libfuzzer")]
     {
-        println!("cargo:rerun-if-changed=src/libfuzzer_compatibility.c");
+        println!("cargo:rerun-if-changed=src/libfuzzer.c");
 
         cc::Build::new()
-            .file(src_dir.join("libfuzzer_compatibility.c"))
-            .compile("libfuzzer_compatibility");
+            .file(src_dir.join("libfuzzer.c"))
+            .compile("libfuzzer");
     }
+
+    println!("cargo:rerun-if-changed=src/common.h");
+    println!("cargo:rerun-if-changed=src/common.c");
+
+    cc::Build::new()
+        .file(src_dir.join("common.c"))
+        .compile("common");
 
     println!("cargo:rerun-if-changed=src/cmplog.h");
     println!("cargo:rerun-if-changed=src/cmplog.c");

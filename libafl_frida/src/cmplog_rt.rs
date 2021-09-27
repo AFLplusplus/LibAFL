@@ -40,6 +40,7 @@ impl CmpLogRuntime {
     }
 
     /// Generate the instrumentation blobs for the current arch.
+    #[allow(clippy::similar_names)]
     fn generate_instrumentation_blobs(&mut self) {
         macro_rules! blr_to_populate {
             ($ops:ident) => {dynasm!($ops

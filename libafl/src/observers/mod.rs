@@ -30,13 +30,13 @@ pub trait Observer<I, S>: Named {
         Ok(())
     }
 
-    /// Called right before exexution starts
+    /// Called right before execution starts.
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Called right after execution finished.
+    /// Called right after execution finish.
     #[inline]
     fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())

@@ -5,12 +5,15 @@ A metadata in LibAFL is a self contained structure that holds associated data to
 In terms of code, a metadata can be defined as a Rust struct registered in the SerdeAny register.
 
 ```rust
+extern crate libafl;
+extern crate serde;
+
 use libafl::SerdeAny;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, SerdeAny)]
 pub struct MyMetadata {
-    ...
+    //...
 }
 ```
 

@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
+  book:
     strategy:
       matrix:
           os: [ubuntu-latest, windows-latest, macOS-latest]
@@ -22,13 +22,17 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
-      - name: Add clippy
-        run: rustup component add clippy
-      #- name: Run clippy
-      #  uses: actions-rs/cargo@v1
-      #  with:
-      #    command: clippy
-      #    args: --all
+      - name: install mdbook
+        run: cargo install mdbook
+      - name: install linkcheck
+        run: cargo install mdbook-linkcheck
+      - name: Build libafl debug
+        run: cargo build -p libafl
+      - name: Build the book
+        run: cd docs && mdbook build
+      - name: Test the book
+        run: cd docs && mdbook test -L ../target/debug/deps
+     
 
   ubuntu:
     runs-on: ubuntu-latest
@@ -40,7 +44,7 @@ jobs:
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -90,7 +94,7 @@ jobs:
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang nasm
+      run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
   nostd-build:

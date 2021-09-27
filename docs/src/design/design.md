@@ -1,3 +1,3 @@
 # Design
 
-In this chapter, we introduce the abstract Core Concepts behind LibAFL, we then discuss how we designed the library to take into account these concepts while allowing code reuse and extensibility.
+In this chapter, we discuss how we designed the library taking into account the core concepts while allowing code reuse and extensibility.
