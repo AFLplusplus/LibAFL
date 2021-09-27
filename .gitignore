@@ -2,6 +2,8 @@ target
 out
 Cargo.lock
 
+.env
+
 *.o
 *.a
 *.so
