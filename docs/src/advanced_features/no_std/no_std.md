@@ -1,4 +1,4 @@
-# Using LibAFL in no_std environments
+# Using LibAFL in `no_std` environments
 
 It is possible to use LibAFL in `no_std` environments e.g. custom platforms like microcontrolles, kernels, hypervisors, and more.
 
@@ -9,7 +9,7 @@ libafl = { path = "path/to/libafl/", default-features = false}
 ```
 
 Then build your project e.g. for `aarch64-unknown-none` using
-```
+```sh
 cargo build --no-default-features --target aarch64-unknown-none
 ```
 
@@ -27,7 +27,7 @@ int my_real_seconds(void)
 ```
 and here we use it in Rust. `external_current_millis` is then called from LibAFL.
 Note that it needs to be `no_mangle` in order to get picked up by LibAFL at linktime.
-```rust
+```rust,ignore
 #[no_mangle]
 pub extern "C" fn external_current_millis() -> u64 {
     unsafe { my_real_seconds()*1000 }

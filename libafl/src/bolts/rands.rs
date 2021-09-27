@@ -412,4 +412,20 @@ mod tests {
         assert_ne!(rand.next(), rand_fixed.next());
         test_single_rand(&mut rand);
     }
+
+    #[test]
+    #[cfg(feature = "rand_trait")]
+    fn test_rgn_core_support() {
+        use crate::bolts::rands::StdRand;
+        use rand_core::RngCore;
+        pub struct Mutator<R: RngCore> {
+            rng: R,
+        }
+
+        let mut mutator = Mutator {
+            rng: StdRand::with_seed(0),
+        };
+
+        println!("random value: {}", mutator.rng.next_u32());
+    }
 }

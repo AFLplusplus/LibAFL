@@ -1,4 +1,5 @@
 # Getting Started
 
-To start using LibAFL, there are some first steps to do. In this chapter, we will
-discuss how to download LibAFL and build with `cargo`, how are structured its crates and the purpose of each crate.
+To get startes with LibAFL, there are some initial steps to do.
+In this chapter, we discuss how to download and build LibAFL, using Rust's `cargo` command.
+We also describe the structure of LibAFL's components, so-called crates, and the purpose of each individual crate.
