@@ -19,3 +19,4 @@
 
 - [Advanced Features](./advanced_features/advanced_features.md)
   - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic/concolic.md)
+  - [Using LibAFL in no_std environments](./advanced_features/no_std/no_std.md)
