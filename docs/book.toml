@@ -8,3 +8,4 @@ title = "The LibAFL Fuzzing Library"
 [output.html]
 
 [output.linkcheck]
+optional = true
