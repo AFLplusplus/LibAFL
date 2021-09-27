@@ -55,8 +55,7 @@ pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     }
     #[pyfn(m)]
     fn read_mem(addr: u64, size: usize) -> Vec<u8> {
-        let mut buf = vec![];
-        unsafe { buf.set_len(size) };
+        let mut buf = vec![0; size];
         emu::read_mem(addr, &mut buf);
         buf
     }
