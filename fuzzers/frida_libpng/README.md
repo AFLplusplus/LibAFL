@@ -51,7 +51,7 @@ export CXX=clang++
 cargo build --release
 cp ./target/release/frida_libpng.exe .
 ```
-4. Compile libpng-1.6.37 with following commands 
+4. Compile libpng-1.6.37 with the following commands 
 ```
 cd libpng-1.6.37
 ./configure --enable-hardware-optimizations=yes --with-pic=yes
