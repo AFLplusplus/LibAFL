@@ -34,7 +34,7 @@ You can also fuzz libpng-1.6.37 on windows with frida mode!
 (but you need to grab msys2 for compiling libpng)
 
 1. Install and setup msys2 (https://www.msys2.org/) 
-2. Compile frida_libpng
+2. Compile frida_libpng (possibly from your powershell)
 ```
 cargo build --release
 cp ./target/release/frida_libpng.exe .
