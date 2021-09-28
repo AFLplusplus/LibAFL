@@ -338,10 +338,7 @@ unsafe fn fuzz(
         );
 
         #[cfg(windows)]
-        let objective = feedback_or_fast!(
-            CrashFeedback::new(),
-            TimeoutFeedback::new()
-        );
+        let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
@@ -412,10 +409,7 @@ unsafe fn fuzz(
             &gum,
             InProcessExecutor::new(
                 &mut frida_harness,
-                tuple_list!(
-                    edges_observer,
-                    time_observer,
-                ),
+                tuple_list!(edges_observer, time_observer,),
                 &mut fuzzer,
                 &mut state,
                 &mut mgr,
