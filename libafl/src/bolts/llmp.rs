@@ -2584,7 +2584,7 @@ where
                             }
                         }
                     }
-                    _ => return Err(Error::IllegalState(format!("Error in create_attach_to_tcp :{}", e.to_string()))),
+                    _ => return Err(Error::IllegalState(e.to_string())),
                 }
             }
         };

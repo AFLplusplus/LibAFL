@@ -34,7 +34,7 @@ use rangemap::RangeMap;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
-#[cfg(not(windows))]
+#[cfg(unix)]
 use crate::{asan_rt::AsanRuntime, FridaOptions};
 
 #[cfg(windows)]
@@ -68,7 +68,7 @@ pub trait FridaHelper<'a> {
     fn transformer(&self) -> &Transformer<'a>;
 
     /// Register a new thread with this `FridaHelper`
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     fn register_thread(&mut self);
 
     /// Called prior to execution of an input
@@ -100,7 +100,7 @@ pub struct FridaInstrumentationHelper<'a> {
     transformer: Option<Transformer<'a>>,
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     asan_runtime: AsanRuntime,
     #[cfg(feature = "cmplog")]
     cmplog_runtime: CmpLogRuntime,
@@ -116,7 +116,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     }
 
     /// Register the current thread with the [`FridaInstrumentationHelper`]
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     fn register_thread(&mut self) {
         self.asan_runtime.register_thread();
     }
@@ -352,7 +352,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             if helper.options().coverage_enabled() {
                                 helper.emit_coverage_mapping(address, &output);
                             }
-                            #[cfg(not(windows))]
+                            #[cfg(unix)]
                             if helper.options().drcov_enabled() {
                                 instruction.put_callout(|context| {
                                     let real_address =
@@ -404,7 +404,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             }
                         }
 
-                        #[cfg(not(windows))]
+                        #[cfg(unix)]
                         if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                             helper.asan_runtime.add_stalked_address(
                                 output.writer().pc() as usize - 4,
@@ -417,7 +417,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             });
             helper.transformer = Some(transformer);
 
-            #[cfg(not(windows))]
+            #[cfg(unix)]
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.init(gum, modules_to_instrument);
             }
@@ -794,7 +794,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
             self.current_report_impl = writer.pc();
 
-            #[cfg(not(windows))]
+            #[cfg(unix)]
             writer.put_bytes(self.asan_runtime.blob_report());
 
             writer.put_label(after_report_impl);
@@ -931,7 +931,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             }
         }
         // Insert the check_shadow_mem code blob
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
             2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),

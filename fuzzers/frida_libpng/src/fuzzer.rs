@@ -56,7 +56,7 @@ use libafl_frida::{
     FridaOptions,
 };
 
-#[cfg(not(windows))]
+#[cfg(unix)]
 use libafl_frida::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
@@ -110,7 +110,7 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
             println!("Crashing target as it had ASAN errors");
             unsafe {
@@ -261,25 +261,6 @@ pub fn main() {
     }
 }
 
-/*
-/// Not supported on windows right now
-#[cfg(windows)]
-#[allow(clippy::too_many_arguments)]
-fn fuzz(
-    _module_name: &str,
-    _symbol_name: &str,
-    _corpus_dirs: &[PathBuf],
-    _objective_dir: &Path,
-    _broker_port: u16,
-    _cores: &[usize],
-    _stdout_file: Option<&str>,
-    _broker_addr: Option<SocketAddr>,
-    _configuration: String,
-) -> Result<(), ()> {
-    todo!("Example not supported on Windows");
-}
-*/
-
 /// The actual fuzzer
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 unsafe fn fuzz(
@@ -404,7 +385,7 @@ unsafe fn fuzz(
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         frida_helper.register_thread();
         // Create the executor for an in-process function with just one observer for edge coverage
 
