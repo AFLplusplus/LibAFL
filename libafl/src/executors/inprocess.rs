@@ -589,7 +589,7 @@ mod unix_signal_handler {
             println!("Bye!");
         }
 
-        libc::_exit(1);
+        libc::_exit(15);
     }
 }
 
