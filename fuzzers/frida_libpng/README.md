@@ -28,3 +28,30 @@ By restarting the actual fuzzer, it can recover from these exit conditions.
 
 After building the libpng-harness, too, you can run `find . -name libpng-harness.so` to find the location of your harness, then run
 `./target/release/frida_libpng ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0`
+
+## Windows
+You can also fuzz libpng-1.6.37 on windows with frida mode!
+(but you need to grab msys2 for compiling libpng)
+
+1. Install and setup msys2 (https://www.msys2.org/) 
+2. Compile frida_libpng
+```
+cargo build --release
+cp ./target/release/frida_libpng.exe .
+```
+3. Compile libpng-1.6.37 with following commands 
+```
+cd libpng-1.6.37
+./configure --enable-hardware-optimizations=yes --with-pic=yes
+make
+cd ..
+```
+4. Compile the harness
+```
+g++ -O3 -c -I./libpng-1.6.37 -fPIC harness.cc -o harness.o
+g++ -O3 harness.o ./libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.dll
+```
+5. Run the fuzzer
+```
+./frida_libpng.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll --cores=0
+```
