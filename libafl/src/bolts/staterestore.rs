@@ -2,7 +2,6 @@
 /// Uses a [`ShMem`] up to a threshold, then write to disk.
 use ahash::AHasher;
 use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
-use postcard;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     env::temp_dir,

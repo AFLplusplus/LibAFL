@@ -5,12 +5,15 @@ A metadata in LibAFL is a self contained structure that holds associated data to
 In terms of code, a metadata can be defined as a Rust struct registered in the SerdeAny register.
 
 ```rust
+extern crate libafl;
+extern crate serde;
+
 use libafl::SerdeAny;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, SerdeAny)]
 pub struct MyMetadata {
-    ...
+    //...
 }
 ```
 
@@ -32,7 +35,7 @@ By default, Testcase and State implement it and hold a SerdeAnyMap testcase.
 
 We are interested to store State's Metadata to not lose them in case of crash or stop of a fuzzer. To do that, they must be serialized and unserialized using Serde.
 
-As Metadata are stored in a SerdeAnyMap as trait objects, they cannot be deserialized using Serde by default.
+As Metadata is stored in a SerdeAnyMap as trait objects, they cannot be deserialized using Serde by default.
 
 To cope with this problem, in LibAFL each SerdeAny struct must be registered in a global registry that keeps track of types and allows the (de)serialization of the registered types.
 

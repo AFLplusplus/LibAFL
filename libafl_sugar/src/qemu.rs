@@ -63,7 +63,7 @@ where
     /// clusters.
     #[builder(default = None, setter(strip_option))]
     remote_broker_addr: Option<SocketAddr>,
-    /// Bytes harness    
+    /// Bytes harness
     #[builder(setter(strip_option))]
     harness: Option<H>,
     // Syscall hook
@@ -113,7 +113,7 @@ where
 
         let stats = MultiStats::new(|s| println!("{}", s));
 
-        let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr| {
+        let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut hooks::EDGES_MAP };
             let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
@@ -262,5 +262,63 @@ where
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         launcher.build().launch().expect("Launcher failed");
+    }
+}
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::qemu;
+    use pyo3::prelude::*;
+    use pyo3::types::PyBytes;
+    use std::path::PathBuf;
+
+    #[pyclass(unsendable)]
+    struct QemuBytesCoverageSugar {
+        input_dirs: Vec<PathBuf>,
+        output_dir: PathBuf,
+        broker_port: u16,
+        cores: Vec<usize>,
+    }
+
+    #[pymethods]
+    impl QemuBytesCoverageSugar {
+        #[new]
+        fn new(
+            input_dirs: Vec<PathBuf>,
+            output_dir: PathBuf,
+            broker_port: u16,
+            cores: Vec<usize>,
+        ) -> Self {
+            Self {
+                input_dirs,
+                output_dir,
+                broker_port,
+                cores,
+            }
+        }
+
+        #[allow(clippy::needless_pass_by_value)]
+        pub fn run(&self, harness: PyObject) {
+            qemu::QemuBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .harness(|buf| {
+                    Python::with_gil(|py| -> PyResult<()> {
+                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        harness.call1(py, args)?;
+                        Ok(())
+                    })
+                    .unwrap();
+                })
+                .build()
+                .run();
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<QemuBytesCoverageSugar>()?;
+        Ok(())
     }
 }

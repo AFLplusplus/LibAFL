@@ -2,6 +2,8 @@ target
 out
 Cargo.lock
 
+.env
+
 *.o
 *.a
 *.so
@@ -13,6 +15,7 @@ Cargo.lock
 *.dSYM
 
 .cur_input
+.venv
 
 crashes
 
@@ -30,3 +33,5 @@ AFLplusplus
 # Ignore common dummy and logfiles
 *.log
 a
+
+forkserver_test

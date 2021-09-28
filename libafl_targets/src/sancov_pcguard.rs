@@ -13,13 +13,13 @@ use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
 ))]
 #[cfg(not(any(doc, feature = "clippy")))]
 compile_error!(
-    "the libafl_targets `pcguard_edges_ptr` and `pcguard_hitcounts_ptr` features are mutually exclusive."
+    "the libafl_targets `sancov_pcguard_edges_ptr` and `sancov_pcguard_hitcounts_ptr` features are mutually exclusive."
 );
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
 compile_error!(
-    "the libafl_targets `pcguard_edges` and `pcguard_hitcounts` features are mutually exclusive."
+    "the libafl_targets `sancov_pcguard_edges` and `sancov_pcguard_hitcounts` features are mutually exclusive."
 );
 
 /// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.

@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
+  book:
     strategy:
       matrix:
           os: [ubuntu-latest, windows-latest, macOS-latest]
@@ -22,13 +22,17 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
-      - name: Add clippy
-        run: rustup component add clippy
-      #- name: Run clippy
-      #  uses: actions-rs/cargo@v1
-      #  with:
-      #    command: clippy
-      #    args: --all
+      - name: install mdbook
+        run: cargo install mdbook
+      - name: install linkcheck
+        run: cargo install mdbook-linkcheck
+      - name: Build libafl debug
+        run: cargo build -p libafl
+      - name: Build the book
+        run: cd docs && mdbook build
+      - name: Test the book
+        run: cd docs && mdbook test -L ../target/debug/deps
+     
 
   ubuntu:
     runs-on: ubuntu-latest
@@ -40,7 +44,7 @@ jobs:
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -48,11 +52,15 @@ jobs:
     - name: Run a normal build
       run: cargo build --verbose
     # cargo-hack tests/checks each crate in the workspace
-    - name: Run tests
-      run: cargo hack test --all-features
+    #- name: Run tests
+    #  run: cargo hack test --all-features
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
     - name: Check each feature
-      run: cargo hack check --each-feature
+      # Skipping python as it has to be built with the `maturin` tool
+      run: cargo hack check --feature-powerset --depth=2 --exclude-features=python,sancov_pcguard_edges,sancov_pcguard_edges_ptr --no-dev-deps
+    # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
+    - name: Check pcguard edges
+      run: cargo check --features=sancov_pcguard_edges,sancov_pcguard_edges_ptr
     - name: Build examples
       run: cargo build --examples --verbose
     - uses: actions/checkout@v2
@@ -90,7 +98,7 @@ jobs:
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang nasm
+      run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
   nostd-build:
@@ -108,6 +116,8 @@ jobs:
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
       run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
+    - name: no_std tests
+      run: cd ./libafl && cargo test --no-default-features 
   build-docker:
     runs-on: ubuntu-latest
     steps:

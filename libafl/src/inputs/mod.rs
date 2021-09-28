@@ -11,15 +11,12 @@ use alloc::{
     vec::Vec,
 };
 use core::{clone::Clone, fmt::Debug};
-#[cfg(feature = "std")]
-use std::{
-    fs::File,
-    io::{Read, Write},
-    path::Path,
-};
-
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::{fs::File, io::Read, path::Path};
 
+#[cfg(feature = "std")]
+use crate::bolts::fs::write_file_atomic;
 use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
@@ -30,10 +27,7 @@ pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug 
     where
         P: AsRef<Path>,
     {
-        let mut file = File::create(path)?;
-        let serialized = postcard::to_allocvec(self)?;
-        file.write_all(&serialized)?;
-        Ok(())
+        write_file_atomic(path, &postcard::to_allocvec(self)?)
     }
 
     #[cfg(not(feature = "std"))]

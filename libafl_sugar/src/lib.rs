@@ -1,4 +1,4 @@
-//! Sugar API to simplify the life of the naibe user of `LibAFL`
+//! Sugar API to simplify the life of the naive user of `LibAFL`
 
 pub mod inmemory;
 pub use inmemory::InMemoryBytesCoverageSugar;
@@ -10,3 +10,18 @@ pub use qemu::QemuBytesCoverageSugar;
 
 pub const DEFAULT_TIMEOUT_SECS: u64 = 1200;
 pub const CORPUS_CACHE_SIZE: usize = 4096;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "python")]
+#[pymodule]
+#[pyo3(name = "libafl_sugar")]
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    inmemory::pybind::register(py, m)?;
+    #[cfg(target_os = "linux")]
+    {
+        qemu::pybind::register(py, m)?;
+    }
+    Ok(())
+}
