@@ -26,7 +26,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::{
@@ -89,7 +89,7 @@ pub fn libafl_main() {
                 .short('t')
                 .long("timeout")
                 .about("Timeout for each individual execution, in milliseconds")
-                .default_value("1000"),
+                .default_value("1200"),
         )
         .try_get_matches()
     {
@@ -220,7 +220,7 @@ fn fuzz(
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+    let objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
