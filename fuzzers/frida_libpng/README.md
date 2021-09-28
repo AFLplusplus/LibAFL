@@ -34,6 +34,18 @@ You can also fuzz libpng-1.6.37 on windows with frida mode!
 (but you need to grab msys2 for compiling libpng)
 
 1. Install and setup msys2 (https://www.msys2.org/) 
+1.1 If you prefer to compile libpng with clang, you can install it and its dependecy with
+```
+pacman -S mingw-w64-x86_64-clang
+pacman -S mingw-w64-clang-x86_64-zlib
+```
+and
+```
+export LDFLAGS='-L/clang64/lib'
+export CPPFLAGS='-I/clang64/include'
+export CC=clang
+export CXX=clang++
+```
 2. Compile frida_libpng (possibly from your powershell)
 ```
 cargo build --release
@@ -46,10 +58,15 @@ cd libpng-1.6.37
 make
 cd ..
 ```
-4. Compile the harness
+4. Compile the harness with gcc or clang++
 ```
 g++ -O3 -c -I./libpng-1.6.37 -fPIC harness.cc -o harness.o
 g++ -O3 harness.o ./libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.dll
+```
+or
+```
+clang++ -O3 -c -I./libpng-1.6.37 -fPIC harness.cc -o harness.o
+clang++ -O3 harness.o ./libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.dll
 ```
 5. Run the fuzzer
 ```
