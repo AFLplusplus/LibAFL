@@ -285,6 +285,18 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     timer_queue: ptr::null_mut(),
 };
 
+pub fn inprocess_run_state<'a, S>() -> Option<&'a mut S> {
+    unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
+}
+
+pub fn inprocess_run_event_manager<'a, EM>() -> Option<&'a mut EM> {
+    unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
+}
+
+pub fn inprocess_run_event_fuzzer<'a, F>() -> Option<&'a mut F> {
+    unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
+}
+
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;

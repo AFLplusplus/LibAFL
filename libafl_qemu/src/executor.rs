@@ -20,6 +20,7 @@ static mut GEN_BLOCK_HOOK_PTR: *const c_void = ptr::null();
 static mut GEN_READ_HOOK_PTR: *const c_void = ptr::null();
 static mut GEN_WRITE_HOOK_PTR: *const c_void = ptr::null();
 static mut GEN_CMP_HOOK_PTR: *const c_void = ptr::null();
+static mut SYSCALL_HOOK_PTR: *const c_void = ptr::null();
 
 extern "C" fn gen_edge_hook_wrapper<S>(src: u64, dst: u64) -> u64 {
     unsafe {
@@ -58,6 +59,25 @@ extern "C" fn gen_cmp_hook_wrapper<S>(pc: u64, size: u32) -> u64 {
         let state = (GLOBAL_STATE.state_ptr as *mut S).as_mut().unwrap();
         let func: fn(&mut S, u64, usize) -> Option<u64> = transmute(GEN_CMP_HOOK_PTR);
         (func)(state, pc, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
+    }
+}
+
+extern "C" fn gen_syscall_hook_wrapper<S>(
+    sys_num: i32,
+    a0: u64,
+    a1: u64,
+    a2: u64,
+    a3: u64,
+    a4: u64,
+    a5: u64,
+    a6: u64,
+    a7: u64,
+) -> SyscallHookResult {
+    unsafe {
+        let state = (GLOBAL_STATE.state_ptr as *mut S).as_mut().unwrap();
+        let func: fn(&mut S, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult =
+            transmute(SYSCALL_HOOK_PTR);
+        (func)(state, sys_num, a0, a1, a2, a3, a4, a5, a6, a7)
     }
 }
 
@@ -239,6 +259,17 @@ where
         ) -> SyscallHookResult,
     ) {
         emu::set_syscall_hook(hook);
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn hook_syscalls_state(
+        &self,
+        hook: fn(&mut S, sys_num: i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
+    ) {
+        unsafe {
+            SYSCALL_HOOK_PTR = hook as *const _;
+        }
+        emu::set_syscall_hook(gen_syscall_hook_wrapper::<S>);
     }
 }
 
