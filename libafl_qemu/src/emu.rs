@@ -40,7 +40,7 @@ impl IntoPy<PyObject> for MmapPerms {
 #[repr(C)]
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pyclass)]
-#[derive(FromPyObject)]
+#[cfg_attr(feature = "python", derive(FromPyObject))]
 pub struct SyscallHookResult {
     pub retval: u64,
     pub skip_syscall: bool,
