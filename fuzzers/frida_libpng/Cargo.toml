@@ -20,6 +20,14 @@ cc = { version = "1.0", features = ["parallel"] }
 num_cpus = "1.0"
 which = "4.1"
 
+
+[target.'cfg(windows)'.build-dependencies]
+xz = "0.1.0"
+flate2 = "1.0.22"
+tar = "0.4.37"
+reqwest = { version = "0.11.4", features = ["blocking"] }
+
+
 [dependencies]
 libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public" ] } #,  "llmp_small_maps", "llmp_debug"]}
 capstone = "0.8.0"
