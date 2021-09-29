@@ -33,7 +33,6 @@ fn build_dep_check(tools: &[&str]) {
 
 fn main() {
     if cfg!(windows) {
-        println!("cargo:warning=You have to compile the hareness manually on Windows.");
         let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
         println!("cargo:rerun-if-changed=build.rs");
         println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
@@ -77,6 +76,8 @@ fn main() {
                 rename(zlib_1_2_11, zlib).expect("Zlib extraction failed");
             }
         }
+
+        println!("cargo:warning=Now compile libpng with either visual studio or msys2");
     } else {
         let out_dir = env::var_os("OUT_DIR").unwrap();
         let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
