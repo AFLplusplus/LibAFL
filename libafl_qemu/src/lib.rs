@@ -42,7 +42,7 @@ static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 #[cfg(all(target_os = "linux", feature = "python"))]
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
-#[allow(clippy::items_after_statements)]
+#[allow(clippy::items_after_statements, clippy::too_many_lines)]
 pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     use core::mem::transmute;
     use pyo3::exceptions::PyValueError;
@@ -126,28 +126,29 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         a6: u64,
         a7: u64,
     ) -> SyscallHookResult {
-        if let Some(obj) = unsafe { &PY_SYSCALL_HOOK } {
-            let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
-            Python::with_gil(|py| {
-                let ret = obj.call1(py, args).expect("Error in the syscall hook");
-                let any = ret.as_ref(py);
-                if any.is_none() {
-                    SyscallHookResult::new(None)
-                } else {
-                    let a: Result<&PyInt, _> = any.try_into();
-                    if let Ok(i) = a {
-                        SyscallHookResult::new(Some(
-                            i.extract().expect("Invalid syscall hook return value"),
-                        ))
+        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+            || SyscallHookResult::new(None),
+            |obj| {
+                let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
+                Python::with_gil(|py| {
+                    let ret = obj.call1(py, args).expect("Error in the syscall hook");
+                    let any = ret.as_ref(py);
+                    if any.is_none() {
+                        SyscallHookResult::new(None)
                     } else {
-                        SyscallHookResult::extract(any)
-                            .expect("The syscall hook must return a SyscallHookResult")
+                        let a: Result<&PyInt, _> = any.try_into();
+                        if let Ok(i) = a {
+                            SyscallHookResult::new(Some(
+                                i.extract().expect("Invalid syscall hook return value"),
+                            ))
+                        } else {
+                            SyscallHookResult::extract(any)
+                                .expect("The syscall hook must return a SyscallHookResult")
+                        }
                     }
-                }
-            })
-        } else {
-            SyscallHookResult::new(None)
-        }
+                })
+            },
+        )
     }
     #[pyfn(m)]
     fn set_syscall_hook(hook: PyObject) {
@@ -157,26 +158,26 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         emu::set_syscall_hook(py_syscall_hook_wrapper);
     }
 
-    let child_module = PyModule::new(py, "x86")?;
+    let x86m = PyModule::new(py, "x86")?;
     for r in x86::X86Regs::iter() {
         let v: i32 = r.into();
-        child_module.add(&format!("{:?}", r), v)?;
+        x86m.add(&format!("{:?}", r), v)?;
     }
-    m.add_submodule(child_module)?;
+    m.add_submodule(x86m)?;
 
-    let child_module = PyModule::new(py, "amd64")?;
+    let amd64m = PyModule::new(py, "amd64")?;
     for r in amd64::Amd64Regs::iter() {
         let v: i32 = r.into();
-        child_module.add(&format!("{:?}", r), v)?;
+        amd64m.add(&format!("{:?}", r), v)?;
     }
-    m.add_submodule(child_module)?;
+    m.add_submodule(amd64m)?;
 
-    let child_module = PyModule::new(py, "mmap")?;
+    let mmapm = PyModule::new(py, "mmap")?;
     for r in emu::MmapPerms::iter() {
         let v: i32 = r.into();
-        child_module.add(&format!("{:?}", r), v)?;
+        mmapm.add(&format!("{:?}", r), v)?;
     }
-    m.add_submodule(child_module)?;
+    m.add_submodule(mmapm)?;
 
     m.add_class::<emu::MapInfo>()?;
     m.add_class::<emu::GuestMaps>()?;

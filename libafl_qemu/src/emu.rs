@@ -51,17 +51,16 @@ impl SyscallHookResult {
     #[new]
     #[must_use]
     pub fn new(value: Option<u64>) -> Self {
-        if let Some(v) = value {
-            Self {
-                retval: v,
-                skip_syscall: true,
-            }
-        } else {
+        value.map_or(
             Self {
                 retval: 0,
                 skip_syscall: false,
-            }
-        }
+            },
+            |v| Self {
+                retval: v,
+                skip_syscall: true,
+            },
+        )
     }
 }
 
@@ -69,17 +68,16 @@ impl SyscallHookResult {
 impl SyscallHookResult {
     #[must_use]
     pub fn new(value: Option<u64>) -> Self {
-        if let Some(v) = value {
-            Self {
-                retval: v,
-                skip_syscall: true,
-            }
-        } else {
+        value.map_or(
             Self {
                 retval: 0,
                 skip_syscall: false,
-            }
-        }
+            },
+            |v| Self {
+                retval: v,
+                skip_syscall: true,
+            },
+        )
     }
 }
 
