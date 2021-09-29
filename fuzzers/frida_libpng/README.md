@@ -61,12 +61,12 @@ cd ..
 5. Compile the harness with gcc or clang++
 ```
 g++ -O3 -c -I./libpng-1.6.37 -fPIC harness.cc -o harness.o
-g++ -O3 harness.o ./libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.dll
+g++ -O3 harness.o ./libpng-1.6.37/.libs/libpng16.a -static -shared -lz -o libpng-harness.dll
 ```
 or
 ```
 clang++ -O3 -c -I./libpng-1.6.37 -fPIC harness.cc -o harness.o
-clang++ -O3 harness.o ./libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.dll
+clang++ -O3 harness.o ./libpng-1.6.37/.libs/libpng16.a -static -shared -lz -o libpng-harness.dll
 ```
 6. Run the fuzzer
 ```
