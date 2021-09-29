@@ -31,7 +31,6 @@ After building the libpng-harness, too, you can run `find . -name libpng-harness
 
 ## Windows
 You can also fuzz libpng-1.6.37 on windows with frida mode!
-(but you need to grab msys2 for compiling libpng)
 
 ### To build it with visual studio
 1. Install clang for windows (make sure you add LLVM to the system path!) 
