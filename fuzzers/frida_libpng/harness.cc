@@ -88,10 +88,17 @@ static char * allocation = NULL;
 __attribute__((noinline))
 void func3( char * alloc) {
   //printf("func3\n");
+  #ifdef _WIN32
+  if (rand() == 0) {
+    alloc[0x1ff] = 0xde;
+    printf("alloc[0x200]: %d\n", alloc[0x200]);
+  }
+  #else
   if (random() == 0) {
     alloc[0x1ff] = 0xde;
     printf("alloc[0x200]: %d\n", alloc[0x200]);
   }
+  #endif
 }
 __attribute__((noinline))
 void func2() {
@@ -104,10 +111,19 @@ void func1() {
   //printf("func1\n");
   func2();
 }
+
+
+// Export this symbol
+#ifdef _WIN32
+#	define HARNESS_EXPORTS __declspec(dllexport)
+#else
+#	define HARNESS_EXPORTS
+#endif
+
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+HARNESS_EXPORTS extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
     if (size >= 8 && *(uint64_t*)data == 0xABCDEFAA8F1324AA){
         abort();

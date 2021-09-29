@@ -31,9 +31,14 @@ use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
 
+#[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
+#[cfg(unix)]
 use crate::{asan_rt::AsanRuntime, FridaOptions};
+
+#[cfg(windows)]
+use crate::FridaOptions;
 
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
@@ -54,7 +59,7 @@ enum SpecialCmpLogCase {
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(target_vendor = "apple"))]
+#[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
@@ -63,6 +68,7 @@ pub trait FridaHelper<'a> {
     fn transformer(&self) -> &Transformer<'a>;
 
     /// Register a new thread with this `FridaHelper`
+    #[cfg(unix)]
     fn register_thread(&mut self);
 
     /// Called prior to execution of an input
@@ -94,6 +100,7 @@ pub struct FridaInstrumentationHelper<'a> {
     transformer: Option<Transformer<'a>>,
     #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
+    #[cfg(unix)]
     asan_runtime: AsanRuntime,
     #[cfg(feature = "cmplog")]
     cmplog_runtime: CmpLogRuntime,
@@ -109,6 +116,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     }
 
     /// Register the current thread with the [`FridaInstrumentationHelper`]
+    #[cfg(unix)]
     fn register_thread(&mut self) {
         self.asan_runtime.register_thread();
     }
@@ -258,6 +266,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         modules_to_instrument: &'a [&str],
     ) -> Self {
         // workaround frida's frida-gum-allocate-near bug:
+        #[cfg(unix)]
         unsafe {
             for _ in 0..512 {
                 mmap(
@@ -295,6 +304,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
+            #[cfg(not(windows))]
             asan_runtime: AsanRuntime::new(options.clone()),
             #[cfg(feature = "cmplog")]
             cmplog_runtime: CmpLogRuntime::new(),
@@ -342,6 +352,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             if helper.options().coverage_enabled() {
                                 helper.emit_coverage_mapping(address, &output);
                             }
+                            #[cfg(unix)]
                             if helper.options().drcov_enabled() {
                                 instruction.put_callout(|context| {
                                     let real_address =
@@ -393,6 +404,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             }
                         }
 
+                        #[cfg(unix)]
                         if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                             helper.asan_runtime.add_stalked_address(
                                 output.writer().pc() as usize - 4,
@@ -404,6 +416,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 }
             });
             helper.transformer = Some(transformer);
+
+            #[cfg(unix)]
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.init(gum, modules_to_instrument);
             }
@@ -779,6 +793,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
             writer.put_b_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
+
+            #[cfg(unix)]
             writer.put_bytes(self.asan_runtime.blob_report());
 
             writer.put_label(after_report_impl);
@@ -915,6 +931,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             }
         }
         // Insert the check_shadow_mem code blob
+        #[cfg(unix)]
         match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
             2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),

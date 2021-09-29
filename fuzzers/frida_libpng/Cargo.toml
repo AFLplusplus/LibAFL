@@ -19,11 +19,18 @@ debug = true
 cc = { version = "1.0", features = ["parallel"] }
 num_cpus = "1.0"
 which = "4.1"
+xz = "0.1.0"
+flate2 = "1.0.22"
+tar = "0.4.37"
+reqwest = { version = "0.11.4", features = ["blocking"] }
 
-[target.'cfg(unix)'.dependencies]
+
+
+
+[dependencies]
 libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public" ] } #,  "llmp_small_maps", "llmp_debug"]}
 capstone = "0.8.0"
-frida-gum = { version = "0.5.2", features = [ "auto-download", "backtrace", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.5.2", features = [ "auto-download", "event-sink", "invocation-listener"] }
 libafl_frida = { path = "../../libafl_frida", version = "0.6.1", features = ["cmplog"] }
 libafl_targets = { path = "../../libafl_targets", version = "0.6.1" , features = ["sancov_cmplog"] }
 lazy_static = "1.4.0"
