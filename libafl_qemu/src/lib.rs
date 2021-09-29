@@ -34,7 +34,10 @@ pub fn filter_qemu_args() -> Vec<String> {
 }
 
 #[cfg(all(target_os = "linux", feature = "python"))]
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyInt};
+
+#[cfg(all(target_os = "linux", feature = "python"))]
+static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 #[pymodule]
@@ -112,6 +115,48 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         }
     }
 
+    extern "C" fn py_syscall_hook_wrapper(
+        sys_num: i32,
+        a0: u64,
+        a1: u64,
+        a2: u64,
+        a3: u64,
+        a4: u64,
+        a5: u64,
+        a6: u64,
+        a7: u64,
+    ) -> SyscallHookResult {
+        if let Some(obj) = unsafe { &PY_SYSCALL_HOOK } {
+            let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
+            Python::with_gil(|py| {
+                let ret = obj.call1(py, args).expect("Error in the syscall hook");
+                let any = ret.as_ref(py);
+                if any.is_none() {
+                    SyscallHookResult::new(None)
+                } else {
+                    let a: Result<&PyInt, _> = any.try_into();
+                    if let Ok(i) = a {
+                        SyscallHookResult::new(Some(
+                            i.extract().expect("Invalid syscall hook return value"),
+                        ))
+                    } else {
+                        SyscallHookResult::extract(any)
+                            .expect("The syscall hook must return a SyscallHookResult")
+                    }
+                }
+            })
+        } else {
+            SyscallHookResult::new(None)
+        }
+    }
+    #[pyfn(m)]
+    fn set_syscall_hook(hook: PyObject) {
+        unsafe {
+            PY_SYSCALL_HOOK = Some(hook);
+        }
+        emu::set_syscall_hook(py_syscall_hook_wrapper);
+    }
+
     let child_module = PyModule::new(py, "x86")?;
     for r in x86::X86Regs::iter() {
         let v: i32 = r.into();
@@ -135,6 +180,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add_class::<emu::MapInfo>()?;
     m.add_class::<emu::GuestMaps>()?;
+    m.add_class::<emu::SyscallHookResult>()?;
 
     Ok(())
 }
