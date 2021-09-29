@@ -2471,7 +2471,7 @@ where
                 id: 0,
                 current_recv_map: initial_broker_map,
                 last_msg_recvd: ptr::null_mut(),
-                shmem_provider: shmem_provider.clone(),
+                shmem_provider,
             },
         })
     }

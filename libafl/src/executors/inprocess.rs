@@ -736,11 +736,8 @@ mod windows_exception_handler {
         Z: HasObjective<I, OF, S>,
     {
         // Have we set a timer_before?
-        match (data.timer_queue as *mut HANDLE).as_mut() {
-            Some(x) => {
-                windows_delete_timer_queue(*x);
-            }
-            None => {}
+        if let Some(x) = (data.timer_queue as *mut HANDLE).as_mut() {
+            windows_delete_timer_queue(*x);
         }
 
         #[cfg(feature = "std")]
@@ -794,8 +791,6 @@ mod windows_exception_handler {
             event_mgr.await_restart_safe();
             #[cfg(feature = "std")]
             println!("Bye!");
-
-            ExitProcess(1);
         } else {
             #[cfg(feature = "std")]
             {
@@ -823,17 +818,17 @@ mod windows_exception_handler {
             }
 
             // TODO tell the parent to not restart
-            ExitProcess(1);
         }
+        ExitProcess(1);
     }
 }
 
 #[cfg(windows)]
-type WAITORTIMERCALLBACK = unsafe extern "system" fn(param0: *mut c_void, param1: u8);
+type WaitOrTimerCallback = unsafe extern "system" fn(param0: *mut c_void, param1: u8);
 
 #[cfg(windows)]
 pub trait HasTimeoutHandler {
-    unsafe fn timeout_handler(&self) -> WAITORTIMERCALLBACK;
+    fn timeout_handler(&self) -> WaitOrTimerCallback;
 }
 
 #[cfg(windows)]
@@ -843,9 +838,10 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
 {
+    /// the timeout handler
     #[inline]
-    unsafe fn timeout_handler(&self) -> WAITORTIMERCALLBACK {
-        let func: WAITORTIMERCALLBACK = transmute(self.timeout_handler);
+    fn timeout_handler(&self) -> WaitOrTimerCallback {
+        let func: WaitOrTimerCallback = unsafe { transmute(self.timeout_handler) };
         func
     }
 }

@@ -128,7 +128,7 @@ impl<E> TimeoutExecutor<E> {
         unsafe {
             let code = DeleteTimerQueueTimer(self.timer_queue, self.ph_new_timer, HANDLE::NULL);
             if !code.as_bool() {
-                return Err(Error::Unknown(format!("DeleteTimerQueueTimer failed.")));
+                return Err(Error::Unknown("DeleteTimerQueueTimer failed.".to_string()));
             }
         }
         Ok(())
