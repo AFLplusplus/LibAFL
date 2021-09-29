@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  book:
+  common:
     strategy:
       matrix:
           os: [ubuntu-latest, windows-latest, macOS-latest]
@@ -22,6 +22,10 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
+      - name: Add clang path to $PATH env on Windows
+        shell: bash
+        if: runner.os == 'Windows'
+        run: echo "PATH=$PATH:C:\msys64\mingw64\bin" >> $GITHUB_ENV
       - name: install mdbook
         run: cargo install mdbook
       - name: install linkcheck
@@ -119,7 +123,7 @@ jobs:
     - name: Build aarch64-unknown-none
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
-      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
+      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
     - name: no_std tests
       run: cd ./libafl && cargo test --no-default-features 
   build-docker:
