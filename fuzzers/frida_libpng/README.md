@@ -49,7 +49,8 @@ Fire up a powershell at this directory.
 ```
 cp .\libpng-1.6.37\projects\vstudio\x64\Release\libpng16.lib .
 cp .\libpng-1.6.37\projects\vstudio\x64\Release\zlib.lib .
-clang++ -O3 -c -I./libpng-1.6.37 .\harness.cc -o .\harness.o
+cp .\target\release\frida_libpng.exe .
+clang++ -O3 -c -I.\libpng-1.6.37 .\harness.cc -o .\harness.o
 clang++ -L.\zlib.dll .\harness.o .\libpng16.lib -lzlib -shared -o .\libpng-harness.dll
 ```
 4. Run the fuzzer
