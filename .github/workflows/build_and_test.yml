@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  book:
+  common:
     strategy:
       matrix:
           os: [ubuntu-latest, windows-latest, macOS-latest]
@@ -32,6 +32,10 @@ jobs:
         run: cd docs && mdbook build
       - name: Test the book
         run: cd docs && mdbook test -L ../target/debug/deps
+      - name: Run tests
+        run: cargo test
+      - name: Test libafl no_std
+        run: cd libafl && cargo test --no-default-features
      
 
   ubuntu:
@@ -115,7 +119,7 @@ jobs:
     - name: Build aarch64-unknown-none
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
-      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -eq 1 || exit 1
+      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
     - name: no_std tests
       run: cd ./libafl && cargo test --no-default-features 
   build-docker:

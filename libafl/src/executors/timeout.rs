@@ -10,7 +10,7 @@ use crate::{
     Error,
 };
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 use crate::executors::inprocess::{HasTimeoutHandler, GLOBAL_STATE};
 
 #[cfg(unix)]
@@ -18,7 +18,7 @@ use core::{mem::zeroed, ptr::null_mut};
 #[cfg(unix)]
 use libc::c_int;
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 use crate::bolts::bindings::Windows::Win32::{
     Foundation::HANDLE,
     System::Threading::{
@@ -27,7 +27,7 @@ use crate::bolts::bindings::Windows::Win32::{
     },
 };
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 use core::{ffi::c_void, ptr::write_volatile};
 
 #[repr(C)]
@@ -61,7 +61,7 @@ pub fn unix_remove_timeout() {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 pub fn windows_delete_timer_queue(timer_queue: HANDLE) {
     unsafe {
         DeleteTimerQueueEx(timer_queue, HANDLE::NULL);
@@ -128,7 +128,7 @@ impl<E> TimeoutExecutor<E> {
         unsafe {
             let code = DeleteTimerQueueTimer(self.timer_queue, self.ph_new_timer, HANDLE::NULL);
             if !code.as_bool() {
-                return Err(Error::Unknown(format!("DeleteTimerQueueTimer failed.")));
+                return Err(Error::Unknown("DeleteTimerQueueTimer failed.".to_string()));
             }
         }
         Ok(())

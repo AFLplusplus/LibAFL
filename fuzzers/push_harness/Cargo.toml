@@ -20,4 +20,4 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-klo-routines = { version = "0.1.0", git = "https://github.com/andreafioraldi/klo-routines.git" }
+klo-routines = { version = "0.1.0", git = "https://github.com/andreafioraldi/klo-routines.git", rev = "b8e2fb6" }
