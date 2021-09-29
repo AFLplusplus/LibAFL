@@ -1867,6 +1867,7 @@ where
     /// Always returns true on platforms, where no shutdown signal handlers are supported
     #[inline]
     #[cfg(not(unix))]
+    #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
         false
     }

@@ -742,7 +742,34 @@ mod windows_exception_handler {
 
         #[cfg(feature = "std")]
         println!("Crashed with {}", code);
-        if !data.current_input_ptr.is_null() {
+        if data.current_input_ptr.is_null() {
+            #[cfg(feature = "std")]
+            {
+                println!("Double crash\n");
+                let crash_addr = exception_pointers
+                    .as_mut()
+                    .unwrap()
+                    .ExceptionRecord
+                    .as_mut()
+                    .unwrap()
+                    .ExceptionAddress as usize;
+
+                println!(
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
+                    crash_addr
+                );
+            }
+            #[cfg(feature = "std")]
+            {
+                println!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
+
+            // TODO tell the parent to not restart
+        } else {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
@@ -751,7 +778,7 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             println!("Child crashed!");
             #[cfg(feature = "std")]
-            let _ = stdout().flush();
+            drop(stdout().flush());
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             // Make sure we don't crash in the crash handler forever.
@@ -791,33 +818,6 @@ mod windows_exception_handler {
             event_mgr.await_restart_safe();
             #[cfg(feature = "std")]
             println!("Bye!");
-        } else {
-            #[cfg(feature = "std")]
-            {
-                println!("Double crash\n");
-                let crash_addr = exception_pointers
-                    .as_mut()
-                    .unwrap()
-                    .ExceptionRecord
-                    .as_mut()
-                    .unwrap()
-                    .ExceptionAddress as usize;
-
-                println!(
-                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
-                    crash_addr
-                );
-            }
-            #[cfg(feature = "std")]
-            {
-                println!("Type QUIT to restart the child");
-                let mut line = String::new();
-                while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
-                }
-            }
-
-            // TODO tell the parent to not restart
         }
         ExitProcess(1);
     }
