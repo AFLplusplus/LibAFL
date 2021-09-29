@@ -394,53 +394,53 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             println!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
-        } else {
-            #[cfg(feature = "std")]
-            println!("Timeout in fuzz run.");
-            #[cfg(feature = "std")]
-            let _res = stdout().flush();
-
-            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-            data.current_input_ptr = ptr::null();
-
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
-                .expect("In timeout handler objective failure.");
-
-            if interesting {
-                let mut new_testcase = Testcase::new(input.clone());
-                new_testcase.add_metadata(ExitKind::Timeout);
-                fuzzer
-                    .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In timeout handler solutions failure.");
-                event_mgr
-                    .fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
-                    )
-                    .expect("Could not send timeouting input");
-            }
-
-            event_mgr.on_restart(state).unwrap();
-
-            #[cfg(feature = "std")]
-            println!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            println!("Bye!");
-
-            event_mgr.await_restart_safe();
-
-            libc::_exit(55);
         }
+
+        #[cfg(feature = "std")]
+        println!("Timeout in fuzz run.");
+        #[cfg(feature = "std")]
+        let _res = stdout().flush();
+
+        let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+        data.current_input_ptr = ptr::null();
+
+        let interesting = fuzzer
+            .objective_mut()
+            .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+            .expect("In timeout handler objective failure.");
+
+        if interesting {
+            let mut new_testcase = Testcase::new(input.clone());
+            new_testcase.add_metadata(ExitKind::Timeout);
+            fuzzer
+                .objective_mut()
+                .append_metadata(state, &mut new_testcase)
+                .expect("Failed adding metadata");
+            state
+                .solutions_mut()
+                .add(new_testcase)
+                .expect("In timeout handler solutions failure.");
+            event_mgr
+                .fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.solutions().count(),
+                    },
+                )
+                .expect("Could not send timeouting input");
+        }
+
+        event_mgr.on_restart(state).unwrap();
+
+        #[cfg(feature = "std")]
+        println!("Waiting for broker...");
+        event_mgr.await_restart_safe();
+        #[cfg(feature = "std")]
+        println!("Bye!");
+
+        event_mgr.await_restart_safe();
+
+        libc::_exit(55);
     }
 
     /// Crash-Handler for in-process fuzzing.
