@@ -380,7 +380,8 @@ mod unix_signal_handler {
 
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
-            dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
+            println!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
+            return;
         } else {
             #[cfg(feature = "std")]
             println!("Timeout in fuzz run.");
@@ -426,7 +427,7 @@ mod unix_signal_handler {
 
             event_mgr.await_restart_safe();
 
-            libc::_exit(1);
+            libc::_exit(55);
         }
     }
 
@@ -435,7 +436,7 @@ mod unix_signal_handler {
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S, Z>(
-        _signal: Signal,
+        signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
@@ -455,7 +456,7 @@ mod unix_signal_handler {
             as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]
-        println!("Crashed with {}", _signal);
+        println!("Crashed with {}", signal);
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
             {
@@ -505,7 +506,7 @@ mod unix_signal_handler {
                 println!("{:━^100}", " CRASH ");
                 println!(
                     "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
-                    _signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
+                    signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
                 );
 
                 println!("{:━^100}", " REGISTERS ");
@@ -531,7 +532,7 @@ mod unix_signal_handler {
                 println!("{:━^100}", " CRASH ");
                 println!(
                     "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
-                    _signal, mcontext.__ss.__pc, mcontext.__es.__far
+                    signal, mcontext.__ss.__pc, mcontext.__es.__far
                 );
 
                 println!("{:━^100}", " REGISTERS ");
@@ -589,7 +590,7 @@ mod unix_signal_handler {
             println!("Bye!");
         }
 
-        libc::_exit(1);
+        libc::_exit(128 + (signal as i32));
     }
 }
 
