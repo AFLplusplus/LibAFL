@@ -46,34 +46,9 @@ pub struct SyscallHookResult {
     pub skip_syscall: bool,
 }
 
-#[repr(C)]
-#[cfg(not(feature = "python"))]
-pub struct SyscallHookResult {
-    pub retval: u64,
-    pub skip_syscall: bool,
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
+#[cfg_attr(feature = "python", pymethods)]
 impl SyscallHookResult {
-    #[new]
-    #[must_use]
-    pub fn new(value: Option<u64>) -> Self {
-        value.map_or(
-            Self {
-                retval: 0,
-                skip_syscall: false,
-            },
-            |v| Self {
-                retval: v,
-                skip_syscall: true,
-            },
-        )
-    }
-}
-
-#[cfg(not(feature = "python"))]
-impl SyscallHookResult {
+    #[cfg_attr(feature = "python", new)]
     #[must_use]
     pub fn new(value: Option<u64>) -> Self {
         value.map_or(
