@@ -40,9 +40,11 @@ use pyo3::prelude::*;
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
 #[allow(clippy::items_after_statements)]
-pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     use core::mem::transmute;
     use pyo3::exceptions::PyValueError;
+    use std::convert::TryFrom;
+    use strum::IntoEnumIterator;
 
     #[pyfn(m)]
     #[allow(clippy::needless_pass_by_value)]
@@ -87,7 +89,7 @@ pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     }
     #[pyfn(m)]
     fn g2h(addr: u64) -> u64 {
-        unsafe { emu::g2h::<*const u8>(addr) as u64 }
+        emu::g2h::<*const u8>(addr) as u64
     }
     #[pyfn(m)]
     fn h2g(addr: u64) -> u64 {
@@ -101,5 +103,38 @@ pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     fn load_addr() -> u64 {
         emu::load_addr()
     }
+    #[pyfn(m)]
+    fn map_private(addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+        if let Ok(p) = MmapPerms::try_from(perms) {
+            emu::map_private(addr, size, p).map_err(PyValueError::new_err)
+        } else {
+            Err(PyValueError::new_err("Invalid perms"))
+        }
+    }
+
+    let child_module = PyModule::new(py, "x86")?;
+    for r in x86::X86Regs::iter() {
+        let v: i32 = r.into();
+        child_module.add(&format!("{:?}", r), v)?;
+    }
+    m.add_submodule(child_module)?;
+
+    let child_module = PyModule::new(py, "amd64")?;
+    for r in amd64::Amd64Regs::iter() {
+        let v: i32 = r.into();
+        child_module.add(&format!("{:?}", r), v)?;
+    }
+    m.add_submodule(child_module)?;
+
+    let child_module = PyModule::new(py, "mmap")?;
+    for r in emu::MmapPerms::iter() {
+        let v: i32 = r.into();
+        child_module.add(&format!("{:?}", r), v)?;
+    }
+    m.add_submodule(child_module)?;
+
+    m.add_class::<emu::MapInfo>()?;
+    m.add_class::<emu::GuestMaps>()?;
+
     Ok(())
 }
