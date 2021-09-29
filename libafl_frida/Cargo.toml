@@ -28,7 +28,7 @@ libloading = "0.7.0"
 rangemap = "0.1.10"
 frida-gum-sys = { version = "0.3", features = [ "auto-download", "event-sink", "invocation-listener"] }
 frida-gum = { version = "0.5.2", features = [ "auto-download", "event-sink", "invocation-listener"] }
-core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs" }
+core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", rev = "6648a7a" }
 regex = "1.4"
 dynasmrt = "1.0.1"
 capstone = "0.8.0"

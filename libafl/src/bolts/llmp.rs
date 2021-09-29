@@ -1867,6 +1867,7 @@ where
     /// Always returns true on platforms, where no shutdown signal handlers are supported
     #[inline]
     #[cfg(not(unix))]
+    #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
         false
     }
@@ -2471,7 +2472,7 @@ where
                 id: 0,
                 current_recv_map: initial_broker_map,
                 last_msg_recvd: ptr::null_mut(),
-                shmem_provider: shmem_provider.clone(),
+                shmem_provider,
             },
         })
     }

@@ -5,7 +5,11 @@ pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", unix))]
 pub use inprocess::InProcessForkExecutor;
 
+/// Timeout executor.
+/// Not possible on `no-std` Windows or `no-std`, but works for unix
+#[cfg(any(unix, feature = "std"))]
 pub mod timeout;
+#[cfg(any(unix, feature = "std"))]
 pub use timeout::TimeoutExecutor;
 
 #[cfg(all(feature = "std", unix))]
@@ -22,9 +26,9 @@ pub use shadow::ShadowExecutor;
 pub mod with_observers;
 pub use with_observers::WithObservers;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub mod command;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub use command::CommandExecutor;
 
 use crate::{

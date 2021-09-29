@@ -285,6 +285,21 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     timer_queue: ptr::null_mut(),
 };
 
+#[must_use]
+pub fn inprocess_run_state<'a, S>() -> Option<&'a mut S> {
+    unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
+}
+
+#[must_use]
+pub fn inprocess_run_event_manager<'a, EM>() -> Option<&'a mut EM> {
+    unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
+}
+
+#[must_use]
+pub fn inprocess_run_event_fuzzer<'a, F>() -> Option<&'a mut F> {
+    unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
+}
+
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
@@ -382,53 +397,53 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             println!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
-        } else {
-            #[cfg(feature = "std")]
-            println!("Timeout in fuzz run.");
-            #[cfg(feature = "std")]
-            let _res = stdout().flush();
-
-            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-            data.current_input_ptr = ptr::null();
-
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
-                .expect("In timeout handler objective failure.");
-
-            if interesting {
-                let mut new_testcase = Testcase::new(input.clone());
-                new_testcase.add_metadata(ExitKind::Timeout);
-                fuzzer
-                    .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In timeout handler solutions failure.");
-                event_mgr
-                    .fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
-                    )
-                    .expect("Could not send timeouting input");
-            }
-
-            event_mgr.on_restart(state).unwrap();
-
-            #[cfg(feature = "std")]
-            println!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            println!("Bye!");
-
-            event_mgr.await_restart_safe();
-
-            libc::_exit(55);
         }
+
+        #[cfg(feature = "std")]
+        println!("Timeout in fuzz run.");
+        #[cfg(feature = "std")]
+        let _res = stdout().flush();
+
+        let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+        data.current_input_ptr = ptr::null();
+
+        let interesting = fuzzer
+            .objective_mut()
+            .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+            .expect("In timeout handler objective failure.");
+
+        if interesting {
+            let mut new_testcase = Testcase::new(input.clone());
+            new_testcase.add_metadata(ExitKind::Timeout);
+            fuzzer
+                .objective_mut()
+                .append_metadata(state, &mut new_testcase)
+                .expect("Failed adding metadata");
+            state
+                .solutions_mut()
+                .add(new_testcase)
+                .expect("In timeout handler solutions failure.");
+            event_mgr
+                .fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.solutions().count(),
+                    },
+                )
+                .expect("Could not send timeouting input");
+        }
+
+        event_mgr.on_restart(state).unwrap();
+
+        #[cfg(feature = "std")]
+        println!("Waiting for broker...");
+        event_mgr.await_restart_safe();
+        #[cfg(feature = "std")]
+        println!("Bye!");
+
+        event_mgr.await_restart_safe();
+
+        libc::_exit(55);
     }
 
     /// Crash-Handler for in-process fuzzing.
@@ -737,16 +752,40 @@ mod windows_exception_handler {
         Z: HasObjective<I, OF, S>,
     {
         // Have we set a timer_before?
-        match (data.timer_queue as *mut HANDLE).as_mut() {
-            Some(x) => {
-                windows_delete_timer_queue(*x);
-            }
-            None => {}
+        if let Some(x) = (data.timer_queue as *mut HANDLE).as_mut() {
+            windows_delete_timer_queue(*x);
         }
 
         #[cfg(feature = "std")]
         println!("Crashed with {}", code);
-        if !data.current_input_ptr.is_null() {
+        if data.current_input_ptr.is_null() {
+            #[cfg(feature = "std")]
+            {
+                println!("Double crash\n");
+                let crash_addr = exception_pointers
+                    .as_mut()
+                    .unwrap()
+                    .ExceptionRecord
+                    .as_mut()
+                    .unwrap()
+                    .ExceptionAddress as usize;
+
+                println!(
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
+                    crash_addr
+                );
+            }
+            #[cfg(feature = "std")]
+            {
+                println!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
+
+            // TODO tell the parent to not restart
+        } else {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
@@ -755,7 +794,7 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             println!("Child crashed!");
             #[cfg(feature = "std")]
-            let _ = stdout().flush();
+            drop(stdout().flush());
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             // Make sure we don't crash in the crash handler forever.
@@ -795,46 +834,17 @@ mod windows_exception_handler {
             event_mgr.await_restart_safe();
             #[cfg(feature = "std")]
             println!("Bye!");
-
-            ExitProcess(1);
-        } else {
-            #[cfg(feature = "std")]
-            {
-                println!("Double crash\n");
-                let crash_addr = exception_pointers
-                    .as_mut()
-                    .unwrap()
-                    .ExceptionRecord
-                    .as_mut()
-                    .unwrap()
-                    .ExceptionAddress as usize;
-
-                println!(
-                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
-                    crash_addr
-                );
-            }
-            #[cfg(feature = "std")]
-            {
-                println!("Type QUIT to restart the child");
-                let mut line = String::new();
-                while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
-                }
-            }
-
-            // TODO tell the parent to not restart
-            ExitProcess(1);
         }
+        ExitProcess(1);
     }
 }
 
 #[cfg(windows)]
-type WAITORTIMERCALLBACK = unsafe extern "system" fn(param0: *mut c_void, param1: u8);
+type WaitOrTimerCallback = unsafe extern "system" fn(param0: *mut c_void, param1: u8);
 
 #[cfg(windows)]
 pub trait HasTimeoutHandler {
-    unsafe fn timeout_handler(&self) -> WAITORTIMERCALLBACK;
+    fn timeout_handler(&self) -> WaitOrTimerCallback;
 }
 
 #[cfg(windows)]
@@ -844,9 +854,10 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
 {
+    /// the timeout handler
     #[inline]
-    unsafe fn timeout_handler(&self) -> WAITORTIMERCALLBACK {
-        let func: WAITORTIMERCALLBACK = transmute(self.timeout_handler);
+    fn timeout_handler(&self) -> WaitOrTimerCallback {
+        let func: WaitOrTimerCallback = unsafe { transmute(self.timeout_handler) };
         func
     }
 }

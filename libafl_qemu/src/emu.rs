@@ -10,10 +10,14 @@ use core::{
 use num::Num;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use strum_macros::EnumIter;
+
+#[cfg(feature = "python")]
+use pyo3::{prelude::*, PyIterProtocol};
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum MmapPerms {
     Read = libc::PROT_READ,
@@ -25,13 +29,43 @@ pub enum MmapPerms {
     ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
 }
 
-#[repr(C)]
-pub struct SyscallHookResult {
-    retval: u64,
-    skip_syscall: bool,
+#[cfg(feature = "python")]
+impl IntoPy<PyObject> for MmapPerms {
+    fn into_py(self, py: Python) -> PyObject {
+        let n: i32 = self.into();
+        n.into_py(py)
+    }
 }
 
 #[repr(C)]
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", derive(FromPyObject))]
+pub struct SyscallHookResult {
+    pub retval: u64,
+    pub skip_syscall: bool,
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl SyscallHookResult {
+    #[cfg_attr(feature = "python", new)]
+    #[must_use]
+    pub fn new(value: Option<u64>) -> Self {
+        value.map_or(
+            Self {
+                retval: 0,
+                skip_syscall: false,
+            },
+            |v| Self {
+                retval: v,
+                skip_syscall: true,
+            },
+        )
+    }
+}
+
+#[repr(C)]
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
     start: u64,
     end: u64,
@@ -41,6 +75,7 @@ pub struct MapInfo {
     is_priv: i32,
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]
     pub fn start(&self) -> u64 {
@@ -161,15 +196,15 @@ pub fn init(args: &[String], env: &[(String, String)]) -> i32 {
     }
 }
 
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
     orig_c_iter: *const c_void,
     c_iter: *const c_void,
 }
 
-impl GuestMaps {
+impl Default for GuestMaps {
     #[must_use]
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    fn default() -> Self {
         unsafe {
             let maps = read_self_maps();
             Self {
@@ -177,6 +212,24 @@ impl GuestMaps {
                 c_iter: maps,
             }
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl GuestMaps {
+    #[new]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[cfg(not(feature = "python"))]
+impl GuestMaps {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -197,6 +250,17 @@ impl Iterator for GuestMaps {
                 Some(ret)
             }
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pyproto]
+impl PyIterProtocol for GuestMaps {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
+        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
     }
 }
 
