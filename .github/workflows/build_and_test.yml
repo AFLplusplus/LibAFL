@@ -32,6 +32,10 @@ jobs:
         run: cd docs && mdbook build
       - name: Test the book
         run: cd docs && mdbook test -L ../target/debug/deps
+      - name: Run tests
+        run: cargo test
+      - name: Test libafl no_std
+        run: cd libafl && cargo test --no-default-features
      
 
   ubuntu:

@@ -67,7 +67,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 impl<EM, I, S, Z, T, OT> HasObservers<I, OT, S> for CommandExecutor<EM, I, S, Z, T, OT>
 where
     I: Input,
@@ -88,8 +88,8 @@ where
 /// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
 /// # Example
 /// ```
-/// # use std::{io::Write, process::{Stdio, Command, Child}};
-/// # use libafl::{Error, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
+/// use std::{io::Write, process::{Stdio, Command, Child}};
+/// use libafl::{Error, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
 /// struct MyExecutor;
 ///
 /// impl<EM, I: Input + HasTargetBytes, S, Z> CommandConfigurator<EM, I, S, Z> for MyExecutor {
@@ -117,7 +117,7 @@ where
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
     fn spawn_child(
         &mut self,
