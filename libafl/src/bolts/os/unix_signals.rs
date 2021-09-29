@@ -54,7 +54,7 @@ pub struct ucontext_t {
 pub use libc::ucontext_t;
 
 use libc::{
-    c_int, malloc, sigaction, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
+    c_int, malloc, sigaction, sigaddset, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
     SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
     SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
@@ -210,6 +210,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
 
     let mut sa: sigaction = mem::zeroed();
     sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
+    sigaddset(&mut sa.sa_mask as *mut libc::sigset_t, SIGALRM);
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = handle_signal as usize;
     let signals = handler.signals();
