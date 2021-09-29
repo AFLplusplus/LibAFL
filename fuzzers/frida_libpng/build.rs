@@ -2,7 +2,7 @@
 
 use std::{
     env,
-    fs::{File, rename},
+    fs::{rename, File},
     io,
     path::Path,
     process::{exit, Command},
@@ -10,17 +10,13 @@ use std::{
 
 use which::which;
 
-#[cfg(windows)]
-use tar::Archive;
-#[cfg(windows)]
-use xz::read::XzDecoder;
-#[cfg(windows)]
 use flate2::read::GzDecoder;
+use tar::Archive;
+use xz::read::XzDecoder;
 
 const LIBPNG_URL: &str =
     "https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz";
-const ZLIB_URL: &str =
-    "https://zlib.net/zlib-1.2.11.tar.gz";
+const ZLIB_URL: &str = "https://zlib.net/zlib-1.2.11.tar.gz";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -52,8 +48,8 @@ fn main() {
         let zlib_path = Path::new(&zlib);
         let zlib_tar = format!("{}/zlib-1.2.11.tar.gz", &cwd);
 
-        if !libpng_path.is_dir(){
-            if !Path::new(&libpng_tar).is_file(){
+        if !libpng_path.is_dir() {
+            if !Path::new(&libpng_tar).is_file() {
                 println!("cargo:warning=Libpng not found, downloading...");
                 // Download libpng
                 let mut resp = reqwest::blocking::get(LIBPNG_URL).expect("Libpng download failed");
@@ -66,8 +62,8 @@ fn main() {
                 archive.unpack(&cwd).expect("Libpng extraction failed");
             }
         }
-        if !zlib_path.is_dir(){
-            if !Path::new(&zlib_tar).is_file(){
+        if !zlib_path.is_dir() {
+            if !Path::new(&zlib_tar).is_file() {
                 println!("cargo:warning=Zlib not found, downloading...");
                 // Download Zlib
                 let mut resp = reqwest::blocking::get(ZLIB_URL).expect("Zlib download failed");
@@ -78,27 +74,27 @@ fn main() {
                 let tar = GzDecoder::new(tar_gz);
                 let mut archive = Archive::new(tar);
                 archive.unpack(&cwd).expect("Zlib extraction failed");
-                rename(zlib_1_2_11, zlib)?;
+                rename(zlib_1_2_11, zlib).expect("Zlib extraction failed");
             }
         }
-    }
-    else{
+    } else {
         let out_dir = env::var_os("OUT_DIR").unwrap();
         let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
         let out_dir = out_dir.to_string_lossy().to_string();
         let out_dir_path = Path::new(&out_dir);
-        std::fs::create_dir_all(&out_dir).unwrap_or_else(|_| panic!("Failed to create {}", &out_dir));
-    
+        std::fs::create_dir_all(&out_dir)
+            .unwrap_or_else(|_| panic!("Failed to create {}", &out_dir));
+
         println!("cargo:rerun-if-changed=build.rs");
         println!("cargo:rerun-if-changed=../libfuzzer_runtime/rt.c",);
         println!("cargo:rerun-if-changed=harness.cc");
-    
+
         build_dep_check(&["clang", "clang++", "wget", "tar", "make"]);
-    
+
         let libpng = format!("{}/libpng-1.6.37", &out_dir);
         let libpng_path = Path::new(&libpng);
         let libpng_tar = format!("{}/libpng-1.6.37.tar.xz", &cwd);
-    
+
         // Enforce clang for its -fsanitize-coverage support.
         let clang = match env::var("CLANG_PATH") {
             Ok(path) => path,
@@ -111,7 +107,7 @@ fn main() {
             Ok(val) => val,
             Err(_) => "".to_string(),
         };
-    
+
         // println!("cargo:warning=output path is {}", libpng);
         if !libpng_path.is_dir() {
             if !Path::new(&libpng_tar).is_file() {
@@ -159,7 +155,7 @@ fn main() {
                 .status()
                 .unwrap();
         }
-    
+
         let status = cc::Build::new()
             .cpp(true)
             .get_compiler()
