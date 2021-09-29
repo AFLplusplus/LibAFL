@@ -22,10 +22,6 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
-      - name: Add clang path to $PATH env on Windows
-        shell: bash
-        if: runner.os == 'Windows'
-        run: echo "PATH=$PATH:C:\msys64\mingw64\bin" >> $GITHUB_ENV
       - name: install mdbook
         run: cargo install mdbook
       - name: install linkcheck
