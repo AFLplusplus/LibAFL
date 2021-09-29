@@ -182,7 +182,7 @@ where
 
     /// Launch the broker and the clients and fuzz
     #[cfg(all(windows, feature = "std"))]
-    #[allow(unused_mut)]
+    #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 
