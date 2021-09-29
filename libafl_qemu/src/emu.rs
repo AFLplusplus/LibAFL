@@ -38,7 +38,6 @@ impl IntoPy<PyObject> for MmapPerms {
 }
 
 #[repr(C)]
-#[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", derive(FromPyObject))]
 pub struct SyscallHookResult {
@@ -46,9 +45,27 @@ pub struct SyscallHookResult {
     pub skip_syscall: bool,
 }
 
-#[cfg_attr(feature = "python", pymethods)]
+#[cfg(feature = "python")]
+#[pymethods]
 impl SyscallHookResult {
-    #[cfg_attr(feature = "python", new)]
+    #[new]
+    #[must_use]
+    pub fn new(value: Option<u64>) -> Self {
+        value.map_or(
+            Self {
+                retval: 0,
+                skip_syscall: false,
+            },
+            |v| Self {
+                retval: v,
+                skip_syscall: true,
+            },
+        )
+    }
+}
+
+#[cfg(not(feature = "python"))]
+impl SyscallHookResult {
     #[must_use]
     pub fn new(value: Option<u64>) -> Self {
         value.map_or(
