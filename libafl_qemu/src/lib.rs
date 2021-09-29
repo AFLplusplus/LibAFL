@@ -34,15 +34,20 @@ pub fn filter_qemu_args() -> Vec<String> {
 }
 
 #[cfg(all(target_os = "linux", feature = "python"))]
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyInt};
+
+#[cfg(all(target_os = "linux", feature = "python"))]
+static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
-#[allow(clippy::items_after_statements)]
-pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
+#[allow(clippy::items_after_statements, clippy::too_many_lines)]
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     use core::mem::transmute;
     use pyo3::exceptions::PyValueError;
+    use std::convert::TryFrom;
+    use strum::IntoEnumIterator;
 
     #[pyfn(m)]
     #[allow(clippy::needless_pass_by_value)]
@@ -87,7 +92,7 @@ pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     }
     #[pyfn(m)]
     fn g2h(addr: u64) -> u64 {
-        unsafe { emu::g2h::<*const u8>(addr) as u64 }
+        emu::g2h::<*const u8>(addr) as u64
     }
     #[pyfn(m)]
     fn h2g(addr: u64) -> u64 {
@@ -101,5 +106,82 @@ pub fn python_module(_py: Python, m: &PyModule) -> PyResult<()> {
     fn load_addr() -> u64 {
         emu::load_addr()
     }
+    #[pyfn(m)]
+    fn map_private(addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+        if let Ok(p) = MmapPerms::try_from(perms) {
+            emu::map_private(addr, size, p).map_err(PyValueError::new_err)
+        } else {
+            Err(PyValueError::new_err("Invalid perms"))
+        }
+    }
+
+    extern "C" fn py_syscall_hook_wrapper(
+        sys_num: i32,
+        a0: u64,
+        a1: u64,
+        a2: u64,
+        a3: u64,
+        a4: u64,
+        a5: u64,
+        a6: u64,
+        a7: u64,
+    ) -> SyscallHookResult {
+        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+            || SyscallHookResult::new(None),
+            |obj| {
+                let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
+                Python::with_gil(|py| {
+                    let ret = obj.call1(py, args).expect("Error in the syscall hook");
+                    let any = ret.as_ref(py);
+                    if any.is_none() {
+                        SyscallHookResult::new(None)
+                    } else {
+                        let a: Result<&PyInt, _> = any.try_into();
+                        if let Ok(i) = a {
+                            SyscallHookResult::new(Some(
+                                i.extract().expect("Invalid syscall hook return value"),
+                            ))
+                        } else {
+                            SyscallHookResult::extract(any)
+                                .expect("The syscall hook must return a SyscallHookResult")
+                        }
+                    }
+                })
+            },
+        )
+    }
+    #[pyfn(m)]
+    fn set_syscall_hook(hook: PyObject) {
+        unsafe {
+            PY_SYSCALL_HOOK = Some(hook);
+        }
+        emu::set_syscall_hook(py_syscall_hook_wrapper);
+    }
+
+    let x86m = PyModule::new(py, "x86")?;
+    for r in x86::X86Regs::iter() {
+        let v: i32 = r.into();
+        x86m.add(&format!("{:?}", r), v)?;
+    }
+    m.add_submodule(x86m)?;
+
+    let amd64m = PyModule::new(py, "amd64")?;
+    for r in amd64::Amd64Regs::iter() {
+        let v: i32 = r.into();
+        amd64m.add(&format!("{:?}", r), v)?;
+    }
+    m.add_submodule(amd64m)?;
+
+    let mmapm = PyModule::new(py, "mmap")?;
+    for r in emu::MmapPerms::iter() {
+        let v: i32 = r.into();
+        mmapm.add(&format!("{:?}", r), v)?;
+    }
+    m.add_submodule(mmapm)?;
+
+    m.add_class::<emu::MapInfo>()?;
+    m.add_class::<emu::GuestMaps>()?;
+    m.add_class::<emu::SyscallHookResult>()?;
+
     Ok(())
 }

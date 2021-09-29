@@ -1,6 +1,10 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use strum_macros::EnumIter;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Amd64Regs {
     Rax = 0,
@@ -21,6 +25,14 @@ pub enum Amd64Regs {
     R15 = 15,
     Rip = 16,
     Rflags = 17,
+}
+
+#[cfg(feature = "python")]
+impl IntoPy<PyObject> for Amd64Regs {
+    fn into_py(self, py: Python) -> PyObject {
+        let n: i32 = self.into();
+        n.into_py(py)
+    }
 }
 
 #[allow(non_upper_case_globals)]

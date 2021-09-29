@@ -285,6 +285,21 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     timer_queue: ptr::null_mut(),
 };
 
+#[must_use]
+pub fn inprocess_run_state<'a, S>() -> Option<&'a mut S> {
+    unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
+}
+
+#[must_use]
+pub fn inprocess_run_event_manager<'a, EM>() -> Option<&'a mut EM> {
+    unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
+}
+
+#[must_use]
+pub fn inprocess_run_event_fuzzer<'a, F>() -> Option<&'a mut F> {
+    unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
+}
+
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
@@ -380,54 +395,55 @@ mod unix_signal_handler {
 
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
-            dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
-        } else {
-            #[cfg(feature = "std")]
-            println!("Timeout in fuzz run.");
-            #[cfg(feature = "std")]
-            let _res = stdout().flush();
-
-            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-            data.current_input_ptr = ptr::null();
-
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
-                .expect("In timeout handler objective failure.");
-
-            if interesting {
-                let mut new_testcase = Testcase::new(input.clone());
-                new_testcase.add_metadata(ExitKind::Timeout);
-                fuzzer
-                    .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In timeout handler solutions failure.");
-                event_mgr
-                    .fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
-                    )
-                    .expect("Could not send timeouting input");
-            }
-
-            event_mgr.on_restart(state).unwrap();
-
-            #[cfg(feature = "std")]
-            println!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            println!("Bye!");
-
-            event_mgr.await_restart_safe();
-
-            libc::_exit(1);
+            println!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
+            return;
         }
+
+        #[cfg(feature = "std")]
+        println!("Timeout in fuzz run.");
+        #[cfg(feature = "std")]
+        let _res = stdout().flush();
+
+        let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+        data.current_input_ptr = ptr::null();
+
+        let interesting = fuzzer
+            .objective_mut()
+            .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+            .expect("In timeout handler objective failure.");
+
+        if interesting {
+            let mut new_testcase = Testcase::new(input.clone());
+            new_testcase.add_metadata(ExitKind::Timeout);
+            fuzzer
+                .objective_mut()
+                .append_metadata(state, &mut new_testcase)
+                .expect("Failed adding metadata");
+            state
+                .solutions_mut()
+                .add(new_testcase)
+                .expect("In timeout handler solutions failure.");
+            event_mgr
+                .fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.solutions().count(),
+                    },
+                )
+                .expect("Could not send timeouting input");
+        }
+
+        event_mgr.on_restart(state).unwrap();
+
+        #[cfg(feature = "std")]
+        println!("Waiting for broker...");
+        event_mgr.await_restart_safe();
+        #[cfg(feature = "std")]
+        println!("Bye!");
+
+        event_mgr.await_restart_safe();
+
+        libc::_exit(55);
     }
 
     /// Crash-Handler for in-process fuzzing.
@@ -435,7 +451,7 @@ mod unix_signal_handler {
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S, Z>(
-        _signal: Signal,
+        signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
@@ -455,7 +471,7 @@ mod unix_signal_handler {
             as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]
-        println!("Crashed with {}", _signal);
+        println!("Crashed with {}", signal);
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
             {
@@ -505,7 +521,7 @@ mod unix_signal_handler {
                 println!("{:━^100}", " CRASH ");
                 println!(
                     "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
-                    _signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
+                    signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
                 );
 
                 println!("{:━^100}", " REGISTERS ");
@@ -531,7 +547,7 @@ mod unix_signal_handler {
                 println!("{:━^100}", " CRASH ");
                 println!(
                     "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
-                    _signal, mcontext.__ss.__pc, mcontext.__es.__far
+                    signal, mcontext.__ss.__pc, mcontext.__es.__far
                 );
 
                 println!("{:━^100}", " REGISTERS ");
@@ -589,7 +605,7 @@ mod unix_signal_handler {
             println!("Bye!");
         }
 
-        libc::_exit(1);
+        libc::_exit(128 + (signal as i32));
     }
 }
 
