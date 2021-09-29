@@ -111,10 +111,19 @@ void func1() {
   //printf("func1\n");
   func2();
 }
+
+
+// Export this symbol
+#ifdef _WIN32
+#	define HARNESS_EXPORTS __declspec(dllexport)
+#else
+#	define HARNESS_EXPORTS
+#endif
+
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+HARNESS_EXPORTS extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
     if (size >= 8 && *(uint64_t*)data == 0xABCDEFAA8F1324AA){
         abort();
