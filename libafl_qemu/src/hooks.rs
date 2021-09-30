@@ -53,7 +53,12 @@ fn hash_me(mut x: u64) -> u64 {
     x
 }
 
-pub fn gen_unique_edge_ids<S>(state: &mut S, src: u64, dest: u64) -> Option<u64>
+pub fn gen_unique_edge_ids<I, QT, S>(
+    _helpers: &mut QT,
+    state: &mut S,
+    src: u64,
+    dest: u64,
+) -> Option<u64>
 where
     S: HasMetadata,
 {
@@ -76,7 +81,12 @@ where
     }
 }
 
-pub fn gen_hashed_edge_ids<S>(_state: &mut S, src: u64, dest: u64) -> Option<u64> {
+pub fn gen_hashed_edge_ids<I, QT, S>(
+    _helpers: &mut QT,
+    _state: &mut S,
+    src: u64,
+    dest: u64,
+) -> Option<u64> {
     Some(hash_me(src) ^ hash_me(dest))
 }
 
@@ -92,11 +102,11 @@ pub extern "C" fn trace_edge_single(id: u64) {
     }
 }
 
-pub fn gen_addr_block_ids<S>(_state: &mut S, pc: u64) -> Option<u64> {
+pub fn gen_addr_block_ids<I, QT, S>(_helpers: &mut QT, _state: &mut S, pc: u64) -> Option<u64> {
     Some(pc)
 }
 
-pub fn gen_hashed_block_ids<S>(_state: &mut S, pc: u64) -> Option<u64> {
+pub fn gen_hashed_block_ids<I, QT, S>(_helpers: &mut QT, _state: &mut S, pc: u64) -> Option<u64> {
     Some(hash_me(pc))
 }
 
@@ -120,7 +130,12 @@ pub extern "C" fn trace_block_transition_single(id: u64) {
     }
 }
 
-pub fn gen_unique_cmp_ids<S>(state: &mut S, pc: u64, _size: usize) -> Option<u64>
+pub fn gen_unique_cmp_ids<I, QT, S>(
+    _helpers: &mut QT,
+    state: &mut S,
+    pc: u64,
+    _size: usize,
+) -> Option<u64>
 where
     S: HasMetadata,
 {

@@ -16,6 +16,11 @@ pub mod emu;
 #[cfg(target_os = "linux")]
 pub use emu::*;
 
+#[cfg(target_os = "linux")]
+pub mod helpers;
+#[cfg(target_os = "linux")]
+pub use helpers::*;
+
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
     let mut args = vec![env::args().next().unwrap()];
