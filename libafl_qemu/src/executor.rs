@@ -623,9 +623,9 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         unsafe { QEMU_HELPERS_PTR = &self.helpers as *const _ as *const c_void };
-        self.helpers.pre_exec_all(self, input);
+        self.helpers.pre_exec_all(input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
-        self.helpers.post_exec_all(self, input);
+        self.helpers.post_exec_all(input);
         unsafe { QEMU_HELPERS_PTR = ptr::null() };
         r
     }
