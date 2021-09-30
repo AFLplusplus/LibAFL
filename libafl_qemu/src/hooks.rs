@@ -2,11 +2,13 @@ use core::{cell::UnsafeCell, cmp::max};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
-use libafl::state::HasMetadata;
+use libafl::{bolts::tuples::MatchFirstType, inputs::Input, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
     EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
+
+use crate::helpers::{QemuHelperTuple, QemuSnapshotHelper};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
@@ -177,4 +179,28 @@ pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
     }
+}
+
+pub fn trace_write1_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers.match_first_type::<QemuSnapshotHelper>().unwrap();
+}
+
+pub fn trace_write2_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64) {}
+
+pub fn trace_write4_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64) {}
+
+pub fn trace_write8_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64) {}
+
+pub fn trace_write_n_snapshot<I, QT, S>(
+    _helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    _addr: u64,
+    _size: usize,
+) {
+    //println!("writen {:#x} {}", addr, size);
 }

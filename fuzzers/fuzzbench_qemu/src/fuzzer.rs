@@ -43,7 +43,7 @@ use libafl_qemu::{
     amd64::Amd64Regs,
     elf::EasyElf,
     emu, filter_qemu_args,
-    helpers::{QemuCmpLogHelper, QemuEdgeCoverageHelper},
+    helpers::{QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuSnapshotHelper},
     hooks,
     hooks::CmpLogObserver,
     MmapPerms, QemuExecutor,
@@ -301,7 +301,7 @@ fn fuzz(
 
     let executor = QemuExecutor::new(
         &mut harness,
-        tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new()),
+        tuple_list!(QemuEdgeCoverageHelper::new(), QemuSnapshotHelper::new()),
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,

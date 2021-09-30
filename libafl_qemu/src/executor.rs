@@ -42,7 +42,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &EDGE_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id);
     }
 }
@@ -70,7 +70,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &BLOCK_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id);
     }
 }
@@ -112,7 +112,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &READ1_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -126,7 +126,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &READ2_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -140,7 +140,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &READ4_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -154,7 +154,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &READ8_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -168,7 +168,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &READ_N_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64, usize) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr, size as usize);
     }
 }
@@ -182,7 +182,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &WRITE1_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -196,7 +196,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &WRITE2_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -210,7 +210,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &WRITE4_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -224,7 +224,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &WRITE8_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr);
     }
 }
@@ -238,7 +238,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &WRITE_N_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64, usize) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, addr, size as usize);
     }
 }
@@ -266,7 +266,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &CMP1_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u8, u8) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u8, u8) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, v0, v1);
     }
 }
@@ -280,7 +280,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &CMP2_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u16, u16) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u16, u16) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, v0, v1);
     }
 }
@@ -294,7 +294,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &CMP4_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u32, u32) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u32, u32) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, v0, v1);
     }
 }
@@ -308,7 +308,7 @@ where
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
     for hook in unsafe { &CMP8_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64, u64) = unsafe { transmute(hook) };
+        let func: fn(&mut QT, &mut S, u64, u64, u64) = unsafe { transmute(*hook) };
         (func)(helpers, state, id, v0, v1);
     }
 }
@@ -345,7 +345,7 @@ where
             u64,
             u64,
             u64,
-        ) -> SyscallHookResult = unsafe { transmute(hook) };
+        ) -> SyscallHookResult = unsafe { transmute(*hook) };
         let r = (func)(helpers, state, sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
         if r.skip_syscall {
             res.skip_syscall = true;
@@ -480,7 +480,10 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read_n_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64, size: u32)) {
+    pub fn hook_read_n_execution(
+        &self,
+        hook: fn(&mut QT, &mut S, id: u64, addr: u64, size: usize),
+    ) {
         unsafe {
             READ_N_HOOKS.push(hook as *const _);
         }
@@ -528,7 +531,10 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write_n_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64, size: u32)) {
+    pub fn hook_write_n_execution(
+        &self,
+        hook: fn(&mut QT, &mut S, id: u64, addr: u64, size: usize),
+    ) {
         unsafe {
             WRITE_N_HOOKS.push(hook as *const _);
         }
@@ -617,7 +623,9 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         unsafe { QEMU_HELPERS_PTR = &self.helpers as *const _ as *const c_void };
+        self.helpers.pre_exec_all(self, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
+        self.helpers.post_exec_all(self, input);
         unsafe { QEMU_HELPERS_PTR = ptr::null() };
         r
     }

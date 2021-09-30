@@ -20,6 +20,7 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum MmapPerms {
+    None = 0,
     Read = libc::PROT_READ,
     Write = libc::PROT_WRITE,
     Execute = libc::PROT_EXEC,
@@ -27,6 +28,38 @@ pub enum MmapPerms {
     ReadExecute = libc::PROT_READ | libc::PROT_EXEC,
     WriteExecute = libc::PROT_WRITE | libc::PROT_EXEC,
     ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+}
+
+impl MmapPerms {
+    pub fn is_r(&self) -> bool {
+        matches!(
+            self,
+            MmapPerms::Read
+                | MmapPerms::ReadWrite
+                | MmapPerms::ReadExecute
+                | MmapPerms::ReadWriteExecute
+        )
+    }
+
+    pub fn is_w(&self) -> bool {
+        matches!(
+            self,
+            MmapPerms::Write
+                | MmapPerms::ReadWrite
+                | MmapPerms::WriteExecute
+                | MmapPerms::ReadWriteExecute
+        )
+    }
+
+    pub fn is_x(&self) -> bool {
+        matches!(
+            self,
+            MmapPerms::Execute
+                | MmapPerms::ReadExecute
+                | MmapPerms::WriteExecute
+                | MmapPerms::ReadWriteExecute
+        )
+    }
 }
 
 #[cfg(feature = "python")]

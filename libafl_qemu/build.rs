@@ -1,13 +1,9 @@
-#[cfg(not(feature = "python"))]
-use std::fs::copy;
-#[cfg(feature = "python")]
-use std::fs::read_dir;
-use std::{env, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command};
 use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "22daaa7d0c76b32f8391bad40c0b220f3e659f66";
+const QEMU_REVISION: &str = "444c415ca2fa04a43959277750003be88ec56c72";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -42,7 +38,15 @@ fn main() {
 
     build_dep_check(&["git", "make"]);
 
+    let qemu_rev = out_dir_path.join("QEMU_REVISION");
     let qemu_path = out_dir_path.join(QEMU_DIRNAME);
+
+    if qemu_rev.exists()
+        && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
+    {
+        fs::remove_dir_all(&qemu_path).unwrap();
+    }
+
     if !qemu_path.is_dir() {
         println!(
             "cargo:warning=Qemu not found, cloning with git ({})...",
@@ -60,6 +64,7 @@ fn main() {
             .arg(QEMU_REVISION)
             .status()
             .unwrap();
+        fs::write(&qemu_rev, QEMU_REVISION).unwrap();
     }
 
     let build_dir = qemu_path.join("build");
@@ -164,7 +169,7 @@ fn main() {
             //build_dir.join("libhwcore.fa.p"),
             //build_dir.join("libcapstone.a.p"),
         ] {
-            for path in read_dir(dir).unwrap() {
+            for path in fs::read_dir(dir).unwrap() {
                 let path = path.unwrap().path();
                 if path.is_file() {
                     if let Some(name) = path.file_name() {
@@ -224,7 +229,7 @@ fn main() {
 
     #[cfg(not(feature = "python"))]
     {
-        copy(
+        fs::copy(
             build_dir.join(&format!("libqemu-{}.so", cpu_target)),
             target_dir.join(&format!("libqemu-{}.so", cpu_target)),
         )
