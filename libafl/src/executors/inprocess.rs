@@ -79,10 +79,7 @@ where
                 &mut data.current_input_ptr,
                 input as *const _ as *const c_void,
             );
-            write_volatile(
-                &mut data.observers_ptr,
-                &self.observers as *const _ as *const c_void,
-            );
+            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
@@ -99,10 +96,7 @@ where
                 &mut data.current_input_ptr,
                 input as *const _ as *const c_void,
             );
-            write_volatile(
-                &mut data.observers_ptr,
-                &self.observers as *const _ as *const c_void,
-            );
+            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
@@ -182,9 +176,18 @@ where
             Ok(Self {
                 harness_fn,
                 observers,
-                crash_handler: unix_signal_handler::inproc_crash_handler::<EM, I, OC, OF, OT, S, Z>
-                    as *const _,
+                crash_handler: unix_signal_handler::inproc_crash_handler::<
+                    Self,
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                > as *const _,
                 timeout_handler: unix_signal_handler::inproc_timeout_handler::<
+                    Self,
                     EM,
                     I,
                     OC,
@@ -206,6 +209,7 @@ where
                 harness_fn,
                 observers,
                 crash_handler: windows_exception_handler::inproc_crash_handler::<
+                    Self,
                     EM,
                     I,
                     OC,
@@ -215,6 +219,7 @@ where
                     Z,
                 > as *const _,
                 timeout_handler: windows_exception_handler::inproc_timeout_handler::<
+                    Self,
                     EM,
                     I,
                     OC,
@@ -254,7 +259,7 @@ pub struct InProcessExecutorHandlerData {
     pub state_ptr: *mut c_void,
     pub event_mgr_ptr: *mut c_void,
     pub fuzzer_ptr: *mut c_void,
-    pub observers_ptr: *const c_void,
+    pub executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
     pub crash_handler: *const c_void,
     pub timeout_handler: *const c_void,
@@ -273,8 +278,8 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     event_mgr_ptr: ptr::null_mut(),
     /// The fuzzer ptr for signal handling
     fuzzer_ptr: ptr::null_mut(),
-    /// The observers ptr for signal handling
-    observers_ptr: ptr::null(),
+    /// The executor ptr for signal handling
+    executor_ptr: ptr::null(),
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
     /// The crash handler fn
@@ -286,18 +291,23 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
 };
 
 #[must_use]
-pub fn inprocess_run_state<'a, S>() -> Option<&'a mut S> {
+pub fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
 
 #[must_use]
-pub fn inprocess_run_event_manager<'a, EM>() -> Option<&'a mut EM> {
+pub fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
     unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
 }
 
 #[must_use]
-pub fn inprocess_run_event_fuzzer<'a, F>() -> Option<&'a mut F> {
+pub fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
     unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
+}
+
+#[must_use]
+pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
+    unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
 }
 
 #[cfg(unix)]
@@ -315,7 +325,7 @@ mod unix_signal_handler {
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
             timeout::unix_remove_timeout,
-            ExitKind,
+            ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -374,12 +384,13 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<EM, I, OC, OF, OT, S, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, I, OC, OF, OT, S, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
+        E: HasObservers<I, OT, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
@@ -391,7 +402,8 @@ mod unix_signal_handler {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
         let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-        let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+        let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+        let observers = executor.observers();
 
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
@@ -450,12 +462,13 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, OC, OF, OT, S, Z>(
         signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
+        E: HasObservers<I, OT, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
@@ -506,7 +519,8 @@ mod unix_signal_handler {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+            let observers = executor.observers();
 
             #[cfg(feature = "std")]
             println!("Child crashed!");
@@ -629,7 +643,7 @@ mod windows_exception_handler {
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
             timeout::windows_delete_timer_queue,
-            ExitKind,
+            ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -665,10 +679,11 @@ mod windows_exception_handler {
         }
     }
 
-    pub unsafe extern "system" fn inproc_timeout_handler<EM, I, OC, OF, OT, S, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OC, OF, OT, S, Z>(
         global_state: *mut c_void,
         _p1: u8,
     ) where
+        E: HasObservers<I, OT, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
@@ -683,7 +698,8 @@ mod windows_exception_handler {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
         let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-        let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+        let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+        let observers = executor.observers();
 
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
@@ -738,11 +754,12 @@ mod windows_exception_handler {
         // println!("TIMER INVOKED!");
     }
 
-    pub unsafe fn inproc_crash_handler<EM, I, OC, OF, OT, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, OC, OF, OT, S, Z>(
         code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
+        E: HasObservers<I, OT, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
@@ -789,7 +806,8 @@ mod windows_exception_handler {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let observers = (data.observers_ptr as *const OT).as_ref().unwrap();
+            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+            let observers = executor.observers();
 
             #[cfg(feature = "std")]
             println!("Child crashed!");
