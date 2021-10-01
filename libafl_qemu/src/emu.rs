@@ -31,6 +31,7 @@ pub enum MmapPerms {
 }
 
 impl MmapPerms {
+    #[must_use]
     pub fn is_r(&self) -> bool {
         matches!(
             self,
@@ -41,6 +42,7 @@ impl MmapPerms {
         )
     }
 
+    #[must_use]
     pub fn is_w(&self) -> bool {
         matches!(
             self,
@@ -51,6 +53,7 @@ impl MmapPerms {
         )
     }
 
+    #[must_use]
     pub fn is_x(&self) -> bool {
         matches!(
             self,

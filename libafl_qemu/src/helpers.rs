@@ -70,23 +70,24 @@ where
         QT: QemuHelperTuple<I, S>,
     {
         self.0.init(executor);
-        self.1.init_all(executor)
+        self.1.init_all(executor);
     }
 
     fn pre_exec_all(&mut self, input: &I) {
         self.0.pre_exec(input);
-        self.1.pre_exec_all(input)
+        self.1.pre_exec_all(input);
     }
 
     fn post_exec_all(&mut self, input: &I) {
         self.0.post_exec(input);
-        self.1.post_exec_all(input)
+        self.1.post_exec_all(input);
     }
 }
 
 pub struct QemuEdgeCoverageHelper {}
 
 impl QemuEdgeCoverageHelper {
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -111,6 +112,7 @@ where
 pub struct QemuCmpLogHelper {}
 
 impl QemuCmpLogHelper {
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -154,6 +156,7 @@ pub struct QemuSnapshotHelper {
 }
 
 impl QemuSnapshotHelper {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             access_cache: [u64::MAX; 4],
@@ -220,7 +223,7 @@ impl QemuSnapshotHelper {
     pub fn reset(&mut self) {
         self.access_cache = [u64::MAX; 4];
         self.access_cache_idx = 0;
-        for page in self.dirty.pop() {
+        while let Some(page) = self.dirty.pop() {
             if let Some(info) = self.pages.get_mut(&page) {
                 emu::write_mem(page, &info.data);
                 info.dirty = false;
