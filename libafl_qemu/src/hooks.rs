@@ -2,7 +2,7 @@ use core::{cell::UnsafeCell, cmp::max};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
-use libafl::{bolts::tuples::MatchFirstType, inputs::Input, state::HasMetadata};
+use libafl::{inputs::Input, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
     EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM,
@@ -186,21 +186,48 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type::<QemuSnapshotHelper>().unwrap();
+    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 1);
 }
 
-pub fn trace_write2_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64) {}
+pub fn trace_write2_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 2);
+}
 
-pub fn trace_write4_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64) {}
+pub fn trace_write4_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 4);
+}
 
-pub fn trace_write8_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64) {}
+pub fn trace_write8_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 8);
+}
 
 pub fn trace_write_n_snapshot<I, QT, S>(
-    _helpers: &mut QT,
+    helpers: &mut QT,
     _state: &mut S,
     _id: u64,
-    _addr: u64,
-    _size: usize,
-) {
-    //println!("writen {:#x} {}", addr, size);
+    addr: u64,
+    size: usize,
+)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, size);
 }

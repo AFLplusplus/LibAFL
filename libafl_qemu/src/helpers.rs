@@ -178,9 +178,8 @@ impl QemuSnapshotHelper {
             dirty: vec![],
         }
     }
-
-    pub fn access(&mut self, addr: u64, size: usize) {
-        let page = addr & (SNAPSHOT_PAGE_SIZE as u64 - 1);
+    
+    pub fn page_access(&mut self, page: u64) {
         if self.access_cache[0] == page
             || self.access_cache[1] == page
             || self.access_cache[2] == page
@@ -199,7 +198,19 @@ impl QemuSnapshotHelper {
         self.dirty.push(page);
     }
 
+    pub fn access(&mut self, addr: u64, size: usize) {
+        debug_assert!(size > 0);
+        let page = addr & (SNAPSHOT_PAGE_SIZE as u64 - 1);
+        self.page_access(page);
+        let second_page = (addr + size as u64 -1) & (SNAPSHOT_PAGE_SIZE as u64 - 1);
+        if page != second_page {
+            self.page_access(second_page);
+        }
+    }
+
     pub fn reset(&mut self) {
+        self.access_cache = [u64::MAX; 4];
+        self.access_cache_idx = 0;
         for page in self.dirty.pop() {
             if let Some(info) = self.pages.get_mut(&page) {
                 emu::write_mem(page, &info.data);
