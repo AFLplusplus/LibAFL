@@ -46,6 +46,9 @@ use pyo3::{prelude::*, types::PyInt};
 static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 
 #[cfg(all(target_os = "linux", feature = "python"))]
+static mut PY_GENERIC_HOOKS: Vec<(u64, PyObject)> = vec![];
+
+#[cfg(all(target_os = "linux", feature = "python"))]
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
 #[allow(clippy::items_after_statements, clippy::too_many_lines)]
@@ -166,6 +169,28 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
             PY_SYSCALL_HOOK = Some(hook);
         }
         emu::set_syscall_hook(py_syscall_hook_wrapper);
+    }
+
+    extern "C" fn py_generic_hook_wrapper(idx: u64) {
+        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
+        Python::with_gil(|py| {
+            obj.call0(py).expect("Error in the hook");
+        });
+    }
+    #[pyfn(m)]
+    fn set_hook(addr: u64, hook: PyObject) {
+        unsafe {
+            let idx = PY_GENERIC_HOOKS.len();
+            PY_GENERIC_HOOKS.push((addr, hook));
+            emu::set_hook(addr, py_generic_hook_wrapper, idx as u64);
+        }
+    }
+    #[pyfn(m)]
+    fn remove_hook(addr: u64) {
+        unsafe {
+            PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
+        }
+        emu::remove_hook(addr);
     }
 
     let x86m = PyModule::new(py, "x86")?;
