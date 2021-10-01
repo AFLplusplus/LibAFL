@@ -150,11 +150,24 @@ pub struct QemuSnapshotHelper {
     pub pages: HashMap<u64, SnapshotPageInfo>,
     pub dirty: Vec<u64>,
     pub brk: u64,
+    pub empty: bool,
 }
 
 impl QemuSnapshotHelper {
     pub fn new() -> Self {
-        let mut pages = HashMap::default();
+        Self {
+            access_cache: [u64::MAX; 4],
+            access_cache_idx: 0,
+            pages: HashMap::default(),
+            dirty: vec![],
+            brk: 0,
+            empty: true,
+        }
+    }
+
+    pub fn snapshot(&mut self) {
+        self.brk = emu::get_brk();
+        self.pages.clear();
         for map in GuestMaps::new() {
             // TODO track all the pages OR track mproctect
             if !map.flags().is_w() {
@@ -168,17 +181,11 @@ impl QemuSnapshotHelper {
                     data: [0; SNAPSHOT_PAGE_SIZE],
                 };
                 emu::read_mem(addr, &mut info.data);
-                pages.insert(addr, info);
+                self.pages.insert(addr, info);
                 addr += SNAPSHOT_PAGE_SIZE as u64;
             }
         }
-        Self {
-            access_cache: [u64::MAX; 4],
-            access_cache_idx: 0,
-            pages,
-            dirty: vec![],
-            brk: emu::get_brk(),
-        }
+        self.empty = false;
     }
 
     pub fn page_access(&mut self, page: u64) {
@@ -242,6 +249,10 @@ where
     }
 
     fn pre_exec(&mut self, _input: &I) {
-        self.reset();
+        if self.empty {
+            self.snapshot();
+        } else {
+            self.reset();
+        }
     }
 }
