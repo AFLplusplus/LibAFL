@@ -91,6 +91,7 @@ pub enum QemuInstrumentationFilter {
 }
 
 impl QemuInstrumentationFilter {
+    #[must_use]
     pub fn allowed(&self, addr: u64) -> bool {
         match self {
             QemuInstrumentationFilter::AllowList(l) => {

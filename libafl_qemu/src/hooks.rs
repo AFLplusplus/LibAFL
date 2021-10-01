@@ -8,7 +8,9 @@ pub use libafl_targets::{
     EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 
-use crate::helpers::*;
+use crate::helpers::{
+    QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuHelperTuple, QemuSnapshotHelper,
+};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
