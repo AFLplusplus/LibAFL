@@ -8,7 +8,7 @@ pub use libafl_targets::{
     EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 
-use crate::helpers::{QemuHelperTuple, QemuSnapshotHelper};
+use crate::helpers::*;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
@@ -56,14 +56,21 @@ fn hash_me(mut x: u64) -> u64 {
 }
 
 pub fn gen_unique_edge_ids<I, QT, S>(
-    _helpers: &mut QT,
+    helpers: &mut QT,
     state: &mut S,
     src: u64,
     dest: u64,
 ) -> Option<u64>
 where
     S: HasMetadata,
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
 {
+    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageHelper>() {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
+            return None;
+        }
+    }
     if state.metadata().get::<QemuEdgesMapMetadata>().is_none() {
         state.add_metadata(QemuEdgesMapMetadata::new());
     }
@@ -71,11 +78,17 @@ where
         .metadata_mut()
         .get_mut::<QemuEdgesMapMetadata>()
         .unwrap();
-    let id = max(meta.current_id as usize, unsafe { MAX_EDGES_NUM });
     if meta.map.contains_key(&(src, dest)) {
-        Some(*meta.map.get(&(src, dest)).unwrap())
+        let id = *meta.map.get(&(src, dest)).unwrap();
+        let nxt = (id as usize + 1) & (EDGES_MAP_SIZE - 1);
+        unsafe {
+            MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
+        }
+        Some(id)
     } else {
-        meta.current_id = ((id + 1) & (EDGES_MAP_SIZE - 1)) as u64;
+        let id = meta.current_id;
+        meta.map.insert((src, dest), id);
+        meta.current_id = (id + 1) & (EDGES_MAP_SIZE as u64 - 1);
         unsafe {
             MAX_EDGES_NUM = meta.current_id as usize;
         }
@@ -84,11 +97,20 @@ where
 }
 
 pub fn gen_hashed_edge_ids<I, QT, S>(
-    _helpers: &mut QT,
+    helpers: &mut QT,
     _state: &mut S,
     src: u64,
     dest: u64,
-) -> Option<u64> {
+) -> Option<u64>
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageHelper>() {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
+            return None;
+        }
+    }
     Some(hash_me(src) ^ hash_me(dest))
 }
 
@@ -133,14 +155,21 @@ pub extern "C" fn trace_block_transition_single(id: u64) {
 }
 
 pub fn gen_unique_cmp_ids<I, QT, S>(
-    _helpers: &mut QT,
+    helpers: &mut QT,
     state: &mut S,
     pc: u64,
     _size: usize,
 ) -> Option<u64>
 where
     S: HasMetadata,
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
 {
+    if let Some(h) = helpers.match_first_type::<QemuCmpLogHelper>() {
+        if !h.must_instrument(pc) {
+            return None;
+        }
+    }
     if state.metadata().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
     }
@@ -153,6 +182,7 @@ where
         Some(*meta.map.get(&pc).unwrap())
     } else {
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
+        meta.map.insert(pc, id as u64);
         Some(id as u64)
     }
 }

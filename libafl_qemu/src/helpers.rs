@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use libafl::{
     bolts::tuples::MatchFirstType, executors::ExitKind, inputs::Input, observers::ObserversTuple,
@@ -84,12 +84,56 @@ where
     }
 }
 
-pub struct QemuEdgeCoverageHelper {}
+pub enum QemuInstrumentationFilter {
+    AllowList(Vec<Range<u64>>),
+    DenyList(Vec<Range<u64>>),
+    None,
+}
+
+impl QemuInstrumentationFilter {
+    pub fn allowed(&self, addr: u64) -> bool {
+        match self {
+            QemuInstrumentationFilter::AllowList(l) => {
+                for rng in l {
+                    if rng.contains(&addr) {
+                        return true;
+                    }
+                }
+                false
+            }
+            QemuInstrumentationFilter::DenyList(l) => {
+                for rng in l {
+                    if rng.contains(&addr) {
+                        return false;
+                    }
+                }
+                true
+            }
+            QemuInstrumentationFilter::None => true,
+        }
+    }
+}
+
+pub struct QemuEdgeCoverageHelper {
+    filter: QemuInstrumentationFilter,
+}
 
 impl QemuEdgeCoverageHelper {
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            filter: QemuInstrumentationFilter::None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+        Self { filter }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: u64) -> bool {
+        self.filter.allowed(addr)
     }
 }
 
@@ -109,12 +153,26 @@ where
     }
 }
 
-pub struct QemuCmpLogHelper {}
+pub struct QemuCmpLogHelper {
+    filter: QemuInstrumentationFilter,
+}
 
 impl QemuCmpLogHelper {
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            filter: QemuInstrumentationFilter::None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+        Self { filter }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: u64) -> bool {
+        self.filter.allowed(addr)
     }
 }
 
