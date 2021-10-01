@@ -178,7 +178,7 @@ extern "C" {
     fn libafl_qemu_num_regs() -> i32;
     fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
-    fn libafl_qemu_set_hook(addr: u64, callback: /*extern "C"*/ fn ()) -> i32;
+    fn libafl_qemu_insert_hook(addr: u64, callback: /*extern "C"*/ extern fn ()) -> i32;
     fn libafl_qemu_remove_hook(addr: u64) -> i32;
     fn libafl_qemu_run() -> i32;
     fn libafl_load_addr() -> u64;
@@ -397,9 +397,9 @@ pub fn remove_breakpoint(addr: u64) {
     }
 }
 
-pub fn set_hook(addr: u64, callback: fn()) {
+pub fn set_hook(addr: u64, callback: extern fn()) {
     unsafe {
-        libafl_qemu_set_hook(addr, callback);
+        libafl_qemu_insert_hook(addr, callback);
     }
 }
 
