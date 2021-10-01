@@ -41,14 +41,12 @@ pub fn filter_qemu_args() -> Vec<String> {
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 use pyo3::{prelude::*, types::PyInt};
-#[cfg(all(target_os = "linux", feature = "python"))]
-use std::collections::HashMap;
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 
 #[cfg(all(target_os = "linux", feature = "python"))]
-static mut PY_GENERIC_HOOK: HashMap<u64, PyObject> = HashMap::default();
+static mut PY_GENERIC_HOOKS: Vec<(u64, PyObject)> = vec![];
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 #[pymodule]
@@ -172,16 +170,27 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         }
         emu::set_syscall_hook(py_syscall_hook_wrapper);
     }
-    
-    extern "C" fn py_generic_hook_wrapper(info: u64) {
-        
+
+    extern "C" fn py_generic_hook_wrapper(idx: u64) {
+        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
+        Python::with_gil(|py| {
+            obj.call0(py).expect("Error in the hook");
+        });
     }
     #[pyfn(m)]
     fn set_hook(addr: u64, hook: PyObject) {
         unsafe {
-            PY_GENERIC_HOOK = Some(hook);
+            let idx = PY_GENERIC_HOOKS.len();
+            PY_GENERIC_HOOKS.push((addr, hook));
+            emu::set_hook(addr, py_generic_hook_wrapper, idx as u64);
         }
-        emu::set_hook(addr, py_generic_hook_wrapper);
+    }
+    #[pyfn(m)]
+    fn remove_hook(addr: u64) {
+        unsafe {
+            PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
+        }
+        emu::remove_hook(addr);
     }
 
     let x86m = PyModule::new(py, "x86")?;
