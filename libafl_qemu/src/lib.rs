@@ -41,9 +41,14 @@ pub fn filter_qemu_args() -> Vec<String> {
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 use pyo3::{prelude::*, types::PyInt};
+#[cfg(all(target_os = "linux", feature = "python"))]
+use std::collections::HashMap;
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
+
+#[cfg(all(target_os = "linux", feature = "python"))]
+static mut PY_GENERIC_HOOK: HashMap<u64, PyObject> = HashMap::default();
 
 #[cfg(all(target_os = "linux", feature = "python"))]
 #[pymodule]
@@ -166,6 +171,17 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
             PY_SYSCALL_HOOK = Some(hook);
         }
         emu::set_syscall_hook(py_syscall_hook_wrapper);
+    }
+    
+    extern "C" fn py_generic_hook_wrapper(info: u64) {
+        
+    }
+    #[pyfn(m)]
+    fn set_hook(addr: u64, hook: PyObject) {
+        unsafe {
+            PY_GENERIC_HOOK = Some(hook);
+        }
+        emu::set_hook(addr, py_generic_hook_wrapper);
     }
 
     let x86m = PyModule::new(py, "x86")?;
