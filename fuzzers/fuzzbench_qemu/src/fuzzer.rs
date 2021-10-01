@@ -301,7 +301,11 @@ fn fuzz(
 
     let executor = QemuExecutor::new(
         &mut harness,
-        tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new(), QemuSnapshotHelper::new()),
+        tuple_list!(
+            QemuEdgeCoverageHelper::new(),
+            QemuCmpLogHelper::new(),
+            QemuSnapshotHelper::new()
+        ),
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
