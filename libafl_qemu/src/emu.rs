@@ -177,6 +177,8 @@ extern "C" {
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_run() -> i32;
     fn libafl_load_addr() -> u64;
+    fn libafl_get_brk() -> u64;
+    fn libafl_set_brk(brk: u64) -> u64;
 
     fn strlen(s: *const u8) -> usize;
 
@@ -414,6 +416,15 @@ pub fn binary_path<'a>() -> &'a str {
 #[must_use]
 pub fn load_addr() -> u64 {
     unsafe { libafl_load_addr() }
+}
+
+#[must_use]
+pub fn get_brk() -> u64 {
+    unsafe { libafl_get_brk() }
+}
+
+pub fn set_brk(brk: u64) {
+    unsafe { libafl_set_brk(brk) };
 }
 
 pub fn map_private(addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {

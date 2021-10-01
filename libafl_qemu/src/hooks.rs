@@ -186,7 +186,9 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 1);
 }
 
@@ -195,7 +197,9 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 2);
 }
 
@@ -204,7 +208,9 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 4);
 }
 
@@ -213,7 +219,9 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 8);
 }
 
@@ -223,11 +231,12 @@ pub fn trace_write_n_snapshot<I, QT, S>(
     _id: u64,
     addr: u64,
     size: usize,
-)
-where
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuSnapshotHelper>().unwrap();
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, size);
 }

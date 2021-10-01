@@ -149,6 +149,7 @@ pub struct QemuSnapshotHelper {
     pub access_cache_idx: usize,
     pub pages: HashMap<u64, SnapshotPageInfo>,
     pub dirty: Vec<u64>,
+    pub brk: u64,
 }
 
 impl QemuSnapshotHelper {
@@ -176,9 +177,10 @@ impl QemuSnapshotHelper {
             access_cache_idx: 0,
             pages,
             dirty: vec![],
+            brk: emu::get_brk(),
         }
     }
-    
+
     pub fn page_access(&mut self, page: u64) {
         if self.access_cache[0] == page
             || self.access_cache[1] == page
@@ -202,7 +204,7 @@ impl QemuSnapshotHelper {
         debug_assert!(size > 0);
         let page = addr & (SNAPSHOT_PAGE_SIZE as u64 - 1);
         self.page_access(page);
-        let second_page = (addr + size as u64 -1) & (SNAPSHOT_PAGE_SIZE as u64 - 1);
+        let second_page = (addr + size as u64 - 1) & (SNAPSHOT_PAGE_SIZE as u64 - 1);
         if page != second_page {
             self.page_access(second_page);
         }
@@ -217,6 +219,7 @@ impl QemuSnapshotHelper {
                 info.dirty = false;
             }
         }
+        emu::set_brk(self.brk);
     }
 }
 

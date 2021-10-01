@@ -119,6 +119,10 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
             Err(PyValueError::new_err("Invalid perms"))
         }
     }
+    #[pyfn(m)]
+    fn unmap(addr: u64, size: usize) -> PyResult<()> {
+        emu::unmap(addr, size).map_err(PyValueError::new_err)
+    }
 
     extern "C" fn py_syscall_hook_wrapper(
         sys_num: i32,
