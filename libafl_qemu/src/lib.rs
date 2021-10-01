@@ -4,6 +4,7 @@ pub mod amd64;
 pub mod x86;
 
 pub mod elf;
+#[cfg(target_os = "linux")]
 pub mod hooks;
 
 #[cfg(target_os = "linux")]
