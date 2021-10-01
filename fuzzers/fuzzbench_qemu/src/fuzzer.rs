@@ -40,8 +40,13 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, hooks, hooks::CmpLogObserver, MmapPerms,
-    QemuExecutor,
+    amd64::Amd64Regs,
+    elf::EasyElf,
+    emu, filter_qemu_args,
+    helpers::{QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuSnapshotHelper},
+    hooks,
+    hooks::CmpLogObserver,
+    MmapPerms, QemuExecutor,
 };
 
 /// The fuzzer main
@@ -296,20 +301,12 @@ fn fuzz(
 
     let executor = QemuExecutor::new(
         &mut harness,
+        tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new(), QemuSnapshotHelper::new()),
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
     )?;
-
-    // Track edge coverage
-    executor.hook_edge_generation(hooks::gen_unique_edge_ids);
-    executor.hook_edge_execution(hooks::trace_edge_hitcount);
-    // Track 2-4-8 cmps with CmpLog
-    executor.hook_cmp_generation(hooks::gen_unique_cmp_ids);
-    executor.hook_cmp8_execution(hooks::trace_cmp8_cmplog);
-    executor.hook_cmp4_execution(hooks::trace_cmp4_cmplog);
-    executor.hook_cmp2_execution(hooks::trace_cmp2_cmplog);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = TimeoutExecutor::new(executor, timeout);

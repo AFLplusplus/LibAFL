@@ -4,6 +4,7 @@ pub mod amd64;
 pub mod x86;
 
 pub mod elf;
+#[cfg(target_os = "linux")]
 pub mod hooks;
 
 #[cfg(target_os = "linux")]
@@ -15,6 +16,11 @@ pub use executor::QemuExecutor;
 pub mod emu;
 #[cfg(target_os = "linux")]
 pub use emu::*;
+
+#[cfg(target_os = "linux")]
+pub mod helpers;
+#[cfg(target_os = "linux")]
+pub use helpers::*;
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
@@ -113,6 +119,10 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         } else {
             Err(PyValueError::new_err("Invalid perms"))
         }
+    }
+    #[pyfn(m)]
+    fn unmap(addr: u64, size: usize) -> PyResult<()> {
+        emu::unmap(addr, size).map_err(PyValueError::new_err)
     }
 
     extern "C" fn py_syscall_hook_wrapper(

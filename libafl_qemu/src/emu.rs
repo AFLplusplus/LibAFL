@@ -20,6 +20,7 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum MmapPerms {
+    None = 0,
     Read = libc::PROT_READ,
     Write = libc::PROT_WRITE,
     Execute = libc::PROT_EXEC,
@@ -27,6 +28,41 @@ pub enum MmapPerms {
     ReadExecute = libc::PROT_READ | libc::PROT_EXEC,
     WriteExecute = libc::PROT_WRITE | libc::PROT_EXEC,
     ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+}
+
+impl MmapPerms {
+    #[must_use]
+    pub fn is_r(&self) -> bool {
+        matches!(
+            self,
+            MmapPerms::Read
+                | MmapPerms::ReadWrite
+                | MmapPerms::ReadExecute
+                | MmapPerms::ReadWriteExecute
+        )
+    }
+
+    #[must_use]
+    pub fn is_w(&self) -> bool {
+        matches!(
+            self,
+            MmapPerms::Write
+                | MmapPerms::ReadWrite
+                | MmapPerms::WriteExecute
+                | MmapPerms::ReadWriteExecute
+        )
+    }
+
+    #[must_use]
+    pub fn is_x(&self) -> bool {
+        matches!(
+            self,
+            MmapPerms::Execute
+                | MmapPerms::ReadExecute
+                | MmapPerms::WriteExecute
+                | MmapPerms::ReadWriteExecute
+        )
+    }
 }
 
 #[cfg(feature = "python")]
@@ -144,6 +180,8 @@ extern "C" {
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_run() -> i32;
     fn libafl_load_addr() -> u64;
+    fn libafl_get_brk() -> u64;
+    fn libafl_set_brk(brk: u64) -> u64;
 
     fn strlen(s: *const u8) -> usize;
 
@@ -383,6 +421,15 @@ pub fn load_addr() -> u64 {
     unsafe { libafl_load_addr() }
 }
 
+#[must_use]
+pub fn get_brk() -> u64 {
+    unsafe { libafl_get_brk() }
+}
+
+pub fn set_brk(brk: u64) {
+    unsafe { libafl_set_brk(brk) };
+}
+
 pub fn map_private(addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
     let res = unsafe {
         target_mmap(
@@ -408,6 +455,8 @@ pub fn unmap(addr: u64, size: usize) -> Result<(), String> {
         Err(format!("Failed to unmap {}", addr))
     }
 }
+
+// TODO add has_X_hook() and panic when setting a hook for the second time
 
 pub fn set_exec_edge_hook(hook: extern "C" fn(id: u64)) {
     unsafe {
@@ -499,6 +548,7 @@ pub fn set_exec_write_n_hook(hook: extern "C" fn(id: u64, addr: u64, size: u32))
     }
 }
 
+// TODO add pc arg
 pub fn set_gen_write_hook(hook: extern "C" fn(size: u32) -> u64) {
     unsafe {
         libafl_gen_write_hook = hook;

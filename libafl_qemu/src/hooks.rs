@@ -2,11 +2,13 @@ use core::{cell::UnsafeCell, cmp::max};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
-use libafl::state::HasMetadata;
+use libafl::{inputs::Input, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
     EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
+
+use crate::helpers::{QemuHelperTuple, QemuSnapshotHelper};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
@@ -53,7 +55,12 @@ fn hash_me(mut x: u64) -> u64 {
     x
 }
 
-pub fn gen_unique_edge_ids<S>(state: &mut S, src: u64, dest: u64) -> Option<u64>
+pub fn gen_unique_edge_ids<I, QT, S>(
+    _helpers: &mut QT,
+    state: &mut S,
+    src: u64,
+    dest: u64,
+) -> Option<u64>
 where
     S: HasMetadata,
 {
@@ -76,7 +83,12 @@ where
     }
 }
 
-pub fn gen_hashed_edge_ids<S>(_state: &mut S, src: u64, dest: u64) -> Option<u64> {
+pub fn gen_hashed_edge_ids<I, QT, S>(
+    _helpers: &mut QT,
+    _state: &mut S,
+    src: u64,
+    dest: u64,
+) -> Option<u64> {
     Some(hash_me(src) ^ hash_me(dest))
 }
 
@@ -92,11 +104,11 @@ pub extern "C" fn trace_edge_single(id: u64) {
     }
 }
 
-pub fn gen_addr_block_ids<S>(_state: &mut S, pc: u64) -> Option<u64> {
+pub fn gen_addr_block_ids<I, QT, S>(_helpers: &mut QT, _state: &mut S, pc: u64) -> Option<u64> {
     Some(pc)
 }
 
-pub fn gen_hashed_block_ids<S>(_state: &mut S, pc: u64) -> Option<u64> {
+pub fn gen_hashed_block_ids<I, QT, S>(_helpers: &mut QT, _state: &mut S, pc: u64) -> Option<u64> {
     Some(hash_me(pc))
 }
 
@@ -120,7 +132,12 @@ pub extern "C" fn trace_block_transition_single(id: u64) {
     }
 }
 
-pub fn gen_unique_cmp_ids<S>(state: &mut S, pc: u64, _size: usize) -> Option<u64>
+pub fn gen_unique_cmp_ids<I, QT, S>(
+    _helpers: &mut QT,
+    state: &mut S,
+    pc: u64,
+    _size: usize,
+) -> Option<u64>
 where
     S: HasMetadata,
 {
@@ -162,4 +179,64 @@ pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
     }
+}
+
+pub fn trace_write1_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
+    h.access(addr, 1);
+}
+
+pub fn trace_write2_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
+    h.access(addr, 2);
+}
+
+pub fn trace_write4_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
+    h.access(addr, 4);
+}
+
+pub fn trace_write8_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
+    h.access(addr, 8);
+}
+
+pub fn trace_write_n_snapshot<I, QT, S>(
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+    size: usize,
+) where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers
+        .match_first_type_mut::<QemuSnapshotHelper>()
+        .unwrap();
+    h.access(addr, size);
 }
