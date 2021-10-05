@@ -471,7 +471,7 @@ mod unix_signal_handler {
                 );
             }
             // let's yolo-cat the maps for debugging, if possible.
-            #[cfg(all(target_os = "linux", feature = "std"))]
+            #[cfg(all(any(target_os = "linux", target_os = "netbsd"), feature = "std"))]
             match std::fs::read_to_string("/proc/self/maps") {
                 Ok(maps) => println!("maps:\n{}", maps),
                 Err(e) => println!("Couldn't load mappings: {:?}", e),
