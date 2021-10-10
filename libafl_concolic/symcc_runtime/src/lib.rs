@@ -187,6 +187,58 @@ impl Runtime for NopRuntime {
     invoke_macro_with_rust_runtime_exports!(impl_nop_runtime_fn;);
 }
 
+/// This runtime can be constructed from an [`Option`] of a runtime, concretizing all expressions in the `None` case and forwarding expressions to the respective runtime in the `Some` case.
+/// This is especially useful for parts of the processing pipeline that should be activated based on a runtime configuration, such as an environment variable.
+pub struct OptionalRuntime<RT> {
+    inner: Option<RT>,
+}
+
+impl<RT> OptionalRuntime<RT> {
+    pub fn new(rt: Option<RT>) -> Self {
+        Self { inner: rt }
+    }
+
+    pub fn into_inner(self) -> Option<RT> {
+        self.inner
+    }
+}
+
+macro_rules! rust_runtime_function_declaration {
+    (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident;) => {
+        #[allow(clippy::default_trait_access)]
+        fn expression_unreachable(&mut self, exprs: &[RSymExpr]) {
+            if let Some(inner) = &mut self.inner {
+                inner.expression_unreachable(exprs);
+            }
+        }
+    };
+
+    (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?) -> $ret:ty,  $c_name:ident;) => {
+        fn $name(&mut self, $( $arg : $type),*) -> Option<$ret> {
+            if let Some(inner) = &mut self.inner {
+                inner.$name($($arg,)*)
+            } else {
+                None
+            }
+        }
+    };
+
+    (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?), $c_name:ident;) => {
+        fn $name(&mut self, $( $arg : $type),*) {
+            if let Some(inner) = &mut self.inner {
+                inner.$name($($arg,)*);
+            }
+        }
+    };
+}
+
+impl<RT> Runtime for OptionalRuntime<RT>
+where
+    RT: Runtime,
+{
+    invoke_macro_with_rust_runtime_exports!(rust_runtime_function_declaration;);
+}
+
 /// This macro allows you to export your runtime from your crate. It is necessary to call this macro in your crate to get a functional runtime.
 ///
 /// ## Simple form
