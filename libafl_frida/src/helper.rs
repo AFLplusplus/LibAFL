@@ -17,6 +17,12 @@ use capstone::{
 };
 
 #[cfg(target_arch = "x86_64")]
+use capstone::{
+    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
+    Capstone, Insn, RegId,
+};
+
+#[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
@@ -26,7 +32,6 @@ use frida_gum::{
     CpuContext, ModuleDetails, ModuleMap,
 };
 use frida_gum::{Gum, Module, PageProtection};
-#[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
@@ -94,11 +99,9 @@ pub struct FridaInstrumentationHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
     current_log_impl: u64,
-    #[cfg(target_arch = "aarch64")]
     current_report_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
-    #[cfg(target_arch = "aarch64")]
     capstone: Capstone,
     #[cfg(unix)]
     asan_runtime: AsanRuntime,
@@ -294,13 +297,19 @@ impl<'a> FridaInstrumentationHelper<'a> {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],
             current_log_impl: 0,
-            #[cfg(target_arch = "aarch64")]
             current_report_impl: 0,
             transformer: None,
             #[cfg(target_arch = "aarch64")]
             capstone: Capstone::new()
                 .arm64()
                 .mode(arch::arm64::ArchMode::Arm)
+                .detail(true)
+                .build()
+                .expect("Failed to create Capstone object"),
+            #[cfg(target_arch = "x86_64")]
+            capstone: Capstone::new()
+                .x86()
+                .mode(arch::x86::ArchMode::Mode64)
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
@@ -367,8 +376,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         }
 
                         if helper.options().asan_enabled() {
-                            #[cfg(not(target_arch = "aarch64"))]
-                            todo!("Implement ASAN for non-aarch64 targets");
+                            #[cfg(target_arch = "x86_64")]
+                            if let Ok((segment, basereg, indexreg, scale, disp)) =
+                                helper.asan_is_interesting_instruction(address, instr)
+                            {
+                                helper.emit_shadow_check(
+                                    address, &output, segment, basereg, indexreg, scale, disp,
+                                );
+                            }
                             #[cfg(target_arch = "aarch64")]
                             if let Ok((basereg, indexreg, displacement, width, shift, extender)) =
                                 helper.asan_is_interesting_instruction(address, instr)
@@ -439,6 +454,53 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let regint: u16 = reg.0;
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
+
+
+    // frida registers: https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html
+    // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    fn writer_register(&self, reg: RegId) -> X86Register {
+        let regint: u16 = reg.0;
+        match regint {
+            19 => X86Register::Eax,
+            22 => X86Register::Ecx,
+            24 => X86Register::Edx,
+            21 => X86Register::Ebx,
+            30 => X86Register::Esp,
+            20 => X86Register::Ebp,
+            29 => X86Register::Esi,
+            23 => X86Register::Edi,
+            226 => X86Register::R8d,
+            227 => X86Register::R9d,
+            228 => X86Register::R10d,
+            229 => X86Register::R11d,
+            230 => X86Register::R12d,
+            231 => X86Register::R13d,
+            232 => X86Register::R14d,
+            233 => X86Register::R15d,
+            26 => X86Register::Eip,
+            35 => X86Register::Rax,
+            38 => X86Register::Rcx,
+            40 => X86Register::Rdx,
+            37 => X86Register::Rbx,
+            44 => X86Register::Rsp,
+            36 => X86Register::Rbp,
+            43 => X86Register::Rsi,
+            39 => X86Register::Rdi,
+            106 => X86Register::R8,
+            107 => X86Register::R9,
+            108 => X86Register::R10,
+            109 => X86Register::R11,
+            110 => X86Register::R12,
+            111 => X86Register::R13,
+            112 => X86Register::R14,
+            113 => X86Register::R15,
+            41 => X86Register::Rip,
+            _ => X86Register::None, // Ignore Xax..Xip
+        }
+    }
+
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
@@ -756,6 +818,95 @@ impl<'a> FridaInstrumentationHelper<'a> {
             16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
             IndexMode::PostAdjust,
         ));
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    fn emit_shadow_check(
+        &mut self,
+        _address: u64,
+        output: &StalkerOutput,
+        _segment: RegId,
+        basereg: RegId,
+        indexreg: RegId,
+        scale: i32,
+        disp: i64,
+    ) {
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i64;
+
+        let writer = output.writer();
+
+        let basereg = if basereg.0 != 0 {
+            Some(self.writer_register(basereg))
+        } else {
+            None
+        };
+
+        let indexreg = if indexreg.0 != 0 {
+            Some(self.writer_register(indexreg))
+        } else {
+            None
+        };
+
+        let scale = match scale {
+            2 => 1,
+            4 => 2,
+            8 => 3,
+            _ => 0,
+        };
+
+
+        if self.current_report_impl == 0
+            || !writer.can_branch_directly_to(self.current_report_impl)
+            || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
+        {
+            let after_report_impl = writer.code_offset() + 2;
+
+            #[cfg(target_arch = "x86_64")]
+            writer.put_jmp_near_label(after_report_impl);
+            #[cfg(target_arch = "aarch64")]
+            writer.put_b_label(after_report_impl);
+
+            self.current_report_impl = writer.pc();
+
+            #[cfg(unix)]
+            writer.put_bytes(self.asan_runtime.blob_report());
+
+            writer.put_label(after_report_impl);
+        }
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -redzone_size);
+        writer.put_push_reg(X86Register::Rdi);
+        writer.put_push_reg(X86Register::Rsi);
+
+        // Init Rdi
+        if basereg.is_some(){
+            writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
+        }
+        else {
+            writer.put_xor_reg_reg(X86Register::Rdi, X86Register::Rdi);
+        }
+
+        // Init Rsi
+        if indexreg.is_some(){
+            writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
+        }
+        else {
+            writer.put_xor_reg_reg(X86Register::Rsi, X86Register::Rsi);
+        }
+
+        // Scale
+        if scale > 0 {
+            writer.put_shl_reg_u8(X86Register::Rsi, scale);
+        }
+
+        // Finally set Rdi to base + index * scale + disp
+        writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
+        writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
+
+
+        writer.put_pop_reg(X86Register::Rsi);
+        writer.put_pop_reg(X86Register::Rdi);
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -1088,6 +1239,49 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Err(())
     }
 
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    fn asan_is_interesting_instruction(
+        &self,
+        _address: u64,
+        instr: &Insn,
+    ) -> Result<(RegId, RegId, RegId, i32, i64), ()> {
+        let operands = self
+            .capstone
+            .insn_detail(instr)
+            .unwrap()
+            .arch_detail()
+            .operands();
+
+        for operand in operands {
+            if let X86Operand(x86operand) = operand {
+                if let X86OperandType::Mem(opmem) = x86operand.op_type {
+                    println!(
+                        "insn: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
+                        instr,
+                        opmem.segment(),
+                        opmem.base(),
+                        opmem.index(),
+                        opmem.scale(),
+                        opmem.disp()
+                    );
+                    if opmem.segment() != RegId(0) {
+                        return Ok((
+                            opmem.segment(),
+                            opmem.base(),
+                            opmem.index(),
+                            opmem.scale(),
+                            opmem.disp(),
+                        ));
+                    }
+
+                }
+            }
+        }
+
+        Err(())
+    }
+
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
@@ -1181,7 +1375,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
-        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i64;
         if self.current_log_impl == 0
             || !writer.can_branch_directly_to(self.current_log_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_log_impl)
