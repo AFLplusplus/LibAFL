@@ -24,7 +24,7 @@ pub struct PacketData {
     pub offset: u64,
     pub length: u64,
 
-    #[lain(min = 0, max = 10)]
+    #[lain(max = 10)]
     pub data: Vec<u8>,
 }
 
