@@ -27,6 +27,13 @@ pub enum Amd64Regs {
     Rflags = 17,
 }
 
+/// alias registers
+#[allow(non_upper_case_globals)]
+impl Amd64Regs {
+    pub const Sp: Amd64Regs = Amd64Regs::Rsp;
+    pub const Pc: Amd64Regs = Amd64Regs::Rip;
+}
+
 #[cfg(feature = "python")]
 impl IntoPy<PyObject> for Amd64Regs {
     fn into_py(self, py: Python) -> PyObject {

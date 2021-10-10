@@ -27,14 +27,15 @@ pub enum ArmRegs {
 }
 
 /// alias registers
+#[allow(non_upper_case_globals)]
 impl ArmRegs {
-    pub const SP: ArmRegs = ArmRegs::R13;
-    pub const LR: ArmRegs = ArmRegs::R14;
-    pub const PC: ArmRegs = ArmRegs::R15;
-    pub const SB: ArmRegs = ArmRegs::R9;
-    pub const SL: ArmRegs = ArmRegs::R10;
-    pub const FP: ArmRegs = ArmRegs::R11;
-    pub const IP: ArmRegs = ArmRegs::R12;
+    pub const Sp: ArmRegs = ArmRegs::R13;
+    pub const Lr: ArmRegs = ArmRegs::R14;
+    pub const Pc: ArmRegs = ArmRegs::R15;
+    pub const Sb: ArmRegs = ArmRegs::R9;
+    pub const Sl: ArmRegs = ArmRegs::R10;
+    pub const Fp: ArmRegs = ArmRegs::R11;
+    pub const Ip: ArmRegs = ArmRegs::R12;
 }
 
 #[cfg(feature = "python")]

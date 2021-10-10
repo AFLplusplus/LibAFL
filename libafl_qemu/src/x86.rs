@@ -19,6 +19,13 @@ pub enum X86Regs {
     Eflags = 9,
 }
 
+/// alias registers
+#[allow(non_upper_case_globals)]
+impl X86Regs {
+    pub const Sp: X86Regs = X86Regs::Esp;
+    pub const Pc: X86Regs = X86Regs::Eip;
+}
+
 #[cfg(feature = "python")]
 impl IntoPy<PyObject> for X86Regs {
     fn into_py(self, py: Python) -> PyObject {
