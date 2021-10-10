@@ -306,11 +306,17 @@ pub enum SymExpr {
     },
 
     /// Location information regarding a call. Tracing this information is optional.
-    Call { location: usize },
+    Call {
+        location: usize,
+    },
     /// Location information regarding a return. Tracing this information is optional.
-    Return { location: usize },
+    Return {
+        location: usize,
+    },
     /// Location information regarding a basic block. Tracing this information is optional.
-    BasicBlock { location: usize },
+    BasicBlock {
+        location: usize,
+    },
 }
 
 #[cfg(feature = "std")]
