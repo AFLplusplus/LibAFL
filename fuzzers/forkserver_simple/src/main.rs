@@ -96,8 +96,6 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-
-
     // Create the executor for the forkserver
     let mut executor = TimeoutForkserverExecutor::new(
         ForkserverExecutor::new(
