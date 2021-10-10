@@ -52,9 +52,6 @@ COPY libafl_targets/Cargo.toml libafl_targets/build.rs libafl_targets/
 COPY libafl_targets/src libafl_targets/src
 COPY scripts/dummy.rs libafl_targets/src/lib.rs
 
-COPY libafl_tests/Cargo.toml libafl_tests/build.rs libafl_tests/
-COPY scripts/dummy.rs libafl_tests/src/lib.rs
-
 COPY libafl_concolic/test/dump_constraints/Cargo.toml libafl_concolic/test/dump_constraints/
 COPY scripts/dummy.rs libafl_concolic/test/dump_constraints/src/lib.rs
 
@@ -77,7 +74,6 @@ COPY docs docs
 # Dep chain:
 # libafl_cc (independent)
 # libafl_derive -> libafl
-# libafl_tests -> libafl
 # libafl -> libafl_targets
 # libafl_targets -> libafl_frida
 
@@ -86,8 +82,6 @@ COPY libafl_cc/src libafl_cc/src
 RUN touch libafl_cc/src/lib.rs
 COPY libafl_derive/src libafl_derive/src
 RUN touch libafl_derive/src/lib.rs
-COPY libafl_tests/src libafl_tests/src
-RUN touch libafl_tests/src/lib.rs
 COPY libafl/src libafl/src
 RUN touch libafl/src/lib.rs
 COPY libafl_targets/src libafl_targets/src
