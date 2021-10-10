@@ -99,7 +99,7 @@ pub fn main() {
     // Create the executor for the forkserver
     let mut executor = TimeoutForkserverExecutor::new(
         ForkserverExecutor::new(
-            "../../libafl_tests/src/forkserver_test".to_string(),
+            "./target/release/program".to_string(),
             &[],
             true,
             tuple_list!(edges_observer, time_observer),

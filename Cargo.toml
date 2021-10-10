@@ -13,7 +13,6 @@ members = [
     "libafl_frida",
     "libafl_qemu",
     "libafl_sugar",
-    "libafl_tests",
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
     "libafl_concolic/test/dump_constraints",
@@ -24,7 +23,6 @@ default-members = [
     "libafl_derive",
     "libafl_cc",
     "libafl_targets",
-    "libafl_tests",
 ]
 exclude = [
     "fuzzers",
