@@ -304,6 +304,13 @@ pub enum SymExpr {
     ExpressionsUnreachable {
         exprs: Vec<SymExprRef>,
     },
+
+    /// Location information regarding a call. Tracing this information is optional.
+    Call { location: usize },
+    /// Location information regarding a return. Tracing this information is optional.
+    Return { location: usize },
+    /// Location information regarding a basic block. Tracing this information is optional.
+    BasicBlock { location: usize },
 }
 
 #[cfg(feature = "std")]

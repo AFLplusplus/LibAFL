@@ -9,13 +9,19 @@ use crate::{RSymExpr, Runtime};
 /// The format can be read from elsewhere to perform processing of the expressions outside of the runtime.
 pub struct TracingRuntime {
     writer: StdShMemMessageFileWriter,
+    trace_locations: bool,
 }
 
 impl TracingRuntime {
     /// Creates the runtime, tracing using the given writer.
+    /// When `trace_locations` is true, location information for calls, returns and basic blocks will also be part of the trace.
+    /// Tracing location information can drastically increase trace size. It is therefore recommended to not active this if not needed.
     #[must_use]
-    pub fn new(writer: StdShMemMessageFileWriter) -> Self {
-        Self { writer }
+    pub fn new(writer: StdShMemMessageFileWriter, trace_locations: bool) -> Self {
+        Self {
+            writer,
+            trace_locations,
+        }
     }
 
     #[allow(clippy::unnecessary_wraps)]
@@ -143,11 +149,23 @@ impl Runtime for TracingRuntime {
     binary_expression_builder!(concat_helper, Concat);
     expression_builder!(extract_helper(op: RSymExpr, first_bit:usize, last_bit:usize) => Extract);
 
-    fn notify_call(&mut self, _site_id: usize) {}
+    fn notify_call(&mut self, site_id: usize) {
+        if self.trace_locations {
+            self.write_message(SymExpr::Call { location: site_id });
+        }
+    }
 
-    fn notify_ret(&mut self, _site_id: usize) {}
+    fn notify_ret(&mut self, site_id: usize) {
+        if self.trace_locations {
+            self.write_message(SymExpr::Return { location: site_id });
+        }
+    }
 
-    fn notify_basic_block(&mut self, _site_id: usize) {}
+    fn notify_basic_block(&mut self, site_id: usize) {
+        if self.trace_locations {
+            self.write_message(SymExpr::BasicBlock { location: site_id });
+        }
+    }
 
     fn expression_unreachable(&mut self, exprs: &[RSymExpr]) {
         self.write_message(SymExpr::ExpressionsUnreachable {

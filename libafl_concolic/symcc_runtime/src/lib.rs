@@ -201,7 +201,7 @@ impl Runtime for NopRuntime {
 /// ```no_run
 /// # #[macro_use] extern crate symcc_runtime;
 /// # use symcc_runtime::{tracing::TracingRuntime, Runtime};
-/// export_runtime!(TracingRuntime::new(todo!()) => TracingRuntime);
+/// export_runtime!(TracingRuntime::new(todo!(), todo!()) => TracingRuntime);
 /// ```
 ///
 /// ## Runtime composition using `Filter`s
@@ -215,7 +215,7 @@ impl Runtime for NopRuntime {
 /// ```no_run
 /// # #[macro_use] extern crate symcc_runtime;
 /// # use symcc_runtime::{tracing::TracingRuntime, Runtime, filter::NoFloat};
-/// export_runtime!(NoFloat => NoFloat; TracingRuntime::new(todo!()) => TracingRuntime);
+/// export_runtime!(NoFloat => NoFloat; TracingRuntime::new(todo!(), todo!()) => TracingRuntime);
 /// ```
 /// This will construct a runtime that is first filtered by [`filter::NoFloat`] and then traced by the tracing runtime.
 ///
