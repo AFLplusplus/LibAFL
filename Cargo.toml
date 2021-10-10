@@ -23,7 +23,6 @@ default-members = [
     "libafl_derive",
     "libafl_cc",
     "libafl_targets",
-    "libafl_tests",
 ]
 exclude = [
     "fuzzers",
