@@ -18,7 +18,7 @@ use capstone::{
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{
-    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
+    arch::{self, x86::{X86OperandType, X86InsnDetail, X86Insn}, ArchOperand::X86Operand, BuildsCapstone},
     Capstone, Insn, RegId,
 };
 
@@ -32,7 +32,6 @@ use frida_gum::{
     CpuContext, ModuleDetails, ModuleMap,
 };
 use frida_gum::{Gum, Module, PageProtection};
-use num_traits::cast::FromPrimitive;
 
 use rangemap::RangeMap;
 
@@ -377,11 +376,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
                         if helper.options().asan_enabled() {
                             #[cfg(target_arch = "x86_64")]
-                            if let Ok((segment, basereg, indexreg, scale, disp)) =
+                            if let Ok((segment, width, basereg, indexreg, scale, disp)) =
                                 helper.asan_is_interesting_instruction(address, instr)
                             {
                                 helper.emit_shadow_check(
-                                    address, &output, segment, basereg, indexreg, scale, disp,
+                                    address, &output, segment, width, basereg, indexreg, scale, disp,
                                 );
                             }
                             #[cfg(target_arch = "aarch64")]
@@ -827,6 +826,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         _address: u64,
         output: &StalkerOutput,
         _segment: RegId,
+        width: u8,
         basereg: RegId,
         indexreg: RegId,
         scale: i32,
@@ -903,6 +903,24 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
         writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
 
+        /*
+        #[cfg(unix)]
+        match width {
+            1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
+            2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
+            3 => writer.put_bytes(&self.asan_runtime.blob_check_mem_3bytes()),
+            4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
+            6 => writer.put_bytes(&self.asan_runtime.blob_check_mem_6bytes()),
+            8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
+            12 => writer.put_bytes(&self.asan_runtime.blob_check_mem_12bytes()),
+            16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
+            24 => writer.put_bytes(&self.asan_runtime.blob_check_mem_24bytes()),
+            32 => writer.put_bytes(&self.asan_runtime.blob_check_mem_32bytes()),
+            48 => writer.put_bytes(&self.asan_runtime.blob_check_mem_48bytes()),
+            64 => writer.put_bytes(&self.asan_runtime.blob_check_mem_64bytes()),
+            _ => false,
+        };
+        */
 
         writer.put_pop_reg(X86Register::Rsi);
         writer.put_pop_reg(X86Register::Rdi);
@@ -1245,7 +1263,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         &self,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(RegId, RegId, RegId, i32, i64), ()> {
+    ) -> Result<(RegId, u8, RegId, RegId, i32, i64), ()> {
         let operands = self
             .capstone
             .insn_detail(instr)
@@ -1253,21 +1271,32 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .arch_detail()
             .operands();
 
+        // Ignore lea instruction
+        match instr.mnemonic().unwrap() {
+            "lea" => return Err(()),
+            _ => (),
+        }
+
+
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
+                    let insn_id : X86Insn = instr.id().0.into();
                     println!(
-                        "insn: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
+                        "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
+                        insn_id,
                         instr,
+                        x86operand.size,
                         opmem.segment(),
                         opmem.base(),
                         opmem.index(),
                         opmem.scale(),
-                        opmem.disp()
+                        opmem.disp(),
                     );
                     if opmem.segment() != RegId(0) {
                         return Ok((
                             opmem.segment(),
+                            x86operand.size,
                             opmem.base(),
                             opmem.index(),
                             opmem.scale(),
