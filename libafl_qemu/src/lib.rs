@@ -1,6 +1,5 @@
 use std::env;
 
-pub mod aarch64;
 pub mod amd64;
 pub mod arm;
 pub mod x86;
