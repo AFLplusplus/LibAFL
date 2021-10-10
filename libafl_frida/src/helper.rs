@@ -18,7 +18,7 @@ use capstone::{
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{
-    arch::{self, x86::{X86OperandType, X86InsnDetail, X86Insn}, ArchOperand::X86Operand, BuildsCapstone},
+    arch::{self, x86::{X86OperandType, X86Insn}, ArchOperand::X86Operand, BuildsCapstone},
     Capstone, Insn, RegId,
 };
 
@@ -826,7 +826,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         _address: u64,
         output: &StalkerOutput,
         _segment: RegId,
-        width: u8,
+        _width: u8,
         basereg: RegId,
         indexreg: RegId,
         scale: i32,

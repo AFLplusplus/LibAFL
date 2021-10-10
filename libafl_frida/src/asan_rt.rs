@@ -16,11 +16,15 @@ use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 #[cfg(target_arch = "aarch64")]
 use nix::libc::memset;
 
+#[cfg(target_arch = "aarch64")]
 use backtrace::Backtrace;
+
+#[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
+#[cfg(target_arch = "aarch64")]
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
@@ -116,7 +120,9 @@ impl AsanRuntime {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
 
+        #[cfg(target_arch = "aarch64")]
         self.generate_instrumentation_blobs();
+        #[cfg(target_arch = "aarch64")]
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
@@ -1863,6 +1869,7 @@ impl AsanRuntime {
         hook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(clippy::cast_sign_loss)] // for displacement
     #[allow(clippy::too_many_lines)]
     extern "C" fn handle_trap(&mut self) {
@@ -2016,6 +2023,7 @@ impl AsanRuntime {
         AsanErrors::get_mut().report_error(error);
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self, clippy::identity_op)] // identity_op appears to be a false positive in ubfx
     fn generate_shadow_check_function(&mut self) {
         let shadow_bit = self.allocator.shadow_bit();
@@ -2137,6 +2145,7 @@ impl AsanRuntime {
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
@@ -2168,6 +2177,7 @@ impl AsanRuntime {
         ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
 
+    #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_exact_blob(&mut self, val: u64) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
@@ -2206,6 +2216,7 @@ impl AsanRuntime {
 
     ///
     /// Generate the instrumentation blobs for the current arch.
+    #[cfg(target_arch = "aarch64")]
     #[allow(clippy::similar_names)] // We allow things like dword and qword
     #[allow(clippy::cast_possible_wrap)]
     #[allow(clippy::too_many_lines)]
