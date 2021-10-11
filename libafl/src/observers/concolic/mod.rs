@@ -18,7 +18,7 @@ pub type SymExprRef = NonZeroUsize;
 /// [`Location`]s are code locations encountered during concolic tracing, that are constructed from pointers, but not always in a meaningful way.
 /// Therefore, a location is an opague value that can only be compared against itself.
 ///
-/// It is possible to get at the underlying value using [`Location::into_inner`], should this restriction be too inflexible for your usecase.
+/// It is possible to get at the underlying value using [`Into::into`], should this restriction be too inflexible for your usecase.
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -36,16 +36,15 @@ impl Display for Location {
     }
 }
 
-impl From<NonZeroUsize> for Location {
-    fn from(v: NonZeroUsize) -> Self {
-        Self(v)
+impl From<Location> for NonZeroUsize {
+    fn from(l: Location) -> Self {
+        l.0
     }
 }
 
-impl Location {
-    #[must_use]
-    pub fn into_inner(self) -> NonZeroUsize {
-        self.0
+impl From<NonZeroUsize> for Location {
+    fn from(v: NonZeroUsize) -> Self {
+        Self(v)
     }
 }
 
