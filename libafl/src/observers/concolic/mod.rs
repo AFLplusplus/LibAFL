@@ -22,7 +22,7 @@ pub type SymExprRef = NonZeroUsize;
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct Location(NonZeroUsize);
+pub struct Location(usize);
 
 impl Debug for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -36,14 +36,14 @@ impl Display for Location {
     }
 }
 
-impl From<Location> for NonZeroUsize {
+impl From<Location> for usize {
     fn from(l: Location) -> Self {
         l.0
     }
 }
 
-impl From<NonZeroUsize> for Location {
-    fn from(v: NonZeroUsize) -> Self {
+impl From<usize> for Location {
+    fn from(v: usize) -> Self {
         Self(v)
     }
 }

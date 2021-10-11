@@ -153,31 +153,25 @@ impl Runtime for TracingRuntime {
 
     fn notify_call(&mut self, site_id: usize) {
         if self.trace_locations {
-            if let Some(nzu) = NonZeroUsize::new(site_id) {
-                self.write_message(SymExpr::Call {
-                    location: nzu.into(),
-                });
-            }
+            self.write_message(SymExpr::Call {
+                location: site_id.into(),
+            });
         }
     }
 
     fn notify_ret(&mut self, site_id: usize) {
         if self.trace_locations {
-            if let Some(nzu) = NonZeroUsize::new(site_id) {
-                self.write_message(SymExpr::Return {
-                    location: nzu.into(),
-                });
-            }
+            self.write_message(SymExpr::Return {
+                location: site_id.into(),
+            });
         }
     }
 
     fn notify_basic_block(&mut self, site_id: usize) {
         if self.trace_locations {
-            if let Some(nzu) = NonZeroUsize::new(site_id) {
-                self.write_message(SymExpr::BasicBlock {
-                    location: nzu.into(),
-                });
-            }
+            self.write_message(SymExpr::BasicBlock {
+                location: site_id.into(),
+            });
         }
     }
 
@@ -188,13 +182,11 @@ impl Runtime for TracingRuntime {
     }
 
     fn push_path_constraint(&mut self, constraint: RSymExpr, taken: bool, site_id: usize) {
-        if let Some(nzu) = NonZeroUsize::new(site_id) {
-            self.write_message(SymExpr::PathConstraint {
-                constraint,
-                taken,
-                location: nzu.into(),
-            });
-        }
+        self.write_message(SymExpr::PathConstraint {
+            constraint,
+            taken,
+            location: site_id.into(),
+        });
     }
 }
 
