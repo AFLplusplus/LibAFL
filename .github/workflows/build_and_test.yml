@@ -151,6 +151,8 @@ jobs:
         profile: minimal
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
+    - name: Install deps
+      run: brew install z3
     - uses: actions/checkout@v2
     - name: MacOS Build
       run: cargo build --verbose
@@ -171,7 +173,7 @@ jobs:
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
-      run: brew install llvm libpng nasm coreutils && brew link --force llvm
+      run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
     - uses: actions/checkout@v2
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh

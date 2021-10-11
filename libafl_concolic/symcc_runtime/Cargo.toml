@@ -25,7 +25,7 @@ libafl = {path = "../../libafl", version="0.6", default-features=false, features
 
 [build-dependencies]
 cmake = "0.1"
-bindgen = "0.58"
+bindgen = "0.59"
 regex = "1"
 lazy_static = "1.4"
 which = "4.1"
