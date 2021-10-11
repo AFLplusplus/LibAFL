@@ -1,5 +1,8 @@
 //! # Concolic Tracing
-use core::num::NonZeroUsize;
+use core::{
+    fmt::{Debug, Display, Error, Formatter},
+    num::NonZeroUsize,
+};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -11,6 +14,40 @@ use serde::{Deserialize, Serialize};
 /// In a trace, `SymExprRef`s are monotonically increasing and start at 1.
 /// `SymExprRef`s are not valid across traces.
 pub type SymExprRef = NonZeroUsize;
+
+/// [`Location`]s are code locations encountered during concolic tracing, that are constructed from pointers, but not always in a meaningful way.
+/// Therefore, a location is an opague value that can only be compared against itself.
+///
+/// It is possible to get at the underlying value using [`Location::into_inner`], should this restriction be too inflexible for your usecase.
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct Location(NonZeroUsize);
+
+impl Debug for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        core::fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        core::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl From<NonZeroUsize> for Location {
+    fn from(v: NonZeroUsize) -> Self {
+        Self(v)
+    }
+}
+
+impl Location {
+    #[must_use]
+    pub fn into_inner(self) -> NonZeroUsize {
+        self.0
+    }
+}
 
 /// `SymExpr` represents a message in the serialization format.
 /// The messages in the format are a perfect mirror of the methods that are called on the runtime during execution.
@@ -297,7 +334,7 @@ pub enum SymExpr {
     PathConstraint {
         constraint: SymExprRef,
         taken: bool,
-        site_id: usize,
+        location: Location,
     },
 
     /// These expressions won't be referenced again
@@ -307,15 +344,15 @@ pub enum SymExpr {
 
     /// Location information regarding a call. Tracing this information is optional.
     Call {
-        location: usize,
+        location: Location,
     },
     /// Location information regarding a return. Tracing this information is optional.
     Return {
-        location: usize,
+        location: Location,
     },
     /// Location information regarding a basic block. Tracing this information is optional.
     BasicBlock {
-        location: usize,
+        location: Location,
     },
 }
 

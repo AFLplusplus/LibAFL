@@ -281,8 +281,8 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             translation.insert(id, expr);
         } else if let SymExpr::PathConstraint {
             constraint,
-            site_id: _,
             taken,
+            ..
         } = msg
         {
             let op = translation[&constraint].as_bool().unwrap();

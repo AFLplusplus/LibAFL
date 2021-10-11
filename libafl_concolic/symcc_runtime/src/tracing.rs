@@ -1,5 +1,7 @@
 //! Tracing of expressions in a serialized form.
 
+use std::num::NonZeroUsize;
+
 pub use libafl::observers::concolic::serialization_format::StdShMemMessageFileWriter;
 use libafl::observers::concolic::SymExpr;
 
@@ -151,19 +153,31 @@ impl Runtime for TracingRuntime {
 
     fn notify_call(&mut self, site_id: usize) {
         if self.trace_locations {
-            self.write_message(SymExpr::Call { location: site_id });
+            if let Some(nzu) = NonZeroUsize::new(site_id) {
+                self.write_message(SymExpr::Call {
+                    location: nzu.into(),
+                });
+            }
         }
     }
 
     fn notify_ret(&mut self, site_id: usize) {
         if self.trace_locations {
-            self.write_message(SymExpr::Return { location: site_id });
+            if let Some(nzu) = NonZeroUsize::new(site_id) {
+                self.write_message(SymExpr::Return {
+                    location: nzu.into(),
+                });
+            }
         }
     }
 
     fn notify_basic_block(&mut self, site_id: usize) {
         if self.trace_locations {
-            self.write_message(SymExpr::BasicBlock { location: site_id });
+            if let Some(nzu) = NonZeroUsize::new(site_id) {
+                self.write_message(SymExpr::BasicBlock {
+                    location: nzu.into(),
+                });
+            }
         }
     }
 
@@ -174,11 +188,13 @@ impl Runtime for TracingRuntime {
     }
 
     fn push_path_constraint(&mut self, constraint: RSymExpr, taken: bool, site_id: usize) {
-        self.write_message(SymExpr::PathConstraint {
-            constraint,
-            taken,
-            site_id,
-        });
+        if let Some(nzu) = NonZeroUsize::new(site_id) {
+            self.write_message(SymExpr::PathConstraint {
+                constraint,
+                taken,
+                location: nzu.into(),
+            });
+        }
     }
 }
 
