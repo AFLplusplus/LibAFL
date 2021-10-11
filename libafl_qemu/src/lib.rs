@@ -1,6 +1,7 @@
 use std::env;
 
 pub mod amd64;
+pub mod arm;
 pub mod x86;
 
 pub mod elf;
