@@ -46,7 +46,7 @@ echo "constraints: "
 cat constraints.txt
 
 # site_id's in the constraints trace will differ for every run. we therefore filter those.
-sed 's/, site_id: .* / /' < constraints.txt > constraints_filtered.txt
-sed 's/, site_id: .* / /' < expected_constraints.txt > expected_constraints_filtered.txt
+sed 's/, location: .* / /' < constraints.txt > constraints_filtered.txt
+sed 's/, location: .* / /' < expected_constraints.txt > expected_constraints_filtered.txt
 
 diff constraints_filtered.txt expected_constraints_filtered.txt

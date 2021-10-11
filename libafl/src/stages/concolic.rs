@@ -280,9 +280,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
         if let Some(expr) = z3_expr {
             translation.insert(id, expr);
         } else if let SymExpr::PathConstraint {
-            constraint,
-            site_id: _,
-            taken,
+            constraint, taken, ..
         } = msg
         {
             let op = translation[&constraint].as_bool().unwrap();
