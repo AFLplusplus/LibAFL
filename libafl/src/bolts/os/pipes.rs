@@ -60,7 +60,7 @@ impl Read for Pipe {
         match self.read_end {
             Some(read_end) => match read(read_end, buf) {
                 Ok(res) => Ok(res),
-                Err(e) => Err(io::Error::from_raw_os_error(e.as_errno().unwrap() as i32)),
+                Err(e) => Err(io::Error::from_raw_os_error(e as i32)),
             },
             None => Err(io::Error::new(
                 ErrorKind::BrokenPipe,
@@ -77,7 +77,7 @@ impl Write for Pipe {
         match self.write_end {
             Some(write_end) => match write(write_end, buf) {
                 Ok(res) => Ok(res),
-                Err(e) => Err(io::Error::from_raw_os_error(e.as_errno().unwrap() as i32)),
+                Err(e) => Err(io::Error::from_raw_os_error(e as i32)),
             },
             None => Err(io::Error::new(
                 ErrorKind::BrokenPipe,
