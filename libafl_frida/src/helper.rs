@@ -1077,7 +1077,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             | "cbz" | "tbz" | "tbnz" => (),
             _ => return Err(()),
         }
-        let operands = self
+        let mut operands = self
             .capstone
             .insn_detail(instr)
             .unwrap()
@@ -1085,13 +1085,23 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .operands();
 
         // cbz - 1 operand, tbz - 3 operands
-        let special_case = ["cbz", "cbnz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
-        if operands.len() != 2 || !special_case {
+        let special_case =
+            ["cbz", "cbnz", "tbz", "tbnz", "subs"].contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 && !special_case {
             return Err(());
         }
+
+        // handle special "subs" case which have 3 operands, but the 1st(dest) is not important to us
+        if instr.mnemonic().unwrap().eq("subs") {
+            //remove the dest operand from the list
+            operands.remove(0);
+        }
+
         // cbz marked as special since there is only 1 operand
-        let special_case = instr.mnemonic().unwrap() == "cbz" | "cbnz";
+        let special_case = match (instr.mnemonic().unwrap()) {
+            "cbz" | "cbnz" => true,
+            _ => false,
+        };
 
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
             match arm64operand.op_type {
