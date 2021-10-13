@@ -1087,6 +1087,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         // cbz - 1 operand, tbz - 3 operands
         let special_case = ["cbz", "cbnz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 || !special_case {
+        if operands.len() != 2 && !special_case {
             return Err(());
         }
         // cbz marked as special since there is only 1 operand
