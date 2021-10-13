@@ -1085,12 +1085,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .operands();
 
         // cbz - 1 operand, tbz - 3 operands
-        let special_case = ["cbz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
+        let special_case = ["cbz", "cbnz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 || !special_case {
             return Err(());
         }
         // cbz marked as special since there is only 1 operand
-        let special_case = instr.mnemonic().unwrap() == "cbz";
+        let special_case = instr.mnemonic().unwrap() == "cbz" | "cbnz";
 
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
             match arm64operand.op_type {
