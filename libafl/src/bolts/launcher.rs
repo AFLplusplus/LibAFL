@@ -18,7 +18,7 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{dup2, fork, ForkResult};
 
 #[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::unix::io::AsRawFd};
+use std::ffi::CString;
 
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
@@ -98,9 +98,16 @@ where
         let mut handles = vec![];
 
         println!("spawning on cores: {:?}", self.cores);
-        let file = self
-            .stdout_file
-            .map(|filename| File::create(filename).unwrap());
+        let file = self.stdout_file.map(|filename| {
+            let fname = CString::new(filename).unwrap();
+            unsafe {
+                libc::open(
+                    fname.as_ptr(),
+                    libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC,
+                    0666,
+                )
+            }
+        });
 
         // Spawn clients
         for (index, (id, bind_to)) in core_ids.iter().enumerate().take(num_cores).enumerate() {
@@ -121,9 +128,10 @@ where
                         std::thread::sleep(std::time::Duration::from_secs((index + 1) as u64));
 
                         #[cfg(feature = "std")]
-                        if file.is_some() {
-                            dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDOUT_FILENO)?;
-                            dup2(file.as_ref().unwrap().as_raw_fd(), libc::STDERR_FILENO)?;
+                        if let Some(fd) = file {
+                            dup2(fd, libc::STDOUT_FILENO)?;
+                            dup2(fd, libc::STDERR_FILENO)?;
+                            unsafe { libc::close(fd) };
                         }
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
                         let (state, mgr) = RestartingMgr::<I, OT, S, SP, ST>::builder()
