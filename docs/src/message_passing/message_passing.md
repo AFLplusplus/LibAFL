@@ -27,7 +27,7 @@ Throughout LibAFL, we use a wrapper around different operating system's shared m
 Shared maps are the backbone of `LLMP`.
 Each client, usually a fuzzer trying to share stats and new testcases, maps an outgoing `ShMem` map.
 With very few exceptions, only this client writes to this map, therefore, we do not run in race conditions and can live without locks.
-The broker reas from all client's `ShMem` maps.
+The broker reads from all client's `ShMem` maps.
 It checks all incoming client maps periodically, and then forwards new messages to its outgoing broadcast-`ShMem`, mapped by all connected clients.
 
 To send new messages, a client places a new message at the end of their map, and then updates a static field to notify the broker.
