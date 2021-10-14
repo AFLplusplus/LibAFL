@@ -244,7 +244,7 @@ where
 
         if size <= map_state.history_map.len()
         {
-            println!("Could be a bug or are you using same coverage map for NONASAN and ASAN fuzzers? Adjust to use differen coverage map for each different config");
+            println!("Could be a bug or are you using the same coverage map for NONASAN and ASAN fuzzers? Adjust to use different coverage map for each different config");
         }
 
         assert!(size <= observer.map().len());
