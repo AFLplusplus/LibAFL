@@ -242,7 +242,10 @@ where
             .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
-        assert!(size <= map_state.history_map.len());
+        if size <= map_state.history_map.len() {
+            panic!("Could be a bug or are you using the same coverage map for NONASAN and ASAN fuzzers? Adjust to use different coverage map for each different config");
+        }
+
         assert!(size <= observer.map().len());
 
         if self.novelties.is_some() {
