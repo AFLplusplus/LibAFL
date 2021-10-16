@@ -8,13 +8,13 @@ this helps finding mem errors early.
 
 #[cfg(target_arch = "aarch64")]
 use frida_gum::NativePointer;
+use nix::sys::mman::mprotect;
 use frida_gum::RangeDetails;
 use hashbrown::HashMap;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
-#[cfg(target_arch = "aarch64")]
-use nix::libc::memset;
+use nix::libc::{memset};
 
 #[cfg(target_arch = "aarch64")]
 use backtrace::Backtrace;
@@ -25,12 +25,10 @@ use capstone::{
     Capstone, Insn,
 };
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-#[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, ModuleMap};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
-#[cfg(target_arch = "aarch64")]
 use libc::{c_char, wchar_t};
 #[cfg(target_vendor = "apple")]
 use libc::{getrlimit, rlimit};
@@ -123,12 +121,12 @@ impl AsanRuntime {
     /// invalid!
     pub fn init(&mut self, _gum: &Gum, modules_to_instrument: &[&str]) {
         unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
+            ASAN_ERRORS = Some(AsanErrors::new(selfpre_allocated_shadow.options.clone()));
         }
 
         #[cfg(target_arch = "aarch64")]
         self.generate_instrumentation_blobs();
-        #[cfg(target_arch = "aarch64")]
+
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
@@ -136,20 +134,22 @@ impl AsanRuntime {
 
         #[cfg(target_arch = "aarch64")]
         self.hook_functions(_gum);
-        //unsafe {
-        //let mem = self.allocator.alloc(0xac + 2, 8);
 
-        //unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
-        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0xac));
-        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2) as *const c_void, 0xac));
-        //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 3) as *const c_void, 0xac));
-        //assert!(!(self.shadow_check_func.unwrap())(((mem as isize) + -1) as *const c_void, 0xac));
-        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa4) as *const c_void, 8));
-        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa6) as *const c_void, 6));
-        //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 6));
-        //assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 0xac));
-        //assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
-        //}
+        println!("Test");
+        unsafe {
+        let mem = self.allocator.alloc(0xac + 2, 8);
+        
+        unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
+        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0xac));
+        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2) as *const c_void, 0xac));
+        assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 3) as *const c_void, 0xac));
+        assert!(!(self.shadow_check_func.unwrap())(((mem as isize) + -1) as *const c_void, 0xac));
+        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa4) as *const c_void, 8));
+        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa6) as *const c_void, 6));
+        assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 6));
+        assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 0xac));
+        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
+        }
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -2130,7 +2130,6 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
         }
         return 1;
     }
-
 }
     */
     #[cfg(target_arch = "x86_64")]
@@ -2143,27 +2142,112 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
         dynasm!(ops
             ; .arch x64
             // Get the start address
-            ; mov cl, shadow_bit as i8
-            ; mov edx, 1
-            ; shl rax, cl
-            ; sar rax, 3
-            ; add rdx, rdi
-            
-            // and with mask
-            ; add cl, 1
-            ; mov eax, -1
-            ; shl eax, cl
-            ; not eax
-            ; cdqe
-            ; and rax, rdx
-
-            ; test rsi, rsi
-            ; je >return_success
-
-
-            ; return_success:
-            ; mov rax, 1
-            ; ret
+            ;    mov     cl, shadow_bit as i8
+            ;    mov     eax, 1
+            ;    mov     r8d, 1
+            ;    shl     r8, cl
+            ;    mov     edx, 2
+            ;    shl     edx, cl
+            ;    test    rsi, rsi
+            ;    je      >LBB0_15
+            ;    mov     rcx, rdi
+            ;    shr     rcx, 3
+            ;    add     r8, rcx
+            ;    add     edx, -1
+            ;    movsxd  r9, edx
+            ;    and     r9, r8
+            ;    and     dil, 17
+            ;    je      >LBB0_4
+            ;    mov     cl, 8
+            ;    sub     cl, dil
+            ;    cmp     rsi, 8
+            ;    movzx   edx, cl
+            ;    mov     ecx, esi
+            ;    cmovae  ecx, edx
+            ;    mov     r8d, -1
+            ;    shl     r8d, cl
+            ;    not     r8d
+            ;    mov     cl, BYTE [r9]
+            ;    rol     cl, 4
+            ;    mov     edx, ecx
+            ;    shr     dl, 2
+            ;    shl     cl, 2
+            ;    and     cl, -52
+            ;    or      cl, dl
+            ;    mov     edx, ecx
+            ;    shr     dl, 1
+            ;    and     dl, 85
+            ;    add     cl, cl
+            ;    and     cl, -86
+            ;    or      cl, dl
+            ;    movzx   ecx, cl
+            ;    movzx   edx, r8b
+            ;    and     ecx, edx
+            ;    cmp     ecx, edx
+            ;    jne     >LBB0_11
+            ;    movzx   ecx, dil
+            ;    sub     rsi, rcx
+            ;    add     r9, 1
+            ;   LBB0_4:
+            ;    mov     rcx, rsi
+            ;    shr     rcx, 3
+            ;    mov     r10, rcx
+            ;    and     r10, -8
+            ;    mov     r8d, ecx
+            ;    and     r8d, 7
+            ;    and     esi, 63
+            ;    mov     rdx, rcx
+            ;    mov     rdi, r9
+            ;   LBB0_5:
+            ;    cmp     rdx, 7
+            ;    jbe     >LBB0_8
+            ;    add     rdx, -8
+            ;    cmp     QWORD [rdi], -1
+            ;    lea     rdi, [rdi + 8]
+            ;    je      <LBB0_5
+            ;    jmp     >LBB0_11
+            ;   LBB0_8:
+            ;    shl     r8, 3
+            ;    sub     rsi, r8
+            ;    sub     rcx, r10
+            ;    add     rcx, 1
+            ;   LBB0_9:
+            ;    add     rcx, -1
+            ;    je      >LBB0_13
+            ;    cmp     BYTE [r10 + r9], -1
+            ;    je      <LBB0_9
+            ;   LBB0_11:
+            ;    xor     eax, eax
+            ;    ret
+            ;   LBB0_13:
+            ;    test    rsi, rsi
+            ;    je      >LBB0_15
+            ;    and     sil, 17
+            ;    mov     eax, -1
+            ;    mov     ecx, esi
+            ;    shl     eax, cl
+            ;    mov     cl, BYTE [r10 + r9]
+            ;    rol     cl, 4
+            ;    not     eax
+            ;    mov     edx, ecx
+            ;    shr     dl, 2
+            ;    shl     cl, 2
+            ;    and     cl, -52
+            ;    or      cl, dl
+            ;    mov     edx, ecx
+            ;    shr     dl, 1
+            ;    and     dl, 85
+            ;    add     cl, cl
+            ;    and     cl, -86
+            ;    or      cl, dl
+            ;    movzx   ecx, cl
+            ;    movzx   edx, al
+            ;    and     ecx, edx
+            ;    xor     eax, eax
+            ;    cmp     ecx, edx
+            ;    sete    al
+            ;   LBB0_15:
+            ;    ret
         );
 
         let blob = ops.finalize().unwrap();

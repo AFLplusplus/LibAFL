@@ -27,11 +27,8 @@ pub(crate) struct Allocator {
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
     allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
-    #[cfg(target_arch = "aarch64")]
     largest_allocation: usize,
-    #[cfg(target_arch = "aarch64")]
     base_mapping_addr: usize,
-    #[cfg(target_arch = "aarch64")]
     current_mapping_addr: usize,
 }
 
@@ -85,6 +82,7 @@ impl Allocator {
             }
             .is_ok()
             {
+                println!("OK: {:x}", addr);
                 shadow_bit = *try_shadow_bit;
                 break;
             }
@@ -92,7 +90,9 @@ impl Allocator {
         assert!(shadow_bit != 0);
 
         // attempt to pre-map the entire shadow-memory space
+
         let addr: usize = 1 << shadow_bit;
+        println!("{:x} {:x}", addr, addr + addr);
         let pre_allocated_shadow = unsafe {
             mmap(
                 addr as *mut c_void,
@@ -108,6 +108,21 @@ impl Allocator {
         }
         .is_ok();
 
+        println!("{:}", pre_allocated_shadow);
+        let _ = unsafe{
+            mmap(
+                (addr + addr + addr) as *mut c_void,
+                0x3000,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                ANONYMOUS_FLAG
+                    | MapFlags::MAP_FIXED
+                    | MapFlags::MAP_PRIVATE
+                    | MapFlags::MAP_NORESERVE,
+                -1,
+                0,
+            )
+        }.expect("FAILURE");
+
         Self {
             options,
             page_size,
@@ -117,11 +132,8 @@ impl Allocator {
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: HashMap::new(),
-            #[cfg(target_arch = "aarch64")]
             largest_allocation: 0,
-            #[cfg(target_arch = "aarch64")]
             base_mapping_addr: addr + addr + addr,
-            #[cfg(target_arch = "aarch64")]
             current_mapping_addr: addr + addr + addr,
         }
     }
@@ -144,7 +156,6 @@ impl Allocator {
         (value / self.page_size) * self.page_size
     }
 
-    #[cfg(target_arch = "aarch64")]
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
         let mut current_size = size;
         while current_size <= self.largest_allocation {
@@ -159,7 +170,6 @@ impl Allocator {
         None
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[must_use]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
@@ -187,6 +197,7 @@ impl Allocator {
             }
             metadata
         } else {
+            println!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
             let mapping = match mmap(
                 self.current_mapping_addr as *mut c_void,
                 rounded_up_size,
@@ -236,7 +247,6 @@ impl Allocator {
         address
     }
 
-    #[cfg(target_arch = "aarch64")]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
             metadata
@@ -320,7 +330,6 @@ impl Allocator {
         }
     }
 
-    #[cfg(target_arch = "aarch64")]
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
         match self.allocations.get(&(ptr as usize)) {
             Some(metadata) => metadata.size,
@@ -406,12 +415,10 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
-    #[cfg(target_arch = "aarch64")]
     pub fn map_to_shadow(&self, start: usize) -> usize {
         map_to_shadow!(self, start)
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))
