@@ -16,7 +16,6 @@ jobs:
           os: [ubuntu-latest, windows-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -26,6 +25,7 @@ jobs:
         run: cargo install mdbook
       - name: install linkcheck
         run: cargo install mdbook-linkcheck
+      - uses: actions/checkout@v2
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Build the book
@@ -41,7 +41,6 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -53,6 +52,7 @@ jobs:
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
+    - uses: actions/checkout@v2
     - name: Run a normal build
       run: cargo build --verbose
     # cargo-hack tests/checks each crate in the workspace
@@ -80,12 +80,12 @@ jobs:
   ubuntu-concolic:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
+    - uses: actions/checkout@v2
     - name: Install smoke test deps
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
@@ -93,7 +93,6 @@ jobs:
   ubuntu-fuzzers:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -103,12 +102,12 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
+    - uses: actions/checkout@v2
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
   nostd-build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -116,6 +115,7 @@ jobs:
     - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly rust-src 
+    - uses: actions/checkout@v2
     - name: Build aarch64-unknown-none
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
@@ -131,12 +131,12 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
+    - uses: actions/checkout@v2
     - name: Windows Build
       run: cargo build --verbose
     - name: Run clippy
@@ -146,12 +146,14 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
+    - name: Install deps
+      run: brew install z3
+    - uses: actions/checkout@v2
     - name: MacOS Build
       run: cargo build --verbose
     - name: Run clippy
@@ -163,7 +165,6 @@ jobs:
   macos-fuzzers:
     runs-on: macOS-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -171,10 +172,9 @@ jobs:
     - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-    - name: YOLO remove ancient libpng for mozjpeg build
-      run: rm -rf /usr/local/lib/libpng.a
     - name: Install deps
-      run: brew install llvm libpng nasm coreutils && brew link --force llvm
+      run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
+    - uses: actions/checkout@v2
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
     - name: Build and run example fuzzers
@@ -182,7 +182,6 @@ jobs:
   other_targets:
     runs-on: macOS-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -197,6 +196,7 @@ jobs:
       run: rustup target add aarch64-linux-android
     - name: install cargo ndk
       run: cargo install cargo-ndk
+    - uses: actions/checkout@v2
     - name: Build iOS
       run: cargo build --target aarch64-apple-ios
     - name: Build Android

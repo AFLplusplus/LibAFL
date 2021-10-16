@@ -198,6 +198,7 @@ impl<R: Read> MessageFileReader<R> {
                     *expr = self.make_absolute(*expr);
                 }
             }
+            SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
         }
         SymExprRef::new(ret).unwrap()
     }
@@ -348,6 +349,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                     *expr = self.make_relative(*expr);
                 }
             }
+            SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;

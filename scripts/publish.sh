@@ -52,6 +52,13 @@ cd ../..
 
 sleep 20
 
+# init symcc submodule if not already done
+if git submodule status | grep "^-">/dev/null ; then \
+    echo "Initializing submodules"; \
+    git submodule init; \
+    git submodule update; \
+fi
+
 cd libafl_concolic/symcc_runtime
 cargo publish $@
 cd ../..

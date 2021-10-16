@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
 
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named, AsSlice},
@@ -45,11 +45,22 @@ impl CmpValues {
 }
 
 /// A state metadata holding a list of values logged from comparisons
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Deserialize)]
 pub struct CmpValuesMetadata {
     /// A `list` of values.
     #[serde(skip)]
     pub list: Vec<CmpValues>,
+}
+
+/// Implement an empty serializer as we do not need to keep this metadata in State after a restore
+impl Serialize for CmpValuesMetadata {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let list: Vec<CmpValues> = vec![];
+        list.serialize(serializer)
+    }
 }
 
 crate::impl_serdeany!(CmpValuesMetadata);
