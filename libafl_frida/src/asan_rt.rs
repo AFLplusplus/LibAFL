@@ -65,6 +65,10 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 /// this helps finding mem errors early.
 pub struct AsanRuntime {
     allocator: Allocator,
+    #[cfg(target_arch = "x86_64")]
+    // sixteen general purpose registers, rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15
+    regs: [usize; 16],
+    #[cfg(target_arch = "aarch64")]
     regs: [usize; 32],
     blob_report: Option<Box<[u8]>>,
     blob_check_mem_byte: Option<Box<[u8]>>,
@@ -91,6 +95,9 @@ impl AsanRuntime {
     pub fn new(options: FridaOptions) -> AsanRuntime {
         Self {
             allocator: Allocator::new(options.clone()),
+            #[cfg(target_arch = "x86_64")]
+            regs: [0; 16],
+            #[cfg(target_arch = "aarch64")]
             regs: [0; 32],
             blob_report: None,
             blob_check_mem_byte: None,
@@ -2409,6 +2416,20 @@ size_t generate_shadow_check_blob(uint64_t start){
         ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
 
+    #[cfg(target_arch = "x86_64")]
+    #[allow(clippy::similar_names)]
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::too_many_lines)]
+    fn generate_instrumentation_blobs(&mut self){
+
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
+    }
+
+
     ///
     /// Generate the instrumentation blobs for the current arch.
     #[cfg(target_arch = "aarch64")]
@@ -2448,7 +2469,7 @@ size_t generate_shadow_check_blob(uint64_t start){
             ; str x25, [x28, 0xf8]
 
             ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
-            ; ldp x0, x1, [sp, 0x20]
+            ; ldp x0, x1, [sp, 0x20] // 0x20のオフセットはどこから？
             ; stp x0, x1, [x28]
 
             ; adr x25, <report
