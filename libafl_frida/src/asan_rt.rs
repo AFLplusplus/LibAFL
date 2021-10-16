@@ -2022,7 +2022,6 @@ impl AsanRuntime {
         AsanErrors::get_mut().report_error(error);
     }
 
-    // Basically... this.
     /*
 clang++ -std=c++20 -O3 -Wall -Wextra
 #include <stdio.h>
@@ -2033,7 +2032,7 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
     // calculate the shadow address
     uint64_t addr = 1;
     addr = addr << shadow_bit;
-    addr = start + (addr >> 3);
+    addr = addr + (start >> 3);
     uint64_t mask = (1 << (shadow_bit + 1)) - 1;
     addr = addr & mask;
 
@@ -2182,7 +2181,7 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
-            ; .arch aarch64
+            ; .arch x64
 
             // calculate the shadow address
             ; mov x5, #1
@@ -2296,6 +2295,49 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
         }
+    }
+
+    /*
+#include <stdio.h>
+#include <stdint.h>
+uint8_t shadow_bit = 8;
+uint8_t bit = 3;
+size_t generate_shadow_check_blob(uint64_t start){
+    uint64_t addr = (1 << shadow_bit) + (start >> 3);
+    uint64_t mask = (1 << (shadow_bit + 1)) - 1;
+    addr = addr & mask;
+
+    uint8_t val = *(uint8_t *)addr;
+    val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
+    val = (val & 0xff) >> 2 | (val & 0x33) << 2;
+    val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+    if((val & (1 << bit)) == (1 << bit)){
+        // goto done               
+        return 0;
+    }
+    else{
+        return val;
+    }
+}
+    */
+
+    #[cfg(target_arch = "x86_64")]
+    #[allow(clippy::unused_self)]
+    fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
+        let shadow_bit = self.allocator.shadow_bit();
+        macro_rules! shadow_check{
+            ($ops:ident, $bit:expr) => {dynasm!($ops
+                ; .arch x64
+            
+            
+                ; done:
+            );};
+        }
+        // Q: なんでこれnopを4bytesいれなきゃいけない？
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        shadow_check!(ops, bit);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
 
     #[cfg(target_arch = "aarch64")]
