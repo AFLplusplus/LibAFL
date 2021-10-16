@@ -24,7 +24,6 @@ use capstone::{
     arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
-#[cfg(target_arch = "aarch64")]
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
@@ -2021,6 +2020,160 @@ impl AsanRuntime {
             ))
         };
         AsanErrors::get_mut().report_error(error);
+    }
+
+    // Basically... this.
+    /*
+clang++ -std=c++20 -O3 -Wall -Wextra
+#include <stdio.h>
+#include <stdint.h>
+uint8_t shadow_bit = 8;
+
+uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
+    // calculate the shadow address
+    uint64_t addr = 1;
+    addr = addr << shadow_bit;
+    addr = start + (addr >> 3);
+    uint64_t mask = (1 << (shadow_bit + 1)) - 1;
+    addr = addr & mask;
+
+    if(size == 0){
+        // goto return_success
+        return 1;
+    }
+    else{
+        // check if the ptr is not aligned to 8 bytes
+        uint8_t remainder = start & 0x111;
+        if(remainder != 0){
+            // we need to test the high bits from the first shadow byte
+            uint8_t shift;
+            if(size < 8){
+                shift = size;
+            }
+            else{
+                shift = 8 - remainder;
+            }
+            // goto check_bits
+            uint8_t mask = (1 << shift) - 1;
+
+            // bitwise reverse for amd64 :<
+            // https://stackoverflow.com/questions/2602823/in-c-c-whats-the-simplest-way-to-reverse-the-order-of-bits-in-a-byte
+            uint8_t val = *(uint8_t *)addr;
+            val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
+            val = (val & 0xff) >> 2 | (val & 0x33) << 2;
+            val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+            if((val & mask) != mask){
+                // goto return failure                
+                return 0;
+            }
+
+            size = size - remainder;
+            addr += 1;
+        }
+
+        // no_start_offset
+        uint64_t num_shadow_bytes = size >> 3;
+        uint64_t mask = -1;
+
+        while(true){
+            if(num_shadow_bytes < 8){
+                // goto less_than_8_shadow_bytes_remaining
+                break;
+            }
+            else{
+                uint64_t val = *(uint64_t *)addr;
+                addr += 8;
+                if(val != mask){
+                    // goto return failure
+                    return 0;
+                }
+                num_shadow_bytes -= 8;
+                size -= 64;
+            }
+        }
+
+        while(true){
+            if(num_shadow_bytes < 1){
+                // goto check_trailing_bits
+                break;
+            }
+            else{
+                uint8_t val = *(uint8_t *)addr;
+                if(val != 0xff){
+                    // goto return failure
+                    return 0;
+                }
+                num_shadow_bytes -= 1;
+                size -= 8;
+            }
+        }
+
+        if(size == 0){
+            // goto return success
+            return 1;
+        }
+
+        uint8_t mask2 = ((1 << (size & 0x111)) - 1);
+        uint8_t val = *(uint8_t *)addr;
+        val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
+        val = (val & 0xff) >> 2 | (val & 0x33) << 2;
+        val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+        if((val & mask2) != mask2){
+            // goto return failure                
+            return 0;
+        }
+        return 1;
+    }
+
+}
+    */
+    #[cfg(target_arch = "x86_64")]
+    #[allow(clippy::unused_self, clippy::identity_op)]
+    fn generate_shadow_check_function(&mut self){
+        let shadow_bit = self.allocator.shadow_bit();
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+
+        // Rdi start, Rsi size
+        dynasm!(ops
+            ; .arch x64
+            // Get the start address
+            ; mov cl, shadow_bit as i8
+            ; mov edx, 1
+            ; shl rax, cl
+            ; sar rax, 3
+            ; add rdx, rdi
+            
+            // and with mask
+            ; add cl, 1
+            ; mov eax, -1
+            ; shl eax, cl
+            ; not eax
+            ; cdqe
+            ; and rax, rdx
+
+            ; test rsi, rsi
+            ; je >return_success
+
+
+            ; return_success:
+            ; mov rax, 1
+            ; ret
+        );
+
+        let blob = ops.finalize().unwrap();
+        unsafe {
+            let mapping = mmap(
+                std::ptr::null_mut(),
+                0x1000,
+                ProtFlags::all(),
+                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
+                -1,
+                0,
+            ).unwrap();
+            blob.as_ptr()
+                .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
+            self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
+        }
     }
 
     #[cfg(target_arch = "aarch64")]
