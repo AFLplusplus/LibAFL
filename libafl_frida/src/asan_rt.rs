@@ -121,7 +121,7 @@ impl AsanRuntime {
     /// invalid!
     pub fn init(&mut self, _gum: &Gum, modules_to_instrument: &[&str]) {
         unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new(selfpre_allocated_shadow.options.clone()));
+            ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
 
         #[cfg(target_arch = "aarch64")]
@@ -140,15 +140,31 @@ impl AsanRuntime {
         let mem = self.allocator.alloc(0xac + 2, 8);
         
         unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
+        println!("Test0");
+        /*
+        0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
+        0x555555916cef <libafl_frida::asan_rt::AsanRuntime::init+13039>    mov    rdi, r15 <0x555558392338>
+        */
+        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0x00));
+        println!("Test1");
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0xac));
+        println!("Test2");
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2) as *const c_void, 0xac));
+        println!("Test3");
         assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 3) as *const c_void, 0xac));
+        println!("Test4");
         assert!(!(self.shadow_check_func.unwrap())(((mem as isize) + -1) as *const c_void, 0xac));
+        println!("Test5");
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa4) as *const c_void, 8));
+        println!("Test6");
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa6) as *const c_void, 6));
+        println!("Test7");
         assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 6));
+        println!("Test8");
         assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 0xac));
+        println!("Test9");
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
+        println!("FIN");
         }
     }
 
@@ -2040,7 +2056,7 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
     uint64_t addr = 1;
     addr = addr << shadow_bit;
     addr = addr + (start >> 3);
-    uint64_t mask = (1 << (shadow_bit + 1)) - 1;
+    uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
     addr = addr & mask;
 
     if(size == 0){
@@ -2140,114 +2156,112 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
 
         // Rdi start, Rsi size
         dynasm!(ops
-            ; .arch x64
-            // Get the start address
-            ;    mov     cl, shadow_bit as i8
-            ;    mov     eax, 1
-            ;    mov     r8d, 1
-            ;    shl     r8, cl
-            ;    mov     edx, 2
-            ;    shl     edx, cl
-            ;    test    rsi, rsi
-            ;    je      >LBB0_15
-            ;    mov     rcx, rdi
-            ;    shr     rcx, 3
-            ;    add     r8, rcx
-            ;    add     edx, -1
-            ;    movsxd  r9, edx
-            ;    and     r9, r8
-            ;    and     dil, 17
-            ;    je      >LBB0_4
-            ;    mov     cl, 8
-            ;    sub     cl, dil
-            ;    cmp     rsi, 8
-            ;    movzx   edx, cl
-            ;    mov     ecx, esi
-            ;    cmovae  ecx, edx
-            ;    mov     r8d, -1
-            ;    shl     r8d, cl
-            ;    not     r8d
-            ;    mov     cl, BYTE [r9]
-            ;    rol     cl, 4
-            ;    mov     edx, ecx
-            ;    shr     dl, 2
-            ;    shl     cl, 2
-            ;    and     cl, -52
-            ;    or      cl, dl
-            ;    mov     edx, ecx
-            ;    shr     dl, 1
-            ;    and     dl, 85
-            ;    add     cl, cl
-            ;    and     cl, -86
-            ;    or      cl, dl
-            ;    movzx   ecx, cl
-            ;    movzx   edx, r8b
-            ;    and     ecx, edx
-            ;    cmp     ecx, edx
-            ;    jne     >LBB0_11
-            ;    movzx   ecx, dil
-            ;    sub     rsi, rcx
-            ;    add     r9, 1
-            ;   LBB0_4:
-            ;    mov     rcx, rsi
-            ;    shr     rcx, 3
-            ;    mov     r10, rcx
-            ;    and     r10, -8
-            ;    mov     r8d, ecx
-            ;    and     r8d, 7
-            ;    and     esi, 63
-            ;    mov     rdx, rcx
-            ;    mov     rdi, r9
-            ;   LBB0_5:
-            ;    cmp     rdx, 7
-            ;    jbe     >LBB0_8
-            ;    add     rdx, -8
-            ;    cmp     QWORD [rdi], -1
-            ;    lea     rdi, [rdi + 8]
-            ;    je      <LBB0_5
-            ;    jmp     >LBB0_11
-            ;   LBB0_8:
-            ;    shl     r8, 3
-            ;    sub     rsi, r8
-            ;    sub     rcx, r10
-            ;    add     rcx, 1
-            ;   LBB0_9:
-            ;    add     rcx, -1
-            ;    je      >LBB0_13
-            ;    cmp     BYTE [r10 + r9], -1
-            ;    je      <LBB0_9
-            ;   LBB0_11:
-            ;    xor     eax, eax
-            ;    ret
-            ;   LBB0_13:
-            ;    test    rsi, rsi
-            ;    je      >LBB0_15
-            ;    and     sil, 17
-            ;    mov     eax, -1
-            ;    mov     ecx, esi
-            ;    shl     eax, cl
-            ;    mov     cl, BYTE [r10 + r9]
-            ;    rol     cl, 4
-            ;    not     eax
-            ;    mov     edx, ecx
-            ;    shr     dl, 2
-            ;    shl     cl, 2
-            ;    and     cl, -52
-            ;    or      cl, dl
-            ;    mov     edx, ecx
-            ;    shr     dl, 1
-            ;    and     dl, 85
-            ;    add     cl, cl
-            ;    and     cl, -86
-            ;    or      cl, dl
-            ;    movzx   ecx, cl
-            ;    movzx   edx, al
-            ;    and     ecx, edx
-            ;    xor     eax, eax
-            ;    cmp     ecx, edx
-            ;    sete    al
-            ;   LBB0_15:
-            ;    ret
+    ;       .arch x64
+    ;           mov     cl, BYTE shadow_bit as i8
+    ;           mov     eax, 1
+    ;           mov     edx, 1
+    ;           shl     rdx, cl
+    ;           mov     r9d, 2
+    ;           shl     r9, cl
+    ;           test    rsi, rsi
+    ;           je      >LBB0_15
+    ;           mov     rcx, rdi
+    ;           shr     rcx, 3
+    ;           add     rdx, rcx
+    ;           add     r9, -1
+    ;           and     r9, rdx
+    ;           and     dil, 17
+    ;           je      >LBB0_4
+    ;           mov     cl, 8
+    ;           sub     cl, dil
+    ;           cmp     rsi, 8
+    ;           movzx   edx, cl
+    ;           mov     ecx, esi
+    ;           cmovae  ecx, edx
+    ;           mov     r8d, -1
+    ;           shl     r8d, cl
+    ;           not     r8d
+    ;           mov     cl, BYTE [r9]
+    ;           rol     cl, 4
+    ;           mov     edx, ecx
+    ;           shr     dl, 2
+    ;           shl     cl, 2
+    ;           and     cl, -52
+    ;           or      cl, dl
+    ;           mov     edx, ecx
+    ;           shr     dl, 1
+    ;           and     dl, 85
+    ;           add     cl, cl
+    ;           and     cl, -86
+    ;           or      cl, dl
+    ;           movzx   ecx, cl
+    ;           movzx   edx, r8b
+    ;           and     ecx, edx
+    ;           cmp     ecx, edx
+    ;           jne     >LBB0_11
+    ;           movzx   ecx, dil
+    ;           sub     rsi, rcx
+    ;           add     r9, 1
+    ;   LBB0_4:
+    ;           mov     rcx, rsi
+    ;           shr     rcx, 3
+    ;           mov     r10, rcx
+    ;           and     r10, -8
+    ;           mov     r8d, ecx
+    ;           and     r8d, 7
+    ;           and     esi, 63
+    ;           mov     rdx, rcx
+    ;           mov     rdi, r9
+    ;   LBB0_5:
+    ;           cmp     rdx, 7
+    ;           jbe     >LBB0_8
+    ;           add     rdx, -8
+    ;           cmp     QWORD [rdi], -1
+    ;           lea     rdi, [rdi + 8]
+    ;           je      <LBB0_5
+    ;           jmp     >LBB0_11
+    ;   LBB0_8:
+    ;           shl     r8, 3
+    ;           sub     rsi, r8
+    ;           sub     rcx, r10
+    ;           add     rcx, 1
+    ;   LBB0_9:
+    ;           add     rcx, -1
+    ;           je      >LBB0_13
+    ;           cmp     BYTE [r10 + r9], -1
+    ;           je      <LBB0_9
+    ;   LBB0_11:
+    ;           xor     eax, eax
+    ;           ret
+    ;   LBB0_13:
+    ;           test    rsi, rsi
+    ;           je      >LBB0_15
+    ;           and     sil, 17
+    ;           mov     eax, -1
+    ;           mov     ecx, esi
+    ;           shl     eax, cl
+    ;           mov     cl, BYTE [r10 + r9]
+    ;           rol     cl, 4
+    ;           not     eax
+    ;           mov     edx, ecx
+    ;           shr     dl, 2
+    ;           shl     cl, 2
+    ;           and     cl, -52
+    ;           or      cl, dl
+    ;           mov     edx, ecx
+    ;           shr     dl, 1
+    ;           and     dl, 85
+    ;           add     cl, cl
+    ;           and     cl, -86
+    ;           or      cl, dl
+    ;           movzx   ecx, cl
+    ;           movzx   edx, al
+    ;           and     ecx, edx
+    ;           xor     eax, eax
+    ;           cmp     ecx, edx
+    ;           sete    al
+    ;   LBB0_15:
+    ;           ret
         );
 
         let blob = ops.finalize().unwrap();

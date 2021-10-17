@@ -65,7 +65,10 @@ impl Allocator {
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
 
-        for try_shadow_bit in &[46usize, 36usize] {
+        // x86_64's userspace's up to 0x7fff-ffff-ffff so 46 is not available. (0x4000-0000-0000 - 0xc000-0000-0000)
+        // we'd also want to avoid 0x5555-xxxx-xxxx because programs are mapped there. so 45 is not available either (0x2000-0000-0000 - 0x6000-0000-0000).
+        // TODO: fix it back for aarch64
+        for try_shadow_bit in &[44usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
                 mmap(
@@ -108,7 +111,7 @@ impl Allocator {
         }
         .is_ok();
 
-        println!("{:}", pre_allocated_shadow);
+        println!("pre: {:}", pre_allocated_shadow);
         let _ = unsafe{
             mmap(
                 (addr + addr + addr) as *mut c_void,
@@ -390,7 +393,7 @@ impl Allocator {
             let shadow_end =
                 self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                //println!("range: {:x}-{:x}, pagesize: {}", range.start, range.end, self.page_size);
+                println!("range: {:x}-{:x}, pagesize: {}", range.start, range.end, self.page_size);
                 unsafe {
                     mmap(
                         range.start as *mut c_void,
