@@ -135,7 +135,7 @@ impl AsanRuntime {
         #[cfg(target_arch = "aarch64")]
         self.hook_functions(_gum);
 
-        println!("Test");
+        /*
         unsafe {
         let mem = self.allocator.alloc(0xac + 2, 8);
         
@@ -166,6 +166,7 @@ impl AsanRuntime {
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
         println!("FIN");
         }
+        */
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -2046,10 +2047,9 @@ impl AsanRuntime {
     }
 
     /*
-clang++ -std=c++20 -O3 -Wall -Wextra
 #include <stdio.h>
 #include <stdint.h>
-uint8_t shadow_bit = 8;
+uint8_t shadow_bit = 44;
 
 uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
     // calculate the shadow address
@@ -2065,7 +2065,7 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
     }
     else{
         // check if the ptr is not aligned to 8 bytes
-        uint8_t remainder = start & 0x111;
+        uint8_t remainder = start & 0b111;
         if(remainder != 0){
             // we need to test the high bits from the first shadow byte
             uint8_t shift;
@@ -2084,12 +2084,13 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
             val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
             val = (val & 0xff) >> 2 | (val & 0x33) << 2;
             val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+            val = (val >> remainder);
             if((val & mask) != mask){
                 // goto return failure                
                 return 0;
             }
 
-            size = size - remainder;
+            size = size - shift;
             addr += 1;
         }
 
@@ -2121,6 +2122,7 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
             }
             else{
                 uint8_t val = *(uint8_t *)addr;
+                addr += 1;
                 if(val != 0xff){
                     // goto return failure
                     return 0;
@@ -2135,11 +2137,12 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
             return 1;
         }
 
-        uint8_t mask2 = ((1 << (size & 0x111)) - 1);
+        uint8_t mask2 = ((1 << (size & 0b111)) - 1);
         uint8_t val = *(uint8_t *)addr;
         val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
         val = (val & 0xff) >> 2 | (val & 0x33) << 2;
         val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+
         if((val & mask2) != mask2){
             // goto return failure                
             return 0;
@@ -2156,112 +2159,114 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
 
         // Rdi start, Rsi size
         dynasm!(ops
-    ;       .arch x64
-    ;           mov     cl, BYTE shadow_bit as i8
-    ;           mov     eax, 1
-    ;           mov     edx, 1
-    ;           shl     rdx, cl
-    ;           mov     r9d, 2
-    ;           shl     r9, cl
-    ;           test    rsi, rsi
-    ;           je      >LBB0_15
-    ;           mov     rcx, rdi
-    ;           shr     rcx, 3
-    ;           add     rdx, rcx
-    ;           add     r9, -1
-    ;           and     r9, rdx
-    ;           and     dil, 17
-    ;           je      >LBB0_4
-    ;           mov     cl, 8
-    ;           sub     cl, dil
-    ;           cmp     rsi, 8
-    ;           movzx   edx, cl
-    ;           mov     ecx, esi
-    ;           cmovae  ecx, edx
-    ;           mov     r8d, -1
-    ;           shl     r8d, cl
-    ;           not     r8d
-    ;           mov     cl, BYTE [r9]
-    ;           rol     cl, 4
-    ;           mov     edx, ecx
-    ;           shr     dl, 2
-    ;           shl     cl, 2
-    ;           and     cl, -52
-    ;           or      cl, dl
-    ;           mov     edx, ecx
-    ;           shr     dl, 1
-    ;           and     dl, 85
-    ;           add     cl, cl
-    ;           and     cl, -86
-    ;           or      cl, dl
-    ;           movzx   ecx, cl
-    ;           movzx   edx, r8b
-    ;           and     ecx, edx
-    ;           cmp     ecx, edx
-    ;           jne     >LBB0_11
-    ;           movzx   ecx, dil
-    ;           sub     rsi, rcx
-    ;           add     r9, 1
-    ;   LBB0_4:
-    ;           mov     rcx, rsi
-    ;           shr     rcx, 3
-    ;           mov     r10, rcx
-    ;           and     r10, -8
-    ;           mov     r8d, ecx
-    ;           and     r8d, 7
-    ;           and     esi, 63
-    ;           mov     rdx, rcx
-    ;           mov     rdi, r9
-    ;   LBB0_5:
-    ;           cmp     rdx, 7
-    ;           jbe     >LBB0_8
-    ;           add     rdx, -8
-    ;           cmp     QWORD [rdi], -1
-    ;           lea     rdi, [rdi + 8]
-    ;           je      <LBB0_5
-    ;           jmp     >LBB0_11
-    ;   LBB0_8:
-    ;           shl     r8, 3
-    ;           sub     rsi, r8
-    ;           sub     rcx, r10
-    ;           add     rcx, 1
-    ;   LBB0_9:
-    ;           add     rcx, -1
-    ;           je      >LBB0_13
-    ;           cmp     BYTE [r10 + r9], -1
-    ;           je      <LBB0_9
-    ;   LBB0_11:
-    ;           xor     eax, eax
-    ;           ret
-    ;   LBB0_13:
-    ;           test    rsi, rsi
-    ;           je      >LBB0_15
-    ;           and     sil, 17
-    ;           mov     eax, -1
-    ;           mov     ecx, esi
-    ;           shl     eax, cl
-    ;           mov     cl, BYTE [r10 + r9]
-    ;           rol     cl, 4
-    ;           not     eax
-    ;           mov     edx, ecx
-    ;           shr     dl, 2
-    ;           shl     cl, 2
-    ;           and     cl, -52
-    ;           or      cl, dl
-    ;           mov     edx, ecx
-    ;           shr     dl, 1
-    ;           and     dl, 85
-    ;           add     cl, cl
-    ;           and     cl, -86
-    ;           or      cl, dl
-    ;           movzx   ecx, cl
-    ;           movzx   edx, al
-    ;           and     ecx, edx
-    ;           xor     eax, eax
-    ;           cmp     ecx, edx
-    ;           sete    al
-    ;   LBB0_15:
-    ;           ret
+    ;    .arch x64
+    ;    mov     cl, BYTE shadow_bit as i8
+    ;    mov     eax, 1
+    ;    mov     edx, 1
+    ;    shl     rdx, cl
+    ;    mov     r9d, 2
+    ;    shl     r9, cl
+    ;    test    rsi, rsi
+    ;    je      >LBB0_15
+    ;    mov     rcx, rdi
+    ;    shr     rcx, 3
+    ;    add     rdx, rcx
+    ;    add     r9, -1
+    ;    and     r9, rdx
+    ;    and     edi, 7
+    ;    je      >LBB0_4
+    ;    mov     cl, 8
+    ;    sub     cl, dil
+    ;    cmp     rsi, 8
+    ;    movzx   ecx, cl
+    ;    mov     r8d, esi
+    ;    cmovae  r8d, ecx
+    ;    mov     r10d, -1
+    ;    mov     ecx, r8d
+    ;    shl     r10d, cl
+    ;    mov     cl, BYTE [r9]
+    ;    rol     cl, 4
+    ;    mov     edx, ecx
+    ;    shr     dl, 2
+    ;    shl     cl, 2
+    ;    and     cl, -52
+    ;    or      cl, dl
+    ;    mov     edx, ecx
+    ;    shr     dl, 1
+    ;    and     dl, 85
+    ;    add     cl, cl
+    ;    and     cl, -86
+    ;    or      cl, dl
+    ;    movzx   edx, cl
+    ;    mov     ecx, edi
+    ;    shr     edx, cl
+    ;    not     r10d
+    ;    movzx   ecx, r10b
+    ;    and     edx, ecx
+    ;    cmp     edx, ecx
+    ;    jne     >LBB0_11
+    ;    movzx   ecx, r8b
+    ;    sub     rsi, rcx
+    ;    add     r9, 1
+    ;LBB0_4:
+    ;    mov     r8, rsi
+    ;    shr     r8, 3
+    ;    mov     r10, r8
+    ;    and     r10, -8
+    ;    mov     edi, r8d
+    ;    and     edi, 7
+    ;    add     r10, r9
+    ;    and     esi, 63
+    ;    mov     rdx, r8
+    ;    mov     rcx, r9
+    ;LBB0_5:
+    ;    cmp     rdx, 7
+    ;    jbe     >LBB0_8
+    ;    add     rdx, -8
+    ;    cmp     QWORD [rcx], -1
+    ;    lea     rcx, [rcx + 8]
+    ;    je      <LBB0_5
+    ;    jmp     >LBB0_11
+    ;LBB0_8:
+    ;    lea     rcx, [8*rdi]
+    ;    sub     rsi, rcx
+    ;LBB0_9:
+    ;    test    rdi, rdi
+    ;    je      >LBB0_13
+    ;    add     rdi, -1
+    ;    cmp     BYTE [r10], -1
+    ;    lea     r10, [r10 + 1]
+    ;    je      <LBB0_9
+    ;LBB0_11:
+    ;    xor     eax, eax
+    ;    ret
+    ;LBB0_13:
+    ;    test    rsi, rsi
+    ;    je      >LBB0_15
+    ;    and     sil, 7
+    ;    mov     dl, -1
+    ;    mov     ecx, esi
+    ;    shl     dl, cl
+    ;    not     dl
+    ;    mov     cl, BYTE [r8 + r9]
+    ;    rol     cl, 4
+    ;    mov     eax, ecx
+    ;    shr     al, 2
+    ;    shl     cl, 2
+    ;    and     cl, -52
+    ;    or      cl, al
+    ;    mov     eax, ecx
+    ;    shr     al, 1
+    ;    and     al, 85
+    ;    add     cl, cl
+    ;    and     cl, -86
+    ;    or      cl, al
+    ;    and     cl, dl
+    ;    xor     eax, eax
+    ;    cmp     cl, dl
+    ;    sete    al
+    ;LBB0_15:
+    ;    ret
         );
 
         let blob = ops.finalize().unwrap();
@@ -2438,7 +2443,7 @@ size_t generate_shadow_check_blob(uint64_t start){
                 ; done:
             );};
         }
-        // Q: なんでこれnopを4bytesいれなきゃいけない？
+        // do I need to insert additional 4bytes
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
@@ -2567,7 +2572,7 @@ size_t generate_shadow_check_blob(uint64_t start){
             ; str x25, [x28, 0xf8]
 
             ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
-            ; ldp x0, x1, [sp, 0x20] // 0x20のオフセットはどこから？
+            ; ldp x0, x1, [sp, 0x20]
             ; stp x0, x1, [x28]
 
             ; adr x25, <report

@@ -111,21 +111,6 @@ impl Allocator {
         }
         .is_ok();
 
-        println!("pre: {:}", pre_allocated_shadow);
-        let _ = unsafe{
-            mmap(
-                (addr + addr + addr) as *mut c_void,
-                0x3000,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                ANONYMOUS_FLAG
-                    | MapFlags::MAP_FIXED
-                    | MapFlags::MAP_PRIVATE
-                    | MapFlags::MAP_NORESERVE,
-                -1,
-                0,
-            )
-        }.expect("FAILURE");
-
         Self {
             options,
             page_size,
@@ -200,7 +185,7 @@ impl Allocator {
             }
             metadata
         } else {
-            println!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
+            // println!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
             let mapping = match mmap(
                 self.current_mapping_addr as *mut c_void,
                 rounded_up_size,
@@ -246,7 +231,7 @@ impl Allocator {
 
         self.allocations
             .insert(metadata.address + self.page_size, metadata);
-        //println!("serving address: {:?}, size: {:x}", address, size);
+        // println!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
