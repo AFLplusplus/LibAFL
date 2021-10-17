@@ -18,7 +18,12 @@ use capstone::{
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{
-    arch::{self, x86::{X86OperandType, X86Insn}, ArchOperand::X86Operand, BuildsCapstone},
+    arch::{
+        self,
+        x86::{X86Insn, X86OperandType},
+        ArchOperand::X86Operand,
+        BuildsCapstone,
+    },
     Capstone, Insn, RegId,
 };
 
@@ -380,7 +385,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                 helper.asan_is_interesting_instruction(address, instr)
                             {
                                 helper.emit_shadow_check(
-                                    address, &output, segment, width, basereg, indexreg, scale, disp,
+                                    address, &output, segment, width, basereg, indexreg, scale,
+                                    disp,
                                 );
                             }
                             #[cfg(target_arch = "aarch64")]
@@ -454,7 +460,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
 
-
     // frida registers: https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html
     // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
     #[cfg(target_arch = "x86_64")]
@@ -499,7 +504,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => X86Register::None, // Ignore Xax..Xip
         }
     }
-
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
@@ -855,7 +859,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => 0,
         };
 
-
         if self.current_report_impl == 0
             || !writer.can_branch_directly_to(self.current_report_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
@@ -879,18 +882,16 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_push_reg(X86Register::Rsi);
 
         // Init Rdi
-        if basereg.is_some(){
+        if basereg.is_some() {
             writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
-        }
-        else {
+        } else {
             writer.put_xor_reg_reg(X86Register::Rdi, X86Register::Rdi);
         }
 
         // Init Rsi
-        if indexreg.is_some(){
+        if indexreg.is_some() {
             writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
-        }
-        else {
+        } else {
             writer.put_xor_reg_reg(X86Register::Rsi, X86Register::Rsi);
         }
 
@@ -1277,11 +1278,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => (),
         }
 
-
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
-                    let insn_id : X86Insn = instr.id().0.into();
+                    let insn_id: X86Insn = instr.id().0.into();
                     println!(
                         "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
                         insn_id,
@@ -1303,7 +1303,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             opmem.disp(),
                         ));
                     }
-
                 }
             }
         }

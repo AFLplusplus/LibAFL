@@ -8,13 +8,13 @@ this helps finding mem errors early.
 
 #[cfg(target_arch = "aarch64")]
 use frida_gum::NativePointer;
-use nix::sys::mman::mprotect;
 use frida_gum::RangeDetails;
 use hashbrown::HashMap;
+use nix::sys::mman::mprotect;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
-use nix::libc::{memset};
+use nix::libc::memset;
 
 #[cfg(target_arch = "aarch64")]
 use backtrace::Backtrace;
@@ -138,7 +138,7 @@ impl AsanRuntime {
         /*
         unsafe {
         let mem = self.allocator.alloc(0xac + 2, 8);
-        
+
         unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
         println!("Test0");
         /*
@@ -2047,227 +2047,227 @@ impl AsanRuntime {
     }
 
     /*
-#include <stdio.h>
-#include <stdint.h>
-uint8_t shadow_bit = 44;
+    #include <stdio.h>
+    #include <stdint.h>
+    uint8_t shadow_bit = 44;
 
-uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
-    // calculate the shadow address
-    uint64_t addr = 1;
-    addr = addr << shadow_bit;
-    addr = addr + (start >> 3);
-    uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
-    addr = addr & mask;
+    uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
+        // calculate the shadow address
+        uint64_t addr = 1;
+        addr = addr << shadow_bit;
+        addr = addr + (start >> 3);
+        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
+        addr = addr & mask;
 
-    if(size == 0){
-        // goto return_success
-        return 1;
-    }
-    else{
-        // check if the ptr is not aligned to 8 bytes
-        uint8_t remainder = start & 0b111;
-        if(remainder != 0){
-            // we need to test the high bits from the first shadow byte
-            uint8_t shift;
-            if(size < 8){
-                shift = size;
+        if(size == 0){
+            // goto return_success
+            return 1;
+        }
+        else{
+            // check if the ptr is not aligned to 8 bytes
+            uint8_t remainder = start & 0b111;
+            if(remainder != 0){
+                // we need to test the high bits from the first shadow byte
+                uint8_t shift;
+                if(size < 8){
+                    shift = size;
+                }
+                else{
+                    shift = 8 - remainder;
+                }
+                // goto check_bits
+                uint8_t mask = (1 << shift) - 1;
+
+                // bitwise reverse for amd64 :<
+                // https://stackoverflow.com/questions/2602823/in-c-c-whats-the-simplest-way-to-reverse-the-order-of-bits-in-a-byte
+                uint8_t val = *(uint8_t *)addr;
+                val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
+                val = (val & 0xff) >> 2 | (val & 0x33) << 2;
+                val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+                val = (val >> remainder);
+                if((val & mask) != mask){
+                    // goto return failure
+                    return 0;
+                }
+
+                size = size - shift;
+                addr += 1;
             }
-            else{
-                shift = 8 - remainder;
-            }
-            // goto check_bits
-            uint8_t mask = (1 << shift) - 1;
 
-            // bitwise reverse for amd64 :<
-            // https://stackoverflow.com/questions/2602823/in-c-c-whats-the-simplest-way-to-reverse-the-order-of-bits-in-a-byte
+            // no_start_offset
+            uint64_t num_shadow_bytes = size >> 3;
+            uint64_t mask = -1;
+
+            while(true){
+                if(num_shadow_bytes < 8){
+                    // goto less_than_8_shadow_bytes_remaining
+                    break;
+                }
+                else{
+                    uint64_t val = *(uint64_t *)addr;
+                    addr += 8;
+                    if(val != mask){
+                        // goto return failure
+                        return 0;
+                    }
+                    num_shadow_bytes -= 8;
+                    size -= 64;
+                }
+            }
+
+            while(true){
+                if(num_shadow_bytes < 1){
+                    // goto check_trailing_bits
+                    break;
+                }
+                else{
+                    uint8_t val = *(uint8_t *)addr;
+                    addr += 1;
+                    if(val != 0xff){
+                        // goto return failure
+                        return 0;
+                    }
+                    num_shadow_bytes -= 1;
+                    size -= 8;
+                }
+            }
+
+            if(size == 0){
+                // goto return success
+                return 1;
+            }
+
+            uint8_t mask2 = ((1 << (size & 0b111)) - 1);
             uint8_t val = *(uint8_t *)addr;
             val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
             val = (val & 0xff) >> 2 | (val & 0x33) << 2;
             val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
-            val = (val >> remainder);
-            if((val & mask) != mask){
-                // goto return failure                
+
+            if((val & mask2) != mask2){
+                // goto return failure
                 return 0;
             }
-
-            size = size - shift;
-            addr += 1;
-        }
-
-        // no_start_offset
-        uint64_t num_shadow_bytes = size >> 3;
-        uint64_t mask = -1;
-
-        while(true){
-            if(num_shadow_bytes < 8){
-                // goto less_than_8_shadow_bytes_remaining
-                break;
-            }
-            else{
-                uint64_t val = *(uint64_t *)addr;
-                addr += 8;
-                if(val != mask){
-                    // goto return failure
-                    return 0;
-                }
-                num_shadow_bytes -= 8;
-                size -= 64;
-            }
-        }
-
-        while(true){
-            if(num_shadow_bytes < 1){
-                // goto check_trailing_bits
-                break;
-            }
-            else{
-                uint8_t val = *(uint8_t *)addr;
-                addr += 1;
-                if(val != 0xff){
-                    // goto return failure
-                    return 0;
-                }
-                num_shadow_bytes -= 1;
-                size -= 8;
-            }
-        }
-
-        if(size == 0){
-            // goto return success
             return 1;
         }
-
-        uint8_t mask2 = ((1 << (size & 0b111)) - 1);
-        uint8_t val = *(uint8_t *)addr;
-        val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
-        val = (val & 0xff) >> 2 | (val & 0x33) << 2;
-        val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
-
-        if((val & mask2) != mask2){
-            // goto return failure                
-            return 0;
-        }
-        return 1;
     }
-}
-    */
+        */
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self, clippy::identity_op)]
-    fn generate_shadow_check_function(&mut self){
+    fn generate_shadow_check_function(&mut self) {
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
 
         // Rdi start, Rsi size
         dynasm!(ops
-    ;    .arch x64
-    ;    mov     cl, BYTE shadow_bit as i8
-    ;    mov     eax, 1
-    ;    mov     edx, 1
-    ;    shl     rdx, cl
-    ;    mov     r9d, 2
-    ;    shl     r9, cl
-    ;    test    rsi, rsi
-    ;    je      >LBB0_15
-    ;    mov     rcx, rdi
-    ;    shr     rcx, 3
-    ;    add     rdx, rcx
-    ;    add     r9, -1
-    ;    and     r9, rdx
-    ;    and     edi, 7
-    ;    je      >LBB0_4
-    ;    mov     cl, 8
-    ;    sub     cl, dil
-    ;    cmp     rsi, 8
-    ;    movzx   ecx, cl
-    ;    mov     r8d, esi
-    ;    cmovae  r8d, ecx
-    ;    mov     r10d, -1
-    ;    mov     ecx, r8d
-    ;    shl     r10d, cl
-    ;    mov     cl, BYTE [r9]
-    ;    rol     cl, 4
-    ;    mov     edx, ecx
-    ;    shr     dl, 2
-    ;    shl     cl, 2
-    ;    and     cl, -52
-    ;    or      cl, dl
-    ;    mov     edx, ecx
-    ;    shr     dl, 1
-    ;    and     dl, 85
-    ;    add     cl, cl
-    ;    and     cl, -86
-    ;    or      cl, dl
-    ;    movzx   edx, cl
-    ;    mov     ecx, edi
-    ;    shr     edx, cl
-    ;    not     r10d
-    ;    movzx   ecx, r10b
-    ;    and     edx, ecx
-    ;    cmp     edx, ecx
-    ;    jne     >LBB0_11
-    ;    movzx   ecx, r8b
-    ;    sub     rsi, rcx
-    ;    add     r9, 1
-    ;LBB0_4:
-    ;    mov     r8, rsi
-    ;    shr     r8, 3
-    ;    mov     r10, r8
-    ;    and     r10, -8
-    ;    mov     edi, r8d
-    ;    and     edi, 7
-    ;    add     r10, r9
-    ;    and     esi, 63
-    ;    mov     rdx, r8
-    ;    mov     rcx, r9
-    ;LBB0_5:
-    ;    cmp     rdx, 7
-    ;    jbe     >LBB0_8
-    ;    add     rdx, -8
-    ;    cmp     QWORD [rcx], -1
-    ;    lea     rcx, [rcx + 8]
-    ;    je      <LBB0_5
-    ;    jmp     >LBB0_11
-    ;LBB0_8:
-    ;    lea     rcx, [8*rdi]
-    ;    sub     rsi, rcx
-    ;LBB0_9:
-    ;    test    rdi, rdi
-    ;    je      >LBB0_13
-    ;    add     rdi, -1
-    ;    cmp     BYTE [r10], -1
-    ;    lea     r10, [r10 + 1]
-    ;    je      <LBB0_9
-    ;LBB0_11:
-    ;    xor     eax, eax
-    ;    ret
-    ;LBB0_13:
-    ;    test    rsi, rsi
-    ;    je      >LBB0_15
-    ;    and     sil, 7
-    ;    mov     dl, -1
-    ;    mov     ecx, esi
-    ;    shl     dl, cl
-    ;    not     dl
-    ;    mov     cl, BYTE [r8 + r9]
-    ;    rol     cl, 4
-    ;    mov     eax, ecx
-    ;    shr     al, 2
-    ;    shl     cl, 2
-    ;    and     cl, -52
-    ;    or      cl, al
-    ;    mov     eax, ecx
-    ;    shr     al, 1
-    ;    and     al, 85
-    ;    add     cl, cl
-    ;    and     cl, -86
-    ;    or      cl, al
-    ;    and     cl, dl
-    ;    xor     eax, eax
-    ;    cmp     cl, dl
-    ;    sete    al
-    ;LBB0_15:
-    ;    ret
-        );
+        ;    .arch x64
+        ;    mov     cl, BYTE shadow_bit as i8
+        ;    mov     eax, 1
+        ;    mov     edx, 1
+        ;    shl     rdx, cl
+        ;    mov     r9d, 2
+        ;    shl     r9, cl
+        ;    test    rsi, rsi
+        ;    je      >LBB0_15
+        ;    mov     rcx, rdi
+        ;    shr     rcx, 3
+        ;    add     rdx, rcx
+        ;    add     r9, -1
+        ;    and     r9, rdx
+        ;    and     edi, 7
+        ;    je      >LBB0_4
+        ;    mov     cl, 8
+        ;    sub     cl, dil
+        ;    cmp     rsi, 8
+        ;    movzx   ecx, cl
+        ;    mov     r8d, esi
+        ;    cmovae  r8d, ecx
+        ;    mov     r10d, -1
+        ;    mov     ecx, r8d
+        ;    shl     r10d, cl
+        ;    mov     cl, BYTE [r9]
+        ;    rol     cl, 4
+        ;    mov     edx, ecx
+        ;    shr     dl, 2
+        ;    shl     cl, 2
+        ;    and     cl, -52
+        ;    or      cl, dl
+        ;    mov     edx, ecx
+        ;    shr     dl, 1
+        ;    and     dl, 85
+        ;    add     cl, cl
+        ;    and     cl, -86
+        ;    or      cl, dl
+        ;    movzx   edx, cl
+        ;    mov     ecx, edi
+        ;    shr     edx, cl
+        ;    not     r10d
+        ;    movzx   ecx, r10b
+        ;    and     edx, ecx
+        ;    cmp     edx, ecx
+        ;    jne     >LBB0_11
+        ;    movzx   ecx, r8b
+        ;    sub     rsi, rcx
+        ;    add     r9, 1
+        ;LBB0_4:
+        ;    mov     r8, rsi
+        ;    shr     r8, 3
+        ;    mov     r10, r8
+        ;    and     r10, -8
+        ;    mov     edi, r8d
+        ;    and     edi, 7
+        ;    add     r10, r9
+        ;    and     esi, 63
+        ;    mov     rdx, r8
+        ;    mov     rcx, r9
+        ;LBB0_5:
+        ;    cmp     rdx, 7
+        ;    jbe     >LBB0_8
+        ;    add     rdx, -8
+        ;    cmp     QWORD [rcx], -1
+        ;    lea     rcx, [rcx + 8]
+        ;    je      <LBB0_5
+        ;    jmp     >LBB0_11
+        ;LBB0_8:
+        ;    lea     rcx, [8*rdi]
+        ;    sub     rsi, rcx
+        ;LBB0_9:
+        ;    test    rdi, rdi
+        ;    je      >LBB0_13
+        ;    add     rdi, -1
+        ;    cmp     BYTE [r10], -1
+        ;    lea     r10, [r10 + 1]
+        ;    je      <LBB0_9
+        ;LBB0_11:
+        ;    xor     eax, eax
+        ;    ret
+        ;LBB0_13:
+        ;    test    rsi, rsi
+        ;    je      >LBB0_15
+        ;    and     sil, 7
+        ;    mov     dl, -1
+        ;    mov     ecx, esi
+        ;    shl     dl, cl
+        ;    not     dl
+        ;    mov     cl, BYTE [r8 + r9]
+        ;    rol     cl, 4
+        ;    mov     eax, ecx
+        ;    shr     al, 2
+        ;    shl     cl, 2
+        ;    and     cl, -52
+        ;    or      cl, al
+        ;    mov     eax, ecx
+        ;    shr     al, 1
+        ;    and     al, 85
+        ;    add     cl, cl
+        ;    and     cl, -86
+        ;    or      cl, al
+        ;    and     cl, dl
+        ;    xor     eax, eax
+        ;    cmp     cl, dl
+        ;    sete    al
+        ;LBB0_15:
+        ;    ret
+            );
 
         let blob = ops.finalize().unwrap();
         unsafe {
@@ -2278,7 +2278,8 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
                 MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 -1,
                 0,
-            ).unwrap();
+            )
+            .unwrap();
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
@@ -2408,28 +2409,28 @@ uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
     }
 
     /*
-#include <stdio.h>
-#include <stdint.h>
-uint8_t shadow_bit = 8;
-uint8_t bit = 3;
-size_t generate_shadow_check_blob(uint64_t start){
-    uint64_t addr = (1 << shadow_bit) + (start >> 3);
-    uint64_t mask = (1 << (shadow_bit + 1)) - 1;
-    addr = addr & mask;
+    #include <stdio.h>
+    #include <stdint.h>
+    uint8_t shadow_bit = 8;
+    uint8_t bit = 3;
+    size_t generate_shadow_check_blob(uint64_t start){
+        uint64_t addr = (1 << shadow_bit) + (start >> 3);
+        uint64_t mask = (1 << (shadow_bit + 1)) - 1;
+        addr = addr & mask;
 
-    uint8_t val = *(uint8_t *)addr;
-    val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
-    val = (val & 0xff) >> 2 | (val & 0x33) << 2;
-    val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
-    if((val & (1 << bit)) == (1 << bit)){
-        // goto done               
-        return 0;
+        uint8_t val = *(uint8_t *)addr;
+        val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
+        val = (val & 0xff) >> 2 | (val & 0x33) << 2;
+        val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+        if((val & (1 << bit)) == (1 << bit)){
+            // goto done
+            return 0;
+        }
+        else{
+            return val;
+        }
     }
-    else{
-        return val;
-    }
-}
-    */
+        */
 
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
@@ -2438,8 +2439,8 @@ size_t generate_shadow_check_blob(uint64_t start){
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch x64
-            
-            
+
+
                 ; done:
             );};
         }
@@ -2523,15 +2524,13 @@ size_t generate_shadow_check_blob(uint64_t start){
     #[allow(clippy::similar_names)]
     #[allow(clippy::cast_possible_wrap)]
     #[allow(clippy::too_many_lines)]
-    fn generate_instrumentation_blobs(&mut self){
-
+    fn generate_instrumentation_blobs(&mut self) {
         self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
         self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
         self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
         self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
         self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
     }
-
 
     ///
     /// Generate the instrumentation blobs for the current arch.
