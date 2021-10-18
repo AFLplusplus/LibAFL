@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::marker::PhantomData;
+use core::{marker::PhantomData};
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
@@ -242,7 +242,9 @@ where
             .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
-        assert!(size <= map_state.history_map.len());
+        if size > map_state.history_map.len() {
+            panic!("The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
+        }
         assert!(size <= observer.map().len());
 
         if self.novelties.is_some() {
