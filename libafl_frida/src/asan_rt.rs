@@ -16,7 +16,6 @@ use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 use nix::libc::memset;
 
-#[cfg(target_arch = "aarch64")]
 use backtrace::Backtrace;
 
 #[cfg(target_arch = "aarch64")]
@@ -24,6 +23,13 @@ use capstone::{
     arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
+
+#[cfg(target_arch = "x86_64")]
+use capstone::{
+    arch::{self, BuildsCapstone},
+    Capstone,
+};
+
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, ModuleMap};
@@ -64,8 +70,8 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 pub struct AsanRuntime {
     allocator: Allocator,
     #[cfg(target_arch = "x86_64")]
-    // sixteen general purpose registers, rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15
-    regs: [usize; 16],
+    // sixteen general purpose registers, rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15, plus rip (instrumented location)
+    regs: [usize; 17],
     #[cfg(target_arch = "aarch64")]
     regs: [usize; 32],
     blob_report: Option<Box<[u8]>>,
@@ -94,7 +100,7 @@ impl AsanRuntime {
         Self {
             allocator: Allocator::new(options.clone()),
             #[cfg(target_arch = "x86_64")]
-            regs: [0; 16],
+            regs: [0; 17],
             #[cfg(target_arch = "aarch64")]
             regs: [0; 32],
             blob_report: None,
@@ -1892,6 +1898,26 @@ impl AsanRuntime {
         hook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
     }
 
+    #[cfg(target_arch = "x86_64")]
+    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::too_many_lines)]
+    extern "C" fn handle_trap(&mut self) {
+        let mut actual_pc = self.regs[16];
+        actual_pc = match self.stalked_addresses.get(&actual_pc) {
+            Some(addr) => *addr,
+            None => actual_pc,
+        };
+
+        let backtrace = Backtrace::new();
+
+        // Just a place holder... for now
+        let error = AsanError::Unknown((self.regs, actual_pc, (0, 0, 0, 0), backtrace));
+
+        println!("{:#?}", self.regs);
+
+        AsanErrors::get_mut().report_error(error)
+    }
+
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::cast_sign_loss)] // for displacement
     #[allow(clippy::too_many_lines)]
@@ -2582,7 +2608,10 @@ impl AsanRuntime {
             ; report:
 
 
-
+            ; self_addr:
+            ; .qword self as *mut _  as *mut c_void as i64
+            ; self_regs_addr:
+            ; .qword &mut self.regs as *mut _ as *mut c_void as i64
         );
         self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
         self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));

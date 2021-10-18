@@ -22,6 +22,7 @@ use termcolor::{Color, ColorSpec, WriteColor};
 
 use crate::{alloc::AllocationMetadata, FridaOptions};
 
+#[cfg(target_arch = "aarch64")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
     pub registers: [usize; 32],
@@ -31,6 +32,17 @@ pub(crate) struct AsanReadWriteError {
     pub backtrace: Backtrace,
 }
 
+#[cfg(target_arch = "x86_64")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct AsanReadWriteError {
+    pub registers: [usize; 17],
+    pub pc: usize,
+    pub fault: (u16, u16, usize, usize),
+    pub metadata: AllocationMetadata,
+    pub backtrace: Backtrace,
+}
+
+#[cfg(target_arch = "aarch64")]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
     OobRead(AsanReadWriteError),
@@ -43,6 +55,23 @@ pub(crate) enum AsanError {
     Leak((usize, AllocationMetadata)),
     StackOobRead(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
     StackOobWrite(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
+    BadFuncArgRead((String, usize, usize, usize, Backtrace)),
+    BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
+}
+
+#[cfg(target_arch = "x86_64")]
+#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
+pub(crate) enum AsanError {
+    OobRead(AsanReadWriteError),
+    OobWrite(AsanReadWriteError),
+    ReadAfterFree(AsanReadWriteError),
+    WriteAfterFree(AsanReadWriteError),
+    DoubleFree((usize, AllocationMetadata, Backtrace)),
+    UnallocatedFree((usize, Backtrace)),
+    Unknown(([usize; 17], usize, (u16, u16, usize, usize), Backtrace)),
+    Leak((usize, AllocationMetadata)),
+    StackOobRead(([usize; 17], usize, (u16, u16, usize, usize), Backtrace)),
+    StackOobWrite(([usize; 17], usize, (u16, u16, usize, usize), Backtrace)),
     BadFuncArgRead((String, usize, usize, usize, Backtrace)),
     BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
 }
