@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{marker::PhantomData};
+use core::marker::PhantomData;
 use num::Integer;
 use serde::{Deserialize, Serialize};
 
