@@ -20,29 +20,17 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
-use crate::{alloc::AllocationMetadata, FridaOptions};
+use crate::{alloc::AllocationMetadata, asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
-#[cfg(target_arch = "aarch64")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
-    pub registers: [usize; 32],
+    pub registers: [usize; ASAN_SAVE_REGISTER_COUNT],
     pub pc: usize,
     pub fault: (u16, u16, usize, usize),
     pub metadata: AllocationMetadata,
     pub backtrace: Backtrace,
 }
 
-#[cfg(target_arch = "x86_64")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AsanReadWriteError {
-    pub registers: [usize; 17],
-    pub pc: usize,
-    pub fault: (u16, u16, usize, usize),
-    pub metadata: AllocationMetadata,
-    pub backtrace: Backtrace,
-}
-
-#[cfg(target_arch = "aarch64")]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
     OobRead(AsanReadWriteError),
@@ -51,27 +39,31 @@ pub(crate) enum AsanError {
     WriteAfterFree(AsanReadWriteError),
     DoubleFree((usize, AllocationMetadata, Backtrace)),
     UnallocatedFree((usize, Backtrace)),
-    Unknown(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
+    Unknown(
+        (
+            [usize; ASAN_SAVE_REGISTER_COUNT],
+            usize,
+            (u16, u16, usize, usize),
+            Backtrace,
+        ),
+    ),
     Leak((usize, AllocationMetadata)),
-    StackOobRead(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
-    StackOobWrite(([usize; 32], usize, (u16, u16, usize, usize), Backtrace)),
-    BadFuncArgRead((String, usize, usize, usize, Backtrace)),
-    BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
-}
-
-#[cfg(target_arch = "x86_64")]
-#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
-pub(crate) enum AsanError {
-    OobRead(AsanReadWriteError),
-    OobWrite(AsanReadWriteError),
-    ReadAfterFree(AsanReadWriteError),
-    WriteAfterFree(AsanReadWriteError),
-    DoubleFree((usize, AllocationMetadata, Backtrace)),
-    UnallocatedFree((usize, Backtrace)),
-    Unknown(([usize; 17], usize, (u16, u16, usize, usize), Backtrace)),
-    Leak((usize, AllocationMetadata)),
-    StackOobRead(([usize; 17], usize, (u16, u16, usize, usize), Backtrace)),
-    StackOobWrite(([usize; 17], usize, (u16, u16, usize, usize), Backtrace)),
+    StackOobRead(
+        (
+            [usize; ASAN_SAVE_REGISTER_COUNT],
+            usize,
+            (u16, u16, usize, usize),
+            Backtrace,
+        ),
+    ),
+    StackOobWrite(
+        (
+            [usize; ASAN_SAVE_REGISTER_COUNT],
+            usize,
+            (u16, u16, usize, usize),
+            Backtrace,
+        ),
+    ),
     BadFuncArgRead((String, usize, usize, usize, Backtrace)),
     BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
 }

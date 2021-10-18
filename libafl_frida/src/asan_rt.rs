@@ -62,6 +62,13 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
+// sixteen general purpose registers, rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15, plus rip (instrumented location)
+#[cfg(target_arch = "x86_64")]
+pub const ASAN_SAVE_REGISTER_COUNT: usize = 17;
+
+#[cfg(tareget_arch = "aarch64")]
+pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
+
 /// The frida address sanitizer runtime, providing address sanitization.
 /// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
 /// The runtime can report memory errors that occurred during execution,
@@ -69,11 +76,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 /// this helps finding mem errors early.
 pub struct AsanRuntime {
     allocator: Allocator,
-    #[cfg(target_arch = "x86_64")]
-    // sixteen general purpose registers, rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15, plus rip (instrumented location)
-    regs: [usize; 17],
-    #[cfg(target_arch = "aarch64")]
-    regs: [usize; 32],
+    regs: [usize; ASAN_SAVE_REGISTER_COUNT],
     blob_report: Option<Box<[u8]>>,
     blob_check_mem_byte: Option<Box<[u8]>>,
     blob_check_mem_halfword: Option<Box<[u8]>>,
@@ -99,10 +102,7 @@ impl AsanRuntime {
     pub fn new(options: FridaOptions) -> AsanRuntime {
         Self {
             allocator: Allocator::new(options.clone()),
-            #[cfg(target_arch = "x86_64")]
-            regs: [0; 17],
-            #[cfg(target_arch = "aarch64")]
-            regs: [0; 32],
+            regs: [0; ASAN_SAVE_REGISTER_COUNT],
             blob_report: None,
             blob_check_mem_byte: None,
             blob_check_mem_halfword: None,

@@ -885,7 +885,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                         |       |       |
             Old Rsp                  -> |       |       |
         */
-        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(8 + redzone_size));
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
         writer.put_pushfx();
         writer.put_push_reg(X86Register::Rdi);
         writer.put_push_reg(X86Register::Rsi);
@@ -945,7 +945,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_pop_reg(X86Register::Rsi);
         writer.put_pop_reg(X86Register::Rdi);
         writer.put_popfx();
-        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, 8 + redzone_size);
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
     }
 
     #[cfg(target_arch = "aarch64")]
