@@ -877,9 +877,20 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
             writer.put_label(after_report_impl);
         }
-        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -redzone_size);
+        /* Save registers that we'll use later in shadow_check_blob
+
+                                        | Rcx   | Rax   |
+                                        | Rsi   | Rdx   |
+            Old Rsp - (redsone_size) -> |       | Rdi   |
+                                        |       |       |
+            Old Rsp                  -> |       |       |
+        */
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(8 + redzone_size));
         writer.put_push_reg(X86Register::Rdi);
         writer.put_push_reg(X86Register::Rsi);
+        writer.put_push_reg(X86Register::Rdx);
+        writer.put_push_reg(X86Register::Rcx);
+        writer.put_push_reg(X86Register::Rax);
 
         // Init Rdi
         if basereg.is_some() {
@@ -922,10 +933,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => false,
         };
         */
-
+        writer.put_pop_reg(X86Register::Rax);
+        writer.put_pop_reg(X86Register::Rcx);
+        writer.put_pop_reg(X86Register::Rdx);
         writer.put_pop_reg(X86Register::Rsi);
         writer.put_pop_reg(X86Register::Rdi);
-        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, 8 + redzone_size);
     }
 
     #[cfg(target_arch = "aarch64")]

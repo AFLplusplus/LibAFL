@@ -2413,35 +2413,87 @@ impl AsanRuntime {
     #include <stdint.h>
     uint8_t shadow_bit = 8;
     uint8_t bit = 3;
-    size_t generate_shadow_check_blob(uint64_t start){
-        uint64_t addr = (1 << shadow_bit) + (start >> 3);
-        uint64_t mask = (1 << (shadow_bit + 1)) - 1;
+    uint64_t generate_shadow_check_blob(uint64_t start){
+        uint64_t addr = 1;
+        addr = addr << shadow_bit;
+        addr = addr + (start >> 3);
+        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
         addr = addr & mask;
 
         uint8_t val = *(uint8_t *)addr;
+        uint8_t remainder = start & 0b111;
         val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
         val = (val & 0xff) >> 2 | (val & 0x33) << 2;
         val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
-        if((val & (1 << bit)) == (1 << bit)){
-            // goto done
+        val = (val >> remainder);
+
+        uint8_t mask2 = (1 << bit) - 1;
+        if((val & mask2) == mask2){
+            // success
             return 0;
         }
         else{
-            return val;
+            // failure
+            return 1;
         }
     }
-        */
-
+    */
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
+        // Rcx, Rax, Rdi, Rdx, Rsi are used, so we save them in emit_shadow_check
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
-                ; .arch x64
-
-
-                ; done:
+                ;   .arch x64
+                ;   mov     cl, shadow_bit as i8
+                ;   mov     eax, 1
+                ;   shl     rax, cl
+                ;   mov     rdx, rdi
+                ;   shr     rdx, 3
+                ;   mov     esi, 2
+                ;   shl     rsi, cl
+                ;   add     rdx, rax
+                ;   add     rsi, -1
+                ;   and     rsi, rdx
+                ;   mov     al, BYTE [rsi]
+                ;   and     dil, 7
+                ;   rol     al, 4
+                ;   mov     ecx, eax
+                ;   shr     cl, 2
+                ;   shl     al, 2
+                ;   and     al, -52
+                ;   or      al, cl
+                ;   mov     ecx, eax
+                ;   shr     cl, 1
+                ;   and     cl, 85
+                ;   add     al, al
+                ;   and     al, -86
+                ;   or      al, cl
+                ;   mov     ecx, edi
+                ;   shr     al, cl
+                ;   mov     cl, bit as i8
+                ;   mov     edx, -1
+                ;   shl     edx, cl
+                ;   not     edx
+                ;   movzx   ecx, al
+                ;   movzx   edx, dl
+                ;   and     ecx, edx
+                ;   xor     eax, eax
+                ;   cmp     ecx, edx
+                ;   je      >done
+                ;   lea     rsi, [>done]
+                ;   nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
+                ;   nop
+                ;   nop
+                ;   nop
+                ;   nop
+                ;   nop
+                ;   nop
+                ;   nop
+                ;   nop
+                ;   nop
+                ;done:
             );};
         }
         // do I need to insert additional 4bytes
@@ -2525,6 +2577,7 @@ impl AsanRuntime {
     #[allow(clippy::cast_possible_wrap)]
     #[allow(clippy::too_many_lines)]
     fn generate_instrumentation_blobs(&mut self) {
+        let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
         self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
         self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
