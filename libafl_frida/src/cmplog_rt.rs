@@ -77,22 +77,27 @@ impl CmpLogRuntime {
             );};
         }
 
+        // ldp/stp is more efficient than str/ldr so we use them instead.
         macro_rules! tbz_masking {
             ($ops:ident) => {dynasm!($ops
                 ; .arch aarch64
+                ; stp x5, x5, [sp, #-0x10]!
                 ; mov x5, #1
                 ; lsl x5, x5, x1
                 ; eor x5, x5, #255
                 ; orr x1, x0, x5
+                ; ldp x5, x5, [sp], #0x10
             );};
         }
 
         macro_rules! tbnz_masking {
             ($ops:ident) => {dynasm!($ops
                 ; .arch aarch64
+                ; stp x5, x5, [sp, #-0x10]!
                 ; mov x5, #1
                 ; lsl x5, x5, x1
                 ; orr x1, x0, x5
+                ; ldp x5, x5, [sp], #0x10
             );};
 
         }
