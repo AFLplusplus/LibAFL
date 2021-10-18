@@ -2482,7 +2482,7 @@ impl AsanRuntime {
                 ;   xor     eax, eax
                 ;   cmp     ecx, edx
                 ;   je      >done
-                ;   lea     rsi, [>done]
+                ;   lea     rsi, [>done] // leap 10 bytes forward
                 ;   nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
                 ;   nop
                 ;   nop
@@ -2496,11 +2496,10 @@ impl AsanRuntime {
                 ;done:
             );};
         }
-        // do I need to insert additional 4bytes
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
+        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //????
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -2578,6 +2577,13 @@ impl AsanRuntime {
     #[allow(clippy::too_many_lines)]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        dynasm!(ops_report
+            ; .arch x64
+            ; report:
+
+
+
+        );
         self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
         self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
         self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));

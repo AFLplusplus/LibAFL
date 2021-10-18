@@ -881,11 +881,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
                                         | Rcx   | Rax   |
                                         | Rsi   | Rdx   |
-            Old Rsp - (redsone_size) -> |       | Rdi   |
+            Old Rsp - (redsone_size) -> | flags | Rdi   |
                                         |       |       |
             Old Rsp                  -> |       |       |
         */
         writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(8 + redzone_size));
+        writer.put_pushfx();
         writer.put_push_reg(X86Register::Rdi);
         writer.put_push_reg(X86Register::Rsi);
         writer.put_push_reg(X86Register::Rdx);
@@ -933,11 +934,17 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => false,
         };
         */
+        writer.put_jmp_near_label(self.current_report_impl);
+        for _ in 0..10 {
+            // shadow_check_blob's done will land somewhere in these nops
+            writer.put_nop();
+        }
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
         writer.put_pop_reg(X86Register::Rdx);
         writer.put_pop_reg(X86Register::Rsi);
         writer.put_pop_reg(X86Register::Rdi);
+        writer.put_popfx();
         writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, 8 + redzone_size);
     }
 
