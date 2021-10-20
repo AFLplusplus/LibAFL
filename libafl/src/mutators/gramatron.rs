@@ -130,18 +130,19 @@ where
             .unwrap();
         let other = other_testcase.input().as_ref().unwrap();
 
-        if let Some(splice_points) = meta.map.get(&input.terminals()[insert_at].state) {
-            let from = splice_points[rand_num % splice_points.len()];
+        meta.map.get(&input.terminals()[insert_at].state).map_or(
+            Ok(MutationResult::Skipped),
+            |splice_points| {
+                let from = splice_points[rand_num % splice_points.len()];
 
-            input.terminals_mut().truncate(insert_at);
-            input
-                .terminals_mut()
-                .extend_from_slice(&other.terminals()[from..]);
+                input.terminals_mut().truncate(insert_at);
+                input
+                    .terminals_mut()
+                    .extend_from_slice(&other.terminals()[from..]);
 
-            Ok(MutationResult::Mutated)
-        } else {
-            Ok(MutationResult::Skipped)
-        }
+                Ok(MutationResult::Mutated)
+            },
+        )
     }
 }
 

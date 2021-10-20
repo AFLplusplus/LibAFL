@@ -80,7 +80,7 @@ impl GramatronInput {
     pub fn unparse(&self, bytes: &mut Vec<u8>) {
         bytes.clear();
         for term in &self.terms {
-            bytes.extend_from_slice(&term.symbol.as_bytes());
+            bytes.extend_from_slice(term.symbol.as_bytes());
         }
     }
 
