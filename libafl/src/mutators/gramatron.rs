@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
