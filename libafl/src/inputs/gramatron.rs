@@ -18,6 +18,7 @@ pub struct Terminal {
 }
 
 impl Terminal {
+    #[must_use]
     pub fn new(state: usize, trigger_idx: usize, symbol: String) -> Self {
         Self {
             state,
@@ -39,7 +40,7 @@ impl Input for GramatronInput {
     fn generate_name(&self, _idx: usize) -> String {
         let mut hasher = AHasher::new_with_keys(0, 0);
         for term in &self.terms {
-            hasher.write(&term.symbol.as_bytes());
+            hasher.write(term.symbol.as_bytes());
         }
         format!("{:016x}", hasher.finish())
     }

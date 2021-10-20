@@ -30,7 +30,7 @@ where
         input: &mut GramatronInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.terminals().len() > 0 {
+        if !input.terminals().is_empty() {
             let size = state.rand_mut().below(input.terminals().len() as u64 + 1) as usize;
             input.terminals_mut().truncate(size);
         }
