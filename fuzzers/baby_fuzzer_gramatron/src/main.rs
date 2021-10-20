@@ -15,9 +15,9 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    generators::{Automaton, GrammatronGenerator},
-    inputs::GrammatronInput,
-    mutators::GrammatronRandomMutator,
+    generators::{Automaton, GramatronGenerator},
+    inputs::GramatronInput,
+    mutators::GramatronRandomMutator,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -44,7 +44,7 @@ pub fn main() {
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
-    let mut harness = |input: &GrammatronInput| {
+    let mut harness = |input: &GramatronInput| {
         input.unparse(&mut bytes);
         unsafe {
             println!("{}", std::str::from_utf8_unchecked(&bytes));
@@ -102,7 +102,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     let mut generator =
-        GrammatronGenerator::new(read_automaton_from_file(PathBuf::from("auto.json")));
+        GramatronGenerator::new(read_automaton_from_file(PathBuf::from("auto.json")));
 
     // Generate 8 initial inputs
     state
@@ -110,7 +110,7 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = GrammatronRandomMutator::new(&generator);
+    let mutator = GramatronRandomMutator::new(&generator);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

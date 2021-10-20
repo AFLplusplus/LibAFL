@@ -6,8 +6,8 @@ pub use bytes::BytesInput;
 pub mod encoded;
 pub use encoded::*;
 
-pub mod grammatron;
-pub use grammatron::*;
+pub mod gramatron;
+pub use gramatron::*;
 
 use alloc::{
     string::{String, ToString},

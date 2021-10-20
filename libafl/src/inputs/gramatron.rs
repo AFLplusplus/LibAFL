@@ -28,12 +28,12 @@ impl Terminal {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
-pub struct GrammatronInput {
+pub struct GramatronInput {
     /// The input representation as list of terminals
     terms: Vec<Terminal>,
 }
 
-impl Input for GrammatronInput {
+impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _idx: usize) -> String {
@@ -46,20 +46,20 @@ impl Input for GrammatronInput {
 }
 
 /// Rc Ref-cell from Input
-impl From<GrammatronInput> for Rc<RefCell<GrammatronInput>> {
-    fn from(input: GrammatronInput) -> Self {
+impl From<GramatronInput> for Rc<RefCell<GramatronInput>> {
+    fn from(input: GramatronInput) -> Self {
         Rc::new(RefCell::new(input))
     }
 }
 
-impl HasLen for GrammatronInput {
+impl HasLen for GramatronInput {
     #[inline]
     fn len(&self) -> usize {
         self.terms.len()
     }
 }
 
-impl GrammatronInput {
+impl GramatronInput {
     /// Creates a new codes input using the given terminals
     #[must_use]
     pub fn new(terms: Vec<Terminal>) -> Self {

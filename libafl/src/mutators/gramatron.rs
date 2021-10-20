@@ -3,23 +3,23 @@ use core::marker::PhantomData;
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    generators::GrammatronGenerator,
-    inputs::GrammatronInput,
+    generators::GramatronGenerator,
+    inputs::GramatronInput,
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 
-pub struct GrammatronRandomMutator<'a, R, S>
+pub struct GramatronRandomMutator<'a, R, S>
 where
     S: HasRand<R> + HasMetadata,
     R: Rand,
 {
-    generator: &'a GrammatronGenerator<R, S>,
+    generator: &'a GramatronGenerator<R, S>,
     phantom: PhantomData<(R, S)>,
 }
 
-impl<'a, R, S> Mutator<GrammatronInput, S> for GrammatronRandomMutator<'a, R, S>
+impl<'a, R, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, R, S>
 where
     S: HasRand<R> + HasMetadata,
     R: Rand,
@@ -27,7 +27,7 @@ where
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut GrammatronInput,
+        input: &mut GramatronInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.terminals().len() > 0 {
@@ -42,24 +42,24 @@ where
     }
 }
 
-impl<'a, R, S> Named for GrammatronRandomMutator<'a, R, S>
+impl<'a, R, S> Named for GramatronRandomMutator<'a, R, S>
 where
     S: HasRand<R> + HasMetadata,
     R: Rand,
 {
     fn name(&self) -> &str {
-        "GrammatronRandomMutator"
+        "GramatronRandomMutator"
     }
 }
 
-impl<'a, R, S> GrammatronRandomMutator<'a, R, S>
+impl<'a, R, S> GramatronRandomMutator<'a, R, S>
 where
     S: HasRand<R> + HasMetadata,
     R: Rand,
 {
-    /// Creates a new [`GrammatronRandomMutator`].
+    /// Creates a new [`GramatronRandomMutator`].
     #[must_use]
-    pub fn new(generator: &'a GrammatronGenerator<R, S>) -> Self {
+    pub fn new(generator: &'a GramatronGenerator<R, S>) -> Self {
         Self {
             generator,
             phantom: PhantomData,
