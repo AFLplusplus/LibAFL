@@ -68,10 +68,15 @@ where
     pub fn append_generated_terminals(&self, input: &mut GramatronInput, state: &mut S) -> usize {
         let mut counter = 0;
         let final_state = self.automaton.final_state;
-        let mut current_state = input
-            .terminals()
-            .last()
-            .map_or(self.automaton.init_state, |last| last.state);
+        let mut current_state =
+            input
+                .terminals()
+                .last()
+                .map_or(self.automaton.init_state, |last| {
+                    let triggers = &self.automaton.pda[last.state];
+                    let idx = state.rand_mut().below(triggers.len() as u64) as usize;
+                    triggers[idx].dest
+                });
 
         while current_state != final_state {
             let triggers = &self.automaton.pda[current_state];

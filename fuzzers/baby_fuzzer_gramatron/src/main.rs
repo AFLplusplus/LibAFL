@@ -17,7 +17,7 @@ use libafl::{
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     generators::{Automaton, GramatronGenerator},
     inputs::GramatronInput,
-    mutators::GramatronRandomMutator,
+    mutators::{GramatronRandomMutator, GramatronSpliceMutator, StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -47,7 +47,7 @@ pub fn main() {
     let mut harness = |input: &GramatronInput| {
         input.unparse(&mut bytes);
         unsafe {
-            println!("{}", std::str::from_utf8_unchecked(&bytes));
+            //println!(">>> {}", std::str::from_utf8_unchecked(&bytes));
         }
         ExitKind::Ok
     };
@@ -110,7 +110,13 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = GramatronRandomMutator::new(&generator);
+    let mutator = StdScheduledMutator::with_max_iterations(
+        tuple_list!(
+            GramatronRandomMutator::new(&generator),
+            GramatronSpliceMutator::new()
+        ),
+        2,
+    );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
