@@ -187,7 +187,7 @@ def get_template():
             }
     return transition_template
 
-def postprocess():
+def postprocess1():
     '''
     Creates a representation to be passed on to the C-module
     '''
@@ -226,14 +226,14 @@ def postprocess():
             if transition["dest"] in blocklist:
                     continue 
             num_transitions += 1
-            memoized[int(state)].append({'id': transition["trigger"],
-                'dest': int(transition["dest"]), 'term': transition["terminal"]})
+            memoized[int(state)].append((transition["trigger"],
+                int(transition["dest"]), transition["terminal"]))
         final_struct["init_state"] = int(initial)
         final_struct["final_state"] = int(culled_final[0])
         # The reason we do this is because when states are culled, the indexing is
         # still relative to the actual number of states hence we keep numstates recorded
         # as the original number of states
-        print ('[X] Actual Number of states:', len(memoized.keys()))
+        print ('[X] Actual Number of states:', len(memoized))
         print ('[X] Number of transitions:', num_transitions)
         print ('[X] Original Number of states:', len(states))
         final_struct["pda"] = memoized
@@ -242,13 +242,85 @@ def postprocess():
     # Running FSA construction in exact approximation mode and postprocessing it like so
     for transition in pda:
        state = transition["source"]
-       memoized[int(state)].append({'id': transition["trigger"],
-                'dest': int(transition["dest"]), 'term': transition["terminal"]})
+       memoized[int(state)].append((transition["trigger"],
+                int(transition["dest"]), transition["terminal"]))
 
     final_struct["init_state"] = int(initial)
     final_struct["final_state"] = int(final[0])
     print ('[X] Actual Number of states:', len(memoized))
     final_struct["pda"] = memoized
+    return final_struct
+
+def postprocess():
+    '''
+    Creates a representation to be passed on to the C-module
+    '''
+    global pda
+    final_struct = {}
+    memoized = defaultdict(list)
+    # Supporting data structures for if stack limit is imposed
+    culled_pda = []
+    culled_final = []
+    num_transitions = 0 # Keep track of number of transitions
+
+
+    states, final, initial = _get_states()
+
+    print (initial)
+    assert len(initial) == 1, 'More than one init state found'
+
+    # Cull transitions to states which were not expanded owing to the stack limit
+    if stack_limit:
+
+        blocklist = []
+        for final_state in final:
+            for transition in pda:
+                if (transition["dest"] == final_state) and (len(transition["stack"]) > 0):
+                    blocklist.append(transition["dest"])
+                    continue
+                else:
+                    culled_pda.append(transition)
+        
+        culled_final = [state for state in final if state not in blocklist]
+
+        assert len(culled_final) == 1, 'More than one final state found'
+
+        for transition in culled_pda:
+            state = transition["source"]
+            if transition["dest"] in blocklist:
+                    continue 
+            num_transitions += 1
+            memoized[int(state)].append([transition["trigger"], int(transition["dest"]), 
+                transition["terminal"]])
+        
+        
+        
+        final_struct["init_state"] = int(initial)
+        final_struct["final_state"] = int(culled_final[0])
+        # The reason we do this is because when states are culled, the indexing is
+        # still relative to the actual number of states hence we keep numstates recorded
+        # as the original number of states
+        print ('[X] Actual Number of states:', len(memoized.keys()))
+        print ('[X] Number of transitions:', num_transitions)
+        print ('[X] Original Number of states:', len(states))
+        #final_struct["numstates"] = len(states) 
+        memoized_list = [[]]*len(states) 
+    else:
+        # Running FSA construction in exact approximation mode and postprocessing it like so
+        for transition in pda:
+           state = transition["source"]
+           memoized[int(state)].append([transition["trigger"], int(transition["dest"]), 
+               transition["terminal"]])
+
+        final_struct["init_state"] = int(initial)
+        final_struct["final_state"] = int(final[0])
+        print ('[X] Actual Number of states:', len(memoized.keys()))
+        #final_struct["numstates"] = len(memoized.keys()) 
+        memoized_list = [[]]*len(memoized.keys()) 
+    
+    for k in memoized.keys():
+        memoized_list[k] = memoized[k]
+    final_struct["pda"] = memoized_list
     return final_struct
 
 
@@ -269,8 +341,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--gf',
             type = str,
-            help = 'Location of GNF grammar',
-            required = True)
+            help = 'Location of GNF grammar')
     parser.add_argument(
             '--limit',
             type = int,
