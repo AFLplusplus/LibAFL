@@ -190,6 +190,7 @@ where
     S: HasRand<R> + HasMetadata,
     R: Rand,
 {
+    #[allow(clippy::cast_sign_loss)]
     fn mutate(
         &mut self,
         state: &mut S,
@@ -223,12 +224,10 @@ where
         let chosen = *state.rand_mut().choose(&self.states);
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
-        let mut first = i64::from(state.rand_mut().below(chosen_nums as u64 - 1));
-        let mut second = i64::from(
-            state
-                .rand_mut()
-                .between(first as u64 + 1, chosen_nums as u64 - 1),
-        );
+        let mut first = state.rand_mut().below(chosen_nums as u64 - 1) as i64;
+        let mut second = state
+            .rand_mut()
+            .between(first as u64 + 1, chosen_nums as u64 - 1) as i64;
 
         let mut idx_1 = 0;
         let mut idx_2 = 0;
