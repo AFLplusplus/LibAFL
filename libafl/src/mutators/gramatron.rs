@@ -85,6 +85,7 @@ impl GramatronIdxMapMetadata {
     }
 }
 
+#[derive(Default)]
 pub struct GramatronSpliceMutator<C, R, S>
 where
     C: Corpus<GramatronInput>,
@@ -172,6 +173,7 @@ where
     }
 }
 
+#[derive(Default)]
 pub struct GramatronRecursionMutator<R, S>
 where
     S: HasRand<R> + HasMetadata,
@@ -221,10 +223,12 @@ where
         let chosen = *state.rand_mut().choose(&self.states);
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
-        let mut first = state.rand_mut().below(chosen_nums as u64 - 1) as i64;
-        let mut second = state
-            .rand_mut()
-            .between(first as u64 + 1, chosen_nums as u64 - 1) as i64;
+        let mut first = i64::from(state.rand_mut().below(chosen_nums as u64 - 1));
+        let mut second = i64::from(
+            state
+                .rand_mut()
+                .between(first as u64 + 1, chosen_nums as u64 - 1),
+        );
 
         let mut idx_1 = 0;
         let mut idx_2 = 0;
