@@ -17,7 +17,10 @@ use libafl::{
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     generators::{Automaton, GramatronGenerator},
     inputs::GramatronInput,
-    mutators::{GramatronRandomMutator, GramatronSpliceMutator, StdScheduledMutator},
+    mutators::{
+        GramatronRandomMutator, GramatronRecursionMutator, GramatronSpliceMutator,
+        StdScheduledMutator,
+    },
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -47,7 +50,7 @@ pub fn main() {
     let mut harness = |input: &GramatronInput| {
         input.unparse(&mut bytes);
         unsafe {
-            //println!(">>> {}", std::str::from_utf8_unchecked(&bytes));
+            println!(">>> {}", std::str::from_utf8_unchecked(&bytes));
         }
         ExitKind::Ok
     };
@@ -113,7 +116,11 @@ pub fn main() {
     let mutator = StdScheduledMutator::with_max_iterations(
         tuple_list!(
             GramatronRandomMutator::new(&generator),
-            GramatronSpliceMutator::new()
+            GramatronRandomMutator::new(&generator),
+            GramatronRandomMutator::new(&generator),
+            GramatronSpliceMutator::new(),
+            GramatronSpliceMutator::new(),
+            GramatronRecursionMutator::new()
         ),
         2,
     );
