@@ -222,4 +222,22 @@ impl Filter for NoFloat {
     fn build_bits_to_float(&mut self, _expr: RSymExpr, _to_double: bool) -> bool {
         false
     }
+    fn build_fp_abs(&mut self, a:RSymExpr) ->bool {
+        false
+    }
+    fn build_fp_add(&mut self, a:RSymExpr) ->bool {
+        false
+    }
+    fn build_fp_sub(&mut self, a:RSymExpr) ->bool {
+        false
+    }
+    fn build_fp_mul(&mut self, a:RSymExpr) ->bool {
+        false
+    }
+    fn build_fp_div(&mut self, a:RSymExpr) ->bool {
+        false
+    }
+    fn build_fp_rem(&mut self, a:RSymExpr) ->bool {
+        false
+    }
 }
