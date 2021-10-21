@@ -593,7 +593,7 @@ where
     }
 }
 
-/// Variadic macro to create a chain of AndFeedback
+/// Variadic macro to create a chain of [`AndFeedback`](EagerAndFeedback)
 #[macro_export]
 macro_rules! feedback_and {
     ( $last:expr ) => { $last };
@@ -604,7 +604,7 @@ macro_rules! feedback_and {
     };
 }
 ///
-/// Variadic macro to create a chain of (fast) AndFeedback
+/// Variadic macro to create a chain of (fast) [`AndFeedback`](FastAndFeedback)
 #[macro_export]
 macro_rules! feedback_and_fast {
     ( $last:expr ) => { $last };
@@ -615,7 +615,7 @@ macro_rules! feedback_and_fast {
     };
 }
 
-/// Variadic macro to create a chain of OrFeedback
+/// Variadic macro to create a chain of [`OrFeedback`](EagerOrFeedback)
 #[macro_export]
 macro_rules! feedback_or {
     ( $last:expr ) => { $last };
@@ -636,7 +636,7 @@ macro_rules! feedback_or_fast {
     };
 }
 
-/// Variadic macro to create a NotFeedback
+/// Variadic macro to create a [`NotFeedback`]
 #[macro_export]
 macro_rules! feedback_not {
     ( $last:expr ) => {
