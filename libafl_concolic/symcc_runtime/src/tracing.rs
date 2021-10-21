@@ -1,7 +1,5 @@
 //! Tracing of expressions in a serialized form.
 
-use std::num::NonZeroUsize;
-
 pub use libafl::observers::concolic::serialization_format::StdShMemMessageFileWriter;
 use libafl::observers::concolic::SymExpr;
 
