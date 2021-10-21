@@ -10,6 +10,8 @@ pub mod encoded_mutations;
 pub use encoded_mutations::*;
 pub mod mopt_mutator;
 pub use mopt_mutator::*;
+pub mod gramatron;
+pub use gramatron::*;
 
 use crate::{
     bolts::tuples::{HasLen, Named},
