@@ -249,7 +249,7 @@ fn pc(context: &CpuContext) -> usize {
     context.pc() as usize
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", not(windows))]
 fn pc(context: &CpuContext) -> usize {
     context.rip() as usize
 }
