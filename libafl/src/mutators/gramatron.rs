@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::marker::PhantomData;
+use core::{cmp::max, marker::PhantomData};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
     generators::GramatronGenerator,
-    inputs::GramatronInput,
+    inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
@@ -167,6 +167,116 @@ where
     #[must_use]
     pub fn new() -> Self {
         Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+pub struct GramatronRecursionMutator<R, S>
+where
+    S: HasRand<R> + HasMetadata,
+    R: Rand,
+{
+    counters: HashMap<usize, (usize, usize, usize)>,
+    states: Vec<usize>,
+    temp: Vec<Terminal>,
+    phantom: PhantomData<(R, S)>,
+}
+
+impl<R, S> Mutator<GramatronInput, S> for GramatronRecursionMutator<R, S>
+where
+    S: HasRand<R> + HasMetadata,
+    R: Rand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut GramatronInput,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.terminals().is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
+        self.counters.clear();
+        self.states.clear();
+        for i in 0..input.terminals().len() {
+            let s = input.terminals()[i].state;
+            if let Some(entry) = self.counters.get_mut(&s) {
+                if entry.0 == 1 {
+                    // Keep track only of states with more than one node
+                    self.states.push(s);
+                }
+                entry.0 += 1;
+                entry.2 = max(entry.2, i);
+            } else {
+                self.counters.insert(s, (1, i, i));
+            }
+        }
+
+        if self.states.is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let chosen = *state.rand_mut().choose(&self.states);
+        let chosen_nums = self.counters.get(&chosen).unwrap().0;
+
+        let mut first = state.rand_mut().below(chosen_nums as u64 - 1) as i64;
+        let mut second = state
+            .rand_mut()
+            .between(first as u64 + 1, chosen_nums as u64 - 1) as i64;
+
+        let mut idx_1 = 0;
+        let mut idx_2 = 0;
+        for i in
+            (self.counters.get(&chosen).unwrap().1)..(self.counters.get(&chosen).unwrap().2 + 1)
+        {
+            if input.terminals()[i].state == chosen {
+                if first == 0 {
+                    idx_1 = i;
+                }
+                if second == 0 {
+                    idx_2 = i;
+                    break;
+                }
+                first -= 1;
+                second -= 1;
+            }
+        }
+        debug_assert!(idx_1 < idx_2);
+
+        self.temp.clear();
+        self.temp.extend_from_slice(&input.terminals()[idx_2..]);
+
+        input.terminals_mut().truncate(idx_2);
+        input.terminals_mut().extend_from_slice(&self.temp);
+
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<R, S> Named for GramatronRecursionMutator<R, S>
+where
+    S: HasRand<R> + HasMetadata,
+    R: Rand,
+{
+    fn name(&self) -> &str {
+        "GramatronRecursionMutator"
+    }
+}
+
+impl<R, S> GramatronRecursionMutator<R, S>
+where
+    S: HasRand<R> + HasMetadata,
+    R: Rand,
+{
+    /// Creates a new [`GramatronRecursionMutator`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            counters: HashMap::default(),
+            states: vec![],
+            temp: vec![],
             phantom: PhantomData,
         }
     }
