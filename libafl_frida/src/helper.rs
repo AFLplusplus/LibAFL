@@ -1307,6 +1307,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
                     let insn_id: X86Insn = instr.id().0.into();
+                    /*
                     println!(
                         "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
                         insn_id,
@@ -1318,6 +1319,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         opmem.scale(),
                         opmem.disp(),
                     );
+                    */
                     if opmem.segment() != RegId(0) {
                         return Ok((
                             opmem.segment(),

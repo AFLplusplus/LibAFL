@@ -331,14 +331,14 @@ impl Allocator {
     }
 
     fn unpoison(start: usize, size: usize) {
-        //println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
+        println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            //println!("memset: {:?}", start as *mut c_void);
+            println!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0xff, size / 8);
 
             let remainder = size % 8;
             if remainder > 0 {
-                //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
+                println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 memset(
                     (start + size / 8) as *mut c_void,
                     (0xff << (8 - remainder)) & 0xff,
@@ -349,14 +349,14 @@ impl Allocator {
     }
 
     pub fn poison(start: usize, size: usize) {
-        //println!("poisoning {:x} for {:x}", start, size / 8 + 1);
+        println!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            //println!("memset: {:?}", start as *mut c_void);
+            println!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0x00, size / 8);
 
             let remainder = size % 8;
             if remainder > 0 {
-                //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
+                println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 memset((start + size / 8) as *mut c_void, 0x00, 1);
             }
         }

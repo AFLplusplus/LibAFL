@@ -6,7 +6,6 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-#[cfg(target_arch = "aarch64")]
 use frida_gum::NativePointer;
 use frida_gum::RangeDetails;
 use hashbrown::HashMap;
@@ -138,7 +137,6 @@ impl AsanRuntime {
 
         self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
 
-        #[cfg(target_arch = "aarch64")]
         self.hook_functions(_gum);
 
         unsafe {
@@ -170,6 +168,10 @@ impl AsanRuntime {
         println!("Test9");
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
         println!("FIN");
+
+        for i in 0..0xad {
+            assert!((self.shadow_check_func.unwrap())(((mem as usize) + i) as *const c_void, 0x01));
+        }
         }
     }
 
@@ -193,13 +195,14 @@ impl AsanRuntime {
     /// Make sure the specified memory is unpoisoned
     #[allow(clippy::unused_self)]
     pub fn unpoison(&mut self, address: usize, size: usize) {
+        println!("unpoison start_address: {}, size: {}", address, size);
         self.allocator
             .map_shadow_for_region(address, address + size, true);
     }
 
     /// Make sure the specified memory is poisoned
-    #[cfg(target_arch = "aarch64")]
     pub fn poison(&mut self, address: usize, size: usize) {
+        println!("poison start_address: {}, size: {}", address, size);
         Allocator::poison(self.allocator.map_to_shadow(address), size);
     }
 
@@ -321,34 +324,29 @@ impl AsanRuntime {
         (start, end)
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_malloc(&mut self, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__Znam(&mut self, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnamSt11align_val_tRKSt9nothrow_t(
@@ -360,28 +358,24 @@ impl AsanRuntime {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__Znwm(&mut self, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
         unsafe { self.allocator.alloc(size, 8) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[allow(non_snake_case)]
     #[inline]
     fn hook__ZnwmSt11align_val_tRKSt9nothrow_t(
@@ -393,7 +387,6 @@ impl AsanRuntime {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
         let ret = unsafe { self.allocator.alloc(size * nmemb, 8) };
@@ -403,7 +396,6 @@ impl AsanRuntime {
         ret
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
         unsafe {
@@ -418,13 +410,11 @@ impl AsanRuntime {
         }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_check_free(&mut self, ptr: *mut c_void) -> bool {
         self.allocator.is_managed(ptr)
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_free(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
@@ -432,13 +422,12 @@ impl AsanRuntime {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
+    #[cfg(not(target_vendor = "apple"))]
     #[inline]
     fn hook_memalign(&mut self, alignment: usize, size: usize) -> *mut c_void {
         unsafe { self.allocator.alloc(size, alignment) }
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     fn hook_posix_memalign(
         &mut self,
@@ -453,14 +442,13 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
+    #[cfg(not(target_vendor = "apple"))]
     fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
         self.allocator.get_usable_size(ptr)
     }
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -469,7 +457,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -478,7 +465,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -487,7 +473,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -496,7 +481,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
         ptr: *mut c_void,
@@ -510,7 +494,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -519,7 +502,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -528,7 +510,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -537,7 +518,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -546,7 +526,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -555,7 +534,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
         ptr: *mut c_void,
@@ -569,7 +547,6 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -577,7 +554,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_mmap(
         &mut self,
         addr: *const c_void,
@@ -606,7 +582,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_munmap(&mut self, addr: *const c_void, length: usize) -> i32 {
         extern "C" {
             fn munmap(addr: *const c_void, length: usize) -> i32;
@@ -619,14 +594,44 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_write(&mut self, fd: i32, buf: *const c_void, count: usize) -> usize {
         extern "C" {
             fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(buf, count) {
+            #[cfg(target_arch = "aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "write".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().pc() as usize,
+                ),
+                buf as usize,
+                count,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch = "x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "write".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize,
+                ),
+                buf as usize,
+                count,
+                Backtrace::new(),
+            ))); 
+        }
+        unsafe { write(fd, buf, count) }
+    }
+
+    #[inline]
+    fn hook_read(&mut self, fd: i32, buf: *mut c_void, count: usize) -> usize {
+        extern "C" {
+            fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
+        }
+        if !(self.shadow_check_func.unwrap())(buf, count) {
+            #[cfg(target_arch="aarch64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "read".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
                 ),
@@ -634,21 +639,11 @@ impl AsanRuntime {
                 count,
                 Backtrace::new(),
             )));
-        }
-        unsafe { write(fd, buf, count) }
-    }
-
-    #[inline]
-    #[cfg(target_arch = "aarch64")]
-    fn hook_read(&mut self, fd: i32, buf: *mut c_void, count: usize) -> usize {
-        extern "C" {
-            fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(buf, count) {
+            #[cfg(target_arch="x86_64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "read".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 buf as usize,
                 count,
@@ -659,16 +654,26 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_fgets(&mut self, s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void {
         extern "C" {
             fn fgets(s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, size as usize) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "fgets".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                size as usize,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "fgets".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 size as usize,
@@ -679,12 +684,12 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_memcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
         extern "C" {
             fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
                 self.real_address_for_stalked(
@@ -694,12 +699,33 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memcmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memcmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 n,
@@ -710,12 +736,12 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_memcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memcpy".to_string(),
                 self.real_address_for_stalked(
@@ -725,12 +751,35 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                dest as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
+            println!("PC: {:x} src: {:x}, size: {:x}", Interceptor::current_invocation().cpu_context().rip() as usize, src as usize, n);
+            println!("shadow_address: {:x}", self.allocator.map_to_shadow(src as usize));
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcpy".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                src as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 src as usize,
                 n,
@@ -741,12 +790,12 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
     fn hook_mempcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "mempcpy".to_string(),
                 self.real_address_for_stalked(
@@ -756,12 +805,33 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "mempcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                dest as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "mempcpy".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                src as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "mempcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 src as usize,
                 n,
@@ -772,12 +842,12 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_memmove(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
         extern "C" {
             fn memmove(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memmove".to_string(),
                 self.real_address_for_stalked(
@@ -787,12 +857,33 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memmove".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                dest as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmove".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                src as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x64_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memmove".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 src as usize,
                 n,
@@ -803,16 +894,26 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_memset(&mut self, dest: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(dest, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                dest as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memset".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 dest as usize,
                 n,
@@ -823,16 +924,26 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_memchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memchr".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memchr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 n,
@@ -843,16 +954,27 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))]
+    #[cfg(not(target_vendor = "apple"))]
     fn hook_memrchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
         extern "C" {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memrchr".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memrchr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 n,
@@ -863,7 +985,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_memmem(
         &mut self,
         haystack: *const c_void,
@@ -880,6 +1001,7 @@ impl AsanRuntime {
             ) -> *mut c_void;
         }
         if !(self.shadow_check_func.unwrap())(haystack, haystacklen) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
                 self.real_address_for_stalked(
@@ -889,8 +1011,19 @@ impl AsanRuntime {
                 haystacklen,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memmem".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                haystack as usize,
+                haystacklen,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(needle, needlelen) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
                 self.real_address_for_stalked(
@@ -900,21 +1033,42 @@ impl AsanRuntime {
                 needlelen,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "memmem".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                needle as usize,
+                needlelen,
+                Backtrace::new(),
+            )));
         }
         unsafe { memmem(haystack, haystacklen, needle, needlelen) }
     }
 
-    #[cfg(all(not(target_os = "android"), target_arch = "aarch64"))]
+    #[cfg(not(target_os = "android"))]
     #[inline]
     fn hook_bzero(&mut self, s: *mut c_void, n: usize) {
         extern "C" {
             fn bzero(s: *mut c_void, n: usize);
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "bzero".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "bzero".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 n,
@@ -926,7 +1080,6 @@ impl AsanRuntime {
 
     #[cfg(all(
         not(target_os = "android"),
-        target_arch = "aarch64",
         not(target_vendor = "apple")
     ))]
     #[inline]
@@ -935,6 +1088,7 @@ impl AsanRuntime {
             fn explicit_bzero(s: *mut c_void, n: usize);
         }
         if !(self.shadow_check_func.unwrap())(s, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "explicit_bzero".to_string(),
                 self.real_address_for_stalked(
@@ -944,17 +1098,28 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "explicit_bzero".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         unsafe { explicit_bzero(s, n) }
     }
 
-    #[cfg(all(not(target_os = "android"), target_arch = "aarch64"))]
+    #[cfg(not(target_os = "android"))]
     #[inline]
     fn hook_bcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
         extern "C" {
             fn bcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
                 self.real_address_for_stalked(
@@ -964,12 +1129,33 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "bcmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "bcmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 n,
@@ -980,17 +1166,27 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
         extern "C" {
             fn strchr(s: *mut c_char, c: i32) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strchr".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                unsafe { strlen(s) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strchr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1001,17 +1197,27 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strrchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
         extern "C" {
             fn strrchr(s: *mut c_char, c: i32) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strrchr".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                unsafe { strlen(s) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strrchr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1022,13 +1228,13 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strcasecmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
         extern "C" {
             fn strcasecmp(s1: *const c_char, s2: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
                 self.real_address_for_stalked(
@@ -1038,12 +1244,33 @@ impl AsanRuntime {
                 unsafe { strlen(s1) },
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcasecmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                unsafe { strlen(s1) },
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                unsafe { strlen(s2) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcasecmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 unsafe { strlen(s2) },
@@ -1054,12 +1281,12 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strncasecmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
         extern "C" {
             fn strncasecmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
                 self.real_address_for_stalked(
@@ -1069,12 +1296,33 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strncasecmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strncasecmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 n,
@@ -1085,13 +1333,13 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strcat(&mut self, s1: *mut c_char, s2: *const c_char) -> *mut c_char {
         extern "C" {
             fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
                 self.real_address_for_stalked(
@@ -1101,12 +1349,33 @@ impl AsanRuntime {
                 unsafe { strlen(s1) },
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcat".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                unsafe { strlen(s1) },
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                unsafe { strlen(s2) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcat".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 unsafe { strlen(s2) },
@@ -1117,13 +1386,13 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strcmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
         extern "C" {
             fn strcmp(s1: *const c_char, s2: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
                 self.real_address_for_stalked(
@@ -1133,12 +1402,33 @@ impl AsanRuntime {
                 unsafe { strlen(s1) },
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                unsafe { strlen(s1) },
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                unsafe { strlen(s2) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 unsafe { strlen(s2) },
@@ -1149,12 +1439,12 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strncmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
         extern "C" {
             fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(
@@ -1164,12 +1454,33 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strncmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strncmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 n,
@@ -1180,13 +1491,13 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
         extern "C" {
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strcpy".to_string(),
                 self.real_address_for_stalked(
@@ -1196,12 +1507,33 @@ impl AsanRuntime {
                 unsafe { strlen(src) },
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "strcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                dest as usize,
+                unsafe { strlen(src) },
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcpy".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                src as usize,
+                unsafe { strlen(src) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 src as usize,
                 unsafe { strlen(src) },
@@ -1212,12 +1544,12 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strncpy(&mut self, dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char {
         extern "C" {
             fn strncpy(dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strncpy".to_string(),
                 self.real_address_for_stalked(
@@ -1227,12 +1559,33 @@ impl AsanRuntime {
                 n,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "strncpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                dest as usize,
+                n,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, n) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncpy".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                src as usize,
+                n,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strncpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 src as usize,
                 n,
@@ -1243,13 +1596,13 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_stpcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
         extern "C" {
             fn stpcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "stpcpy".to_string(),
                 self.real_address_for_stalked(
@@ -1259,12 +1612,33 @@ impl AsanRuntime {
                 unsafe { strlen(src) },
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "stpcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                dest as usize,
+                unsafe { strlen(src) },
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "stpcpy".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                src as usize,
+                unsafe { strlen(src) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "stpcpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 src as usize,
                 unsafe { strlen(src) },
@@ -1275,7 +1649,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strdup(&mut self, s: *const c_char) -> *mut c_char {
         extern "C" {
             fn strlen(s: *const c_char) -> usize;
@@ -1283,10 +1656,21 @@ impl AsanRuntime {
         }
         let size = unsafe { strlen(s) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strdup".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                unsafe { strlen(s) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strdup".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1302,13 +1686,13 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strlen(&mut self, s: *const c_char) -> usize {
         extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         let size = unsafe { strlen(s) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strlen".to_string(),
                 self.real_address_for_stalked(
@@ -1318,22 +1702,11 @@ impl AsanRuntime {
                 size,
                 Backtrace::new(),
             )));
-        }
-        size
-    }
-
-    #[inline]
-    #[cfg(target_arch = "aarch64")]
-    fn hook_strnlen(&mut self, s: *const c_char, n: usize) -> usize {
-        extern "C" {
-            fn strnlen(s: *const c_char, n: usize) -> usize;
-        }
-        let size = unsafe { strnlen(s, n) };
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
+            #[cfg(target_arch="x86_64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strnlen".to_string(),
+                "strlen".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 size,
@@ -1344,7 +1717,37 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
+    fn hook_strnlen(&mut self, s: *const c_char, n: usize) -> usize {
+        extern "C" {
+            fn strnlen(s: *const c_char, n: usize) -> usize;
+        }
+        let size = unsafe { strnlen(s, n) };
+        if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
+            #[cfg(target_arch="aarch64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strnlen".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                size,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strnlen".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s as usize,
+                size,
+                Backtrace::new(),
+            )));
+        }
+        size
+    }
+
+    #[inline]
     fn hook_strstr(&mut self, haystack: *const c_char, needle: *const c_char) -> *mut c_char {
         extern "C" {
             fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
@@ -1353,6 +1756,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe {
             strlen(haystack)
         }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
                 self.real_address_for_stalked(
@@ -1362,12 +1766,33 @@ impl AsanRuntime {
                 unsafe { strlen(haystack) },
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strstr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                haystack as usize,
+                unsafe { strlen(haystack) },
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                needle as usize,
+                unsafe { strlen(needle) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strstr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 needle as usize,
                 unsafe { strlen(needle) },
@@ -1378,7 +1803,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_strcasestr(&mut self, haystack: *const c_char, needle: *const c_char) -> *mut c_char {
         extern "C" {
             fn strcasestr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
@@ -1387,6 +1811,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe {
             strlen(haystack)
         }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
                 self.real_address_for_stalked(
@@ -1396,12 +1821,33 @@ impl AsanRuntime {
                 unsafe { strlen(haystack) },
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcasestr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                haystack as usize,
+                unsafe { strlen(haystack) },
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                needle as usize,
+                unsafe { strlen(needle) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "strcasestr".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 needle as usize,
                 unsafe { strlen(needle) },
@@ -1412,17 +1858,27 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_atoi(&mut self, s: *const c_char) -> i32 {
         extern "C" {
             fn atoi(s: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoi".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                unsafe { strlen(s) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "atoi".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1433,17 +1889,27 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_atol(&mut self, s: *const c_char) -> i32 {
         extern "C" {
             fn atol(s: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atol".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                unsafe { strlen(s) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "atol".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1454,17 +1920,27 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_atoll(&mut self, s: *const c_char) -> i64 {
         extern "C" {
             fn atoll(s: *const c_char) -> i64;
             fn strlen(s: *const c_char) -> usize;
         }
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoll".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                unsafe { strlen(s) },
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "atoll".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1475,17 +1951,27 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_wcslen(&mut self, s: *const wchar_t) -> usize {
         extern "C" {
             fn wcslen(s: *const wchar_t) -> usize;
         }
         let size = unsafe { wcslen(s) };
         if !(self.shadow_check_func.unwrap())(s as *const c_void, (size + 1) * 2) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcslen".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s as usize,
+                (size + 1) * 2,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "wcslen".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s as usize,
                 (size + 1) * 2,
@@ -1496,7 +1982,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_wcscpy(&mut self, dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t {
         extern "C" {
             fn wcscpy(dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t;
@@ -1505,6 +1990,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe {
             (wcslen(src) + 1) * 2
         }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "wcscpy".to_string(),
                 self.real_address_for_stalked(
@@ -1514,14 +2000,35 @@ impl AsanRuntime {
                 (unsafe { wcslen(src) } + 1) * 2,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "wcscpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                dest as usize,
+                (unsafe { wcslen(src) } + 1) * 2,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe {
             (wcslen(src) + 1) * 2
         }) {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscpy".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                src as usize,
+                (unsafe { wcslen(src) } + 1) * 2,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "wcscpy".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 src as usize,
                 (unsafe { wcslen(src) } + 1) * 2,
@@ -1532,7 +2039,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(target_arch = "aarch64")]
     fn hook_wcscmp(&mut self, s1: *const wchar_t, s2: *const wchar_t) -> i32 {
         extern "C" {
             fn wcscmp(s1: *const wchar_t, s2: *const wchar_t) -> i32;
@@ -1540,6 +2046,7 @@ impl AsanRuntime {
         }
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { (wcslen(s1) + 1) * 2 })
         {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
                 self.real_address_for_stalked(
@@ -1549,13 +2056,34 @@ impl AsanRuntime {
                 (unsafe { wcslen(s1) } + 1) * 2,
                 Backtrace::new(),
             )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "wcscmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
+                ),
+                s1 as usize,
+                (unsafe { wcslen(s1) } + 1) * 2,
+                Backtrace::new(),
+            )));
         }
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { (wcslen(s2) + 1) * 2 })
         {
+            #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
                 self.real_address_for_stalked(
                     Interceptor::current_invocation().cpu_context().pc() as usize
+                ),
+                s2 as usize,
+                (unsafe { wcslen(s2) } + 1) * 2,
+                Backtrace::new(),
+            )));
+            #[cfg(target_arch="x86_64")]
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
+                "wcscmp".to_string(),
+                self.real_address_for_stalked(
+                    Interceptor::current_invocation().cpu_context().rip() as usize
                 ),
                 s2 as usize,
                 (unsafe { wcslen(s2) } + 1) * 2,
@@ -1568,7 +2096,6 @@ impl AsanRuntime {
     /// Hook all functions required for ASAN to function, replacing them with our own
     /// implementations.
     #[allow(clippy::items_after_statements)]
-    #[cfg(target_arch = "aarch64")]
     fn hook_functions(&mut self, gum: &Gum) {
         let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
 
@@ -2184,6 +2711,7 @@ impl AsanRuntime {
         // Rdi start, Rsi size
         dynasm!(ops
         ;    .arch x64
+        ;->SHADOW_DEBUG:
         ;    mov     cl, BYTE shadow_bit as i8
         ;    mov     eax, 1
         ;    mov     edx, 1
@@ -2306,6 +2834,7 @@ impl AsanRuntime {
             .unwrap();
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
+            println!("SHADOW_CHECK ADDR: {:x}", mapping as *mut u8 as usize);
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
         }
     }
