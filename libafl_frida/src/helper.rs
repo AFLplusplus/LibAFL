@@ -128,7 +128,6 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
-
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
