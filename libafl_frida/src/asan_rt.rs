@@ -2432,14 +2432,9 @@ impl AsanRuntime {
             None => actual_pc,
         };
 
-        let backtrace = Backtrace::new();
-
-        // Just a place holder... for now
-        let error = AsanError::Unknown((self.regs, actual_pc, (0, 0, 0, 0), backtrace));
 
         println!("{:#?}", self.regs);
 
-        AsanErrors::get_mut().report_error(error)
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -3150,7 +3145,7 @@ impl AsanRuntime {
         dynasm!(ops_report
             ; .arch x64
             ; report:
-            ; lea rdi, [>self_regs_addr] // load self.regs into rdi
+            ; mov rdi, [>self_regs_addr] // load self.regs into rdi
             ; mov [rdi + 0x80], rsi // return address is loaded into rsi in generate_shadow_check_blob
             ; mov [rdi + 0x8], rbx
             ; mov [rdi + 0x20], rbp
@@ -3172,11 +3167,27 @@ impl AsanRuntime {
             ; mov rsi, [rsp + 0x20]
             ; mov [rdi + 0x30], rsi
             ; mov rsi, rdi // Lastly, we want to save rdi, but we have to copy the address of self.regs into another register
-            ; mov rdi, [rsp + 0x28]
+            ; mov rdi, [rsp + 0x38]
             ; mov [rsi + 0x0], rdi
 
-            ; lea rdi, [>self_addr]
-            ; lea rsi, [>trap_func]
+            ; mov rdi, [>self_addr]
+            ; mov rsi, [>trap_func]
+            ; call rsi
+
+            ; mov rdi, [>self_regs_addr]
+            // restore rbx to r15
+            ; mov rbx, [rdi + 0x8]
+            ; mov rbp, [rdi + 0x20]
+            ; mov rsp, [rdi + 0x28]
+            ; mov r8, [rdi + 0x40]
+            ; mov r9, [rdi + 0x48]
+            ; mov r10, [rdi + 0x50]
+            ; mov r11, [rdi + 0x58]
+            ; mov r12, [rdi + 0x60]
+            ; mov r13, [rdi + 0x68]
+            ; mov r14, [rdi + 0x70]
+            ; mov r15, [rdi + 0x78]
+            ; mov rsi, [rdi + 0x80] // load back >done into rsi
             ; jmp rsi
 
             // Ignore eh_frame_cie for amd64
