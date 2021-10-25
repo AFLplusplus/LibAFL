@@ -128,16 +128,11 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
-    #[cfg(not(target_arch = "aarch64"))]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
 
-    #[cfg(target_arch = "aarch64")]
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
-        #[cfg(target_arch = "aarch64")]
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);
-        #[cfg(target_arch = "aarch64")]
         if self.options.asan_enabled() {
             self.asan_runtime
                 .unpoison(slice.as_ptr() as usize, slice.len());
@@ -153,7 +148,6 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
-        #[cfg(target_arch = "aarch64")]
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
                 self.asan_runtime.check_for_leaks();

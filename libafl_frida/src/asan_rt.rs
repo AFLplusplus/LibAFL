@@ -141,7 +141,6 @@ impl AsanRuntime {
 
         unsafe {
         let mem = self.allocator.alloc(0xac + 2, 8);
-
         unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
         println!("Test0");
         /*
@@ -168,10 +167,11 @@ impl AsanRuntime {
         println!("Test9");
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
         println!("FIN");
-
+        
         for i in 0..0xad {
             assert!((self.shadow_check_func.unwrap())(((mem as usize) + i) as *const c_void, 0x01));
         }
+        assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
     }
 
@@ -765,6 +765,26 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(src, n) {
             println!("PC: {:x} src: {:x}, size: {:x}", Interceptor::current_invocation().cpu_context().rip() as usize, src as usize, n);
             println!("shadow_address: {:x}", self.allocator.map_to_shadow(src as usize));
+            //  Debug this with a debug build: 0x5555559b3287 <libafl_frida::asan_rt::AsanRuntime::hook_memcpy+727>
+            /*
+ RAX  0x7ffff7ffb000 ◂— mov    cl, 0x2c /* 0xba00000001b82cb1 */
+ RBX  0xe4
+ RCX  0xf
+ RDX  0xf
+ RDI  0x555558ca5c10 ◂— 0xa1a0a0d474e5089
+ RSI  0xe4
+ R8   0x1c
+ R9   0x16000000a200 ◂— 0xffffffffffffffff
+ R10  0x16000000a21c ◂— 0xf0
+ R11  0xff
+ R12  0x555558ca5c10 ◂— 0xa1a0a0d474e5089
+ R13  0x555558c74e40 ◂— 'LLVMFuzzerTestOneInput'
+ R14  0x300000051000 ◂— 0x0
+ R15  0x555558c74980 —▸ 0x555558c74e80 ◂— './libpng-harness.so'
+ RBP  0x7ffffffe2290 ◂— 0x13
+*RSP  0x7ffffffe1b78 —▸ 0x5555559b3289 (libafl_frida::asan_rt::AsanRuntime::hook_memcpy+729) ◂— mov    byte ptr [rsp + 0xa7], al
+*RIP  0x7ffff7ffb000 ◂— mov    cl, 0x2c /* 0xba00000001b82cb1 */
+            */
             #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcpy".to_string(),
@@ -2630,11 +2650,13 @@ impl AsanRuntime {
                 uint8_t mask = (1 << shift) - 1;
 
                 // bitwise reverse for amd64 :<
-                // https://stackoverflow.com/questions/2602823/in-c-c-whats-the-simplest-way-to-reverse-the-order-of-bits-in-a-byte
-                uint8_t val = *(uint8_t *)addr;
-                val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
-                val = (val & 0xff) >> 2 | (val & 0x33) << 2;
-                val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+                // https://gist.github.com/yantonov/4359090
+                // we need 16bit number here, (not 8bit)
+                uint16_t val = *(uint16_t *)addr;
+                val = (val & 0xff00) >> 8 | (val & 0x00ff) << 8;
+                val = (val & 0xf0f0) >> 4 | (val & 0x0f0f) << 4;
+                val = (val & 0xcccc) >> 2 | (val & 0x3333) << 2;
+                val = (val & 0xaaaa) >> 1 | (val & 0x5555) << 1;
                 val = (val >> remainder);
                 if((val & mask) != mask){
                     // goto return failure
@@ -2710,115 +2732,119 @@ impl AsanRuntime {
 
         // Rdi start, Rsi size
         dynasm!(ops
-        ;    .arch x64
-        ;->SHADOW_DEBUG:
-        ;    mov     cl, BYTE shadow_bit as i8
-        ;    mov     eax, 1
-        ;    mov     edx, 1
-        ;    shl     rdx, cl
-        ;    mov     r9d, 2
-        ;    shl     r9, cl
-        ;    test    rsi, rsi
-        ;    je      >LBB0_15
-        ;    mov     rcx, rdi
-        ;    shr     rcx, 3
-        ;    add     rdx, rcx
-        ;    add     r9, -1
-        ;    and     r9, rdx
-        ;    and     edi, 7
-        ;    je      >LBB0_4
-        ;    mov     cl, 8
-        ;    sub     cl, dil
-        ;    cmp     rsi, 8
-        ;    movzx   ecx, cl
-        ;    mov     r8d, esi
-        ;    cmovae  r8d, ecx
-        ;    mov     r10d, -1
-        ;    mov     ecx, r8d
-        ;    shl     r10d, cl
-        ;    mov     cl, BYTE [r9]
-        ;    rol     cl, 4
-        ;    mov     edx, ecx
-        ;    shr     dl, 2
-        ;    shl     cl, 2
-        ;    and     cl, -52
-        ;    or      cl, dl
-        ;    mov     edx, ecx
-        ;    shr     dl, 1
-        ;    and     dl, 85
-        ;    add     cl, cl
-        ;    and     cl, -86
-        ;    or      cl, dl
-        ;    movzx   edx, cl
-        ;    mov     ecx, edi
-        ;    shr     edx, cl
-        ;    not     r10d
-        ;    movzx   ecx, r10b
-        ;    and     edx, ecx
-        ;    cmp     edx, ecx
-        ;    jne     >LBB0_11
-        ;    movzx   ecx, r8b
-        ;    sub     rsi, rcx
-        ;    add     r9, 1
+        ;       .arch x64
+        ;       mov     cl, shadow_bit as i8
+        ;       mov     eax, 1
+        ;       mov     edx, 1
+        ;       shl     rdx, cl
+        ;       mov     r10d, 2
+        ;       shl     r10, cl
+        ;       test    rsi, rsi
+        ;       je      >LBB0_15
+        ;       mov     rcx, rdi
+        ;       shr     rcx, 3
+        ;       add     rdx, rcx
+        ;       add     r10, -1
+        ;       and     r10, rdx
+        ;       and     edi, 7
+        ;       je      >LBB0_4
+        ;       mov     cl, 8
+        ;       sub     cl, dil
+        ;       cmp     rsi, 8
+        ;       movzx   ecx, cl
+        ;       mov     r8d, esi
+        ;       cmovae  r8d, ecx
+        ;       mov     r9d, -1
+        ;       mov     ecx, r8d
+        ;       shl     r9d, cl
+        ;       movzx   ecx, WORD [r10]
+        ;       rol     cx, 8
+        ;       mov     edx, ecx
+        ;       shr     edx, 4
+        ;       and     edx, 3855
+        ;       shl     ecx, 4
+        ;       and     ecx, -3856
+        ;       or      ecx, edx
+        ;       mov     edx, ecx
+        ;       shr     edx, 2
+        ;       and     edx, 13107
+        ;       and     ecx, -3277
+        ;       lea     ecx, [rdx + 4*rcx]
+        ;       mov     edx, ecx
+        ;       shr     edx, 1
+        ;       and     edx, 21845
+        ;       and     ecx, -10923
+        ;       lea     ecx, [rdx + 2*rcx]
+        ;       movzx   edx, cx
+        ;       mov     ecx, edi
+        ;       shr     edx, cl
+        ;       not     r9d
+        ;       movzx   ecx, r9b
+        ;       and     edx, ecx
+        ;       cmp     edx, ecx
+        ;       jne     >LBB0_11
+        ;       movzx   ecx, r8b
+        ;       sub     rsi, rcx
+        ;       add     r10, 1
         ;LBB0_4:
-        ;    mov     r8, rsi
-        ;    shr     r8, 3
-        ;    mov     r10, r8
-        ;    and     r10, -8
-        ;    mov     edi, r8d
-        ;    and     edi, 7
-        ;    add     r10, r9
-        ;    and     esi, 63
-        ;    mov     rdx, r8
-        ;    mov     rcx, r9
+        ;       mov     r8, rsi
+        ;       shr     r8, 3
+        ;       mov     r9, r8
+        ;       and     r9, -8
+        ;       mov     edi, r8d
+        ;       and     edi, 7
+        ;       add     r9, r10
+        ;       and     esi, 63
+        ;       mov     rdx, r8
+        ;       mov     rcx, r10
         ;LBB0_5:
-        ;    cmp     rdx, 7
-        ;    jbe     >LBB0_8
-        ;    add     rdx, -8
-        ;    cmp     QWORD [rcx], -1
-        ;    lea     rcx, [rcx + 8]
-        ;    je      <LBB0_5
-        ;    jmp     >LBB0_11
+        ;       cmp     rdx, 7
+        ;       jbe     >LBB0_8
+        ;       add     rdx, -8
+        ;       cmp     QWORD [rcx], -1
+        ;       lea     rcx, [rcx + 8]
+        ;       je      <LBB0_5
+        ;       jmp     >LBB0_11
         ;LBB0_8:
-        ;    lea     rcx, [8*rdi]
-        ;    sub     rsi, rcx
+        ;       lea     rcx, [8*rdi]
+        ;       sub     rsi, rcx
         ;LBB0_9:
-        ;    test    rdi, rdi
-        ;    je      >LBB0_13
-        ;    add     rdi, -1
-        ;    cmp     BYTE [r10], -1
-        ;    lea     r10, [r10 + 1]
-        ;    je      <LBB0_9
+        ;       test    rdi, rdi
+        ;       je      >LBB0_13
+        ;       add     rdi, -1
+        ;       cmp     BYTE [r9], -1
+        ;       lea     r9, [r9 + 1]
+        ;       je      <LBB0_9
         ;LBB0_11:
-        ;    xor     eax, eax
-        ;    ret
+        ;       xor     eax, eax
+        ;       ret
         ;LBB0_13:
-        ;    test    rsi, rsi
-        ;    je      >LBB0_15
-        ;    and     sil, 7
-        ;    mov     dl, -1
-        ;    mov     ecx, esi
-        ;    shl     dl, cl
-        ;    not     dl
-        ;    mov     cl, BYTE [r8 + r9]
-        ;    rol     cl, 4
-        ;    mov     eax, ecx
-        ;    shr     al, 2
-        ;    shl     cl, 2
-        ;    and     cl, -52
-        ;    or      cl, al
-        ;    mov     eax, ecx
-        ;    shr     al, 1
-        ;    and     al, 85
-        ;    add     cl, cl
-        ;    and     cl, -86
-        ;    or      cl, al
-        ;    and     cl, dl
-        ;    xor     eax, eax
-        ;    cmp     cl, dl
-        ;    sete    al
+        ;       test    rsi, rsi
+        ;       je      >LBB0_15
+        ;       and     sil, 7
+        ;       mov     dl, -1
+        ;       mov     ecx, esi
+        ;       shl     dl, cl
+        ;       not     dl
+        ;       mov     cl, BYTE [r8 + r10]
+        ;       rol     cl, 4
+        ;       mov     eax, ecx
+        ;       shr     al, 2
+        ;       shl     cl, 2
+        ;       and     cl, -52
+        ;       or      cl, al
+        ;       mov     eax, ecx
+        ;       shr     al, 1
+        ;       and     al, 85
+        ;       add     cl, cl
+        ;       and     cl, -86
+        ;       or      cl, al
+        ;       and     cl, dl
+        ;       xor     eax, eax
+        ;       cmp     cl, dl
+        ;       sete    al
         ;LBB0_15:
-        ;    ret
+        ;       ret
             );
 
         let blob = ops.finalize().unwrap();
