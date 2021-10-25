@@ -1,7 +1,5 @@
 //! Tracing of expressions in a serialized form.
 
-use std::num::NonZeroUsize;
-
 pub use libafl::observers::concolic::serialization_format::StdShMemMessageFileWriter;
 use libafl::observers::concolic::SymExpr;
 
@@ -32,7 +30,7 @@ impl TracingRuntime {
     }
 }
 
-/// A macro to generate the boilerplate for declaring a runtime function for SymCC that simply logs the function call
+/// A macro to generate the boilerplate for declaring a runtime function for `SymCC` that simply logs the function call
 /// according to [`concolic::SymExpr`].
 macro_rules! expression_builder {
     ($method_name:ident ( $($param_name:ident : $param_type:ty ),+ ) => $message:ident) => {
