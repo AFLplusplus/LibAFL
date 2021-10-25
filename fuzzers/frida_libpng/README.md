@@ -38,15 +38,16 @@ You can also fuzz libpng-1.6.37 on windows with frida mode!
 2. Build libpng1.6.37 
    - Open libpng-1.6.37/projects/vstudio/vstudio.sln 
    - Open Build->Configuration Manager 
-      - select Release for Active soltuion configuration and 
+      - select Release for Active solution configuration and 
       - select <New>->x64 for Active solution platform (Copy settings from Win32) 
    - Then for libpng, pngstest, pngtest, pngunknown, pngvalid, zlib in Solution Explorer, choose General -> Configuration Type -> Static library(.lib) 
       - C/C++ -> Treat Warnings As Errors -> No
       - C/C++ -> Code Generation -> Runtime Library -> Multi-threaded (/MT)
-   - Finally you can build libpng-1.6.37
+   - Finally, you can build libpng-1.6.37
 3. Compile the harness
 Fire up a powershell at this directory.
 ```
+cargo build --release
 cp .\libpng-1.6.37\projects\vstudio\x64\Release\libpng16.lib .
 cp .\libpng-1.6.37\projects\vstudio\x64\Release\zlib.lib .
 cp .\target\release\frida_libpng.exe .
