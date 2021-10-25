@@ -141,7 +141,6 @@ impl AsanRuntime {
         #[cfg(target_arch = "aarch64")]
         self.hook_functions(_gum);
 
-        /*
         unsafe {
         let mem = self.allocator.alloc(0xac + 2, 8);
 
@@ -172,7 +171,6 @@ impl AsanRuntime {
         assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
         println!("FIN");
         }
-        */
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -2598,7 +2596,7 @@ impl AsanRuntime {
     }
 
     // Save registers into self_regs_addr
-    // Five registers, Rdi, Rsi, Rdx, Rcx, Rax are saved before entering this function
+    // Five registers, Rdi, Rsi, Rdx, Rcx, Rax are saved in emit_shadow_check before entering this function
     // So we retrieve them after saving other registers
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::similar_names)]

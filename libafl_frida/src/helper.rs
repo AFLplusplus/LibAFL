@@ -859,6 +859,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => 0,
         };
 
+        /*
         if self.current_report_impl == 0
             || !writer.can_branch_directly_to(self.current_report_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
@@ -877,6 +878,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
             writer.put_label(after_report_impl);
         }
+        */
         /* Save registers that we'll use later in shadow_check_blob
 
                                         | Rcx   | Rax   |
@@ -934,11 +936,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => false,
         };
         */
+
+        /*
         writer.put_jmp_near_label(self.current_report_impl);
         for _ in 0..10 {
             // shadow_check_blob's done will land somewhere in these nops
             writer.put_nop();
         }
+        */
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
         writer.put_pop_reg(X86Register::Rdx);
