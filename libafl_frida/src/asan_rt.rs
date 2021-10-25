@@ -2586,6 +2586,7 @@ impl AsanRuntime {
         AsanErrors::get_mut().report_error(error);
     }
 
+    // https://godbolt.org/z/Y87PYGd69
     /*
     #include <stdio.h>
     #include <stdint.h>
@@ -2957,6 +2958,7 @@ impl AsanRuntime {
         }
     }
 
+    // https://godbolt.org/z/cqEKf63e1
     /*
     #include <stdio.h>
     #include <stdint.h>
