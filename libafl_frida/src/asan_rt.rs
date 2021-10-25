@@ -129,7 +129,6 @@ impl AsanRuntime {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
 
-        #[cfg(target_arch = "aarch64")]
         self.generate_instrumentation_blobs();
 
         self.generate_shadow_check_function();
@@ -3175,11 +3174,23 @@ impl AsanRuntime {
             ; mov rsi, rdi // Lastly, we want to save rdi, but we have to copy the address of self.regs into another register
             ; mov rdi, [rsp + 0x28]
             ; mov [rsi + 0x0], rdi
+
+            ; lea rdi, [>self_addr]
+            ; lea rsi, [>trap_func]
+            ; jmp rsi
+
+            // Ignore eh_frame_cie for amd64
+            // See discussions https://github.com/AFLplusplus/LibAFL/pull/331
+
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
             ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+            ; trap_func:
+            ; .qword AsanRuntime::handle_trap as *mut c_void as i64
         );
+        self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
+
         self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
         self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
         self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));

@@ -819,19 +819,19 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
     #[cfg(target_arch = "x86_64")]
     #[inline]
-    fn emit_shadow_check(
+    pub fn emit_shadow_check(
         &mut self,
         _address: u64,
         output: &StalkerOutput,
         _segment: RegId,
-        _width: u8,
+        width: u8,
         basereg: RegId,
         indexreg: RegId,
         scale: i32,
         disp: i64,
     ) {
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i64;
-
+        println!("XXX");
         let writer = output.writer();
 
         let basereg = if basereg.0 != 0 {
@@ -852,8 +852,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             8 => 3,
             _ => 0,
         };
-
-        /*
+        println!("000");
         if self.current_report_impl == 0
             || !writer.can_branch_directly_to(self.current_report_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
@@ -866,13 +865,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
             writer.put_b_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
-
+            println!("self.current_report_impl {:x}", self.current_report_impl);
             #[cfg(unix)]
             writer.put_bytes(self.asan_runtime.blob_report());
 
             writer.put_label(after_report_impl);
         }
-        */
         /* Save registers that we'll use later in shadow_check_blob
 
                                         | Rcx   | Rax   |
@@ -912,7 +910,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
         writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
 
-        /*
         #[cfg(unix)]
         match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
@@ -929,15 +926,15 @@ impl<'a> FridaInstrumentationHelper<'a> {
             64 => writer.put_bytes(&self.asan_runtime.blob_check_mem_64bytes()),
             _ => false,
         };
-        */
 
-        /*
-        writer.put_jmp_near_label(self.current_report_impl);
+        println!("AAA");
+        writer.put_jmp_address(self.current_report_impl);
+        println!("BBB");
         for _ in 0..10 {
             // shadow_check_blob's done will land somewhere in these nops
             writer.put_nop();
         }
-        */
+
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
         writer.put_pop_reg(X86Register::Rdx);
@@ -1302,7 +1299,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
                     let insn_id: X86Insn = instr.id().0.into();
-                    /*
                     println!(
                         "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
                         insn_id,
@@ -1314,7 +1310,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         opmem.scale(),
                         opmem.disp(),
                     );
-                    */
                     if opmem.segment() != RegId(0) {
                         return Ok((
                             opmem.segment(),
