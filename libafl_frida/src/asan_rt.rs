@@ -62,7 +62,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
-// sixteen general purpose registers, rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15, plus rip (instrumented location)
+// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus rip (instrumented location)
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 17;
 
@@ -2597,6 +2597,9 @@ impl AsanRuntime {
         ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
 
+    // Save registers into self_regs_addr
+    // Five registers, Rdi, Rsi, Rdx, Rcx, Rax are saved before entering this function
+    // So we retrieve them after saving other registers
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::similar_names)]
     #[allow(clippy::cast_possible_wrap)]
@@ -2606,8 +2609,30 @@ impl AsanRuntime {
         dynasm!(ops_report
             ; .arch x64
             ; report:
-
-
+            ; lea rdi, [>self_regs_addr] // load self.regs into rdi
+            ; mov [rdi + 0x80], rsi // return address is loaded into rsi in generate_shadow_check_blob
+            ; mov [rdi + 0x8], rbx
+            ; mov [rdi + 0x20], rbp
+            ; mov [rdi + 0x28], rsp
+            ; mov [rdi + 0x40], r8
+            ; mov [rdi + 0x48], r9
+            ; mov [rdi + 0x50], r10
+            ; mov [rdi + 0x58], r11
+            ; mov [rdi + 0x60], r12
+            ; mov [rdi + 0x68], r13
+            ; mov [rdi + 0x70], r14
+            ; mov [rdi + 0x78], r15
+            ; mov rax, [rsp + 0x8]
+            ; mov [rdi + 0x0], rax
+            ; mov rcx, [rsp + 0x10]
+            ; mov [rdi + 0x10], rcx
+            ; mov rdx, [rsp + 0x18]
+            ; mov [rdi + 0x18], rdx
+            ; mov rsi, [rsp + 0x20]
+            ; mov [rdi + 0x30], rsi
+            ; mov rsi, rdi // Lastly, we want to save rdi, but we have to copy the address of self.regs into another register
+            ; mov rdi, [rsp + 0x28]
+            ; mov [rsi + 0x0], rdi
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
