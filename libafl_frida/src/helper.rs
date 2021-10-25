@@ -320,10 +320,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
             drcov_basic_blocks: vec![],
         };
 
+
         if helper.options().stalker_enabled() {
             for (i, module) in helper.module_map.values().iter().enumerate() {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
+                println!("start: {:x}", start);
                 helper
                     .ranges
                     .insert(start..(start + range.size()), (i as u16, module.path()));
@@ -349,12 +351,13 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 for instruction in basic_block {
                     let instr = instruction.instr();
                     let address = instr.address();
-                    //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                    //println!("address: {:x} contains: {:?}", address, helper.ranges.contains_key(&(address as usize)));
+                    // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                    println!("address: {:x} contains: {:?}", address, helper.ranges.contains_key(&(address as usize)));
+                    println!("Ranges: {:#?}", helper.ranges);
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {
                             first = false;
-                            //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                            // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
                             if helper.options().coverage_enabled() {
                                 helper.emit_coverage_mapping(address, &output);
                             }
@@ -833,16 +836,16 @@ impl<'a> FridaInstrumentationHelper<'a> {
         println!("XXX");
         let writer = output.writer();
 
-        let basereg = if basereg.0 != 0 {
-            Some(self.writer_register(basereg))
-        } else {
+        let basereg = if basereg.0 == 0 {
             None
+        } else {
+            Some(self.writer_register(basereg))
         };
 
-        let indexreg = if indexreg.0 != 0 {
-            Some(self.writer_register(indexreg))
-        } else {
+        let indexreg = if indexreg.0 == 0 {
             None
+        } else {
+            Some(self.writer_register(indexreg))
         };
 
         let scale = match scale {

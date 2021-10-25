@@ -65,9 +65,34 @@ impl Allocator {
         // probe to find a usable shadow bit:
         let mut shadow_bit: usize = 0;
 
+        #[cfg(target_arch = "aarch64")]
+        for try_shadow_bit in &[46usize, 36usize] {
+            let addr: usize = 1 << try_shadow_bit;
+            if unsafe {
+                mmap(
+                    addr as *mut c_void,
+                    page_size,
+                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                    MapFlags::MAP_PRIVATE
+                        | ANONYMOUS_FLAG
+                        | MapFlags::MAP_FIXED
+                        | MapFlags::MAP_NORESERVE,
+                    -1,
+                    0,
+                )
+            }
+            .is_ok()
+            {
+                shadow_bit = *try_shadow_bit;
+                break;
+            }
+        }
+
+
         // x86_64's userspace's up to 0x7fff-ffff-ffff so 46 is not available. (0x4000-0000-0000 - 0xc000-0000-0000)
         // we'd also want to avoid 0x5555-xxxx-xxxx because programs are mapped there. so 45 is not available either (0x2000-0000-0000 - 0x6000-0000-0000).
-        // TODO: fix it back for aarch64
+        // This memory map is for amd64 linux.
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
         for try_shadow_bit in &[44usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
