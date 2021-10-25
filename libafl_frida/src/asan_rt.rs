@@ -2852,7 +2852,7 @@ impl AsanRuntime {
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
-            ; .arch x64
+            ; .arch aarch64
 
             // calculate the shadow address
             ; mov x5, #1
@@ -2980,11 +2980,13 @@ impl AsanRuntime {
         uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
         addr = addr & mask;
 
-        uint8_t val = *(uint8_t *)addr;
         uint8_t remainder = start & 0b111;
-        val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
-        val = (val & 0xff) >> 2 | (val & 0x33) << 2;
-        val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+        uint16_t val = *(uint16_t *)addr;
+        val = (val & 0xff00) >> 8 | (val & 0x00ff) << 8;
+        val = (val & 0xf0f0) >> 4 | (val & 0x0f0f) << 4;
+        val = (val & 0xcccc) >> 2 | (val & 0x3333) << 2;
+        val = (val & 0xaaaa) >> 1 | (val & 0x5555) << 1;
+        val = (val >> 8) | (val << 8); // swap the byte
         val = (val >> remainder);
 
         uint8_t mask2 = (1 << bit) - 1;
@@ -3010,37 +3012,43 @@ impl AsanRuntime {
                 ;   mov     eax, 1
                 ;   shl     rax, cl
                 ;   mov     rdx, rdi
-                ;   shr     rdx, 3
                 ;   mov     esi, 2
                 ;   shl     rsi, cl
+                ;   shr     rdx, 3
                 ;   add     rdx, rax
                 ;   add     rsi, -1
                 ;   and     rsi, rdx
-                ;   mov     al, BYTE [rsi]
+                ;   movzx   eax, WORD [rsi]
+                ;   rol     ax, 8
+                ;   mov     ecx, eax
+                ;   shr     ecx, 4
+                ;   and     ecx, 3855
+                ;   shl     eax, 4
+                ;   and     eax, -3856
+                ;   or      eax, ecx
+                ;   mov     ecx, eax
+                ;   shr     ecx, 2
+                ;   and     ecx, 13107
+                ;   and     eax, -3277
+                ;   lea     eax, [rcx + 4*rax]
+                ;   mov     ecx, eax
+                ;   shr     ecx, 1
+                ;   and     ecx, 21845
+                ;   and     eax, -10923
+                ;   lea     eax, [rcx + 2*rax]
+                ;   rol     ax, 8
+                ;   movzx   edx, ax
                 ;   and     dil, 7
-                ;   rol     al, 4
-                ;   mov     ecx, eax
-                ;   shr     cl, 2
-                ;   shl     al, 2
-                ;   and     al, -52
-                ;   or      al, cl
-                ;   mov     ecx, eax
-                ;   shr     cl, 1
-                ;   and     cl, 85
-                ;   add     al, al
-                ;   and     al, -86
-                ;   or      al, cl
                 ;   mov     ecx, edi
-                ;   shr     al, cl
-                ;   mov     cl, bit as i8
-                ;   mov     edx, -1
-                ;   shl     edx, cl
-                ;   not     edx
+                ;   shr     edx, cl
+                ;   mov     cl, BYTE bit as i8
+                ;   mov     eax, -1
+                ;   shl     eax, cl
+                ;   not     eax
                 ;   movzx   ecx, al
-                ;   movzx   edx, dl
-                ;   and     ecx, edx
+                ;   and     edx, ecx
                 ;   xor     eax, eax
-                ;   cmp     ecx, edx
+                ;   cmp     edx, ecx
                 ;   je      >done
                 ;   lea     rsi, [>done] // leap 10 bytes forward
                 ;   nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
