@@ -6,6 +6,9 @@ pub use bytes::BytesInput;
 pub mod encoded;
 pub use encoded::*;
 
+pub mod gramatron;
+pub use gramatron::*;
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,

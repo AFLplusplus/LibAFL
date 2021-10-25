@@ -485,13 +485,13 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        G: Generator<I, R>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
         EM: EventFirer<I, Self>,
     {
         let mut added = 0;
         for _ in 0..num {
-            let input = generator.generate(self.rand_mut())?;
+            let input = generator.generate(self)?;
             if forced {
                 let _ = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
@@ -523,7 +523,7 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        G: Generator<I, R>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
         EM: EventFirer<I, Self>,
     {
@@ -540,7 +540,7 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        G: Generator<I, R>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
         EM: EventFirer<I, Self>,
     {

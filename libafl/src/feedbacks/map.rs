@@ -242,10 +242,9 @@ where
             .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
-        if size <= map_state.history_map.len() {
-            panic!("Could be a bug or are you using the same coverage map for NONASAN and ASAN fuzzers? Adjust to use different coverage map for each different config");
+        if size > map_state.history_map.len() {
+            panic!("The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
         }
-
         assert!(size <= observer.map().len());
 
         if self.novelties.is_some() {
