@@ -320,7 +320,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             drcov_basic_blocks: vec![],
         };
 
-
         if helper.options().stalker_enabled() {
             for (i, module) in helper.module_map.values().iter().enumerate() {
                 let range = module.range();
@@ -352,7 +351,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     let instr = instruction.instr();
                     let address = instr.address();
                     // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                    println!("address: {:x} contains: {:?}", address, helper.ranges.contains_key(&(address as usize)));
+                    println!(
+                        "address: {:x} contains: {:?}",
+                        address,
+                        helper.ranges.contains_key(&(address as usize))
+                    );
                     println!("Ranges: {:#?}", helper.ranges);
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {

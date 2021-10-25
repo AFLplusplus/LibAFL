@@ -88,7 +88,6 @@ impl Allocator {
             }
         }
 
-
         // x86_64's userspace's up to 0x7fff-ffff-ffff so 46 is not available. (0x4000-0000-0000 - 0xc000-0000-0000)
         // we'd also want to avoid 0x5555-xxxx-xxxx because programs are mapped there. so 45 is not available either (0x2000-0000-0000 - 0x6000-0000-0000).
         // This memory map is for amd64 linux.
