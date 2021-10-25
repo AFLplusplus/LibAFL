@@ -139,6 +139,8 @@ impl AsanRuntime {
 
         self.hook_functions(_gum);
 
+        /*
+
         unsafe {
         let mem = self.allocator.alloc(0xac + 2, 8);
         unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
@@ -173,6 +175,8 @@ impl AsanRuntime {
         }
         // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
+
+        */
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -195,14 +199,12 @@ impl AsanRuntime {
     /// Make sure the specified memory is unpoisoned
     #[allow(clippy::unused_self)]
     pub fn unpoison(&mut self, address: usize, size: usize) {
-        println!("unpoison start_address: {}, size: {}", address, size);
         self.allocator
             .map_shadow_for_region(address, address + size, true);
     }
 
     /// Make sure the specified memory is poisoned
     pub fn poison(&mut self, address: usize, size: usize) {
-        println!("poison start_address: {}, size: {}", address, size);
         Allocator::poison(self.allocator.map_to_shadow(address), size);
     }
 
@@ -763,28 +765,6 @@ impl AsanRuntime {
             )));
         }
         if !(self.shadow_check_func.unwrap())(src, n) {
-            println!("PC: {:x} src: {:x}, size: {:x}", Interceptor::current_invocation().cpu_context().rip() as usize, src as usize, n);
-            println!("shadow_address: {:x}", self.allocator.map_to_shadow(src as usize));
-            //  Debug this with a debug build: 0x5555559b3287 <libafl_frida::asan_rt::AsanRuntime::hook_memcpy+727>
-            /*
- RAX  0x7ffff7ffb000 ◂— mov    cl, 0x2c /* 0xba00000001b82cb1 */
- RBX  0xe4
- RCX  0xf
- RDX  0xf
- RDI  0x555558ca5c10 ◂— 0xa1a0a0d474e5089
- RSI  0xe4
- R8   0x1c
- R9   0x16000000a200 ◂— 0xffffffffffffffff
- R10  0x16000000a21c ◂— 0xf0
- R11  0xff
- R12  0x555558ca5c10 ◂— 0xa1a0a0d474e5089
- R13  0x555558c74e40 ◂— 'LLVMFuzzerTestOneInput'
- R14  0x300000051000 ◂— 0x0
- R15  0x555558c74980 —▸ 0x555558c74e80 ◂— './libpng-harness.so'
- RBP  0x7ffffffe2290 ◂— 0x13
-*RSP  0x7ffffffe1b78 —▸ 0x5555559b3289 (libafl_frida::asan_rt::AsanRuntime::hook_memcpy+729) ◂— mov    byte ptr [rsp + 0xa7], al
-*RIP  0x7ffff7ffb000 ◂— mov    cl, 0x2c /* 0xba00000001b82cb1 */
-            */
             #[cfg(target_arch="aarch64")]
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcpy".to_string(),
@@ -2862,7 +2842,6 @@ impl AsanRuntime {
             .unwrap();
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
-            println!("SHADOW_CHECK ADDR: {:x}", mapping as *mut u8 as usize);
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
         }
     }
