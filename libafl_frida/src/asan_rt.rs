@@ -2431,9 +2431,7 @@ impl AsanRuntime {
         };
 
         self.dump_registers();
-        while(true){
-
-        }
+        while (true) {}
         panic!("asan errors!");
     }
 
@@ -2610,7 +2608,6 @@ impl AsanRuntime {
         println!("R14: {:x}", self.regs[14]);
         println!("R15: {:x}", self.regs[15]);
         println!("Return address: {:x}", self.regs[16]);
-
     }
 
     // https://godbolt.org/z/Y87PYGd69
@@ -3197,10 +3194,15 @@ impl AsanRuntime {
 
             ; mov rdi, [>self_addr]
             ; mov rsi, [>trap_func]
-            ; add rsp, -8 // Adjust rsp to align it with 16 bytes boundary
+
+            // Align the rsp to 16bytes boundary
+            // This adds either -8 or -16 to the currrent rsp.
+            // rsp is restored later from self.regs
+            ; add rsp, -8
+            ; and rsp, -16
+
             ; call rsi
 
-            ; add rsp, 8
             ; mov rdi, [>self_regs_addr]
             // restore rbx to r15
             ; mov rbx, [rdi + 0x8]

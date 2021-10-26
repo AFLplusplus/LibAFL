@@ -825,8 +825,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         ));
     }
 
-
-
     #[inline]
     pub fn emit_shadow_check(
         &mut self,
@@ -900,21 +898,19 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Things are a bit different when Rip is either base register or index register.
         Suppose we have an instruction like
         `bnd jmp qword ptr [rip + 0x2e4b5]`
-        We can't just emit code like 
+        We can't just emit code like
         `mov rdi, rip` to get RIP loaded into RDI,
         because this RIP is NOT the orginal RIP (, which is usually within .text) anymore, rather it is pointing to the memory allocated by the frida stalker.
         Please confer https://frida.re/docs/stalker/ for details.
         */
         // Init Rdi
         match basereg {
-            Some(reg) => {
-                match reg {
-                    X86Register::Rip => {
-                        writer.put_mov_reg_address(X86Register::Rdi, true_rip);
-                    },
-                    _ => {
-                        writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
-                    }
+            Some(reg) => match reg {
+                X86Register::Rip => {
+                    writer.put_mov_reg_address(X86Register::Rdi, true_rip);
+                }
+                _ => {
+                    writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
                 }
             },
             None => {
@@ -923,14 +919,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
         }
 
         match indexreg {
-            Some(reg) => {
-                match reg {
-                    X86Register::Rip => {
-                        writer.put_mov_reg_address(X86Register::Rsi, true_rip);
-                    },
-                    _ => {
-                        writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
-                    }
+            Some(reg) => match reg {
+                X86Register::Rip => {
+                    writer.put_mov_reg_address(X86Register::Rsi, true_rip);
+                }
+                _ => {
+                    writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
                 }
             },
             None => {
@@ -946,7 +940,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         // Finally set Rdi to base + index * scale + disp
         writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
         writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
-
 
         #[cfg(unix)]
         match width {
@@ -1320,8 +1313,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
         // Ignore lea instruction
         match instr.mnemonic().unwrap() {
             "lea" => return Err(()),
-             // I don't know why nop has X86OperandType::Mem.. but let's put it to white-list
-             // like `nop dword [rax + rax]`
+            // put nop into the white-list so that instructions like
+            // like `nop dword [rax + rax]` does not get caught.
             "nop" => return Err(()),
             _ => (),
         }
@@ -1331,6 +1324,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
                     let insn_id: X86Insn = instr.id().0.into();
+                    /*
                     println!(
                         "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
                         insn_id,
@@ -1342,6 +1336,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         opmem.scale(),
                         opmem.disp(),
                     );
+                    */
                     if opmem.segment() == RegId(0) {
                         return Ok((
                             opmem.segment(),
