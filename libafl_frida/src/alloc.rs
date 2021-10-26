@@ -400,10 +400,12 @@ impl Allocator {
             let shadow_end =
                 self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
+                /*
                 println!(
                     "range: {:x}-{:x}, pagesize: {}",
                     range.start, range.end, self.page_size
                 );
+                */
                 unsafe {
                     mmap(
                         range.start as *mut c_void,

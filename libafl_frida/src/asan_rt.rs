@@ -2146,6 +2146,7 @@ impl AsanRuntime {
             }
         }
 
+
         // Hook the memory allocator functions
         hook_func!(None, malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
@@ -2266,6 +2267,7 @@ impl AsanRuntime {
             *mut c_void
         );
         hook_func!(None, munmap, (addr: *const c_void, length: usize), i32);
+
 
         // Hook libc functions which may access allocated memory
         hook_func!(
@@ -2418,6 +2420,8 @@ impl AsanRuntime {
             *mut wchar_t
         );
         hook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
+
+
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -2728,10 +2732,6 @@ impl AsanRuntime {
         // Rdi start, Rsi size
         dynasm!(ops
         ;       .arch x64
-        ;       mov     rax, 1
-        ;       ret
-        );
-        /*
         ;       mov     cl, shadow_bit as i8
         ;       mov     eax, 1
         ;       mov     edx, 1
@@ -2846,7 +2846,6 @@ impl AsanRuntime {
         ;LBB0_15:
         ;       ret
             );
-        */
         let blob = ops.finalize().unwrap();
         unsafe {
             let mapping = mmap(

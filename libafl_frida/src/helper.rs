@@ -325,7 +325,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             for (i, module) in helper.module_map.values().iter().enumerate() {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
-                println!("start: {:x}", start);
+                // println!("start: {:x}", start);
                 helper
                     .ranges
                     .insert(start..(start + range.size()), (i as u16, module.path()));
@@ -334,7 +334,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 for (module_name, offset) in suppressed_specifiers {
                     let module_details = ModuleDetails::with_name(module_name).unwrap();
                     let lib_start = module_details.range().base_address().0 as usize;
-                    println!("removing address: {:#x}", lib_start + offset);
+                    // println!("removing address: {:#x}", lib_start + offset);
                     helper
                         .ranges
                         .remove((lib_start + offset)..(lib_start + offset + 4));
