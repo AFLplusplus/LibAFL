@@ -2092,6 +2092,7 @@ impl AsanRuntime {
     /// Hook all functions required for ASAN to function, replacing them with our own
     /// implementations.
     #[allow(clippy::items_after_statements)]
+    #[allow(clippy::too_many_lines)]
     fn hook_functions(&mut self, gum: &Gum) {
         let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
 
@@ -2697,6 +2698,7 @@ impl AsanRuntime {
         */
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self, clippy::identity_op)]
+    #[allow(clippy::too_many_lines)]
     fn generate_shadow_check_function(&mut self) {
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);

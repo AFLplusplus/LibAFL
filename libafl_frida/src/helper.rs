@@ -4,6 +4,7 @@ use std::hash::Hasher;
 use libafl::inputs::{HasTargetBytes, Input};
 
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
+use frida_gum::interceptor::Interceptor;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -351,12 +352,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     let instr = instruction.instr();
                     let address = instr.address();
                     // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                    /*
                     println!(
                         "address: {:x} contains: {:?}",
                         address,
                         helper.ranges.contains_key(&(address as usize))
                     );
-                    println!("Ranges: {:#?}", helper.ranges);
+                    */
+                    // println!("Ranges: {:#?}", helper.ranges);
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {
                             first = false;
@@ -835,8 +838,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         scale: i32,
         disp: i64,
     ) {
-        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i64;
-        println!("XXX");
+        let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
         let writer = output.writer();
 
         let basereg = if basereg.0 == 0 {
@@ -857,7 +859,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             8 => 3,
             _ => 0,
         };
-        println!("000");
         if self.current_report_impl == 0
             || !writer.can_branch_directly_to(self.current_report_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
@@ -919,22 +920,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
         match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
             2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
-            3 => writer.put_bytes(&self.asan_runtime.blob_check_mem_3bytes()),
             4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
-            6 => writer.put_bytes(&self.asan_runtime.blob_check_mem_6bytes()),
             8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
-            12 => writer.put_bytes(&self.asan_runtime.blob_check_mem_12bytes()),
-            16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
-            24 => writer.put_bytes(&self.asan_runtime.blob_check_mem_24bytes()),
-            32 => writer.put_bytes(&self.asan_runtime.blob_check_mem_32bytes()),
-            48 => writer.put_bytes(&self.asan_runtime.blob_check_mem_48bytes()),
-            64 => writer.put_bytes(&self.asan_runtime.blob_check_mem_64bytes()),
             _ => false,
         };
 
-        println!("AAA");
         writer.put_jmp_address(self.current_report_impl);
-        println!("BBB");
         for _ in 0..10 {
             // shadow_check_blob's done will land somewhere in these nops
             writer.put_nop();
@@ -1425,7 +1416,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
-        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i64;
+        let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
         if self.current_log_impl == 0
             || !writer.can_branch_directly_to(self.current_log_impl)
             || !writer.can_branch_directly_between(writer.pc() + 128, self.current_log_impl)
