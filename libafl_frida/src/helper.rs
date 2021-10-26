@@ -3,8 +3,8 @@ use std::hash::Hasher;
 
 use libafl::inputs::{HasTargetBytes, Input};
 
-use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use frida_gum::interceptor::Interceptor;
+use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
