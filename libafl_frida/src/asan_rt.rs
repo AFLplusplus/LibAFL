@@ -2431,7 +2431,6 @@ impl AsanRuntime {
         };
 
         self.dump_registers();
-        while (true) {}
         panic!("asan errors!");
     }
 
@@ -2729,6 +2728,10 @@ impl AsanRuntime {
         // Rdi start, Rsi size
         dynasm!(ops
         ;       .arch x64
+        ;       mov     rax, 1
+        ;       ret
+        );
+        /*
         ;       mov     cl, shadow_bit as i8
         ;       mov     eax, 1
         ;       mov     edx, 1
@@ -2843,7 +2846,7 @@ impl AsanRuntime {
         ;LBB0_15:
         ;       ret
             );
-
+        */
         let blob = ops.finalize().unwrap();
         unsafe {
             let mapping = mmap(
