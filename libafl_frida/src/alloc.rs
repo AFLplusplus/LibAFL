@@ -353,7 +353,7 @@ impl Allocator {
     }
 
     fn unpoison(start: usize, size: usize) {
-        // println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
+        println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             // println!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0xff, size / 8);
@@ -371,7 +371,7 @@ impl Allocator {
     }
 
     pub fn poison(start: usize, size: usize) {
-        // println!("poisoning {:x} for {:x}", start, size / 8 + 1);
+        println!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             // println!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0x00, size / 8);

@@ -825,11 +825,12 @@ impl<'a> FridaInstrumentationHelper<'a> {
         ));
     }
 
-    #[cfg(target_arch = "x86_64")]
+
+
     #[inline]
     pub fn emit_shadow_check(
         &mut self,
-        _address: u64,
+        address: u64,
         output: &StalkerOutput,
         _segment: RegId,
         width: u8,
@@ -840,17 +841,20 @@ impl<'a> FridaInstrumentationHelper<'a> {
     ) {
         let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
         let writer = output.writer();
+        let true_rip = address;
 
         let basereg = if basereg.0 == 0 {
             None
         } else {
-            Some(self.writer_register(basereg))
+            let reg = self.writer_register(basereg);
+            Some(reg)
         };
 
         let indexreg = if indexreg.0 == 0 {
             None
         } else {
-            Some(self.writer_register(indexreg))
+            let reg = self.writer_register(indexreg);
+            Some(reg)
         };
 
         let scale = match scale {
@@ -871,7 +875,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             writer.put_b_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
-            println!("self.current_report_impl {:x}", self.current_report_impl);
             #[cfg(unix)]
             writer.put_bytes(self.asan_runtime.blob_report());
 
@@ -893,18 +896,46 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_push_reg(X86Register::Rcx);
         writer.put_push_reg(X86Register::Rax);
 
+        /*
+        Things are a bit different when Rip is either base register or index register.
+        Suppose we have an instruction like
+        `bnd jmp qword ptr [rip + 0x2e4b5]`
+        We can't just emit code like 
+        `mov rdi, rip` to get RIP loaded into RDI,
+        because this RIP is NOT the orginal RIP (, which is usually within .text) anymore, rather it is pointing to the memory allocated by the frida stalker.
+        Please confer https://frida.re/docs/stalker/ for details.
+        */
         // Init Rdi
-        if basereg.is_some() {
-            writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
-        } else {
-            writer.put_xor_reg_reg(X86Register::Rdi, X86Register::Rdi);
+        match basereg {
+            Some(reg) => {
+                match reg {
+                    X86Register::Rip => {
+                        writer.put_mov_reg_address(X86Register::Rdi, true_rip);
+                    },
+                    _ => {
+                        writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
+                    }
+                }
+            },
+            None => {
+                writer.put_xor_reg_reg(X86Register::Rdi, X86Register::Rdi);
+            }
         }
 
-        // Init Rsi
-        if indexreg.is_some() {
-            writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
-        } else {
-            writer.put_xor_reg_reg(X86Register::Rsi, X86Register::Rsi);
+        match indexreg {
+            Some(reg) => {
+                match reg {
+                    X86Register::Rip => {
+                        writer.put_mov_reg_address(X86Register::Rsi, true_rip);
+                    },
+                    _ => {
+                        writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
+                    }
+                }
+            },
+            None => {
+                writer.put_xor_reg_reg(X86Register::Rsi, X86Register::Rsi);
+            }
         }
 
         // Scale
@@ -916,12 +947,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
         writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
 
+
         #[cfg(unix)]
         match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
             2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
             4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
             8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
+            16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
             _ => false,
         };
 
@@ -1287,6 +1320,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
         // Ignore lea instruction
         match instr.mnemonic().unwrap() {
             "lea" => return Err(()),
+             // I don't know why nop has X86OperandType::Mem.. but let's put it to white-list
+             // like `nop dword [rax + rax]`
+            "nop" => return Err(()),
             _ => (),
         }
 
@@ -1306,7 +1342,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         opmem.scale(),
                         opmem.disp(),
                     );
-                    if opmem.segment() != RegId(0) {
+                    if opmem.segment() == RegId(0) {
                         return Ok((
                             opmem.segment(),
                             x86operand.size,

@@ -2430,7 +2430,11 @@ impl AsanRuntime {
             None => actual_pc,
         };
 
-        println!("{:#?}", self.regs);
+        self.dump_registers();
+        while(true){
+
+        }
+        panic!("asan errors!");
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -2585,6 +2589,28 @@ impl AsanRuntime {
             ))
         };
         AsanErrors::get_mut().report_error(error);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn dump_registers(&self) {
+        println!("Rax: {:x}", self.regs[0]);
+        println!("Rbx: {:x}", self.regs[1]);
+        println!("Rcx: {:x}", self.regs[2]);
+        println!("Rdx: {:x}", self.regs[3]);
+        println!("Rbp: {:x}", self.regs[4]);
+        println!("Rsp: {:x}", self.regs[5]);
+        println!("Rsi: {:x}", self.regs[6]);
+        println!("Rdi: {:x}", self.regs[7]);
+        println!("R8: {:x}", self.regs[8]);
+        println!("R9: {:x}", self.regs[9]);
+        println!("R10: {:x}", self.regs[10]);
+        println!("R11: {:x}", self.regs[11]);
+        println!("R12: {:x}", self.regs[12]);
+        println!("R13: {:x}", self.regs[13]);
+        println!("R14: {:x}", self.regs[14]);
+        println!("R15: {:x}", self.regs[15]);
+        println!("Return address: {:x}", self.regs[16]);
+
     }
 
     // https://godbolt.org/z/Y87PYGd69
@@ -3171,8 +3197,10 @@ impl AsanRuntime {
 
             ; mov rdi, [>self_addr]
             ; mov rsi, [>trap_func]
+            ; add rsp, -8 // Adjust rsp to align it with 16 bytes boundary
             ; call rsi
 
+            ; add rsp, 8
             ; mov rdi, [>self_regs_addr]
             // restore rbx to r15
             ; mov rbx, [rdi + 0x8]
