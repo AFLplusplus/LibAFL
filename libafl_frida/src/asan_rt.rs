@@ -325,6 +325,17 @@ impl AsanRuntime {
         (start, end)
     }
 
+    #[cfg(target_arch = "aarch64")]
+    #[inline]
+    fn pc() -> usize {
+        Interceptor::current_invocation().cpu_context().pc() as usize
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    fn pc() -> usize {
+        Interceptor::current_invocation().cpu_context().rip() as usize
+    }
 
     #[inline]
     fn hook_malloc(&mut self, size: usize) -> *mut c_void {
@@ -604,7 +615,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "write".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 buf as usize,
                 count,
@@ -623,7 +634,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "read".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 buf as usize,
                 count,
@@ -642,7 +653,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "fgets".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 size as usize,
@@ -661,7 +672,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 n,
@@ -672,7 +683,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 n,
@@ -691,7 +702,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 n,
@@ -702,7 +713,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 src as usize,
                 n,
@@ -722,7 +733,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "mempcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 n,
@@ -733,7 +744,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "mempcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 src as usize,
                 n,
@@ -752,7 +763,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memmove".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 n,
@@ -763,7 +774,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmove".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 src as usize,
                 n,
@@ -782,7 +793,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 n,
@@ -801,7 +812,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memchr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 n,
@@ -821,7 +832,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memrchr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 n,
@@ -851,7 +862,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 haystack as usize,
                 haystacklen,
@@ -862,7 +873,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 needle as usize,
                 needlelen,
@@ -882,7 +893,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "bzero".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 n,
@@ -905,7 +916,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "explicit_bzero".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 n,
@@ -925,7 +936,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 n,
@@ -936,7 +947,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 n,
@@ -956,7 +967,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strchr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -976,7 +987,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strrchr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -996,7 +1007,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 unsafe { strlen(s1) },
@@ -1007,7 +1018,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 unsafe { strlen(s2) },
@@ -1026,7 +1037,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 n,
@@ -1037,7 +1048,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 n,
@@ -1057,7 +1068,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 unsafe { strlen(s1) },
@@ -1068,7 +1079,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 unsafe { strlen(s2) },
@@ -1088,7 +1099,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 unsafe { strlen(s1) },
@@ -1099,7 +1110,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 unsafe { strlen(s2) },
@@ -1118,7 +1129,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 n,
@@ -1129,7 +1140,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 n,
@@ -1149,7 +1160,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 unsafe { strlen(src) },
@@ -1160,7 +1171,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 src as usize,
                 unsafe { strlen(src) },
@@ -1179,7 +1190,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strncpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 n,
@@ -1190,7 +1201,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 src as usize,
                 n,
@@ -1210,7 +1221,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "stpcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 unsafe { strlen(src) },
@@ -1221,7 +1232,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "stpcpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 src as usize,
                 unsafe { strlen(src) },
@@ -1242,7 +1253,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strdup".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1267,7 +1278,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strlen".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 size,
@@ -1287,7 +1298,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strnlen".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 size,
@@ -1309,7 +1320,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 haystack as usize,
                 unsafe { strlen(haystack) },
@@ -1320,7 +1331,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 needle as usize,
                 unsafe { strlen(needle) },
@@ -1342,7 +1353,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 haystack as usize,
                 unsafe { strlen(haystack) },
@@ -1353,7 +1364,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 needle as usize,
                 unsafe { strlen(needle) },
@@ -1373,7 +1384,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoi".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1393,7 +1404,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atol".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1413,7 +1424,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoll".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 unsafe { strlen(s) },
@@ -1433,7 +1444,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcslen".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s as usize,
                 (size + 1) * 2,
@@ -1455,7 +1466,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "wcscpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 dest as usize,
                 (unsafe { wcslen(src) } + 1) * 2,
@@ -1468,7 +1479,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscpy".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 src as usize,
                 (unsafe { wcslen(src) } + 1) * 2,
@@ -1489,7 +1500,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s1 as usize,
                 (unsafe { wcslen(s1) } + 1) * 2,
@@ -1501,7 +1512,7 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
                 self.real_address_for_stalked(
-                    Interceptor::current_invocation().cpu_context().pc() as usize
+                    AsanRuntime::pc()
                 ),
                 s2 as usize,
                 (unsafe { wcslen(s2) } + 1) * 2,

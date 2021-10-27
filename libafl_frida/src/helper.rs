@@ -28,6 +28,9 @@ use capstone::{
     Capstone, Insn, RegId,
 };
 
+#[cfg(target_arch = "aarch64")]
+use num_traits::cast::FromPrimitive;
+
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
@@ -1329,7 +1332,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             return Err(());
         }
 
-        return Err(());
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
