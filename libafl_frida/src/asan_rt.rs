@@ -614,9 +614,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(buf, count) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "write".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 buf as usize,
                 count,
                 Backtrace::new(),
@@ -633,9 +631,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(buf, count) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "read".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 buf as usize,
                 count,
                 Backtrace::new(),
@@ -652,9 +648,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s, size as usize) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "fgets".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 size as usize,
                 Backtrace::new(),
@@ -671,9 +665,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s1, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 n,
                 Backtrace::new(),
@@ -682,9 +674,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s2, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 n,
                 Backtrace::new(),
@@ -701,9 +691,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 n,
                 Backtrace::new(),
@@ -712,9 +700,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(src, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 n,
                 Backtrace::new(),
@@ -732,9 +718,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "mempcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 n,
                 Backtrace::new(),
@@ -743,9 +727,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(src, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "mempcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 n,
                 Backtrace::new(),
@@ -762,9 +744,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memmove".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 n,
                 Backtrace::new(),
@@ -773,9 +753,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(src, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmove".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 n,
                 Backtrace::new(),
@@ -792,9 +770,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 n,
                 Backtrace::new(),
@@ -811,9 +787,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memchr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 n,
                 Backtrace::new(),
@@ -831,9 +805,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memrchr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 n,
                 Backtrace::new(),
@@ -861,9 +833,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(haystack, haystacklen) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 haystack as usize,
                 haystacklen,
                 Backtrace::new(),
@@ -872,9 +842,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(needle, needlelen) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 needle as usize,
                 needlelen,
                 Backtrace::new(),
@@ -892,9 +860,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "bzero".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 n,
                 Backtrace::new(),
@@ -903,10 +869,7 @@ impl AsanRuntime {
         unsafe { bzero(s, n) }
     }
 
-    #[cfg(all(
-        not(target_os = "android"),
-        not(target_vendor = "apple")
-    ))]
+    #[cfg(all(not(target_os = "android"), not(target_vendor = "apple")))]
     #[inline]
     fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) {
         extern "C" {
@@ -915,9 +878,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "explicit_bzero".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 n,
                 Backtrace::new(),
@@ -935,9 +896,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s1, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 n,
                 Backtrace::new(),
@@ -946,9 +905,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s2, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 n,
                 Backtrace::new(),
@@ -966,9 +923,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strchr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 unsafe { strlen(s) },
                 Backtrace::new(),
@@ -986,9 +941,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strrchr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 unsafe { strlen(s) },
                 Backtrace::new(),
@@ -1006,9 +959,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 unsafe { strlen(s1) },
                 Backtrace::new(),
@@ -1017,9 +968,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 unsafe { strlen(s2) },
                 Backtrace::new(),
@@ -1036,9 +985,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 n,
                 Backtrace::new(),
@@ -1047,9 +994,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 n,
                 Backtrace::new(),
@@ -1067,9 +1012,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 unsafe { strlen(s1) },
                 Backtrace::new(),
@@ -1078,9 +1021,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 unsafe { strlen(s2) },
                 Backtrace::new(),
@@ -1098,9 +1039,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 unsafe { strlen(s1) },
                 Backtrace::new(),
@@ -1109,9 +1048,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 unsafe { strlen(s2) },
                 Backtrace::new(),
@@ -1128,9 +1065,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 n,
                 Backtrace::new(),
@@ -1139,9 +1074,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 n,
                 Backtrace::new(),
@@ -1159,9 +1092,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 unsafe { strlen(src) },
                 Backtrace::new(),
@@ -1170,9 +1101,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 unsafe { strlen(src) },
                 Backtrace::new(),
@@ -1189,9 +1118,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strncpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 n,
                 Backtrace::new(),
@@ -1200,9 +1127,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(src as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 n,
                 Backtrace::new(),
@@ -1220,9 +1145,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "stpcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 unsafe { strlen(src) },
                 Backtrace::new(),
@@ -1231,9 +1154,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "stpcpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 unsafe { strlen(src) },
                 Backtrace::new(),
@@ -1252,9 +1173,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strdup".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 unsafe { strlen(s) },
                 Backtrace::new(),
@@ -1277,9 +1196,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strlen".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 size,
                 Backtrace::new(),
@@ -1297,9 +1214,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strnlen".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 size,
                 Backtrace::new(),
@@ -1319,9 +1234,7 @@ impl AsanRuntime {
         }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 haystack as usize,
                 unsafe { strlen(haystack) },
                 Backtrace::new(),
@@ -1330,9 +1243,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 needle as usize,
                 unsafe { strlen(needle) },
                 Backtrace::new(),
@@ -1352,9 +1263,7 @@ impl AsanRuntime {
         }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 haystack as usize,
                 unsafe { strlen(haystack) },
                 Backtrace::new(),
@@ -1363,9 +1272,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 needle as usize,
                 unsafe { strlen(needle) },
                 Backtrace::new(),
@@ -1383,9 +1290,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoi".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 unsafe { strlen(s) },
                 Backtrace::new(),
@@ -1403,9 +1308,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atol".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 unsafe { strlen(s) },
                 Backtrace::new(),
@@ -1423,9 +1326,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoll".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 unsafe { strlen(s) },
                 Backtrace::new(),
@@ -1443,9 +1344,7 @@ impl AsanRuntime {
         if !(self.shadow_check_func.unwrap())(s as *const c_void, (size + 1) * 2) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcslen".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s as usize,
                 (size + 1) * 2,
                 Backtrace::new(),
@@ -1465,9 +1364,7 @@ impl AsanRuntime {
         }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "wcscpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 (unsafe { wcslen(src) } + 1) * 2,
                 Backtrace::new(),
@@ -1478,9 +1375,7 @@ impl AsanRuntime {
         }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscpy".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 (unsafe { wcslen(src) } + 1) * 2,
                 Backtrace::new(),
@@ -1499,9 +1394,7 @@ impl AsanRuntime {
         {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s1 as usize,
                 (unsafe { wcslen(s1) } + 1) * 2,
                 Backtrace::new(),
@@ -1511,9 +1404,7 @@ impl AsanRuntime {
         {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
-                self.real_address_for_stalked(
-                    AsanRuntime::pc()
-                ),
+                self.real_address_for_stalked(AsanRuntime::pc()),
                 s2 as usize,
                 (unsafe { wcslen(s2) } + 1) * 2,
                 Backtrace::new(),
@@ -1578,7 +1469,6 @@ impl AsanRuntime {
                 }
             }
         }
-
 
         // Hook the memory allocator functions
         hook_func!(None, malloc, (size: usize), *mut c_void);
@@ -1701,7 +1591,6 @@ impl AsanRuntime {
         );
         hook_func!(None, munmap, (addr: *const c_void, length: usize), i32);
 
-        
         // Hook libc functions which may access allocated memory
         hook_func!(
             None,
@@ -1853,8 +1742,6 @@ impl AsanRuntime {
             *mut wchar_t
         );
         hook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
-
-
     }
 
     #[cfg(target_arch = "x86_64")]

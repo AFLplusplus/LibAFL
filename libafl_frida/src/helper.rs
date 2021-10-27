@@ -945,7 +945,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
 
         #[cfg(unix)]
-        let checked : bool = match width {
+        let checked: bool = match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
             2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
             4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
@@ -961,7 +961,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 writer.put_nop();
             }
         }
-
 
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
@@ -1316,7 +1315,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .arch_detail()
             .operands();
 
-
         // Ignore lea instruction
         match instr.mnemonic().unwrap() {
             "lea" => return Err(()),
@@ -1328,7 +1326,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         // This is a TODO! In this case, both the src and the dst are mem operand
         // so we would need to return two operadns?
-        if instr.mnemonic().unwrap().starts_with("rep"){
+        if instr.mnemonic().unwrap().starts_with("rep") {
             return Err(());
         }
 
