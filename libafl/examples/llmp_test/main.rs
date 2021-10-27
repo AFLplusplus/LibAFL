@@ -4,7 +4,7 @@ This shows how llmp can be used directly, without libafl abstractions
 extern crate alloc;
 
 #[cfg(all(unix, feature = "std"))]
-use core::{convert::TryInto, time::Duration};
+use core::time::Duration;
 #[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 

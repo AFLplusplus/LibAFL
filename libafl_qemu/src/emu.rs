@@ -2,7 +2,6 @@
 
 use core::{
     convert::Into,
-    convert::TryFrom,
     ffi::c_void,
     mem::{size_of, transmute, MaybeUninit},
     ptr::{copy_nonoverlapping, null},
