@@ -184,7 +184,7 @@ impl Allocator {
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
         let size = if size == 0 {
-            println!("zero-sized allocation!");
+            // println!("zero-sized allocation!");
             is_malloc_zero = true;
             16
         } else {
@@ -235,7 +235,6 @@ impl Allocator {
                 actual_size: rounded_up_size,
                 ..AllocationMetadata::default()
             };
-
             if self.options.enable_asan_allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
