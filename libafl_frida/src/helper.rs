@@ -1329,7 +1329,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             return Err(());
         }
 
-
+        return Err(());
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
