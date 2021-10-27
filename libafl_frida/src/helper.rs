@@ -942,7 +942,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
 
         #[cfg(unix)]
-        match width {
+        let checked : bool = match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
             2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
             4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
@@ -951,11 +951,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => false,
         };
 
-        writer.put_jmp_address(self.current_report_impl);
-        for _ in 0..10 {
-            // shadow_check_blob's done will land somewhere in these nops
-            writer.put_nop();
+        if checked {
+            writer.put_jmp_address(self.current_report_impl);
+            for _ in 0..10 {
+                // shadow_check_blob's done will land somewhere in these nops
+                writer.put_nop();
+            }
         }
+
 
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
@@ -1310,7 +1313,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .arch_detail()
             .operands();
 
-        return Err(());
 
         // Ignore lea instruction
         match instr.mnemonic().unwrap() {
@@ -1321,11 +1323,18 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => (),
         }
 
-        // Q: Does this work on insts like `rep stos`?
+        // This is a TODO! In this case, both the src and the dst are mem operand
+        // so we would need to return two operadns?
+        if instr.mnemonic().unwrap().starts_with("rep"){
+            return Err(());
+        }
+
+
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
                     let insn_id: X86Insn = instr.id().0.into();
+                    /*
                     println!(
                         "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
                         insn_id,
@@ -1337,6 +1346,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         opmem.scale(),
                         opmem.disp(),
                     );
+                    */
                     if opmem.segment() == RegId(0) {
                         return Ok((
                             opmem.segment(),

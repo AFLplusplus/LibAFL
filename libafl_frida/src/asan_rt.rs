@@ -2268,7 +2268,7 @@ impl AsanRuntime {
         );
         hook_func!(None, munmap, (addr: *const c_void, length: usize), i32);
 
-
+        
         // Hook libc functions which may access allocated memory
         hook_func!(
             None,
