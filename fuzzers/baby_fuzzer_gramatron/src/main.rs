@@ -109,7 +109,6 @@ pub fn main() {
     let automaton = read_automaton_from_file(PathBuf::from("auto.postcard"));
     let mut generator = GramatronGenerator::new(&automaton);
 
-    
     /// Use this code to profile the generator performance
     /*
     use libafl::generators::Generator;
@@ -129,7 +128,6 @@ pub fn main() {
 
     return;
     */
-
     // Generate 8 initial inputs
     state
         .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
