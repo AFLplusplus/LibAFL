@@ -469,7 +469,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
     #[cfg(target_arch = "x86_64")]
     #[inline]
-    fn writer_register(&self, reg: RegId) -> X86Register {
+    pub fn writer_register(reg: RegId) -> X86Register {
         let regint: u16 = reg.0;
         match regint {
             19 => X86Register::Eax,
@@ -844,7 +844,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let writer = output.writer();
         let true_rip = address;
 
-
         if (basereg.0 == 35) {
             println!("Stop");
         }
@@ -852,14 +851,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let basereg = if basereg.0 == 0 {
             None
         } else {
-            let reg = self.writer_register(basereg);
+            let reg = FridaInstrumentationHelper::<'a>::writer_register(basereg);
             Some(reg)
         };
 
         let indexreg = if indexreg.0 == 0 {
             None
         } else {
-            let reg = self.writer_register(indexreg);
+            let reg = FridaInstrumentationHelper::<'a>::writer_register(indexreg);
             Some(reg)
         };
 

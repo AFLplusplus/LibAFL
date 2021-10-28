@@ -25,8 +25,13 @@ use capstone::{
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{
-    arch::{self, BuildsCapstone},
-    Capstone,
+    arch::{
+        self,
+        x86::{X86Insn, X86OperandType},
+        ArchOperand::X86Operand,
+        BuildsCapstone,
+    },
+    Capstone, Insn, RegAccessType, RegId,
 };
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -44,6 +49,7 @@ use std::{ffi::c_void, ptr::write_volatile};
 use crate::{
     alloc::Allocator,
     asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    helper::FridaInstrumentationHelper,
     FridaOptions,
 };
 
@@ -1748,14 +1754,90 @@ impl AsanRuntime {
     #[allow(clippy::cast_sign_loss)]
     #[allow(clippy::too_many_lines)]
     extern "C" fn handle_trap(&mut self) {
-        let mut actual_pc = self.regs[16];
-        actual_pc = match self.stalked_addresses.get(&actual_pc) {
-            Some(addr) => *addr,
-            None => actual_pc,
-        };
+        self.dump_registers();
+
+        let mut fault_address = self.regs[17];
+        let mut actual_pc = self.regs[18];
+
+        let cs = Capstone::new()
+            .x86()
+            .mode(arch::x86::ArchMode::Mode64)
+            .detail(true)
+            .build()
+            .expect("Failed to create Capstone object");
+
+        let instructions = cs
+            .disasm_count(
+                unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 24) },
+                actual_pc as u64,
+                3,
+            )
+            .expect("Failed to disassmeble");
+
+        let insn = instructions.as_ref().first().unwrap(); // This is the very instruction that has triggered fault
+        println!("{:#?}", insn);
+        let operands = cs.insn_detail(insn).unwrap().arch_detail().operands();
+
+        let mut access_type: Option<RegAccessType> = None;
+        let mut base: Option<RegId> = None;
+        for operand in operands {
+            if let X86Operand(x86operand) = operand {
+                match x86operand.op_type {
+                    X86OperandType::Mem(mem) => {
+                        access_type = x86operand.access;
+                        base = Some(mem.base());
+                    }
+                    _ => (),
+                }
+            }
+        }
+
+        let backtrace = Backtrace::new();
+        let (stack_start, stack_end) = Self::current_stack();
+
+        if base.is_none() {
+            // not a mem instruction?
+            AsanErrors::get_mut().report_error(AsanError::Unknown((
+                self.regs,
+                actual_pc,
+                (0, 0, 0, fault_address),
+                backtrace,
+            )));
+        } else {
+            let error = if fault_address >= stack_start && fault_address < stack_end {
+                match access_type {
+                    Some(t) => match t {
+                        RegAccessType::ReadOnly => AsanError::StackOobRead((
+                            self.regs,
+                            actual_pc,
+                            (0, 0, 0, fault_address),
+                            backtrace,
+                        )),
+                        _ => AsanError::StackOobWrite((
+                            self.regs,
+                            actual_pc,
+                            (0, 0, 0, fault_address),
+                            backtrace,
+                        )),
+                    },
+                    None => AsanError::Unknown((
+                        self.regs,
+                        actual_pc,
+                        (0, 0, 0, fault_address),
+                        backtrace,
+                    )),
+                }
+            } else if let Some(metadata) =
+                self.allocator.find_metadata(fault_address, fault_address)
+            {
+                AsanError::Unknown((self.regs, actual_pc, (0, 0, 0, fault_address), backtrace))
+            } else {
+                AsanError::Unknown((self.regs, actual_pc, (0, 0, 0, fault_address), backtrace))
+            };
+            AsanErrors::get_mut().report_error(error);
+        }
 
         self.dump_registers();
-        panic!("asan errors!");
     }
 
     #[cfg(target_arch = "aarch64")]
