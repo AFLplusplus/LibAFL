@@ -61,9 +61,9 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
-// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus rip (instrumented location)
+// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus instrumented rip, accessed memory addr and true rip
 #[cfg(target_arch = "x86_64")]
-pub const ASAN_SAVE_REGISTER_COUNT: usize = 17;
+pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
 #[cfg(tareget_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
@@ -1930,7 +1930,9 @@ impl AsanRuntime {
         println!("R13: {:x}", self.regs[13]);
         println!("R14: {:x}", self.regs[14]);
         println!("R15: {:x}", self.regs[15]);
-        println!("Return address: {:x}", self.regs[16]);
+        println!("instrumented return address: {:x}", self.regs[16]);
+        println!("accessed memory address {:x}", self.regs[17]);
+        println!("r/w instruction rip {:x}", self.regs[18]);
     }
 
     // https://godbolt.org/z/Y87PYGd69
@@ -2502,16 +2504,22 @@ impl AsanRuntime {
             ; mov [rdi + 0x68], r13
             ; mov [rdi + 0x70], r14
             ; mov [rdi + 0x78], r15
-            ; mov rax, [rsp + 0]
+            ; mov rax, [rsp + 0x10]
             ; mov [rdi + 0x0], rax
-            ; mov rcx, [rsp + 0x8]
+            ; mov rcx, [rsp + 0x18]
             ; mov [rdi + 0x10], rcx
-            ; mov rdx, [rsp + 0x10]
+            ; mov rdx, [rsp + 0x20]
             ; mov [rdi + 0x18], rdx
-            ; mov rsi, [rsp + 0x18]
+            ; mov rsi, [rsp + 0x28]
             ; mov [rdi + 0x30], rsi
-            ; mov rsi, rdi // Lastly, we want to save rdi, but we have to copy the address of self.regs into another register
-            ; mov rdi, [rsp + 0x20]
+
+            ; mov rsi, [rsp + 0x0]  // access_addr
+            ; mov [rdi + 0x88], rsi
+            ; mov rsi, [rsp + 0x8] // true_rip
+            ; mov [rdi + 0x90], rsi
+
+            ; mov rsi, rdi // we want to save rdi, but we have to copy the address of self.regs into another register
+            ; mov rdi, [rsp + 0x30]
             ; mov [rsi + 0x38], rdi
 
             ; mov rdi, [>self_addr]

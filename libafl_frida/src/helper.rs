@@ -888,7 +888,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         }
 
         /* Save registers that we'll use later in shadow_check_blob
-
+                                        | addr  | rip   |
                                         | Rcx   | Rax   |
                                         | Rsi   | Rdx   |
             Old Rsp - (redsone_size) -> | flags | Rdi   |
@@ -950,6 +950,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
         writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
         writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
 
+        writer.put_mov_reg_address(X86Register::Rsi, true_rip); // load true_rip into rsi in case we need them in handle_trap
+        writer.put_push_reg(X86Register::Rsi); // save true_rip
+        writer.put_push_reg(X86Register::Rdi); // save accessed_address
+
         #[cfg(unix)]
         let checked: bool = match width {
             1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
@@ -968,6 +972,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 writer.put_nop();
             }
         }
+
+        writer.put_pop_reg(X86Register::Rdi);
+        writer.put_pop_reg(X86Register::Rsi);
 
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
