@@ -38,8 +38,12 @@ impl<'a, S> Mutator<NautilusInput, S> for NautilusRandomMutator<'a> {
                 },
             )
             .unwrap();
-        input.tree = Tree::from_rule_vec(tmp, &self.ctx);
-        Ok(MutationResult::Mutated)
+        if tmp.len() > 0 {
+            input.tree = Tree::from_rule_vec(tmp, &self.ctx);
+            Ok(MutationResult::Mutated)
+        } else {
+            Ok(MutationResult::Skipped)
+        }
     }
 }
 

@@ -30,7 +30,7 @@ fn signals_set(idx: usize) {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let context = NautilusContext::from_file(5, "grammar.json");
+    let context = NautilusContext::from_file(15, "grammar.json");
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
@@ -94,7 +94,7 @@ pub fn main() {
     let mut generator = NautilusGenerator::new(&context);
 
     // Use this code to profile the generator performance
-
+    /*
     use libafl::generators::Generator;
     use std::collections::hash_map::DefaultHasher;
     use std::collections::HashSet;
@@ -120,6 +120,7 @@ pub fn main() {
     println!("{} / 100000", set.len());
 
     return;
+    */
 
     // Generate 8 initial inputs
     state
@@ -127,7 +128,10 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = NautilusRandomMutator::new(&context);
+    let mutator = StdScheduledMutator::with_max_iterations(
+        tuple_list!(NautilusRandomMutator::new(&context)),
+        2,
+    );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
