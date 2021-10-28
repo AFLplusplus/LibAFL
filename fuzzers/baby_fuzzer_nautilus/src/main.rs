@@ -1,9 +1,4 @@
-use std::io::Read;
-use std::{
-    fs,
-    io::BufReader,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 #[cfg(windows)]
 use std::ptr::write_volatile;
@@ -15,12 +10,9 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    generators::{Automaton, GramatronGenerator},
-    inputs::GramatronInput,
-    mutators::{
-        GramatronRandomMutator, GramatronRecursionMutator, GramatronSpliceMutator,
-        StdScheduledMutator,
-    },
+    generators::{NautilusContext, NautilusGenerator},
+    inputs::NautilusInput,
+    mutators::{NautilusRandomMutator, StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -36,21 +28,14 @@ fn signals_set(idx: usize) {
 }
 */
 
-fn read_automaton_from_file<P: AsRef<Path>>(path: P) -> Automaton {
-    let file = fs::File::open(path).unwrap();
-    let mut reader = BufReader::new(file);
-    let mut buffer = Vec::new();
-    reader.read_to_end(&mut buffer).unwrap();
-    postcard::from_bytes(&buffer).unwrap()
-}
-
 #[allow(clippy::similar_names)]
 pub fn main() {
+    let context = NautilusContext::from_file(5, "grammar.json");
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
-    let mut harness = |input: &GramatronInput| {
-        input.unparse(&mut bytes);
+    let mut harness = |input: &NautilusInput| {
+        input.unparse(&context, &mut bytes);
         unsafe {
             println!(">>> {}", std::str::from_utf8_unchecked(&bytes));
         }
@@ -106,14 +91,13 @@ pub fn main() {
     )
     .expect("Failed to create the Executor");
 
-    let automaton = read_automaton_from_file(PathBuf::from("auto.postcard"));
-    let mut generator = GramatronGenerator::new(&automaton);
+    let mut generator = NautilusGenerator::new(&context);
 
     // Use this code to profile the generator performance
-    /*
+
     use libafl::generators::Generator;
-    use std::collections::HashSet;
     use std::collections::hash_map::DefaultHasher;
+    use std::collections::HashSet;
     use std::hash::{Hash, Hasher};
 
     fn calculate_hash<T: Hash>(t: &T) -> u64 {
@@ -128,7 +112,7 @@ pub fn main() {
     let mut c = 0;
     for _ in 0..100000 {
         let i = generator.generate(&mut state).unwrap();
-        i.unparse(&mut b);
+        i.unparse(&context, &mut b);
         set.insert(calculate_hash(&b));
         c += b.len();
     }
@@ -136,7 +120,6 @@ pub fn main() {
     println!("{} / 100000", set.len());
 
     return;
-    */
 
     // Generate 8 initial inputs
     state
@@ -144,17 +127,7 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_iterations(
-        tuple_list!(
-            GramatronRandomMutator::new(&generator),
-            GramatronRandomMutator::new(&generator),
-            GramatronRandomMutator::new(&generator),
-            GramatronSpliceMutator::new(),
-            GramatronSpliceMutator::new(),
-            GramatronRecursionMutator::new()
-        ),
-        2,
-    );
+    let mutator = NautilusRandomMutator::new(&context);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
