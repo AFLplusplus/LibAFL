@@ -844,6 +844,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let writer = output.writer();
         let true_rip = address;
 
+
+        if (basereg.0 == 35) {
+            println!("Stop");
+        }
+
         let basereg = if basereg.0 == 0 {
             None
         } else {
@@ -881,6 +886,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
             writer.put_label(after_report_impl);
         }
+
         /* Save registers that we'll use later in shadow_check_blob
 
                                         | Rcx   | Rax   |
@@ -958,6 +964,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             writer.put_jmp_address(self.current_report_impl);
             for _ in 0..10 {
                 // shadow_check_blob's done will land somewhere in these nops
+                // on amd64 jump can takes 10 bytes at most, so that's why I put 10 bytes.
                 writer.put_nop();
             }
         }

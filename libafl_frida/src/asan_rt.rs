@@ -136,7 +136,7 @@ impl AsanRuntime {
 
         self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
 
-        self.hook_functions(_gum);
+        // self.hook_functions(_gum);
 
         /*
 
@@ -2502,17 +2502,17 @@ impl AsanRuntime {
             ; mov [rdi + 0x68], r13
             ; mov [rdi + 0x70], r14
             ; mov [rdi + 0x78], r15
-            ; mov rax, [rsp + 0x8]
+            ; mov rax, [rsp + 0]
             ; mov [rdi + 0x0], rax
-            ; mov rcx, [rsp + 0x10]
+            ; mov rcx, [rsp + 0x8]
             ; mov [rdi + 0x10], rcx
-            ; mov rdx, [rsp + 0x18]
+            ; mov rdx, [rsp + 0x10]
             ; mov [rdi + 0x18], rdx
-            ; mov rsi, [rsp + 0x20]
+            ; mov rsi, [rsp + 0x18]
             ; mov [rdi + 0x30], rsi
             ; mov rsi, rdi // Lastly, we want to save rdi, but we have to copy the address of self.regs into another register
-            ; mov rdi, [rsp + 0x38]
-            ; mov [rsi + 0x0], rdi
+            ; mov rdi, [rsp + 0x20]
+            ; mov [rsi + 0x38], rdi
 
             ; mov rdi, [>self_addr]
             ; mov rsi, [>trap_func]
@@ -2543,7 +2543,8 @@ impl AsanRuntime {
 
             // Ignore eh_frame_cie for amd64
             // See discussions https://github.com/AFLplusplus/LibAFL/pull/331
-
+            ;->accessed_address:
+            ; .dword 0x0
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
