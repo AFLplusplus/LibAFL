@@ -143,6 +143,8 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: clippy
+    #- name: Build frida
+    #  run: cd fuzzers/frida_libpng/ && cargo build --release
   macos:
     runs-on: macOS-latest
     steps:

@@ -111,7 +111,7 @@ pub fn main() {
 
     
     /// Use this code to profile the generator performance
-
+    /*
     use libafl::generators::Generator;
     use std::collections::HashSet;
     let mut set = HashSet::new();
@@ -128,7 +128,7 @@ pub fn main() {
     println!("{} / 100000000", set.len());
 
     return;
-    
+    */
 
     // Generate 8 initial inputs
     state
