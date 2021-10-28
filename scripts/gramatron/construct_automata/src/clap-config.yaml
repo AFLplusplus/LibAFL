@@ -1,0 +1,22 @@
+name: construct_automata
+version: "0.1.0"
+author: "Andrea Fioraldi <andreafioraldi@gmail.com>"
+about: Generate a serialized Automaton using a json GNF grammar
+args:
+    - grammar:
+        short: g
+        long: grammar-file
+        value_name: GRAMMAR
+        required: true
+        takes_value: true
+    - output:
+        short: o
+        long: output
+        value_name: OUTPUT
+        required: true
+        takes_value: true
+    - limit:
+        short: l
+        long: limit
+        value_name: LIMIT
+        takes_value: true

@@ -14,7 +14,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
-    fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     generators::{Automaton, GramatronGenerator},
     inputs::GramatronInput,
     mutators::{
@@ -38,8 +38,10 @@ fn signals_set(idx: usize) {
 
 fn read_automaton_from_file<P: AsRef<Path>>(path: P) -> Automaton {
     let file = fs::File::open(path).unwrap();
-    let reader = BufReader::new(file);
-    serde_json::from_reader(reader).unwrap()
+    let mut reader = BufReader::new(file);
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer).unwrap();
+    postcard::from_bytes(&buffer).unwrap()
 }
 
 #[allow(clippy::similar_names)]
@@ -104,9 +106,28 @@ pub fn main() {
     )
     .expect("Failed to create the Executor");
 
-    let mut generator =
-        GramatronGenerator::new(read_automaton_from_file(PathBuf::from("auto.json")));
+    let automaton = read_automaton_from_file(PathBuf::from("auto.postcard"));
+    let mut generator = GramatronGenerator::new(&automaton);
 
+    /// Use this code to profile the generator performance
+    /*
+    use libafl::generators::Generator;
+    use std::collections::HashSet;
+    let mut set = HashSet::new();
+    let st = libafl::bolts::current_milliseconds();
+    let mut b = vec![];
+    let mut c = 0;
+    for _ in 0..100000000 {
+        let i = generator.generate(&mut state).unwrap();
+        i.unparse(&mut b);
+        set.insert(b.clone());
+        c += b.len();
+    }
+    println!("{} / {}", c, libafl::bolts::current_milliseconds() - st);
+    println!("{} / 100000000", set.len());
+
+    return;
+    */
     // Generate 8 initial inputs
     state
         .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)

@@ -134,7 +134,7 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client)(state, mgr, bind_to.id)?;
+                        (self.run_client)(state, mgr, bind_to.id).expect("Client closure failed");
                         break;
                     }
                 };
