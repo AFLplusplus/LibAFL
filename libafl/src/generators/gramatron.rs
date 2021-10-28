@@ -10,14 +10,13 @@ use crate::{
     Error,
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Trigger {
-    pub id: String,
     pub dest: usize,
     pub term: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Automaton {
     pub final_state: usize,
     pub init_state: usize,
@@ -26,16 +25,16 @@ pub struct Automaton {
 
 #[derive(Clone, Debug)]
 /// Generates random inputs from a grammar automatron
-pub struct GramatronGenerator<R, S>
+pub struct GramatronGenerator<'a, R, S>
 where
     R: Rand,
     S: HasRand<R>,
 {
-    automaton: Automaton,
+    automaton: &'a Automaton,
     phantom: PhantomData<(R, S)>,
 }
 
-impl<R, S> Generator<GramatronInput, S> for GramatronGenerator<R, S>
+impl<'a, R, S> Generator<GramatronInput, S> for GramatronGenerator<'a, R, S>
 where
     R: Rand,
     S: HasRand<R>,
@@ -51,14 +50,14 @@ where
     }
 }
 
-impl<R, S> GramatronGenerator<R, S>
+impl<'a, R, S> GramatronGenerator<'a, R, S>
 where
     R: Rand,
     S: HasRand<R>,
 {
     /// Returns a new [`GramatronGenerator`]
     #[must_use]
-    pub fn new(automaton: Automaton) -> Self {
+    pub fn new(automaton: &'a Automaton) -> Self {
         Self {
             automaton,
             phantom: PhantomData,

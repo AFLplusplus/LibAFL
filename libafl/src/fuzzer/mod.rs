@@ -23,8 +23,8 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
-/// Send a stats update all 3 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(3 * 1000);
+/// Send a stats update all 15 (or more) seconds
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
 pub trait HasCorpusScheduler<CS, I, S>

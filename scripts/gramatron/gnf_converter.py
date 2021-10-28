@@ -186,15 +186,20 @@ def remove_mixed(grammar):
         for rhs in rules:
             # tokens = rhs.split(' ')
             regen_rule = []
+            # print('---------------------')
+            # print(rhs)
             tokens = gettokens(rhs)
             if len(gettokens(rhs)) == 1:
                 new_grammar[lhs].append(rhs)
                 continue
             for token in tokens:
+                # print(token, isTerminal(token), regen_rule)
                 # Identify if there is a terminal in the RHS
                 if isTerminal(token):
                     # Check if a corresponding nonterminal already exists
-                    nonterminal = terminal_exist(token, new_grammar)
+                    # nonterminal = terminal_exist(token, new_grammar)
+                    nonterminal = None
+                    # TODO(andrea) disabled ATM, further investigation using the Ruby grammar needed
                     if nonterminal:
                         regen_rule.append(nonterminal)
                     else:
