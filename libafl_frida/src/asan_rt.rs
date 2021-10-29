@@ -1804,9 +1804,50 @@ impl AsanRuntime {
                 backtrace,
             )));
         } else {
+            let reg = base.unwrap();
+            // from capstone register id to self.regs's index
+            let base_value = match reg.0 {
+                19 => self.regs[0] & 0xffffffff,
+                22 => self.regs[2] & 0xffffffff,
+                24 => self.regs[3] & 0xffffffff,
+                21 => self.regs[1] & 0xffffffff,
+                30 => self.regs[5] & 0xffffffff,
+                20 => self.regs[4] & 0xffffffff,
+                29 => self.regs[6] & 0xffffffff,
+                23 => self.regs[7] & 0xffffffff,
+                226 => self.regs[8] & 0xffffffff,
+                227 => self.regs[9] & 0xffffffff,
+                228 => self.regs[10] & 0xffffffff,
+                229 => self.regs[11] & 0xffffffff,
+                230 => self.regs[12] & 0xffffffff,
+                231 => self.regs[13] & 0xffffffff,
+                232 => self.regs[14] & 0xffffffff,
+                233 => self.regs[15] & 0xffffffff,
+                26 => actual_pc & 0xffffffff,
+                35 => self.regs[0],
+                38 => self.regs[2],
+                40 => self.regs[3],
+                37 => self.regs[1],
+                44 => self.regs[5],
+                36 => self.regs[4],
+                43 => self.regs[6],
+                39 => self.regs[7],
+                106 => self.regs[8],
+                107 => self.regs[9],
+                108 => self.regs[10],
+                109 => self.regs[11],
+                110 => self.regs[12],
+                111 => self.regs[13],
+                112 => self.regs[14],
+                113 => self.regs[15],
+                41 => actual_pc,
+                _ => 0,
+            };
+        
+            println!("{:x}", base_value);
             let error = if fault_address >= stack_start && fault_address < stack_end {
                 match access_type {
-                    Some(t) => match t {
+                    Some(typ) => match typ {
                         RegAccessType::ReadOnly => AsanError::StackOobRead((
                             self.regs,
                             actual_pc,
@@ -1827,17 +1868,48 @@ impl AsanRuntime {
                         backtrace,
                     )),
                 }
-            } else if let Some(metadata) =
-                self.allocator.find_metadata(fault_address, fault_address)
-            {
-                AsanError::Unknown((self.regs, actual_pc, (0, 0, 0, fault_address), backtrace))
+            } else if let Some(metadata) = self.allocator.find_metadata(fault_address, base_value) {
+                match access_type {
+                    Some(typ) => {
+                        let asan_readwrite_error = AsanReadWriteError {
+                            registers: self.regs,
+                            pc: actual_pc,
+                            fault: (0, 0, 0 as usize, fault_address),
+                            metadata: metadata.clone(),
+                            backtrace,
+                        };
+                        match typ {
+                            RegAccessType::ReadOnly => {
+                                if metadata.freed {
+                                    AsanError::ReadAfterFree(asan_readwrite_error)
+                                } else {
+                                    AsanError::OobRead(asan_readwrite_error)
+                                }
+                            }
+                            _ => {
+                                if metadata.freed {
+                                    AsanError::WriteAfterFree(asan_readwrite_error)
+                                } else {
+                                    AsanError::OobWrite(asan_readwrite_error)
+                                }
+                            }
+                        }
+                    }
+                    None => AsanError::Unknown((
+                        self.regs,
+                        actual_pc,
+                        (0, 0, 0, fault_address),
+                        backtrace,
+                    )),
+                }
             } else {
+                println!("Unknown");
                 AsanError::Unknown((self.regs, actual_pc, (0, 0, 0, fault_address), backtrace))
             };
             AsanErrors::get_mut().report_error(error);
         }
 
-        self.dump_registers();
+        // self.dump_registers();
     }
 
     #[cfg(target_arch = "aarch64")]
