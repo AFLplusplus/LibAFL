@@ -1843,7 +1843,7 @@ impl AsanRuntime {
                 41 => actual_pc,
                 _ => 0,
             };
-        
+
             println!("{:x}", base_value);
             let error = if fault_address >= stack_start && fault_address < stack_end {
                 match access_type {

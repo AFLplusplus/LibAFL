@@ -468,6 +468,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     // frida registers: https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html
     // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
     #[cfg(target_arch = "x86_64")]
+    #[must_use]
     #[inline]
     pub fn writer_register(reg: RegId) -> X86Register {
         let regint: u16 = reg.0;
@@ -829,6 +830,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     }
 
     #[inline]
+    #[allow(clippy::too_many_lines)]
     pub fn emit_shadow_check(
         &mut self,
         address: u64,
@@ -1329,11 +1331,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .operands();
 
         // Ignore lea instruction
+        // put nop into the white-list so that instructions like
+        // like `nop dword [rax + rax]` does not get caught.
         match instr.mnemonic().unwrap() {
-            "lea" => return Err(()),
-            // put nop into the white-list so that instructions like
-            // like `nop dword [rax + rax]` does not get caught.
-            "nop" => return Err(()),
+            "lea" | "nop" => return Err(()),
+
             _ => (),
         }
 
