@@ -129,7 +129,8 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::with_max_iterations(
-        tuple_list!(NautilusRandomMutator::new(&context)),
+        tuple_list!(NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),
+        NautilusRecursionMutator::new(&context)),
         2,
     );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));

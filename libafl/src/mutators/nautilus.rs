@@ -64,3 +64,56 @@ impl<'a> NautilusRandomMutator<'a> {
         }
     }
 }
+
+pub struct NautilusRecursionMutator<'a> {
+    ctx: &'a Context,
+    mutator: BackingMutator,
+}
+
+impl<'a, S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'a> {
+    fn mutate(
+        &mut self,
+        _state: &mut S,
+        input: &mut NautilusInput,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        // TODO get rid of tmp
+        let mut tmp = vec![];
+        self.mutator
+            .mut_random(
+                &input.tree,
+                &self.ctx,
+                &mut |t: &TreeMutation, _ctx: &Context| {
+                    tmp.extend_from_slice(&t.prefix);
+                    tmp.extend_from_slice(&t.repl);
+                    tmp.extend_from_slice(&t.postfix);
+                    Ok(())
+                },
+            )
+            .unwrap();
+        if tmp.len() > 0 {
+            input.tree = Tree::from_rule_vec(tmp, &self.ctx);
+            Ok(MutationResult::Mutated)
+        } else {
+            Ok(MutationResult::Skipped)
+        }
+    }
+}
+
+impl<'a> Named for NautilusRecursionMutator<'a> {
+    fn name(&self) -> &str {
+        "NautilusRecursionMutator"
+    }
+}
+
+impl<'a> NautilusRecursionMutator<'a> {
+    /// Creates a new [`NautilusRecursionMutator`].
+    #[must_use]
+    pub fn new(context: &'a NautilusContext) -> Self {
+        let mutator = BackingMutator::new(&context.ctx);
+        Self {
+            ctx: &context.ctx,
+            mutator,
+        }
+    }
+}
