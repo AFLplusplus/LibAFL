@@ -48,6 +48,7 @@ llmp_debug = ["backtrace"] # Enables debug output for LLMP
 llmp_small_maps = [] # reduces initial map size for llmp
 introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
+python = ["pyo3"]
 
 [[example]]
 name = "llmp_test"
@@ -85,6 +86,8 @@ wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to
 
 z3 = { version = "0.11", optional = true } # for concolic mutation
 
+pyo3 = { version = "0.14.3", optional = true }
+
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug
 
@@ -103,3 +106,7 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [target.'cfg(windows)'.build-dependencies]
 windows = "0.18.0"
+
+[lib]
+name = "libafl"
+crate-type = ["cdylib", "rlib"]

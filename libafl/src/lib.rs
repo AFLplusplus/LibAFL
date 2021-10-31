@@ -250,3 +250,14 @@ pub extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here
     1000
 }
+
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "python")]
+#[pymodule]
+#[pyo3(name = "libafl")]
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    Ok(())
+}
