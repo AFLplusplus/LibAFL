@@ -22,6 +22,7 @@ use termcolor::{Color, ColorSpec, WriteColor};
 
 use crate::{alloc::AllocationMetadata, asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
+#[cfg(target_arch = "aarch64")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
     pub registers: [usize; ASAN_SAVE_REGISTER_COUNT],
@@ -31,6 +32,7 @@ pub(crate) struct AsanReadWriteError {
     pub backtrace: Backtrace,
 }
 
+#[cfg(target_arch = "aarch64")]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
     OobRead(AsanReadWriteError),
@@ -67,6 +69,56 @@ pub(crate) enum AsanError {
     BadFuncArgRead((String, usize, usize, usize, Backtrace)),
     BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
 }
+
+#[cfg(target_arch = "x86_64")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct AsanReadWriteError {
+    pub registers: [usize; ASAN_SAVE_REGISTER_COUNT],
+    pub pc: usize,
+    pub fault: (Option<u16>, Option<u16>, usize, usize),
+    pub metadata: AllocationMetadata,
+    pub backtrace: Backtrace,
+}
+
+
+#[cfg(target_arch = "x86_64")]
+#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
+pub(crate) enum AsanError {
+    OobRead(AsanReadWriteError),
+    OobWrite(AsanReadWriteError),
+    ReadAfterFree(AsanReadWriteError),
+    WriteAfterFree(AsanReadWriteError),
+    DoubleFree((usize, AllocationMetadata, Backtrace)),
+    UnallocatedFree((usize, Backtrace)),
+    Unknown(
+        (
+            [usize; ASAN_SAVE_REGISTER_COUNT],
+            usize,
+            (Option<u16>, Option<u16>, usize, usize),
+            Backtrace,
+        ),
+    ),
+    Leak((usize, AllocationMetadata)),
+    StackOobRead(
+        (
+            [usize; ASAN_SAVE_REGISTER_COUNT],
+            usize,
+            (Option<u16>, Option<u16>, usize, usize),
+            Backtrace,
+        ),
+    ),
+    StackOobWrite(
+        (
+            [usize; ASAN_SAVE_REGISTER_COUNT],
+            usize,
+            (Option<u16>, Option<u16>, usize, usize),
+            Backtrace,
+        ),
+    ),
+    BadFuncArgRead((String, usize, usize, usize, Backtrace)),
+    BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
+}
+
 
 impl AsanError {
     fn description(&self) -> &str {
@@ -181,6 +233,7 @@ impl AsanErrors {
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
+                #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
                     if reg == basereg {
                         output
@@ -202,7 +255,22 @@ impl AsanErrors {
                         writeln!(output).unwrap();
                     }
                 }
+                #[cfg(target_arch = "aarch64")]
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
+
+                #[cfg(target_arch = "x86_64")]
+                for reg in 0..ASAN_SAVE_REGISTER_COUNT {
+                    if basereg.is_some() && reg == basereg.unwrap() as usize {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                    }
+                    if indexreg.is_some() && reg == indexreg.unwrap() as usize {
+                        output
+                        .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
+                        .unwrap();
+                    }
+                }
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();

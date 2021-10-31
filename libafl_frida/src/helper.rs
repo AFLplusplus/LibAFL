@@ -470,7 +470,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     #[cfg(target_arch = "x86_64")]
     #[must_use]
     #[inline]
-    pub fn writer_register(reg: RegId) -> X86Register {
+    pub fn writer_register(&self, reg: RegId) -> X86Register {
         let regint: u16 = reg.0;
         match regint {
             19 => X86Register::Eax,
@@ -853,14 +853,14 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let basereg = if basereg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::<'a>::writer_register(basereg);
+            let reg = self.writer_register(basereg);
             Some(reg)
         };
 
         let indexreg = if indexreg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::<'a>::writer_register(indexreg);
+            let reg = self.writer_register(indexreg);
             Some(reg)
         };
 

@@ -1779,13 +1779,13 @@ impl AsanRuntime {
         let operands = cs.insn_detail(insn).unwrap().arch_detail().operands();
 
         let mut access_type: Option<RegAccessType> = None;
-        let mut base: Option<RegId> = None;
+        let mut regs : Option<(RegId, RegId, i64)> = None;
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 match x86operand.op_type {
                     X86OperandType::Mem(mem) => {
                         access_type = x86operand.access;
-                        base = Some(mem.base());
+                        regs = Some((mem.base(), mem.index(), mem.disp()));
                     }
                     _ => (),
                 }
@@ -1795,116 +1795,95 @@ impl AsanRuntime {
         let backtrace = Backtrace::new();
         let (stack_start, stack_end) = Self::current_stack();
 
-        if base.is_none() {
-            // not a mem instruction?
+        if regs.is_none() {
+            // This is not even a mem instruction??
             AsanErrors::get_mut().report_error(AsanError::Unknown((
                 self.regs,
                 actual_pc,
-                (0, 0, 0, fault_address),
+                (None, None, 0, fault_address),
                 backtrace,
             )));
         } else {
-            let reg = base.unwrap();
+            let (base_idx, size) = self.register_idx(regs.unwrap().0); // safe to unwrap
+            let (index_idx, _) = self.register_idx(regs.unwrap().1);
+            let disp = regs.unwrap().2;
             // from capstone register id to self.regs's index
-            let base_value = match reg.0 {
-                19 => self.regs[0] & 0xffffffff,
-                22 => self.regs[2] & 0xffffffff,
-                24 => self.regs[3] & 0xffffffff,
-                21 => self.regs[1] & 0xffffffff,
-                30 => self.regs[5] & 0xffffffff,
-                20 => self.regs[4] & 0xffffffff,
-                29 => self.regs[6] & 0xffffffff,
-                23 => self.regs[7] & 0xffffffff,
-                226 => self.regs[8] & 0xffffffff,
-                227 => self.regs[9] & 0xffffffff,
-                228 => self.regs[10] & 0xffffffff,
-                229 => self.regs[11] & 0xffffffff,
-                230 => self.regs[12] & 0xffffffff,
-                231 => self.regs[13] & 0xffffffff,
-                232 => self.regs[14] & 0xffffffff,
-                233 => self.regs[15] & 0xffffffff,
-                26 => actual_pc & 0xffffffff,
-                35 => self.regs[0],
-                38 => self.regs[2],
-                40 => self.regs[3],
-                37 => self.regs[1],
-                44 => self.regs[5],
-                36 => self.regs[4],
-                43 => self.regs[6],
-                39 => self.regs[7],
-                106 => self.regs[8],
-                107 => self.regs[9],
-                108 => self.regs[10],
-                109 => self.regs[11],
-                110 => self.regs[12],
-                111 => self.regs[13],
-                112 => self.regs[14],
-                113 => self.regs[15],
-                41 => actual_pc,
-                _ => 0,
+            let base_value = if base_idx.is_some() && size.is_some() {
+                if size.unwrap() == 64 {
+                    Some(self.regs[base_idx.unwrap() as usize])
+                }
+                else{
+                    Some(self.regs[base_idx.unwrap() as usize] & 0xffffffff)
+                }
+            }
+            else{
+                None
             };
 
-            println!("{:x}", base_value);
+            // println!("{:x}", base_value);
             let error = if fault_address >= stack_start && fault_address < stack_end {
                 match access_type {
                     Some(typ) => match typ {
                         RegAccessType::ReadOnly => AsanError::StackOobRead((
                             self.regs,
                             actual_pc,
-                            (0, 0, 0, fault_address),
+                            (base_idx, index_idx, disp as usize, fault_address),
                             backtrace,
                         )),
                         _ => AsanError::StackOobWrite((
                             self.regs,
                             actual_pc,
-                            (0, 0, 0, fault_address),
+                            (base_idx, index_idx, disp as usize, fault_address),
                             backtrace,
                         )),
                     },
                     None => AsanError::Unknown((
                         self.regs,
                         actual_pc,
-                        (0, 0, 0, fault_address),
+                        (base_idx, index_idx, disp as usize, fault_address),
                         backtrace,
                     )),
                 }
-            } else if let Some(metadata) = self.allocator.find_metadata(fault_address, base_value) {
-                match access_type {
-                    Some(typ) => {
-                        let asan_readwrite_error = AsanReadWriteError {
-                            registers: self.regs,
-                            pc: actual_pc,
-                            fault: (0, 0, 0 as usize, fault_address),
-                            metadata: metadata.clone(),
-                            backtrace,
-                        };
-                        match typ {
-                            RegAccessType::ReadOnly => {
-                                if metadata.freed {
-                                    AsanError::ReadAfterFree(asan_readwrite_error)
-                                } else {
-                                    AsanError::OobRead(asan_readwrite_error)
+            } else if base_value.is_some() { 
+                if let Some(metadata) = self.allocator.find_metadata(fault_address, base_value.unwrap()) {
+                    match access_type {
+                        Some(typ) => {
+                            let asan_readwrite_error = AsanReadWriteError {
+                                registers: self.regs,
+                                pc: actual_pc,
+                                fault: (base_idx, index_idx, disp as usize, fault_address),
+                                metadata: metadata.clone(),
+                                backtrace,
+                            };
+                            match typ {
+                                RegAccessType::ReadOnly => {
+                                    if metadata.freed {
+                                        AsanError::ReadAfterFree(asan_readwrite_error)
+                                    } else {
+                                        AsanError::OobRead(asan_readwrite_error)
+                                    }
                                 }
-                            }
-                            _ => {
-                                if metadata.freed {
-                                    AsanError::WriteAfterFree(asan_readwrite_error)
-                                } else {
-                                    AsanError::OobWrite(asan_readwrite_error)
+                                _ => {
+                                    if metadata.freed {
+                                        AsanError::WriteAfterFree(asan_readwrite_error)
+                                    } else {
+                                        AsanError::OobWrite(asan_readwrite_error)
+                                    }
                                 }
                             }
                         }
+                        None => AsanError::Unknown((
+                            self.regs,
+                            actual_pc,
+                            (base_idx, index_idx, disp as usize, fault_address),
+                            backtrace,
+                        )),
                     }
-                    None => AsanError::Unknown((
-                        self.regs,
-                        actual_pc,
-                        (0, 0, 0, fault_address),
-                        backtrace,
-                    )),
+                } else{
+                    AsanError::Unknown((self.regs, actual_pc, (base_idx, index_idx, disp as usize, fault_address), backtrace))
                 }
             } else {
-                println!("Unknown");
-                AsanError::Unknown((self.regs, actual_pc, (0, 0, 0, fault_address), backtrace))
+                AsanError::Unknown((self.regs, actual_pc, (base_idx, index_idx, disp as usize, fault_address), backtrace))
             };
             AsanErrors::get_mut().report_error(error);
         }
@@ -2064,6 +2043,47 @@ impl AsanRuntime {
             ))
         };
         AsanErrors::get_mut().report_error(error);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn register_idx(&self, capid : RegId) -> (Option<u16>, Option<u16>) {
+        match capid.0 {
+            19 => (Some(0), Some(32)),
+            22 => (Some(2), Some(32)),
+            24 => (Some(3), Some(32)),
+            21 => (Some(1), Some(32)),
+            30 => (Some(5), Some(32)),
+            20 => (Some(4), Some(32)),
+            29 => (Some(6), Some(32)),
+            23 => (Some(7), Some(32)),
+            226 => (Some(8), Some(32)),
+            227 => (Some(9), Some(32)),
+            228 => (Some(10), Some(32)),
+            229 => (Some(11), Some(32)),
+            230 => (Some(12), Some(32)),
+            231 => (Some(13), Some(32)),
+            232 => (Some(14), Some(32)),
+            233 => (Some(15), Some(32)),
+            26 => (Some(18), Some(32)),
+            35 => (Some(0), Some(64)),
+            38 => (Some(2), Some(64)),
+            40 => (Some(3), Some(64)),
+            37 => (Some(1), Some(64)),
+            44 => (Some(5), Some(64)),
+            36 => (Some(4), Some(64)),
+            43 => (Some(6), Some(64)),
+            39 => (Some(7), Some(64)),
+            106 => (Some(8), Some(64)),
+            107 => (Some(9), Some(64)),
+            108 => (Some(10), Some(64)),
+            109 => (Some(11), Some(64)),
+            110 => (Some(12), Some(64)),
+            111 => (Some(13), Some(64)),
+            112 => (Some(14), Some(64)),
+            113 => (Some(15), Some(64)),
+            41 => (Some(18), Some(64)),
+            _ => (None, None), 
+        }
     }
 
     #[cfg(target_arch = "x86_64")]
