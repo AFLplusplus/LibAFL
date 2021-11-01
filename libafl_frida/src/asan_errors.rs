@@ -20,6 +20,9 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
+#[cfg(target_arch = "x86_64")]
+use crate::asan_rt::ASAN_SAVE_REGISTER_NAME;
+
 use crate::{alloc::AllocationMetadata, asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
 #[cfg(target_arch = "aarch64")]
@@ -80,7 +83,6 @@ pub(crate) struct AsanReadWriteError {
     pub backtrace: Backtrace,
 }
 
-
 #[cfg(target_arch = "x86_64")]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
@@ -118,7 +120,6 @@ pub(crate) enum AsanError {
     BadFuncArgRead((String, usize, usize, usize, Backtrace)),
     BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
 }
-
 
 impl AsanError {
     fn description(&self) -> &str {
@@ -264,21 +265,43 @@ impl AsanErrors {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
-                    }
-                    if indexreg.is_some() && reg == indexreg.unwrap() as usize {
+                    } else if indexreg.is_some() && reg == indexreg.unwrap() as usize {
                         output
-                        .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
-                        .unwrap();
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
+                            .unwrap();
+                    }
+                    write!(
+                        output,
+                        "{}: 0x{:016x} ",
+                        ASAN_SAVE_REGISTER_NAME[reg], error.registers[reg]
+                    );
+                    output.reset().unwrap();
+                    if reg % 4 == 3 {
+                        writeln!(output).unwrap();
                     }
                 }
 
+                #[cfg(target_arch = "x86_64")]
+                writeln!(output, "Rip: 0x{:016x}", error.pc).unwrap();
+
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
+
+                #[cfg(target_arch = "aarch64")]
                 let mut cs = Capstone::new()
                     .arm64()
                     .mode(capstone::arch::arm64::ArchMode::Arm)
                     .build()
                     .unwrap();
+
+                #[cfg(target_arch = "x86_64")]
+                let mut cs = Capstone::new()
+                    .x86()
+                    .mode(capstone::arch::x86::ArchMode::Mode64)
+                    .detail(true)
+                    .build()
+                    .expect("Failed to create Capstone object");
+
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
                 let start_pc = error.pc - 4 * 5;
@@ -469,6 +492,8 @@ impl AsanErrors {
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
+
+                #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
                     if reg == basereg {
                         output
@@ -485,15 +510,52 @@ impl AsanErrors {
                         writeln!(output).unwrap();
                     }
                 }
+                #[cfg(target_arch = "aarch64")]
                 writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+
+                #[cfg(target_arch = "x86_64")]
+                for reg in 0..ASAN_SAVE_REGISTER_COUNT {
+                    if basereg.is_some() && reg == basereg.unwrap() as usize {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                            .unwrap();
+                    } else if indexreg.is_some() && reg == indexreg.unwrap() as usize {
+                        output
+                            .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
+                            .unwrap();
+                    }
+                    write!(
+                        output,
+                        "{}: 0x{:016x} ",
+                        ASAN_SAVE_REGISTER_NAME[reg], registers[reg]
+                    );
+                    output.reset().unwrap();
+                    if reg % 4 == 3 {
+                        writeln!(output).unwrap();
+                    }
+                }
+
+                #[cfg(target_arch = "x86_64")]
+                writeln!(output, "Rip: 0x{:016x}", pc).unwrap();
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
+
+                #[cfg(target_arch = "aarch64")]
                 let mut cs = Capstone::new()
                     .arm64()
                     .mode(capstone::arch::arm64::ArchMode::Arm)
                     .build()
                     .unwrap();
+
+                #[cfg(target_arch = "x86_64")]
+                let mut cs = Capstone::new()
+                    .x86()
+                    .mode(capstone::arch::x86::ArchMode::Mode64)
+                    .detail(true)
+                    .build()
+                    .expect("Failed to create Capstone object");
+
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
                 let start_pc = pc - 4 * 5;

@@ -71,6 +71,28 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
+pub const ASAN_SAVE_REGISTER_NAME: [&str; ASAN_SAVE_REGISTER_COUNT] = [
+    "Rax",
+    "Rbx",
+    "Rcx",
+    "Rdx",
+    "Rbp",
+    "Rsp",
+    "Rsi",
+    "Rdi",
+    "R8",
+    "R9",
+    "R10",
+    "R11",
+    "R12",
+    "R13",
+    "R14",
+    "R15",
+    "Instrumented Rip",
+    "Fault Address",
+    "Actual Rip",
+];
+
 #[cfg(tareget_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 
@@ -1779,7 +1801,7 @@ impl AsanRuntime {
         let operands = cs.insn_detail(insn).unwrap().arch_detail().operands();
 
         let mut access_type: Option<RegAccessType> = None;
-        let mut regs : Option<(RegId, RegId, i64)> = None;
+        let mut regs: Option<(RegId, RegId, i64)> = None;
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 match x86operand.op_type {
@@ -1811,12 +1833,10 @@ impl AsanRuntime {
             let base_value = if base_idx.is_some() && size.is_some() {
                 if size.unwrap() == 64 {
                     Some(self.regs[base_idx.unwrap() as usize])
-                }
-                else{
+                } else {
                     Some(self.regs[base_idx.unwrap() as usize] & 0xffffffff)
                 }
-            }
-            else{
+            } else {
                 None
             };
 
@@ -1844,8 +1864,11 @@ impl AsanRuntime {
                         backtrace,
                     )),
                 }
-            } else if base_value.is_some() { 
-                if let Some(metadata) = self.allocator.find_metadata(fault_address, base_value.unwrap()) {
+            } else if base_value.is_some() {
+                if let Some(metadata) = self
+                    .allocator
+                    .find_metadata(fault_address, base_value.unwrap())
+                {
                     match access_type {
                         Some(typ) => {
                             let asan_readwrite_error = AsanReadWriteError {
@@ -1879,11 +1902,21 @@ impl AsanRuntime {
                             backtrace,
                         )),
                     }
-                } else{
-                    AsanError::Unknown((self.regs, actual_pc, (base_idx, index_idx, disp as usize, fault_address), backtrace))
+                } else {
+                    AsanError::Unknown((
+                        self.regs,
+                        actual_pc,
+                        (base_idx, index_idx, disp as usize, fault_address),
+                        backtrace,
+                    ))
                 }
             } else {
-                AsanError::Unknown((self.regs, actual_pc, (base_idx, index_idx, disp as usize, fault_address), backtrace))
+                AsanError::Unknown((
+                    self.regs,
+                    actual_pc,
+                    (base_idx, index_idx, disp as usize, fault_address),
+                    backtrace,
+                ))
             };
             AsanErrors::get_mut().report_error(error);
         }
@@ -2046,7 +2079,7 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "x86_64")]
-    fn register_idx(&self, capid : RegId) -> (Option<u16>, Option<u16>) {
+    fn register_idx(&self, capid: RegId) -> (Option<u16>, Option<u16>) {
         match capid.0 {
             19 => (Some(0), Some(32)),
             22 => (Some(2), Some(32)),
@@ -2082,7 +2115,7 @@ impl AsanRuntime {
             112 => (Some(14), Some(64)),
             113 => (Some(15), Some(64)),
             41 => (Some(18), Some(64)),
-            _ => (None, None), 
+            _ => (None, None),
         }
     }
 
