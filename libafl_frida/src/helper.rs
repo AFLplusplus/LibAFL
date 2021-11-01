@@ -3,7 +3,6 @@ use std::hash::Hasher;
 
 use libafl::inputs::{HasTargetBytes, Input};
 
-use frida_gum::interceptor::Interceptor;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
@@ -21,7 +20,7 @@ use capstone::{
 use capstone::{
     arch::{
         self,
-        x86::{X86Insn, X86OperandType},
+        x86::X86OperandType,
         ArchOperand::X86Operand,
         BuildsCapstone,
     },
@@ -470,6 +469,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     #[cfg(target_arch = "x86_64")]
     #[must_use]
     #[inline]
+    #[allow(clippy::unused_self)]
     pub fn writer_register(&self, reg: RegId) -> X86Register {
         let regint: u16 = reg.0;
         match regint {
@@ -831,6 +831,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
     #[inline]
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_arguments)]
     pub fn emit_shadow_check(
         &mut self,
         address: u64,
@@ -845,10 +846,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
         let writer = output.writer();
         let true_rip = address;
-
-        if (basereg.0 == 35) {
-            println!("Stop");
-        }
 
         let basereg = if basereg.0 == 0 {
             None
@@ -957,11 +954,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         #[cfg(unix)]
         let checked: bool = match width {
-            1 => writer.put_bytes(&self.asan_runtime.blob_check_mem_byte()),
-            2 => writer.put_bytes(&self.asan_runtime.blob_check_mem_halfword()),
-            4 => writer.put_bytes(&self.asan_runtime.blob_check_mem_dword()),
-            8 => writer.put_bytes(&self.asan_runtime.blob_check_mem_qword()),
-            16 => writer.put_bytes(&self.asan_runtime.blob_check_mem_16bytes()),
+            1 => writer.put_bytes(self.asan_runtime.blob_check_mem_byte()),
+            2 => writer.put_bytes(self.asan_runtime.blob_check_mem_halfword()),
+            4 => writer.put_bytes(self.asan_runtime.blob_check_mem_dword()),
+            8 => writer.put_bytes(self.asan_runtime.blob_check_mem_qword()),
+            16 => writer.put_bytes(self.asan_runtime.blob_check_mem_16bytes()),
             _ => false,
         };
 
@@ -1348,7 +1345,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         for operand in operands {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
-                    let insn_id: X86Insn = instr.id().0.into();
                     /*
                     println!(
                         "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",

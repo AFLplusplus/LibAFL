@@ -9,7 +9,6 @@ this helps finding mem errors early.
 use frida_gum::NativePointer;
 use frida_gum::RangeDetails;
 use hashbrown::HashMap;
-use nix::sys::mman::mprotect;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
@@ -27,11 +26,11 @@ use capstone::{
 use capstone::{
     arch::{
         self,
-        x86::{X86Insn, X86OperandType},
+        x86::X86OperandType,
         ArchOperand::X86Operand,
         BuildsCapstone,
     },
-    Capstone, Insn, RegAccessType, RegId,
+    Capstone, RegAccessType, RegId,
 };
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -49,7 +48,6 @@ use std::{ffi::c_void, ptr::write_volatile};
 use crate::{
     alloc::Allocator,
     asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
-    helper::FridaInstrumentationHelper,
     FridaOptions,
 };
 
@@ -164,7 +162,7 @@ impl AsanRuntime {
 
         self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
 
-        // self.hook_functions(_gum);
+        self.hook_functions(_gum);
 
         /*
 
@@ -438,6 +436,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[allow(clippy::cmp_null)]
     fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
         unsafe {
             let ret = self.allocator.alloc(size, 0x8);
@@ -457,6 +456,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[allow(clippy::cmp_null)]
     fn hook_free(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator.release(ptr) }
@@ -489,6 +489,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdaPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
@@ -497,6 +498,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
@@ -505,6 +507,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdaPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
@@ -513,6 +516,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
@@ -521,6 +525,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdaPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
@@ -534,6 +539,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
@@ -542,6 +548,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdlPv(&mut self, ptr: *mut c_void) {
         if ptr != std::ptr::null_mut() {
@@ -550,6 +557,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
         if ptr != std::ptr::null_mut() {
@@ -558,6 +566,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdlPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
@@ -566,6 +575,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
         if ptr != std::ptr::null_mut() {
@@ -574,6 +584,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdlPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
@@ -587,6 +598,7 @@ impl AsanRuntime {
     }
 
     #[allow(non_snake_case)]
+    #[allow(clippy::cmp_null)]
     #[inline]
     fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
         if ptr != std::ptr::null_mut() {
@@ -1778,8 +1790,8 @@ impl AsanRuntime {
     extern "C" fn handle_trap(&mut self) {
         self.dump_registers();
 
-        let mut fault_address = self.regs[17];
-        let mut actual_pc = self.regs[18];
+        let fault_address = self.regs[17];
+        let actual_pc = self.regs[18];
 
         let cs = Capstone::new()
             .x86()
@@ -1804,12 +1816,9 @@ impl AsanRuntime {
         let mut regs: Option<(RegId, RegId, i64)> = None;
         for operand in operands {
             if let X86Operand(x86operand) = operand {
-                match x86operand.op_type {
-                    X86OperandType::Mem(mem) => {
-                        access_type = x86operand.access;
-                        regs = Some((mem.base(), mem.index(), mem.disp()));
-                    }
-                    _ => (),
+                if let X86OperandType::Mem(mem) = x86operand.op_type {
+                    access_type = x86operand.access;
+                    regs = Some((mem.base(), mem.index(), mem.disp()));
                 }
             }
         }
@@ -1817,30 +1826,30 @@ impl AsanRuntime {
         let backtrace = Backtrace::new();
         let (stack_start, stack_end) = Self::current_stack();
 
-        if regs.is_none() {
-            // This is not even a mem instruction??
-            AsanErrors::get_mut().report_error(AsanError::Unknown((
-                self.regs,
-                actual_pc,
-                (None, None, 0, fault_address),
-                backtrace,
-            )));
-        } else {
-            let (base_idx, size) = self.register_idx(regs.unwrap().0); // safe to unwrap
-            let (index_idx, _) = self.register_idx(regs.unwrap().1);
-            let disp = regs.unwrap().2;
+        if let Some(r) = regs {
+            let (base_idx, size) = self.register_idx(r.0); // safe to unwrap
+            let (index_idx, _) = self.register_idx(r.1);
+            let disp = r.2;
+
             // from capstone register id to self.regs's index
-            let base_value = if base_idx.is_some() && size.is_some() {
-                if size.unwrap() == 64 {
-                    Some(self.regs[base_idx.unwrap() as usize])
-                } else {
-                    Some(self.regs[base_idx.unwrap() as usize] & 0xffffffff)
+            let base_value = match base_idx {
+                Some(base) => {
+                    match size {
+                        Some(sz) => {
+                            if sz == 64 {
+                                Some(self.regs[base as usize])
+                            } else {
+                                Some(self.regs[base as usize] & 0xffffffff)
+                            }
+                        },
+                        _ => None
+                    }
                 }
-            } else {
-                None
+                _ => None,
             };
 
             // println!("{:x}", base_value);
+            #[allow(clippy::option_if_let_else)]
             let error = if fault_address >= stack_start && fault_address < stack_end {
                 match access_type {
                     Some(typ) => match typ {
@@ -1919,6 +1928,16 @@ impl AsanRuntime {
                 ))
             };
             AsanErrors::get_mut().report_error(error);
+
+            // This is not even a mem instruction??
+
+        } else {
+            AsanErrors::get_mut().report_error(AsanError::Unknown((
+                self.regs,
+                actual_pc,
+                (None, None, 0, fault_address),
+                backtrace,
+            )));
         }
 
         // self.dump_registers();
@@ -2079,6 +2098,7 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "x86_64")]
+    #[allow(clippy::unused_self)]
     fn register_idx(&self, capid: RegId) -> (Option<u16>, Option<u16>) {
         match capid.0 {
             19 => (Some(0), Some(32)),
