@@ -24,12 +24,7 @@ use capstone::{
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{
-    arch::{
-        self,
-        x86::X86OperandType,
-        ArchOperand::X86Operand,
-        BuildsCapstone,
-    },
+    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
     Capstone, RegAccessType, RegId,
 };
 
@@ -1833,18 +1828,16 @@ impl AsanRuntime {
 
             // from capstone register id to self.regs's index
             let base_value = match base_idx {
-                Some(base) => {
-                    match size {
-                        Some(sz) => {
-                            if sz == 64 {
-                                Some(self.regs[base as usize])
-                            } else {
-                                Some(self.regs[base as usize] & 0xffffffff)
-                            }
-                        },
-                        _ => None
+                Some(base) => match size {
+                    Some(sz) => {
+                        if sz == 64 {
+                            Some(self.regs[base as usize])
+                        } else {
+                            Some(self.regs[base as usize] & 0xffffffff)
+                        }
                     }
-                }
+                    _ => None,
+                },
                 _ => None,
             };
 
@@ -1930,7 +1923,6 @@ impl AsanRuntime {
             AsanErrors::get_mut().report_error(error);
 
             // This is not even a mem instruction??
-
         } else {
             AsanErrors::get_mut().report_error(AsanError::Unknown((
                 self.regs,

@@ -261,7 +261,11 @@ impl AsanErrors {
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
 
                 #[cfg(target_arch = "x86_64")]
-                for (reg, name) in ASAN_SAVE_REGISTER_NAME.iter().enumerate().take(ASAN_SAVE_REGISTER_COUNT) {
+                for (reg, name) in ASAN_SAVE_REGISTER_NAME
+                    .iter()
+                    .enumerate()
+                    .take(ASAN_SAVE_REGISTER_COUNT)
+                {
                     if basereg.is_some() && reg == basereg.unwrap() as usize {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -271,11 +275,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(
-                        output,
-                        "{}: 0x{:016x} ",
-                        name, error.registers[reg]
-                    ).unwrap();
+                    write!(output, "{}: 0x{:016x} ", name, error.registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -529,7 +529,8 @@ impl AsanErrors {
                         output,
                         "{}: 0x{:016x} ",
                         ASAN_SAVE_REGISTER_NAME[reg], registers[reg]
-                    ).unwrap();
+                    )
+                    .unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
