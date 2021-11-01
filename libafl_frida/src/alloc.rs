@@ -92,7 +92,8 @@ impl Allocator {
         // we'd also want to avoid 0x5555-xxxx-xxxx because programs are mapped there. so 45 is not available either (0x2000-0000-0000 - 0x6000-0000-0000).
         // This memory map is for amd64 linux.
         #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
-        for try_shadow_bit in &[44usize, 36usize] {
+        {
+            let try_shadow_bit: usize = 44;
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
                 mmap(
@@ -109,8 +110,7 @@ impl Allocator {
             }
             .is_ok()
             {
-                shadow_bit = *try_shadow_bit;
-                break;
+                shadow_bit = try_shadow_bit;
             }
         }
         assert!(shadow_bit != 0);
