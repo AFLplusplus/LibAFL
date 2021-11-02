@@ -12,10 +12,13 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::NautilusInput,
-    mutators::{NautilusRandomMutator, StdScheduledMutator},
+    mutators::{
+        NautilusChunksMetadata, NautilusRandomMutator, NautilusRecursionMutator,
+        NautilusSpliceMutator, StdScheduledMutator,
+    },
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
-    state::StdState,
+    state::{HasMetadata, StdState},
     stats::SimpleStats,
 };
 
@@ -67,6 +70,10 @@ pub fn main() {
         // They are the data related to the feedbacks that you want to persist in the State.
         tuple_list!(feedback_state),
     );
+
+    if state.metadata().get::<NautilusChunksMetadata>().is_none() {
+        state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
+    }
 
     // The Stats trait define how the fuzzer stats are reported to the user
     let stats = SimpleStats::new(|s| println!("{}", s));
@@ -129,8 +136,18 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::with_max_iterations(
-        tuple_list!(NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),NautilusRandomMutator::new(&context),
-        NautilusRecursionMutator::new(&context)),
+        tuple_list!(
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRecursionMutator::new(&context),
+            NautilusSpliceMutator::new(&context),
+            NautilusSpliceMutator::new(&context),
+            NautilusSpliceMutator::new(&context),
+        ),
         2,
     );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
