@@ -67,7 +67,7 @@ where
 }
 
 #[derive(Serialize, Deserialize)]
-struct GramatronIdxMapMetadata {
+pub struct GramatronIdxMapMetadata {
     pub map: HashMap<usize, Vec<usize>>,
 }
 
