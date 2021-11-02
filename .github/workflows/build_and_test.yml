@@ -35,7 +35,7 @@ jobs:
       - name: Run tests
         run: cargo test
       - name: Test libafl no_std
-        run: cd libafl && cargo test --no-default-features
+        run: cd libafl && cargo hack test --exclude-features=nautilus,python,sancov_pcguard_edges,sancov_pcguard_edges_ptr --no-default-features
      
 
   ubuntu:
@@ -74,7 +74,7 @@ jobs:
     - name: Build Docs
       run: cargo doc
     - name: Test Docs
-      run: cargo test --all-features --doc
+      run: cargo hack test --feature-powerset --depth=2 --exclude-features=nautilus,python,sancov_pcguard_edges,sancov_pcguard_edges_ptr --no-dev-deps
     - name: Run clippy
       run: ./scripts/clippy.sh
   ubuntu-concolic:
@@ -121,7 +121,7 @@ jobs:
     - name: run x86_64 until panic!
       run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
     - name: no_std tests
-      run: cd ./libafl && cargo test --no-default-features 
+      run: cd ./libafl && cargo hack test --exclude-features=nautilus --no-default-features
   build-docker:
     runs-on: ubuntu-latest
     steps:
