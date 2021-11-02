@@ -61,7 +61,7 @@ jobs:
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
     - name: Check each feature
       # Skipping python as it has to be built with the `maturin` tool
-      run: cargo hack check --feature-powerset --depth=2 --exclude-features=python,sancov_pcguard_edges,sancov_pcguard_edges_ptr --no-dev-deps
+      run: cargo hack check --feature-powerset --depth=2 --exclude-features=nautilus,python,sancov_pcguard_edges,sancov_pcguard_edges_ptr --no-dev-deps
     # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
     - name: Check pcguard edges
       run: cargo check --features=sancov_pcguard_edges,sancov_pcguard_edges_ptr
