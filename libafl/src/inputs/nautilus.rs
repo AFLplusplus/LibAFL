@@ -67,6 +67,7 @@ impl NautilusInput {
     }
 
     pub fn unparse(&self, context: &NautilusContext, bytes: &mut Vec<u8>) {
+        bytes.clear();
         self.tree.unparse(NodeID::from(0), &context.ctx, bytes);
     }
 
