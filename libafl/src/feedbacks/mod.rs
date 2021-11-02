@@ -9,6 +9,11 @@ pub mod concolic;
 #[cfg(feature = "std")]
 pub use concolic::ConcolicFeedback;
 
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 

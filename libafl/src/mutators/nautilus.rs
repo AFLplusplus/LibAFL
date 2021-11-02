@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::tuples::Named,
     corpus::Corpus,
+    feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
@@ -13,7 +13,6 @@ use crate::{
 
 use grammartec::mutator::Mutator as BackingMutator;
 use grammartec::{
-    chunkstore::ChunkStore,
     context::Context,
     tree::{Tree, TreeMutation},
 };
@@ -128,22 +127,6 @@ impl<'a> NautilusRecursionMutator<'a> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct NautilusChunksMetadata {
-    pub cks: ChunkStore,
-}
-
-crate::impl_serdeany!(NautilusChunksMetadata);
-
-impl NautilusChunksMetadata {
-    #[must_use]
-    pub fn new(work_dir: String) -> Self {
-        Self {
-            cks: ChunkStore::new(work_dir),
-        }
-    }
-}
-
 pub struct NautilusSpliceMutator<'a, C> {
     ctx: &'a Context,
     mutator: BackingMutator,
@@ -186,24 +169,6 @@ where
         } else {
             Ok(MutationResult::Skipped)
         }
-    }
-
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<usize>,
-    ) -> Result<(), Error> {
-        // New entry in corpus
-        if let Some(idx) = corpus_idx {
-            let input = state.corpus().get(idx)?.borrow_mut().load_input()?.clone();
-            let meta = state
-                .metadata_mut()
-                .get_mut::<NautilusChunksMetadata>()
-                .expect("NautilusChunksMetadata not in the state");
-            meta.cks.add_tree(input.tree, &self.ctx);
-        }
-        Ok(())
     }
 }
 

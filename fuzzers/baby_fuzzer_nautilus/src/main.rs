@@ -8,13 +8,15 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedback_or,
+    feedbacks::{
+        CrashFeedback, MapFeedbackState, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
+    },
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::NautilusInput,
     mutators::{
-        NautilusChunksMetadata, NautilusRandomMutator, NautilusRecursionMutator,
-        NautilusSpliceMutator, StdScheduledMutator,
+        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, StdScheduledMutator,
     },
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
@@ -52,7 +54,10 @@ pub fn main() {
     let feedback_state = MapFeedbackState::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let feedback = feedback_or!(
+        MaxMapFeedback::new(&feedback_state, &observer),
+        NautilusFeedback::new(&context)
+    );
 
     // A feedback to choose if an input is a solution or not
     let objective = CrashFeedback::new();
