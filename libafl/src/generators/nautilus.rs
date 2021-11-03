@@ -64,7 +64,7 @@ impl<'a> NautilusGenerator<'a> {
     }
 
     // TODO create from a python grammar
-
+    #[must_use]
     pub fn nonterminal(&self, name: &str) -> NTermID {
         self.ctx.nt_id(name)
     }

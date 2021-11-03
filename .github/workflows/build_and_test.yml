@@ -52,6 +52,8 @@ jobs:
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - uses: actions/checkout@v2
     - name: Run a normal build
       run: cargo build --verbose
@@ -74,7 +76,7 @@ jobs:
     - name: Build Docs
       run: cargo doc
     - name: Test Docs
-      run: cargo hack test --docs --feature-powerset --depth=2 --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,sancov_pcguard_edges_ptr --no-dev-deps
+      run: cargo hack test --docs --feature-powerset --depth=2 --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,sancov_pcguard_edges_ptr
     - name: Run clippy
       run: ./scripts/clippy.sh
   ubuntu-concolic:
