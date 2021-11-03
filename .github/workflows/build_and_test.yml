@@ -155,6 +155,8 @@ jobs:
         profile: minimal
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: brew install z3
     - uses: actions/checkout@v2
