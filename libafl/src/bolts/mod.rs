@@ -27,6 +27,17 @@ pub trait AsSlice<T> {
     fn as_slice(&self) -> &[T];
 }
 
+/// Has a length field
+pub trait HasLen {
+    /// The length
+    fn len(&self) -> usize;
+
+    /// Returns `true` if it has no elements.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
 /// Current time
 #[cfg(feature = "std")]
 #[must_use]

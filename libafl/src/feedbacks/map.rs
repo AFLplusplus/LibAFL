@@ -171,7 +171,7 @@ where
         O: MapObserver<T>,
     {
         Self {
-            history_map: vec![T::default(); map_observer.map().len()],
+            history_map: vec![T::default(); map_observer.len()],
             name: map_observer.name().to_string(),
         }
     }
@@ -245,12 +245,12 @@ where
         if size > map_state.history_map.len() {
             panic!("The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
         }
-        assert!(size <= observer.map().len());
+        assert!(size <= observer.len());
 
         if self.novelties.is_some() {
             for i in 0..size {
                 let history = map_state.history_map[i];
-                let item = observer.map()[i];
+                let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
                 if history != reduced {
@@ -262,7 +262,7 @@ where
         } else {
             for i in 0..size {
                 let history = map_state.history_map[i];
-                let item = observer.map()[i];
+                let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
                 if history != reduced {
@@ -457,7 +457,7 @@ where
         let mut hit_target: bool = false;
         //check if we've hit any targets.
         for i in 0..size {
-            if observer.map()[i] > 0 {
+            if *observer.get(i) > 0 {
                 self.target_idx.push(i);
                 hit_target = true;
             }

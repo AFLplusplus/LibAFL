@@ -6,8 +6,8 @@ use core::{convert::Into, default::Default, option::Option, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serdeany::SerdeAnyMap,
-    inputs::{HasLen, Input},
+    bolts::{serdeany::SerdeAnyMap, HasLen},
+    inputs::Input,
     state::HasMetadata,
     Error,
 };

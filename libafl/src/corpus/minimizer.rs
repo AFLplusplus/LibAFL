@@ -2,10 +2,10 @@
 // with testcases only from a subset of the total corpus.
 
 use crate::{
-    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice},
+    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasLen},
     corpus::{Corpus, CorpusScheduler, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::{HasLen, Input},
+    inputs::Input,
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
