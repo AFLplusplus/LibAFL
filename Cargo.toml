@@ -17,6 +17,7 @@ members = [
     "libafl_concolic/symcc_libafl",
     "libafl_concolic/test/dump_constraints",
     "libafl_concolic/test/runtime_test",
+    "utils/deexit",
 ]
 default-members = [
     "libafl",
