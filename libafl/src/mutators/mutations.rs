@@ -1580,7 +1580,7 @@ mod tests {
     use crate::{
         bolts::{
             rands::StdRand,
-            tuples::{tuple_list, HasLen},
+            tuples::{tuple_list, HasConstLen},
         },
         corpus::{Corpus, InMemoryCorpus},
         inputs::BytesInput,
