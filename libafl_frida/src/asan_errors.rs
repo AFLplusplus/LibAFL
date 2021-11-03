@@ -261,7 +261,7 @@ impl AsanErrors {
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
 
                 #[cfg(target_arch = "x86_64")]
-                for (reg, name) in ASAN_SAVE_REGISTER_NAME
+                for (reg, name) in ASAN_SAVE_REGISTER_NAMES
                     .iter()
                     .enumerate()
                     .take(ASAN_SAVE_REGISTER_COUNT)
@@ -528,7 +528,7 @@ impl AsanErrors {
                     write!(
                         output,
                         "{}: 0x{:016x} ",
-                        ASAN_SAVE_REGISTER_NAME[reg], registers[reg]
+                        ASAN_SAVE_REGISTER_NAMES[reg], registers[reg]
                     )
                     .unwrap();
                     output.reset().unwrap();
