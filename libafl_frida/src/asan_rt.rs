@@ -64,26 +64,26 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
-pub const ASAN_SAVE_REGISTER_NAME: [&str; ASAN_SAVE_REGISTER_COUNT] = [
-    "Rax",
-    "Rbx",
-    "Rcx",
-    "Rdx",
-    "Rbp",
-    "Rsp",
-    "Rsi",
-    "Rdi",
-    "R8",
-    "R9",
-    "R10",
-    "R11",
-    "R12",
-    "R13",
-    "R14",
-    "R15",
-    "Instrumented Rip",
-    "Fault Address",
-    "Actual Rip",
+pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
+    "rax",
+    "rbx",
+    "rcx",
+    "rdx",
+    "rbp",
+    "rsp",
+    "rsi",
+    "rdi",
+    "r8",
+    "r9",
+    "r10",
+    "r11",
+    "r12",
+    "r13",
+    "r14",
+    "r15",
+    "instrumented rip",
+    "fault address",
+    "actual rip",
 ];
 
 #[cfg(tareget_arch = "aarch64")]
@@ -2133,25 +2133,25 @@ impl AsanRuntime {
 
     #[cfg(target_arch = "x86_64")]
     fn dump_registers(&self) {
-        println!("Rax: {:x}", self.regs[0]);
-        println!("Rbx: {:x}", self.regs[1]);
-        println!("Rcx: {:x}", self.regs[2]);
-        println!("Rdx: {:x}", self.regs[3]);
-        println!("Rbp: {:x}", self.regs[4]);
-        println!("Rsp: {:x}", self.regs[5]);
-        println!("Rsi: {:x}", self.regs[6]);
-        println!("Rdi: {:x}", self.regs[7]);
-        println!("R8: {:x}", self.regs[8]);
-        println!("R9: {:x}", self.regs[9]);
-        println!("R10: {:x}", self.regs[10]);
-        println!("R11: {:x}", self.regs[11]);
-        println!("R12: {:x}", self.regs[12]);
-        println!("R13: {:x}", self.regs[13]);
-        println!("R14: {:x}", self.regs[14]);
-        println!("R15: {:x}", self.regs[15]);
-        println!("instrumented return address: {:x}", self.regs[16]);
-        println!("accessed memory address {:x}", self.regs[17]);
-        println!("r/w instruction rip {:x}", self.regs[18]);
+        println!("rax: {:x}", self.regs[0]);
+        println!("rbx: {:x}", self.regs[1]);
+        println!("rcx: {:x}", self.regs[2]);
+        println!("rdx: {:x}", self.regs[3]);
+        println!("rbp: {:x}", self.regs[4]);
+        println!("rsp: {:x}", self.regs[5]);
+        println!("rsi: {:x}", self.regs[6]);
+        println!("rdi: {:x}", self.regs[7]);
+        println!("r8: {:x}", self.regs[8]);
+        println!("r9: {:x}", self.regs[9]);
+        println!("r10: {:x}", self.regs[10]);
+        println!("r11: {:x}", self.regs[11]);
+        println!("r12: {:x}", self.regs[12]);
+        println!("r13: {:x}", self.regs[13]);
+        println!("r14: {:x}", self.regs[14]);
+        println!("r15: {:x}", self.regs[15]);
+        println!("instrumented rip: {:x}", self.regs[16]);
+        println!("fault address: {:x}", self.regs[17]);
+        println!("actual rip: {:x}", self.regs[18]);
     }
 
     // https://godbolt.org/z/Y87PYGd69

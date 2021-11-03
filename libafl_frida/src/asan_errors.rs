@@ -21,7 +21,7 @@ use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
 #[cfg(target_arch = "x86_64")]
-use crate::asan_rt::ASAN_SAVE_REGISTER_NAME;
+use crate::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 
 use crate::{alloc::AllocationMetadata, asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
@@ -283,7 +283,7 @@ impl AsanErrors {
                 }
 
                 #[cfg(target_arch = "x86_64")]
-                writeln!(output, "Rip: 0x{:016x}", error.pc).unwrap();
+                writeln!(output, "rip: 0x{:016x}", error.pc).unwrap();
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
