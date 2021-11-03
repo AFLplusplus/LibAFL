@@ -1,9 +1,15 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The `launcher` will spawn new processes for each cpu core.
+//! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
+//! for python instrumentation and fuzzing.
 
-use clap::{load_yaml, App};
-use core::time::Duration;
-use std::{env, path::PathBuf};
+use clap::{App, AppSettings, Arg};
+use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
+use std::{
+    env,
+    os::raw::{c_char, c_int},
+    path::PathBuf,
+};
 
 use libafl::{
     bolts::{
@@ -33,23 +39,145 @@ use libafl::{
     stats::MultiStats,
     Error,
 };
-
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
+    CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
+    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, CMPLOG_MAP, EDGES_MAP_PTR,
     MAX_EDGES_NUM,
 };
 
-/// The main fn, `no_mangle` as it is a C symbol
+/// Set up our coverage map.
 #[no_mangle]
-pub fn libafl_main() {
+pub fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
+    unsafe {
+        EDGES_MAP_PTR = start;
+        MAX_EDGES_NUM = (stop as usize - start as usize) / 8;
+    }
+}
+
+/// `pcs` tables seem to be unused by `Atheris`, so we can ignore this setup function,
+/// but the symbol is still being called and, hence, required.
+#[no_mangle]
+pub fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
+    // noop
+}
+
+/// Allow the python code to use `cmplog`.
+/// This is a PoC implementation and could be improved.
+/// For example, it only takes up to 8 bytes into consideration.
+#[no_mangle]
+pub fn __sanitizer_weak_hook_memcmp(
+    _caller_pc: *const c_void,
+    s1: *const c_void,
+    s2: *const c_void,
+    n: usize,
+    _result: c_int,
+) {
+    unsafe {
+        let s1 = slice::from_raw_parts(s1 as *const u8, n);
+        let s2 = slice::from_raw_parts(s2 as *const u8, n);
+        match n {
+            0 => (),
+            1 => __sanitizer_cov_trace_cmp1(
+                u8::from_ne_bytes(s1.try_into().unwrap()),
+                u8::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+            2..=3 => __sanitizer_cov_trace_cmp2(
+                u16::from_ne_bytes(s1.try_into().unwrap()),
+                u16::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+            4..=7 => __sanitizer_cov_trace_cmp4(
+                u32::from_ne_bytes(s1.try_into().unwrap()),
+                u32::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+            _ => __sanitizer_cov_trace_cmp8(
+                u64::from_ne_bytes(s1.try_into().unwrap()),
+                u64::from_ne_bytes(s2.try_into().unwrap()),
+            ),
+        }
+    }
+}
+
+/// It's called by Atheris after the fuzzer has been initialized.
+/// The main entrypoint to our fuzzer, which will be called by `Atheris` when fuzzing starts.
+/// The `harness_fn` parameter is the function that will be called by `LibAFL` for each iteration
+/// and jumps back into `Atheris'` instrumented python code.
+#[no_mangle]
+#[allow(non_snake_case)]
+pub fn LLVMFuzzerRunDriver(
+    _argc: *const c_int,
+    _argv: *const *const c_char,
+    harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
+) {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let workdir = env::current_dir().unwrap();
+    if harness_fn.is_none() {
+        panic!("No harness callback provided");
+    }
+    let harness_fn = harness_fn.unwrap();
 
-    let yaml = load_yaml!("clap-config.yaml");
-    let matches = App::from(yaml).get_matches();
+    if unsafe { EDGES_MAP_PTR.is_null() } {
+        panic!(
+            "Edges map was never initialized - __sanitizer_cov_8bit_counters_init never got called"
+        );
+    }
+
+    println!("Args: {:?}", std::env::args());
+
+    let matches = App::new("libafl_atheris")
+        .version("0.1.0")
+        .setting(AppSettings::AllowExternalSubcommands)
+        .arg(Arg::new("script")) // The python script is the first arg
+        .arg(
+            Arg::new("cores")
+                .short('c')
+                .long("cores")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("broker_port")
+                .short('p')
+                .long("broker-port")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("output")
+                .short('o')
+                .long("output")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("input")
+                .short('i')
+                .long("input")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("remote_broker_addr")
+                .short('B')
+                .long("remote-broker-addr")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("timeout")
+                .short('t')
+                .long("timeout")
+                .required(false)
+                .takes_value(true),
+        )
+        .get_matches();
+
+    let workdir = env::current_dir().unwrap();
+    println!(
+        "Workdir: {:?}",
+        env::current_dir().unwrap().to_string_lossy().to_string()
+    );
 
     let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
@@ -84,9 +212,11 @@ pub fn libafl_main() {
 
     let stats = MultiStats::new(|s| println!("{}", s));
 
+    // TODO: we need to handle Atheris calls to `exit` on errors somhow.
+
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+        let edges = unsafe { slice::from_raw_parts_mut(EDGES_MAP_PTR, MAX_EDGES_NUM) };
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
         // Create an observation channel to keep track of the execution time
@@ -144,7 +274,7 @@ pub fn libafl_main() {
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
-            libfuzzer_test_one_input(buf);
+            harness_fn(buf.as_ptr(), buf.len());
             ExitKind::Ok
         };
 
@@ -164,7 +294,7 @@ pub fn libafl_main() {
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
-            libfuzzer_test_one_input(buf);
+            harness_fn(buf.as_ptr(), buf.len());
             ExitKind::Ok
         };
 
@@ -187,13 +317,6 @@ pub fn libafl_main() {
 
         // The order of the stages matter!
         let mut stages = tuple_list!(tracing, i2s, mutational);
-
-        // The actual target run starts here.
-        // Call LLVMFUzzerInitialize() if present.
-        let args: Vec<String> = env::args().collect();
-        if libfuzzer_initialize(&args) == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
-        }
 
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
@@ -218,8 +341,9 @@ pub fn libafl_main() {
             } else {
                 println!("Loading from {:?}", &input_dirs);
                 // Load from disk
+                // we used _forced since some Atheris testcases don't touch the map at all, hence, wolud not load any data.
                 state
-                    .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &input_dirs)
+                    .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &input_dirs)
                     .unwrap_or_else(|_| {
                         panic!("Failed to load initial corpus at {:?}", &input_dirs)
                     });
@@ -231,6 +355,7 @@ pub fn libafl_main() {
         Ok(())
     };
 
+    // Let's go. Python fuzzing ftw!
     match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
@@ -239,11 +364,12 @@ pub fn libafl_main() {
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(remote_broker_addr)
+        // remove this comment to sience the target.
         //.stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {
         Ok(_) | Err(Error::ShuttingDown) => (),
-        Err(e) => panic!("{:?}", e),
+        Err(e) => panic!("Error in fuzzer: {}", e),
     };
 }
