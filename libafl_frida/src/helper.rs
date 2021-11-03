@@ -25,6 +25,10 @@ use frida_gum::{
     stalker::{StalkerOutput, Transformer},
     CpuContext, ModuleDetails, ModuleMap,
 };
+
+#[cfg(unix)]
+use frida_gum::CpuContext;
+
 use frida_gum::{Gum, Module, PageProtection};
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
