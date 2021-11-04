@@ -5,10 +5,7 @@ use alloc::{rc::Rc, string::String};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    generators::nautilus::NautilusContext,
-    inputs::{HasLen, Input},
-};
+use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input};
 
 use grammartec::{
     newtypes::NodeID,
