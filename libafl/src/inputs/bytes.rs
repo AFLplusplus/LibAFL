@@ -12,8 +12,8 @@ use std::{fs::File, io::Read, path::Path};
 #[cfg(feature = "std")]
 use crate::{bolts::fs::write_file_atomic, Error};
 use crate::{
-    bolts::ownedref::OwnedSlice,
-    inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
+    bolts::{ownedref::OwnedSlice, HasLen},
+    inputs::{HasBytesVec, HasTargetBytes, Input},
 };
 
 /// A bytes input is the basic input
