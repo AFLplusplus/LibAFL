@@ -187,7 +187,7 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
-                    if basereg.is_some() && reg == basereg.unwrap() as usize  {
+                    if basereg.is_some() && reg == basereg.unwrap() as usize {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
