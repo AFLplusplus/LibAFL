@@ -43,10 +43,7 @@
 
 #![cfg(feature = "std")]
 
-use std::{
-    convert::TryFrom,
-    io::{self, Cursor, Read, Seek, SeekFrom, Write},
-};
+use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
 use bincode::{DefaultOptions, Options};
 

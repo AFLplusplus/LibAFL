@@ -32,8 +32,12 @@ use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter,
     stalker::{StalkerOutput, Transformer},
-    CpuContext, ModuleDetails, ModuleMap,
+    ModuleDetails, ModuleMap,
 };
+
+#[cfg(unix)]
+use frida_gum::CpuContext;
+
 use frida_gum::{Gum, Module, PageProtection};
 
 use rangemap::RangeMap;

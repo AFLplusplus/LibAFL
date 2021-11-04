@@ -151,7 +151,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
                     if any.is_none() {
                         SyscallHookResult::new(None)
                     } else {
-                        let a: Result<&PyInt, _> = any.try_into();
+                        let a: Result<&PyInt, _> = any.cast_as();
                         if let Ok(i) = a {
                             SyscallHookResult::new(Some(
                                 i.extract().expect("Invalid syscall hook return value"),

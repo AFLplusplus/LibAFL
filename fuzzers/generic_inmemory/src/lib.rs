@@ -31,6 +31,7 @@ use libafl::{
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
+    Error,
 };
 
 use libafl_targets::{
@@ -230,7 +231,7 @@ pub fn libafl_main() {
         Ok(())
     };
 
-    Launcher::builder()
+    match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .stats(stats)
@@ -241,5 +242,8 @@ pub fn libafl_main() {
         //.stdout_file(Some("/dev/null"))
         .build()
         .launch()
-        .expect("Launcher failed");
+    {
+        Ok(_) | Err(Error::ShuttingDown) => (),
+        Err(e) => panic!("{:?}", e),
+    };
 }

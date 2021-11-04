@@ -12,8 +12,6 @@ use hashbrown::HashMap;
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
-#[cfg(feature = "introspection")]
-use core::convert::TryInto;
 
 use crate::bolts::current_time;
 

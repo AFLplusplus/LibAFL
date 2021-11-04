@@ -13,10 +13,7 @@ use hashbrown::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    inputs::{HasLen, Input},
-    Error,
-};
+use crate::{bolts::HasLen, inputs::Input, Error};
 
 pub trait InputEncoder<T>
 where

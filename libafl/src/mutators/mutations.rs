@@ -12,7 +12,6 @@ use crate::{
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{
     cmp::{max, min},
-    convert::TryInto,
     marker::PhantomData,
     mem::size_of,
 };
@@ -1580,7 +1579,7 @@ mod tests {
     use crate::{
         bolts::{
             rands::StdRand,
-            tuples::{tuple_list, HasLen},
+            tuples::{tuple_list, HasConstLen},
         },
         corpus::{Corpus, InMemoryCorpus},
         inputs::BytesInput,

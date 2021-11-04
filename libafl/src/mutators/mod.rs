@@ -14,7 +14,7 @@ pub mod gramatron;
 pub use gramatron::*;
 
 use crate::{
-    bolts::tuples::{HasLen, Named},
+    bolts::tuples::{HasConstLen, Named},
     inputs::Input,
     Error,
 };
@@ -59,7 +59,7 @@ where
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
-pub trait MutatorsTuple<I, S>: HasLen
+pub trait MutatorsTuple<I, S>: HasConstLen
 where
     I: Input,
 {

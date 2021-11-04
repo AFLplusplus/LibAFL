@@ -96,7 +96,6 @@ use crate::stats::PerfFeature;
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
     use core::mem::size_of;
     use hashbrown::HashMap;
-    use std::convert::TryInto;
     use z3::{
         ast::{Ast, Bool, Dynamic, BV},
         Config, Context, Solver, Symbol,
