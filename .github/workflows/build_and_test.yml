@@ -76,7 +76,7 @@ jobs:
     - name: Build Docs
       run: cargo doc
     - name: Test Docs
-      run: cargo hack test --doc --feature-powerset --depth=2 --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,sancov_pcguard_edges_ptr
+      run: cargo hack test --doc --workspace --feature-powerset --depth=1 --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,sancov_pcguard_edges_ptr
     - name: Run clippy
       run: ./scripts/clippy.sh
   ubuntu-concolic:
