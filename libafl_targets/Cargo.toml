@@ -18,6 +18,7 @@ sancov_pcguard_hitcounts = []
 sancov_pcguard_edges_ptr = []
 sancov_pcguard_hitcounts_ptr = []
 sancov_value_profile = []
+sancov_8bit = []
 sancov_cmplog = []
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
 clippy = [] # Ignore compiler warnings during clippy
