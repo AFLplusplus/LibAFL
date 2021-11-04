@@ -5,6 +5,7 @@ pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let mut dir = env::current_exe().unwrap();
+        let weak = env::var("LIBAFL_WEAK").unwrap();
         let wrapper_name = dir.file_name().unwrap().to_str().unwrap();
 
         let is_cpp = match wrapper_name[wrapper_name.len()-2..].to_lowercase().as_str() {
@@ -22,7 +23,7 @@ pub fn main() {
             .silence(true)
             .from_args(&args)
             .expect("Failed to parse the command line")
-            .add_link_arg("../weak.o")
+            .add_link_arg(weak)
             .link_staticlib(&dir, "libfuzzer_libpng")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .run()

@@ -34,7 +34,7 @@ Now compile libpng, using the libafl_cc compiler wrapper:
 ```bash
 cd libpng-1.6.37
 ./configure
-make CC="$(pwd)/../target/release/libafl_cc" CXX="$(pwd)/../target/release/libafl_cxx" -j `nproc`
+LIBAFL_WEAK=../weak.o make CC="$(pwd)/../target/release/libafl_cc" CXX="$(pwd)/../target/release/libafl_cxx" -j `nproc`
 ```
 
 You can find the static lib at `libpng-1.6.37/.libs/libpng16.a`.
@@ -43,7 +43,7 @@ Now, we have to build the libfuzzer harness and link all together to create our 
 
 ```
 cd ..
-./target/release/libafl_cxx ./harness.cc libpng-1.6.37/.libs/libpng16.a -I libpng-1.6.37/ -o fuzzer_libpng -lz -lm
+LIBAFL_WEAK=./weak.o ./target/release/libafl_cxx ./harness.cc libpng-1.6.37/.libs/libpng16.a -I libpng-1.6.37/ -o fuzzer_libpng -lz -lm
 ```
 
 Afterward, the fuzzer will be ready to run.
