@@ -625,7 +625,7 @@ where
 
     #[inline]
     fn get(&self, idx: usize) -> &T {
-        let elem = self.intervals.query_point(idx).nth(0).unwrap();
+        let elem = self.intervals.query_point(idx).next().unwrap();
         let i = elem.value;
         let j = idx - elem.range.start;
         &self.maps[i].as_slice()[j]
@@ -633,7 +633,7 @@ where
 
     #[inline]
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        let elem = self.intervals.query_point(idx).nth(0).unwrap();
+        let elem = self.intervals.query_point(idx).next().unwrap();
         let i = elem.value;
         let j = idx - elem.range.start;
         &mut self.maps[i].as_mut_slice()[j]
@@ -703,9 +703,9 @@ where
         let mut initial = T::default();
         let mut builder = vec![];
         let maps: Vec<_> = maps
-            .into_iter()
+            .iter_mut()
             .map(|x| {
-                if x.len() > 0 {
+                if !x.is_empty() {
                     initial = x[0];
                 }
                 let l = x.len();
@@ -718,7 +718,7 @@ where
             .collect();
         Self {
             maps,
-            intervals: IntervalTree::from_iter(builder.into_iter()),
+            intervals: builder.into_iter().collect::<IntervalTree>(),
             len: idx,
             name: name.to_string(),
             initial,
@@ -733,9 +733,9 @@ where
         let mut initial = T::default();
         let mut builder = vec![];
         let maps: Vec<_> = maps
-            .into_iter()
+            .iter_mut()
             .map(|x| {
-                if x.len() > 0 {
+                if !x.is_empty() {
                     initial = x[0];
                 }
                 let l = x.len();
@@ -748,7 +748,7 @@ where
             .collect();
         Self {
             maps,
-            intervals: IntervalTree::from_iter(builder.into_iter()),
+            intervals: builder.into_iter().collect::<IntervalTree>(),
             len: idx,
             name: name.to_string(),
             initial,
