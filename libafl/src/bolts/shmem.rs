@@ -63,10 +63,7 @@ pub type StdShMemService = DummyShMemService;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::{
-    convert::{TryFrom, TryInto},
-    env,
-};
+use std::env;
 
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
@@ -487,7 +484,7 @@ pub mod unix_shmem {
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
 
-        use core::{convert::TryInto, ptr, slice};
+        use core::{ptr, slice};
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,

@@ -722,11 +722,11 @@ mod tests {
             .new_map(MAP_SIZE as usize)
             .unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
-        let mut shmem_map = shmem.map_mut();
+        let shmem_map = shmem.map_mut();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",
-            &mut shmem_map,
+            shmem_map,
         ));
 
         let executor = ForkserverExecutor::<NopInput, _, ()>::new(

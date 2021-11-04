@@ -12,7 +12,6 @@ use crate::{
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{
     cmp::{max, min},
-    convert::TryInto,
     marker::PhantomData,
     mem::size_of,
 };

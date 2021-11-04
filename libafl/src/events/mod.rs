@@ -19,16 +19,10 @@ use crate::{
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct EventManagerId {
     /// The id
     pub id: usize,
-}
-
-impl Default for EventManagerId {
-    fn default() -> Self {
-        Self { id: 0 }
-    }
 }
 
 #[cfg(feature = "introspection")]
