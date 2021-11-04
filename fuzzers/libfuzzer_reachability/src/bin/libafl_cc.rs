@@ -22,6 +22,7 @@ pub fn main() {
             .silence(true)
             .from_args(&args)
             .expect("Failed to parse the command line")
+            .add_link_arg("../weak.o")
             .link_staticlib(&dir, "libfuzzer_libpng")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .run()

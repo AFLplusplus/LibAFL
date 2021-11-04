@@ -15,6 +15,7 @@ To build this example, run
 
 ```bash
 cargo build --release
+clang -c weak.c -o weak.o
 ```
 
 This will build the library with the fuzzer (src/lib.rs) with the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback.
