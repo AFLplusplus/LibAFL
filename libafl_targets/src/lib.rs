@@ -1,5 +1,8 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
 
+#[macro_use]
+extern crate alloc;
+
 include!(concat!(env!("OUT_DIR"), "/constants.rs"));
 
 #[cfg(any(
@@ -26,6 +29,11 @@ pub use sancov_cmp::*;
 pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]
 pub use libfuzzer::*;
+
+#[cfg(feature = "sancov_8bit")]
+pub mod sancov_8bit;
+#[cfg(feature = "sancov_8bit")]
+pub use sancov_8bit::*;
 
 pub mod coverage;
 pub use coverage::*;
