@@ -1,7 +1,7 @@
 [package]
 name = "symcc_libafl"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Meta package for symcc_runtime"
 documentation = "https://docs.rs/symcc_libafl"

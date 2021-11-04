@@ -12,7 +12,6 @@ use std::os::raw::{c_long, c_void};
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
-    convert::TryFrom,
     fmt::{self, Display, Formatter},
     ptr,
     ptr::write_volatile,

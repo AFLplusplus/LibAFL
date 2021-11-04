@@ -2,7 +2,6 @@
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
-    convert::TryFrom,
     fmt::{self, Display, Formatter},
     mem, ptr,
     ptr::write_volatile,

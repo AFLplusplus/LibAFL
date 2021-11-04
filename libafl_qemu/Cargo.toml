@@ -8,7 +8,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "qemu", "instrumentation"]
-edition = "2018"
+edition = "2021"
 
 [features]
 python = ["pyo3", "pyo3-build-config"]
