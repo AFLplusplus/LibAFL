@@ -32,7 +32,7 @@ impl<'a, S> Mutator<NautilusInput, S> for NautilusRandomMutator<'a> {
         // TODO get rid of tmp
         let mut tmp = vec![];
         self.mutator
-            .mut_random(
+            .mut_random::<_, ()>(
                 &input.tree,
                 &self.ctx,
                 &mut |t: &TreeMutation, _ctx: &Context| {
@@ -88,7 +88,7 @@ impl<'a, S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'a> {
             // TODO get rid of tmp
             let mut tmp = vec![];
             self.mutator
-                .mut_random_recursion(
+                .mut_random_recursion::<_, ()>(
                     &input.tree,
                     recursions,
                     &self.ctx,
@@ -151,7 +151,7 @@ where
         // TODO get rid of tmp
         let mut tmp = vec![];
         self.mutator
-            .mut_splice(
+            .mut_splice::<_, ()>(
                 &input.tree,
                 &self.ctx,
                 &meta.cks,
