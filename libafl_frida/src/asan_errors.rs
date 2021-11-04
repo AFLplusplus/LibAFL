@@ -25,55 +25,6 @@ use crate::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 
 use crate::{alloc::AllocationMetadata, asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
-#[cfg(target_arch = "aarch64")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AsanReadWriteError {
-    pub registers: [usize; ASAN_SAVE_REGISTER_COUNT],
-    pub pc: usize,
-    pub fault: (u16, u16, usize, usize),
-    pub metadata: AllocationMetadata,
-    pub backtrace: Backtrace,
-}
-
-#[cfg(target_arch = "aarch64")]
-#[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
-pub(crate) enum AsanError {
-    OobRead(AsanReadWriteError),
-    OobWrite(AsanReadWriteError),
-    ReadAfterFree(AsanReadWriteError),
-    WriteAfterFree(AsanReadWriteError),
-    DoubleFree((usize, AllocationMetadata, Backtrace)),
-    UnallocatedFree((usize, Backtrace)),
-    Unknown(
-        (
-            [usize; ASAN_SAVE_REGISTER_COUNT],
-            usize,
-            (u16, u16, usize, usize),
-            Backtrace,
-        ),
-    ),
-    Leak((usize, AllocationMetadata)),
-    StackOobRead(
-        (
-            [usize; ASAN_SAVE_REGISTER_COUNT],
-            usize,
-            (u16, u16, usize, usize),
-            Backtrace,
-        ),
-    ),
-    StackOobWrite(
-        (
-            [usize; ASAN_SAVE_REGISTER_COUNT],
-            usize,
-            (u16, u16, usize, usize),
-            Backtrace,
-        ),
-    ),
-    BadFuncArgRead((String, usize, usize, usize, Backtrace)),
-    BadFuncArgWrite((String, usize, usize, usize, Backtrace)),
-}
-
-#[cfg(target_arch = "x86_64")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
     pub registers: [usize; ASAN_SAVE_REGISTER_COUNT],
@@ -83,7 +34,6 @@ pub(crate) struct AsanReadWriteError {
     pub backtrace: Backtrace,
 }
 
-#[cfg(target_arch = "x86_64")]
 #[allow(clippy::type_complexity)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
@@ -237,11 +187,11 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
-                    if reg == basereg {
+                    if basereg.is_some() && reg == basereg.unwrap() as usize  {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
-                    } else if reg == indexreg {
+                    } else if indexreg.is_some() && reg == indexreg.unwrap() as usize {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
@@ -496,11 +446,11 @@ impl AsanErrors {
 
                 #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
-                    if reg == basereg {
+                    if basereg.is_some() && reg == basereg.unwrap() as usize {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
-                    } else if reg == indexreg {
+                    } else if indexreg.is_some() && reg == indexreg.unwrap() as usize {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();

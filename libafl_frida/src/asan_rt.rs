@@ -2045,14 +2045,14 @@ impl AsanRuntime {
                 AsanError::StackOobRead((
                     self.regs,
                     actual_pc,
-                    (base_reg, index_reg, displacement as usize, fault_address),
+                    (Some(base_reg), Some(index_reg), displacement as usize, fault_address),
                     backtrace,
                 ))
             } else {
                 AsanError::StackOobWrite((
                     self.regs,
                     actual_pc,
-                    (base_reg, index_reg, displacement as usize, fault_address),
+                    (Some(base_reg), Some(index_reg), displacement as usize, fault_address),
                     backtrace,
                 ))
             }
@@ -2063,7 +2063,7 @@ impl AsanRuntime {
             let asan_readwrite_error = AsanReadWriteError {
                 registers: self.regs,
                 pc: actual_pc,
-                fault: (base_reg, index_reg, displacement as usize, fault_address),
+                fault: (Some(base_reg), Some(index_reg), displacement as usize, fault_address),
                 metadata: metadata.clone(),
                 backtrace,
             };
@@ -2082,7 +2082,7 @@ impl AsanRuntime {
             AsanError::Unknown((
                 self.regs,
                 actual_pc,
-                (base_reg, index_reg, displacement as usize, fault_address),
+                (Some(base_reg), Some(index_reg), displacement as usize, fault_address),
                 backtrace,
             ))
         };
