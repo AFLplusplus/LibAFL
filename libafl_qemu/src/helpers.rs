@@ -138,6 +138,12 @@ impl QemuEdgeCoverageHelper {
     }
 }
 
+impl Default for QemuEdgeCoverageHelper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<I, S> QemuHelper<I, S> for QemuEdgeCoverageHelper
 where
     I: Input,
@@ -174,6 +180,12 @@ impl QemuCmpLogHelper {
     #[must_use]
     pub fn must_instrument(&self, addr: u64) -> bool {
         self.filter.allowed(addr)
+    }
+}
+
+impl Default for QemuCmpLogHelper {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -289,6 +301,12 @@ impl QemuSnapshotHelper {
             }
         }
         emu::set_brk(self.brk);
+    }
+}
+
+impl Default for QemuSnapshotHelper {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
