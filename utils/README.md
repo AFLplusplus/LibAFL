@@ -9,3 +9,6 @@ In the `deexit` folder, you'll find a ldpreloadable library, that changes calls 
 When a target exits, it quits, and LibAFL will not be able to catch this or recover.
 Abort, on the other hand, raises an error LibAFL's inprocess executor will be able to catch, thanks to its signal handlers.
 
+## Gramatron: gramatron grammars and preprocessing utils
+
+See https://github.com/HexHive/Gramatron
