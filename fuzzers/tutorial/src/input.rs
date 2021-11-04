@@ -1,6 +1,6 @@
 use libafl::{
-    bolts::ownedref::OwnedSlice,
-    inputs::{HasLen, HasTargetBytes, Input},
+    bolts::{ownedref::OwnedSlice, HasLen},
+    inputs::{HasTargetBytes, Input},
 };
 
 use lain::prelude::*;
