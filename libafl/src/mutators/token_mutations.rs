@@ -1,7 +1,7 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 use alloc::vec::Vec;
-use core::{convert::TryInto, marker::PhantomData, mem::size_of};
+use core::{marker::PhantomData, mem::size_of};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]

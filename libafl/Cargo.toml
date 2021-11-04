@@ -8,7 +8,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 
 [features]
@@ -37,7 +37,7 @@ rustc_version = "0.4"
 criterion = "0.3" # Benchmarking
 ahash = "0.7" # another hash
 fxhash = "0.2.1" # yet another hash
-xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
+xxhash-rust = { version = "0.8.2", features = ["xxh3", "const_xxh3"] } # xxh3 hashing for rust
 serde_json = "1.0.60"
 num_cpus = "1.0" # cpu count, for llmp example
 serial_test = "0.5"

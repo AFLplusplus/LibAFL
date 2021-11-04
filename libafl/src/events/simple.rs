@@ -12,7 +12,6 @@ use crate::{
 use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 use core::{
-    convert::TryInto,
     marker::PhantomData,
     sync::atomic::{compiler_fence, Ordering},
 };

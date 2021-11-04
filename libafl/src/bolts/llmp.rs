@@ -62,7 +62,6 @@ For broker2broker communication, all messages are forwarded via network sockets.
 use alloc::{string::String, vec::Vec};
 use core::{
     cmp::max,
-    convert::{TryFrom, TryInto},
     fmt::Debug,
     mem::size_of,
     ptr, slice,
@@ -896,7 +895,7 @@ where
     /// So if [`alloc_next`] fails, create new page if necessary, use this function,
     /// place `EOP`, commit `EOP`, reset, alloc again on the new space.
     unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, Error> {
-        let mut map = self.out_maps.last_mut().unwrap();
+        let map = self.out_maps.last_mut().unwrap();
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
         if (*page).size_used + EOP_MSG_SIZE > (*page).size_total {
@@ -906,7 +905,7 @@ where
         let mut ret: *mut LlmpMsg = if last_msg.is_null() {
             (*page).messages.as_mut_ptr()
         } else {
-            llmp_next_msg_ptr_checked(&mut map, last_msg, EOP_MSG_SIZE)?
+            llmp_next_msg_ptr_checked(map, last_msg, EOP_MSG_SIZE)?
         };
         if (*ret).tag == LLMP_TAG_UNINITIALIZED {
             panic!("Did not call send() on last message!");

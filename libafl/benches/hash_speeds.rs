@@ -1,7 +1,5 @@
 //! Compare the speed of rust hash implementations
 
-use ahash;
-use fxhash;
 use std::hash::Hasher;
 use xxhash_rust::const_xxh3;
 use xxhash_rust::xxh3;

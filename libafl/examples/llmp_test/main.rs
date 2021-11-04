@@ -4,7 +4,7 @@ This shows how llmp can be used directly, without libafl abstractions
 extern crate alloc;
 
 #[cfg(all(unix, feature = "std"))]
-use core::{convert::TryInto, time::Duration};
+use core::time::Duration;
 #[cfg(all(unix, feature = "std"))]
 use std::{thread, time};
 
@@ -124,13 +124,13 @@ fn main() {
         .expect("no mode specified, chose 'broker', 'b2b', 'ctr', 'adder', or 'large'");
     let port: u16 = std::env::args()
         .nth(2)
-        .unwrap_or("1337".into())
+        .unwrap_or_else(|| "1337".into())
         .parse::<u16>()
         .unwrap();
     // in the b2b use-case, this is our "own" port, we connect to the "normal" broker node on startup.
     let b2b_port: u16 = std::env::args()
         .nth(3)
-        .unwrap_or("4242".into())
+        .unwrap_or_else(|| "4242".into())
         .parse::<u16>()
         .unwrap();
     println!("Launching in mode {} on port {}", mode, port);
