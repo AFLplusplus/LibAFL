@@ -7,7 +7,6 @@ use alloc::{
 };
 use core::{
     hash::Hasher,
-    iter::FromIterator,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 use intervaltree::IntervalTree;
@@ -718,7 +717,7 @@ where
             .collect();
         Self {
             maps,
-            intervals: builder.into_iter().collect::<IntervalTree>(),
+            intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
             len: idx,
             name: name.to_string(),
             initial,
@@ -733,7 +732,7 @@ where
         let mut initial = T::default();
         let mut builder = vec![];
         let maps: Vec<_> = maps
-            .iter_mut()
+            .into_iter()
             .map(|x| {
                 if !x.is_empty() {
                     initial = x[0];
@@ -748,7 +747,7 @@ where
             .collect();
         Self {
             maps,
-            intervals: builder.into_iter().collect::<IntervalTree>(),
+            intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
             len: idx,
             name: name.to_string(),
             initial,
