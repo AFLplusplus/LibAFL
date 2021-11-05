@@ -28,6 +28,7 @@ use crate::{
 use core_affinity::CoreId;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
+use std::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -39,7 +40,7 @@ use typed_builder::TypedBuilder;
 
 /// The Launcher client callback type reference
 #[cfg(feature = "std")]
-pub type LauncherClientFnRef<'a, I, OT, S, SP> = &'a mut dyn FnMut(
+pub type LauncherClientFnRef<'a, I, OT, S, SP> = &'a mut dyn FnOnce(
     Option<S>,
     LlmpRestartingEventManager<I, OT, S, SP>,
     usize,
@@ -50,13 +51,14 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity)]
-pub struct Launcher<'a, I, OT, S, SP, ST>
+pub struct Launcher<'a, CF, I, OT, S, SP, ST>
 where
-    I: Input,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
+    I: Input + 'a,
     ST: Stats,
     SP: ShMemProvider + 'static,
-    OT: ObserversTuple<I, S>,
-    S: DeserializeOwned,
+    OT: ObserversTuple<I, S> + 'a,
+    S: DeserializeOwned + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -65,7 +67,8 @@ where
     /// The configuration
     configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
-    run_client: LauncherClientFnRef<'a, I, OT, S, SP>,
+    #[builder(default, setter(strip_option))]
+    run_client: Option<CF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -84,11 +87,14 @@ where
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     #[builder(default = true)]
     spawn_broker: bool,
+    #[builder(default = PhantomData)]
+    phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
 }
 
 #[cfg(feature = "std")]
-impl<'a, I, OT, S, SP, ST> Launcher<'a, I, OT, S, SP, ST>
+impl<'a, CF, I, OT, S, SP, ST> Launcher<'a, CF, I, OT, S, SP, ST>
 where
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     ST: Stats + Clone,
@@ -99,6 +105,12 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        if self.run_client.is_none() {
+            return Err(Error::IllegalArgument(
+                "No client callback provided".to_string(),
+            ));
+        }
+
         let core_ids = core_affinity::get_core_ids().unwrap();
         let num_cores = core_ids.len();
         let mut handles = vec![];
@@ -140,7 +152,8 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client)(state, mgr, bind_to.id).expect("Client closure failed");
+                        (self.run_client.take().unwrap())(state, mgr, bind_to.id)
+                            .expect("Client closure failed");
                         break;
                     }
                 };
@@ -192,6 +205,8 @@ where
 
         let mut handles = match is_client {
             Ok(core_conf) => {
+                let core_id = core_conf.parse()?;
+
                 //todo: silence stdout and stderr for clients
 
                 // the actual client. do the fuzzing
@@ -199,15 +214,14 @@ where
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
-                        cpu_core: Some(CoreId {
-                            id: core_conf.parse()?,
-                        }),
+                        cpu_core: Some(CoreId { id: core_id }),
                     })
                     .configuration(self.configuration)
                     .build()
                     .launch()?;
 
-                (self.run_client)(state, mgr, core_conf.parse()?)?;
+                (self.run_client.take().unwrap())(state, mgr, core_id)
+                    .expect("Client closure failed");
 
                 unreachable!("Fuzzer client code should never get here!");
             }
