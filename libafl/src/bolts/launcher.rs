@@ -1,6 +1,19 @@
-#[cfg(feature = "std")]
-use serde::de::DeserializeOwned;
+//! The [`Launcher`] launches multiple fuzzer instances in parallel.
+//! Thanks to it, we won't need a `for` loop in a shell script...
+//!
+//! To use multiple [`Launcher`]`s` for individual configurations,
+//! we can set `spawn_broker` to `false` on all but one.
+//!
+//! To connect multiple nodes together via TCP, we can use the `remote_broker_addr`.
+//! (this requires the `llmp_bind_public` compile-time feature for `LibAFL`).
+//!
+//! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
+//! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::bolts::os::{dup2, fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
@@ -11,23 +24,16 @@ use crate::{
     Error,
 };
 
-#[cfg(all(windows, feature = "std"))]
-use crate::bolts::os::startable_self;
-
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::{dup2, fork, ForkResult};
-
-#[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::unix::io::AsRawFd};
-
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use core_affinity::CoreId;
+#[cfg(feature = "std")]
+use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
-
-#[cfg(all(windows, feature = "std"))]
-use core_affinity::CoreId;
-
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use std::{fs::File, os::unix::io::AsRawFd};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -90,7 +96,7 @@ where
     S: DeserializeOwned,
 {
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
         let core_ids = core_affinity::get_core_ids().unwrap();
@@ -179,7 +185,7 @@ where
     }
 
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
@@ -228,11 +234,9 @@ where
                             Stdio::null()
                         };
 
-                        if self.cores.iter().any(|&x| x == id) {
-                            std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                            let child = startable_self()?.stdout(stdio).spawn()?;
-                            handles.push(child);
-                        }
+                        std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                        let child = startable_self()?.stdout(stdio).spawn()?;
+                        handles.push(child);
                     }
                 }
 

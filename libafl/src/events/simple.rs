@@ -18,9 +18,9 @@ use core::{
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
-#[cfg(all(feature = "std", windows))]
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
@@ -343,7 +343,7 @@ where
                 dbg!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
-                #[cfg(unix)]
+                #[cfg(all(unix, feature = "fork"))]
                 let child_status = {
                     shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
@@ -358,9 +358,11 @@ where
                     }
                 };
 
-                // On windows, we spawn ourself again
-                #[cfg(windows)]
+                // On windows (or in any case without forks), we spawn ourself again
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
+                #[cfg(all(unix, not(feature = "fork")))]
+                let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
 

@@ -2,7 +2,7 @@
 
 pub mod inprocess;
 pub use inprocess::InProcessExecutor;
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 pub use inprocess::InProcessForkExecutor;
 
 /// Timeout executor.
@@ -12,9 +12,9 @@ pub mod timeout;
 #[cfg(any(unix, feature = "std"))]
 pub use timeout::TimeoutExecutor;
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 pub use forkserver::{Forkserver, ForkserverExecutor, OutFile, TimeoutForkserverExecutor};
 
 pub mod combined;
