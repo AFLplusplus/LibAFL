@@ -16,7 +16,7 @@ use capstone::{
     Capstone, Insn,
 };
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", unix))]
 use capstone::{
     arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
     Capstone, Insn, RegId,
@@ -105,9 +105,11 @@ pub struct FridaInstrumentationHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
     current_log_impl: u64,
+    #[cfg(unix)]
     current_report_impl: u64,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
+    #[cfg(unix)]
     capstone: Capstone,
     #[cfg(unix)]
     asan_runtime: AsanRuntime,
@@ -130,6 +132,10 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
+    #[cfg(not(unix))]
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
+
+    #[cfg(unix)]
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
@@ -149,6 +155,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
             DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
         }
 
+        #[cfg(unix)]
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
                 self.asan_runtime.check_for_leaks();
@@ -251,7 +258,7 @@ fn pc(context: &CpuContext) -> usize {
     context.pc() as usize
 }
 
-#[cfg(all(target_arch = "x86_64", not(windows)))]
+#[cfg(all(target_arch = "x86_64", unix))]
 fn pc(context: &CpuContext) -> usize {
     context.rip() as usize
 }
@@ -296,6 +303,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],
             current_log_impl: 0,
+            #[cfg(unix)]
             current_report_impl: 0,
             transformer: None,
             #[cfg(target_arch = "aarch64")]
@@ -305,7 +313,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(all(target_arch = "x86_64", unix))]
             capstone: Capstone::new()
                 .x86()
                 .mode(arch::x86::ArchMode::Mode64)
@@ -383,7 +391,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                         }
 
                         if helper.options().asan_enabled() {
-                            #[cfg(target_arch = "x86_64")]
+                            #[cfg(all(target_arch = "x86_64", unix))]
                             if let Ok((segment, width, basereg, indexreg, scale, disp)) =
                                 helper.asan_is_interesting_instruction(address, instr)
                             {
@@ -465,7 +473,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
     // frida registers: https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html
     // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", unix))]
     #[must_use]
     #[inline]
     #[allow(clippy::unused_self)]
@@ -831,6 +839,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     #[inline]
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::too_many_arguments)]
+    #[cfg(all(target_arch = "x86_64", unix))]
     pub fn emit_shadow_check(
         &mut self,
         address: u64,
@@ -1312,7 +1321,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Err(())
     }
 
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", unix))]
     #[inline]
     fn asan_is_interesting_instruction(
         &self,

@@ -63,7 +63,16 @@ impl Allocator {
         #[allow(clippy::cast_sign_loss)]
         let page_size = ret as usize;
         // probe to find a usable shadow bit:
+        #[cfg(any(
+            target_arch = "aarch64",
+            all(target_arch = "x86_64", target_os = "linux")
+        ))]
         let mut shadow_bit: usize = 0;
+        #[cfg(not(any(
+            target_arch = "aarch64",
+            all(target_arch = "x86_64", target_os = "linux")
+        )))]
+        let shadow_bit = 0;
 
         #[cfg(target_arch = "aarch64")]
         for try_shadow_bit in &[46usize, 36usize] {

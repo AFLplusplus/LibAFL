@@ -6,6 +6,7 @@ pub mod compress;
 pub mod cpu;
 #[cfg(feature = "std")]
 pub mod fs;
+#[cfg(feature = "std")]
 pub mod launcher;
 pub mod llmp;
 pub mod os;

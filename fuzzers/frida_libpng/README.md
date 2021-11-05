@@ -35,7 +35,11 @@ You can also fuzz libpng-1.6.37 on windows with frida mode!
 ### To build it with visual studio
 1. Install clang for windows (make sure you add LLVM to the system path!) 
 [https://github.com/llvm/llvm-project/releases/tag/llvmorg-12.0.1](https://github.com/llvm/llvm-project/releases/tag/llvmorg-12.0.1)
-2. Build libpng1.6.37 
+2. Run build, this will download and extract libpng-1.6.37 directory.
+```
+cargo build --release
+```
+3. Build libpng1.6.37 
    - Open libpng-1.6.37/projects/vstudio/vstudio.sln 
    - Open Build->Configuration Manager 
       - select Release for Active solution configuration and 
@@ -44,17 +48,16 @@ You can also fuzz libpng-1.6.37 on windows with frida mode!
       - C/C++ -> Treat Warnings As Errors -> No
       - C/C++ -> Code Generation -> Runtime Library -> Multi-threaded (/MT)
    - Finally, you can build libpng-1.6.37
-3. Compile the harness
+4. Compile the harness
 Fire up a powershell at this directory.
 ```
-cargo build --release
 cp .\libpng-1.6.37\projects\vstudio\x64\Release\libpng16.lib .
 cp .\libpng-1.6.37\projects\vstudio\x64\Release\zlib.lib .
 cp .\target\release\frida_libpng.exe .
 clang++ -O3 -c -I.\libpng-1.6.37 .\harness.cc -o .\harness.o
 clang++ -L.\zlib.dll .\harness.o .\libpng16.lib -lzlib -shared -o .\libpng-harness.dll
 ```
-4. Run the fuzzer
+5. Run the fuzzer
 ```
 ./frida_libpng.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll --cores=0
 ```

@@ -42,10 +42,10 @@ use crate::bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 
-#[cfg(all(feature = "std", windows))]
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
 
 #[cfg(feature = "std")]
@@ -760,7 +760,7 @@ where
                 broker.broker_loop()
             };
 
-            // We get here if we are on Unix, or we are a broker on Windows.
+            // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
                     let connection =
@@ -831,7 +831,7 @@ where
                 dbg!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
-                #[cfg(unix)]
+                #[cfg(all(unix, feature = "fork"))]
                 let child_status = {
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
@@ -846,9 +846,11 @@ where
                     }
                 };
 
-                // On windows, we spawn ourself again
-                #[cfg(windows)]
+                // On windows (or in any case without fork), we spawn ourself again
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
+                #[cfg(all(unix, not(feature = "fork")))]
+                let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
 

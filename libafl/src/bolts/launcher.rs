@@ -1,6 +1,19 @@
-#[cfg(feature = "std")]
-use serde::de::DeserializeOwned;
+//! The [`Launcher`] launches multiple fuzzer instances in parallel.
+//! Thanks to it, we won't need a `for` loop in a shell script...
+//!
+//! To use multiple [`Launcher`]`s` for individual configurations,
+//! we can set `spawn_broker` to `false` on all but one.
+//!
+//! To connect multiple nodes together via TCP, we can use the `remote_broker_addr`.
+//! (this requires the `llmp_bind_public` compile-time feature for `LibAFL`).
+//!
+//! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
+//! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::bolts::os::{dup2, fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
     bolts::shmem::ShMemProvider,
@@ -11,46 +24,35 @@ use crate::{
     Error,
 };
 
-#[cfg(all(windows, feature = "std"))]
-use crate::bolts::os::startable_self;
-
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::{dup2, fork, ForkResult};
-
-#[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::unix::io::AsRawFd};
-
+#[cfg(feature = "std")]
+use core::marker::PhantomData;
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use core_affinity::CoreId;
+#[cfg(feature = "std")]
+use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
-
-#[cfg(all(windows, feature = "std"))]
-use core_affinity::CoreId;
-
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use std::{fs::File, os::unix::io::AsRawFd};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-/// The Launcher client callback type reference
-#[cfg(feature = "std")]
-pub type LauncherClientFnRef<'a, I, OT, S, SP> = &'a mut dyn FnMut(
-    Option<S>,
-    LlmpRestartingEventManager<I, OT, S, SP>,
-    usize,
-) -> Result<(), Error>;
-
+/// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity)]
-pub struct Launcher<'a, I, OT, S, SP, ST>
+pub struct Launcher<'a, CF, I, OT, S, SP, ST>
 where
-    I: Input,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
+    I: Input + 'a,
     ST: Stats,
     SP: ShMemProvider + 'static,
-    OT: ObserversTuple<I, S>,
-    S: DeserializeOwned,
+    OT: ObserversTuple<I, S> + 'a,
+    S: DeserializeOwned + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -59,7 +61,8 @@ where
     /// The configuration
     configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
-    run_client: LauncherClientFnRef<'a, I, OT, S, SP>,
+    #[builder(default, setter(strip_option))]
+    run_client: Option<CF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -78,11 +81,14 @@ where
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     #[builder(default = true)]
     spawn_broker: bool,
+    #[builder(default = PhantomData)]
+    phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
 }
 
 #[cfg(feature = "std")]
-impl<'a, I, OT, S, SP, ST> Launcher<'a, I, OT, S, SP, ST>
+impl<'a, CF, I, OT, S, SP, ST> Launcher<'a, CF, I, OT, S, SP, ST>
 where
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     ST: Stats + Clone,
@@ -90,9 +96,15 @@ where
     S: DeserializeOwned,
 {
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        if self.run_client.is_none() {
+            return Err(Error::IllegalArgument(
+                "No client callback provided".to_string(),
+            ));
+        }
+
         let core_ids = core_affinity::get_core_ids().unwrap();
         let num_cores = core_ids.len();
         let mut handles = vec![];
@@ -134,7 +146,8 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client)(state, mgr, bind_to.id).expect("Client closure failed");
+                        (self.run_client.take().unwrap())(state, mgr, bind_to.id)
+                            .expect("Client closure failed");
                         break;
                     }
                 };
@@ -179,13 +192,15 @@ where
     }
 
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 
         let mut handles = match is_client {
             Ok(core_conf) => {
+                let core_id = core_conf.parse()?;
+
                 //todo: silence stdout and stderr for clients
 
                 // the actual client. do the fuzzing
@@ -193,15 +208,14 @@ where
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
-                        cpu_core: Some(CoreId {
-                            id: core_conf.parse()?,
-                        }),
+                        cpu_core: Some(CoreId { id: core_id }),
                     })
                     .configuration(self.configuration)
                     .build()
                     .launch()?;
 
-                (self.run_client)(state, mgr, core_conf.parse()?)?;
+                (self.run_client.take().unwrap())(state, mgr, core_id)
+                    .expect("Client closure failed");
 
                 unreachable!("Fuzzer client code should never get here!");
             }
@@ -228,11 +242,9 @@ where
                             Stdio::null()
                         };
 
-                        if self.cores.iter().any(|&x| x == id) {
-                            std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                            let child = startable_self()?.stdout(stdio).spawn()?;
-                            handles.push(child);
-                        }
+                        std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                        let child = startable_self()?.stdout(stdio).spawn()?;
+                        handles.push(child);
                     }
                 }
 
