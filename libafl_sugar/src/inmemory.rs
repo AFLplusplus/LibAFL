@@ -85,9 +85,11 @@ where
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
             println!("Out dir at {:?} already exists.", &out_dir);
-            if !out_dir.is_dir() {
-                panic!("Out dir at {:?} is not a valid directory!", &out_dir);
-            }
+            assert!(
+                out_dir.is_dir(),
+                "Out dir at {:?} is not a valid directory!",
+                &out_dir
+            );
         }
         let mut crashes = out_dir.clone();
         crashes.push("crashes");

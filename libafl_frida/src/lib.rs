@@ -109,23 +109,21 @@ impl FridaOptions {
                     "drcov" => {
                         options.enable_drcov = value.parse().unwrap();
                         #[cfg(not(target_arch = "aarch64"))]
-                        if options.enable_drcov {
-                            panic!(
-                                "DrCov is not currently supported on targets other than aarch64"
-                            );
-                        }
+                        assert!(
+                            !options.enable_drcov,
+                            "DrCov is not currently supported on targets other than aarch64"
+                        );
                     }
                     "cmplog" => {
                         options.enable_cmplog = value.parse().unwrap();
                         #[cfg(not(target_arch = "aarch64"))]
-                        if options.enable_cmplog {
-                            panic!(
-                                "cmplog is not currently supported on targets other than aarch64"
-                            );
-                        }
+                        assert!(
+                            !options.enable_cmplog,
+                            "cmplog is not currently supported on targets other than aarch64"
+                        );
 
-                        if !cfg!(feature = "cmplog") && options.enable_cmplog {
-                            panic!("cmplog feature is disabled!");
+                        if options.enable_cmplog {
+                            assert!(cfg!(feature = "cmplog"), "cmplog feature is disabled!");
                         }
                     }
                     "cmplog-cores" => {

@@ -57,9 +57,12 @@ pub(crate) struct AllocationMetadata {
 impl Allocator {
     pub fn new(options: FridaOptions) -> Self {
         let ret = unsafe { sysconf(_SC_PAGESIZE) };
-        if ret < 0 {
-            panic!("Failed to read pagesize {:?}", io::Error::last_os_error());
-        }
+        assert!(
+            ret >= 0,
+            "Failed to read pagesize {:?}",
+            io::Error::last_os_error()
+        );
+
         #[allow(clippy::cast_sign_loss)]
         let page_size = ret as usize;
         // probe to find a usable shadow bit:
@@ -200,9 +203,11 @@ impl Allocator {
             size
         };
         if size > self.options.asan_max_allocation() {
+            #[allow(clippy::manual_assert)]
             if self.options.asan_max_allocation_panics() {
-                panic!("Allocation is too large: 0x{:x}", size);
+                panic!("ASAN: Allocation is too large: 0x{:x}", size);
             }
+
             return std::ptr::null_mut();
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;

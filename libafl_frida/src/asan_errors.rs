@@ -534,8 +534,9 @@ impl AsanErrors {
             }
         };
 
+        #[allow(clippy::manual_assert)]
         if !self.options.asan_continue_after_error() {
-            panic!("Crashing target!");
+            panic!("ASAN: Crashing target!");
         }
     }
 }

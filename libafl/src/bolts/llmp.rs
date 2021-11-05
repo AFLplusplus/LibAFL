@@ -426,12 +426,14 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     #[cfg(all(feature = "llmp_debug", feature = "std"))]
     dbg!("_llmp_page_init: page {}", *page);
 
-    assert!(
-        !((*page).magic == PAGE_INITIALIZED_MAGIC && !allow_reinit),
-        "Tried to initialize page {:?} twice (for shmem {:?})",
-        page,
-        shmem
-    );
+    if !allow_reinit {
+        assert!(
+            (*page).magic != PAGE_INITIALIZED_MAGIC,
+            "Tried to initialize page {:?} twice (for shmem {:?})",
+            page,
+            shmem
+        );
+    }
 
     (*page).magic = PAGE_INITIALIZED_MAGIC;
     (*page).sender = sender;
@@ -1375,7 +1377,7 @@ where
                     println!("Received end of page, allocating next");
                     // Handle end of page
                     assert!(
-                        !((*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64),
+                        (*msg).buf_len >= size_of::<LlmpPayloadSharedMapInfo>() as u64,
                         "Illegal message length for EOP (is {}/{}, expected {})",
                         (*msg).buf_len,
                         (*msg).buf_len_padded,
