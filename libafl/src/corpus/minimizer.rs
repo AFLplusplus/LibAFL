@@ -155,6 +155,7 @@ where
 {
     /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
     #[allow(clippy::unused_self)]
+    #[allow(clippy::cast_possible_wrap)]
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
