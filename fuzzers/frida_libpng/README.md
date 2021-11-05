@@ -57,7 +57,7 @@ cp .\target\release\frida_libpng.exe .
 clang++ -O3 -c -I.\libpng-1.6.37 .\harness.cc -o .\harness.o
 clang++ -L.\zlib.dll .\harness.o .\libpng16.lib -lzlib -shared -o .\libpng-harness.dll
 ```
-4. Run the fuzzer
+5. Run the fuzzer
 ```
 ./frida_libpng.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll --cores=0
 ```
