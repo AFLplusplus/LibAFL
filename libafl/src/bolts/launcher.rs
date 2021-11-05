@@ -38,14 +38,7 @@ use std::{fs::File, os::unix::io::AsRawFd};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-/// The Launcher client callback type reference
-#[cfg(feature = "std")]
-pub type LauncherClientFnRef<'a, I, OT, S, SP> = &'a mut dyn FnOnce(
-    Option<S>,
-    LlmpRestartingEventManager<I, OT, S, SP>,
-    usize,
-) -> Result<(), Error>;
-
+/// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
