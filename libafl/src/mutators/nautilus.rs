@@ -34,20 +34,20 @@ impl<'a, S> Mutator<NautilusInput, S> for NautilusRandomMutator<'a> {
         self.mutator
             .mut_random::<_, ()>(
                 &input.tree,
-                &self.ctx,
+                self.ctx,
                 &mut |t: &TreeMutation, _ctx: &Context| {
-                    tmp.extend_from_slice(&t.prefix);
-                    tmp.extend_from_slice(&t.repl);
-                    tmp.extend_from_slice(&t.postfix);
+                    tmp.extend_from_slice(t.prefix);
+                    tmp.extend_from_slice(t.repl);
+                    tmp.extend_from_slice(t.postfix);
                     Ok(())
                 },
             )
             .unwrap();
-        if tmp.len() > 0 {
-            input.tree = Tree::from_rule_vec(tmp, &self.ctx);
-            Ok(MutationResult::Mutated)
-        } else {
+        if tmp.is_empty() {
             Ok(MutationResult::Skipped)
+        } else {
+            input.tree = Tree::from_rule_vec(tmp, self.ctx);
+            Ok(MutationResult::Mutated)
         }
     }
 }
@@ -84,24 +84,24 @@ impl<'a, S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'a> {
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO don't calc recursions here
-        if let Some(ref mut recursions) = input.tree.calc_recursions(&self.ctx) {
+        if let Some(ref mut recursions) = input.tree.calc_recursions(self.ctx) {
             // TODO get rid of tmp
             let mut tmp = vec![];
             self.mutator
                 .mut_random_recursion::<_, ()>(
                     &input.tree,
                     recursions,
-                    &self.ctx,
+                    self.ctx,
                     &mut |t: &TreeMutation, _ctx: &Context| {
-                        tmp.extend_from_slice(&t.prefix);
-                        tmp.extend_from_slice(&t.repl);
-                        tmp.extend_from_slice(&t.postfix);
+                        tmp.extend_from_slice(t.prefix);
+                        tmp.extend_from_slice(t.repl);
+                        tmp.extend_from_slice(t.postfix);
                         Ok(())
                     },
                 )
                 .unwrap();
-            if tmp.len() > 0 {
-                input.tree = Tree::from_rule_vec(tmp, &self.ctx);
+            if !tmp.is_empty() {
+                input.tree = Tree::from_rule_vec(tmp, self.ctx);
                 return Ok(MutationResult::Mutated);
             }
         }
@@ -153,21 +153,21 @@ where
         self.mutator
             .mut_splice::<_, ()>(
                 &input.tree,
-                &self.ctx,
+                self.ctx,
                 &meta.cks,
                 &mut |t: &TreeMutation, _ctx: &Context| {
-                    tmp.extend_from_slice(&t.prefix);
-                    tmp.extend_from_slice(&t.repl);
-                    tmp.extend_from_slice(&t.postfix);
+                    tmp.extend_from_slice(t.prefix);
+                    tmp.extend_from_slice(t.repl);
+                    tmp.extend_from_slice(t.postfix);
                     Ok(())
                 },
             )
             .unwrap();
-        if tmp.len() > 0 {
-            input.tree = Tree::from_rule_vec(tmp, &self.ctx);
-            Ok(MutationResult::Mutated)
-        } else {
+        if tmp.is_empty() {
             Ok(MutationResult::Skipped)
+        } else {
+            input.tree = Tree::from_rule_vec(tmp, self.ctx);
+            Ok(MutationResult::Mutated)
         }
     }
 }

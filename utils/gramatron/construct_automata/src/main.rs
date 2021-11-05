@@ -50,7 +50,7 @@ fn tokenize(rule: &str) -> (String, Vec<String>, bool) {
     let ss = cap.get(3).map_or(vec![], |m| {
         m.as_str()
             .split_whitespace()
-            .map(|x| x.to_owned())
+            .map(ToOwned::to_owned)
             .collect()
     });
     if terminal == "\\n" {
@@ -66,7 +66,7 @@ fn prepare_transitions(
     state_stacks: &mut Stacks,
     state_count: &mut usize,
     worklist: &mut VecDeque<Element>,
-    element: Element,
+    element: &Element,
     stack_limit: usize,
 ) {
     if element.items.is_empty() {
@@ -88,7 +88,7 @@ fn prepare_transitions(
         let mut state_stack = state_stacks
             .q
             .get(&state)
-            .map_or(VecDeque::new(), |x| x.clone());
+            .map_or(VecDeque::new(), Clone::clone);
         if !state_stack.is_empty() {
             state_stack.pop_front();
         }
@@ -109,7 +109,7 @@ fn prepare_transitions(
 
         // Check if a recursive transition state being created, if so make a backward
         // edge and don't add anything to the worklist
-        for (key, val) in state_stacks.s.iter() {
+        for (key, val) in &state_stacks.s {
             if state_stack_sorted == *val {
                 transition.dest = *key;
                 // i += 1;
@@ -123,11 +123,9 @@ fn prepare_transitions(
 
         // If the generated state has a stack size > stack_limit then that state is abandoned
         // and not added to the FSA or the worklist for further expansion
-        if stack_limit > 0 {
-            if transition.stack.len() > stack_limit {
-                // TODO add to unexpanded_rules
-                continue;
-            }
+        if stack_limit > 0 && transition.stack.len() > stack_limit {
+            // TODO add to unexpanded_rules
+            continue;
         }
 
         // Create transitions for the non-recursive relations and add to the worklist
@@ -153,11 +151,11 @@ fn get_states(pda: &[Transition]) -> (HashSet<usize>, HashSet<usize>, HashSet<us
         source.insert(transition.source);
         dest.insert(transition.dest);
     }
-    let all = source.union(&dest).map(|x| *x).collect();
+    let all = source.union(&dest).copied().collect();
     (
         all,
-        dest.difference(&source).map(|x| *x).collect(),
-        source.difference(&dest).map(|x| *x).collect(),
+        dest.difference(&source).copied().collect(),
+        source.difference(&dest).copied().collect(),
     )
 }
 
@@ -182,24 +180,24 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         //let mut culled_pda_unique = HashSet::new();
 
         for final_state in &finals {
-            pda.iter().for_each(|transition| {
+            for transition in pda.iter() {
                 if transition.dest == *final_state && transition.stack.len() > 0 {
                     blocklist.insert(transition.dest);
                 } else {
                     culled_pda.push(transition);
                     //culled_pda_unique.insert(transition);
                 }
-            });
+            }
         }
 
         // println!("culled_pda size: {} pda size: {}", culled_pda.len(), pda.len());
 
-        let culled_finals: HashSet<usize> = finals.difference(&blocklist).map(|x| *x).collect();
+        let culled_finals: HashSet<usize> = finals.difference(&blocklist).copied().collect();
         assert!(culled_finals.len() == 1);
 
-        culled_pda.iter().for_each(|transition| {
+        for transition in &culled_pda {
             if blocklist.contains(&transition.dest) {
-                return;
+                continue;
             }
             num_transition += 1;
             let state = transition.source;
@@ -218,7 +216,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
                     culled_pda.len()
                 );
             }
-        });
+        }
 
         /*
         culled_pda_unique.iter().for_each(|transition| {
@@ -235,13 +233,13 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         */
 
         Automaton {
-            init_state: initial.iter().next().cloned().unwrap(),
-            final_state: culled_finals.iter().next().cloned().unwrap(),
+            init_state: initial.iter().next().copied().unwrap(),
+            final_state: culled_finals.iter().next().copied().unwrap(),
             pda: memoized,
         }
     } else {
         // Running FSA construction in exact approximation mode and postprocessing it like so
-        pda.iter().for_each(|transition| {
+        for transition in pda.iter() {
             num_transition += 1;
             let state = transition.source;
             if state >= memoized.len() {
@@ -259,11 +257,11 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
                     pda.len()
                 );
             }
-        });
+        }
 
         Automaton {
-            init_state: initial.iter().next().cloned().unwrap(),
-            final_state: finals.iter().next().cloned().unwrap(),
+            init_state: initial.iter().next().copied().unwrap(),
+            final_state: finals.iter().next().copied().unwrap(),
             pda: memoized,
         }
     }
@@ -298,7 +296,7 @@ fn main() {
             &mut state_stacks,
             &mut state_count,
             &mut worklist,
-            element,
+            &element,
             stack_limit,
         );
     }

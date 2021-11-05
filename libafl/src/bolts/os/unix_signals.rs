@@ -194,13 +194,12 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     if SIGNAL_STACK_PTR.is_null() {
         SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
 
-        if SIGNAL_STACK_PTR.is_null() {
-            // Rust always panics on OOM, so we will, too.
-            panic!(
-                "Failed to allocate signal stack with {} bytes!",
-                SIGNAL_STACK_SIZE
-            );
-        }
+        // Rust always panics on OOM, so we will, too.
+        assert!(
+            !SIGNAL_STACK_PTR.is_null(),
+            "Failed to allocate signal stack with {} bytes!",
+            SIGNAL_STACK_SIZE
+        );
     }
     let mut ss: stack_t = mem::zeroed();
     ss.ss_size = SIGNAL_STACK_SIZE;

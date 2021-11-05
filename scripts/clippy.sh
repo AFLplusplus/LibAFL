@@ -8,7 +8,7 @@ if [ "$1" != "--no-clean" ]; then
    echo "[+] Cleaning up previous builds..."
    cargo clean -p libafl
 fi
-RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --tests -- \
+RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --tests -- -Z macro-backtrace \
    -D clippy::pedantic \
    -W clippy::similar_names \
    -A clippy::type_repetition_in_bounds \

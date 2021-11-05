@@ -368,6 +368,7 @@ where
 
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
+                    #[allow(clippy::manual_assert)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.

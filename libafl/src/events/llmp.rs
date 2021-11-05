@@ -467,9 +467,11 @@ where
         let mut events = vec![];
         let self_id = self.llmp.sender.id;
         while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
-            if tag == _LLMP_TAG_EVENT_TO_BROKER {
-                panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
-            }
+            assert!(
+                tag != _LLMP_TAG_EVENT_TO_BROKER,
+                "EVENT_TO_BROKER parcel should not have arrived in the client!"
+            );
+
             if client_id == self_id {
                 continue;
             }
@@ -729,8 +731,8 @@ where
     /// The type of manager to build
     #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
-    #[builder(setter(skip), default = PhantomData {})]
-    _phantom: PhantomData<(I, OT, S)>,
+    #[builder(setter(skip), default = PhantomData)]
+    phantom_data: PhantomData<(I, OT, S)>,
 }
 
 #[cfg(feature = "std")]
@@ -856,6 +858,7 @@ where
 
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
+                    #[allow(clippy::manual_assert)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.

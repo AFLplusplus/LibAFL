@@ -14,8 +14,8 @@ impl NautilusContext {
     /// Returns a new [`NautilusGenerator`]
     #[must_use]
     pub fn new(tree_depth: usize, rules: &[Vec<String>]) -> Self {
-        assert!(rules.len() > 0);
-        assert!(rules[0].len() > 0);
+        assert!(!rules.is_empty());
+        assert!(!rules[0].is_empty());
         let mut ctx = Context::new();
         for rule in rules {
             ctx.add_rule(&rule[0], rule[1].as_bytes());
@@ -70,6 +70,6 @@ impl<'a> NautilusGenerator<'a> {
     }
 
     pub fn generate_from_nonterminal(&self, input: &mut NautilusInput, start: NTermID, len: usize) {
-        input.tree_mut().generate_from_nt(start, len, &self.ctx);
+        input.tree_mut().generate_from_nt(start, len, self.ctx);
     }
 }

@@ -79,7 +79,7 @@ where
             .metadata_mut()
             .get_mut::<NautilusChunksMetadata>()
             .expect("NautilusChunksMetadata not in the state");
-        meta.cks.add_tree(input.tree, &self.ctx);
+        meta.cks.add_tree(input.tree, self.ctx);
         Ok(())
     }
 

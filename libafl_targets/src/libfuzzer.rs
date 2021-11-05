@@ -1,4 +1,4 @@
-//! (Libfuzzer)[https://www.llvm.org/docs/LibFuzzer.html]-style runtime wrapper for `LibAFL`.
+//! [`Libfuzzer`](https://www.llvm.org/docs/LibFuzzer.html)-style runtime wrapper for `LibAFL`.
 //! This makes `LibAFL` interoperable with harnesses written for other fuzzers like `Libfuzzer` and [`AFLplusplus`](aflplus.plus).
 //! We will interact with a C++ target, so use external c functionality
 
