@@ -63,10 +63,6 @@ impl FridaOptions {
                 match name {
                     "asan" => {
                         options.enable_asan = value.parse().unwrap();
-                        #[cfg(not(target_arch = "aarch64"))]
-                        if options.enable_asan {
-                            panic!("ASAN is not currently supported on targets other than aarch64");
-                        }
                     }
                     "asan-detect-leaks" => {
                         options.enable_asan_leak_detection = value.parse().unwrap();
