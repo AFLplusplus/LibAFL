@@ -24,11 +24,12 @@ use crate::{
     Error,
 };
 
+#[cfg(feature = "std")]
+use core::marker::PhantomData;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use core_affinity::CoreId;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
-use std::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
