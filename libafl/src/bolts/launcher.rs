@@ -228,11 +228,9 @@ where
                             Stdio::null()
                         };
 
-                        if self.cores.iter().any(|&x| x == id) {
-                            std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                            let child = startable_self()?.stdout(stdio).spawn()?;
-                            handles.push(child);
-                        }
+                        std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                        let child = startable_self()?.stdout(stdio).spawn()?;
+                        handles.push(child);
                     }
                 }
 
