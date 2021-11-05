@@ -9,7 +9,7 @@ use num::Integer;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{tuples::Named, AsSlice},
+    bolts::{tuples::Named, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
@@ -76,6 +76,8 @@ where
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
+    /// A refcount used to know when remove this meta
+    pub tcref: isize,
 }
 
 crate::impl_serdeany!(MapIndexesMetadata);
@@ -87,11 +89,21 @@ impl AsSlice<usize> for MapIndexesMetadata {
     }
 }
 
+impl HasRefCnt for MapIndexesMetadata {
+    fn refcnt(&self) -> isize {
+        self.tcref
+    }
+
+    fn refcnt_mut(&mut self) -> &mut isize {
+        &mut self.tcref
+    }
+}
+
 impl MapIndexesMetadata {
     /// Creates a new [`struct@MapIndexesMetadata`].
     #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
-        Self { list }
+        Self { list, tcref: 0 }
     }
 }
 
