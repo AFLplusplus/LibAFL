@@ -22,9 +22,10 @@ mod clone {
     /// Any errors will trigger a panic.
     pub fn clone_symcc_at_version(path: &Path, url: &str, commit: &str) {
         assert!(
-            !which("git").is_err(),
+            which("git").is_ok(),
             "ERROR: unable to find git. Git is required to download SymCC."
         );
+
         let mut cmd = Command::new("git");
         cmd.arg("clone").arg(url).arg(&path);
         let output = cmd.output().expect("failed to execute git clone");
