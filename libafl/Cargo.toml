@@ -85,7 +85,7 @@ libm = "0.2.1"
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
-z3 = { version = "0.11", optional = true } # for concolic mutation
+z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for concolic mutation
 
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug
