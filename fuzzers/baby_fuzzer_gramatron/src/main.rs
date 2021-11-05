@@ -109,7 +109,7 @@ pub fn main() {
     let automaton = read_automaton_from_file(PathBuf::from("auto.postcard"));
     let mut generator = GramatronGenerator::new(&automaton);
 
-    /// Use this code to profile the generator performance
+    // Use this code to profile the generator performance
     /*
     use libafl::generators::Generator;
     use std::collections::HashSet;

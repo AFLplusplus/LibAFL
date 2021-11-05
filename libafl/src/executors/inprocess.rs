@@ -1,5 +1,7 @@
 //! The [`InProcessExecutor`] is a libfuzzer-like executor, that will simply call a function.
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
+//!
+//! Needs the `fork` feature flag.
 
 use core::{ffi::c_void, marker::PhantomData, ptr};
 
@@ -1008,16 +1010,15 @@ where
 mod tests {
     use core::{marker::PhantomData, ptr};
 
+    #[cfg(all(feature = "std", feature = "fork", unix))]
+    use crate::{
+        bolts::shmem::{ShMemProvider, StdShMemProvider},
+        executors::InProcessForkExecutor,
+    };
     use crate::{
         bolts::tuples::tuple_list,
         executors::{Executor, ExitKind, InProcessExecutor},
         inputs::NopInput,
-    };
-
-    #[cfg(all(feature = "std", unix))]
-    use crate::{
-        bolts::shmem::{ShMemProvider, StdShMemProvider},
-        executors::InProcessForkExecutor,
     };
 
     #[test]
@@ -1038,7 +1039,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "std", unix))]
+    #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         let provider = StdShMemProvider::new().unwrap();
 
