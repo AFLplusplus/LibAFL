@@ -13,8 +13,8 @@ use libafl::{
         tuples::{tuple_list, Merge},
     },
     corpus::{
-        ondisk::OnDiskMetadataFormat, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
+        ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus,
+        IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{
@@ -347,7 +347,7 @@ unsafe fn fuzz(
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                OnDiskCorpus::new(PathBuf::from("./corpus_discovered")).unwrap(),
+                CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new_save_meta(
