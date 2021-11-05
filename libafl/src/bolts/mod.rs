@@ -38,6 +38,11 @@ pub trait HasLen {
     }
 }
 
+pub trait HasRefCnt {
+    fn refcnt(&self) -> isize;
+    fn refcnt_mut(&mut self) -> &mut isize;
+}
+
 /// Current time
 #[cfg(feature = "std")]
 #[must_use]
