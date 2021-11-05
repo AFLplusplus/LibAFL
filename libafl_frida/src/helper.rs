@@ -132,7 +132,6 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
-
     #[cfg(not(unix))]
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
 
@@ -840,7 +839,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
     #[inline]
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::too_many_arguments)]
-    #[cfg(all(target_arch="x86_64", unix))]
+    #[cfg(all(target_arch = "x86_64", unix))]
     pub fn emit_shadow_check(
         &mut self,
         address: u64,
