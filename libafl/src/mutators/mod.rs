@@ -13,6 +13,11 @@ pub use mopt_mutator::*;
 pub mod gramatron;
 pub use gramatron::*;
 
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+
 use crate::{
     bolts::tuples::{HasConstLen, Named},
     inputs::Input,

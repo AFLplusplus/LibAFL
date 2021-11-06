@@ -11,6 +11,26 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 build = "build.rs"
 
+[features]
+default = ["std", "anymap_debug", "derive", "llmp_compression", "rand_trait", "fork"]
+std = ["serde_json", "serde_json/std", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid"] # print, env, launcher ... support
+anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
+derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
+fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
+rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
+introspection = [] # Include performance statistics of the fuzzing pipeline
+concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
+# features hiding dependencies licensed under GPL
+gpl = []
+# features hiding dependencies licensed under AGPL
+agpl = ["gpl", "nautilus"]
+nautilus = ["grammartec", "std", "serde_json/std"]
+# LLMP features
+llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
+llmp_compression = ["miniz_oxide"] # llmp compression using GZip
+llmp_debug = ["backtrace"] # Enables debug output for LLMP
+llmp_small_maps = [] # reduces initial map size for llmp
+
 [build-dependencies]
 rustc_version = "0.4"
 
@@ -22,38 +42,6 @@ xxhash-rust = { version = "0.8.2", features = ["xxh3", "const_xxh3"] } # xxh3 ha
 serde_json = "1.0.60"
 num_cpus = "1.0" # cpu count, for llmp example
 serial_test = "0.5"
-
-[[bench]]
-name = "rand_speeds"
-harness = false
-
-[[bench]]
-name = "hash_speeds"
-harness = false
-
-#[profile.release]
-#lto = true
-#opt-level = 3
-#debug = true
-
-[features]
-default = ["std", "anymap_debug", "derive", "llmp_compression", "rand_trait", "fork"]
-std = ["serde_json", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid"] # print, env, launcher ... support
-anymap_debug = ["serde_json"] # uses serde_json to Debug the anymap trait. Disable for smaller footprint.
-derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
-fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
-rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
-llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_compression = ["miniz_oxide"] # llmp compression using GZip
-llmp_debug = ["backtrace"] # Enables debug output for LLMP
-llmp_small_maps = [] # reduces initial map size for llmp
-introspection = [] # Include performance statistics of the fuzzing pipeline
-concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
-
-[[example]]
-name = "llmp_test"
-path = "./examples/llmp_test/main.rs"
-required-features = ["std"]
 
 [dependencies]
 tuple_list = { version = "0.1.3" }
@@ -87,6 +75,9 @@ wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to
 
 z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for concolic mutation
 
+# AGPL
+grammartec = { git = "https://github.com/andreafioraldi/nautilus", optional = true }
+
 [target.'cfg(target_os = "android")'.dependencies]
 backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug
 
@@ -105,3 +96,21 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [target.'cfg(windows)'.build-dependencies]
 windows = "0.18.0"
+
+[[bench]]
+name = "rand_speeds"
+harness = false
+
+[[bench]]
+name = "hash_speeds"
+harness = false
+
+#[profile.release]
+#lto = true
+#opt-level = 3
+#debug = true
+
+[[example]]
+name = "llmp_test"
+path = "./examples/llmp_test/main.rs"
+required-features = ["std"]

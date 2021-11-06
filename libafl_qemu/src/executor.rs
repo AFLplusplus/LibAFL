@@ -333,6 +333,7 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let mut res = SyscallHookResult::new(None);
     for hook in unsafe { &SYSCALL_HOOKS } {
+        #[allow(clippy::type_complexity)]
         let func: fn(
             &mut QT,
             &mut S,
@@ -585,6 +586,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
+    #[allow(clippy::type_complexity)]
     pub fn hook_syscalls(
         &self,
         hook: fn(

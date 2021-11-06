@@ -1,9 +1,4 @@
-use std::io::Read;
-use std::{
-    fs,
-    io::BufReader,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 #[cfg(windows)]
 use std::ptr::write_volatile;
@@ -13,17 +8,19 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedback_or,
+    feedbacks::{
+        CrashFeedback, MapFeedbackState, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
+    },
     fuzzer::{Fuzzer, StdFuzzer},
-    generators::{Automaton, GramatronGenerator},
-    inputs::GramatronInput,
+    generators::{NautilusContext, NautilusGenerator},
+    inputs::NautilusInput,
     mutators::{
-        GramatronRandomMutator, GramatronRecursionMutator, GramatronSpliceMutator,
-        StdScheduledMutator,
+        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, StdScheduledMutator,
     },
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
-    state::StdState,
+    state::{HasMetadata, StdState},
     stats::SimpleStats,
 };
 
@@ -36,21 +33,14 @@ fn signals_set(idx: usize) {
 }
 */
 
-fn read_automaton_from_file<P: AsRef<Path>>(path: P) -> Automaton {
-    let file = fs::File::open(path).unwrap();
-    let mut reader = BufReader::new(file);
-    let mut buffer = Vec::new();
-    reader.read_to_end(&mut buffer).unwrap();
-    postcard::from_bytes(&buffer).unwrap()
-}
-
 #[allow(clippy::similar_names)]
 pub fn main() {
+    let context = NautilusContext::from_file(15, "grammar.json");
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
-    let mut harness = |input: &GramatronInput| {
-        input.unparse(&mut bytes);
+    let mut harness = |input: &NautilusInput| {
+        input.unparse(&context, &mut bytes);
         unsafe {
             println!(">>> {}", std::str::from_utf8_unchecked(&bytes));
         }
@@ -64,7 +54,10 @@ pub fn main() {
     let feedback_state = MapFeedbackState::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let feedback = feedback_or!(
+        MaxMapFeedback::new(&feedback_state, &observer),
+        NautilusFeedback::new(&context)
+    );
 
     // A feedback to choose if an input is a solution or not
     let objective = CrashFeedback::new();
@@ -82,6 +75,10 @@ pub fn main() {
         // They are the data related to the feedbacks that you want to persist in the State.
         tuple_list!(feedback_state),
     );
+
+    if state.metadata().get::<NautilusChunksMetadata>().is_none() {
+        state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
+    }
 
     // The Stats trait define how the fuzzer stats are reported to the user
     let stats = SimpleStats::new(|s| println!("{}", s));
@@ -106,14 +103,13 @@ pub fn main() {
     )
     .expect("Failed to create the Executor");
 
-    let automaton = read_automaton_from_file(PathBuf::from("auto.postcard"));
-    let mut generator = GramatronGenerator::new(&automaton);
+    let mut generator = NautilusGenerator::new(&context);
 
     // Use this code to profile the generator performance
     /*
     use libafl::generators::Generator;
-    use std::collections::HashSet;
     use std::collections::hash_map::DefaultHasher;
+    use std::collections::HashSet;
     use std::hash::{Hash, Hasher};
 
     fn calculate_hash<T: Hash>(t: &T) -> u64 {
@@ -128,7 +124,7 @@ pub fn main() {
     let mut c = 0;
     for _ in 0..100000 {
         let i = generator.generate(&mut state).unwrap();
-        i.unparse(&mut b);
+        i.unparse(&context, &mut b);
         set.insert(calculate_hash(&b));
         c += b.len();
     }
@@ -146,12 +142,16 @@ pub fn main() {
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::with_max_iterations(
         tuple_list!(
-            GramatronRandomMutator::new(&generator),
-            GramatronRandomMutator::new(&generator),
-            GramatronRandomMutator::new(&generator),
-            GramatronSpliceMutator::new(),
-            GramatronSpliceMutator::new(),
-            GramatronRecursionMutator::new()
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRandomMutator::new(&context),
+            NautilusRecursionMutator::new(&context),
+            NautilusSpliceMutator::new(&context),
+            NautilusSpliceMutator::new(&context),
+            NautilusSpliceMutator::new(&context),
         ),
         2,
     );

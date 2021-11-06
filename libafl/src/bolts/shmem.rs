@@ -700,16 +700,18 @@ pub mod unix_shmem {
         impl Drop for MmapShMem {
             fn drop(&mut self) {
                 unsafe {
-                    if self.map.is_null() {
-                        panic!("Map should never be null for MmapShMem (on Drop)");
-                    }
+                    assert!(
+                        !self.map.is_null(),
+                        "Map should never be null for MmapShMem (on Drop)"
+                    );
 
                     munmap(self.map as *mut _, self.map_size);
                     self.map = ptr::null_mut();
 
-                    if self.shm_fd == -1 {
-                        panic!("FD should never be -1 for MmapShMem (on Drop)");
-                    }
+                    assert!(
+                        self.shm_fd != -1,
+                        "FD should never be -1 for MmapShMem (on Drop)"
+                    );
 
                     // None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
                     if let Some(filename_path) = self.filename_path {

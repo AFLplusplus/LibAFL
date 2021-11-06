@@ -81,7 +81,7 @@ where
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     #[builder(default = true)]
     spawn_broker: bool,
-    #[builder(default = PhantomData)]
+    #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
 }
 

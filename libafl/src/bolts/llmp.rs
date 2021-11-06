@@ -425,12 +425,16 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     let page = shmem2page_mut(shmem);
     #[cfg(all(feature = "llmp_debug", feature = "std"))]
     dbg!("_llmp_page_init: page {}", *page);
-    if (*page).magic == PAGE_INITIALIZED_MAGIC && !allow_reinit {
-        panic!(
+
+    if !allow_reinit {
+        assert!(
+            (*page).magic != PAGE_INITIALIZED_MAGIC,
             "Tried to initialize page {:?} twice (for shmem {:?})",
-            page, shmem
+            page,
+            shmem
         );
-    };
+    }
+
     (*page).magic = PAGE_INITIALIZED_MAGIC;
     (*page).sender = sender;
     ptr::write_volatile(ptr::addr_of_mut!((*page).current_msg_id), 0);
@@ -898,18 +902,20 @@ where
         let map = self.out_maps.last_mut().unwrap();
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
-        if (*page).size_used + EOP_MSG_SIZE > (*page).size_total {
-            panic!("PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
+        assert!((*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
+                "PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
                 ptr::addr_of!((*page).size_used), ptr::addr_of!((*page).size_total));
-        }
+
         let mut ret: *mut LlmpMsg = if last_msg.is_null() {
             (*page).messages.as_mut_ptr()
         } else {
             llmp_next_msg_ptr_checked(map, last_msg, EOP_MSG_SIZE)?
         };
-        if (*ret).tag == LLMP_TAG_UNINITIALIZED {
-            panic!("Did not call send() on last message!");
-        }
+        assert!(
+            (*ret).tag != LLMP_TAG_UNINITIALIZED,
+            "Did not call send() on last message!"
+        );
+
         (*ret).buf_len = size_of::<LlmpPayloadSharedMapInfo>() as u64;
 
         // We don't need to pad the EOP message: it'll always be the last in this page.
@@ -932,9 +938,10 @@ where
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
 
-        if self.has_unsent_message {
-            panic!("Called alloc without callind send inbetween");
-        }
+        assert!(
+            !self.has_unsent_message,
+            "Called alloc without calling send inbetween"
+        );
 
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
@@ -1009,12 +1016,12 @@ where
     unsafe fn send(&mut self, msg: *mut LlmpMsg, overwrite_client_id: bool) -> Result<(), Error> {
         // dbg!("Sending msg {:?}", msg);
 
-        if self.last_msg_sent == msg {
-            panic!("Message sent twice!");
-        }
-        if (*msg).tag == LLMP_TAG_UNSET {
-            panic!("No tag set on message with id {}", (*msg).message_id);
-        }
+        assert!(self.last_msg_sent != msg, "Message sent twice!");
+        assert!(
+            (*msg).tag != LLMP_TAG_UNSET,
+            "No tag set on message with id {}",
+            (*msg).message_id
+        );
         // A client gets the sender id assigned to by the broker during the initial handshake.
         if overwrite_client_id {
             (*msg).sender = self.id;
@@ -1369,14 +1376,14 @@ where
                     #[cfg(feature = "std")]
                     println!("Received end of page, allocating next");
                     // Handle end of page
-                    if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
-                        panic!(
-                            "Illegal message length for EOP (is {}/{}, expected {})",
-                            (*msg).buf_len,
-                            (*msg).buf_len_padded,
-                            size_of::<LlmpPayloadSharedMapInfo>()
-                        );
-                    }
+                    assert!(
+                        (*msg).buf_len >= size_of::<LlmpPayloadSharedMapInfo>() as u64,
+                        "Illegal message length for EOP (is {}/{}, expected {})",
+                        (*msg).buf_len,
+                        (*msg).buf_len_padded,
+                        size_of::<LlmpPayloadSharedMapInfo>()
+                    );
+
                     #[allow(clippy::cast_ptr_alignment)]
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
@@ -1427,9 +1434,11 @@ where
         let page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
         if !last_msg.is_null() {
-            if (*last_msg).tag == LLMP_TAG_END_OF_PAGE && !llmp_msg_in_page(page, last_msg) {
-                panic!("BUG: full page passed to await_message_blocking or reset failed");
-            }
+            assert!(
+                !((*last_msg).tag == LLMP_TAG_END_OF_PAGE && !llmp_msg_in_page(page, last_msg)),
+                "BUG: full page passed to await_message_blocking or reset failed"
+            );
+
             current_msg_id = (*last_msg).message_id;
         }
         loop {
@@ -1564,9 +1573,11 @@ where
             shmem: existing_map,
         };
         unsafe {
-            if (*ret.page()).magic != PAGE_INITIALIZED_MAGIC {
-                panic!("Map was not priviously initialized at {:?}", &ret.shmem);
-            }
+            assert!(
+                (*ret.page()).magic == PAGE_INITIALIZED_MAGIC,
+                "Map was not priviously initialized at {:?}",
+                &ret.shmem
+            );
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
             dbg!("PAGE: {}", *ret.page());
         }
