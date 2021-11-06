@@ -195,7 +195,7 @@ pub trait ShMem: Sized + Debug + Clone {
 /// A [`ShMemProvider`] provides access to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
-pub trait ShMemProvider: Send + Clone + Default + Debug {
+pub trait ShMemProvider: Clone + Default + Debug {
     /// The actual shared map handed out by this [`ShMemProvider`].
     type Mem: ShMem;
 
@@ -308,8 +308,8 @@ where
     parent_child_pipe: Option<Pipe>,
 }
 
-#[cfg(all(unix, feature = "std"))]
-unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
+//#[cfg(all(unix, feature = "std"))]
+//unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
 
 #[cfg(all(unix, feature = "std"))]
 impl<SP> ShMemProvider for RcShMemProvider<SP>

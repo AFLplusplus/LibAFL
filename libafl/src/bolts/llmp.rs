@@ -1816,7 +1816,6 @@ where
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
             stream,
-            &mut self.shmem_provider,
             self.llmp_clients.len() as ClientId,
             &self.llmp_out.out_maps.first().unwrap().shmem.description(),
         )?;
@@ -1966,22 +1965,18 @@ where
     #[allow(clippy::let_and_return)]
     fn b2b_thread_on(
         mut stream: TcpStream,
-        shmem_provider: &mut SP,
         b2b_client_id: ClientId,
         broker_map_description: &ShMemDescription,
     ) -> Result<ShMemDescription, Error> {
         let broker_map_description = *broker_map_description;
-
-        shmem_provider.pre_fork()?;
-        let mut shmem_provider_clone = shmem_provider.clone();
 
         // A channel to get the new "client's" sharedmap id from
         let (send, recv) = channel();
 
         // (For now) the thread remote broker 2 broker just acts like a "normal" llmp client, except it proxies all messages to the attached socket, in both directions.
         thread::spawn(move || {
-            // as always, call post_fork to potentially reconnect the provider (for threaded/forked use)
-            shmem_provider_clone.post_fork(true).unwrap();
+            // Crete a new ShMemProvider for this background thread
+            let shmem_provider_bg = SP::new().unwrap();
 
             #[cfg(fature = "llmp_debug")]
             println!("B2b: Spawned proxy thread");
@@ -1992,7 +1987,7 @@ where
                 .expect("Failed to set tcp stream timeout");
 
             let mut new_sender =
-                match LlmpSender::new(shmem_provider_clone.clone(), b2b_client_id, false) {
+                match LlmpSender::new(shmem_provider_bg.clone(), b2b_client_id, false) {
                     Ok(new_sender) => new_sender,
                     Err(e) => {
                         panic!("B2B: Could not map shared map: {}", e);
@@ -2004,7 +1999,7 @@ where
 
             // the receiver receives from the local broker, and forwards it to the tcp stream.
             let mut local_receiver = LlmpReceiver::on_existing_from_description(
-                shmem_provider_clone,
+                shmem_provider_bg,
                 &LlmpDescription {
                     last_message_offset: None,
                     shmem: broker_map_description,
@@ -2073,8 +2068,6 @@ where
             }
         });
 
-        shmem_provider.post_fork(false)?;
-
         let ret = recv.recv().map_err(|_| {
             Error::Unknown("Error launching background thread for b2b communcation".to_string())
         });
@@ -2092,7 +2085,6 @@ where
         request: &TcpRequest,
         current_client_id: &mut u32,
         sender: &mut LlmpSender<SP>,
-        shmem_provider: &mut SP,
         broker_map_description: &ShMemDescription,
     ) {
         match request {
@@ -2128,12 +2120,9 @@ where
                     return;
                 }
 
-                if let Ok(shmem_description) = Self::b2b_thread_on(
-                    stream,
-                    shmem_provider,
-                    *current_client_id,
-                    broker_map_description,
-                ) {
+                if let Ok(shmem_description) =
+                    Self::b2b_thread_on(stream, *current_client_id, broker_map_description)
+                {
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
                         println!("B2B: Error announcing client {:?}", shmem_description);
                     };
@@ -2172,12 +2161,9 @@ where
         let tcp_out_map_description = tcp_out_map.shmem.description();
         self.register_client(tcp_out_map);
 
-        self.shmem_provider.pre_fork()?;
-        let mut shmem_provider_clone = self.shmem_provider.clone();
-
         let ret = thread::spawn(move || {
-            // Call `post_fork` (even though this is not forked) so we get a new connection to the cloned `ShMemServer` if we are using a `ServedShMemProvider`
-            shmem_provider_clone.post_fork(true).unwrap();
+            // Create a new ShMemProvider for this background thread.
+            let mut shmem_provider_bg = SP::new().unwrap();
 
             let mut current_client_id = llmp_tcp_id + 1;
 
@@ -2185,14 +2171,14 @@ where
                 id: llmp_tcp_id,
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::existing(
-                    shmem_provider_clone
+                    shmem_provider_bg
                         .from_description(tcp_out_map_description)
                         .unwrap(),
                 )],
                 // drop pages to the broker, if it already read them.
                 keep_pages_forever: false,
                 has_unsent_message: false,
-                shmem_provider: shmem_provider_clone.clone(),
+                shmem_provider: shmem_provider_bg.clone(),
             };
 
             loop {
@@ -2230,7 +2216,6 @@ where
                             &req,
                             &mut current_client_id,
                             &mut tcp_incoming_sender,
-                            &mut shmem_provider_clone,
                             &broker_map_description,
                         );
                     }
@@ -2241,7 +2226,6 @@ where
             }
         });
 
-        self.shmem_provider.post_fork(false)?;
         Ok(ret)
     }
 
