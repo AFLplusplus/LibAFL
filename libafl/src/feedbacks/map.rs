@@ -35,7 +35,7 @@ where
     fn reduce(first: T, second: T) -> T;
 }
 
-/// A [`MinReducer`] reduces [`Integer`] values and returns their maximum.
+/// A [`MaxReducer`] reduces [`Integer`] values and returns their maximum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MaxReducer {}
 
