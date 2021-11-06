@@ -179,8 +179,7 @@ where
     }
 }
 
-impl<C, CS, EM, I, M, OT, R, S, Z> Iterator
-    for StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
+impl<C, CS, EM, I, M, OT, R, S, Z> Iterator for StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
