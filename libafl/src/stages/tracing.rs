@@ -1,3 +1,5 @@
+//! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
+
 use core::{marker::PhantomData, mem::drop};
 
 use crate::{
