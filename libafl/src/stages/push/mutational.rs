@@ -68,7 +68,7 @@ where
 
     current_input: Option<I>, // Todo: Get rid of copy
 
-    stage_idx: usize,
+    stage_idx: i32,
 
     mutator: M,
     #[allow(clippy::type_complexity)]
@@ -93,6 +93,7 @@ where
         + Fuzzer<E, EM, I, S, ()>,
 {
     /// Gets the number of iterations as a random number
+    #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
     fn iterations(&self, state: &mut S, _corpus_idx: usize) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
@@ -127,7 +128,7 @@ where
 
         start_timer!(state);
         self.mutator
-            .mutate(state, &mut input, self.testcases_done as i32)
+            .mutate(state, &mut input, self.stage_idx as i32)
             .unwrap();
         mark_feature_time!(state, PerfFeature::Mutate);
 
@@ -240,7 +241,7 @@ where
         event_mgr: Rc<RefCell<EM>>,
         observers: Rc<RefCell<OT>>,
         exit_kind: Rc<Cell<Option<ExitKind>>>,
-        stage_idx: usize,
+        stage_idx: i32,
     ) -> Self {
         Self {
             mutator,
