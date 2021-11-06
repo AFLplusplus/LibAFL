@@ -1,18 +1,17 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
-use core::marker::PhantomData;
-use std::{
+use alloc::rc::Rc;
+use core::{
     borrow::BorrowMut,
     cell::{Cell, RefCell},
-    ops::DerefMut,
-    rc::Rc,
+    marker::PhantomData,
     time::Duration,
 };
 
 use crate::{
     bolts::{current_time, rands::Rand},
-    corpus::{Corpus, Testcase},
+    corpus::Corpus,
     events::EventManager,
     executors::ExitKind,
     fuzzer::Evaluator,
@@ -20,7 +19,6 @@ use crate::{
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
-    stages::Stage,
     start_timer,
     state::{HasClientPerfStats, HasCorpus, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, Fuzzer,
@@ -75,7 +73,7 @@ where
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, E, EM, I, R, OT, S, Z)>,
-    last_stats_time: std::time::Duration,
+    last_stats_time: Duration,
     observers: Rc<RefCell<OT>>,
     exit_kind: Rc<Cell<Option<ExitKind>>>,
 }
@@ -191,7 +189,7 @@ where
             self.init(self.current_corpus_idx) // TODO: Corpus idx
         };
         if let Err(err) = step_success {
-            let errored = true;
+            //let errored = true;
             return Some(Err(err));
         }
 
@@ -202,7 +200,7 @@ where
             self.initialized = false;
 
             let state: &mut S = &mut (*self.state).borrow_mut();
-            let fuzzer: &mut Z = &mut (*self.fuzzer).borrow_mut();
+            //let fuzzer: &mut Z = &mut (*self.fuzzer).borrow_mut();
             let event_mgr: &mut EM = &mut (*self.event_mgr).borrow_mut();
 
             self.last_stats_time = Z::maybe_report_stats(
@@ -248,14 +246,14 @@ where
             mutator,
             phantom: PhantomData,
             initialized: false,
-            state: state,
+            state,
             current_iter: None,
             current_corpus_idx: 0, // todo
             testcases_to_do: 0,
             testcases_done: 0,
             current_input: None,
-            stage_idx: stage_idx,
-            fuzzer: fuzzer,
+            stage_idx,
+            fuzzer,
             event_mgr,
             observers,
             exit_kind,

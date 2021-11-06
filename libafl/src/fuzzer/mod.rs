@@ -385,7 +385,7 @@ where
                         Event::NewTestcase {
                             input,
                             observers_buf,
-                            exit_kind: exit_kind.clone(),
+                            exit_kind: *exit_kind,
                             corpus_size: state.corpus().count(),
                             client_config: manager.configuration(),
                             time: current_time(),

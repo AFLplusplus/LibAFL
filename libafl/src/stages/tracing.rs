@@ -1,6 +1,6 @@
 //! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
 
-use core::{marker::PhantomData, mem::drop};
+use core::marker::PhantomData;
 
 use crate::{
     corpus::Corpus,
@@ -65,10 +65,9 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        drop(
-            self.tracer_executor
-                .run_target(fuzzer, state, manager, &input)?,
-        );
+        let _ = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -147,7 +146,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        drop(executor.run_target(fuzzer, state, manager, &input)?);
+        let _ = executor.run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
