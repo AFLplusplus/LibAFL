@@ -482,31 +482,34 @@ mod unix_signal_handler {
         unix_remove_timeout();
 
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-        let _context = *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
+        let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
             as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]
-        println!("Crashed with {}", signal);
+        eprintln!("Crashed with {}", signal);
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
             {
-                println!("Double crash\n");
+                eprintln!("Double crash\n");
                 #[cfg(target_os = "android")]
                 let si_addr = (_info._pad[0] as i64) | ((_info._pad[1] as i64) << 32);
                 #[cfg(not(target_os = "android"))]
                 let si_addr = { _info.si_addr() as usize };
 
-                println!(
+                eprintln!(
                 "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
                 si_addr
                 );
+
+                #[cfg(all(feature = "std", unix))]
+                {
+                    let mut writer = std::io::BufWriter::new(std::io::stderr());
+                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                        .unwrap();
+                    writer.flush().unwrap();
+                }
             }
-            // let's yolo-cat the maps for debugging, if possible.
-            #[cfg(all(any(target_os = "linux", target_os = "netbsd"), feature = "std"))]
-            match std::fs::read_to_string("/proc/self/maps") {
-                Ok(maps) => println!("maps:\n{}", maps),
-                Err(e) => println!("Couldn't load mappings: {:?}", e),
-            };
+
             #[cfg(feature = "std")]
             {
                 println!("Type QUIT to restart the child");
@@ -524,66 +527,20 @@ mod unix_signal_handler {
             let executor = (data.executor_ptr as *const E).as_ref().unwrap();
             let observers = executor.observers();
 
-            #[cfg(feature = "std")]
-            println!("Child crashed!");
-
-            #[allow(clippy::non_ascii_literal)]
-            #[cfg(all(
-                feature = "std",
-                any(target_os = "linux", target_os = "android"),
-                target_arch = "aarch64"
-            ))]
-            {
-                println!("{:━^100}", " CRASH ");
-                println!(
-                    "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
-                    signal, _context.uc_mcontext.pc, _context.uc_mcontext.fault_address
-                );
-
-                println!("{:━^100}", " REGISTERS ");
-                for reg in 0..31 {
-                    print!(
-                        "x{:02}: 0x{:016x} ",
-                        reg, _context.uc_mcontext.regs[reg as usize]
-                    );
-                    if reg % 4 == 3 {
-                        println!();
-                    }
-                }
-                println!("pc : 0x{:016x} ", _context.uc_mcontext.pc);
-
-                //println!("{:━^100}", " BACKTRACE ");
-                //println!("{:?}", backtrace::Backtrace::new())
-            }
-
-            #[allow(clippy::non_ascii_literal)]
-            #[cfg(all(feature = "std", target_vendor = "apple", target_arch = "aarch64"))]
-            {
-                let mcontext = *_context.uc_mcontext;
-                println!("{:━^100}", " CRASH ");
-                println!(
-                    "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
-                    signal, mcontext.__ss.__pc, mcontext.__es.__far
-                );
-
-                println!("{:━^100}", " REGISTERS ");
-                for reg in 0..29 {
-                    print!("x{:02}: 0x{:016x} ", reg, mcontext.__ss.__x[reg as usize]);
-                    if reg % 4 == 3 {
-                        println!();
-                    }
-                }
-                print!("fp: 0x{:016x} ", mcontext.__ss.__fp);
-                print!("lr: 0x{:016x} ", mcontext.__ss.__lr);
-                print!("pc: 0x{:016x} ", mcontext.__ss.__pc);
-            }
-
-            #[cfg(feature = "std")]
-            let _res = stdout().flush();
-
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-            // Make sure we don't crash in the crash handler forever.
             data.current_input_ptr = ptr::null();
+
+            #[cfg(feature = "std")]
+            eprintln!("Child crashed!");
+
+            #[cfg(all(feature = "std", unix))]
+            {
+                let mut writer = std::io::BufWriter::new(std::io::stderr());
+                writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
+                crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                    .unwrap();
+                writer.flush().unwrap();
+            }
 
             let interesting = fuzzer
                 .objective_mut()
