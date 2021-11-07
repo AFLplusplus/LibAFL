@@ -508,7 +508,7 @@ mod unix_signal_handler {
                         &mut writer,
                         signal,
                         &_info,
-                        &_context,
+                        _context,
                     )
                     .unwrap();
                     writer.flush().unwrap();
@@ -542,7 +542,7 @@ mod unix_signal_handler {
             {
                 let mut writer = std::io::BufWriter::new(std::io::stderr());
                 writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
-                crate::bolts::minibsod::generate_minibsod(&mut writer, signal, &_info, &_context)
+                crate::bolts::minibsod::generate_minibsod(&mut writer, signal, &_info, _context)
                     .unwrap();
                 writer.flush().unwrap();
             }
