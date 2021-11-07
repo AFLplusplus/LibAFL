@@ -62,13 +62,12 @@ enum CmplogOperandType {
     Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 enum SpecialCmpLogCase {
     Tbz,
     Tbnz,
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(any(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
@@ -1400,11 +1399,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
     > {
         // We only care for compare instrunctions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
-            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls"
-            | "cbz" | "tbz" | "tbnz" => (),
+            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
+            | "cbnz" | "tbz" | "tbnz" | "adcs" => (),
             _ => return Err(()),
         }
-        let operands = self
+        let mut operands = self
             .capstone
             .insn_detail(instr)
             .unwrap()
@@ -1412,12 +1411,25 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .operands();
 
         // cbz - 1 operand, tbz - 3 operands
-        let special_case = ["cbz", "tbz", "tbnz"].contains(&instr.mnemonic().unwrap());
-        if operands.len() != 2 || !special_case {
+        let special_case = [
+            "cbz", "cbnz", "tbz", "tbnz", "subs", "adds", "ands", "sbcs", "bics", "adcs",
+        ]
+        .contains(&instr.mnemonic().unwrap());
+        if operands.len() != 2 && !special_case {
             return Err(());
         }
+
+        // handle special opcodes case which have 3 operands, but the 1st(dest) is not important to us
+        if ["subs", "adds", "ands", "sbcs", "bics", "adcs"].contains(&instr.mnemonic().unwrap()) {
+            //remove the dest operand from the list
+            operands.remove(0);
+        }
+
         // cbz marked as special since there is only 1 operand
-        let special_case = instr.mnemonic().unwrap() == "cbz";
+        let special_case = match instr.mnemonic().unwrap() {
+            "cbz" | "cbnz" => true,
+            _ => false,
+        };
 
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
             match arm64operand.op_type {
