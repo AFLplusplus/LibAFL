@@ -1,10 +1,9 @@
 //! Implements a mini-bsod generator
 
+use libc::siginfo_t;
 use std::io::{BufWriter, Write};
 
-use libc::{siginfo_t, ucontext_t};
-
-use crate::bolts::os::unix_signals::Signal;
+use crate::bolts::os::unix_signals::{ucontext_t, Signal};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
@@ -89,10 +88,34 @@ fn dump_registers<W: Write>(
 #[allow(clippy::unnecessary_wraps)]
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
-    _writer: &mut BufWriter<W>,
-    _ucontext: &ucontext_t,
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    todo!("implement dump registers");
+    use libc::__darwin_mcontext64;
+
+    let mcontext: __darwin_mcontext64 = unsafe { *ucontext.uc_mcontext };
+    let ss = mcontext.__ss;
+
+    write!(writer, "r8 : {:#016x}, ", ss.__r8)?;
+    write!(writer, "r9 : {:#016x}, ", ss.__r9)?;
+    write!(writer, "r10: {:#016x}, ", ss.__r10)?;
+    writeln!(writer, "r11: {:#016x}, ", ss.__r11)?;
+    write!(writer, "r12: {:#016x}, ", ss.__r12)?;
+    write!(writer, "r13: {:#016x}, ", ss.__r13)?;
+    write!(writer, "r14: {:#016x}, ", ss.__r14)?;
+    writeln!(writer, "r15: {:#016x}, ", ss.__r15)?;
+    write!(writer, "rdi: {:#016x}, ", ss.__rdi)?;
+    write!(writer, "rsi: {:#016x}, ", ss.__rsi)?;
+    write!(writer, "rbp: {:#016x}, ", ss.__rbp)?;
+    writeln!(writer, "rbx: {:#016x}, ", ss.__rbx)?;
+    write!(writer, "rdx: {:#016x}, ", ss.__rdx)?;
+    write!(writer, "rax: {:#016x}, ", ss.__rax)?;
+    write!(writer, "rcx: {:#016x}, ", ss.__rcx)?;
+    writeln!(writer, "rsp: {:#016x}, ", ss.__rsp)?;
+    write!(writer, "rip: {:#016x}, ", ss.__rip)?;
+    writeln!(writer, "efl: {:#016x}, ", ss.__rflags)?;
+
+    Ok(())
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -101,7 +124,8 @@ fn dump_registers<W: Write>(
     _writer: &mut BufWriter<W>,
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    todo!("implement dump registers");
+    // TODO: Implement dump registers
+    Ok(())
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -202,4 +226,19 @@ pub fn generate_minibsod<W: Write>(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::io::{stdout, BufWriter};
+
+    use crate::bolts::{minibsod::dump_registers, os::unix_signals::ucontext};
+
+    #[test]
+    pub fn test_dump_registers() {
+        let ucontext = ucontext().unwrap();
+        let mut writer = BufWriter::new(stdout());
+        dump_registers(&mut writer, &ucontext).unwrap();
+    }
 }

@@ -63,6 +63,10 @@ use crate::Error;
 
 pub use libc::{c_void, siginfo_t};
 
+extern "C" {
+    fn getcontext(ucp: *mut ucontext_t) -> c_int;
+}
+
 /// All signals on this system, as `enum`.
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
@@ -232,4 +236,25 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     compiler_fence(Ordering::SeqCst);
 
     Ok(())
+}
+
+/// Function to get the current [`ucontext_t`] for this process.
+/// This calls the libc `getcontext` function under the hood.
+/// We wrap it here, as it seems to be (currently)
+/// not available on `MacOS` in the `libc` crate.
+#[cfg(unix)]
+pub fn ucontext() -> Result<ucontext_t, Error> {
+    use std::mem::MaybeUninit;
+
+    use nix::errno::{errno, Errno};
+
+    let mut ucontext = unsafe { MaybeUninit::zeroed().assume_init() };
+    if unsafe { getcontext(&mut ucontext) } == 0 {
+        Ok(ucontext)
+    } else {
+        Err(Error::Unknown(format!(
+            "Failed to get ucontext: {:?}",
+            Errno::from_i32(errno())
+        )))
+    }
 }
