@@ -504,13 +504,8 @@ mod unix_signal_handler {
                 #[cfg(all(feature = "std", unix))]
                 {
                     let mut writer = std::io::BufWriter::new(std::io::stderr());
-                    crate::bolts::minibsod::generate_minibsod(
-                        &mut writer,
-                        signal,
-                        _info,
-                        _context,
-                    )
-                    .unwrap();
+                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                        .unwrap();
                     writer.flush().unwrap();
                 }
             }
