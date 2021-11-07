@@ -1086,13 +1086,13 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
         // cbz - 1 operand, tbz - 3 operands
         let special_case =
-            ["cbz", "cbnz", "tbz", "tbnz", "subs"].contains(&instr.mnemonic().unwrap());
+            ["cbz", "cbnz", "tbz", "tbnz", "subs", "adds"].contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 && !special_case {
             return Err(());
         }
 
-        // handle special "subs" case which have 3 operands, but the 1st(dest) is not important to us
-        if instr.mnemonic().unwrap().eq("subs") {
+        // handle special "subs"&&"adds" case which have 3 operands, but the 1st(dest) is not important to us
+        if vec!["subs", "adds"].contains(instr.mnemonic().unwrap()) {
             //remove the dest operand from the list
             operands.remove(0);
         }
