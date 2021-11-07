@@ -88,8 +88,8 @@ fn dump_registers<W: Write>(
 
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
-    writer: &mut BufWriter<W>,
-    ucontext: &ucontext_t,
+    _writer: &mut BufWriter<W>,
+    _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     Ok(())
 }
@@ -149,9 +149,8 @@ fn write_crash<W: Write>(
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    ucontext: &ucontext_t,
+    _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    let mcontext = *ucontext.uc_mcontext;
     writeln!(writer, "Received signal {}", signal,)?;
 
     Ok(())
