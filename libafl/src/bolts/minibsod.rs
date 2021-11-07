@@ -119,10 +119,15 @@ fn dump_registers<W: Write>(
 #[allow(clippy::unnecessary_wraps)]
 #[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
 fn dump_registers<W: Write>(
-    _writer: &mut BufWriter<W>,
+    writer: &mut BufWriter<W>,
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     // TODO: Implement dump registers
+    writeln!(
+        writer,
+        "< Dumping registers is not yet supported on platform {:?}. Please add it to `minibsod.rs` >",
+        std::env::consts::OS
+    )?;
     Ok(())
 }
 
@@ -178,6 +183,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
