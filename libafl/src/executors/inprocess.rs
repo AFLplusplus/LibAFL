@@ -482,7 +482,7 @@ mod unix_signal_handler {
         unix_remove_timeout();
 
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-        let _context = *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
+        let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
             as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]

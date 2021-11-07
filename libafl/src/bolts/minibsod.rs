@@ -9,7 +9,7 @@ use crate::bolts::os::unix_signals::Signal;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
-    ucontext: ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     use libc::{
         REG_EFL, REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15, REG_R8, REG_R9, REG_RAX,
@@ -46,7 +46,7 @@ fn dump_registers<W: Write>(
 ))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
-    ucontext: ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     for reg in 0..31 {
         write!(
@@ -66,7 +66,7 @@ fn dump_registers<W: Write>(
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
-    ucontext: ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     let mcontext = unsafe { *ucontext.uc_mcontext };
     for reg in 0..29 {
@@ -90,7 +90,7 @@ fn dump_registers<W: Write>(
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
     _writer: &mut BufWriter<W>,
-    _ucontext: ucontext_t,
+    _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     Ok(())
 }
@@ -99,7 +99,7 @@ fn dump_registers<W: Write>(
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    ucontext: ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     writeln!(
         writer,
@@ -119,7 +119,7 @@ fn write_crash<W: Write>(
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    ucontext: ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     writeln!(
         writer,
@@ -134,7 +134,7 @@ fn write_crash<W: Write>(
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    ucontext: ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     let mcontext = unsafe { *ucontext.uc_mcontext };
     writeln!(
@@ -150,7 +150,7 @@ fn write_crash<W: Write>(
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    _ucontext: ucontext_t,
+    _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     writeln!(writer, "Received signal {}", signal,)?;
 
@@ -163,7 +163,7 @@ pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
     _siginfo: siginfo_t,
-    ucontext: ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     writeln!(writer, "{:━^100}", " CRASH ")?;
     write_crash(writer, signal, ucontext)?;
