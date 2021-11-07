@@ -53,12 +53,12 @@ fn dump_registers<W: Write>(
             writer,
             "x{:02}: 0x{:016x} ",
             reg, ucontext.uc_mcontext.regs[reg as usize]
-        );
+        )?;
         if reg % 4 == 3 {
-            writeln!(writer, "");
+            writeln!(writer)?;
         }
     }
-    writeln!(writer, "pc : 0x{:016x} ", ucontext.uc_mcontext.pc);
+    writeln!(writer, "pc : 0x{:016x} ", ucontext.uc_mcontext.pc)?;
 
     Ok(())
 }
@@ -76,7 +76,7 @@ fn dump_registers<W: Write>(
             reg, mcontext.__ss.__x[reg as usize]
         );
         if reg % 4 == 3 {
-            writeln!(writer, "");
+            writeln!(writer);
         }
     }
     write!(writer, "fp: 0x{:016x} ", mcontext.__ss.__fp);
