@@ -1,5 +1,7 @@
 //! Implements a mini-bsod generator
 //! It dumps all important registers and prints a stacktrace.
+//! You may use the [`crate::bolts::os::unix_signals::ucontext`]
+//! function to get a [`ucontext_t`].
 
 use libc::siginfo_t;
 use std::io::{BufWriter, Write};
