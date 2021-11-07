@@ -177,7 +177,6 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
 pub fn generate_minibsod<W: Write>(
