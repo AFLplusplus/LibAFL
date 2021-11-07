@@ -1073,8 +1073,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
     > {
         // We only care for compare instrunctions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
-            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cls"
-            | "cbz" | "tbz" | "tbnz" => (),
+            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
+            | "cbnz" | "tbz" | "tbnz" => (),
             _ => return Err(()),
         }
         let mut operands = self
@@ -1085,20 +1085,22 @@ impl<'a> FridaInstrumentationHelper<'a> {
             .operands();
 
         // cbz - 1 operand, tbz - 3 operands
-        let special_case =
-            ["cbz", "cbnz", "tbz", "tbnz", "subs", "adds"].contains(&instr.mnemonic().unwrap());
+        let special_case = [
+            "cbz", "cbnz", "tbz", "tbnz", "subs", "adds", "ands", "sbcs", "bics",
+        ]
+        .contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 && !special_case {
             return Err(());
         }
 
-        // handle special "subs"&&"adds" case which have 3 operands, but the 1st(dest) is not important to us
-        if vec!["subs", "adds"].contains(instr.mnemonic().unwrap()) {
+        // handle special opcodes case which have 3 operands, but the 1st(dest) is not important to us
+        if vec!["subs", "adds", "ands", "sbcs", "bics"].contains(&instr.mnemonic().unwrap()) {
             //remove the dest operand from the list
             operands.remove(0);
         }
 
         // cbz marked as special since there is only 1 operand
-        let special_case = match (instr.mnemonic().unwrap()) {
+        let special_case = match instr.mnemonic().unwrap() {
             "cbz" | "cbnz" => true,
             _ => false,
         };
