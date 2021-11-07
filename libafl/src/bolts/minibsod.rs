@@ -187,8 +187,12 @@ fn write_crash<W: Write>(
 
     writeln!(
         writer,
-        "Received signal {} at 0x{:016x}, fault address: 0x{:016x}, trapno: {}",
-        signal, mcontext.__ss.__rip, mcontext.__es.__faultvaddr, mcontext.__es.__trapno
+        "Received signal {} at 0x{:016x}, fault address: 0x{:016x}, trapno: 0x{:x}, err: 0x{:x}",
+        signal,
+        mcontext.__ss.__rip,
+        mcontext.__es.__faultvaddr,
+        mcontext.__es.__trapno,
+        mcontext.__es.__err
     )?;
 
     Ok(())
@@ -200,6 +204,7 @@ fn write_crash<W: Write>(
     signal: Signal,
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
+    // TODO add fault addr for other platforms.
     writeln!(writer, "Received signal {}", signal,)?;
 
     Ok(())
