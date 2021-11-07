@@ -64,6 +64,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
+#[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "rax",
     "rbx",
@@ -86,7 +87,7 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "actual rip",
 ];
 
-#[cfg(tareget_arch = "aarch64")]
+#[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 
 /// The frida address sanitizer runtime, providing address sanitization.
@@ -1959,7 +1960,7 @@ impl AsanRuntime {
                 3,
             )
             .unwrap();
-        let instructions = instructions.iter().collect::<Vec<Insn>>();
+        let instructions = instructions.iter().collect::<Vec<&Insn>>();
         let mut insn = instructions.first().unwrap();
         if insn.mnemonic().unwrap() == "msr" && insn.op_str().unwrap() == "nzcv, x0" {
             insn = instructions.get(2).unwrap();

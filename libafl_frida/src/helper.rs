@@ -836,6 +836,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         ));
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[inline]
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::too_many_arguments)]
