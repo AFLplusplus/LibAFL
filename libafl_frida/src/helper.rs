@@ -67,7 +67,7 @@ enum SpecialCmpLogCase {
     Tbnz,
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
@@ -1420,8 +1420,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         }
 
         // handle special opcodes case which have 3 operands, but the 1st(dest) is not important to us
-        if vec!["subs", "adds", "ands", "sbcs", "bics", "adcs"].contains(&instr.mnemonic().unwrap())
-        {
+        if ["subs", "adds", "ands", "sbcs", "bics", "adcs"].contains(&instr.mnemonic().unwrap()) {
             //remove the dest operand from the list
             operands.remove(0);
         }
