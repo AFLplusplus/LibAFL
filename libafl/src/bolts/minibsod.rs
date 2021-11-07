@@ -92,7 +92,16 @@ fn dump_registers<W: Write>(
     _writer: &mut BufWriter<W>,
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    Ok(())
+    todo!("implement dump registers");
+}
+
+#[allow(clippy::unnecessary_wraps)]
+#[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+fn dump_registers<W: Write>(
+    _writer: &mut BufWriter<W>,
+    _ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    todo!("implement dump registers");
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -156,6 +165,18 @@ fn write_crash<W: Write>(
 
     Ok(())
 }
+
+#[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    _ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(writer, "Received signal {}", signal,)?;
+
+    Ok(())
+}
+
 
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
