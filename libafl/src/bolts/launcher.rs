@@ -129,7 +129,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_millis((index * 100) as u64));
+                        std::thread::sleep(std::time::Duration::from_millis(index * 100));
 
                         #[cfg(feature = "std")]
                         if let Some(filename) = self.stdout_file {
