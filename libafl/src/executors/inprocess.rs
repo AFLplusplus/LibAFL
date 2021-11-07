@@ -515,7 +515,7 @@ mod unix_signal_handler {
                     writer.flush().unwrap();
                 }
             }
-            panic!("COREDUMPME!");
+
             #[cfg(feature = "std")]
             {
                 println!("Type QUIT to restart the child");

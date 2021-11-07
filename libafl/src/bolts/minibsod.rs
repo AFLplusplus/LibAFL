@@ -86,6 +86,14 @@ fn dump_registers<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
+fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    Ok(())
+}
+
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
@@ -133,6 +141,18 @@ fn write_crash<W: Write>(
         "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
         signal, mcontext.__ss.__pc, mcontext.__es.__far
     )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = *ucontext.uc_mcontext;
+    writeln!(writer, "Received signal {}", signal,)?;
 
     Ok(())
 }
