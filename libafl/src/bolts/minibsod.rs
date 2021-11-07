@@ -91,9 +91,7 @@ fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    use libc::__darwin_mcontext64;
-
-    let mcontext: __darwin_mcontext64 = unsafe { *ucontext.uc_mcontext };
+    let mcontext = unsafe { *ucontext.uc_mcontext };
     let ss = mcontext.__ss;
 
     write!(writer, "r8 : {:#016x}, ", ss.__r8)?;
@@ -183,9 +181,15 @@ fn write_crash<W: Write>(
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    _ucontext: &ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    writeln!(writer, "Received signal {}", signal,)?;
+    let mcontext = unsafe { *ucontext.uc_mcontext };
+
+    writeln!(
+        writer,
+        "Received signal {} at 0x{:016x}, fault address: 0x{:016x}, trapno: {}",
+        signal, mcontext.__ss.__rip, mcontext.__es.__faultvaddr, mcontext.__es.__trapno
+    )?;
 
     Ok(())
 }
