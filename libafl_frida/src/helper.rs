@@ -67,6 +67,7 @@ enum SpecialCmpLogCase {
     Tbnz,
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
