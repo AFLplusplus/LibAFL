@@ -9,7 +9,7 @@ pub mod fs;
 #[cfg(feature = "std")]
 pub mod launcher;
 pub mod llmp;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub mod minibsod;
 pub mod os;
 pub mod ownedref;
