@@ -3,11 +3,15 @@ use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
-    mem, ptr,
+    mem,
+    mem::MaybeUninit,
+    ptr,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
 
+#[cfg(feature = "std")]
+use nix::errno::{errno, Errno};
 #[cfg(feature = "std")]
 use std::ffi::CString;
 
@@ -244,14 +248,18 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
 /// not available on `MacOS` in the `libc` crate.
 #[cfg(unix)]
 pub fn ucontext() -> Result<ucontext_t, Error> {
-    use std::mem::MaybeUninit;
-
-    use nix::errno::{errno, Errno};
-
     let mut ucontext = unsafe { MaybeUninit::zeroed().assume_init() };
     if unsafe { getcontext(&mut ucontext) } == 0 {
         Ok(ucontext)
     } else {
+        #[cfg(not(feature = "std"))]
+        unsafe {
+            libc::perror(b"Failed to get ucontext\n".as_ptr() as _)
+        };
+        #[cfg(not(feature = "std"))]
+        return Err(Error::Unknown("Failed to get ucontex".into()));
+
+        #[cfg(feature = "std")]
         Err(Error::Unknown(format!(
             "Failed to get ucontext: {:?}",
             Errno::from_i32(errno())

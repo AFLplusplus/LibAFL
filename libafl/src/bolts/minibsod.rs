@@ -85,7 +85,7 @@ fn dump_registers<W: Write>(
     Ok(())
 }
 
-#[allow(clippy::unnecessary_wraps)]
+#[allow(clippy::unnecessary_wraps, clippy::similar_names)]
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
