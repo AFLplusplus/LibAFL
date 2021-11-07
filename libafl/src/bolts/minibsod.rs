@@ -1,10 +1,9 @@
 //! Implements a mini-bsod generator
 
+use libc::siginfo_t;
 use std::io::{BufWriter, Write};
 
-use libc::{siginfo_t, ucontext_t};
-
-use crate::bolts::os::unix_signals::Signal;
+use crate::bolts::os::unix_signals::{ucontext_t, Signal};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
@@ -86,22 +85,50 @@ fn dump_registers<W: Write>(
     Ok(())
 }
 
-#[allow(clippy::unnecessary_wraps)]
+#[allow(clippy::unnecessary_wraps, clippy::similar_names)]
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
 fn dump_registers<W: Write>(
-    _writer: &mut BufWriter<W>,
-    _ucontext: &ucontext_t,
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    todo!("implement dump registers");
+    let mcontext = unsafe { *ucontext.uc_mcontext };
+    let ss = mcontext.__ss;
+
+    write!(writer, "r8 : {:#016x}, ", ss.__r8)?;
+    write!(writer, "r9 : {:#016x}, ", ss.__r9)?;
+    write!(writer, "r10: {:#016x}, ", ss.__r10)?;
+    writeln!(writer, "r11: {:#016x}, ", ss.__r11)?;
+    write!(writer, "r12: {:#016x}, ", ss.__r12)?;
+    write!(writer, "r13: {:#016x}, ", ss.__r13)?;
+    write!(writer, "r14: {:#016x}, ", ss.__r14)?;
+    writeln!(writer, "r15: {:#016x}, ", ss.__r15)?;
+    write!(writer, "rdi: {:#016x}, ", ss.__rdi)?;
+    write!(writer, "rsi: {:#016x}, ", ss.__rsi)?;
+    write!(writer, "rbp: {:#016x}, ", ss.__rbp)?;
+    writeln!(writer, "rbx: {:#016x}, ", ss.__rbx)?;
+    write!(writer, "rdx: {:#016x}, ", ss.__rdx)?;
+    write!(writer, "rax: {:#016x}, ", ss.__rax)?;
+    write!(writer, "rcx: {:#016x}, ", ss.__rcx)?;
+    writeln!(writer, "rsp: {:#016x}, ", ss.__rsp)?;
+    write!(writer, "rip: {:#016x}, ", ss.__rip)?;
+    writeln!(writer, "efl: {:#016x}, ", ss.__rflags)?;
+
+    Ok(())
 }
 
 #[allow(clippy::unnecessary_wraps)]
 #[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
 fn dump_registers<W: Write>(
-    _writer: &mut BufWriter<W>,
+    writer: &mut BufWriter<W>,
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    todo!("implement dump registers");
+    // TODO: Implement dump registers
+    writeln!(
+        writer,
+        "< Dumping registers is not yet supported on platform {:?}. Please add it to `minibsod.rs` >",
+        std::env::consts::OS
+    )?;
+    Ok(())
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -156,12 +183,23 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    _ucontext: &ucontext_t,
+    ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    writeln!(writer, "Received signal {}", signal,)?;
+    let mcontext = unsafe { *ucontext.uc_mcontext };
+
+    writeln!(
+        writer,
+        "Received signal {} at 0x{:016x}, fault address: 0x{:016x}, trapno: 0x{:x}, err: 0x{:x}",
+        signal,
+        mcontext.__ss.__rip,
+        mcontext.__es.__faultvaddr,
+        mcontext.__es.__trapno,
+        mcontext.__es.__err
+    )?;
 
     Ok(())
 }
@@ -172,6 +210,7 @@ fn write_crash<W: Write>(
     signal: Signal,
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
+    // TODO add fault addr for other platforms.
     writeln!(writer, "Received signal {}", signal,)?;
 
     Ok(())
@@ -202,4 +241,19 @@ pub fn generate_minibsod<W: Write>(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::io::{stdout, BufWriter};
+
+    use crate::bolts::{minibsod::dump_registers, os::unix_signals::ucontext};
+
+    #[test]
+    pub fn test_dump_registers() {
+        let ucontext = ucontext().unwrap();
+        let mut writer = BufWriter::new(stdout());
+        dump_registers(&mut writer, &ucontext).unwrap();
+    }
 }
