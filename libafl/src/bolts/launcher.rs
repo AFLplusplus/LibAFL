@@ -112,8 +112,10 @@ where
         println!("spawning on cores: {:?}", self.cores);
 
         // Spawn clients
-        for (index, (id, bind_to)) in core_ids.iter().enumerate().take(num_cores).enumerate() {
+        let mut index = 0;
+        for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
             if self.cores.iter().any(|&x| x == id) {
+                index += 1;
                 self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
@@ -127,7 +129,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_secs((index + 1) as u64));
+                        std::thread::sleep(std::time::Duration::from_millis((index * 100) as u64));
 
                         #[cfg(feature = "std")]
                         if let Some(filename) = self.stdout_file {
