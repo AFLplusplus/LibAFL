@@ -316,10 +316,10 @@ pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
 mod unix_signal_handler {
     use alloc::vec::Vec;
     use core::{mem::transmute, ptr};
-    use std::time::Duration;
     use libc::siginfo_t;
     #[cfg(feature = "std")]
     use std::io::{stdout, Write};
+    use std::time::Duration;
 
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Handler, Signal},
@@ -505,7 +505,13 @@ mod unix_signal_handler {
                 #[cfg(all(feature = "std", unix))]
                 {
                     let mut writer = std::io::BufWriter::new(std::io::stderr());
-                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, &_info, &_context).unwrap();
+                    crate::bolts::minibsod::generate_minibsod(
+                        &mut writer,
+                        signal,
+                        &_info,
+                        &_context,
+                    )
+                    .unwrap();
                     writer.flush().unwrap();
                 }
             }
@@ -537,12 +543,12 @@ mod unix_signal_handler {
             {
                 let mut writer = std::io::BufWriter::new(std::io::stderr());
                 writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
-                crate::bolts::minibsod::generate_minibsod(&mut writer, signal, &_info, &_context).unwrap();
+                crate::bolts::minibsod::generate_minibsod(&mut writer, signal, &_info, &_context)
+                    .unwrap();
                 writer.flush().unwrap();
 
                 std::thread::sleep(Duration::from_secs(30));
             }
-
 
             let interesting = fuzzer
                 .objective_mut()
