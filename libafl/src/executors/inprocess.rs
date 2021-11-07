@@ -319,7 +319,6 @@ mod unix_signal_handler {
     use libc::siginfo_t;
     #[cfg(feature = "std")]
     use std::io::{stdout, Write};
-    use std::time::Duration;
 
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Handler, Signal},
@@ -546,8 +545,6 @@ mod unix_signal_handler {
                 crate::bolts::minibsod::generate_minibsod(&mut writer, signal, &_info, &_context)
                     .unwrap();
                 writer.flush().unwrap();
-
-                std::thread::sleep(Duration::from_secs(30));
             }
 
             let interesting = fuzzer
