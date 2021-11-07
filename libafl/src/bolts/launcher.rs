@@ -112,7 +112,7 @@ where
         println!("spawning on cores: {:?}", self.cores);
 
         // Spawn clients
-        let mut index = 0;
+        let mut index = 0_u64;
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
             if self.cores.iter().any(|&x| x == id) {
                 index += 1;
