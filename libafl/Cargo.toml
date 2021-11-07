@@ -28,7 +28,7 @@ nautilus = ["grammartec", "std", "serde_json/std"]
 # LLMP features
 llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
 llmp_compression = ["miniz_oxide"] # llmp compression using GZip
-llmp_debug = ["backtrace"] # Enables debug output for LLMP
+llmp_debug = [] # Enables debug output for LLMP
 llmp_small_maps = [] # reduces initial map size for llmp
 
 [build-dependencies]
@@ -78,17 +78,12 @@ z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for 
 # AGPL
 grammartec = { git = "https://github.com/andreafioraldi/nautilus", optional = true }
 
-[target.'cfg(target_os = "android")'.dependencies]
-backtrace = { version = "0.3", optional = true, default-features = false, features = ["std", "libbacktrace"] } # for llmp_debug
-
-[target.'cfg(not(target_os = "android"))'.dependencies]
-backtrace = { version = "0.3", optional = true } # for llmp_debug
-
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
 uds = "0.2.3"
 lock_api = "0.4.3"
 regex = "1.4.5"
+backtrace = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 windows = "0.18.0"
