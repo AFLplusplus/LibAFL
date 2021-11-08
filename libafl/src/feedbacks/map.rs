@@ -29,7 +29,11 @@ pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, MapNopFilter, O, Mi
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
 pub type MaxMapPow2Feedback<FT, I, O, S, T> =
-    MapFeedback<FT, I, MapMaxPow2Filter, O, MaxReducer, S, T>;
+    MapFeedback<FT, I, MaxMapPow2Filter, O, MaxReducer, S, T>;
+/// A [`MapFeedback`] that strives to maximize the map contents,
+/// but only, if a value is larger than `pow2` of the previous.
+pub type MaxMapOneOrFilledFeedback<FT, I, O, S, T> =
+    MapFeedback<FT, I, MaxMapOneOrFilledFilter, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
@@ -40,7 +44,7 @@ where
     fn reduce(first: T, second: T) -> T;
 }
 
-/// A [`MaxReducer`] reduces [`Num`] values and returns their maximum.
+/// A [`MaxReducer`] reduces int values and returns their maximum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MaxReducer {}
 
@@ -64,7 +68,7 @@ where
     }
 }
 
-/// A [`MinReducer`] reduces [`Num`] values and returns their minimum.
+/// A [`MinReducer`] reduces int values and returns their minimum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MinReducer {}
 
@@ -130,8 +134,8 @@ fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
 
 /// A filter that only saves values which are at least the next pow2 class
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MapMaxPow2Filter {}
-impl<T> MapFindFilter<T> for MapMaxPow2Filter
+pub struct MaxMapPow2Filter {}
+impl<T> MapFindFilter<T> for MaxMapPow2Filter
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -145,6 +149,19 @@ where
             let pow2 = saturating_next_power_of_two(old.saturating_add(T::one()));
             new >= pow2
         }
+    }
+}
+
+/// A filter that only saves values which are at least the next pow2 class
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MaxMapOneOrFilledFilter {}
+impl<T> MapFindFilter<T> for MaxMapOneOrFilledFilter
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn is_interesting(old: T, new: T) -> bool {
+        (new == T::one() || new == T::one() || new == T::max_value()) && new > old
     }
 }
 
@@ -593,25 +610,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::feedbacks::{MapFindFilter, MapMaxPow2Filter, MapNopFilter};
+    use crate::feedbacks::{MapFindFilter, MapNopFilter, MaxMapPow2Filter};
 
     #[test]
     fn test_map_max_pow2_filter() {
         // sanity check
         assert!(MapNopFilter::is_interesting(0_u8, 0));
 
-        assert!(!MapMaxPow2Filter::is_interesting(0_u8, 0));
-        assert!(MapMaxPow2Filter::is_interesting(0_u8, 1));
-        assert!(!MapMaxPow2Filter::is_interesting(1_u8, 1));
-        assert!(MapMaxPow2Filter::is_interesting(1_u8, 2));
-        assert!(!MapMaxPow2Filter::is_interesting(2_u8, 2));
-        assert!(!MapMaxPow2Filter::is_interesting(2_u8, 3));
-        assert!(MapMaxPow2Filter::is_interesting(2_u8, 4));
-        assert!(!MapMaxPow2Filter::is_interesting(128_u8, 128));
-        assert!(!MapMaxPow2Filter::is_interesting(129_u8, 128));
-        assert!(MapMaxPow2Filter::is_interesting(128_u8, 255));
-        assert!(!MapMaxPow2Filter::is_interesting(255_u8, 128));
-        assert!(MapMaxPow2Filter::is_interesting(254_u8, 255));
-        assert!(!MapMaxPow2Filter::is_interesting(255_u8, 255));
+        assert!(!MaxMapPow2Filter::is_interesting(0_u8, 0));
+        assert!(MaxMapPow2Filter::is_interesting(0_u8, 1));
+        assert!(!MaxMapPow2Filter::is_interesting(1_u8, 1));
+        assert!(MaxMapPow2Filter::is_interesting(1_u8, 2));
+        assert!(!MaxMapPow2Filter::is_interesting(2_u8, 2));
+        assert!(!MaxMapPow2Filter::is_interesting(2_u8, 3));
+        assert!(MaxMapPow2Filter::is_interesting(2_u8, 4));
+        assert!(!MaxMapPow2Filter::is_interesting(128_u8, 128));
+        assert!(!MaxMapPow2Filter::is_interesting(129_u8, 128));
+        assert!(MaxMapPow2Filter::is_interesting(128_u8, 255));
+        assert!(!MaxMapPow2Filter::is_interesting(255_u8, 128));
+        assert!(MaxMapPow2Filter::is_interesting(254_u8, 255));
+        assert!(!MaxMapPow2Filter::is_interesting(255_u8, 255));
     }
 }
