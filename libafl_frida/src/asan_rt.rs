@@ -7,7 +7,7 @@ this helps finding mem errors early.
 */
 
 use frida_gum::NativePointer;
-use frida_gum::RangeDetails;
+use frida_gum::{ModuleDetails, RangeDetails};
 use hashbrown::HashMap;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -114,6 +114,7 @@ pub struct AsanRuntime {
     stalked_addresses: HashMap<usize, usize>,
     options: FridaOptions,
     module_map: Option<ModuleMap>,
+    suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
 }
 
@@ -140,6 +141,7 @@ impl AsanRuntime {
             stalked_addresses: HashMap::new(),
             options,
             module_map: None,
+            suppressed_addresses: Vec::new(),
             shadow_check_func: None,
         }
     }
@@ -157,6 +159,13 @@ impl AsanRuntime {
         self.unpoison_all_existing_memory();
 
         self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
+        if let Some(suppressed_specifiers) = self.options.dont_instrument_locations() {
+            for (module_name, offset) in suppressed_specifiers {
+                let module_details = ModuleDetails::with_name(module_name).unwrap();
+                let lib_start = module_details.range().base_address().0 as usize;
+                self.suppressed_addresses.push(lib_start + offset);
+            }
+        }
 
         self.hook_functions(_gum);
 
@@ -1466,7 +1475,8 @@ impl AsanRuntime {
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        if this.module_map.as_ref().unwrap().find(this.real_address_for_stalked(invocation.return_addr() as usize) as u64).is_some() {
+                        let real_address = this.real_address_for_stalked(invocation.return_addr() as usize);
+                        if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
                             this.[<hook_ $name>]($($param),*)
                         } else {
                             $name($($param),*)
