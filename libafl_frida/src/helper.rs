@@ -25,6 +25,11 @@ use capstone::{
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
+#[cfg(unix)]
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+#[cfg(unix)]
+use std::{ffi::c_void, ptr::write_volatile};
+
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
@@ -470,6 +475,42 @@ impl<'a> FridaInstrumentationHelper<'a> {
         let regint: u16 = reg.0;
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
+
+    fn generate_maybe_log_blob(&mut self) -> Box<[u8]> {
+        macro_rules! maybe_log{
+            ($ops:ident) => {dynasm!($ops
+                ;   .arch x64
+                ;   pushfq
+                ;   push rax
+                ;   push rcx
+                ;   push rdx
+                ;   lea rax, [>map_addr]
+                ;   mov rax, QWORD [rax]
+                ;   lea rcx, [>previous_loc]
+                ;   mov rdx, QWORD [rcx]
+                ;   mov rdx, QWORD [rdx]
+                ;   xor rdx, rdi
+                ;   inc BYTE [rax + rdx]
+                ;   shr rdi, 1
+                ;   mov rax, QWORD [rcx]
+                ;   mov QWORD [rax], rdi
+                ;   pop rdx
+                ;   pop rcx
+                ;   pop rax
+                ;   popfq
+                ;   ret
+                ;map_addr:
+                ;.qword &mut self.map as *mut _ as *mut c_void as i64
+                ;previous_loc:
+                ;.qword 0
+            );};
+        }
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        maybe_log!(ops);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice() //????
+    }
+
 
     // frida registers: https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html
     // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
