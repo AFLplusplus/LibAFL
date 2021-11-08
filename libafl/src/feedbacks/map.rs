@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 use core::marker::PhantomData;
-use num::Integer;
+use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -22,26 +22,37 @@ use crate::{
 };
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, MapNopFilter, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, O, MinReducer, S, T>;
+pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, MapNopFilter, O, MinReducer, S, T>;
 
-/// A Reducer function is used to aggregate values for the novelty search
+/// A [`MapFeedback`] that strives to maximize the map contents,
+/// but only, if a value is larger than `pow2` of the previous.
+pub type MaxMapPow2Feedback<FT, I, O, S, T> =
+    MapFeedback<FT, I, MapMaxPow2Filter, O, MaxReducer, S, T>;
+
+/// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Reduce two values to one value, with the current [`Reducer`].
     fn reduce(first: T, second: T) -> T;
 }
 
-/// A [`MaxReducer`] reduces [`Integer`] values and returns their maximum.
+/// A [`MaxReducer`] reduces [`Num`] values and returns their maximum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MaxReducer {}
 
 impl<T> Reducer<T> for MaxReducer
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -53,13 +64,19 @@ where
     }
 }
 
-/// A [`MinReducer`] reduces [`Integer`] values and returns their minimum.
+/// A [`MinReducer`] reduces [`Num`] values and returns their minimum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MinReducer {}
 
 impl<T> Reducer<T> for MinReducer
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -67,6 +84,66 @@ where
             first
         } else {
             second
+        }
+    }
+}
+
+/// A `MapFindFilter` function gets called after the `MapFeedback` found a new entry.
+pub trait MapFindFilter<T>: Serialize + serde::de::DeserializeOwned + 'static
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// If a new value in the [`MapFeedback`] was found,
+    /// this filter can decide if the result is intersting or not.
+    /// This way, you can restrict the finds further.
+    fn is_interesting(old: T, new: T) -> bool;
+}
+
+/// A filter that never filters out any finds.
+/// The default
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MapNopFilter {}
+
+impl<T> MapFindFilter<T> for MapNopFilter
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn is_interesting(_old: T, _new: T) -> bool {
+        true
+    }
+}
+
+/// Calculate the next power of two
+/// See <https://stackoverflow.com/a/66253960/1345238>
+/// Will saturate at the max value.
+/// In case of negative values, returns 1.
+#[inline]
+fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
+    if n <= T::one() {
+        T::one()
+    } else {
+        (T::max_value() >> (n - T::one()).leading_zeros().try_into().unwrap())
+            .saturating_add(T::one())
+    }
+}
+
+/// A filter that only saves values which are at least the next pow2 class
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MapMaxPow2Filter {}
+impl<T> MapFindFilter<T> for MapMaxPow2Filter
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn is_interesting(old: T, new: T) -> bool {
+        // We use a trait so we build our numbers from scratch here.
+        // This way it works with Nums of any size.
+        if new <= old {
+            false
+        } else {
+            let pow2 = saturating_next_power_of_two(old.saturating_add(T::one()));
+            new >= pow2
         }
     }
 }
@@ -136,7 +213,7 @@ impl MapNoveltiesMetadata {
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
@@ -146,7 +223,7 @@ where
 
 impl<T> FeedbackState for MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn reset(&mut self) -> Result<(), Error> {
         self.history_map.iter_mut().for_each(|x| *x = T::default());
@@ -156,7 +233,7 @@ where
 
 impl<T> Named for MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -166,7 +243,7 @@ where
 
 impl<T> MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Create new `MapFeedbackState`
     #[must_use]
@@ -202,11 +279,12 @@ where
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<FT, I, O, R, S, T>
+pub struct MapFeedback<FT, I, MF, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
+    MF: MapFindFilter<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
 {
@@ -219,14 +297,15 @@ where
     /// Name identifier of the observer
     observer_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(FT, I, S, R, O, T)>,
+    phantom: PhantomData<(FT, I, MF, S, R, O, T)>,
 }
 
-impl<I, FT, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, O, R, S, T>
+impl<FT, I, MF, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, MF, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
     O: MapObserver<T>,
+    MF: MapFindFilter<T>,
     I: Input,
     S: HasFeedbackStates<FT> + HasClientPerfStats,
     FT: FeedbackStatesTuple,
@@ -264,7 +343,7 @@ where
                 let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
-                if history != reduced {
+                if history != reduced && MF::is_interesting(history, reduced) {
                     map_state.history_map[i] = reduced;
                     interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
@@ -276,7 +355,7 @@ where
                 let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
-                if history != reduced {
+                if history != reduced && MF::is_interesting(history, reduced) {
                     map_state.history_map[i] = reduced;
                     interesting = true;
                 }
@@ -330,10 +409,11 @@ where
     }
 }
 
-impl<FT, I, O, R, S, T> Named for MapFeedback<FT, I, O, R, S, T>
+impl<FT, I, MF, O, R, S, T> Named for MapFeedback<FT, I, MF, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     R: Reducer<T>,
+    MF: MapFindFilter<T>,
     O: MapObserver<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
@@ -344,10 +424,17 @@ where
     }
 }
 
-impl<FT, I, O, R, S, T> MapFeedback<FT, I, O, R, S, T>
+impl<FT, I, MF, O, R, S, T> MapFeedback<FT, I, MF, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
     R: Reducer<T>,
+    MF: MapFindFilter<T>,
     O: MapObserver<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
@@ -501,5 +588,30 @@ where
     #[inline]
     fn name(&self) -> &str {
         self.name.as_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::feedbacks::{MapFindFilter, MapMaxPow2Filter, MapNopFilter};
+
+    #[test]
+    fn test_map_max_pow2_filter() {
+        // sanity check
+        assert!(MapNopFilter::is_interesting(0_u8, 0));
+
+        assert!(!MapMaxPow2Filter::is_interesting(0_u8, 0));
+        assert!(MapMaxPow2Filter::is_interesting(0_u8, 1));
+        assert!(!MapMaxPow2Filter::is_interesting(1_u8, 1));
+        assert!(MapMaxPow2Filter::is_interesting(1_u8, 2));
+        assert!(!MapMaxPow2Filter::is_interesting(2_u8, 2));
+        assert!(!MapMaxPow2Filter::is_interesting(2_u8, 3));
+        assert!(MapMaxPow2Filter::is_interesting(2_u8, 4));
+        assert!(!MapMaxPow2Filter::is_interesting(128_u8, 128));
+        assert!(!MapMaxPow2Filter::is_interesting(129_u8, 128));
+        assert!(MapMaxPow2Filter::is_interesting(128_u8, 255));
+        assert!(!MapMaxPow2Filter::is_interesting(255_u8, 128));
+        assert!(MapMaxPow2Filter::is_interesting(254_u8, 255));
+        assert!(!MapMaxPow2Filter::is_interesting(255_u8, 255));
     }
 }

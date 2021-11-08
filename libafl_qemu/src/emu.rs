@@ -6,8 +6,8 @@ use core::{
     mem::{size_of, transmute, MaybeUninit},
     ptr::{copy_nonoverlapping, null},
 };
-use num::Num;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_traits::PrimInt;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 
@@ -357,7 +357,7 @@ pub fn num_regs() -> i32 {
 
 pub fn write_reg<R, T>(reg: R, val: T) -> Result<(), String>
 where
-    T: Num + PartialOrd + Copy,
+    T: PrimInt + PartialOrd + Copy,
     R: Into<i32>,
 {
     let reg = reg.into();
@@ -371,7 +371,7 @@ where
 
 pub fn read_reg<R, T>(reg: R) -> Result<T, String>
 where
-    T: Num + PartialOrd + Copy,
+    T: PrimInt + PartialOrd + Copy,
     R: Into<i32>,
 {
     let reg = reg.into();
