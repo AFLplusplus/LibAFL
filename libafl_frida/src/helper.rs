@@ -25,9 +25,6 @@ use capstone::{
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
-#[cfg(unix)]
-use std::{ffi::c_void, ptr::write_volatile};
-
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
@@ -197,37 +194,6 @@ pub fn get_module_size(module_name: &str) -> usize {
 
     code_size
 }
-
-/// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
-/// every time we need a copy that is within a direct branch of the start of the transformed basic
-/// block.
-#[cfg(target_arch = "aarch64")]
-const MAYBE_LOG_CODE: [u8; 60] = [
-    // __afl_area_ptr[current_pc ^ previous_pc]++;
-    // previous_pc = current_pc >> 1;
-    0xE1, 0x0B, 0xBF, 0xA9, // stp x1, x2, [sp, -0x10]!
-    0xE3, 0x13, 0xBF, 0xA9, // stp x3, x4, [sp, -0x10]!
-    // x0 = current_pc
-    0xa1, 0x01, 0x00, 0x58, // ldr x1, #0x30, =__afl_area_ptr
-    0x82, 0x01, 0x00, 0x58, // ldr x2, #0x38, =&previous_pc
-    0x44, 0x00, 0x40, 0xf9, // ldr x4, [x2] (=previous_pc)
-    // __afl_area_ptr[current_pc ^ previous_pc]++;
-    0x84, 0x00, 0x00, 0xca, // eor x4, x4, x0
-    0x84, 0x3c, 0x40, 0x92, // and x4, x4, 0xffff (=MAP_SIZE - 1)
-    //0x20, 0x13, 0x20, 0xd4,
-    0x23, 0x68, 0x64, 0xf8, // ldr x3, [x1, x4]
-    0x63, 0x04, 0x00, 0x91, // add x3, x3, #1
-    0x23, 0x68, 0x24, 0xf8, // str x3, [x1, x4]
-    // previous_pc = current_pc >> 1;
-    0xe0, 0x07, 0x40, 0x8b, // add x0, xzr, x0, LSR #1
-    0x40, 0x00, 0x00, 0xf9, // str x0, [x2]
-    0xE3, 0x13, 0xc1, 0xA8, // ldp x3, x4, [sp], #0x10
-    0xE1, 0x0B, 0xc1, 0xA8, // ldp x1, x2, [sp], #0x10
-    0xC0, 0x03, 0x5F, 0xD6, // ret
-
-          // &afl_area_ptr
-          // &afl_prev_loc_ptr
-];
 
 #[cfg(target_arch = "aarch64")]
 fn pc(context: &CpuContext) -> usize {

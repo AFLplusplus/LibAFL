@@ -6,11 +6,7 @@ use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 
-use frida_gum::{
-    instruction_writer::InstructionWriter,
-    stalker::{StalkerOutput, Transformer},
-    ModuleDetails, ModuleMap,
-};
+use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
@@ -44,6 +40,42 @@ impl CoverageRuntime {
         self.blob_maybe_log.as_ref().unwrap()
     }
 
+    /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
+    /// every time we need a copy that is within a direct branch of the start of the transformed basic
+    /// block.
+    #[cfg(target_arch = "aarch64")]
+    pub fn generate_maybe_log_blob(&mut self) {
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        dynasm!(ops
+            ;   .arch aarch64
+            ;   stp x1, x2, [sp, -0x10]!
+            ;   stp x3, x4, [sp, -0x10]!
+            ;   ldr x1, >map_addr
+            ;   ldr x2, #0x38
+            ;   ldr x4, [x2]
+            ;   eor x4, x4, x0
+            ;   and x4, x4, 0xffff
+            ;   ldr x3, [x1, x4]
+            ;   add x3, x3, #1
+            ;   str x3, [x1, x4]
+            ;   add x0, xzr, x0, LSR #1
+            ;   str x0, [x2]
+            ;   ldp x3, x4, [sp], #0x10
+            ;   ldp x1, x2, [sp], #0x10
+            ;   ret
+            ;map_addr:
+            ;.qword &mut self.map as *mut _ as *mut c_void as i64
+            ;previous_loc:
+            ;.qword 0
+        );
+        let ops_vec = ops.finalize().unwrap();
+        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice())
+    }
+
+    /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
+    /// every time we need a copy that is within a direct branch of the start of the transformed basic
+    /// block.
+    #[cfg(target_arch = "x86_64")]
     pub fn generate_maybe_log_blob(&mut self) {
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         dynasm!(ops
