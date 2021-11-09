@@ -19,7 +19,7 @@ pub struct CoverageRuntime {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
     current_log_impl: u64,
-    maybe_log_blob: Option<Box<[u8]>>,
+    blob_maybe_log: Option<Box<[u8]>>,
 }
 
 impl CoverageRuntime {
@@ -28,49 +28,52 @@ impl CoverageRuntime {
             map: [0u8; MAP_SIZE],
             previous_pc: [0u64; 1],
             current_log_impl: 0,
-            maybe_log_blob: None,
+            blob_maybe_log: None,
         }
     }
 
-    pub fn init() {}
+    pub fn init(&mut self) {
+        self.generate_maybe_log_blob();
+    }
 
     pub fn map_ptr(&mut self) -> *mut u8 {
         self.map.as_mut_ptr()
     }
 
-    pub fn generate_maybe_log_blob(&mut self) -> Box<[u8]> {
-        macro_rules! maybe_log{
-            ($ops:ident) => {dynasm!($ops
-                ;   .arch x64
-                ;   pushfq
-                ;   push rax
-                ;   push rcx
-                ;   push rdx
-                ;   lea rax, [>map_addr]
-                ;   mov rax, QWORD [rax]
-                ;   lea rcx, [>previous_loc]
-                ;   mov rdx, QWORD [rcx]
-                ;   mov rdx, QWORD [rdx]
-                ;   xor rdx, rdi
-                ;   inc BYTE [rax + rdx]
-                ;   shr rdi, 1
-                ;   mov rax, QWORD [rcx]
-                ;   mov QWORD [rax], rdi
-                ;   pop rdx
-                ;   pop rcx
-                ;   pop rax
-                ;   popfq
-                ;   ret
-                ;map_addr:
-                ;.qword &mut self.map as *mut _ as *mut c_void as i64
-                ;previous_loc:
-                ;.qword 0
-            );};
-        }
+    pub fn blob_maybe_log(&self) -> &[u8] {
+        self.blob_maybe_log.as_ref().unwrap()
+    }
+
+    pub fn generate_maybe_log_blob(&mut self) {
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
-        maybe_log!(ops);
+        dynasm!(ops
+            ;   .arch x64
+            ;   pushfq
+            ;   push rax
+            ;   push rcx
+            ;   push rdx
+            ;   lea rax, [>map_addr]
+            ;   mov rax, QWORD [rax]
+            ;   lea rcx, [>previous_loc]
+            ;   mov rdx, QWORD [rcx]
+            ;   mov rdx, QWORD [rdx]
+            ;   xor rdx, rdi
+            ;   inc BYTE [rax + rdx]
+            ;   shr rdi, 1
+            ;   mov rax, QWORD [rcx]
+            ;   mov QWORD [rax], rdi
+            ;   pop rdx
+            ;   pop rcx
+            ;   pop rax
+            ;   popfq
+            ;   ret
+            ;map_addr:
+            ;.qword &mut self.map as *mut _ as *mut c_void as i64
+            ;previous_loc:
+            ;.qword 0
+        );
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice() //????
+        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice())
     }
 
     #[inline]
@@ -90,11 +93,9 @@ impl CoverageRuntime {
             writer.put_b_label(after_log_impl);
 
             self.current_log_impl = writer.pc();
-            writer.put_bytes(&self.maybe_log_blob);
+            writer.put_bytes(self.blob_maybe_log());
             let prev_loc_pointer = self.previous_pc.as_ptr() as usize;
-            let map_pointer = self.map.as_ptr() as usize;
 
-            writer.put_bytes(&map_pointer.to_ne_bytes());
             writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
 
             writer.put_label(after_log_impl);

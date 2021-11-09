@@ -201,33 +201,6 @@ pub fn get_module_size(module_name: &str) -> usize {
 /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
 /// every time we need a copy that is within a direct branch of the start of the transformed basic
 /// block.
-#[cfg(target_arch = "x86_64")]
-const MAYBE_LOG_CODE: [u8; 47] = [
-    0x9c, /* pushfq */
-    0x50, /* push rax */
-    0x51, /* push rcx */
-    0x52, /* push rdx */
-    0x48, 0x8d, 0x05, 0x24, 0x00, 0x00, 0x00, /* lea rax, sym._afl_area_ptr_ptr */
-    0x48, 0x8b, 0x00, /* mov rax, qword [rax] */
-    0x48, 0x8d, 0x0d, 0x22, 0x00, 0x00, 0x00, /* lea rcx, sym.previous_pc     */
-    0x48, 0x8b, 0x11, /* mov rdx, qword [rcx] */
-    0x48, 0x8b, 0x12, /* mov rdx, qword [rdx] */
-    0x48, 0x31, 0xfa, /* xor rdx, rdi */
-    0xfe, 0x04, 0x10, /* inc byte [rax + rdx] */
-    0x48, 0xd1, 0xef, /* shr rdi, 1 */
-    0x48, 0x8b, 0x01, /* mov rax, qword [rcx] */
-    0x48, 0x89, 0x38, /* mov qword [rax], rdi */
-    0x5a, /* pop rdx */
-    0x59, /* pop rcx */
-    0x58, /* pop rax */
-    0x9d, /* popfq */
-    0xc3, /* ret */
-
-          /* Read-only data goes here: */
-          /* uint8_t* afl_area_ptr */
-          /* uint64_t* afl_prev_loc_ptr */
-];
-
 #[cfg(target_arch = "aarch64")]
 const MAYBE_LOG_CODE: [u8; 60] = [
     // __afl_area_ptr[current_pc ^ previous_pc]++;
@@ -354,6 +327,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if helper.options().drcov_enabled() {
                 std::fs::create_dir_all("./coverage")
                     .expect("failed to create directory for coverage files");
+            }
+
+            if helper.options().coverage_enabled() {
+                helper.coverage_rt.init();
             }
 
             let transformer = Transformer::from_callback(gum, |basic_block, output| {
