@@ -156,7 +156,7 @@ where
     ) -> Self {
         let mut stalker = Stalker::new(gum);
 
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
+        #[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
         for range in helper.ranges().gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(
