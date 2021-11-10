@@ -18,7 +18,14 @@ pub struct CoverageRuntime {
     blob_maybe_log: Option<Box<[u8]>>,
 }
 
+impl Default for CoverageRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CoverageRuntime {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: [0u8; MAP_SIZE],
@@ -35,7 +42,7 @@ impl CoverageRuntime {
     pub fn map_ptr(&mut self) -> *mut u8 {
         self.map.as_mut_ptr()
     }
-
+    #[must_use]
     pub fn blob_maybe_log(&self) -> &[u8] {
         self.blob_maybe_log.as_ref().unwrap()
     }
@@ -105,7 +112,7 @@ impl CoverageRuntime {
             ;.qword 0
         );
         let ops_vec = ops.finalize().unwrap();
-        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice())
+        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
     #[inline]
