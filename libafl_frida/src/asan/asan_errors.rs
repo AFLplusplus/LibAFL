@@ -21,9 +21,9 @@ use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
 #[cfg(target_arch = "x86_64")]
-use crate::asan_rt::ASAN_SAVE_REGISTER_NAMES;
+use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 
-use crate::{alloc::AllocationMetadata, asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
+use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {

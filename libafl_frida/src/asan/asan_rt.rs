@@ -42,7 +42,7 @@ use std::{ffi::c_void, ptr::write_volatile};
 
 use crate::{
     alloc::Allocator,
-    asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    asan::asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     FridaOptions,
 };
 
