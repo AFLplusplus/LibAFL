@@ -6,10 +6,12 @@ It can report coverage and, on supported architecutres, even reports memory acce
 /// The frida-asan allocator
 #[cfg(unix)]
 pub mod alloc;
-
+/// Handling of ASAN errors
+#[cfg(unix)]
+pub mod asan_errors;
 /// The frida address sanitizer runtime
 #[cfg(unix)]
-pub mod asan;
+pub mod asan_rt;
 
 pub mod coverage_rt;
 

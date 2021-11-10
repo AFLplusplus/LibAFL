@@ -57,7 +57,7 @@ use libafl_frida::{
 };
 
 #[cfg(unix)]
-use libafl_frida::asan::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
+use libafl_frida::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 

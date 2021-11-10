@@ -46,7 +46,7 @@ use rangemap::RangeMap;
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 #[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
+use crate::{asan_rt::AsanRuntime, FridaOptions};
 
 #[cfg(windows)]
 use crate::FridaOptions;
