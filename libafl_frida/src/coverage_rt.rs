@@ -61,7 +61,7 @@ impl CoverageRuntime {
             ;   ldr x2, >previous_loc
             ;   ldr x4, [x2]
             ;   eor x4, x4, x0
-            ;   and x4, x4, MAP_SIZE - 1 as u64
+            ;   and x4, x4, (MAP_SIZE - 1) as u64
             ;   ldr x3, [x1, x4]
             ;   add x3, x3, #1
             ;   str x3, [x1, x4]
