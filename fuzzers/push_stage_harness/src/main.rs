@@ -17,11 +17,11 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     stages::push::StdMutationalPushStage,
     state::{HasCorpus, StdState},
-    monitors::SimpleMonitor,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation

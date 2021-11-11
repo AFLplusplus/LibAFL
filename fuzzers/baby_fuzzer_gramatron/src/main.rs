@@ -17,6 +17,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{Automaton, GramatronGenerator},
     inputs::GramatronInput,
+    monitors::SimpleMonitor,
     mutators::{
         GramatronRandomMutator, GramatronRecursionMutator, GramatronSpliceMutator,
         StdScheduledMutator,
@@ -24,7 +25,6 @@ use libafl::{
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
-    monitors::SimpleMonitor,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation

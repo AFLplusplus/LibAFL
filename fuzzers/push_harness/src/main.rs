@@ -10,11 +10,11 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
+    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
-    monitors::SimpleMonitor,
 };
 use std::path::PathBuf;
 

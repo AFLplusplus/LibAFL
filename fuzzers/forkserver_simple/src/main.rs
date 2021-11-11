@@ -16,11 +16,11 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
+    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    monitors::SimpleMonitor,
 };
 use std::path::PathBuf;
 

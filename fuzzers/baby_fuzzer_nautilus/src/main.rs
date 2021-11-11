@@ -15,13 +15,13 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::NautilusInput,
+    monitors::SimpleMonitor,
     mutators::{
         NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, StdScheduledMutator,
     },
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasMetadata, StdState},
-    monitors::SimpleMonitor,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation

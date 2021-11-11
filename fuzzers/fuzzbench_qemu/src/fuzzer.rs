@@ -29,6 +29,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::{
         scheduled::{havoc_mutations, StdScheduledMutator},
         tokens_mutations, I2SRandReplace, Tokens,
@@ -36,7 +37,6 @@ use libafl::{
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    monitors::SimpleMonitor,
     Error,
 };
 use libafl_qemu::{
@@ -215,7 +215,8 @@ fn fuzz(
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider) {
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,
         Err(err) => match err {

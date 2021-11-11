@@ -12,11 +12,11 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{EncodedInput, InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
+    monitors::SimpleMonitor,
     mutators::{encoded_mutations::encoded_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
-    monitors::SimpleMonitor,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
