@@ -18,41 +18,35 @@ use libafl::{
     },
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{
-        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
-        ShadowExecutor,
+        inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
     },
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes},
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     stats::MultiStats,
     Error,
 };
 
-use frida_gum::{
-    stalker::{NoneEventSink, Stalker},
-    Gum, MemoryRange, NativePointer,
-};
+use frida_gum::Gum;
 
 use std::{
     env,
-    ffi::c_void,
-    marker::PhantomData,
     net::SocketAddr,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use libafl_frida::{
     helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
+    executor::FridaInProcessExecutor,
     FridaOptions,
 };
 
@@ -60,120 +54,6 @@ use libafl_frida::{
 use libafl_frida::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
-
-struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT, S>>,
-    /// Frida's dynamic rewriting engine
-    stalker: Stalker<'a>,
-    /// User provided callback for instrumentation
-    helper: &'c mut FH,
-    followed: bool,
-    _phantom: PhantomData<&'b u8>,
-}
-
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> Executor<EM, I, S, Z>
-    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    /// Instruct the target about the input and run
-    #[inline]
-    fn run_target(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error> {
-        self.helper.pre_exec(input);
-        if self.helper.stalker_enabled() {
-            if self.followed {
-                self.stalker.activate(NativePointer(
-                    self.base.inner().harness_mut() as *mut _ as *mut c_void
-                ))
-            } else {
-                self.followed = true;
-                self.stalker
-                    .follow_me::<NoneEventSink>(self.helper.transformer(), None);
-            }
-        }
-        let res = self.base.run_target(fuzzer, state, mgr, input);
-        if self.helper.stalker_enabled() {
-            self.stalker.deactivate();
-        }
-        #[cfg(unix)]
-        if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
-            println!("Crashing target as it had ASAN errors");
-            unsafe {
-                libc::raise(libc::SIGABRT);
-            }
-        }
-        self.helper.post_exec(input);
-        res
-    }
-}
-
-impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<I, OT, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        self.base.observers()
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        self.base.observers_mut()
-    }
-}
-
-impl<'a, 'b, 'c, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    pub fn new(
-        gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
-        helper: &'c mut FH,
-        timeout: Duration,
-    ) -> Self {
-        let mut stalker = Stalker::new(gum);
-
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
-        for range in helper.ranges().gaps(&(0..usize::MAX)) {
-            println!("excluding range: {:x}-{:x}", range.start, range.end);
-            stalker.exclude(&MemoryRange::new(
-                NativePointer(range.start as *mut c_void),
-                range.end - range.start,
-            ));
-        }
-
-        Self {
-            base: TimeoutExecutor::new(base, timeout),
-            stalker,
-            helper,
-            followed: false,
-            _phantom: PhantomData,
-        }
-    }
-}
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
@@ -402,7 +282,6 @@ unsafe fn fuzz(
                 &mut mgr,
             )?,
             &mut frida_helper,
-            Duration::new(30, 0),
         );
 
         #[cfg(windows)]
