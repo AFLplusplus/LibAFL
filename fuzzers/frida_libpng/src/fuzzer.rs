@@ -17,9 +17,7 @@ use libafl::{
         IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
     events::{llmp::LlmpRestartingEventManager, EventConfig},
-    executors::{
-        inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
-    },
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -45,8 +43,8 @@ use std::{
 };
 
 use libafl_frida::{
-    helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     executor::FridaInProcessExecutor,
+    helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
     FridaOptions,
 };
 
