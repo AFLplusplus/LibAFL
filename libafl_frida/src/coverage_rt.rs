@@ -39,7 +39,7 @@ impl CoverageRuntime {
         self.generate_maybe_log_blob();
     }
 
-    pub fn map_ptr(&mut self) -> *mut u8 {
+    pub fn map_mut_ptr(&mut self) -> *mut u8 {
         self.map.as_mut_ptr()
     }
     #[must_use]
@@ -58,10 +58,10 @@ impl CoverageRuntime {
             ;   stp x1, x2, [sp, -0x10]!
             ;   stp x3, x4, [sp, -0x10]!
             ;   ldr x1, >map_addr
-            ;   ldr x2, #0x38
+            ;   ldr x2, >previous_loc
             ;   ldr x4, [x2]
             ;   eor x4, x4, x0
-            ;   and x4, x4, 0xffff
+            ;   and x4, x4, MAP_SIZE - 1 as u64
             ;   ldr x3, [x1, x4]
             ;   add x3, x3, #1
             ;   str x3, [x1, x4]
