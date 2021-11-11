@@ -54,6 +54,11 @@ pub mod stats {
         note = "Use monitors::SimpleMonitor instead of stats::SimpleStats!"
     )]
     pub use crate::monitors::SimpleMonitor as SimpleStats;
+    #[deprecated(
+        since = "0.6.0",
+        note = "Use monitors::UserMonitor instead of stats::SimpleStats!"
+    )]
+    pub use crate::monitors::UserMonitor as UserStats;
 }
 
 use alloc::string::String;
