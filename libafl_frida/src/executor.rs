@@ -1,24 +1,20 @@
 use crate::helper::FridaHelper;
 
-use std::{
-    ffi::c_void,
-    marker::PhantomData,
-};
+use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
-    Gum, MemoryRange, NativePointer,
+    Gum, NativePointer,
 };
 
 use libafl::{
-    executors::{Executor, ExitKind, InProcessExecutor, HasObservers},
-    inputs::{Input, HasTargetBytes},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
 
 use crate::asan_errors::ASAN_ERRORS;
-
 
 pub struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
@@ -58,7 +54,7 @@ where
             if self.followed {
                 self.stalker.activate(NativePointer(
                     self.base.harness_mut() as *mut _ as *mut c_void
-                ))
+                ));
             } else {
                 self.followed = true;
                 self.stalker
@@ -107,11 +103,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
 {
-    pub fn new(
-        gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
-        helper: &'c mut FH,
-    ) -> Self {
+    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
         let mut stalker = Stalker::new(gum);
 
         #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
@@ -124,7 +116,7 @@ where
         }
 
         Self {
-            base: base,
+            base,
             stalker,
             helper,
             followed: false,
