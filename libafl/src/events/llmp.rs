@@ -66,28 +66,28 @@ const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 const COMPRESS_THRESHOLD: usize = 1024;
 
 #[derive(Debug)]
-pub struct LlmpEventBroker<I, SP, ST>
+pub struct LlmpEventBroker<I, MT, SP>
 where
     I: Input,
     SP: ShMemProvider + 'static,
-    ST: Monitor,
+    MT: Monitor,
     //CE: CustomEvent<I>,
 {
-    monitor: ST,
+    monitor: MT,
     llmp: llmp::LlmpBroker<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     phantom: PhantomData<I>,
 }
 
-impl<I, SP, ST> LlmpEventBroker<I, SP, ST>
+impl<I, MT, SP> LlmpEventBroker<I, MT, SP>
 where
     I: Input,
     SP: ShMemProvider + 'static,
-    ST: Monitor,
+    MT: Monitor,
 {
     /// Create an even broker from a raw broker.
-    pub fn new(llmp: llmp::LlmpBroker<SP>, monitor: ST) -> Result<Self, Error> {
+    pub fn new(llmp: llmp::LlmpBroker<SP>, monitor: MT) -> Result<Self, Error> {
         Ok(Self {
             monitor,
             llmp,
@@ -100,7 +100,7 @@ where
     /// Create llmp on a port
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn new_on_port(shmem_provider: SP, monitor: ST, port: u16) -> Result<Self, Error> {
+    pub fn new_on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
         Ok(Self {
             monitor,
             llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
@@ -155,7 +155,7 @@ where
     /// Handle arriving events in the broker
     #[allow(clippy::unnecessary_wraps)]
     fn handle_in_broker(
-        monitor: &mut ST,
+        monitor: &mut MT,
         client_id: u32,
         event: &Event<I>,
     ) -> Result<BrokerEventResult, Error> {
@@ -672,8 +672,8 @@ pub enum ManagerKind {
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<I, OT, S, ST>(
-    monitor: ST,
+pub fn setup_restarting_mgr_std<I, MT, OT, S>(
+    monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
 ) -> Result<
@@ -686,7 +686,7 @@ pub fn setup_restarting_mgr_std<I, OT, S, ST>(
 where
     I: Input,
     S: DeserializeOwned,
-    ST: Monitor + Clone,
+    MT: Monitor + Clone,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
@@ -705,13 +705,13 @@ where
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<I, OT, S, SP, ST>
+pub struct RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider + 'static,
-    ST: Monitor,
+    MT: Monitor,
     //CE: CustomEvent<I>,
 {
     /// The shared memory provider to use for the broker or client spawned by the restarting
@@ -721,7 +721,7 @@ where
     configuration: EventConfig,
     /// The monitor to use
     #[builder(default = None)]
-    monitor: Option<ST>,
+    monitor: Option<MT>,
     /// The broker port to use
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -737,13 +737,13 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, OT, S, SP, ST> RestartingMgr<I, OT, S, SP, ST>
+impl<I, MT, OT, S, SP> RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
-    ST: Monitor + Clone,
+    MT: Monitor + Clone,
 {
     /// Launch the restarting manager
     pub fn launch(
@@ -753,7 +753,7 @@ where
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: LlmpEventBroker<I, SP, ST>, remote_broker_addr| {
+            let broker_things = |mut broker: LlmpEventBroker<I, MT, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     println!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.connect_b2b(remote_broker_addr)?;
@@ -769,7 +769,7 @@ where
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
-                            let event_broker = LlmpEventBroker::<I, SP, ST>::new(
+                            let event_broker = LlmpEventBroker::<I, MT, SP>::new(
                                 broker,
                                 self.monitor.take().unwrap(),
                             )?;
@@ -791,7 +791,7 @@ where
                     }
                 }
                 ManagerKind::Broker => {
-                    let event_broker = LlmpEventBroker::<I, SP, ST>::new_on_port(
+                    let event_broker = LlmpEventBroker::<I, MT, SP>::new_on_port(
                         self.shmem_provider.clone(),
                         self.monitor.take().unwrap(),
                         self.broker_port,
