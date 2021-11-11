@@ -133,7 +133,7 @@ impl CoverageRuntime {
 
             self.current_log_impl = writer.pc();
             writer.put_bytes(self.blob_maybe_log());
-            let prev_loc_pointer = self.previous_pc as usize;
+            let prev_loc_pointer = &mut self.previous_pc as *mut _ as u64; // Get the pointer to self.previous_pc
 
             writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
 
