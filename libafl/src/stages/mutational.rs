@@ -1,3 +1,6 @@
+//| The [`MutationalStage`] is the default stage used during fuzzing.
+//! For the current input, it will perform a range of random mutations, and then run them in the executor.
+
 use core::marker::PhantomData;
 
 use crate::{
