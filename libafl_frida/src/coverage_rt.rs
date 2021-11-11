@@ -13,7 +13,7 @@ pub const MAP_SIZE: usize = 64 * 1024;
 
 pub struct CoverageRuntime {
     map: [u8; MAP_SIZE],
-    previous_pc: [u64; 1],
+    previous_pc: u64,
     current_log_impl: u64,
     blob_maybe_log: Option<Box<[u8]>>,
 }
@@ -29,7 +29,7 @@ impl CoverageRuntime {
     pub fn new() -> Self {
         Self {
             map: [0u8; MAP_SIZE],
-            previous_pc: [0u64; 1],
+            previous_pc: 0,
             current_log_impl: 0,
             blob_maybe_log: None,
         }
@@ -39,7 +39,7 @@ impl CoverageRuntime {
         self.generate_maybe_log_blob();
     }
 
-    pub fn map_mut_ptr(&mut self) -> *mut u8 {
+    pub fn map_ptr_mut(&mut self) -> *mut u8 {
         self.map.as_mut_ptr()
     }
     #[must_use]
@@ -133,7 +133,7 @@ impl CoverageRuntime {
 
             self.current_log_impl = writer.pc();
             writer.put_bytes(self.blob_maybe_log());
-            let prev_loc_pointer = self.previous_pc.as_ptr() as usize;
+            let prev_loc_pointer = self.previous_pc as usize;
 
             writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
 

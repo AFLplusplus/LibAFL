@@ -312,7 +312,7 @@ unsafe fn fuzz(
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
-            frida_helper.map_ptr(),
+            frida_helper.map_ptr_mut(),
             MAP_SIZE,
         ));
 

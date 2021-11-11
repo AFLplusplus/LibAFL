@@ -94,7 +94,7 @@ pub trait FridaHelper<'a> {
     fn stalker_enabled(&self) -> bool;
 
     /// pointer to the frida coverage map
-    fn map_ptr(&mut self) -> *mut u8;
+    fn map_ptr_mut(&mut self) -> *mut u8;
 
     fn ranges(&self) -> &RangeMap<usize, (u16, String)>;
 }
@@ -173,8 +173,8 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         self.options.stalker_enabled()
     }
 
-    fn map_ptr(&mut self) -> *mut u8 {
-        self.coverage_rt.map_ptr()
+    fn map_ptr_mut(&mut self) -> *mut u8 {
+        self.coverage_rt.map_ptr_mut()
     }
 
     fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
