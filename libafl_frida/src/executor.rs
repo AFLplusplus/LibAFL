@@ -4,7 +4,7 @@ use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
-    Gum, NativePointer, MemoryRange
+    Gum, MemoryRange, NativePointer,
 };
 
 use libafl::{
