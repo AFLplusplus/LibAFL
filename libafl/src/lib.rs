@@ -40,6 +40,22 @@ pub mod state;
 pub mod fuzzer;
 pub use fuzzer::*;
 
+/// The `stats` module got renamed to [`monitors`].
+/// It monitors and displays the statistics of the fuzzing process.
+#[deprecated(since = "0.6.0", note = "The `stats` module got renamed to `monitors`")]
+pub mod stats {
+    #[deprecated(
+        since = "0.6.0",
+        note = "Use monitors::MultiMonitor instead of stats::MultiStats!"
+    )]
+    pub use crate::monitors::MultiMonitor as MultiStats;
+    #[deprecated(
+        since = "0.6.0",
+        note = "Use monitors::SimpleMonitor instead of stats::SimpleStats!"
+    )]
+    pub use crate::monitors::SimpleMonitor as SimpleStats;
+}
+
 use alloc::string::String;
 use core::fmt;
 
