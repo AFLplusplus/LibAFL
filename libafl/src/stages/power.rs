@@ -2,7 +2,7 @@
 
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
-use num::Integer;
+use num_traits::PrimInt;
 
 use crate::{
     corpus::{Corpus, IsFavoredMetadata, PowerScheduleTestcaseMetaData, Testcase},
@@ -34,7 +34,7 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
@@ -55,7 +55,7 @@ where
 impl<C, E, EM, I, M, O, OT, S, T, Z> MutationalStage<C, E, EM, I, M, S, Z>
     for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
@@ -156,7 +156,7 @@ where
 impl<C, E, EM, I, M, O, OT, S, T, Z> Stage<E, EM, S, Z>
     for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
@@ -183,7 +183,7 @@ where
 
 impl<C, E, EM, I, M, O, OT, S, T, Z> PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
