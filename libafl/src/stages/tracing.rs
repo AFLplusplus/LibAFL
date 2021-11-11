@@ -10,12 +10,12 @@ use crate::{
     observers::ObserversTuple,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasExecutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions},
     Error,
 };
 
 #[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
+use crate::monitors::PerfFeature;
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
@@ -25,7 +25,7 @@ where
     C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     tracer_executor: TE,
     #[allow(clippy::type_complexity)]
@@ -38,7 +38,7 @@ where
     C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     #[inline]
     fn perform(
@@ -88,7 +88,7 @@ where
     C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
@@ -118,7 +118,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     #[inline]
     fn perform(
@@ -169,7 +169,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {

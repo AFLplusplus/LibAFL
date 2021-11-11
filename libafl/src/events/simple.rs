@@ -6,7 +6,7 @@ use crate::{
         EventRestarter, HasEventManagerId,
     },
     inputs::Input,
-    stats::Stats,
+    monitors::Monitor,
     Error,
 };
 use alloc::{string::ToString, vec::Vec};
@@ -40,10 +40,10 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 pub struct SimpleEventManager<I, ST>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
-    /// The stats
-    stats: ST,
+    /// The monitor
+    monitor: ST,
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
 }
@@ -51,10 +51,10 @@ where
 impl<I, S, ST> EventFirer<I, S> for SimpleEventManager<I, ST>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        match Self::handle_in_broker(&mut self.stats, &event)? {
+        match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
         };
@@ -65,14 +65,14 @@ where
 impl<I, S, ST> EventRestarter<S> for SimpleEventManager<I, ST>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
 }
 
 impl<E, I, S, ST, Z> EventProcessor<E, I, S, Z> for SimpleEventManager<I, ST>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
     fn process(
         &mut self,
@@ -92,14 +92,14 @@ where
 impl<E, I, S, ST, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, ST>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
 }
 
 impl<I, ST> HasEventManagerId for SimpleEventManager<I, ST>
 where
     I: Input,
-    ST: Stats,
+    ST: Monitor,
 {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
@@ -109,19 +109,19 @@ where
 impl<I, ST> SimpleEventManager<I, ST>
 where
     I: Input,
-    ST: Stats, //TODO CE: CustomEvent,
+    ST: Monitor, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    pub fn new(stats: ST) -> Self {
+    pub fn new(monitor: ST) -> Self {
         Self {
-            stats,
+            monitor,
             events: vec![],
         }
     }
 
     // Handle arriving events in the broker
     #[allow(clippy::unnecessary_wraps)]
-    fn handle_in_broker(stats: &mut ST, event: &Event<I>) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(monitor: &mut ST, event: &Event<I>) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase {
                 input: _,
@@ -132,57 +132,57 @@ where
                 time,
                 executions,
             } => {
-                stats
-                    .client_stats_mut_for(0)
+                monitor
+                    .client_monitor_mut_for(0)
                     .update_corpus_size(*corpus_size as u64);
-                stats
-                    .client_stats_mut_for(0)
+                monitor
+                    .client_monitor_mut_for(0)
                     .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateStats {
+            Event::UpdateMonitor {
                 time,
                 executions,
                 phantom: _,
             } => {
-                // TODO: The stats buffer should be added on client add.
-                stats
-                    .client_stats_mut_for(0)
+                // TODO: The monitor buffer should be added on client add.
+                monitor
+                    .client_monitor_mut_for(0)
                     .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateUserStats {
+            Event::UpdateUserMonitor {
                 name,
                 value,
                 phantom: _,
             } => {
-                stats
-                    .client_stats_mut_for(0)
-                    .update_user_stats(name.clone(), value.clone());
-                stats.display(event.name().to_string(), 0);
+                monitor
+                    .client_monitor_mut_for(0)
+                    .update_user_monitor(name.clone(), value.clone());
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfStats {
+            Event::UpdatePerfMonitor {
                 time,
                 executions,
-                introspection_stats,
+                introspection_monitor,
                 phantom: _,
             } => {
-                // TODO: The stats buffer should be added on client add.
-                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                stats.client_stats_mut()[0]
-                    .update_introspection_stats((**introspection_stats).clone());
-                stats.display(event.name().to_string(), 0);
+                // TODO: The monitor buffer should be added on client add.
+                monitor.client_monitor_mut()[0].update_executions(*executions as u64, *time);
+                monitor.client_monitor_mut()[0]
+                    .update_introspection_monitor((**introspection_monitor).clone());
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
-                stats
-                    .client_stats_mut_for(0)
+                monitor
+                    .client_monitor_mut_for(0)
                     .update_objective_size(*objective_size as u64);
-                stats.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -219,7 +219,7 @@ where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
     /// The actual simple event mgr
     simple_event_mgr: SimpleEventManager<I, ST>,
@@ -237,7 +237,7 @@ where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         self.simple_event_mgr.fire(_state, event)
@@ -252,7 +252,7 @@ where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -270,7 +270,7 @@ where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.simple_event_mgr.process(fuzzer, state, executor)
@@ -285,7 +285,7 @@ where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    ST: Monitor, //CE: CustomEvent<I, OT>,
 {
 }
 
@@ -297,7 +297,7 @@ where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats,
+    ST: Monitor,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.simple_event_mgr.mgr_id()
@@ -313,13 +313,13 @@ where
     S: DeserializeOwned + Serialize + HasCorpus<C, I> + HasSolutions<SC, I>,
     SC: Corpus<I>,
     SP: ShMemProvider,
-    ST: Stats, //TODO CE: CustomEvent,
+    ST: Monitor, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    fn new_launched(stats: ST, staterestorer: StateRestorer<SP>) -> Self {
+    fn new_launched(monitor: ST, staterestorer: StateRestorer<SP>) -> Self {
         Self {
             staterestorer,
-            simple_event_mgr: SimpleEventManager::new(stats),
+            simple_event_mgr: SimpleEventManager::new(monitor),
             _phantom: PhantomData {},
         }
     }
@@ -328,7 +328,7 @@ where
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     #[allow(clippy::similar_names)]
-    pub fn launch(mut stats: ST, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error> {
+    pub fn launch(mut monitor: ST, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error> {
         // We start ourself as child process to actually fuzz
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
@@ -397,7 +397,7 @@ where
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    SimpleRestartingEventManager::new_launched(stats, staterestorer),
+                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
@@ -406,14 +406,14 @@ where
                 // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
                 staterestorer.reset();
 
-                // load the corpus size into stats to still display the correct numbers after restart.
-                let client_stats = stats.client_stats_mut_for(0);
-                client_stats.update_corpus_size(state.corpus().count().try_into()?);
-                client_stats.update_objective_size(state.solutions().count().try_into()?);
+                // load the corpus size into monitor to still display the correct numbers after restart.
+                let client_monitor = monitor.client_monitor_mut_for(0);
+                client_monitor.update_corpus_size(state.corpus().count().try_into()?);
+                client_monitor.update_objective_size(state.solutions().count().try_into()?);
 
                 (
                     Some(state),
-                    SimpleRestartingEventManager::new_launched(stats, staterestorer),
+                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
                 )
             }
         };

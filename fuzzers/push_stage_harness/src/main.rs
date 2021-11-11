@@ -21,7 +21,7 @@ use libafl::{
     observers::StdMapObserver,
     stages::push::StdMutationalPushStage,
     state::{HasCorpus, StdState},
-    stats::SimpleStats,
+    monitors::SimpleMonitor,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -60,12 +60,12 @@ pub fn main() {
         tuple_list!(feedback_state),
     );
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| println!("{}", s));
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mgr = SimpleEventManager::new(stats);
+    let mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();

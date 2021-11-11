@@ -11,19 +11,19 @@ use crate::{
     observers::ObserversTuple,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasExecutions, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     Error,
 };
 
 #[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
+use crate::monitors::PerfFeature;
 #[cfg(feature = "introspection")]
 use alloc::boxed::Box;
 
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
-/// Send a stats update all 15 (or more) seconds
+/// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
@@ -44,7 +44,7 @@ pub trait HasFeedback<F, I, S>
 where
     F: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// The feedback
     fn feedback(&self) -> &F;
@@ -58,7 +58,7 @@ pub trait HasObjective<I, OF, S>
 where
     OF: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// The objective feedback
     fn objective(&self) -> &OF;
@@ -172,10 +172,10 @@ pub trait Fuzzer<E, EM, I, S, ST> {
         manager: &mut EM,
     ) -> Result<usize, Error> {
         let mut last = current_time();
-        let stats_timeout = STATS_TIMEOUT_DEFAULT;
+        let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
             self.fuzz_one(stages, executor, state, manager)?;
-            last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
+            last = Self::maybe_report_monitor(state, manager, last, monitor_timeout)?;
         }
     }
 
@@ -201,11 +201,11 @@ pub trait Fuzzer<E, EM, I, S, ST> {
 
         let mut ret = 0;
         let mut last = current_time();
-        let stats_timeout = STATS_TIMEOUT_DEFAULT;
+        let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
             ret = self.fuzz_one(stages, executor, state, manager)?;
-            last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
+            last = Self::maybe_report_monitor(state, manager, last, monitor_timeout)?;
         }
 
         // If we would assume the fuzzer loop will always exit after this, we could do this here:
@@ -216,14 +216,14 @@ pub trait Fuzzer<E, EM, I, S, ST> {
         Ok(ret)
     }
 
-    /// Given the last time, if `stats_timeout` seconds passed, send off an info/stats/heartbeat message to the broker.
-    /// Returns the new `last` time (so the old one, unless `stats_timeout` time has passed and stats have been sent)
-    /// Will return an [`crate::Error`], if the stats could not be sent.
-    fn maybe_report_stats(
+    /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
+    /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
+    /// Will return an [`crate::Error`], if the monitor could not be sent.
+    fn maybe_report_monitor(
         state: &mut S,
         manager: &mut EM,
         last: Duration,
-        stats_timeout: Duration,
+        monitor_timeout: Duration,
     ) -> Result<Duration, Error>;
 }
 
@@ -242,7 +242,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     scheduler: CS,
     feedback: F,
@@ -257,7 +257,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn scheduler(&self) -> &CS {
         &self.scheduler
@@ -274,7 +274,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn feedback(&self) -> &F {
         &self.feedback
@@ -291,7 +291,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn objective(&self) -> &OF {
         &self.objective
@@ -312,7 +312,7 @@ where
     I: Input,
     OF: Feedback<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats + HasExecutions,
+    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -428,7 +428,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor,
     SC: Corpus<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -462,7 +462,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
+    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor,
     SC: Corpus<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -527,46 +527,46 @@ where
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
-    S: HasExecutions + HasClientPerfStats,
+    S: HasExecutions + HasClientPerfMonitor,
     OF: Feedback<I, S>,
     ST: StagesTuple<E, EM, S, Self>,
 {
     #[inline]
-    fn maybe_report_stats(
+    fn maybe_report_monitor(
         state: &mut S,
         manager: &mut EM,
         last: Duration,
-        stats_timeout: Duration,
+        monitor_timeout: Duration,
     ) -> Result<Duration, Error> {
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
-        if cur.checked_sub(last).unwrap_or_default() > stats_timeout {
+        if cur.checked_sub(last).unwrap_or_default() > monitor_timeout {
             // Default no introspection implmentation
             #[cfg(not(feature = "introspection"))]
             manager.fire(
                 state,
-                Event::UpdateStats {
+                Event::UpdateMonitor {
                     executions: *state.executions(),
                     time: cur,
                     phantom: PhantomData,
                 },
             )?;
 
-            // If performance stats are requested, fire the `UpdatePerfStats` event
+            // If performance monitor are requested, fire the `UpdatePerfMonitor` event
             #[cfg(feature = "introspection")]
             {
                 state
-                    .introspection_stats_mut()
+                    .introspection_monitor_mut()
                     .set_current_time(crate::bolts::cpu::read_time_counter());
 
-                // Send the current stats over to the manager. This `.clone` shouldn't be
-                // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s
+                // Send the current monitor over to the manager. This `.clone` shouldn't be
+                // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
                 manager.fire(
                     state,
-                    Event::UpdatePerfStats {
+                    Event::UpdatePerfMonitor {
                         executions: *state.executions(),
                         time: cur,
-                        introspection_stats: Box::new(state.introspection_stats().clone()),
+                        introspection_monitor: Box::new(state.introspection_monitor().clone()),
                         phantom: PhantomData,
                     },
                 )?;
@@ -588,32 +588,32 @@ where
     ) -> Result<usize, Error> {
         // Init timer for scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().start_timer();
+        state.introspection_monitor_mut().start_timer();
 
         // Get the next index from the scheduler
         let idx = self.scheduler.next(state)?;
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().mark_scheduler_time();
+        state.introspection_monitor_mut().mark_scheduler_time();
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().reset_stage_index();
+        state.introspection_monitor_mut().reset_stage_index();
 
         // Execute all stages
         stages.perform_all(self, executor, state, manager, idx)?;
 
         // Init timer for manager
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().start_timer();
+        state.introspection_monitor_mut().start_timer();
 
         // Execute the manager
         manager.process(self, state, executor)?;
 
         // Mark the elapsed time for the manager
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().mark_manager_time();
+        state.introspection_monitor_mut().mark_manager_time();
 
         Ok(idx)
     }
@@ -625,7 +625,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasClientPerfStats,
+    S: HasExecutions + HasClientPerfMonitor,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {

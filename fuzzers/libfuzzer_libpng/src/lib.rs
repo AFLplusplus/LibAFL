@@ -28,7 +28,7 @@ use libafl::{
         power::{PowerMutationalStage, PowerSchedule},
     },
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
+    monitors::MultiMonitor,
     Error,
 };
 
@@ -57,11 +57,11 @@ pub fn libafl_main() {
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, EventConfig::AlwaysUnique) {
+        match setup_restarting_mgr_std(monitor, broker_port, EventConfig::AlwaysUnique) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {

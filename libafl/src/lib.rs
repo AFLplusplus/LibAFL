@@ -31,11 +31,11 @@ pub mod executors;
 pub mod feedbacks;
 pub mod generators;
 pub mod inputs;
+pub mod monitors;
 pub mod mutators;
 pub mod observers;
 pub mod stages;
 pub mod state;
-pub mod stats;
 
 pub mod fuzzer;
 pub use fuzzer::*;
@@ -173,10 +173,10 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
+        monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        stats::SimpleStats,
         Fuzzer, StdFuzzer,
     };
 
@@ -199,10 +199,10 @@ mod tests {
             tuple_list!(),
         );
 
-        let stats = SimpleStats::new(|s| {
+        let monitor = SimpleMonitor::new(|s| {
             println!("{}", s);
         });
-        let mut event_manager = SimpleEventManager::new(stats);
+        let mut event_manager = SimpleEventManager::new(monitor);
 
         let scheduler = RandCorpusScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());

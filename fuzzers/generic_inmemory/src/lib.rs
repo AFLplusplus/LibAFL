@@ -30,7 +30,7 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
+    monitors::MultiMonitor,
     Error,
 };
 
@@ -82,7 +82,7 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
@@ -234,7 +234,7 @@ pub fn libafl_main() {
     match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
-        .stats(stats)
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)

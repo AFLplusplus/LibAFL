@@ -3,7 +3,7 @@
 - [ ] Objective-Specific Corpuses (named per objective)
 - [ ] Good documentation
 - [ ] LAIN / structured fuzzing example
-- [ ] More informative outpus, deeper introspection (stats, what mutation did x, etc.)
+- [ ] More informative outpus, deeper introspection (monitor, what mutation did x, etc.)
 - [ ] Timeout handling for llmp clients (no ping for n seconds -> treat as disconnected)
 - [ ] Heap for signal handling (bumpallo or llmp directly?)
 - [ ] Frida support for Windows

@@ -19,8 +19,8 @@ use crate::{
     bolts::shmem::ShMemProvider,
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
+    monitors::Monitor,
     observers::ObserversTuple,
-    stats::Stats,
     Error,
 };
 
@@ -49,15 +49,15 @@ pub struct Launcher<'a, CF, I, OT, S, SP, ST>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input + 'a,
-    ST: Stats,
+    ST: Monitor,
     SP: ShMemProvider + 'static,
     OT: ObserversTuple<I, S> + 'a,
     S: DeserializeOwned + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
-    /// The stats instance to use
-    stats: ST,
+    /// The monitor instance to use
+    monitor: ST,
     /// The configuration
     configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
@@ -91,7 +91,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
-    ST: Stats + Clone,
+    ST: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,
 {
@@ -163,7 +163,7 @@ where
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
             RestartingMgr::<I, OT, S, SP, ST>::builder()
                 .shmem_provider(self.shmem_provider.clone())
-                .stats(Some(self.stats.clone()))
+                .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
@@ -261,7 +261,7 @@ where
 
             RestartingMgr::<I, OT, S, SP, ST>::builder()
                 .shmem_provider(self.shmem_provider.clone())
-                .stats(Some(self.stats.clone()))
+                .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)

@@ -36,7 +36,7 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
+    monitors::MultiMonitor,
     Error,
 };
 use libafl_targets::{
@@ -210,7 +210,7 @@ pub fn LLVMFuzzerRunDriver(
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     // TODO: we need to handle Atheris calls to `exit` on errors somhow.
 
@@ -359,7 +359,7 @@ pub fn LLVMFuzzerRunDriver(
     match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
-        .stats(stats)
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)

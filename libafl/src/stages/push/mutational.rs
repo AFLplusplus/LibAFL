@@ -19,14 +19,14 @@ use crate::{
     mutators::Mutator,
     observers::ObserversTuple,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, Fuzzer, HasCorpusScheduler,
 };
 
 #[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
+use crate::monitors::PerfFeature;
 
-/// Send a stats update all 15 (or more) seconds
+/// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
@@ -50,7 +50,7 @@ where
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
         + Fuzzer<(), EM, I, S, ()>
@@ -73,7 +73,7 @@ where
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, CS, (), EM, I, R, OT, S, Z)>,
-    last_stats_time: Duration,
+    last_monitor_time: Duration,
     observers: Rc<RefCell<OT>>,
     exit_kind: Rc<Cell<Option<ExitKind>>>,
 }
@@ -87,7 +87,7 @@ where
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
         + Fuzzer<(), EM, I, S, ()>
@@ -188,7 +188,7 @@ where
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
         + Fuzzer<(), EM, I, S, ()>
@@ -219,14 +219,14 @@ where
             //let fuzzer: &mut Z = &mut (*self.fuzzer).borrow_mut();
             let event_mgr: &mut EM = &mut (*self.event_mgr).borrow_mut();
 
-            self.last_stats_time = Z::maybe_report_stats(
+            self.last_monitor_time = Z::maybe_report_monitor(
                 state,
                 event_mgr,
-                self.last_stats_time,
+                self.last_monitor_time,
                 STATS_TIMEOUT_DEFAULT,
             )
             .unwrap();
-            //self.fuzzer.maybe_report_stats();
+            //self.fuzzer.maybe_report_monitor();
         } else {
             self.exit_kind.replace(None);
         }
@@ -243,7 +243,7 @@ where
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
         + Fuzzer<(), EM, I, S, ()>
@@ -274,7 +274,7 @@ where
             event_mgr,
             observers,
             exit_kind,
-            last_stats_time: current_time(),
+            last_monitor_time: current_time(),
         }
     }
 }
