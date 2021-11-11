@@ -2,11 +2,11 @@
 
 - [ ] Objective-Specific Corpuses (named per objective)
 - [ ] Good documentation
-- [ ] LAIN / structured fuzzing example
 - [ ] More informative outpus, deeper introspection (stats, what mutation did x, etc.)
 - [ ] Timeout handling for llmp clients (no ping for n seconds -> treat as disconnected)
 - [ ] Heap for signal handling (bumpallo or llmp directly?)
-- [ ] Frida support for Windows
+- [x] Frida support for Windows
+- [x] LAIN / structured fuzzing example
 - [x] LLMP compression
 - [x] AFL-Style Forkserver Executor
 - [x] "Launcher" example that spawns broker + n clients
