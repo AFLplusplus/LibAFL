@@ -198,18 +198,18 @@ pub trait Monitor {
 /// Not good for debuging, very good for speed.
 pub struct NopMonitor {
     start_time: Duration,
-    client_monitor: Vec<ClientStats>,
+    client_stats: Vec<ClientStats>,
 }
 
 impl Monitor for NopMonitor {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_monitor
+        &mut self.client_stats
     }
 
     /// the client monitor
     fn client_stats(&self) -> &[ClientStats] {
-        &self.client_monitor
+        &self.client_stats
     }
 
     /// Time this fuzzing run stated
@@ -226,7 +226,7 @@ impl NopMonitor {
     pub fn new() -> Self {
         Self {
             start_time: current_time(),
-            client_monitor: vec![],
+            client_stats: vec![],
         }
     }
 }
@@ -245,7 +245,7 @@ where
 {
     print_fn: F,
     start_time: Duration,
-    client_monitor: Vec<ClientStats>,
+    client_stats: Vec<ClientStats>,
 }
 
 impl<F> Monitor for SimpleMonitor<F>
@@ -254,12 +254,12 @@ where
 {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_monitor
+        &mut self.client_stats
     }
 
     /// the client monitor
     fn client_stats(&self) -> &[ClientStats] {
-        &self.client_monitor
+        &self.client_stats
     }
 
     /// Time this fuzzing run stated
@@ -269,7 +269,8 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "{}: [{} #{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            (current_time() - self.start_time).as_millis(),
             event_msg,
             sender_id,
             self.client_stats().len(),
@@ -286,7 +287,7 @@ where
             // Print the client performance monitor.
             let fmt = format!(
                 "Client {:03}:\n{}",
-                sender_id, self.client_monitor[sender_id as usize].introspection_monitor
+                sender_id, self.client_stats[sender_id as usize].introspection_monitor
             );
             (self.print_fn)(fmt);
 
@@ -305,7 +306,7 @@ where
         Self {
             print_fn,
             start_time: current_time(),
-            client_monitor: vec![],
+            client_stats: vec![],
         }
     }
 
@@ -314,7 +315,7 @@ where
         Self {
             print_fn,
             start_time,
-            client_monitor: vec![],
+            client_stats: vec![],
         }
     }
 }

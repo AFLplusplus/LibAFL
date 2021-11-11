@@ -172,8 +172,8 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_monitor_mut()[0].update_executions(*executions as u64, *time);
-                monitor.client_monitor_mut()[0]
+                monitor.client_stats_mut()[0].update_executions(*executions as u64, *time);
+                monitor.client_stats_mut()[0]
                     .update_introspection_monitor((**introspection_monitor).clone());
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
@@ -407,9 +407,9 @@ where
                 staterestorer.reset();
 
                 // load the corpus size into monitor to still display the correct numbers after restart.
-                let client_monitor = monitor.client_stats_mut_for(0);
-                client_monitor.update_corpus_size(state.corpus().count().try_into()?);
-                client_monitor.update_objective_size(state.solutions().count().try_into()?);
+                let client_stats = monitor.client_stats_mut_for(0);
+                client_stats.update_corpus_size(state.corpus().count().try_into()?);
+                client_stats.update_objective_size(state.solutions().count().try_into()?);
 
                 (
                     Some(state),

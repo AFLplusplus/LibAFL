@@ -19,7 +19,7 @@ where
 {
     print_fn: F,
     start_time: Duration,
-    client_monitor: Vec<ClientStats>,
+    client_stats: Vec<ClientStats>,
 }
 
 impl<F> Monitor for MultiMonitor<F>
@@ -28,12 +28,12 @@ where
 {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_monitor
+        &mut self.client_stats
     }
 
     /// the client monitor
     fn client_stats(&self) -> &[ClientStats] {
-        &self.client_monitor
+        &self.client_stats
     }
 
     /// Time this fuzzing run stated
@@ -78,7 +78,7 @@ where
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, client) in self.client_monitor.iter().skip(1).enumerate() {
+            for (i, client) in self.client_stats.iter().skip(1).enumerate() {
                 let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_monitor);
                 (self.print_fn)(fmt);
             }
@@ -98,7 +98,7 @@ where
         Self {
             print_fn,
             start_time: current_time(),
-            client_monitor: vec![],
+            client_stats: vec![],
         }
     }
 
@@ -107,7 +107,7 @@ where
         Self {
             print_fn,
             start_time,
-            client_monitor: vec![],
+            client_stats: vec![],
         }
     }
 }
