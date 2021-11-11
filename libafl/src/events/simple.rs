@@ -133,34 +133,34 @@ where
                 executions,
             } => {
                 monitor
-                    .client_monitor_mut_for(0)
+                    .client_stats_mut_for(0)
                     .update_corpus_size(*corpus_size as u64);
                 monitor
-                    .client_monitor_mut_for(0)
+                    .client_stats_mut_for(0)
                     .update_executions(*executions as u64, *time);
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateMonitor {
+            Event::UpdateExecutions {
                 time,
                 executions,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 monitor
-                    .client_monitor_mut_for(0)
+                    .client_stats_mut_for(0)
                     .update_executions(*executions as u64, *time);
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateUserMonitor {
+            Event::UpdateUserStats {
                 name,
                 value,
                 phantom: _,
             } => {
                 monitor
-                    .client_monitor_mut_for(0)
-                    .update_user_monitor(name.clone(), value.clone());
+                    .client_stats_mut_for(0)
+                    .update_user_stats(name.clone(), value.clone());
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
@@ -180,7 +180,7 @@ where
             }
             Event::Objective { objective_size } => {
                 monitor
-                    .client_monitor_mut_for(0)
+                    .client_stats_mut_for(0)
                     .update_objective_size(*objective_size as u64);
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
@@ -407,7 +407,7 @@ where
                 staterestorer.reset();
 
                 // load the corpus size into monitor to still display the correct numbers after restart.
-                let client_monitor = monitor.client_monitor_mut_for(0);
+                let client_monitor = monitor.client_stats_mut_for(0);
                 client_monitor.update_corpus_size(state.corpus().count().try_into()?);
                 client_monitor.update_objective_size(state.solutions().count().try_into()?);
 

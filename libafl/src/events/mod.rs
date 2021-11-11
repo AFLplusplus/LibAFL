@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    executors::ExitKind, inputs::Input, monitors::UserMonitor, observers::ObserversTuple, Error,
+    executors::ExitKind, inputs::Input, monitors::UserStats, observers::ObserversTuple, Error,
 };
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
@@ -169,8 +169,8 @@ where
         /// The executions of this client
         executions: usize,
     },
-    /// New monitor.
-    UpdateMonitor {
+    /// New stats event to monitor.
+    UpdateExecutions {
         /// The time of generation of the [`Event`]
         time: Duration,
         /// The executions of this client
@@ -178,12 +178,12 @@ where
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
-    /// New monitor.
-    UpdateUserMonitor {
+    /// New user stats event to monitor.
+    UpdateUserStats {
         /// Custom user monitor name
         name: String,
         /// Custom user monitor value
-        value: UserMonitor,
+        value: UserStats,
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
@@ -237,16 +237,16 @@ where
                 time: _,
                 executions: _,
             } => "Testcase",
-            Event::UpdateMonitor {
+            Event::UpdateExecutions {
                 time: _,
                 executions: _,
                 phantom: _,
             }
-            | Event::UpdateUserMonitor {
+            | Event::UpdateUserStats {
                 name: _,
                 value: _,
                 phantom: _,
-            } => "Monitor",
+            } => "Stats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
                 time: _,

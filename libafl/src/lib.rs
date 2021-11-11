@@ -58,7 +58,7 @@ pub mod stats {
         since = "0.6.0",
         note = "Use monitors::UserMonitor instead of stats::SimpleStats!"
     )]
-    pub use crate::monitors::UserMonitor as UserStats;
+    pub use crate::monitors::UserStats;
 }
 
 use alloc::string::String;

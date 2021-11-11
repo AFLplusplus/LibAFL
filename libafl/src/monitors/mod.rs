@@ -17,20 +17,20 @@ use crate::bolts::current_time;
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
-/// User-defined monitor types
+/// User-defined stat types
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum UserMonitor {
+pub enum UserStats {
     Number(u64),
     String(String),
     Ratio(u64, u64),
 }
 
-impl fmt::Display for UserMonitor {
+impl fmt::Display for UserStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UserMonitor::Number(n) => write!(f, "{}", n),
-            UserMonitor::String(s) => write!(f, "{}", s),
-            UserMonitor::Ratio(a, b) => {
+            UserStats::Number(n) => write!(f, "{}", n),
+            UserStats::String(s) => write!(f, "{}", s),
+            UserStats::Ratio(a, b) => {
                 if *b == 0 {
                     write!(f, "{}/{}", a, b)
                 } else {
@@ -43,7 +43,7 @@ impl fmt::Display for UserMonitor {
 
 /// A simple struct to keep track of client monitor
 #[derive(Debug, Clone, Default)]
-pub struct ClientMonitor {
+pub struct ClientStats {
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
     pub corpus_size: u64,
@@ -58,14 +58,14 @@ pub struct ClientMonitor {
     /// The last executions per sec
     pub last_execs_per_sec: f32,
     /// User-defined monitor
-    pub user_monitor: HashMap<String, UserMonitor>,
+    pub user_monitor: HashMap<String, UserStats>,
 
     /// Client performance statistics
     #[cfg(feature = "introspection")]
     pub introspection_monitor: ClientPerfMonitor,
 }
 
-impl ClientMonitor {
+impl ClientStats {
     /// We got a new information about executions for this client, insert them.
     pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
         let diff = cur_time
@@ -120,12 +120,12 @@ impl ClientMonitor {
     }
 
     /// Update the user-defined stat with name and value
-    pub fn update_user_monitor(&mut self, name: String, value: UserMonitor) {
+    pub fn update_user_stats(&mut self, name: String, value: UserStats) {
         self.user_monitor.insert(name, value);
     }
 
     /// Get a user-defined stat using the name
-    pub fn get_user_monitor(&mut self, name: &str) -> Option<&UserMonitor> {
+    pub fn get_user_stats(&mut self, name: &str) -> Option<&UserStats> {
         self.user_monitor.get(name)
     }
 
@@ -139,10 +139,10 @@ impl ClientMonitor {
 /// The monitor trait keeps track of all the client's monitor, and offers methods to dispaly them.
 pub trait Monitor {
     /// the client monitor (mut)
-    fn client_monitor_mut(&mut self) -> &mut Vec<ClientMonitor>;
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
 
     /// the client monitor
-    fn client_monitor(&self) -> &[ClientMonitor];
+    fn client_stats(&self) -> &[ClientStats];
 
     /// creation time
     fn start_time(&mut self) -> time::Duration;
@@ -152,14 +152,14 @@ pub trait Monitor {
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
-        self.client_monitor()
+        self.client_stats()
             .iter()
             .fold(0_u64, |acc, x| acc + x.corpus_size)
     }
 
     /// Amount of elements in the objectives (combined for all children)
     fn objective_size(&self) -> u64 {
-        self.client_monitor()
+        self.client_stats()
             .iter()
             .fold(0_u64, |acc, x| acc + x.objective_size)
     }
@@ -167,7 +167,7 @@ pub trait Monitor {
     /// Total executions
     #[inline]
     fn total_execs(&mut self) -> u64 {
-        self.client_monitor()
+        self.client_stats()
             .iter()
             .fold(0_u64, |acc, x| acc + x.executions)
     }
@@ -176,21 +176,21 @@ pub trait Monitor {
     #[inline]
     fn execs_per_sec(&mut self) -> u64 {
         let cur_time = current_time();
-        self.client_monitor_mut()
+        self.client_stats_mut()
             .iter_mut()
             .fold(0_u64, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
-    fn client_monitor_mut_for(&mut self, client_id: u32) -> &mut ClientMonitor {
-        let client_stat_count = self.client_monitor().len();
+    fn client_stats_mut_for(&mut self, client_id: u32) -> &mut ClientStats {
+        let client_stat_count = self.client_stats().len();
         for _ in client_stat_count..(client_id + 1) as usize {
-            self.client_monitor_mut().push(ClientMonitor {
+            self.client_stats_mut().push(ClientStats {
                 last_window_time: current_time(),
-                ..ClientMonitor::default()
+                ..ClientStats::default()
             });
         }
-        &mut self.client_monitor_mut()[client_id as usize]
+        &mut self.client_stats_mut()[client_id as usize]
     }
 }
 
@@ -198,17 +198,17 @@ pub trait Monitor {
 /// Not good for debuging, very good for speed.
 pub struct NopMonitor {
     start_time: Duration,
-    client_monitor: Vec<ClientMonitor>,
+    client_monitor: Vec<ClientStats>,
 }
 
 impl Monitor for NopMonitor {
     /// the client monitor, mutable
-    fn client_monitor_mut(&mut self) -> &mut Vec<ClientMonitor> {
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_monitor
     }
 
     /// the client monitor
-    fn client_monitor(&self) -> &[ClientMonitor] {
+    fn client_stats(&self) -> &[ClientStats] {
         &self.client_monitor
     }
 
@@ -245,7 +245,7 @@ where
 {
     print_fn: F,
     start_time: Duration,
-    client_monitor: Vec<ClientMonitor>,
+    client_monitor: Vec<ClientStats>,
 }
 
 impl<F> Monitor for SimpleMonitor<F>
@@ -253,12 +253,12 @@ where
     F: FnMut(String),
 {
     /// the client monitor, mutable
-    fn client_monitor_mut(&mut self) -> &mut Vec<ClientMonitor> {
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_monitor
     }
 
     /// the client monitor
-    fn client_monitor(&self) -> &[ClientMonitor] {
+    fn client_stats(&self) -> &[ClientStats] {
         &self.client_monitor
     }
 
@@ -272,7 +272,7 @@ where
             "[{} #{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
-            self.client_monitor().len(),
+            self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),

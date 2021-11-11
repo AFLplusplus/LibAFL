@@ -15,7 +15,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
     inputs::Input,
-    monitors::UserMonitor,
+    monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
     state::{HasClientPerfMonitor, HasFeedbackStates, HasMetadata},
     Error,
@@ -391,9 +391,9 @@ where
             }
             manager.fire(
                 state,
-                Event::UpdateUserMonitor {
+                Event::UpdateUserStats {
                     name: self.name.to_string(),
-                    value: UserMonitor::Ratio(filled, size as u64),
+                    value: UserStats::Ratio(filled, size as u64),
                     phantom: PhantomData,
                 },
             )?;

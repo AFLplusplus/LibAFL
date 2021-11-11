@@ -545,7 +545,7 @@ where
             #[cfg(not(feature = "introspection"))]
             manager.fire(
                 state,
-                Event::UpdateMonitor {
+                Event::UpdateExecutions {
                     executions: *state.executions(),
                     time: cur,
                     phantom: PhantomData,

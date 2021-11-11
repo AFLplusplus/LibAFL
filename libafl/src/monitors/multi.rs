@@ -8,7 +8,7 @@ use alloc::string::ToString;
 
 use crate::{
     bolts::current_time,
-    monitors::{ClientMonitor, Monitor},
+    monitors::{ClientStats, Monitor},
 };
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
@@ -19,7 +19,7 @@ where
 {
     print_fn: F,
     start_time: Duration,
-    client_monitor: Vec<ClientMonitor>,
+    client_monitor: Vec<ClientStats>,
 }
 
 impl<F> Monitor for MultiMonitor<F>
@@ -27,12 +27,12 @@ where
     F: FnMut(String),
 {
     /// the client monitor, mutable
-    fn client_monitor_mut(&mut self) -> &mut Vec<ClientMonitor> {
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_monitor
     }
 
     /// the client monitor
-    fn client_monitor(&self) -> &[ClientMonitor] {
+    fn client_stats(&self) -> &[ClientStats] {
         &self.client_monitor
     }
 
@@ -52,7 +52,7 @@ where
         let global_fmt = format!(
             "[{}]  (GLOBAL) clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
-            self.client_monitor().len(),
+            self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
@@ -60,7 +60,7 @@ where
         );
         (self.print_fn)(global_fmt);
 
-        let client = self.client_monitor_mut_for(sender_id);
+        let client = self.client_stats_mut_for(sender_id);
         let cur_time = current_time();
         let exec_sec = client.execs_per_sec(cur_time);
 

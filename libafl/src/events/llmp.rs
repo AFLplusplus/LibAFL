@@ -169,30 +169,30 @@ where
                 time,
                 executions,
             } => {
-                let client = monitor.client_monitor_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Forward)
             }
-            Event::UpdateMonitor {
+            Event::UpdateExecutions {
                 time,
                 executions,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                let client = monitor.client_monitor_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateUserMonitor {
+            Event::UpdateUserStats {
                 name,
                 value,
                 phantom: _,
             } => {
-                let client = monitor.client_monitor_mut_for(client_id);
-                client.update_user_monitor(name.clone(), value.clone());
+                let client = monitor.client_stats_mut_for(client_id);
+                client.update_user_stats(name.clone(), value.clone());
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -206,7 +206,7 @@ where
                 // TODO: The monitor buffer should be added on client add.
 
                 // Get the client for the staterestorer ID
-                let client = monitor.client_monitor_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
 
                 // Update the normal monitor for this client
                 client.update_executions(*executions as u64, *time);
@@ -221,7 +221,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
-                let client = monitor.client_monitor_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
