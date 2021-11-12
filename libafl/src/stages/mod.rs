@@ -26,6 +26,11 @@ pub use concolic::ConcolicTracingStage;
 #[cfg(feature = "std")]
 pub use concolic::SimpleConcolicMutationalStage;
 
+#[cfg(feature = "std")]
+pub mod sync;
+#[cfg(feature = "std")]
+pub use sync::*;
+
 use crate::Error;
 use core::{convert::From, marker::PhantomData};
 
