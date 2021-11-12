@@ -26,6 +26,11 @@ pub use concolic::ConcolicTracingStage;
 #[cfg(feature = "std")]
 pub use concolic::SimpleConcolicMutationalStage;
 
+#[cfg(feature = "std")]
+pub mod sync;
+#[cfg(feature = "std")]
+pub use sync::*;
+
 use crate::Error;
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
