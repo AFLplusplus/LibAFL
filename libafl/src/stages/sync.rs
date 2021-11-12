@@ -30,6 +30,7 @@ pub struct SyncFromDiskMetadata {
 crate::impl_serdeany!(SyncFromDiskMetadata);
 
 impl SyncFromDiskMetadata {
+    #[must_use]
     pub fn new(last_time: SystemTime) -> Self {
         Self { last_time }
     }
@@ -80,7 +81,7 @@ where
             if last.is_none() {
                 state
                     .metadata_mut()
-                    .insert::<SyncFromDiskMetadata>(SyncFromDiskMetadata::new(max_time))
+                    .insert(SyncFromDiskMetadata::new(max_time));
             } else {
                 state
                     .metadata_mut()
@@ -107,6 +108,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`]
+    #[must_use]
     pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
         Self {
             sync_dir,
@@ -143,7 +145,7 @@ where
                             continue;
                         }
                     }
-                    max_time = Some(max_time.map(|t: SystemTime| t.max(time)).unwrap_or(time));
+                    max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                     let input = (self.load_callback)(fuzzer, state, &path)?;
                     drop(fuzzer.evaluate_input(state, executor, manager, input)?);
                 }
@@ -151,7 +153,7 @@ where
                 let dir_max_time =
                     self.load_from_directory(&path, last, fuzzer, executor, state, manager)?;
                 if let Some(time) = dir_max_time {
-                    max_time = Some(max_time.map(|t: SystemTime| t.max(time)).unwrap_or(time));
+                    max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                 }
             }
         }
@@ -169,7 +171,8 @@ where
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
-    /// Creates a new [`SyncFromDiskStage`] invoking Input::from_file to load inputs
+    /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
+    #[must_use]
     pub fn with_from_file(sync_dir: PathBuf) -> Self {
         fn load_callback<Z, S, I: Input>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error> {
             I::from_file(p)
