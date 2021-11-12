@@ -15,13 +15,13 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::NautilusInput,
+    monitors::SimpleMonitor,
     mutators::{
         NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, StdScheduledMutator,
     },
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasMetadata, StdState},
-    stats::SimpleStats,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -80,12 +80,12 @@ pub fn main() {
         state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
     }
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| println!("{}", s));
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
+    let mut mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();

@@ -1,4 +1,4 @@
-//! Stats to disply both cumulative and per-client stats
+//! Monitor to disply both cumulative and per-client monitor
 
 use alloc::{string::String, vec::Vec};
 use core::{time, time::Duration};
@@ -8,12 +8,12 @@ use alloc::string::ToString;
 
 use crate::{
     bolts::current_time,
-    stats::{ClientStats, Stats},
+    monitors::{ClientStats, Monitor},
 };
 
-/// Tracking stats during fuzzing and display both per-client and cumulative info.
+/// Tracking monitor during fuzzing and display both per-client and cumulative info.
 #[derive(Clone, Debug)]
-pub struct MultiStats<F>
+pub struct MultiMonitor<F>
 where
     F: FnMut(String),
 {
@@ -22,16 +22,16 @@ where
     client_stats: Vec<ClientStats>,
 }
 
-impl<F> Stats for MultiStats<F>
+impl<F> Monitor for MultiMonitor<F>
 where
     F: FnMut(String),
 {
-    /// the client stats, mutable
+    /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_stats
     }
 
-    /// the client stats
+    /// the client monitor
     fn client_stats(&self) -> &[ClientStats] {
         &self.client_stats
     }
@@ -69,17 +69,17 @@ where
             " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             pad, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
-        for (key, val) in &client.user_stats {
+        for (key, val) in &client.user_monitor {
             fmt += &format!(", {}: {}", key, val);
         }
         (self.print_fn)(fmt);
 
-        // Only print perf stats if the feature is enabled
+        // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance stats. Skip the Client 0 which is the broker
+            // Print the client performance monitor. Skip the Client 0 which is the broker
             for (i, client) in self.client_stats.iter().skip(1).enumerate() {
-                let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_stats);
+                let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_monitor);
                 (self.print_fn)(fmt);
             }
 
@@ -89,11 +89,11 @@ where
     }
 }
 
-impl<F> MultiStats<F>
+impl<F> MultiMonitor<F>
 where
     F: FnMut(String),
 {
-    /// Creates the stats, using the `current_time` as `start_time`.
+    /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn,
@@ -102,7 +102,7 @@ where
         }
     }
 
-    /// Creates the stats with a given `start_time`.
+    /// Creates the monitor with a given `start_time`.
     pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
         Self {
             print_fn,

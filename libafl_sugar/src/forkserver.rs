@@ -20,12 +20,12 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     stages::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
 
@@ -97,7 +97,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let stats = MultiStats::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{}", s));
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Coverage map shared between target and fuzzer
@@ -233,7 +233,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
         let launcher = Launcher::builder()
             .shmem_provider(shmem_provider)
             .configuration(conf)
-            .stats(stats)
+            .monitor(monitor)
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
