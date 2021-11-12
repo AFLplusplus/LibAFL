@@ -188,8 +188,8 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     fn fuzz_loop_for(
         &mut self,
         stages: &mut ST,
-        state: &mut S,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
         iters: u64,
     ) -> Result<usize, Error> {
