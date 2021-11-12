@@ -35,7 +35,7 @@ impl SyncFromDiskMetadata {
     }
 }
 
-/// The default mutational stage
+/// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 pub struct SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
 where
     C: Corpus<I>,
@@ -106,7 +106,7 @@ where
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
-    /// Creates a new default mutational stage
+    /// Creates a new [`SyncFromDiskStage`]
     pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
         Self {
             sync_dir,
@@ -157,5 +157,27 @@ where
         }
 
         Ok(max_time)
+    }
+}
+
+impl<C, E, EM, I, R, S, Z>
+    SyncFromDiskStage<C, fn(&mut Z, &mut S, &Path) -> Result<I, Error>, E, EM, I, R, S, Z>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    Z: Evaluator<E, EM, I, S>,
+{
+    /// Creates a new [`SyncFromDiskStage`] invoking Input::from_file to load inputs
+    pub fn with_from_file(sync_dir: PathBuf) -> Self {
+        fn load_callback<Z, S, I: Input>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error> {
+            I::from_file(p)
+        }
+        Self {
+            sync_dir,
+            load_callback: load_callback::<_, _, I>,
+            phantom: PhantomData,
+        }
     }
 }
