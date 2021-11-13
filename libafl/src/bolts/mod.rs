@@ -88,6 +88,7 @@ pub fn current_milliseconds() -> u64 {
 }
 
 /// Format a `Duration` into a HMS string
+#[must_use]
 pub fn format_duration_hms(duration: &time::Duration) -> String {
     let secs = duration.as_secs();
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
