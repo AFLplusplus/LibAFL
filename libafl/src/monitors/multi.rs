@@ -7,7 +7,7 @@ use core::{time, time::Duration};
 use alloc::string::ToString;
 
 use crate::{
-    bolts::current_time,
+    bolts::{current_time, format_duration_hms},
     monitors::{ClientStats, Monitor},
 };
 
@@ -50,8 +50,9 @@ where
         };
         let head = format!("{}{} {}", event_msg, pad, sender);
         let global_fmt = format!(
-            "[{}]  (GLOBAL) clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
+            format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),

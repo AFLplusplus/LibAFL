@@ -20,6 +20,7 @@ pub mod shmem;
 pub mod staterestore;
 pub mod tuples;
 
+use alloc::string::String;
 use core::time;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -84,4 +85,10 @@ pub fn current_nanos() -> u64 {
 #[inline]
 pub fn current_milliseconds() -> u64 {
     current_time().as_millis() as u64
+}
+
+/// Format a `Duration` into a HMS string
+pub fn format_duration_hms(duration: &time::Duration) -> String {
+    let secs = duration.as_secs();
+    format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
 }

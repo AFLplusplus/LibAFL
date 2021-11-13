@@ -19,9 +19,6 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
-
 #[derive(Serialize, Deserialize)]
 pub struct SyncFromDiskMetadata {
     pub last_time: SystemTime,
