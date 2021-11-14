@@ -10,7 +10,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{ObserversTuple, StacktraceObserver},
-    state::HasClientPerfStats,
+    state::HasClientPerfMonitor,
     Error,
 };
 
@@ -23,7 +23,7 @@ pub struct StacktraceFeedback {
 impl<I, S> Feedback<I, S> for StacktraceFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -39,7 +39,7 @@ where
     {
         let observer = observers
             .match_name::<StacktraceObserver>("StacktraceObserver")
-            .expect("A StacktraceFeedback needs an StacktraceObserver");
+            .expect("A StacktraceFeedback needs a StacktraceObserver");
 
         match observer.stacktrace_hash() {
             Some(hash) => Ok(self.hashset.contains(hash)),
