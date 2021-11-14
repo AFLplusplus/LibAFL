@@ -6,6 +6,11 @@ pub use map::*;
 pub mod cmp;
 pub use cmp::*;
 
+#[cfg(feature = "std")]
+pub mod stacktrace;
+#[cfg(feature = "std")]
+pub use stacktrace::*;
+
 pub mod concolic;
 
 use alloc::string::{String, ToString};
