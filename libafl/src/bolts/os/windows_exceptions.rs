@@ -1,10 +1,10 @@
 //! Exception handling for Windows
 
-pub use crate::bolts::bindings::Windows::Win32::System::Diagnostics::Debug::{
+pub use windows::Win32::System::Diagnostics::Debug::{
     SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
 };
 
-pub use crate::bolts::bindings::Windows::Win32::Foundation::NTSTATUS;
+pub use windows::Win32::Foundation::NTSTATUS;
 
 use crate::Error;
 use std::os::raw::{c_long, c_void};
