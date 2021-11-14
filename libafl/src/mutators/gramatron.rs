@@ -18,7 +18,7 @@ where
     S: HasRand<R> + HasMetadata,
     R: Rand,
 {
-    generator: &'a GramatronGenerator<R, S>,
+    generator: &'a GramatronGenerator<'a, R, S>,
 }
 
 impl<'a, R, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, R, S>
@@ -61,13 +61,13 @@ where
 {
     /// Creates a new [`GramatronRandomMutator`].
     #[must_use]
-    pub fn new(generator: &'a GramatronGenerator<R, S>) -> Self {
+    pub fn new(generator: &'a GramatronGenerator<'a, R, S>) -> Self {
         Self { generator }
     }
 }
 
 #[derive(Serialize, Deserialize)]
-struct GramatronIdxMapMetadata {
+pub struct GramatronIdxMapMetadata {
     pub map: HashMap<usize, Vec<usize>>,
 }
 

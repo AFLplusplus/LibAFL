@@ -8,6 +8,8 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 pub mod mutational;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
+pub mod push;
+
 pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
@@ -15,7 +17,6 @@ pub mod calibrate;
 pub use calibrate::{CalibrationStage, PowerScheduleMetadata};
 
 pub mod power;
-use crate::Error;
 pub use power::PowerMutationalStage;
 
 #[cfg(feature = "std")]
@@ -24,6 +25,14 @@ pub mod concolic;
 pub use concolic::ConcolicTracingStage;
 #[cfg(feature = "std")]
 pub use concolic::SimpleConcolicMutationalStage;
+
+#[cfg(feature = "std")]
+pub mod sync;
+#[cfg(feature = "std")]
+pub use sync::*;
+
+use crate::Error;
+use core::{convert::From, marker::PhantomData};
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -85,5 +94,52 @@ where
         // Execute the remaining stages
         self.1
             .perform_all(fuzzer, executor, state, manager, corpus_idx)
+    }
+}
+
+pub struct ClosureStage<CB, E, EM, S, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+{
+    closure: CB,
+    phantom: PhantomData<(E, EM, S, Z)>,
+}
+
+impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for ClosureStage<CB, E, EM, S, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+{
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+        corpus_idx: usize,
+    ) -> Result<(), Error> {
+        (self.closure)(fuzzer, executor, state, manager, corpus_idx)
+    }
+}
+
+impl<CB, E, EM, S, Z> ClosureStage<CB, E, EM, S, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+{
+    #[must_use]
+    pub fn new(closure: CB) -> Self {
+        Self {
+            closure,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<CB, E, EM, S, Z> From<CB> for ClosureStage<CB, E, EM, S, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+{
+    #[must_use]
+    fn from(closure: CB) -> Self {
+        Self::new(closure)
     }
 }

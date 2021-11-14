@@ -17,6 +17,8 @@ members = [
     "libafl_concolic/symcc_libafl",
     "libafl_concolic/test/dump_constraints",
     "libafl_concolic/test/runtime_test",
+    "utils/deexit",
+    "utils/gramatron/construct_automata",
 ]
 default-members = [
     "libafl",
@@ -27,4 +29,5 @@ default-members = [
 exclude = [
     "fuzzers",
     "bindings",
+    "scripts",
 ]

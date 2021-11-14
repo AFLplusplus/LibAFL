@@ -2,13 +2,14 @@
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
-    convert::TryFrom,
     fmt::{self, Display, Formatter},
     mem, ptr,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
 
+#[cfg(feature = "std")]
+use nix::errno::{errno, Errno};
 #[cfg(feature = "std")]
 use std::ffi::CString;
 
@@ -63,6 +64,10 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use crate::Error;
 
 pub use libc::{c_void, siginfo_t};
+
+extern "C" {
+    fn getcontext(ucp: *mut ucontext_t) -> c_int;
+}
 
 /// All signals on this system, as `enum`.
 #[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
@@ -195,13 +200,12 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     if SIGNAL_STACK_PTR.is_null() {
         SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
 
-        if SIGNAL_STACK_PTR.is_null() {
-            // Rust always panics on OOM, so we will, too.
-            panic!(
-                "Failed to allocate signal stack with {} bytes!",
-                SIGNAL_STACK_SIZE
-            );
-        }
+        // Rust always panics on OOM, so we will, too.
+        assert!(
+            !SIGNAL_STACK_PTR.is_null(),
+            "Failed to allocate signal stack with {} bytes!",
+            SIGNAL_STACK_SIZE
+        );
     }
     let mut ss: stack_t = mem::zeroed();
     ss.ss_size = SIGNAL_STACK_SIZE;
@@ -234,4 +238,33 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     compiler_fence(Ordering::SeqCst);
 
     Ok(())
+}
+
+/// Function to get the current [`ucontext_t`] for this process.
+/// This calls the libc `getcontext` function under the hood.
+/// It can be useful, for example for `dump_regs`.
+/// Note that calling this method may, of course, alter the state.
+/// We wrap it here, as it seems to be (currently)
+/// not available on `MacOS` in the `libc` crate.
+#[cfg(unix)]
+#[allow(clippy::inline_always)] // we assume that inlining will destroy less state
+#[inline(always)]
+pub fn ucontext() -> Result<ucontext_t, Error> {
+    let mut ucontext = unsafe { mem::zeroed() };
+    if unsafe { getcontext(&mut ucontext) } == 0 {
+        Ok(ucontext)
+    } else {
+        #[cfg(not(feature = "std"))]
+        unsafe {
+            libc::perror(b"Failed to get ucontext\n".as_ptr() as _)
+        };
+        #[cfg(not(feature = "std"))]
+        return Err(Error::Unknown("Failed to get ucontex".into()));
+
+        #[cfg(feature = "std")]
+        Err(Error::Unknown(format!(
+            "Failed to get ucontext: {:?}",
+            Errno::from_i32(errno())
+        )))
+    }
 }

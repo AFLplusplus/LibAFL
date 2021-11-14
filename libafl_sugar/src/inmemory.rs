@@ -21,12 +21,12 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::{I2SRandReplace, Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
 
@@ -85,9 +85,11 @@ where
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
             println!("Out dir at {:?} already exists.", &out_dir);
-            if !out_dir.is_dir() {
-                panic!("Out dir at {:?} is not a valid directory!", &out_dir);
-            }
+            assert!(
+                out_dir.is_dir(),
+                "Out dir at {:?} is not a valid directory!",
+                &out_dir
+            );
         }
         let mut crashes = out_dir.clone();
         crashes.push("crashes");
@@ -97,7 +99,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let stats = MultiStats::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{}", s));
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
@@ -252,7 +254,7 @@ where
         let launcher = Launcher::builder()
             .shmem_provider(shmem_provider)
             .configuration(conf)
-            .stats(stats)
+            .monitor(monitor)
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)

@@ -25,12 +25,13 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::{I2SRandReplace, Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
+    Error,
 };
 
 use libafl_targets::{
@@ -81,7 +82,7 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
@@ -230,10 +231,10 @@ pub fn libafl_main() {
         Ok(())
     };
 
-    Launcher::builder()
+    match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
-        .stats(stats)
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)
@@ -241,5 +242,8 @@ pub fn libafl_main() {
         //.stdout_file(Some("/dev/null"))
         .build()
         .launch()
-        .expect("Launcher failed");
+    {
+        Ok(_) | Err(Error::ShuttingDown) => (),
+        Err(e) => panic!("{:?}", e),
+    };
 }

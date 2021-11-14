@@ -14,6 +14,11 @@ pub mod stacktrace;
 #[cfg(feature = "std")]
 pub use stacktrace::StacktraceFeedback;
 
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +29,7 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     observers::{ObserversTuple, TimeObserver},
-    state::HasClientPerfStats,
+    state::HasClientPerfMonitor,
     Error,
 };
 
@@ -36,7 +41,7 @@ use core::{marker::PhantomData, time::Duration};
 pub trait Feedback<I, S>: Named
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// `is_interesting ` return if an input is worth the addition to the corpus
     fn is_interesting<EM, OT>(
@@ -76,7 +81,7 @@ where
 
         // Add this stat to the feedback metrics
         state
-            .introspection_stats_mut()
+            .introspection_monitor_mut()
             .update_feedback(self.name(), elapsed);
 
         ret
@@ -136,7 +141,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     pub first: A,
     pub second: B,
@@ -150,7 +155,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name(&self) -> &str {
         self.name.as_ref()
@@ -163,7 +168,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     pub fn new(first: A, second: B) -> Self {
         let name = format!("{} ({},{})", FL::name(), first.name(), second.name());
@@ -182,7 +187,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -249,7 +254,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str;
 
@@ -292,7 +297,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Eager OR"
@@ -343,7 +348,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Fast OR"
@@ -400,7 +405,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Eager AND"
@@ -451,7 +456,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Fast AND"
@@ -526,7 +531,7 @@ pub struct NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// The feedback to invert
     pub first: A,
@@ -539,7 +544,7 @@ impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -573,7 +578,7 @@ impl<A, I, S> Named for NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -585,7 +590,7 @@ impl<A, I, S> NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
@@ -598,7 +603,7 @@ where
     }
 }
 
-/// Variadic macro to create a chain of AndFeedback
+/// Variadic macro to create a chain of [`AndFeedback`](EagerAndFeedback)
 #[macro_export]
 macro_rules! feedback_and {
     ( $last:expr ) => { $last };
@@ -609,7 +614,7 @@ macro_rules! feedback_and {
     };
 }
 ///
-/// Variadic macro to create a chain of (fast) AndFeedback
+/// Variadic macro to create a chain of (fast) [`AndFeedback`](FastAndFeedback)
 #[macro_export]
 macro_rules! feedback_and_fast {
     ( $last:expr ) => { $last };
@@ -620,7 +625,7 @@ macro_rules! feedback_and_fast {
     };
 }
 
-/// Variadic macro to create a chain of OrFeedback
+/// Variadic macro to create a chain of [`OrFeedback`](EagerOrFeedback)
 #[macro_export]
 macro_rules! feedback_or {
     ( $last:expr ) => { $last };
@@ -641,7 +646,7 @@ macro_rules! feedback_or_fast {
     };
 }
 
-/// Variadic macro to create a NotFeedback
+/// Variadic macro to create a [`NotFeedback`]
 #[macro_export]
 macro_rules! feedback_not {
     ( $last:expr ) => {
@@ -653,7 +658,7 @@ macro_rules! feedback_not {
 impl<I, S> Feedback<I, S> for ()
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -685,7 +690,7 @@ pub struct CrashFeedback {}
 impl<I, S> Feedback<I, S> for CrashFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -735,7 +740,7 @@ pub struct TimeoutFeedback {}
 impl<I, S> Feedback<I, S> for TimeoutFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -790,7 +795,7 @@ pub struct TimeFeedback {
 impl<I, S> Feedback<I, S> for TimeFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,

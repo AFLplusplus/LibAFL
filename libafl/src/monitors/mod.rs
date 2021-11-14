@@ -1,7 +1,7 @@
 //! Keep stats, and dispaly them to the user. Usually used in a broker, or main node, of some sort.
 
 pub mod multi;
-pub use multi::MultiStats;
+pub use multi::MultiMonitor;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,14 +12,12 @@ use hashbrown::HashMap;
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
-#[cfg(feature = "introspection")]
-use core::convert::TryInto;
 
-use crate::bolts::current_time;
+use crate::bolts::{current_time, format_duration_hms};
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
-/// User-defined stats types
+/// User-defined stat types
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
     Number(u64),
@@ -43,10 +41,10 @@ impl fmt::Display for UserStats {
     }
 }
 
-/// A simple struct to keep track of client stats
+/// A simple struct to keep track of client monitor
 #[derive(Debug, Clone, Default)]
 pub struct ClientStats {
-    // stats (maybe we need a separated struct?)
+    // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
     pub corpus_size: u64,
     /// The total executions for this client
@@ -59,12 +57,12 @@ pub struct ClientStats {
     pub last_window_time: time::Duration,
     /// The last executions per sec
     pub last_execs_per_sec: f32,
-    /// User-defined stats
-    pub user_stats: HashMap<String, UserStats>,
+    /// User-defined monitor
+    pub user_monitor: HashMap<String, UserStats>,
 
     /// Client performance statistics
     #[cfg(feature = "introspection")]
-    pub introspection_stats: ClientPerfStats,
+    pub introspection_monitor: ClientPerfMonitor,
 }
 
 impl ClientStats {
@@ -123,33 +121,33 @@ impl ClientStats {
 
     /// Update the user-defined stat with name and value
     pub fn update_user_stats(&mut self, name: String, value: UserStats) {
-        self.user_stats.insert(name, value);
+        self.user_monitor.insert(name, value);
     }
 
     /// Get a user-defined stat using the name
     pub fn get_user_stats(&mut self, name: &str) -> Option<&UserStats> {
-        self.user_stats.get(name)
+        self.user_monitor.get(name)
     }
 
-    /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
+    /// Update the current [`ClientPerfMonitor`] with the given [`ClientPerfMonitor`]
     #[cfg(feature = "introspection")]
-    pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
-        self.introspection_stats = introspection_stats;
+    pub fn update_introspection_monitor(&mut self, introspection_monitor: ClientPerfMonitor) {
+        self.introspection_monitor = introspection_monitor;
     }
 }
 
-/// The stats trait keeps track of all the client's stats, and offers methods to dispaly them.
-pub trait Stats {
-    /// the client stats (mut)
+/// The monitor trait keeps track of all the client's monitor, and offers methods to dispaly them.
+pub trait Monitor {
+    /// the client monitor (mut)
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
 
-    /// the client stats
+    /// the client monitor
     fn client_stats(&self) -> &[ClientStats];
 
     /// creation time
     fn start_time(&mut self) -> time::Duration;
 
-    /// show the stats to the user
+    /// show the monitor to the user
     fn display(&mut self, event_msg: String, sender_id: u32);
 
     /// Amount of elements in the corpus (combined for all children)
@@ -183,7 +181,7 @@ pub trait Stats {
             .fold(0_u64, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
-    /// The client stats for a specific id, creating new if it doesn't exist
+    /// The client monitor for a specific id, creating new if it doesn't exist
     fn client_stats_mut_for(&mut self, client_id: u32) -> &mut ClientStats {
         let client_stat_count = self.client_stats().len();
         for _ in client_stat_count..(client_id + 1) as usize {
@@ -196,20 +194,20 @@ pub trait Stats {
     }
 }
 
-/// Stats that print exactly nothing.
+/// Monitor that print exactly nothing.
 /// Not good for debuging, very good for speed.
-pub struct NopStats {
+pub struct NopMonitor {
     start_time: Duration,
     client_stats: Vec<ClientStats>,
 }
 
-impl Stats for NopStats {
-    /// the client stats, mutable
+impl Monitor for NopMonitor {
+    /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_stats
     }
 
-    /// the client stats
+    /// the client monitor
     fn client_stats(&self) -> &[ClientStats] {
         &self.client_stats
     }
@@ -222,8 +220,8 @@ impl Stats for NopStats {
     fn display(&mut self, _event_msg: String, _sender_id: u32) {}
 }
 
-impl NopStats {
-    /// Create new [`NopStats`]
+impl NopMonitor {
+    /// Create new [`NopMonitor`]
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -233,15 +231,15 @@ impl NopStats {
     }
 }
 
-impl Default for NopStats {
+impl Default for NopMonitor {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Tracking stats during fuzzing.
+/// Tracking monitor during fuzzing.
 #[derive(Clone, Debug)]
-pub struct SimpleStats<F>
+pub struct SimpleMonitor<F>
 where
     F: FnMut(String),
 {
@@ -250,16 +248,16 @@ where
     client_stats: Vec<ClientStats>,
 }
 
-impl<F> Stats for SimpleStats<F>
+impl<F> Monitor for SimpleMonitor<F>
 where
     F: FnMut(String),
 {
-    /// the client stats, mutable
+    /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_stats
     }
 
-    /// the client stats
+    /// the client monitor
     fn client_stats(&self) -> &[ClientStats] {
         &self.client_stats
     }
@@ -271,9 +269,10 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
+            format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
@@ -282,13 +281,13 @@ where
         );
         (self.print_fn)(fmt);
 
-        // Only print perf stats if the feature is enabled
+        // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance stats.
+            // Print the client performance monitor.
             let fmt = format!(
                 "Client {:03}:\n{}",
-                sender_id, self.client_stats[sender_id as usize].introspection_stats
+                sender_id, self.client_stats[sender_id as usize].introspection_monitor
             );
             (self.print_fn)(fmt);
 
@@ -298,11 +297,11 @@ where
     }
 }
 
-impl<F> SimpleStats<F>
+impl<F> SimpleMonitor<F>
 where
     F: FnMut(String),
 {
-    /// Creates the stats, using the `current_time` as `start_time`.
+    /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn,
@@ -311,7 +310,7 @@ where
         }
     }
 
-    /// Creates the stats with a given `start_time`.
+    /// Creates the monitor with a given `start_time`.
     pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
         Self {
             print_fn,
@@ -326,7 +325,7 @@ macro_rules! start_timer {
     ($state:expr) => {{
         // Start the timer
         #[cfg(feature = "introspection")]
-        $state.introspection_stats_mut().start_timer();
+        $state.introspection_monitor_mut().start_timer();
     }};
 }
 
@@ -335,7 +334,9 @@ macro_rules! mark_feature_time {
     ($state:expr, $feature:expr) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
-        $state.introspection_stats_mut().mark_feature_time($feature);
+        $state
+            .introspection_monitor_mut()
+            .mark_feature_time($feature);
     }};
 }
 
@@ -344,13 +345,13 @@ macro_rules! mark_feedback_time {
     ($state:expr) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
-        $state.introspection_stats_mut().mark_feedback_time();
+        $state.introspection_monitor_mut().mark_feedback_time();
     }};
 }
 
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ClientPerfStats {
+pub struct ClientPerfMonitor {
     /// Starting counter (in clock cycles from `read_time_counter`)
     start_time: u64,
 
@@ -467,8 +468,8 @@ impl From<usize> for PerfFeature {
 pub const NUM_PERF_FEATURES: usize = PerfFeature::Count as usize;
 
 #[cfg(feature = "introspection")]
-impl ClientPerfStats {
-    /// Create a blank [`ClientPerfStats`] with the `start_time` and `current_time` with
+impl ClientPerfMonitor {
+    /// Create a blank [`ClientPerfMonitor`] with the `start_time` and `current_time` with
     /// the current clock counter
     #[must_use]
     pub fn new() -> Self {
@@ -499,13 +500,13 @@ impl ClientPerfStats {
         self.timer_start = Some(crate::bolts::cpu::read_time_counter());
     }
 
-    /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
-    pub fn update(&mut self, stats: &ClientPerfStats) {
-        self.set_current_time(stats.current_time);
-        self.update_scheduler(stats.scheduler);
-        self.update_manager(stats.manager);
-        self.update_stages(&stats.stages);
-        self.update_feedbacks(&stats.feedbacks);
+    /// Update the current [`ClientPerfMonitor`] with the given [`ClientPerfMonitor`]
+    pub fn update(&mut self, monitor: &ClientPerfMonitor) {
+        self.set_current_time(monitor.current_time);
+        self.update_scheduler(monitor.scheduler);
+        self.update_manager(monitor.manager);
+        self.update_stages(&monitor.stages);
+        self.update_feedbacks(&monitor.feedbacks);
     }
 
     /// Gets the elapsed time since the internal timer started. Resets the timer when
@@ -564,7 +565,7 @@ impl ClientPerfStats {
         self.update_feature(feature, elapsed);
     }
 
-    /// Add the given `time` to the `scheduler` stats
+    /// Add the given `time` to the `scheduler` monitor
     #[inline]
     pub fn update_scheduler(&mut self, time: u64) {
         self.scheduler = self
@@ -573,7 +574,7 @@ impl ClientPerfStats {
             .expect("update_scheduler overflow");
     }
 
-    /// Add the given `time` to the `manager` stats
+    /// Add the given `time` to the `manager` monitor
     #[inline]
     pub fn update_manager(&mut self, time: u64) {
         self.manager = self
@@ -691,10 +692,10 @@ impl ClientPerfStats {
 }
 
 #[cfg(feature = "introspection")]
-impl core::fmt::Display for ClientPerfStats {
+impl core::fmt::Display for ClientPerfMonitor {
     #[allow(clippy::cast_precision_loss)]
     fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        // Calculate the elapsed time from the stats
+        // Calculate the elapsed time from the monitor
         let elapsed: f64 = self.elapsed_cycles() as f64;
 
         // Calculate the percentages for each benchmark
@@ -764,7 +765,7 @@ impl core::fmt::Display for ClientPerfStats {
 }
 
 #[cfg(feature = "introspection")]
-impl Default for ClientPerfStats {
+impl Default for ClientPerfMonitor {
     #[must_use]
     fn default() -> Self {
         Self::new()

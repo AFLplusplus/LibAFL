@@ -13,8 +13,8 @@ use libafl::{
         tuples::{tuple_list, Merge},
     },
     corpus::{
-        ondisk::OnDiskMetadataFormat, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
+        ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus,
+        IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{
@@ -25,6 +25,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
+    monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
@@ -33,7 +34,6 @@ use libafl::{
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
 
@@ -156,6 +156,7 @@ where
     ) -> Self {
         let mut stalker = Stalker::new(gum);
 
+        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
         for range in helper.ranges().gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(
@@ -276,7 +277,7 @@ unsafe fn fuzz(
     configuration: String,
 ) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let shmem_provider = StdShMemProvider::new()?;
 
@@ -346,7 +347,7 @@ unsafe fn fuzz(
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                OnDiskCorpus::new(PathBuf::from("./corpus_discovered")).unwrap(),
+                CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new_save_meta(
@@ -457,7 +458,7 @@ unsafe fn fuzz(
     Launcher::builder()
         .configuration(EventConfig::from_name(&configuration))
         .shmem_provider(shmem_provider)
-        .stats(stats)
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(cores)
         .broker_port(broker_port)

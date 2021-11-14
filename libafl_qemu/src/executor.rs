@@ -10,7 +10,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasSolutions},
+    state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
 
@@ -333,6 +333,7 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let mut res = SyscallHookResult::new(None);
     for hook in unsafe { &SYSCALL_HOOKS } {
+        #[allow(clippy::type_complexity)]
         let func: fn(
             &mut QT,
             &mut S,
@@ -385,7 +386,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let slf = Self {
@@ -585,6 +586,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
+    #[allow(clippy::type_complexity)]
     pub fn hook_syscalls(
         &self,
         hook: fn(

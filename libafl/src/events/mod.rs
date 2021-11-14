@@ -14,25 +14,19 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    executors::ExitKind, inputs::Input, observers::ObserversTuple, stats::UserStats, Error,
+    executors::ExitKind, inputs::Input, monitors::UserStats, observers::ObserversTuple, Error,
 };
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct EventManagerId {
     /// The id
     pub id: usize,
 }
 
-impl Default for EventManagerId {
-    fn default() -> Self {
-        Self { id: 0 }
-    }
-}
-
 #[cfg(feature = "introspection")]
-use crate::stats::ClientPerfStats;
+use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "introspection")]
 use alloc::boxed::Box;
 
@@ -175,8 +169,8 @@ where
         /// The executions of this client
         executions: usize,
     },
-    /// New stats.
-    UpdateStats {
+    /// New stats event to monitor.
+    UpdateExecutions {
         /// The time of generation of the [`Event`]
         time: Duration,
         /// The executions of this client
@@ -184,18 +178,18 @@ where
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
-    /// New stats.
+    /// New user stats event to monitor.
     UpdateUserStats {
-        /// Custom user stats name
+        /// Custom user monitor name
         name: String,
-        /// Custom user stats value
+        /// Custom user monitor value
         value: UserStats,
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
-    /// New stats with performance stats.
+    /// New monitor with performance monitor.
     #[cfg(feature = "introspection")]
-    UpdatePerfStats {
+    UpdatePerfMonitor {
         /// The time of generation of the event
         time: Duration,
 
@@ -203,7 +197,7 @@ where
         executions: usize,
 
         /// Current performance statistics
-        introspection_stats: Box<ClientPerfStats>,
+        introspection_monitor: Box<ClientPerfMonitor>,
 
         phantom: PhantomData<I>,
     },
@@ -243,7 +237,7 @@ where
                 time: _,
                 executions: _,
             } => "Testcase",
-            Event::UpdateStats {
+            Event::UpdateExecutions {
                 time: _,
                 executions: _,
                 phantom: _,
@@ -254,12 +248,12 @@ where
                 phantom: _,
             } => "Stats",
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfStats {
+            Event::UpdatePerfMonitor {
                 time: _,
                 executions: _,
-                introspection_stats: _,
+                introspection_monitor: _,
                 phantom: _,
-            } => "PerfStats",
+            } => "PerfMonitor",
             Event::Objective { objective_size: _ } => "Objective",
             Event::Log {
                 severity_level: _,

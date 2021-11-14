@@ -19,7 +19,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::Input,
-    stats::ClientPerfStats,
+    monitors::ClientPerfMonitor,
     Error,
 };
 
@@ -71,13 +71,13 @@ where
     fn rand_mut(&mut self) -> &mut R;
 }
 
-/// Trait for offering a [`ClientPerfStats`]
-pub trait HasClientPerfStats {
-    /// [`ClientPerfStats`] itself
-    fn introspection_stats(&self) -> &ClientPerfStats;
+/// Trait for offering a [`ClientPerfMonitor`]
+pub trait HasClientPerfMonitor {
+    /// [`ClientPerfMonitor`] itself
+    fn introspection_monitor(&self) -> &ClientPerfMonitor;
 
-    /// Mutatable ref to [`ClientPerfStats`]
-    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats;
+    /// Mutatable ref to [`ClientPerfMonitor`]
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
 }
 
 /// Trait for elements offering metadata
@@ -166,7 +166,7 @@ where
 
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
-    introspection_stats: ClientPerfStats,
+    introspection_monitor: ClientPerfMonitor,
 
     phantom: PhantomData<I>,
 }
@@ -559,14 +559,14 @@ where
             solutions,
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
-            introspection_stats: ClientPerfStats::new(),
+            introspection_monitor: ClientPerfMonitor::new(),
             phantom: PhantomData,
         }
     }
 }
 
 #[cfg(feature = "introspection")]
-impl<C, FT, I, R, SC> HasClientPerfStats for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -574,17 +574,17 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    fn introspection_stats(&self) -> &ClientPerfStats {
-        &self.introspection_stats
+    fn introspection_monitor(&self) -> &ClientPerfMonitor {
+        &self.introspection_monitor
     }
 
-    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
-        &mut self.introspection_stats
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+        &mut self.introspection_monitor
     }
 }
 
 #[cfg(not(feature = "introspection"))]
-impl<C, FT, I, R, SC> HasClientPerfStats for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -592,11 +592,11 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    fn introspection_stats(&self) -> &ClientPerfStats {
+    fn introspection_monitor(&self) -> &ClientPerfMonitor {
         unimplemented!()
     }
 
-    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         unimplemented!()
     }
 }

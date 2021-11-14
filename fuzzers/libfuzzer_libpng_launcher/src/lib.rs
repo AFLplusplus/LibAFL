@@ -26,12 +26,12 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
 
@@ -58,7 +58,7 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
         let corpus_dirs = &[PathBuf::from("./corpus")];
@@ -168,7 +168,7 @@ pub fn libafl_main() {
     match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
-        .stats(stats)
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)

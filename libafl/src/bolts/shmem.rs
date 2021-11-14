@@ -63,10 +63,7 @@ pub type StdShMemService = DummyShMemService;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
-use std::{
-    convert::{TryFrom, TryInto},
-    env,
-};
+use std::env;
 
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
@@ -198,7 +195,7 @@ pub trait ShMem: Sized + Debug + Clone {
 /// A [`ShMemProvider`] provides access to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
-pub trait ShMemProvider: Send + Clone + Default + Debug {
+pub trait ShMemProvider: Clone + Default + Debug {
     /// The actual shared map handed out by this [`ShMemProvider`].
     type Mem: ShMem;
 
@@ -311,8 +308,8 @@ where
     parent_child_pipe: Option<Pipe>,
 }
 
-#[cfg(all(unix, feature = "std"))]
-unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
+//#[cfg(all(unix, feature = "std"))]
+//unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
 
 #[cfg(all(unix, feature = "std"))]
 impl<SP> ShMemProvider for RcShMemProvider<SP>
@@ -487,7 +484,7 @@ pub mod unix_shmem {
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
 
-        use core::{convert::TryInto, ptr, slice};
+        use core::{ptr, slice};
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,
@@ -703,16 +700,18 @@ pub mod unix_shmem {
         impl Drop for MmapShMem {
             fn drop(&mut self) {
                 unsafe {
-                    if self.map.is_null() {
-                        panic!("Map should never be null for MmapShMem (on Drop)");
-                    }
+                    assert!(
+                        !self.map.is_null(),
+                        "Map should never be null for MmapShMem (on Drop)"
+                    );
 
                     munmap(self.map as *mut _, self.map_size);
                     self.map = ptr::null_mut();
 
-                    if self.shm_fd == -1 {
-                        panic!("FD should never be -1 for MmapShMem (on Drop)");
-                    }
+                    assert!(
+                        self.shm_fd != -1,
+                        "FD should never be -1 for MmapShMem (on Drop)"
+                    );
 
                     // None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
                     if let Some(filename_path) = self.filename_path {

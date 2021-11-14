@@ -8,7 +8,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 proc-macro = true

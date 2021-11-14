@@ -82,7 +82,7 @@ where
 {
     fn id(&self) -> ShMemId {
         let client_id = self.inner.id();
-        ShMemId::from_string(&format!("{}:{}", self.server_fd, client_id.to_string()))
+        ShMemId::from_string(&format!("{}:{}", self.server_fd, client_id))
     }
 
     fn len(&self) -> usize {

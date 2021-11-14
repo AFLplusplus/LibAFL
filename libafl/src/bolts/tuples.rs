@@ -35,7 +35,7 @@ const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 }
 
 /// Gets the length of the element
-pub trait HasLen {
+pub trait HasConstLen {
     /// The length as constant `usize`
     const LEN: usize;
 
@@ -47,7 +47,7 @@ pub trait HasLen {
     }
 }
 
-impl HasLen for () {
+impl HasConstLen for () {
     const LEN: usize = 0;
 
     fn len(&self) -> usize {
@@ -55,9 +55,9 @@ impl HasLen for () {
     }
 }
 
-impl<Head, Tail> HasLen for (Head, Tail)
+impl<Head, Tail> HasConstLen for (Head, Tail)
 where
-    Tail: HasLen,
+    Tail: HasConstLen,
 {
     const LEN: usize = 1 + Tail::LEN;
 
@@ -78,7 +78,7 @@ pub trait HasNameId {
 }
 
 /// Gets the id and `const_name` for the given index in a tuple
-pub trait HasNameIdTuple: HasLen {
+pub trait HasNameIdTuple: HasConstLen {
     /// Gets the `const_name` for the entry at the given index
     fn const_name_for(&self, index: usize) -> Option<&'static str>;
 
@@ -199,7 +199,7 @@ pub trait Named {
 }
 
 /// A named tuple
-pub trait NamedTuple: HasLen {
+pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&str>;
 }

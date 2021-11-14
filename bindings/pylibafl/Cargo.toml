@@ -1,7 +1,7 @@
 [package]
 name = "pylibafl"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 pyo3 = { version = "0.14.3", features = ["extension-module"] }

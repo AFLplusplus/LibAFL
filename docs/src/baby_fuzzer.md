@@ -121,15 +121,15 @@ As the second parameter, it takes an instance of something implementing the Corp
 
 We will discuss the last parameter later. The third parameter is another corpus, in this case, to store the testcases that are considered as "solutions" for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
 
-Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a Stats instance.
+Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a `Monitor` instance.
 
 ```rust,ignore
-// The Stats trait define how the fuzzer stats are reported to the user
-let stats = SimpleStats::new(|s| println!("{}", s));
+// The Monitor trait defines how the fuzzer stats are displayed to the user
+let mon = SimpleMonitor::new(|s| println!("{}", s));
 
 // The event manager handle the various events generated during the fuzzing loop
 // such as the notification of the addition of a new item to the corpus
-let mut mgr = SimpleEventManager::new(stats);
+let mut mgr = SimpleEventManager::new(mon);
 ```
 
 In addition, we have the Fuzzer, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
@@ -172,7 +172,7 @@ let mut generator = RandPrintablesGenerator::new(32);
 
 // Generate 8 initial inputs
 state
-    .generate_initial_inputs(&mut executor, &mut generator, &mut mgr, &scheduler, 8)
+    .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
     .expect("Failed to generate the initial corpus".into());
 ```
 
@@ -187,10 +187,11 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
+    fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     state::StdState,
-    stats::SimpleStats,
 };
 ```
 
@@ -257,27 +258,33 @@ The observers are usually kept in the corresponding executor as they keep track 
 
 ```rust,ignore
 // Create the executor for an in-process function with just one observer
-let mut executor =
-    InProcessExecutor::new(&mut harness, tuple_list!(observer), &mut state, &mut mgr)
-        .expect("Failed to create the Executor".into());
+let mut executor = InProcessExecutor::new(
+    &mut harness,
+    tuple_list!(observer),
+    &mut fuzzer,
+    &mut state,
+    &mut mgr,
+)
+.expect("Failed to create the Executor".into());
 ```
 
 Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback. The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a so-called FeedbackState instance, in our case it maintains the set of conditions satisfied in the previous runs.
 
 We use MaxMapFeedback, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
 
-Feedbacks are used also to decide if an input is a "solution". The feedback that does that is called the Objective Feedback and when it rates an input as interested it is not saved to the corpus but to the solutions, written in the `crashes` folder in our case. We use the CrashFeedback to tell the fuzzer that if an input causes the program to crash it is a solution for us.
+Feedbacks are used also to decide if an input is a "solution". The feedback that does that is called the Objective Feedback and when it rates an input as interesting it is not saved to the corpus but to the solutions, written in the `crashes` folder in our case. We use the CrashFeedback to tell the fuzzer that if an input causes the program to crash it is a solution for us.
 
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
 ```rust,ignore
 extern crate libafl;
 use libafl::{
-    bolts::{rands::StdRand,
-    corpus::{InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
-    events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     feedbacks::{MapFeedbackState, MaxMapFeedback, CrashFeedback},
-    fuzzer::{StdFuzzer},
+    fuzzer::StdFuzzer,
+    state::StdState,
+    observers::StdMapObserver,
 };
 
 // The state of the edges feedback.
@@ -318,6 +325,14 @@ Another central component of LibAFL are the Stages, that are actions done on ind
 As the last step, we create a MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
 
 ```rust,ignore
+use libafl::{
+    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    stages::mutational::StdMutationalStage,
+    fuzzer::Fuzzer,
+};
+
+// ...
+
 // Setup a mutational stage with a basic bytes mutator
 let mutator = StdScheduledMutator::new(havoc_mutations());
 let mut stages = tuple_list!(StdMutationalStage::new(mutator));

@@ -6,8 +6,11 @@ pub mod compress;
 pub mod cpu;
 #[cfg(feature = "std")]
 pub mod fs;
+#[cfg(feature = "std")]
 pub mod launcher;
 pub mod llmp;
+#[cfg(all(feature = "std", unix))]
+pub mod minibsod;
 pub mod os;
 pub mod ownedref;
 pub mod rands;
@@ -17,6 +20,7 @@ pub mod shmem;
 pub mod staterestore;
 pub mod tuples;
 
+use alloc::string::String;
 use core::time;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,6 +29,22 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub trait AsSlice<T> {
     /// Convert to a slice
     fn as_slice(&self) -> &[T];
+}
+
+/// Has a length field
+pub trait HasLen {
+    /// The length
+    fn len(&self) -> usize;
+
+    /// Returns `true` if it has no elements.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+pub trait HasRefCnt {
+    fn refcnt(&self) -> isize;
+    fn refcnt_mut(&mut self) -> &mut isize;
 }
 
 /// Current time
@@ -65,4 +85,11 @@ pub fn current_nanos() -> u64 {
 #[inline]
 pub fn current_milliseconds() -> u64 {
     current_time().as_millis() as u64
+}
+
+/// Format a `Duration` into a HMS string
+#[must_use]
+pub fn format_duration_hms(duration: &time::Duration) -> String {
+    let secs = duration.as_secs();
+    format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
 }

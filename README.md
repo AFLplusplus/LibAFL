@@ -104,3 +104,10 @@ for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
 </sub>
 
+<br>
+
+<sub>
+Dependencies under more restrictive licenses, such as GPL or AGPL, can be enabled
+using the respective feature in each crate when it is present, such as the
+'agpl' feature of the libafl crate.
+</sub>

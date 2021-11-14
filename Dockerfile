@@ -64,6 +64,8 @@ COPY scripts/dummy.rs libafl_concolic/symcc_runtime/src/lib.rs
 COPY libafl_concolic/symcc_libafl/Cargo.toml libafl_concolic/symcc_libafl/
 COPY scripts/dummy.rs libafl_concolic/symcc_libafl/src/lib.rs
 
+COPY utils utils
+
 RUN cargo build && cargo build --release
 
 COPY scripts scripts

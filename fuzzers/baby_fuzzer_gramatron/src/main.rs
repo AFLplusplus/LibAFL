@@ -14,9 +14,10 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
-    fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     generators::{Automaton, GramatronGenerator},
     inputs::GramatronInput,
+    monitors::SimpleMonitor,
     mutators::{
         GramatronRandomMutator, GramatronRecursionMutator, GramatronSpliceMutator,
         StdScheduledMutator,
@@ -24,7 +25,6 @@ use libafl::{
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
-    stats::SimpleStats,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -38,8 +38,10 @@ fn signals_set(idx: usize) {
 
 fn read_automaton_from_file<P: AsRef<Path>>(path: P) -> Automaton {
     let file = fs::File::open(path).unwrap();
-    let reader = BufReader::new(file);
-    serde_json::from_reader(reader).unwrap()
+    let mut reader = BufReader::new(file);
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer).unwrap();
+    postcard::from_bytes(&buffer).unwrap()
 }
 
 #[allow(clippy::similar_names)]
@@ -81,12 +83,12 @@ pub fn main() {
         tuple_list!(feedback_state),
     );
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| println!("{}", s));
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
+    let mut mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();
@@ -104,8 +106,37 @@ pub fn main() {
     )
     .expect("Failed to create the Executor");
 
-    let mut generator =
-        GramatronGenerator::new(read_automaton_from_file(PathBuf::from("auto.json")));
+    let automaton = read_automaton_from_file(PathBuf::from("auto.postcard"));
+    let mut generator = GramatronGenerator::new(&automaton);
+
+    // Use this code to profile the generator performance
+    /*
+    use libafl::generators::Generator;
+    use std::collections::HashSet;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    fn calculate_hash<T: Hash>(t: &T) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish()
+    }
+
+    let mut set = HashSet::new();
+    let st = libafl::bolts::current_milliseconds();
+    let mut b = vec![];
+    let mut c = 0;
+    for _ in 0..100000 {
+        let i = generator.generate(&mut state).unwrap();
+        i.unparse(&mut b);
+        set.insert(calculate_hash(&b));
+        c += b.len();
+    }
+    println!("{} / {}", c, libafl::bolts::current_milliseconds() - st);
+    println!("{} / 100000", set.len());
+
+    return;
+    */
 
     // Generate 8 initial inputs
     state
