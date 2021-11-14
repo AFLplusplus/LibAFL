@@ -9,6 +9,11 @@ pub mod concolic;
 #[cfg(feature = "std")]
 pub use concolic::ConcolicFeedback;
 
+#[cfg(feature = "std")]
+pub mod stacktrace;
+#[cfg(feature = "std")]
+pub use stacktrace::StacktraceFeedback;
+
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
