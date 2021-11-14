@@ -58,7 +58,6 @@ where
 {
     initialized: bool,
     state: Rc<RefCell<S>>,
-    current_iter: Option<usize>,
     current_corpus_idx: Option<usize>,
     testcases_to_do: usize,
     testcases_done: usize,
@@ -201,7 +200,7 @@ where
             // We already ran once
             self.post_exec()
         } else {
-            self.init() // TODO: Corpus idx
+            self.init()
         };
         if let Err(err) = step_success {
             //let errored = true;
@@ -264,7 +263,6 @@ where
             phantom: PhantomData,
             initialized: false,
             state,
-            current_iter: None,
             current_corpus_idx: None, // todo
             testcases_to_do: 0,
             testcases_done: 0,
