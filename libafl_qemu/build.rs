@@ -41,6 +41,7 @@ fn main() {
     target_dir.pop();
     let qasan_dir = Path::new("libqasan");
     let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
+    let src_dir = Path::new("src");
     //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
     build_dep_check(&["git", "make"]);
@@ -268,6 +269,12 @@ fn main() {
             .arg(&qasan_dir)
             .status(),
     );
+
+    println!("cargo:rerun-if-changed=src/asan-giovese.c");
+    println!("cargo:rerun-if-changed=src/asan-giovese.h");
+    cc::Build::new()
+        .file(src_dir.join("asan-giovese.c"))
+        .compile("asan_giovese");
 }
 
 /*
