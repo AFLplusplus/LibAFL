@@ -42,8 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Alloc
 // ------------------------------------------------------------------------- //
 
-#include "interval-tree/rbtree.h"
-#include "interval-tree/interval_tree_generic.h"
+#include "interval-tree/interval-tree.inl"
 
 extern uintptr_t guest_base;
 #define AFL_G2H(x) ((uintptr_t)(x) + guest_base)

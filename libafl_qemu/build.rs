@@ -260,6 +260,7 @@ fn main() {
         println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
     }
 
+    println!("cargo:rerun-if-changed={}/libqasan.so", qasan_dir.display());
     drop(
         Command::new("make")
             .current_dir(&out_dir_path)

@@ -70,6 +70,7 @@ struct ChunkInfo {
 }
 
 extern "C" {
+    fn asan_giovese_init();
     // int asan_giovese_loadN(void* ptr, size_t n);
     fn asan_giovese_loadN(ptr: *const u8, n: usize) -> i32;
     // int asan_giovese_storeN(void* ptr, size_t n);
@@ -94,7 +95,7 @@ pub struct QemuAsanHelper {
 impl QemuAsanHelper {
     #[must_use]
     pub fn new() -> Self {
-        Self { enabled: false }
+        Self { enabled: true }
     }
 
     pub fn enabled(&self) -> bool {
@@ -181,6 +182,8 @@ where
         executor.hook_write2_execution(trace_write2_asan::<I, QT, S>);
         executor.hook_write1_execution(trace_write1_asan::<I, QT, S>);
         executor.hook_write_n_execution(trace_write_n_asan::<I, QT, S>);
+        
+        executor.hook_syscalls(qasan_fake_syscall::<I, QT, S>);
     }
 
     fn post_exec(&mut self, _input: &I) {
