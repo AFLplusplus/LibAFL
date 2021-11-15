@@ -173,8 +173,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let iters = 1_000_000;
     fuzzer.fuzz_loop_for(
         &mut stages,
-        &mut state,
         &mut executor,
+        &mut state,
         &mut restarting_mgr,
         iters,
     )?;

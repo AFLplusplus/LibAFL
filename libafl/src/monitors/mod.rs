@@ -13,7 +13,7 @@ use hashbrown::HashMap;
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
 
-use crate::bolts::current_time;
+use crate::bolts::{current_time, format_duration_hms};
 
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
@@ -269,10 +269,10 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "{}: [{} #{}] clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            (current_time() - self.start_time).as_millis(),
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
+            format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
