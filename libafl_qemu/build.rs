@@ -15,16 +15,21 @@ fn build_dep_check(tools: &[&str]) {
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
+    println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     if target_os != "linux" {
         return;
     }
 
-    let jobs = env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| "1".to_owned());
+    let jobs = env::var("CARGO_BUILD_JOBS");
     let cpu_target = env::var("CPU_TARGET").unwrap_or_else(|_| {
         println!("cargo:warning=CPU_TARGET is not set, default to x86_64");
         "x86_64".to_owned()
+    });
+    let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
+        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if CPU_TARGET is not the host arch)");
+        "cc".to_owned()
     });
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -34,6 +39,8 @@ fn main() {
     target_dir.pop();
     target_dir.pop();
     target_dir.pop();
+    let qasan_dir = Path::new("libqasan");
+    let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
     //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
     build_dep_check(&["git", "make"]);
@@ -44,7 +51,7 @@ fn main() {
     if qemu_rev.exists()
         && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
     {
-        fs::remove_dir_all(&qemu_path).unwrap();
+        drop(fs::remove_dir_all(&qemu_path));
     }
 
     if !qemu_path.is_dir() {
@@ -149,12 +156,20 @@ fn main() {
             ])
             .status()
             .expect("Configure failed");
-        Command::new("make")
-            .current_dir(&qemu_path)
-            .arg("-j")
-            .arg(&jobs)
-            .status()
-            .expect("Make failed");
+        if let Ok(j) = jobs {
+            Command::new("make")
+                .current_dir(&qemu_path)
+                .arg("-j")
+                .arg(&j)
+                .status()
+                .expect("Make failed");
+        } else {
+            Command::new("make")
+                .current_dir(&qemu_path)
+                .arg("-j")
+                .status()
+                .expect("Make failed");
+        }
         //let _ = remove_file(build_dir.join(&format!("libqemu-{}.so", cpu_target)));
     }
 
@@ -243,6 +258,16 @@ fn main() {
 
         println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
     }
+
+    drop(
+        Command::new("make")
+            .current_dir(&out_dir_path)
+            .env("CC", cross_cc)
+            .env("OUT_DIR", &target_dir)
+            .arg("-C")
+            .arg(&qasan_dir)
+            .status(),
+    );
 }
 
 /*
