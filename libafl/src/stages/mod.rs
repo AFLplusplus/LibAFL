@@ -31,8 +31,24 @@ pub mod sync;
 #[cfg(feature = "std")]
 pub use sync::*;
 
+use crate::bolts::rands::Rand;
+use crate::corpus::Corpus;
+use crate::corpus::CorpusScheduler;
+use crate::events::EventManager;
+use crate::executors::Executor;
+use crate::inputs::Input;
+use crate::observers::ObserversTuple;
+use crate::state::HasClientPerfMonitor;
+use crate::state::HasCorpus;
+use crate::state::HasRand;
 use crate::Error;
+use crate::EvaluatorObservers;
+use crate::ExecutionProcessor;
+use crate::Fuzzer;
+use crate::HasCorpusScheduler;
 use core::{convert::From, marker::PhantomData};
+
+use self::push::PushStage;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -142,4 +158,91 @@ where
     fn from(closure: CB) -> Self {
         Self::new(closure)
     }
+}
+
+/// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
+pub struct PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    EM: EventManager<(), I, S, Z>,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
+    R: Rand,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    Z: ExecutionProcessor<I, OT, S>
+        + EvaluatorObservers<I, OT, S>
+        + Fuzzer<(), EM, I, S, ()>
+        + HasCorpusScheduler<CS, I, S>,
+{
+    push_stage: PS,
+    phantom: PhantomData<(C, CS, EM, I, OT, R, S, Z)>,
+}
+
+impl<C, CS, EM, I, OT, PS, R, S, Z> PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    EM: EventManager<(), I, S, Z>,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
+    R: Rand,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    Z: ExecutionProcessor<I, OT, S>
+        + EvaluatorObservers<I, OT, S>
+        + Fuzzer<(), EM, I, S, ()>
+        + HasCorpusScheduler<CS, I, S>,
+{
+    /// Create a new [`PushStageAdapter`], warpping the given [`PushStage`]
+    /// to be used as a normal [`Stage`]
+    #[must_use]
+    pub fn new(push_stage: PS) -> Self {
+        Self {
+            push_stage,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<C, CS, E, EM, I, OT, PS, R, S, Z> Stage<E, EM, S, Z>
+    for PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    E: Executor<EM, I, S, Z>,
+    EM: EventManager<(), I, S, Z>,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
+    R: Rand,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    Z: ExecutionProcessor<I, OT, S>
+        + EvaluatorObservers<I, OT, S>
+        + Fuzzer<(), EM, I, S, ()>
+        + HasCorpusScheduler<CS, I, S>,
+{
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        event_mgr: &mut EM,
+        corpus_idx: usize,
+    ) -> Result<(), Error> {
+        todo!();
+
+        /*
+        self.push_stage.init(fuzzer, state, event_mgr, observer);
+
+        loop {
+
+            fuzzer.evaluate_input_with_observers(state, executor, manager, input, send_events)
+
+        }
+
+        self.push_stage.deinit(fuzzer, state, event_mgr, observers);
+        */
+
 }
