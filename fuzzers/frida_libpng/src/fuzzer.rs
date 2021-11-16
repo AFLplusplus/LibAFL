@@ -52,7 +52,8 @@ use std::{
 };
 
 use libafl_frida::{
-    helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
+    helper::{FridaHelper, FridaInstrumentationHelper},
+    coverage_rt::MAP_SIZE,
     FridaOptions,
 };
 

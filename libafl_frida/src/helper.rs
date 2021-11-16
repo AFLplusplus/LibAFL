@@ -99,9 +99,6 @@ pub trait FridaHelper<'a> {
     fn ranges(&self) -> &RangeMap<usize, (u16, String)>;
 }
 
-/// (Default) map size for frida coverage reporting
-pub const MAP_SIZE: usize = 64 * 1024;
-
 /// An helper that feeds [`FridaInProcessExecutor`] with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a> {
     coverage_rt: CoverageRuntime,

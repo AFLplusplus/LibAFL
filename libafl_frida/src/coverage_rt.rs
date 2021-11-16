@@ -52,7 +52,7 @@ impl CoverageRuntime {
     /// block.
     #[cfg(target_arch = "aarch64")]
     pub fn generate_maybe_log_blob(&mut self) {
-        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
             ;   .arch aarch64
             ;   stp x1, x2, [sp, -0x10]!
@@ -61,7 +61,8 @@ impl CoverageRuntime {
             ;   ldr x2, >previous_loc
             ;   ldr x4, [x2]
             ;   eor x4, x4, x0
-            ;   and x4, x4, (MAP_SIZE - 1) as u64
+            ;   mov x3, ((MAP_SIZE - 1) as u32) as u64
+            ;   and x4, x4, x3
             ;   ldr x3, [x1, x4]
             ;   add x3, x3, #1
             ;   str x3, [x1, x4]
