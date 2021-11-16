@@ -21,7 +21,7 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
@@ -45,6 +45,7 @@ use std::{
 use libafl_frida::{
     coverage_rt::MAP_SIZE,
     helper::{FridaHelper, FridaInstrumentationHelper},
+    executor::FridaInProcessExecutor,
     FridaOptions,
 };
 
