@@ -178,6 +178,7 @@ impl QemuAsanHelper {
         self.filter.allowed(addr)
     }
 
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.enabled
     }
@@ -186,6 +187,7 @@ impl QemuAsanHelper {
         self.enabled = enabled;
     }
 
+    #[allow(clippy::unused_self)]
     pub fn alloc(&mut self, start: u64, end: u64) {
         unsafe {
             let ctx: *const CallContext =
@@ -194,6 +196,7 @@ impl QemuAsanHelper {
         }
     }
 
+    #[allow(clippy::unused_self)]
     pub fn dealloc(&mut self, addr: u64) {
         unsafe {
             let ckinfo = asan_giovese_alloc_search(addr);
@@ -212,7 +215,8 @@ impl QemuAsanHelper {
         }
     }
 
-    pub fn is_poisoned(&mut self, addr: u64, size: usize) -> bool {
+    #[allow(clippy::unused_self)]
+    pub fn is_poisoned(&self, addr: u64, size: usize) -> bool {
         unsafe { asan_giovese_loadN(emu::g2h(addr), size) != 0 }
     }
 
@@ -276,14 +280,17 @@ impl QemuAsanHelper {
         }
     }
 
+    #[allow(clippy::unused_self)]
     pub fn poison(&mut self, addr: u64, size: usize, poison: PoisonKind) {
         unsafe { asan_giovese_poison_region(emu::g2h(addr), size, poison.into()) };
     }
 
+    #[allow(clippy::unused_self)]
     pub fn unpoison(&mut self, addr: u64, size: usize) {
         unsafe { asan_giovese_unpoison_region(emu::g2h(addr), size) };
     }
 
+    #[allow(clippy::unused_self)]
     pub fn reset(&mut self) {
         unsafe { asan_giovese_alloc_remove(0, u64::MAX) };
     }
