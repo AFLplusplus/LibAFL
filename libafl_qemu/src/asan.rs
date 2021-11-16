@@ -6,7 +6,7 @@ use crate::{
     emu,
     emu::SyscallHookResult,
     executor::QemuExecutor,
-    helper::{QemuHelper, QemuHelperTuple},
+    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -72,6 +72,14 @@ struct ChunkInfo {
 
 extern "C" {
     fn asan_giovese_init();
+    fn asan_giovese_load1(ptr: *const u8) -> i32;
+    fn asan_giovese_load2(ptr: *const u8) -> i32;
+    fn asan_giovese_load4(ptr: *const u8) -> i32;
+    fn asan_giovese_load8(ptr: *const u8) -> i32;
+    fn asan_giovese_store1(ptr: *const u8) -> i32;
+    fn asan_giovese_store2(ptr: *const u8) -> i32;
+    fn asan_giovese_store4(ptr: *const u8) -> i32;
+    fn asan_giovese_store8(ptr: *const u8) -> i32;
     // int asan_giovese_loadN(void* ptr, size_t n);
     fn asan_giovese_loadN(ptr: *const u8, n: usize) -> i32;
     // int asan_giovese_storeN(void* ptr, size_t n);
@@ -143,14 +151,31 @@ pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> i
 
 // TODO intrumentation filter
 pub struct QemuAsanHelper {
-    pub enabled: bool,
+    enabled: bool,
+    filter: QemuInstrumentationFilter,
 }
 
 impl QemuAsanHelper {
     #[must_use]
     pub fn new() -> Self {
         assert!(unsafe { ASAN_INITED == true }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just init(...)");
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            filter: QemuInstrumentationFilter::None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+        Self {
+            enabled: true,
+            filter,
+        }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: u64) -> bool {
+        self.filter.allowed(addr)
     }
 
     pub fn enabled(&self) -> bool {
@@ -184,8 +209,56 @@ impl QemuAsanHelper {
         unsafe { asan_giovese_loadN(emu::g2h(addr), size) != 0 }
     }
 
+    pub fn read_1(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_load1(emu::g2h(addr)) != 0 } {
+            std::process::abort();
+        }
+    }
+
+    pub fn read_2(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_load2(emu::g2h(addr)) != 0 } {
+            std::process::abort();
+        }
+    }
+
+    pub fn read_4(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_load4(emu::g2h(addr)) != 0 } {
+            std::process::abort();
+        }
+    }
+
+    pub fn read_8(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_load8(emu::g2h(addr)) != 0 } {
+            std::process::abort();
+        }
+    }
+
     pub fn read_n(&mut self, addr: u64, size: usize) {
         if self.enabled() && unsafe { asan_giovese_loadN(emu::g2h(addr), size) != 0 } {
+            std::process::abort();
+        }
+    }
+
+    pub fn write_1(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_store1(emu::g2h(addr)) != 0 } {
+            std::process::abort();
+        }
+    }
+
+    pub fn write_2(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_store2(emu::g2h(addr)) != 0 } {
+            std::process::abort();
+        }
+    }
+
+    pub fn write_4(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_store4(emu::g2h(addr)) != 0 } {
+            std::process::abort();
+        }
+    }
+
+    pub fn write_8(&mut self, addr: u64) {
+        if self.enabled() && unsafe { asan_giovese_store8(emu::g2h(addr)) != 0 } {
             std::process::abort();
         }
     }
@@ -226,12 +299,14 @@ where
         OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
+        //executor.hook_read_generation(gen_readwrite_asan::<I, QT, S>);
         executor.hook_read8_execution(trace_read8_asan::<I, QT, S>);
         executor.hook_read4_execution(trace_read4_asan::<I, QT, S>);
         executor.hook_read2_execution(trace_read2_asan::<I, QT, S>);
         executor.hook_read1_execution(trace_read1_asan::<I, QT, S>);
         executor.hook_read_n_execution(trace_read_n_asan::<I, QT, S>);
 
+        //executor.hook_write_generation(gen_readwrite_asan::<I, QT, S>);
         executor.hook_write8_execution(trace_write8_asan::<I, QT, S>);
         executor.hook_write4_execution(trace_write4_asan::<I, QT, S>);
         executor.hook_write2_execution(trace_write2_asan::<I, QT, S>);
@@ -246,13 +321,32 @@ where
     }
 }
 
+// TODO add pc to generation hooks
+pub fn gen_readwrite_asan<I, QT, S>(
+    helpers: &mut QT,
+    _state: &mut S,
+    pc: u64,
+    _size: usize,
+) -> Option<u64>
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
+    if h.must_instrument(pc) {
+        Some(pc)
+    } else {
+        None
+    }
+}
+
 pub fn trace_read1_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(addr, 1);
+    h.read_1(addr);
 }
 
 pub fn trace_read2_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
@@ -261,7 +355,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(addr, 2);
+    h.read_2(addr);
 }
 
 pub fn trace_read4_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
@@ -270,7 +364,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(addr, 4);
+    h.read_4(addr);
 }
 
 pub fn trace_read8_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
@@ -279,7 +373,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(addr, 8);
+    h.read_8(addr);
 }
 
 pub fn trace_read_n_asan<I, QT, S>(
@@ -302,7 +396,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_n(addr, 1);
+    h.write_1(addr);
 }
 
 pub fn trace_write2_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
@@ -311,7 +405,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_n(addr, 2);
+    h.write_2(addr);
 }
 
 pub fn trace_write4_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
@@ -320,7 +414,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_n(addr, 4);
+    h.write_4(addr);
 }
 
 pub fn trace_write8_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
@@ -329,7 +423,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_n(addr, 8);
+    h.write_8(addr);
 }
 
 pub fn trace_write_n_asan<I, QT, S>(
@@ -376,6 +470,9 @@ where
             QasanAction::Poison => {
                 h.poison(a1, a2 as usize, PoisonKind::try_from(a3 as u8).unwrap());
             }
+            QasanAction::UserPoison => {
+                h.poison(a1, a2 as usize, PoisonKind::User);
+            }
             QasanAction::UnPoison => {
                 h.unpoison(a1, a2 as usize);
             }
@@ -399,7 +496,6 @@ where
             QasanAction::SwapState => {
                 h.set_enabled(!h.enabled());
             }
-            _ => {}
         }
         SyscallHookResult::new(Some(r))
     } else {
