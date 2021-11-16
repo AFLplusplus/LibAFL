@@ -16,7 +16,6 @@ use crate::executors::inprocess::GLOBAL_STATE;
 #[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::ExceptionCode;
 
-
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
 #[cfg(unix)]
@@ -25,11 +24,11 @@ use libc::c_int;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
-    System::Threading::{
-        TP_CALLBACK_ENVIRON_V3, TP_TIMER,
-        CreateThreadpoolTimer, SetThreadpoolTimer, CloseThreadpoolTimer,
-    },
     System::Diagnostics::Debug::RaiseException,
+    System::Threading::{
+        CloseThreadpoolTimer, CreateThreadpoolTimer, SetThreadpoolTimer, TP_CALLBACK_ENVIRON_V3,
+        TP_TIMER,
+    },
 };
 
 #[cfg(all(windows, feature = "std"))]
@@ -75,9 +74,7 @@ pub struct TimeoutExecutor<E> {
     exec_tmout: Duration,
 }
 
-impl<E> TimeoutExecutor<E>
-    where
-    {
+impl<E> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     #[cfg(unix)]
@@ -140,10 +137,7 @@ where
             if after - before > self.exec_tmout {
                 RaiseException(ExceptionCode::Timeout as u32, 0, 0, core::ptr::null());
             }
-            write_volatile(
-                &mut data.timeout_input_ptr,
-                core::ptr::null_mut(),
-            );
+            write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
             ret
         }
     }

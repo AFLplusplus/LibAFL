@@ -591,10 +591,8 @@ mod windows_exception_handler {
     use std::io::{stdout, Write};
 
     use crate::{
-        bolts::{
-            os::windows_exceptions::{
-                ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
-            },
+        bolts::os::windows_exceptions::{
+            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
         },
         corpus::{Corpus, Testcase},
         events::{Event, EventFirer, EventRestarter},
@@ -611,7 +609,6 @@ mod windows_exception_handler {
 
     use windows::Win32::System::Threading::ExitProcess;
 
-
     pub type HandlerFuncPtr =
         unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
 
@@ -627,13 +624,12 @@ mod windows_exception_handler {
         fn handle(&mut self, code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
-                if code != ExceptionCode::Timeout{
+                if code != ExceptionCode::Timeout {
                     if !data.crash_handler.is_null() {
                         let func: HandlerFuncPtr = transmute(data.crash_handler);
                         (func)(code, exception_pointers, data);
                     }
-                }
-                else{
+                } else {
                     if !data.timeout_handler.is_null() {
                         let func: HandlerFuncPtr = transmute(data.timeout_handler);
                         (func)(code, exception_pointers, data);

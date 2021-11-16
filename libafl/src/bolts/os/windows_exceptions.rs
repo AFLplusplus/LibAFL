@@ -150,7 +150,6 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::HeapCorruption,
     ExceptionCode::StackBufferOverrun,
     ExceptionCode::AssertionFailure,
-
     ExceptionCode::Timeout, // Handle timeout in Exceptions
 ];
 
