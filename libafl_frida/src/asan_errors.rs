@@ -126,7 +126,7 @@ impl AsanErrors {
         self.errors.is_empty()
     }
 
-    /// Get a mutable reference to the global [`AsanErrors`] object
+    /// Get a mutable reference to the global [`struct@AsanErrors`] object
     #[must_use]
     pub fn get_mut<'a>() -> &'a mut Self {
         unsafe { ASAN_ERRORS.as_mut().unwrap() }
@@ -595,7 +595,7 @@ impl AsanErrorsObserver {
         }
     }
 
-    /// gets the [`AsanErrors`] from the previous run
+    /// gets the [`struct@AsanErrors`] from the previous run
     #[must_use]
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
@@ -605,7 +605,7 @@ impl AsanErrorsObserver {
     }
 }
 
-/// A feedback reporting potential [`AsanErrors`] from an `AsanErrorsObserver`
+/// A feedback reporting potential [`struct@AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,

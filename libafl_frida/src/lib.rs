@@ -42,7 +42,7 @@ pub struct FridaOptions {
 }
 
 impl FridaOptions {
-    /// Parse the frida options from the [`LIBAFL_FRIDA_OPTIONS`] environment variable.
+    /// Parse the frida options from the "`LIBAFL_FRIDA_OPTIONS`" environment variable.
     ///
     /// Options are `:` separated, and each options is a `name=value` string.
     ///

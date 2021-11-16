@@ -43,13 +43,13 @@ where
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
-    /// The [`State`]
+    /// The [`crate::state::State`]
     pub state: S,
-    /// The [`Fuzzer`] instance
+    /// The [`crate::fuzzer::Fuzzer`] instance
     pub fuzzer: Z,
-    /// The [`EventManager`]
+    /// The [`crate::events::EventManager`]
     pub event_mgr: EM,
-    /// The [`ObserverTuple`]
+    /// The [`crate::observers::ObserversTuple`]
     pub observers: OT,
     phantom: PhantomData<(C, CS, I, OT, R, S, Z)>,
 }

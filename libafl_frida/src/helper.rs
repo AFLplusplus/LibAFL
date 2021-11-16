@@ -73,7 +73,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
-/// An helper that feeds [`FridaInProcessExecutor`] with user-supplied instrumentation
+/// An helper that feeds `FridaInProcessExecutor` with user-supplied instrumentation
 pub trait FridaHelper<'a> {
     /// Access to the stalker `Transformer`
     fn transformer(&self) -> &Transformer<'a>;
@@ -100,7 +100,7 @@ pub trait FridaHelper<'a> {
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
-/// An helper that feeds [`FridaInProcessExecutor`] with edge-coverage instrumentation
+/// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a> {
     map: [u8; MAP_SIZE],
     previous_pc: [u64; 1],
