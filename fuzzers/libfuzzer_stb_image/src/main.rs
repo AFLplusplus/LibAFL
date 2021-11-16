@@ -10,7 +10,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventConfig},
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, timeout::TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -124,7 +124,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     };
 
     // Create the executor for an in-process function with just one observer for edge coverage
-    let mut executor = TimeoutExecutor::new(
+    let mut executor = ShadowExecutor::new(
         InProcessExecutor::new(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
@@ -132,7 +132,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             &mut state,
             &mut restarting_mgr,
         )?,
-        std::time::Duration::new(2, 0),
+        tuple_list!(cmplog_observer),
     );
 
     // The actual target run starts here.
@@ -150,6 +150,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
+    // Setup a tracing stage in which we log comparisons
+    let tracing = ShadowTracingStage::new(&mut executor);
+
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
@@ -158,7 +161,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutational = StdMutationalStage::new(mutator);
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(i2s, mutational);
+    let mut stages = tuple_list!(tracing, i2s, mutational);
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
 
