@@ -41,18 +41,16 @@ use libafl::{
 };
 use libafl_qemu::{
     amd64::Amd64Regs,
-    elf::EasyElf,
-    emu, filter_qemu_args,
-    snapshot::{QemuSnapshotHelper},
     asan::QemuAsanHelper,
-    cmplog::{QemuCmpLogHelper, CmpLogObserver},
-    edges, edges::QemuEdgeCoverageHelper, cmplog,
+    cmplog,
+    cmplog::{CmpLogObserver, QemuCmpLogHelper},
+    edges,
+    edges::QemuEdgeCoverageHelper,
+    elf::EasyElf,
+    emu, filter_qemu_args, init_with_asan,
+    snapshot::QemuSnapshotHelper,
     MmapPerms, QemuExecutor,
 };
-
-extern "C" {
-    fn asan_giovese_init();
-}
 
 /// The fuzzer main
 pub fn main() {
@@ -60,11 +58,9 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    unsafe { asan_giovese_init() };
-
-    let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-    emu::init(&args, &env);
+    let mut args: Vec<String> = env::args().collect();
+    let mut env: Vec<(String, String)> = env::vars().collect();
+    init_with_asan(&mut args, &mut env);
 
     let res = match App::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
@@ -195,7 +191,7 @@ fn fuzz(
 
     let input_addr = emu::map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
     println!("Placing input at {:#x}", input_addr);
-    
+
     let log = RefCell::new(
         OpenOptions::new()
             .append(true)

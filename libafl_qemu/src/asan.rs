@@ -1,11 +1,12 @@
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use std::{env, fs};
 
 use crate::{
     emu,
     emu::SyscallHookResult,
     executor::QemuExecutor,
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{QemuHelper, QemuHelperTuple},
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -87,7 +88,60 @@ extern "C" {
     fn asan_giovese_alloc_insert(start: u64, end: u64, alloc_ctx: *const CallContext);
 }
 
-// TODO be thread-safe maybe with https://amanieu.github.io/thread_local-rs/thread_local/index.html
+static mut ASAN_INITED: bool = false;
+
+pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> i32 {
+    assert!(args.len() > 0);
+    let current = env::current_exe().unwrap();
+    let asan_lib = fs::canonicalize(&current)
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("libqasan.so");
+    let asan_lib = asan_lib
+        .to_str()
+        .expect("The path to the asan lib is invalid")
+        .to_string();
+    let add_asan =
+        |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
+
+    let mut added = false;
+    for (k, v) in env.iter_mut() {
+        if k == "QEMU_SET_ENV" {
+            let mut new_v = vec![];
+            for e in v.split(",") {
+                if e.starts_with("LD_PRELOAD=") {
+                    added = true;
+                    new_v.push(add_asan(e));
+                } else {
+                    new_v.push(e.to_string());
+                }
+            }
+            *v = new_v.join(",");
+        }
+    }
+    for i in 0..args.len() {
+        if args[i] == "-E" && i + 1 < args.len() {
+            if args[i + 1].starts_with("LD_PRELOAD=") {
+                added = true;
+                args[i + 1] = add_asan(&args[i + 1])
+            }
+        }
+    }
+
+    if !added {
+        args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
+        args.insert(1, "-E".into());
+    }
+
+    unsafe {
+        asan_giovese_init();
+        ASAN_INITED = true;
+    }
+    emu::init(args, env)
+}
+
+// TODO intrumentation filter
 pub struct QemuAsanHelper {
     pub enabled: bool,
 }
@@ -95,6 +149,7 @@ pub struct QemuAsanHelper {
 impl QemuAsanHelper {
     #[must_use]
     pub fn new() -> Self {
+        assert!(unsafe { ASAN_INITED == true }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just init(...)");
         Self { enabled: true }
     }
 
@@ -182,7 +237,7 @@ where
         executor.hook_write2_execution(trace_write2_asan::<I, QT, S>);
         executor.hook_write1_execution(trace_write1_asan::<I, QT, S>);
         executor.hook_write_n_execution(trace_write_n_asan::<I, QT, S>);
-        
+
         executor.hook_syscalls(qasan_fake_syscall::<I, QT, S>);
     }
 

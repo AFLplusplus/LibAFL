@@ -274,6 +274,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/asan-giovese.c");
     println!("cargo:rerun-if-changed=src/asan-giovese.h");
     cc::Build::new()
+        .warnings(false)
         .file(src_dir.join("asan-giovese.c"))
         .compile("asan_giovese");
 }

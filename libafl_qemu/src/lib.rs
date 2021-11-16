@@ -27,7 +27,7 @@ pub use snapshot::QemuSnapshotHelper;
 #[cfg(target_os = "linux")]
 pub mod asan;
 #[cfg(target_os = "linux")]
-pub use asan::QemuAsanHelper;
+pub use asan::{init_with_asan, QemuAsanHelper};
 
 #[cfg(target_os = "linux")]
 pub mod executor;

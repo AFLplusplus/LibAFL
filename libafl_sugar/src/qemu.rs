@@ -30,7 +30,7 @@ use libafl::{
 };
 
 pub use libafl_qemu::emu;
-use libafl_qemu::{hooks, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
+use libafl_qemu::{edges, cmplog, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
 use libafl_targets::CmpLogObserver;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -103,8 +103,8 @@ where
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
-            let edges = unsafe { &mut hooks::EDGES_MAP };
-            let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
+            let edges = unsafe { &mut edges::EDGES_MAP };
+            let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
             let edges_observer =
                 HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
 
@@ -112,7 +112,7 @@ where
             let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
-            let cmplog = unsafe { &mut hooks::CMPLOG_MAP };
+            let cmplog = unsafe { &mut cmplog::CMPLOG_MAP };
             let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
             // The state of the edges feedback.
