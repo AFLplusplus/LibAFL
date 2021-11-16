@@ -30,7 +30,7 @@ use libafl::{
 };
 
 pub use libafl_qemu::emu;
-use libafl_qemu::{edges, cmplog, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
+use libafl_qemu::{cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
 use libafl_targets::CmpLogObserver;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
