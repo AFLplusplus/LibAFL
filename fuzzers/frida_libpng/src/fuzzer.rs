@@ -52,7 +52,8 @@ use std::{
 };
 
 use libafl_frida::{
-    helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
+    coverage_rt::MAP_SIZE,
+    helper::{FridaHelper, FridaInstrumentationHelper},
     FridaOptions,
 };
 
@@ -156,7 +157,7 @@ where
     ) -> Self {
         let mut stalker = Stalker::new(gum);
 
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
+        #[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
         for range in helper.ranges().gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(
@@ -312,7 +313,7 @@ unsafe fn fuzz(
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
-            frida_helper.map_ptr(),
+            frida_helper.map_ptr_mut(),
             MAP_SIZE,
         ));
 
