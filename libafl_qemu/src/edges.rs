@@ -104,21 +104,25 @@ where
         .metadata_mut()
         .get_mut::<QemuEdgesMapMetadata>()
         .unwrap();
-    if meta.map.contains_key(&(src, dest)) {
-        let id = *meta.map.get(&(src, dest)).unwrap();
-        let nxt = (id as usize + 1) & (EDGES_MAP_SIZE - 1);
-        unsafe {
-            MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
+
+    match meta.map.entry((src, dest)) {
+        Entry::Occupied(e) => {
+            let id = e.value();
+            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE - 1);
+            unsafe {
+                MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
+            }
+            Some(id)
         }
-        Some(id)
-    } else {
-        let id = meta.current_id;
-        meta.map.insert((src, dest), id);
-        meta.current_id = (id + 1) & (EDGES_MAP_SIZE as u64 - 1);
-        unsafe {
-            MAX_EDGES_NUM = meta.current_id as usize;
+        Entry::Vacant(e) => {
+            let id = meta.current_id;
+            e.insert(id);
+            meta.current_id = (id + 1) & (EDGES_MAP_SIZE as u64 - 1);
+            unsafe {
+                MAX_EDGES_NUM = meta.current_id as usize;
+            }
+            Some(id as u64)
         }
-        Some(id as u64)
     }
 }
 

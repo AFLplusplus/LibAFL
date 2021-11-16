@@ -101,12 +101,14 @@ where
         .get_mut::<QemuCmpsMapMetadata>()
         .unwrap();
     let id = meta.current_id as usize;
-    if meta.map.contains_key(&pc) {
-        Some(*meta.map.get(&pc).unwrap())
-    } else {
-        meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
-        meta.map.insert(pc, id as u64);
-        Some(id as u64)
+
+    match meta.map.entry(pc) {
+        Entry::Occupied(e) => Some(e.value()),
+        Entry::Vacant(e) => {
+            meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
+            e.insert(id as u64);
+            Some(id as u64)
+        }
     }
 }
 
