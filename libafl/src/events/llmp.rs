@@ -886,8 +886,6 @@ where
             core_affinity::set_for_current(core_id);
         }
 
-        println!("We're a client, let's fuzz :)");
-
         // If we're restarting, deserialize the old state.
         let (state, mut mgr) = if let Some((state, mgr_description)) = staterestorer.restore()? {
             (
