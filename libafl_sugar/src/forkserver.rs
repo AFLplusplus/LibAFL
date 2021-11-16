@@ -7,7 +7,7 @@ use libafl::{
         current_nanos,
         launcher::Launcher,
         rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
     corpus::{
@@ -15,30 +15,26 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::EventConfig,
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
-    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    mutators::token_mutations::Tokens,
+    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    stages::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
 
-use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP, MAX_EDGES_NUM};
-
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
+pub const MAP_SIZE: usize = 65536;
+
 #[derive(TypedBuilder)]
-pub struct InMemoryBytesCoverageSugar<'a, H>
-where
-    H: FnMut(&[u8]),
-{
+pub struct ForkserverBytesCoverageSugar<'a> {
     /// Laucher configuration (default is random)
     #[builder(default = None, setter(strip_option))]
     configuration: Option<String>,
@@ -52,9 +48,9 @@ where
     /// Dictionary
     #[builder(default = None, setter(strip_option))]
     tokens_file: Option<PathBuf>,
-    /// Flag if use CmpLog
-    #[builder(default = false)]
-    use_cmplog: bool,
+    // Flag if use CmpLog
+    //#[builder(default = false)]
+    //use_cmplog: bool,
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -63,16 +59,20 @@ where
     /// clusters.
     #[builder(default = None, setter(strip_option))]
     remote_broker_addr: Option<SocketAddr>,
-    /// Bytes harness
-    #[builder(setter(strip_option))]
-    harness: Option<H>,
+    /// Path to program to execute
+    program: String,
+    /// Arguments of the program to execute
+    arguments: &'a [String],
+    #[builder(default = false)]
+    /// Use shared mem testcase delivery
+    shmem_testcase: bool,
+    // Coverage map size
+    //#[builder(default = MAP_SIZE)]
+    //map_size: usize,
 }
 
 #[allow(clippy::similar_names)]
-impl<'a, H> InMemoryBytesCoverageSugar<'a, H>
-where
-    H: FnMut(&[u8]),
-{
+impl<'a> ForkserverBytesCoverageSugar<'a> {
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = match self.configuration.as_ref() {
@@ -95,22 +95,29 @@ where
         crashes.push("crashes");
         out_dir.push("queue");
 
-        let mut harness_bytes = self.harness.take().unwrap();
-
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
         let monitor = MultiMonitor::new(|s| println!("{}", s));
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
+            // Coverage map shared between target and fuzzer
+            let mut shmem = StdShMemProvider::new()
+                .expect("Failed to init shared memory")
+                .new_map(MAP_SIZE)
+                .unwrap();
+            shmem.write_to_env("__AFL_SHM_ID").unwrap();
+            let shmem_map = shmem.map_mut();
+
             // Create an observation channel using the coverage map
-            let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-            let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+            let edges_observer = unsafe {
+                HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new_from_ptr(
+                    "shared_mem",
+                    shmem_map.as_mut_ptr(),
+                ))
+            };
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
-
-            let cmplog = unsafe { &mut CMPLOG_MAP };
-            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
             // The state of the edges feedback.
             let feedback_state = MapFeedbackState::with_observer(&edges_observer);
@@ -157,28 +164,18 @@ where
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            // The wrapped harness function, calling out to the LLVM-style harness
-            let mut harness = |input: &BytesInput| {
-                let target = input.target_bytes();
-                let buf = target.as_slice();
-                (harness_bytes)(buf);
-                ExitKind::Ok
-            };
-
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = ShadowExecutor::new(
-                TimeoutExecutor::new(
-                    InProcessExecutor::new(
-                        &mut harness,
-                        tuple_list!(edges_observer, time_observer),
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
-                    timeout,
-                ),
-                tuple_list!(cmplog_observer),
-            );
+            let mut executor = TimeoutForkserverExecutor::new(
+                ForkserverExecutor::new(
+                    self.program.clone(),
+                    self.arguments,
+                    self.shmem_testcase,
+                    tuple_list!(edges_observer, time_observer),
+                )
+                .expect("Failed to create the executor."),
+                timeout,
+            )
+            .expect("Failed to create the executor.");
 
             // In case the corpus is empty (on first run), reset
             if state.corpus().count() < 1 {
@@ -212,40 +209,22 @@ where
                 }
             }
 
-            // Setup a tracing stage in which we log comparisons
-            let tracing = ShadowTracingStage::new(&mut executor);
-
-            // Setup a randomic Input2State stage
-            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
-                I2SRandReplace::new()
-            )));
-
             if self.tokens_file.is_some() {
                 // Setup a basic mutator
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                if self.use_cmplog {
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-                } else {
-                    let mut stages = tuple_list!(mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-                }
+                let mut stages = tuple_list!(mutational);
+                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
             } else {
                 // Setup a basic mutator
                 let mutator = StdScheduledMutator::new(havoc_mutations());
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                if self.use_cmplog {
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-                } else {
-                    let mut stages = tuple_list!(mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-                }
+                let mut stages = tuple_list!(mutational);
+                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
             }
 
             Ok(())
@@ -269,6 +248,7 @@ where
     }
 }
 
+/*
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::inmemory;
@@ -325,4 +305,4 @@ pub mod pybind {
         m.add_class::<InMemoryBytesCoverageSugar>()?;
         Ok(())
     }
-}
+}*/

@@ -1,3 +1,6 @@
+//| The [`MutationalStage`] is the default stage used during fuzzing.
+//! For the current input, it will perform a range of random mutations, and then run them in the executor.
+
 use core::marker::PhantomData;
 
 use crate::{
@@ -9,12 +12,12 @@ use crate::{
     mutators::Mutator,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasRand},
     Error,
 };
 
 #[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
+use crate::monitors::PerfFeature;
 
 // TODO multi mutators stage
 
@@ -26,7 +29,7 @@ where
     C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    S: HasClientPerfStats + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasCorpus<C, I>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator registered for this stage
@@ -87,7 +90,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
@@ -102,7 +105,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -129,7 +132,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -145,7 +148,7 @@ where
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
 
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().finish_stage();
+        state.introspection_monitor_mut().finish_stage();
 
         ret
     }
@@ -157,7 +160,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage

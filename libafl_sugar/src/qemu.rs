@@ -15,22 +15,23 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::EventConfig,
-    executors::{ExitKind, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::{token_mutations::Tokens, I2SRandReplace},
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    stages::StdMutationalStage,
+    stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
 };
 
 pub use libafl_qemu::emu;
-use libafl_qemu::{hooks, QemuEdgeCoverageHelper, QemuExecutor};
+use libafl_qemu::{hooks, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
+use libafl_targets::CmpLogObserver;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
@@ -53,8 +54,8 @@ where
     #[builder(default = None, setter(strip_option))]
     tokens_file: Option<PathBuf>,
     /// Flag if use CmpLog
-    //#[builder(default = false)]
-    //use_cmplog: bool,
+    #[builder(default = false)]
+    use_cmplog: bool,
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -98,7 +99,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let stats = MultiStats::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{}", s));
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
@@ -109,6 +110,10 @@ where
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
+
+            // Keep tracks of CMPs
+            let cmplog = unsafe { &mut hooks::CMPLOG_MAP };
+            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
             // The state of the edges feedback.
             let feedback_state = MapFeedbackState::with_observer(&edges_observer);
@@ -163,77 +168,155 @@ where
                 ExitKind::Ok
             };
 
-            let executor = QemuExecutor::new(
-                &mut harness,
-                tuple_list!(QemuEdgeCoverageHelper::new()),
-                tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-            )?;
+            if self.use_cmplog {
+                let executor = QemuExecutor::new(
+                    &mut harness,
+                    tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new()),
+                    tuple_list!(edges_observer, time_observer),
+                    &mut fuzzer,
+                    &mut state,
+                    &mut mgr,
+                )?;
+                let executor = TimeoutExecutor::new(executor, timeout);
+                let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-            // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = TimeoutExecutor::new(executor, timeout);
+                // In case the corpus is empty (on first run), reset
+                if state.corpus().count() < 1 {
+                    if self.input_dirs.is_empty() {
+                        // Generator of printable bytearrays of max size 32
+                        let mut generator = RandBytesGenerator::new(32);
 
-            // In case the corpus is empty (on first run), reset
-            if state.corpus().count() < 1 {
-                if self.input_dirs.is_empty() {
-                    // Generator of printable bytearrays of max size 32
-                    let mut generator = RandBytesGenerator::new(32);
+                        // Generate 8 initial inputs
+                        state
+                            .generate_initial_inputs(
+                                &mut fuzzer,
+                                &mut executor,
+                                &mut generator,
+                                &mut mgr,
+                                8,
+                            )
+                            .expect("Failed to generate the initial corpus");
+                        println!(
+                            "We imported {} inputs from the generator.",
+                            state.corpus().count()
+                        );
+                    } else {
+                        println!("Loading from {:?}", &self.input_dirs);
+                        // Load from disk
+                        state
+                            .load_initial_inputs(
+                                &mut fuzzer,
+                                &mut executor,
+                                &mut mgr,
+                                self.input_dirs,
+                            )
+                            .unwrap_or_else(|_| {
+                                panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
+                            });
+                        println!("We imported {} inputs from disk.", state.corpus().count());
+                    }
+                }
 
-                    // Generate 8 initial inputs
-                    state
-                        .generate_initial_inputs(
-                            &mut fuzzer,
-                            &mut executor,
-                            &mut generator,
-                            &mut mgr,
-                            8,
-                        )
-                        .expect("Failed to generate the initial corpus");
-                    println!(
-                        "We imported {} inputs from the generator.",
-                        state.corpus().count()
-                    );
+                // Setup a tracing stage in which we log comparisons
+                let tracing = ShadowTracingStage::new(&mut executor);
+
+                // Setup a randomic Input2State stage
+                let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+                    I2SRandReplace::new()
+                )));
+
+                if self.tokens_file.is_some() {
+                    // Setup a basic mutator
+                    let mutator =
+                        StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                    let mutational = StdMutationalStage::new(mutator);
+
+                    // The order of the stages matter!
+                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
-                    println!("Loading from {:?}", &self.input_dirs);
-                    // Load from disk
-                    state
-                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, self.input_dirs)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
-                        });
-                    println!("We imported {} inputs from disk.", state.corpus().count());
+                    // Setup a basic mutator
+                    let mutator = StdScheduledMutator::new(havoc_mutations());
+                    let mutational = StdMutationalStage::new(mutator);
+
+                    // The order of the stages matter!
+                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                }
+            } else {
+                let executor = QemuExecutor::new(
+                    &mut harness,
+                    tuple_list!(QemuEdgeCoverageHelper::new()),
+                    tuple_list!(edges_observer, time_observer),
+                    &mut fuzzer,
+                    &mut state,
+                    &mut mgr,
+                )?;
+                let mut executor = TimeoutExecutor::new(executor, timeout);
+
+                // In case the corpus is empty (on first run), reset
+                if state.corpus().count() < 1 {
+                    if self.input_dirs.is_empty() {
+                        // Generator of printable bytearrays of max size 32
+                        let mut generator = RandBytesGenerator::new(32);
+
+                        // Generate 8 initial inputs
+                        state
+                            .generate_initial_inputs(
+                                &mut fuzzer,
+                                &mut executor,
+                                &mut generator,
+                                &mut mgr,
+                                8,
+                            )
+                            .expect("Failed to generate the initial corpus");
+                        println!(
+                            "We imported {} inputs from the generator.",
+                            state.corpus().count()
+                        );
+                    } else {
+                        println!("Loading from {:?}", &self.input_dirs);
+                        // Load from disk
+                        state
+                            .load_initial_inputs(
+                                &mut fuzzer,
+                                &mut executor,
+                                &mut mgr,
+                                self.input_dirs,
+                            )
+                            .unwrap_or_else(|_| {
+                                panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
+                            });
+                        println!("We imported {} inputs from disk.", state.corpus().count());
+                    }
+                }
+
+                if self.tokens_file.is_some() {
+                    // Setup a basic mutator
+                    let mutator =
+                        StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                    let mutational = StdMutationalStage::new(mutator);
+
+                    // The order of the stages matter!
+                    let mut stages = tuple_list!(mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                } else {
+                    // Setup a basic mutator
+                    let mutator = StdScheduledMutator::new(havoc_mutations());
+                    let mutational = StdMutationalStage::new(mutator);
+
+                    // The order of the stages matter!
+                    let mut stages = tuple_list!(mutational);
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
-
-            if self.tokens_file.is_some() {
-                // Setup a basic mutator
-                let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-                let mutational = StdMutationalStage::new(mutator);
-
-                // The order of the stages matter!
-                let mut stages = tuple_list!(mutational);
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-            } else {
-                // Setup a basic mutator
-                let mutator = StdScheduledMutator::new(havoc_mutations());
-                let mutational = StdMutationalStage::new(mutator);
-
-                // The order of the stages matter!
-                let mut stages = tuple_list!(mutational);
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-            }
-
             Ok(())
         };
 
         let launcher = Launcher::builder()
             .shmem_provider(shmem_provider)
             .configuration(conf)
-            .stats(stats)
+            .monitor(monitor)
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)

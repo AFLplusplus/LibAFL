@@ -10,7 +10,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasSolutions},
+    state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
 
@@ -386,7 +386,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let slf = Self {

@@ -121,15 +121,15 @@ As the second parameter, it takes an instance of something implementing the Corp
 
 We will discuss the last parameter later. The third parameter is another corpus, in this case, to store the testcases that are considered as "solutions" for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
 
-Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a Stats instance.
+Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a `Monitor` instance.
 
 ```rust,ignore
-// The Stats trait define how the fuzzer stats are reported to the user
-let stats = SimpleStats::new(|s| println!("{}", s));
+// The Monitor trait defines how the fuzzer stats are displayed to the user
+let mon = SimpleMonitor::new(|s| println!("{}", s));
 
 // The event manager handle the various events generated during the fuzzing loop
 // such as the notification of the addition of a new item to the corpus
-let mut mgr = SimpleEventManager::new(stats);
+let mut mgr = SimpleEventManager::new(mon);
 ```
 
 In addition, we have the Fuzzer, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
@@ -190,8 +190,8 @@ use libafl::{
     fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     state::StdState,
-    stats::SimpleStats,
 };
 ```
 

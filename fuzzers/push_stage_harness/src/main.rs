@@ -1,22 +1,28 @@
-//! [`Klo-routines`](https://github.com/andreafioraldi/klo-routines/) based fuzzer.
-//! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
-use klo_routines::*;
-use libafl::inputs::{BytesInput, HasTargetBytes};
+//! A fuzzer that uses a `PushStage`, generating input to be subsequently executed,
+//! instead of executing input iteslf in a loop.
+//! Using this method, we can add LibAFL, for example, into an emulation loop
+//! or use its mutations for another fuzzer.
+//! This is a less hacky alternative to the `KloRoutines` based fuzzer, that will also work on non-`Unix`.
+
+use core::cell::{Cell, RefCell};
+use std::{path::PathBuf, rc::Rc};
+
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{
+        Corpus, CorpusScheduler, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase,
+    },
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::ExitKind,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
-    generators::RandPrintablesGenerator,
+    fuzzer::StdFuzzer,
+    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
-    stages::mutational::StdMutationalStage,
-    state::StdState,
+    stages::push::StdMutationalPushStage,
+    state::{HasCorpus, StdState},
 };
-use std::path::PathBuf;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -26,17 +32,8 @@ fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
-/// This generates the input, using klo-routines.
 #[allow(clippy::similar_names)]
-fn input_generator() {
-    // The closure that produced the input for the generator
-    let mut harness = |input: &BytesInput| {
-        // The `yield_` switches execution context back to the loop in `main`.
-        // When `resume` is called, we return to this function.
-        yield_(input);
-        ExitKind::Ok
-    };
-
+pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
@@ -44,7 +41,7 @@ fn input_generator() {
     let feedback_state = MapFeedbackState::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let feedback = MaxMapFeedback::<_, BytesInput, _, _, _>::new(&feedback_state, &observer);
 
     // A feedback to choose if an input is a solution or not
     let objective = CrashFeedback::new();
@@ -68,51 +65,50 @@ fn input_generator() {
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(monitor);
+    let mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
+    //let mut executor = InProcessExecutor::new(&mut harness, &mut fuzzer, &mut state, &mut mgr)
+    //    .expect("Failed to create the Executor");
 
-    // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let testcase = Testcase::new(BytesInput::new(b"aaaa".to_vec()));
+    //self.feedback_mut().append_metadata(state, &mut testcase)?;
+    let idx = state.corpus_mut().add(testcase).unwrap();
+    scheduler.on_add(&mut state, idx).unwrap();
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Generate 8 initial inputs
-    state
-        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-        .expect("Failed to generate the initial corpus");
+    //state.generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8);
+    //    .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-    fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-        .expect("Error in the fuzzing loop");
-}
+    let exit_kind = Rc::new(Cell::new(None));
 
-/// the main function loops independently of the fuzzer.
-/// `Klo` internally switches between the `LibAFL` and harness coroutines to generate the inputs.
-pub fn main() {
-    // Set up the Klo-routines harness
-    let mut input_generator = input_generator;
-    let mut klo =
-        KloRoutine::<_, &BytesInput>::with_stack_size(&mut input_generator, 512 * 1024 * 1024);
+    let stage_idx = 0;
 
-    // Loop, calling `klo.resume` repeatedly. This will switch execution to the loop in the `input_generator` function.
-    while let Some(input) = klo.resume() {
+    let observers = tuple_list!(observer);
+
+    // All fuzzer elements are hidden behind Rc<RefCell>>, so we can reuse them for multiple stages.
+    let push_stage = StdMutationalPushStage::new(
+        mutator,
+        Rc::new(RefCell::new(fuzzer)),
+        Rc::new(RefCell::new(state)),
+        Rc::new(RefCell::new(mgr)),
+        Rc::new(RefCell::new(observers)),
+        exit_kind.clone(),
+        stage_idx,
+    );
+
+    // Loop, the input, getting a new entry from the push stage each iteration.
+    for input in push_stage {
+        let input = input.unwrap();
         let target = input.target_bytes();
         let buf = target.as_slice();
         signals_set(0);
@@ -125,6 +121,8 @@ pub fn main() {
                 }
             }
         }
+        (*exit_kind).replace(Some(ExitKind::Ok));
     }
-    println!("Flushed klo");
+
+    println!("One iteration done.");
 }

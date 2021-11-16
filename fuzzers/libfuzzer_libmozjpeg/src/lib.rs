@@ -16,12 +16,12 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
     Error,
 };
 
@@ -56,11 +56,11 @@ pub fn libafl_main() {
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = SimpleStats::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, EventConfig::from_name("default")) {
+        match setup_restarting_mgr_std(monitor, broker_port, EventConfig::from_name("default")) {
             Ok(tuple) => tuple,
             Err(Error::ShuttingDown) => {
                 println!("\nFinished fuzzing. Good bye.");
