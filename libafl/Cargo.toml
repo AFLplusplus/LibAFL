@@ -58,8 +58,7 @@ num_enum = { version = "0.5.1", default-features = false }
 typed-builder = "0.9.0" # Implement the builder pattern at compiletime
 ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
 intervaltree = { git = "https://github.com/andreafioraldi/rust-intervaltree", version = "0.2.6", default-features = false, features = ["serde"] }
-digest = "0.9.0"
-backtrace = "0.3.0"
+backtrace = {version = "0.3.0" } # Used to get the stacktrace in StacktraceObserver
 
 libafl_derive = { version = "0.6.1", optional = true, path = "../libafl_derive" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] } # an easy way to debug print SerdeAnyMap
@@ -85,7 +84,6 @@ libc = "0.2" # For (*nix) libc
 uds = "0.2.3"
 lock_api = "0.4.3"
 regex = "1.4.5"
-backtrace = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 windows = "0.18.0"

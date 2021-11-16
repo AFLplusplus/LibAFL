@@ -13,22 +13,20 @@ use crate::{bolts::tuples::Named, observers::Observer, Error};
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StacktraceObserver {
-    stacktrace_hash: Option<u64>,
+    hash: Option<u64>,
 }
 
 impl StacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            stacktrace_hash: None,
-        }
+        Self { hash: None }
     }
 
     /// Gets the runtime for the last execution of this target.
     #[must_use]
-    pub fn stacktrace_hash(&self) -> &Option<u64> {
-        &self.stacktrace_hash
+    pub fn hash(&self) -> &Option<u64> {
+        &self.hash
     }
 }
 
@@ -41,7 +39,7 @@ impl<I, S> Observer<I, S> for StacktraceObserver {
         let bt = Backtrace::new();
         let mut hasher = DefaultHasher::new();
         format!("<START> {:?}", bt).hash(&mut hasher);
-        self.stacktrace_hash = Some(hasher.finish());
+        self.hash = Some(hasher.finish());
         Ok(())
     }
 }
