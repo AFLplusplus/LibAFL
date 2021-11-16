@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
-pub enum Aarch64Regs {
+pub enum Regs {
     X0 = 0,
     X1 = 1,
     X2 = 2,
@@ -38,17 +38,20 @@ pub enum Aarch64Regs {
     X28 = 28,
     X29 = 29,
     X30 = 30,
+    Sp = 31,
+    Pc = 32,
+    Pstate = 33,
 }
 
 /// alias registers
 #[allow(non_upper_case_globals)]
-impl Aarch64Regs {
-    pub const Fp: Aarch64Regs = Aarch64Regs::X29;
-    pub const Lr: Aarch64Regs = Aarch64Regs::X30;
+impl Regs {
+    pub const Fp: Regs = Regs::X29;
+    pub const Lr: Regs = Regs::X30;
 }
 
 #[cfg(feature = "python")]
-impl IntoPy<PyObject> for Aarch64Regs {
+impl IntoPy<PyObject> for Regs {
     fn into_py(self, py: Python) -> PyObject {
         let n: i32 = self.into();
         n.into_py(py)

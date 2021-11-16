@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
-pub enum Amd64Regs {
+pub enum Regs {
     Rax = 0,
     Rbx = 1,
     Rcx = 2,
@@ -29,13 +29,13 @@ pub enum Amd64Regs {
 
 /// alias registers
 #[allow(non_upper_case_globals)]
-impl Amd64Regs {
-    pub const Sp: Amd64Regs = Amd64Regs::Rsp;
-    pub const Pc: Amd64Regs = Amd64Regs::Rip;
+impl Regs {
+    pub const Sp: Regs = Regs::Rsp;
+    pub const Pc: Regs = Regs::Rip;
 }
 
 #[cfg(feature = "python")]
-impl IntoPy<PyObject> for Amd64Regs {
+impl IntoPy<PyObject> for Regs {
     fn into_py(self, py: Python) -> PyObject {
         let n: i32 = self.into();
         n.into_py(py)
