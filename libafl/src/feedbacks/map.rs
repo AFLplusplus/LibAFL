@@ -336,7 +336,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         let mut interesting = false;
@@ -563,7 +563,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // TODO Replace with match_name_type when stable

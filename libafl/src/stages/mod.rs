@@ -31,21 +31,23 @@ pub mod sync;
 #[cfg(feature = "std")]
 pub use sync::*;
 
-use crate::bolts::rands::Rand;
-use crate::corpus::Corpus;
-use crate::corpus::CorpusScheduler;
-use crate::events::EventManager;
-use crate::executors::Executor;
-use crate::inputs::Input;
-use crate::observers::ObserversTuple;
-use crate::state::HasClientPerfMonitor;
-use crate::state::HasCorpus;
-use crate::state::HasRand;
-use crate::Error;
-use crate::EvaluatorObservers;
-use crate::ExecutionProcessor;
-use crate::Fuzzer;
-use crate::HasCorpusScheduler;
+use crate::events::EventFirer;
+use crate::events::EventRestarter;
+use crate::events::HasEventManagerId;
+use crate::events::ProgressReporter;
+use crate::state::HasExecutions;
+use crate::{
+    bolts::rands::Rand,
+    corpus::Corpus,
+    corpus::CorpusScheduler,
+    executors::Executor,
+    executors::HasObservers,
+    inputs::Input,
+    observers::ObserversTuple,
+    state::HasRand,
+    state::{HasClientPerfMonitor, HasCorpus},
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasCorpusScheduler,
+};
 use core::{convert::From, marker::PhantomData};
 
 use self::push::PushStage;
@@ -160,21 +162,19 @@ where
     }
 }
 
-/// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
+/// Allows us to use a [`push::PushStage`] as a normal [`Stage`]set_corpus_idx
+#[allow(clippy::type_complexity)]
 pub struct PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
     R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     push_stage: PS,
     phantom: PhantomData<(C, CS, EM, I, OT, R, S, Z)>,
@@ -184,16 +184,13 @@ impl<C, CS, EM, I, OT, PS, R, S, Z> PushStageAdapter<C, CS, EM, I, OT, PS, R, S,
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
     R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageAdapter`], warpping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
@@ -211,16 +208,16 @@ impl<C, CS, E, EM, I, OT, PS, R, S, Z> Stage<E, EM, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    E: Executor<EM, I, S, Z>,
-    EM: EventManager<(), I, S, Z>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
     R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutesInput<I, OT, S, Z>
+        + ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
         + HasCorpusScheduler<CS, I, S>,
 {
     fn perform(
@@ -231,18 +228,33 @@ where
         event_mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        todo!();
+        let push_stage = &mut self.push_stage;
 
-        /*
-        self.push_stage.init(fuzzer, state, event_mgr, observer);
+        push_stage.set_current_corpus_idx(corpus_idx);
+
+        push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
 
         loop {
+            let input =
+                match push_stage.pre_exec(fuzzer, state, event_mgr, executor.observers_mut()) {
+                    Some(Ok(next_input)) => next_input,
+                    Some(Err(err)) => return Err(err),
+                    None => break,
+                };
 
-            fuzzer.evaluate_input_with_observers(state, executor, manager, input, send_events)
+            let exit_kind = fuzzer.execute_input(state, executor, event_mgr, &input)?;
 
+            push_stage.post_exec(
+                fuzzer,
+                state,
+                event_mgr,
+                executor.observers_mut(),
+                input,
+                exit_kind,
+            )?;
         }
 
-        self.push_stage.deinit(fuzzer, state, event_mgr, observers);
-        */
+        self.push_stage
+            .deinit(fuzzer, state, event_mgr, executor.observers_mut())
     }
 }

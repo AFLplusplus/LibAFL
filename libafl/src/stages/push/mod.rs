@@ -18,12 +18,12 @@ use core::{
 use crate::{
     bolts::{current_time, rands::Rand},
     corpus::{Corpus, CorpusScheduler},
-    events::EventManager,
+    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasCorpus, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, Fuzzer, HasCorpusScheduler,
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    Error, EvaluatorObservers, ExecutionProcessor, HasCorpusScheduler,
 };
 
 /// Send a monitor update all 15 (or more) seconds
@@ -36,15 +36,12 @@ pub struct PushStageSharedState<C, CS, EM, I, OT, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     R: Rand,
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// The [`State`]
     pub state: S,
@@ -61,15 +58,12 @@ impl<C, CS, EM, I, OT, R, S, Z> PushStageSharedState<C, CS, EM, I, OT, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     R: Rand,
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
@@ -90,15 +84,12 @@ pub struct PushStageHelper<C, CS, EM, I, OT, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     R: Rand,
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -110,6 +101,9 @@ where
     pub shared_state: Rc<RefCell<Option<PushStageSharedState<C, CS, EM, I, OT, R, S, Z>>>>,
     /// If the last iteraation failed
     pub errored: bool,
+
+    /// The corpus index we're currently working on
+    pub current_corpus_idx: Option<usize>,
 
     /// The input we just ran
     pub current_input: Option<I>, // Todo: Get rid of copy
@@ -123,15 +117,12 @@ impl<C, CS, EM, I, OT, R, S, Z> PushStageHelper<C, CS, EM, I, OT, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     R: Rand,
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageHelper`]
     #[must_use]
@@ -148,6 +139,7 @@ where
             exit_kind: exit_kind_ref,
             errored: false,
             current_input: None,
+            current_corpus_idx: None,
         }
     }
 
@@ -180,6 +172,20 @@ where
     pub fn reset_exit_kind(&mut self) {
         self.exit_kind.set(None);
     }
+
+    /// Resets this state after a full stage iter.
+    fn end_of_iter(
+        &mut self,
+        shared_state: PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        errored: bool,
+    ) {
+        self.set_shared_state(shared_state);
+        self.errored = errored;
+        self.current_corpus_idx = None;
+        if errored {
+            self.initialized = false;
+        }
+    }
 }
 
 /// A push stage is a generator that returns a single testcase for each call.
@@ -189,20 +195,22 @@ pub trait PushStage<C, CS, EM, I, OT, R, S, Z>: Iterator
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
     R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]
     fn push_stage_helper(&self) -> &PushStageHelper<C, CS, EM, I, OT, R, S, Z>;
     /// Gets the [`PushStageHelper`], mut
     fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<C, CS, EM, I, OT, R, S, Z>;
+
+    /// Set the current corpus index this stagve works on
+    fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
+        self.push_stage_helper_mut().current_corpus_idx = Some(corpus_idx);
+    }
 
     /// Called by `next_std` when this stage is being initialized.
     /// This is called before the first iteration of the stage.
@@ -284,8 +292,7 @@ where
             )
         };
         if let Err(err) = step_success {
-            self.push_stage_helper_mut().errored = true;
-            self.push_stage_helper_mut().set_shared_state(shared_state);
+            self.push_stage_helper_mut().end_of_iter(shared_state, true);
             return Some(Err(err));
         }
 
@@ -307,23 +314,20 @@ where
                 &mut shared_state.event_mgr,
                 &mut shared_state.observers,
             ) {
-                self.push_stage_helper_mut().errored = true;
-                self.push_stage_helper_mut().set_shared_state(shared_state);
+                self.push_stage_helper_mut().end_of_iter(shared_state, true);
                 return Some(Err(err));
             };
 
             let last_monitor_time = self.push_stage_helper().last_monitor_time;
 
-            let new_monitor_time = match Z::maybe_report_monitor(
+            let new_monitor_time = match shared_state.event_mgr.maybe_report_progress(
                 &mut shared_state.state,
-                &mut shared_state.event_mgr,
                 last_monitor_time,
                 STATS_TIMEOUT_DEFAULT,
             ) {
                 Ok(new_time) => new_time,
                 Err(err) => {
-                    self.push_stage_helper_mut().errored = true;
-                    self.push_stage_helper_mut().set_shared_state(shared_state);
+                    self.push_stage_helper_mut().end_of_iter(shared_state, true);
                     return Some(Err(err));
                 }
             };
@@ -333,8 +337,8 @@ where
         } else {
             self.push_stage_helper_mut().reset_exit_kind();
         }
-        self.push_stage_helper_mut().set_shared_state(shared_state);
-        self.push_stage_helper_mut().errored = false;
+        self.push_stage_helper_mut()
+            .end_of_iter(shared_state, false);
         ret
     }
 }

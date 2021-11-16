@@ -7,15 +7,15 @@ use core::cell::{Cell, RefCell};
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, CorpusScheduler},
-    events::EventManager,
+    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::Input,
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, Fuzzer, HasCorpusScheduler,
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    Error, EvaluatorObservers, ExecutionProcessor, HasCorpusScheduler,
 };
 
 #[cfg(feature = "introspection")]
@@ -38,16 +38,13 @@ pub struct StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     current_corpus_idx: Option<usize>,
     testcases_to_do: usize,
@@ -64,16 +61,13 @@ impl<C, CS, EM, I, M, OT, R, S, Z> StdMutationalPushStage<C, CS, EM, I, M, OT, R
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
@@ -91,16 +85,13 @@ impl<C, CS, EM, I, M, OT, R, S, Z> PushStage<C, CS, EM, I, OT, R, S, Z>
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
     fn init(
@@ -207,16 +198,13 @@ impl<C, CS, EM, I, M, OT, R, S, Z> Iterator for StdMutationalPushStage<C, CS, EM
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     type Item = Result<I, Error>;
 
@@ -229,16 +217,13 @@ impl<C, CS, EM, I, M, OT, R, S, Z> StdMutationalPushStage<C, CS, EM, I, M, OT, R
 where
     C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
-    EM: EventManager<(), I, S, Z>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     R: Rand,
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + Fuzzer<(), EM, I, S, ()>
-        + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
     #[must_use]
@@ -252,7 +237,6 @@ where
         Self {
             mutator,
             psh: PushStageHelper::new(shared_state, exit_kind),
-
             current_corpus_idx: None, // todo
             testcases_to_do: 0,
             testcases_done: 0,

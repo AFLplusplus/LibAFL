@@ -14,7 +14,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    executors::ExitKind, inputs::Input, monitors::UserStats, observers::ObserversTuple, Error,
+    bolts::current_time,
+    executors::ExitKind,
+    inputs::Input,
+    monitors::UserStats,
+    observers::ObserversTuple,
+    state::{HasClientPerfMonitor, HasExecutions},
+    Error,
 };
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
@@ -268,7 +274,7 @@ where
 }
 
 /// [`EventFirer`] fire an event.
-pub trait EventFirer<I, S>
+pub trait EventFirer<I>
 where
     I: Input,
 {
@@ -280,10 +286,10 @@ where
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-cases.
-    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
     /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
         OT: ObserversTuple<I, S> + serde::Serialize,
     {
@@ -293,6 +299,66 @@ where
     /// Get the configuration
     fn configuration(&self) -> EventConfig {
         EventConfig::AlwaysUnique
+    }
+}
+
+/// [`EventFirer`] fire an event.
+pub trait ProgressReporter<I>: EventFirer<I>
+where
+    I: Input,
+{
+    /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
+    /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
+    /// Will return an [`crate::Error`], if the stats could not be sent.
+    fn maybe_report_progress<S>(
+        &mut self,
+        state: &mut S,
+        last_report_time: Duration,
+        monitor_timeout: Duration,
+    ) -> Result<Duration, Error>
+    where
+        S: HasExecutions + HasClientPerfMonitor,
+    {
+        let executions = *state.executions();
+        let cur = current_time();
+        // default to 0 here to avoid crashes on clock skew
+        if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
+            // Default no introspection implmentation
+            #[cfg(not(feature = "introspection"))]
+            self.fire(
+                state,
+                Event::UpdateExecutions {
+                    executions,
+                    time: cur,
+                    phantom: PhantomData,
+                },
+            )?;
+
+            // If performance monitor are requested, fire the `UpdatePerfMonitor` event
+            #[cfg(feature = "introspection")]
+            {
+                state
+                    .introspection_monitor_mut()
+                    .set_current_time(crate::bolts::cpu::read_time_counter());
+
+                // Send the current monitor over to the manager. This `.clone` shouldn't be
+                // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
+                self.fire(
+                    state,
+                    Event::UpdatePerfMonitor {
+                        executions,
+                        time: cur,
+                        introspection_monitor: Box::new(state.introspection_monitor().clone()),
+                        phantom: PhantomData,
+                    },
+                )?;
+            }
+
+            Ok(cur)
+        } else {
+            if cur.as_millis() % 1000 == 0 {}
+            Ok(last_report_time)
+        }
     }
 }
 
@@ -332,7 +398,11 @@ pub trait HasEventManagerId {
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
 pub trait EventManager<E, I, S, Z>:
-    EventFirer<I, S> + EventProcessor<E, I, S, Z> + EventRestarter<S> + HasEventManagerId
+    EventFirer<I>
+    + EventProcessor<E, I, S, Z>
+    + EventRestarter<S>
+    + HasEventManagerId
+    + ProgressReporter<I>
 where
     I: Input,
 {
@@ -342,11 +412,11 @@ where
 #[derive(Copy, Clone, Debug)]
 pub struct NopEventManager {}
 
-impl<I, S> EventFirer<I, S> for NopEventManager
+impl<I> EventFirer<I> for NopEventManager
 where
     I: Input,
 {
-    fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+    fn fire<S>(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -365,6 +435,8 @@ impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
 }
 
 impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+
+impl<I> ProgressReporter<I> for NopEventManager where I: Input {}
 
 impl HasEventManagerId for NopEventManager {
     fn mgr_id(&self) -> EventManagerId {
