@@ -1375,7 +1375,7 @@ int asan_giovese_report_and_crash(int access_type, target_ulong addr, size_t n,
       "==%d==ABORTING\n",
       getpid());
 
-  signal(SIGABRT, SIG_DFL);
+  // signal(SIGABRT, SIG_DFL);
   abort();
 
 }
@@ -1491,7 +1491,7 @@ int asan_giovese_badfree(target_ulong addr, target_ulong pc) {
           ": bad-free %s\n", printable_pc);
 
   fprintf(stderr, "==%d==ABORTING\n", getpid());
-  signal(SIGABRT, SIG_DFL);
+  //signal(SIGABRT, SIG_DFL);
   abort();
 
 }

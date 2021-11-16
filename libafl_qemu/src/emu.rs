@@ -232,7 +232,7 @@ extern "C" {
 
 #[allow(clippy::must_use_candidate, clippy::similar_names)]
 pub fn init(args: &[String], env: &[(String, String)]) -> i32 {
-    assert!(args.len() > 0);
+    assert!(!args.is_empty());
     let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
     assert!(argv.len() < i32::MAX as usize);

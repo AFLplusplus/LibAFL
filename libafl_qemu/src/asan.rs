@@ -1,12 +1,13 @@
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::{env, fs};
+use std::{env, fs, ptr};
 
 use crate::{
     emu,
     emu::SyscallHookResult,
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    Regs,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -58,7 +59,7 @@ pub enum PoisonKind {
 #[repr(C)]
 struct CallContext {
     pub addresses: *const u64,
-    pub tid: u32,
+    pub tid: i32,
     pub size: u32,
 }
 
@@ -80,26 +81,41 @@ extern "C" {
     fn asan_giovese_store2(ptr: *const u8) -> i32;
     fn asan_giovese_store4(ptr: *const u8) -> i32;
     fn asan_giovese_store8(ptr: *const u8) -> i32;
-    // int asan_giovese_loadN(void* ptr, size_t n);
     fn asan_giovese_loadN(ptr: *const u8, n: usize) -> i32;
-    // int asan_giovese_storeN(void* ptr, size_t n);
     fn asan_giovese_storeN(ptr: *const u8, n: usize) -> i32;
-    // int asan_giovese_poison_region(void* ptr, size_t n, uint8_t poison_byte);
     fn asan_giovese_poison_region(ptr: *const u8, n: usize, poison: u8) -> i32;
-    // int asan_giovese_unpoison_region(void* ptr, size_t n);
     fn asan_giovese_unpoison_region(ptr: *const u8, n: usize) -> i32;
-    // struct chunk_info* asan_giovese_alloc_search(target_ulong query);
     fn asan_giovese_alloc_search(query: u64) -> *mut ChunkInfo;
-    // void asan_giovese_alloc_remove(target_ulong start, target_ulong end);
     fn asan_giovese_alloc_remove(start: u64, end: u64);
-    // void asan_giovese_alloc_insert(target_ulong start, target_ulong end, struct call_context* alloc_ctx);
     fn asan_giovese_alloc_insert(start: u64, end: u64, alloc_ctx: *const CallContext);
+    fn asan_giovese_report_and_crash(
+        access_type: i32,
+        addr: u64,
+        n: usize,
+        pc: u64,
+        bp: u64,
+        sp: u64,
+    );
+    fn asan_giovese_badfree(addr: u64, pc: u64);
+}
+
+#[no_mangle]
+extern "C" fn asan_giovese_printaddr(_addr: u64) -> *const u8 {
+    // Just addresses ATM
+    ptr::null()
+}
+
+#[no_mangle]
+unsafe extern "C" fn asan_giovese_populate_context(ctx: *mut CallContext, _pc: u64) {
+    let ctx = ctx.as_mut().unwrap();
+    ctx.tid = libc::gettid() as i32;
+    ctx.size = 0;
 }
 
 static mut ASAN_INITED: bool = false;
 
 pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> i32 {
-    assert!(args.len() > 0);
+    assert!(!args.is_empty());
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(&current)
         .unwrap()
@@ -203,14 +219,14 @@ impl QemuAsanHelper {
             if let Some(ck) = ckinfo.as_mut() {
                 if ck.start != addr {
                     // Free not the start of the chunk
-                    std::process::abort();
+                    asan_giovese_badfree(addr, emu::read_reg(Regs::Pc).unwrap_or(u64::MAX));
                 }
                 let ctx: *const CallContext =
                     libc::calloc(core::mem::size_of::<CallContext>(), 1) as *const _;
                 ck.free_ctx = ctx;
             } else {
                 // Free of wild ptr
-                std::process::abort();
+                asan_giovese_badfree(addr, emu::read_reg(Regs::Pc).unwrap_or(u64::MAX));
             }
         }
     }
@@ -221,62 +237,152 @@ impl QemuAsanHelper {
     }
 
     pub fn read_1(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_load1(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_load1(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    0,
+                    addr,
+                    1,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn read_2(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_load2(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_load2(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    0,
+                    addr,
+                    2,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn read_4(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_load4(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_load4(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    0,
+                    addr,
+                    4,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn read_8(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_load8(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_load8(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    0,
+                    addr,
+                    8,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn read_n(&mut self, addr: u64, size: usize) {
-        if self.enabled() && unsafe { asan_giovese_loadN(emu::g2h(addr), size) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_loadN(emu::g2h(addr), size) != 0 {
+                asan_giovese_report_and_crash(
+                    0,
+                    addr,
+                    size,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn write_1(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_store1(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_store1(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    1,
+                    addr,
+                    1,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn write_2(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_store2(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_store2(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    1,
+                    addr,
+                    2,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn write_4(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_store4(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_store4(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    1,
+                    addr,
+                    4,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn write_8(&mut self, addr: u64) {
-        if self.enabled() && unsafe { asan_giovese_store8(emu::g2h(addr)) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_store8(emu::g2h(addr)) != 0 {
+                asan_giovese_report_and_crash(
+                    1,
+                    addr,
+                    8,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
     pub fn write_n(&mut self, addr: u64, size: usize) {
-        if self.enabled() && unsafe { asan_giovese_storeN(emu::g2h(addr), size) != 0 } {
-            std::process::abort();
+        unsafe {
+            if self.enabled() && asan_giovese_storeN(emu::g2h(addr), size) != 0 {
+                asan_giovese_report_and_crash(
+                    1,
+                    addr,
+                    size,
+                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    0,
+                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                );
+            }
         }
     }
 
