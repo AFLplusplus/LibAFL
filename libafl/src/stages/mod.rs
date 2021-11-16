@@ -244,5 +244,5 @@ where
 
         self.push_stage.deinit(fuzzer, state, event_mgr, observers);
         */
-
+    }
 }
