@@ -6,8 +6,8 @@ use core::{
     mem::{size_of, transmute, MaybeUninit},
     ptr::{copy_nonoverlapping, null},
 };
-use num::Num;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_traits::Num;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 

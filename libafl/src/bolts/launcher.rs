@@ -19,8 +19,8 @@ use crate::{
     bolts::shmem::ShMemProvider,
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
+    monitors::Monitor,
     observers::ObserversTuple,
-    stats::Stats,
     Error,
 };
 
@@ -45,19 +45,19 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity)]
-pub struct Launcher<'a, CF, I, OT, S, SP, ST>
+pub struct Launcher<'a, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input + 'a,
-    ST: Stats,
+    MT: Monitor,
     SP: ShMemProvider + 'static,
     OT: ObserversTuple<I, S> + 'a,
     S: DeserializeOwned + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
-    /// The stats instance to use
-    stats: ST,
+    /// The monitor instance to use
+    monitor: MT,
     /// The configuration
     configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
@@ -86,12 +86,12 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, CF, I, OT, S, SP, ST> Launcher<'a, CF, I, OT, S, SP, ST>
+impl<'a, CF, I, MT, OT, S, SP> Launcher<'a, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
-    ST: Stats + Clone,
+    MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,
 {
@@ -138,7 +138,7 @@ where
                             dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
                         }
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<I, OT, S, SP, ST>::builder()
+                        let (state, mgr) = RestartingMgr::<I, MT, OT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -161,9 +161,9 @@ where
             println!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<I, OT, S, SP, ST>::builder()
+            RestartingMgr::<I, MT, OT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
-                .stats(Some(self.stats.clone()))
+                .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
@@ -206,7 +206,7 @@ where
                 //todo: silence stdout and stderr for clients
 
                 // the actual client. do the fuzzing
-                let (state, mgr) = RestartingMgr::<I, OT, S, SP, ST>::builder()
+                let (state, mgr) = RestartingMgr::<I, MT, OT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -259,9 +259,9 @@ where
             #[cfg(feature = "std")]
             println!("I am broker!!.");
 
-            RestartingMgr::<I, OT, S, SP, ST>::builder()
+            RestartingMgr::<I, MT, OT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
-                .stats(Some(self.stats.clone()))
+                .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)

@@ -3,9 +3,7 @@ use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
-    mem,
-    mem::MaybeUninit,
-    ptr,
+    mem, ptr,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
@@ -244,11 +242,15 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
 
 /// Function to get the current [`ucontext_t`] for this process.
 /// This calls the libc `getcontext` function under the hood.
+/// It can be useful, for example for `dump_regs`.
+/// Note that calling this method may, of course, alter the state.
 /// We wrap it here, as it seems to be (currently)
 /// not available on `MacOS` in the `libc` crate.
 #[cfg(unix)]
+#[allow(clippy::inline_always)] // we assume that inlining will destroy less state
+#[inline(always)]
 pub fn ucontext() -> Result<ucontext_t, Error> {
-    let mut ucontext = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut ucontext = unsafe { mem::zeroed() };
     if unsafe { getcontext(&mut ucontext) } == 0 {
         Ok(ucontext)
     } else {

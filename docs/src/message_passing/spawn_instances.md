@@ -27,7 +27,7 @@ An example may look like this:
     Launcher::builder()
         .configuration(EventConfig::from_name(&configuration))
         .shmem_provider(shmem_provider)
-        .stats(stats)
+        .monitor(mon)
         .run_client(&mut run_client)
         .cores(cores)
         .broker_port(broker_port)

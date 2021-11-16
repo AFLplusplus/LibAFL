@@ -7,7 +7,7 @@ this helps finding mem errors early.
 */
 
 use frida_gum::NativePointer;
-use frida_gum::RangeDetails;
+use frida_gum::{ModuleDetails, RangeDetails};
 use hashbrown::HashMap;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -30,7 +30,7 @@ use capstone::{
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use frida_gum::interceptor::Interceptor;
-use frida_gum::{Gum, ModuleMap};
+use frida_gum::{Gum, Module, ModuleMap};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
@@ -114,6 +114,7 @@ pub struct AsanRuntime {
     stalked_addresses: HashMap<usize, usize>,
     options: FridaOptions,
     module_map: Option<ModuleMap>,
+    suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
 }
 
@@ -140,6 +141,7 @@ impl AsanRuntime {
             stalked_addresses: HashMap::new(),
             options,
             module_map: None,
+            suppressed_addresses: Vec::new(),
             shadow_check_func: None,
         }
     }
@@ -157,6 +159,13 @@ impl AsanRuntime {
         self.unpoison_all_existing_memory();
 
         self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
+        if let Some(suppressed_specifiers) = self.options.dont_instrument_locations() {
+            for (module_name, offset) in suppressed_specifiers {
+                let module_details = ModuleDetails::with_name(module_name).unwrap();
+                let lib_start = module_details.range().base_address().0 as usize;
+                self.suppressed_addresses.push(lib_start + offset);
+            }
+        }
 
         self.hook_functions(_gum);
 
@@ -1466,7 +1475,8 @@ impl AsanRuntime {
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        if this.module_map.as_ref().unwrap().find(this.real_address_for_stalked(invocation.return_addr() as usize) as u64).is_some() {
+                        let real_address = this.real_address_for_stalked(invocation.return_addr() as usize);
+                        if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
                             this.[<hook_ $name>]($($param),*)
                         } else {
                             $name($($param),*)
@@ -1521,96 +1531,144 @@ impl AsanRuntime {
         );
         #[cfg(not(target_vendor = "apple"))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
-        hook_func!(None, _Znam, (size: usize), *mut c_void);
-        hook_func!(
-            None,
-            _ZnamRKSt9nothrow_t,
-            (size: usize, _nothrow: *const c_void),
-            *mut c_void
-        );
-        hook_func!(
-            None,
-            _ZnamSt11align_val_t,
-            (size: usize, alignment: usize),
-            *mut c_void
-        );
-        hook_func!(
-            None,
-            _ZnamSt11align_val_tRKSt9nothrow_t,
-            (size: usize, alignment: usize, _nothrow: *const c_void),
-            *mut c_void
-        );
-        hook_func!(None, _Znwm, (size: usize), *mut c_void);
-        hook_func!(
-            None,
-            _ZnwmRKSt9nothrow_t,
-            (size: usize, _nothrow: *const c_void),
-            *mut c_void
-        );
-        hook_func!(
-            None,
-            _ZnwmSt11align_val_t,
-            (size: usize, alignment: usize),
-            *mut c_void
-        );
-        hook_func!(
-            None,
-            _ZnwmSt11align_val_tRKSt9nothrow_t,
-            (size: usize, alignment: usize, _nothrow: *const c_void),
-            *mut c_void
-        );
-        hook_func!(None, _ZdaPv, (ptr: *mut c_void), ());
-        hook_func!(None, _ZdaPvm, (ptr: *mut c_void, _ulong: u64), ());
-        hook_func!(
-            None,
-            _ZdaPvmSt11align_val_t,
-            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
-            ()
-        );
-        hook_func!(
-            None,
-            _ZdaPvRKSt9nothrow_t,
-            (ptr: *mut c_void, _nothrow: *const c_void),
-            ()
-        );
-        hook_func!(
-            None,
-            _ZdaPvSt11align_val_t,
-            (ptr: *mut c_void, _alignment: usize),
-            ()
-        );
-        hook_func!(
-            None,
-            _ZdaPvSt11align_val_tRKSt9nothrow_t,
-            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
-            ()
-        );
-        hook_func!(None, _ZdlPv, (ptr: *mut c_void), ());
-        hook_func!(None, _ZdlPvm, (ptr: *mut c_void, _ulong: u64), ());
-        hook_func!(
-            None,
-            _ZdlPvmSt11align_val_t,
-            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
-            ()
-        );
-        hook_func!(
-            None,
-            _ZdlPvRKSt9nothrow_t,
-            (ptr: *mut c_void, _nothrow: *const c_void),
-            ()
-        );
-        hook_func!(
-            None,
-            _ZdlPvSt11align_val_t,
-            (ptr: *mut c_void, _alignment: usize),
-            ()
-        );
-        hook_func!(
-            None,
-            _ZdlPvSt11align_val_tRKSt9nothrow_t,
-            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
-            ()
-        );
+
+        for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
+            for export in Module::enumerate_exports(libname) {
+                match &export.name[..] {
+                    "_Znam" => {
+                        hook_func!(Some(libname), _Znam, (size: usize), *mut c_void);
+                    }
+                    "_ZnamRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZnamRKSt9nothrow_t,
+                            (size: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnamSt11align_val_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZnamSt11align_val_t,
+                            (size: usize, alignment: usize),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnamSt11align_val_tRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZnamSt11align_val_tRKSt9nothrow_t,
+                            (size: usize, alignment: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_Znwm" => {
+                        hook_func!(Some(libname), _Znwm, (size: usize), *mut c_void);
+                    }
+                    "_ZnwmRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZnwmRKSt9nothrow_t,
+                            (size: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnwmSt11align_val_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZnwmSt11align_val_t,
+                            (size: usize, alignment: usize),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnwmSt11align_val_tRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZnwmSt11align_val_tRKSt9nothrow_t,
+                            (size: usize, alignment: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_ZdaPv" => {
+                        hook_func!(Some(libname), _ZdaPv, (ptr: *mut c_void), ());
+                    }
+                    "_ZdaPvm" => {
+                        hook_func!(Some(libname), _ZdaPvm, (ptr: *mut c_void, _ulong: u64), ());
+                    }
+                    "_ZdaPvmSt11align_val_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdaPvmSt11align_val_t,
+                            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdaPvRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdaPvRKSt9nothrow_t,
+                            (ptr: *mut c_void, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    "_ZdaPvSt11align_val_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdaPvSt11align_val_t,
+                            (ptr: *mut c_void, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdaPvSt11align_val_tRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdaPvSt11align_val_tRKSt9nothrow_t,
+                            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    "_ZdlPv" => {
+                        hook_func!(Some(libname), _ZdlPv, (ptr: *mut c_void), ());
+                    }
+                    "_ZdlPvm" => {
+                        hook_func!(Some(libname), _ZdlPvm, (ptr: *mut c_void, _ulong: u64), ());
+                    }
+                    "_ZdlPvmSt11align_val_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdlPvmSt11align_val_t,
+                            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdlPvRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdlPvRKSt9nothrow_t,
+                            (ptr: *mut c_void, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    "_ZdlPvSt11align_val_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdlPvSt11align_val_t,
+                            (ptr: *mut c_void, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdlPvSt11align_val_tRKSt9nothrow_t" => {
+                        hook_func!(
+                            Some(libname),
+                            _ZdlPvSt11align_val_tRKSt9nothrow_t,
+                            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
 
         hook_func!(
             None,

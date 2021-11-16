@@ -8,6 +8,11 @@ pub mod qemu;
 #[cfg(target_os = "linux")]
 pub use qemu::QemuBytesCoverageSugar;
 
+#[cfg(target_family = "unix")]
+pub mod forkserver;
+#[cfg(target_family = "unix")]
+pub use forkserver::ForkserverBytesCoverageSugar;
+
 pub const DEFAULT_TIMEOUT_SECS: u64 = 1200;
 pub const CORPUS_CACHE_SIZE: usize = 4096;
 
