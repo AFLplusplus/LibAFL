@@ -41,11 +41,14 @@ use libafl::{
 };
 use libafl_qemu::{
     amd64::Amd64Regs,
+    asan::QemuAsanHelper,
+    cmplog,
+    cmplog::{CmpLogObserver, QemuCmpLogHelper},
+    edges,
+    edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    emu, filter_qemu_args,
-    helpers::{QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuSnapshotHelper},
-    hooks,
-    hooks::CmpLogObserver,
+    emu, filter_qemu_args, init_with_asan,
+    snapshot::QemuSnapshotHelper,
     MmapPerms, QemuExecutor,
 };
 
@@ -55,9 +58,9 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-    emu::init(&args, &env);
+    let mut args: Vec<String> = env::args().collect();
+    let mut env: Vec<(String, String)> = env::vars().collect();
+    init_with_asan(&mut args, &mut env);
 
     let res = match App::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
@@ -230,8 +233,8 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut hooks::EDGES_MAP };
-    let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
+    let edges = unsafe { &mut edges::EDGES_MAP };
+    let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
     let edges_observer =
         HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
 
@@ -239,7 +242,7 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut hooks::CMPLOG_MAP }, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
@@ -305,7 +308,8 @@ fn fuzz(
         tuple_list!(
             QemuEdgeCoverageHelper::new(),
             QemuCmpLogHelper::new(),
-            QemuSnapshotHelper::new()
+            QemuAsanHelper::new(),
+            //QemuSnapshotHelper::new()
         ),
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,

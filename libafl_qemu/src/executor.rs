@@ -15,7 +15,7 @@ use libafl::{
 };
 
 pub use crate::emu::SyscallHookResult;
-use crate::{emu, emu::SKIP_EXEC_HOOK, helpers::QemuHelperTuple};
+use crate::{emu, emu::SKIP_EXEC_HOOK, helper::QemuHelperTuple};
 
 static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
 

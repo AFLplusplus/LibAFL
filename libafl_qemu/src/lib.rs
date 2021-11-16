@@ -6,8 +6,28 @@ pub mod arm;
 pub mod x86;
 
 pub mod elf;
+
 #[cfg(target_os = "linux")]
-pub mod hooks;
+pub mod helper;
+#[cfg(target_os = "linux")]
+pub use helper::*;
+
+#[cfg(target_os = "linux")]
+pub mod edges;
+#[cfg(target_os = "linux")]
+pub use edges::QemuEdgeCoverageHelper;
+#[cfg(target_os = "linux")]
+pub mod cmplog;
+#[cfg(target_os = "linux")]
+pub use cmplog::QemuCmpLogHelper;
+#[cfg(target_os = "linux")]
+pub mod snapshot;
+#[cfg(target_os = "linux")]
+pub use snapshot::QemuSnapshotHelper;
+#[cfg(target_os = "linux")]
+pub mod asan;
+#[cfg(target_os = "linux")]
+pub use asan::{init_with_asan, QemuAsanHelper};
 
 #[cfg(target_os = "linux")]
 pub mod executor;
@@ -18,11 +38,6 @@ pub use executor::QemuExecutor;
 pub mod emu;
 #[cfg(target_os = "linux")]
 pub use emu::*;
-
-#[cfg(target_os = "linux")]
-pub mod helpers;
-#[cfg(target_os = "linux")]
-pub use helpers::*;
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
