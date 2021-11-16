@@ -10,7 +10,7 @@ use core::{
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 use intervaltree::IntervalTree;
-use num::Integer;
+use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -26,7 +26,7 @@ use crate::{
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>: HasLen + Named + serde::Serialize + serde::de::DeserializeOwned
 where
-    T: Integer + Default + Copy,
+    T: PrimInt + Default + Copy,
 {
     /// Get the map if the observer can be represented with a slice
     fn map(&self) -> Option<&[T]>;
@@ -108,7 +108,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
@@ -117,7 +117,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -128,7 +128,7 @@ where
 
 impl<'a, T> Named for StdMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -138,7 +138,7 @@ where
 
 impl<'a, T> HasLen for StdMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -148,7 +148,7 @@ where
 
 impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn map(&self) -> Option<&[T]> {
@@ -178,7 +178,7 @@ where
 
 impl<'a, T> StdMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
     #[must_use]
@@ -223,7 +223,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct ConstMapObserver<'a, T, const N: usize>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
@@ -232,7 +232,7 @@ where
 
 impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -243,7 +243,7 @@ where
 
 impl<'a, T, const N: usize> Named for ConstMapObserver<'a, T, N>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -253,7 +253,7 @@ where
 
 impl<'a, T, const N: usize> HasLen for ConstMapObserver<'a, T, N>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -263,7 +263,7 @@ where
 
 impl<'a, T, const N: usize> MapObserver<T> for ConstMapObserver<'a, T, N>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn usable_count(&self) -> usize {
@@ -298,7 +298,7 @@ where
 
 impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
     #[must_use]
@@ -344,7 +344,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
     size: OwnedRefMut<'a, usize>,
@@ -354,7 +354,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -365,7 +365,7 @@ where
 
 impl<'a, T> Named for VariableMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -375,7 +375,7 @@ where
 
 impl<'a, T> HasLen for VariableMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -385,7 +385,7 @@ where
 
 impl<'a, T> MapObserver<T> for VariableMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn map(&self) -> Option<&[T]> {
@@ -420,7 +420,7 @@ where
 
 impl<'a, T> VariableMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
     pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
@@ -568,7 +568,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct MultiMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     maps: Vec<OwnedSliceMut<'a, T>>,
     intervals: IntervalTree<usize, usize>,
@@ -579,7 +579,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for MultiMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -590,7 +590,7 @@ where
 
 impl<'a, T> Named for MultiMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -600,7 +600,7 @@ where
 
 impl<'a, T> HasLen for MultiMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -610,7 +610,7 @@ where
 
 impl<'a, T> MapObserver<T> for MultiMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn map(&self) -> Option<&[T]> {
@@ -692,7 +692,7 @@ where
 
 impl<'a, T> MultiMapObserver<'a, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MultiMapObserver`]
     #[must_use]

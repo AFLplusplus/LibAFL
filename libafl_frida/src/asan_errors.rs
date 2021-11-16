@@ -13,7 +13,7 @@ use libafl::{
     feedbacks::Feedback,
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
-    state::{HasClientPerfStats, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
 };
 use serde::{Deserialize, Serialize};
@@ -614,7 +614,7 @@ pub struct AsanErrorsFeedback {
 impl<I, S> Feedback<I, S> for AsanErrorsFeedback
 where
     I: Input + HasTargetBytes,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,

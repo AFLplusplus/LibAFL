@@ -33,7 +33,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasSolutions},
+    state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
 
@@ -166,7 +166,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         #[cfg(unix)]
@@ -333,7 +333,7 @@ mod unix_signal_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasClientPerfStats, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
     pub type HandlerFuncPtr =
@@ -397,7 +397,7 @@ mod unix_signal_handler {
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -475,7 +475,7 @@ mod unix_signal_handler {
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -608,7 +608,7 @@ mod windows_exception_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasClientPerfStats, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
     pub type HandlerFuncPtr =
@@ -647,7 +647,7 @@ mod windows_exception_handler {
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -723,7 +723,7 @@ mod windows_exception_handler {
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -920,7 +920,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         Ok(Self {

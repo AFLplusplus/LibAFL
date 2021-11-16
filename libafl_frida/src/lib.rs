@@ -13,6 +13,8 @@ pub mod asan_errors;
 #[cfg(unix)]
 pub mod asan_rt;
 
+pub mod coverage_rt;
+
 #[cfg(feature = "cmplog")]
 /// The frida cmplog runtime
 pub mod cmplog_rt;

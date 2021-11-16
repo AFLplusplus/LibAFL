@@ -11,7 +11,7 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
 
@@ -52,7 +52,7 @@ impl<'a> Named for NautilusFeedback<'a> {
 
 impl<'a, S> Feedback<NautilusInput, S> for NautilusFeedback<'a>
 where
-    S: HasMetadata + HasClientPerfStats,
+    S: HasMetadata + HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,

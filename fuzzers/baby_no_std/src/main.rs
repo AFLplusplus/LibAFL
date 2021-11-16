@@ -13,11 +13,11 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     stages::mutational::StdMutationalStage,
     state::StdState,
-    stats::SimpleStats,
 };
 
 #[cfg(any(windows, unix))]
@@ -99,8 +99,8 @@ pub fn main() {
         tuple_list!(feedback_state),
     );
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| {
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let monitor = SimpleMonitor::new(|s| {
         // TODO: Print `s` here, if your target permits it.
         #[cfg(any(windows, unix))]
         unsafe {
@@ -113,7 +113,7 @@ pub fn main() {
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
+    let mut mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueCorpusScheduler::new();

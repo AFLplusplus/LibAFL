@@ -21,7 +21,8 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, HasTargetBytes, Input},
+    monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
@@ -30,7 +31,6 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
 
@@ -43,8 +43,8 @@ use std::{
 };
 
 use libafl_frida::{
-    executor::FridaInProcessExecutor,
-    helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
+    coverage_rt::MAP_SIZE,
+    helper::{FridaHelper, FridaInstrumentationHelper},
     FridaOptions,
 };
 
@@ -155,7 +155,7 @@ unsafe fn fuzz(
     configuration: String,
 ) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let shmem_provider = StdShMemProvider::new()?;
 
@@ -190,7 +190,7 @@ unsafe fn fuzz(
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
-            frida_helper.map_ptr(),
+            frida_helper.map_ptr_mut(),
             MAP_SIZE,
         ));
 
@@ -335,7 +335,7 @@ unsafe fn fuzz(
     Launcher::builder()
         .configuration(EventConfig::from_name(&configuration))
         .shmem_provider(shmem_provider)
-        .stats(stats)
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(cores)
         .broker_port(broker_port)

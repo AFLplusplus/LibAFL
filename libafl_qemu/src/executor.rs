@@ -10,12 +10,12 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasSolutions},
+    state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
 
 pub use crate::emu::SyscallHookResult;
-use crate::{emu, emu::SKIP_EXEC_HOOK, helpers::QemuHelperTuple};
+use crate::{emu, emu::SKIP_EXEC_HOOK, helper::QemuHelperTuple};
 
 static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
 
@@ -386,7 +386,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let slf = Self {

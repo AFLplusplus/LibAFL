@@ -6,8 +6,8 @@ use core::{
     mem::{size_of, transmute, MaybeUninit},
     ptr::{copy_nonoverlapping, null},
 };
-use num::Num;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_traits::Num;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 
@@ -232,6 +232,7 @@ extern "C" {
 
 #[allow(clippy::must_use_candidate, clippy::similar_names)]
 pub fn init(args: &[String], env: &[(String, String)]) -> i32 {
+    assert!(args.len() > 0);
     let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
     assert!(argv.len() < i32::MAX as usize);
