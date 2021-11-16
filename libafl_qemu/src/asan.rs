@@ -198,9 +198,16 @@ impl QemuAsanHelper {
         unsafe {
             let ckinfo = asan_giovese_alloc_search(addr);
             if let Some(ck) = ckinfo.as_mut() {
+                if ck.start != addr {
+                    // Free not the start of the chunk
+                    std::process::abort();
+                }
                 let ctx: *const CallContext =
                     libc::calloc(core::mem::size_of::<CallContext>(), 1) as *const _;
                 ck.free_ctx = ctx;
+            } else {
+                // Free of wild ptr
+                std::process::abort();
             }
         }
     }
