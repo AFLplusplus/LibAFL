@@ -52,6 +52,7 @@ impl CmpLogRuntime {
                 ; stp x10, x11, [sp, #-0x10]!
                 ; stp x12, x13, [sp, #-0x10]!
                 ; stp x14, x15, [sp, #-0x10]!
+                ; stp x24, x25, [sp, #-0x10]!
                 ; stp x29, x30, [sp, #-0x10]!
                 ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
                 // jump to rust based population of the lists
@@ -63,6 +64,7 @@ impl CmpLogRuntime {
                 // restore the reg state before returning to the caller
                 ; .dword 0xd51b4218u32 as i32 // msr nzcv, x24
                 ; ldp x29, x30, [sp], #0x10
+                ; ldp x24, x25, [sp], #0x10
                 ; ldp x14, x15, [sp], #0x10
                 ; ldp x12, x13, [sp], #0x10
                 ; ldp x10, x11, [sp], #0x10
