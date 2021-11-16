@@ -111,6 +111,9 @@ where
     /// If the last iteraation failed
     pub errored: bool,
 
+    /// The input we just ran
+    pub current_input: Option<I>, // Todo: Get rid of copy
+
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, CS, (), EM, I, R, OT, S, Z)>,
     exit_kind: Rc<Cell<Option<ExitKind>>>,
@@ -144,6 +147,7 @@ where
             last_monitor_time: current_time(),
             exit_kind: exit_kind_ref,
             errored: false,
+            current_input: None,
         }
     }
 
@@ -206,7 +210,10 @@ where
     #[inline]
     fn init(
         &mut self,
-        _shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -216,14 +223,21 @@ where
     /// After this stage has finished, or if the stage does not process any inputs, this should return `None`.
     fn pre_exec(
         &mut self,
-        shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
     ) -> Option<Result<I, Error>>;
 
     /// Called after the execution of a testcase finished.
     #[inline]
     fn post_exec(
         &mut self,
-        _shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
+        _input: I,
         _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -233,7 +247,10 @@ where
     #[inline]
     fn deinit(
         &mut self,
-        _shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -247,12 +264,24 @@ where
 
         let step_success = if self.push_stage_helper().initialized {
             // We already ran once
+
+            let last_input = self.push_stage_helper_mut().current_input.take().unwrap();
+
             self.post_exec(
-                &mut shared_state,
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+                last_input,
                 self.push_stage_helper().exit_kind().unwrap(),
             )
         } else {
-            self.init(&mut shared_state)
+            self.init(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+            )
         };
         if let Err(err) = step_success {
             self.push_stage_helper_mut().errored = true;
@@ -261,12 +290,23 @@ where
         }
 
         //for i in 0..num {
-        let ret = self.pre_exec(&mut shared_state);
+        let ret = self.pre_exec(
+            &mut shared_state.fuzzer,
+            &mut shared_state.state,
+            &mut shared_state.event_mgr,
+            &mut shared_state.observers,
+        );
         if ret.is_none() {
             // We're done.
+            drop(self.push_stage_helper_mut().current_input.take());
             self.push_stage_helper_mut().initialized = false;
 
-            if let Err(err) = self.deinit(&mut shared_state) {
+            if let Err(err) = self.deinit(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+            ) {
                 self.push_stage_helper_mut().errored = true;
                 self.push_stage_helper_mut().set_shared_state(shared_state);
                 return Some(Err(err));

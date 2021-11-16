@@ -53,8 +53,6 @@ where
     testcases_to_do: usize,
     testcases_done: usize,
 
-    current_input: Option<I>, // Todo: Get rid of copy
-
     stage_idx: i32,
 
     mutator: M,
@@ -107,11 +105,11 @@ where
     /// Creates a new default mutational stage
     fn init(
         &mut self,
-        shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        fuzzer: &mut Z,
+        state: &mut S,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
     ) -> Result<(), Error> {
-        let state = &mut shared_state.state;
-        let fuzzer = &mut shared_state.fuzzer;
-
         // Find a testcase to work on, unless someone already set it
         self.current_corpus_idx = Some(if let Some(corpus_idx) = self.current_corpus_idx {
             corpus_idx
@@ -127,7 +125,10 @@ where
     #[inline]
     fn deinit(
         &mut self,
-        _shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
     ) -> Result<(), Error> {
         self.current_corpus_idx = None;
         Ok(())
@@ -135,10 +136,11 @@ where
 
     fn pre_exec(
         &mut self,
-        shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        _fuzzer: &mut Z,
+        state: &mut S,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
     ) -> Option<Result<I, Error>> {
-        let state = &mut shared_state.state;
-
         if self.testcases_done >= self.testcases_to_do {
             // finished with this cicle.
             return None;
@@ -161,31 +163,25 @@ where
             .unwrap();
         mark_feature_time!(state, PerfFeature::Mutate);
 
-        self.current_input = Some(input.clone()); // TODO: Get rid of this
+        self.push_stage_helper_mut()
+            .current_input
+            .replace(input.clone()); // TODO: Get rid of this
 
         Some(Ok(input))
     }
 
     fn post_exec(
         &mut self,
-        shared_state: &mut PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        observers: &mut OT,
+        last_input: I,
         exit_kind: ExitKind,
     ) -> Result<(), Error> {
         // todo: isintersting, etc.
 
-        let state = &mut shared_state.state;
-        let fuzzer = &mut shared_state.fuzzer;
-        let event_mgr = &mut shared_state.event_mgr;
-        let observers = &mut shared_state.observers;
-
-        fuzzer.process_execution(
-            state,
-            event_mgr,
-            self.current_input.take().unwrap(),
-            observers,
-            &exit_kind,
-            true,
-        )?;
+        fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
         self.mutator
@@ -260,7 +256,6 @@ where
             current_corpus_idx: None, // todo
             testcases_to_do: 0,
             testcases_done: 0,
-            current_input: None,
             stage_idx,
         }
     }
