@@ -266,9 +266,7 @@ pub struct InProcessExecutorHandlerData {
     pub crash_handler: *const c_void,
     pub timeout_handler: *const c_void,
     #[cfg(windows)]
-    pub tp_timer: *mut c_void,
-    #[cfg(windows)]
-    pub timer_handler_input: *mut c_void,
+    pub timeout_input_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
@@ -291,9 +289,7 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     /// The timeout handler fn
     timeout_handler: ptr::null(),
     #[cfg(windows)]
-    tp_timer: ptr::null_mut(),
-    #[cfg(windows)]
-    timer_handler_input: ptr::null_mut(),
+    timeout_input_ptr: ptr::null_mut(),
 };
 
 #[must_use]
@@ -604,7 +600,6 @@ mod windows_exception_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            timeout::windows_delete_timer_queue,
             ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -632,9 +627,17 @@ mod windows_exception_handler {
         fn handle(&mut self, code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
-                if !data.crash_handler.is_null() {
-                    let func: HandlerFuncPtr = transmute(data.crash_handler);
-                    (func)(code, exception_pointers, data);
+                if code != ExceptionCode::Timeout{
+                    if !data.crash_handler.is_null() {
+                        let func: HandlerFuncPtr = transmute(data.crash_handler);
+                        (func)(code, exception_pointers, data);
+                    }
+                }
+                else{
+                    if !data.timeout_handler.is_null() {
+                        let func: HandlerFuncPtr = transmute(data.timeout_handler);
+                        (func)(code, exception_pointers, data);
+                    }
                 }
             }
         }
@@ -645,9 +648,9 @@ mod windows_exception_handler {
     }
 
     pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OC, OF, OT, S, Z>(
-        _p0: *mut u8,
-        global_state: *mut c_void,
-        _p1: *mut u8,
+        code: ExceptionCode,
+        exception_pointers: *mut EXCEPTION_POINTERS,
+        data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers<I, OT, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
@@ -658,16 +661,12 @@ mod windows_exception_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
-        let data: &mut InProcessExecutorHandlerData =
-            &mut *(global_state as *mut InProcessExecutorHandlerData);
-
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
         let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
         let executor = (data.executor_ptr as *const E).as_ref().unwrap();
         let observers = executor.observers();
-
-        if data.timer_handler_input.is_null() {
+        if data.timeout_input_ptr.is_null() {
             #[cfg(feature = "std")]
             dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
         } else {
@@ -676,8 +675,8 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             let _res = stdout().flush();
 
-            let input = (data.timer_handler_input as *const I).as_ref().unwrap();
-            data.timer_handler_input = ptr::null_mut();
+            let input = (data.timeout_input_ptr as *const I).as_ref().unwrap();
+            data.timeout_input_ptr = ptr::null_mut();
 
             let interesting = fuzzer
                 .objective_mut()
@@ -734,11 +733,6 @@ mod windows_exception_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
-        // Have we set a timer_before?
-        if let Some(x) = (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut() {
-            windows_delete_timer_queue(x);
-        }
-
         #[cfg(feature = "std")]
         println!("Crashed with {}", code);
         if data.current_input_ptr.is_null() {
@@ -820,29 +814,6 @@ mod windows_exception_handler {
             println!("Bye!");
         }
         ExitProcess(1);
-    }
-}
-
-#[cfg(windows)]
-type PTP_TIMER_CALLBACK = unsafe extern "system" fn(param0: *mut windows::Win32::System::Threading::TP_CALLBACK_INSTANCE, param1: *mut c_void, param2: *mut windows::Win32::System::Threading::TP_TIMER);
-
-#[cfg(windows)]
-pub trait HasTimeoutHandler {
-    fn timeout_handler(&self) -> PTP_TIMER_CALLBACK;
-}
-
-#[cfg(windows)]
-impl<'a, H, I, OT, S> HasTimeoutHandler for InProcessExecutor<'a, H, I, OT, S>
-where
-    H: FnMut(&I) -> ExitKind,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    /// the timeout handler
-    #[inline]
-    fn timeout_handler(&self) -> PTP_TIMER_CALLBACK {
-        let func: PTP_TIMER_CALLBACK = unsafe { transmute(self.timeout_handler) };
-        func
     }
 }
 

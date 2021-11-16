@@ -150,6 +150,8 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::HeapCorruption,
     ExceptionCode::StackBufferOverrun,
     ExceptionCode::AssertionFailure,
+
+    ExceptionCode::Timeout, // Handle timeout in Exceptions
 ];
 
 impl PartialEq for ExceptionCode {
@@ -322,7 +324,7 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
         .unwrap()
         .ExceptionCode;
     let exception_code = ExceptionCode::try_from(code.0).unwrap();
-    // println!("Received {}", exception_code);
+    println!("Received {}", exception_code);
     let ret = internal_handle_exception(exception_code, exception_pointers);
     PREVIOUS_HANDLER.map_or(ret, |prev_handler| prev_handler(exception_pointers))
 }

@@ -11,7 +11,11 @@ use crate::{
 };
 
 #[cfg(all(windows, feature = "std"))]
-use crate::executors::inprocess::{HasTimeoutHandler, GLOBAL_STATE};
+use crate::executors::inprocess::GLOBAL_STATE;
+
+#[cfg(all(windows, feature = "std"))]
+use crate::bolts::os::windows_exceptions::ExceptionCode;
+
 
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
@@ -25,6 +29,7 @@ use windows::Win32::{
         TP_CALLBACK_ENVIRON_V3, TP_TIMER,
         CreateThreadpoolTimer, SetThreadpoolTimer, CloseThreadpoolTimer,
     },
+    System::Diagnostics::Debug::RaiseException,
 };
 
 #[cfg(all(windows, feature = "std"))]
@@ -61,27 +66,17 @@ pub fn unix_remove_timeout() {
     }
 }
 
-#[cfg(all(windows, feature = "std"))]
-pub fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
-    unsafe {
-        CloseThreadpoolTimer(tp_timer);
-    }
-}
-
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]
     itimerval: Itimerval,
     #[cfg(windows)]
-    milli_sec: i64,
-    #[cfg(windows)]
-    tp_timer: *mut TP_TIMER,
+    exec_tmout: Duration,
 }
 
 impl<E> TimeoutExecutor<E>
     where
-        E: HasTimeoutHandler,
     {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
@@ -108,12 +103,9 @@ impl<E> TimeoutExecutor<E>
 
     #[cfg(windows)]
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
-        let milli_sec = exec_tmout.as_millis() as i64;
-        let tp_timer = unsafe { CreateThreadpoolTimer(Some(executor.timeout_handler()), &mut GLOBAL_STATE as *mut _ as *mut c_void, &TP_CALLBACK_ENVIRON_V3::default()) };
         Self {
             executor,
-            milli_sec,
-            tp_timer
+            exec_tmout,
         }
     }
 
@@ -121,19 +113,12 @@ impl<E> TimeoutExecutor<E>
     pub fn inner(&mut self) -> &mut E {
         &mut self.executor
     }
-
-    #[cfg(windows)]
-    pub fn windows_reset_timeout(&self) -> Result<(), Error> {
-        unsafe {
-        }
-        Ok(())
-    }
 }
 
 #[cfg(windows)]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasTimeoutHandler,
+    E: Executor<EM, I, S, Z>,
     I: Input,
 {
     fn run_target(
@@ -146,22 +131,19 @@ where
         unsafe {
             let data = &mut GLOBAL_STATE;
             write_volatile(
-                &mut data.tp_timer,
-                &mut self.tp_timer as *mut _ as *mut c_void,
+                &mut data.timeout_input_ptr,
+                input as *const _ as *mut c_void,
             );
-            // Save input for timer handler.
-            write_volatile(
-                &mut data.timer_handler_input,
-                &mut data.current_input_ptr as *mut _ as *mut c_void,
-            );
-            let tm : i64 = -1 * 20000 * 10 * 1000;
-            let mut ft = FILETIME::default();
-            ft.dwLowDateTime = (tm & 0xffffffff) as u32;
-            ft.dwHighDateTime = (tm >> 32) as u32;
-            SetThreadpoolTimer(self.tp_timer, &ft, 0, 0);
+            let before = crate::bolts::current_time();
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            self.windows_reset_timeout()?;
-
+            let after = crate::bolts::current_time();
+            if after - before > self.exec_tmout {
+                RaiseException(ExceptionCode::Timeout as u32, 0, 0, core::ptr::null());
+            }
+            write_volatile(
+                &mut data.timeout_input_ptr,
+                core::ptr::null_mut(),
+            );
             ret
         }
     }
@@ -203,12 +185,5 @@ where
     #[inline]
     fn observers_mut(&mut self) -> &mut OT {
         self.executor.observers_mut()
-    }
-}
-
-#[cfg(windows)]
-impl<E> Drop for TimeoutExecutor<E> {
-    fn drop(&mut self) {
-        windows_delete_timer_queue(self.tp_timer);
     }
 }

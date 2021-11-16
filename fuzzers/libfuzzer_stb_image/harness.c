@@ -18,7 +18,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 
     /* exit if the image is larger than ~80MB */
     if(y && x > (80000000 / 4) / y) return 0;
-    Sleep(2000);
+    Sleep(5000);
     unsigned char *img = stbi_load_from_memory(data, size, &x, &y, &channels, 4);
 
     free(img);
