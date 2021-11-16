@@ -430,7 +430,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
@@ -547,6 +547,7 @@ where
     staterestorer: StateRestorer<SP>,
 }
 
+#[cfg(feature = "std")]
 impl<I, OT, S, SP> ProgressReporter<I> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
