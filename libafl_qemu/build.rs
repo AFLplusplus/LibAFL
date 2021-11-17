@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "844841307dcbf390ecc6ea1f28d9c2cef25d3b0d";
+const QEMU_REVISION: &str = "c74c7db5adc1896bfef4eab7841545a39eb26fe6";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -14,6 +14,8 @@ fn build_dep_check(tools: &[&str]) {
 #[allow(clippy::too_many_lines)]
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/asan-giovese.c");
+    println!("cargo:rerun-if-changed=src/asan-giovese.h");
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rerun-if-env-changed=CROSS_CC");
 
@@ -45,6 +47,12 @@ fn main() {
     let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
     let src_dir = Path::new("src");
     //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
+
+    println!("cargo:rerun-if-changed={}/libqasan.so", qasan_dir.display());
+    println!(
+        "cargo:rerun-if-changed={}/libqasan.so",
+        target_dir.display()
+    );
 
     build_dep_check(&["git", "make"]);
 
@@ -262,19 +270,26 @@ fn main() {
         println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
     }
 
-    println!("cargo:rerun-if-changed={}/libqasan.so", qasan_dir.display());
     drop(
         Command::new("make")
             .current_dir(&out_dir_path)
-            .env("CC", cross_cc)
+            .env("CC", &cross_cc)
+            .env("OUT_DIR", &target_dir)
+            .arg("-C")
+            .arg(&qasan_dir)
+            .arg("clean")
+            .status(),
+    );
+    drop(
+        Command::new("make")
+            .current_dir(&out_dir_path)
+            .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
             .arg("-C")
             .arg(&qasan_dir)
             .status(),
     );
 
-    println!("cargo:rerun-if-changed=src/asan-giovese.c");
-    println!("cargo:rerun-if-changed=src/asan-giovese.h");
     cc::Build::new()
         .warnings(false)
         .file(src_dir.join("asan-giovese.c"))

@@ -25,6 +25,7 @@ goblin = "0.4.2"
 libc = "0.2"
 strum = "0.21"
 strum_macros = "0.21"
+syscall-numbers = "2.0.0"
 #pyo3 = { version = "0.14.3", features = ["extension-module"], optional = true }
 pyo3 = { version = "0.14.3", optional = true }
 
