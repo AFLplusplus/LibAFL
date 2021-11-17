@@ -22,6 +22,9 @@ pub mod cmplog_rt;
 /// The `LibAFL` firda helper
 pub mod helper;
 
+/// The frida executor
+pub mod executor;
+
 // for parsing asan and cmplog cores
 use libafl::bolts::os::parse_core_bind_arg;
 // for getting current core_id
