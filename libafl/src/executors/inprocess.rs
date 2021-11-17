@@ -873,7 +873,7 @@ where
     /// the timeout handler
     #[inline]
     fn timeout_handler(&self) -> WaitOrTimerCallback {
-        let func: WaitOrTimerCallback = unsafe { transmute(self.timeout_handler) };
+        let func: WaitOrTimerCallback = unsafe { transmute(self.timeout_handler()) };
         func
     }
 }
