@@ -1,7 +1,8 @@
+use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM};
 use serde::{Deserialize, Serialize};
-use std::{cell::UnsafeCell, cmp::max, collections::HashMap};
+use std::{cell::UnsafeCell, cmp::max};
 
 use crate::{
     emu,

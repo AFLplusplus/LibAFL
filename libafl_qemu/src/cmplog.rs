@@ -1,9 +1,9 @@
+use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::{
     emu,
