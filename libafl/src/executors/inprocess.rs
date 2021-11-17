@@ -204,6 +204,7 @@ impl InProcessHandlers {
         }
     }
 
+    #[allow(clippy::unused_self)]
     pub fn post_run_target(&self) {
         #[cfg(unix)]
         unsafe {
@@ -217,6 +218,7 @@ impl InProcessHandlers {
         }
     }
 
+    #[must_use]
     pub fn new<E, EM, I, OC, OF, OT, S, Z>() -> Result<Self, Error>
     where
         I: Input,
@@ -283,6 +285,14 @@ impl InProcessHandlers {
             crash_handler: ptr::null(),
             timeout_handler: ptr::null(),
         })
+    }
+
+    #[must_use]
+    pub fn nop() -> Self {
+        Self {
+            crash_handler: ptr::null(),
+            timeout_handler: ptr::null(),
+        }
     }
 }
 
@@ -994,7 +1004,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::{marker::PhantomData, ptr};
+    use core::marker::PhantomData;
 
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use crate::{
@@ -1003,7 +1013,7 @@ mod tests {
     };
     use crate::{
         bolts::tuples::tuple_list,
-        executors::{Executor, ExitKind, InProcessExecutor},
+        executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
         inputs::NopInput,
     };
 
@@ -1014,8 +1024,7 @@ mod tests {
         let mut in_process_executor = InProcessExecutor::<_, NopInput, (), ()> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
+            handlers: InProcessHandlers::nop(),
             phantom: PhantomData,
         };
         let input = NopInput {};
