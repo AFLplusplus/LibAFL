@@ -22,6 +22,9 @@ pub mod cmplog_rt;
 /// The `LibAFL` firda helper
 pub mod helper;
 
+/// The frida executor
+pub mod executor;
+
 // for parsing asan and cmplog cores
 use libafl::bolts::os::parse_core_bind_arg;
 // for getting current core_id
@@ -44,7 +47,7 @@ pub struct FridaOptions {
 }
 
 impl FridaOptions {
-    /// Parse the frida options from the [`LIBAFL_FRIDA_OPTIONS`] environment variable.
+    /// Parse the frida options from the "`LIBAFL_FRIDA_OPTIONS`" environment variable.
     ///
     /// Options are `:` separated, and each options is a `name=value` string.
     ///

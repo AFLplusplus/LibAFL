@@ -1,9 +1,9 @@
+use hashbrown::HashMap;
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::{
     emu,
@@ -101,13 +101,11 @@ where
         .get_mut::<QemuCmpsMapMetadata>()
         .unwrap();
     let id = meta.current_id as usize;
-    if meta.map.contains_key(&pc) {
-        Some(*meta.map.get(&pc).unwrap())
-    } else {
+
+    Some(*meta.map.entry(pc).or_insert_with(|| {
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
-        meta.map.insert(pc, id as u64);
-        Some(id as u64)
-    }
+        id as u64
+    }))
 }
 
 pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8) {

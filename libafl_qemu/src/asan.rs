@@ -133,7 +133,7 @@ pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> i
     for (k, v) in env.iter_mut() {
         if k == "QEMU_SET_ENV" {
             let mut new_v = vec![];
-            for e in v.split(",") {
+            for e in v.split(',') {
                 if e.starts_with("LD_PRELOAD=") {
                     added = true;
                     new_v.push(add_asan(e));
@@ -145,11 +145,9 @@ pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> i
         }
     }
     for i in 0..args.len() {
-        if args[i] == "-E" && i + 1 < args.len() {
-            if args[i + 1].starts_with("LD_PRELOAD=") {
-                added = true;
-                args[i + 1] = add_asan(&args[i + 1])
-            }
+        if args[i] == "-E" && i + 1 < args.len() && args[i + 1].starts_with("LD_PRELOAD=") {
+            added = true;
+            args[i + 1] = add_asan(&args[i + 1]);
         }
     }
 
@@ -174,7 +172,7 @@ pub struct QemuAsanHelper {
 impl QemuAsanHelper {
     #[must_use]
     pub fn new() -> Self {
-        assert!(unsafe { ASAN_INITED == true }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just init(...)");
+        assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just init(...)");
         Self {
             enabled: true,
             filter: QemuInstrumentationFilter::None,
@@ -232,6 +230,7 @@ impl QemuAsanHelper {
     }
 
     #[allow(clippy::unused_self)]
+    #[must_use]
     pub fn is_poisoned(&self, addr: u64, size: usize) -> bool {
         unsafe { asan_giovese_loadN(emu::g2h(addr), size) != 0 }
     }
@@ -560,6 +559,7 @@ pub fn trace_write_n_asan<I, QT, S>(
     h.read_n(addr, size);
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,

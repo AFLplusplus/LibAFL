@@ -20,7 +20,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
-    stages::push::StdMutationalPushStage,
+    stages::push::{PushStageSharedState, StdMutationalPushStage},
     state::{HasCorpus, StdState},
 };
 
@@ -95,13 +95,12 @@ pub fn main() {
 
     let observers = tuple_list!(observer);
 
+    let shared_state = PushStageSharedState::new(fuzzer, state, observers, mgr);
+
     // All fuzzer elements are hidden behind Rc<RefCell>>, so we can reuse them for multiple stages.
     let push_stage = StdMutationalPushStage::new(
         mutator,
-        Rc::new(RefCell::new(fuzzer)),
-        Rc::new(RefCell::new(state)),
-        Rc::new(RefCell::new(mgr)),
-        Rc::new(RefCell::new(observers)),
+        Rc::new(RefCell::new(Some(shared_state))),
         exit_kind.clone(),
         stage_idx,
     );

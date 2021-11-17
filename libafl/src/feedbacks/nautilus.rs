@@ -63,7 +63,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<NautilusInput, S>,
+        EM: EventFirer<NautilusInput>,
         OT: ObserversTuple<NautilusInput, S>,
     {
         Ok(false)

@@ -50,7 +50,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<PacketData, S>,
+        EM: EventFirer<PacketData>,
         OT: ObserversTuple<PacketData, S>,
     {
         self.len = input.length;

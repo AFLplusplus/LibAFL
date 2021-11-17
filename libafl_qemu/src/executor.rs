@@ -383,7 +383,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I> + HasClientPerfMonitor,
