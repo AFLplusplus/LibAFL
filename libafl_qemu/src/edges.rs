@@ -108,7 +108,7 @@ where
 
     match meta.map.entry((src, dest)) {
         Entry::Occupied(e) => {
-            let id = e.get();
+            let id = *e.get();
             let nxt = (id as usize + 1) & (EDGES_MAP_SIZE - 1);
             unsafe {
                 MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
