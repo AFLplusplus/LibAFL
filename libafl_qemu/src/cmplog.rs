@@ -103,7 +103,7 @@ where
     let id = meta.current_id as usize;
 
     match meta.map.entry(pc) {
-        Entry::Occupied(e) => Some(e.value()),
+        Entry::Occupied(e) => Some(e.get()),
         Entry::Vacant(e) => {
             meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
             e.insert(id as u64);
