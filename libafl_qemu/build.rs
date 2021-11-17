@@ -32,6 +32,8 @@ fn main() {
         "cc".to_owned()
     });
 
+    println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
