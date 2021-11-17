@@ -163,7 +163,7 @@ where
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I> + HasClientPerfMonitor,
@@ -393,7 +393,7 @@ mod unix_signal_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers<I, OT, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
@@ -471,7 +471,7 @@ mod unix_signal_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers<I, OT, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
@@ -643,7 +643,7 @@ mod windows_exception_handler {
         _p1: u8,
     ) where
         E: HasObservers<I, OT, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
@@ -719,7 +719,7 @@ mod windows_exception_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers<I, OT, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
@@ -917,7 +917,7 @@ where
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I> + HasClientPerfMonitor,

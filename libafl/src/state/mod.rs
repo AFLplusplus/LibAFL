@@ -411,7 +411,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(
@@ -446,7 +446,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
@@ -461,7 +461,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
@@ -487,7 +487,7 @@ where
     where
         G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -525,7 +525,7 @@ where
     where
         G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -542,7 +542,7 @@ where
     where
         G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }

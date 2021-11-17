@@ -53,7 +53,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         self.metadata = observers

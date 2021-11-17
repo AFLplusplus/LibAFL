@@ -10,6 +10,7 @@ use crate::bolts::os::unix_signals::{ucontext_t, Signal};
 
 /// Write the contens of all important registers
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,

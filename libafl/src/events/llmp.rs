@@ -51,6 +51,8 @@ use crate::bolts::os::{fork, ForkResult};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+use super::ProgressReporter;
+
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
 /// Only handle this in the broker
@@ -400,7 +402,7 @@ where
     }
 }
 
-impl<I, OT, S, SP> EventFirer<I, S> for LlmpEventManager<I, OT, S, SP>
+impl<I, OT, S, SP> EventFirer<I> for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -408,7 +410,7 @@ where
     //CE: CustomEvent<I>,
 {
     #[cfg(feature = "llmp_compression")]
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         let flags: Flags = LLMP_FLAG_INITIALIZED;
 
@@ -428,7 +430,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
@@ -507,6 +509,14 @@ where
 {
 }
 
+impl<I, OT, S, SP> ProgressReporter<I> for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    SP: ShMemProvider,
+{
+}
+
 impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
@@ -538,15 +548,24 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, OT, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<I, OT, S, SP>
+impl<I, OT, S, SP> ProgressReporter<I> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
     S: Serialize,
     SP: ShMemProvider,
+{
+}
+
+#[cfg(feature = "std")]
+impl<I, OT, S, SP> EventFirer<I> for LlmpRestartingEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
-    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, state: &mut S2, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)
     }
