@@ -388,8 +388,6 @@ where
             StateRestorer::from_env(shmem_provider, _ENV_FUZZER_SENDER)?
         };
 
-        println!("We're a client, let's fuzz :)");
-
         // If we're restarting, deserialize the old state.
         let (state, mgr) = match staterestorer.restore::<S>()? {
             None => {
