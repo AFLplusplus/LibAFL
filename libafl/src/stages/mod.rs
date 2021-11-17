@@ -162,7 +162,7 @@ where
     }
 }
 
-/// Allows us to use a [`push::PushStage`] as a normal [`Stage`]set_corpus_idx
+/// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
 pub struct PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
 where
