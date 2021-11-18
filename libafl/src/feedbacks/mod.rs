@@ -10,9 +10,9 @@ pub mod concolic;
 pub use concolic::ConcolicFeedback;
 
 #[cfg(feature = "std")]
-pub mod new_hash_feebdack;
+pub mod new_hash_feedback;
 #[cfg(feature = "std")]
-pub use new_hash_feebdack::NewHashFeebdack;
+pub use new_hash_feedback::NewHashFeedback;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;

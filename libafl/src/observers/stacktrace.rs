@@ -1,4 +1,4 @@
-//! the Stacktrace Observer looks up the stacktrace on the execution thread and computes a hash for it for dedupe
+//! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
 use std::{
     collections::hash_map::DefaultHasher,
@@ -13,20 +13,30 @@ use crate::{bolts::tuples::Named, observers::Observer, Error};
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StacktraceObserver {
+    observer_name: String,
     hash: Option<u64>,
 }
 
 impl StacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new() -> Self {
-        Self { hash: None }
+    pub fn new(observer_name: String) -> Self {
+        Self {
+            observer_name,
+            hash: None,
+        }
     }
 
     /// Gets the runtime for the last execution of this target.
     #[must_use]
     pub fn hash(&self) -> &Option<u64> {
         &self.hash
+    }
+}
+
+impl Default for StacktraceObserver {
+    fn default() -> Self {
+        Self::new("StacktraceObserver".to_string())
     }
 }
 
@@ -46,6 +56,6 @@ impl<I, S> Observer<I, S> for StacktraceObserver {
 
 impl Named for StacktraceObserver {
     fn name(&self) -> &str {
-        "StacktraceObserver"
+        &self.observer_name
     }
 }

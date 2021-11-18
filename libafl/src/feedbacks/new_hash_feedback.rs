@@ -1,4 +1,4 @@
-//! The NewHashFeebdacks uses the backtrace hash and a hashset to only keep novel cases
+//! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
@@ -14,14 +14,15 @@ use crate::{
     Error,
 };
 
-/// A [`NewHashFeebdack`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
+/// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewHashFeebdack {
+pub struct NewHashFeedback {
+    feedback_name: String,
     observer_name: String,
     hashset: HashSet<u64>,
 }
 
-impl<I, S> Feedback<I, S> for NewHashFeebdack
+impl<I, S> Feedback<I, S> for NewHashFeedback
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -40,7 +41,7 @@ where
     {
         let observer = observers
             .match_name::<StacktraceObserver>(&self.observer_name)
-            .expect("A NewHashFeebdack needs a StacktraceObserver");
+            .expect("A NewHashFeedback needs a StacktraceObserver");
 
         match observer.hash() {
             Some(hash) => {
@@ -57,26 +58,30 @@ where
     }
 }
 
-impl Named for NewHashFeebdack {
+impl Named for NewHashFeedback {
     #[inline]
     fn name(&self) -> &str {
-        "NewHashFeebdack"
+        &self.feedback_name
     }
 }
 
-impl NewHashFeebdack {
-    /// Returns a new [`NewHashFeebdack`].
+impl NewHashFeedback {
+    /// Returns a new [`NewHashFeedback`].
     #[must_use]
-    pub fn new(observer_name: String) -> Self {
+    pub fn new(feedback_name: String, observer_name: String) -> Self {
         Self {
+            feedback_name,
             observer_name,
             hashset: HashSet::new(),
         }
     }
 }
 
-impl Default for NewHashFeebdack {
+impl Default for NewHashFeedback {
     fn default() -> Self {
-        Self::new("StacktraceObserver".to_string())
+        Self::new(
+            "NewHashFeedback".to_string(),
+            "StacktraceObserver".to_string(),
+        )
     }
 }
