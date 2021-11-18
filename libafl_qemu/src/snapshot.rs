@@ -214,6 +214,7 @@ pub fn trace_write_n_snapshot<I, QT, S>(
     h.access(addr, size);
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn trace_mmap_snapshot<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,
@@ -231,7 +232,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if sys_num as i64 == SYS_mmap {
+    if i64::from(sys_num) == SYS_mmap {
         let h = helpers
             .match_first_type_mut::<QemuSnapshotHelper>()
             .unwrap();
