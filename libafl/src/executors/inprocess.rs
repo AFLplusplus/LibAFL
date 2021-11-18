@@ -148,9 +148,9 @@ where
 #[derive(Debug)]
 pub struct InProcessHandlers {
     /// On crash C function pointer
-    crash_handler: *const c_void,
+    pub crash_handler: *const c_void,
     /// On timeout C function pointer
-    timeout_handler: *const c_void,
+    pub timeout_handler: *const c_void,
 }
 
 impl InProcessHandlers {
@@ -873,7 +873,7 @@ where
     /// the timeout handler
     #[inline]
     fn timeout_handler(&self) -> WaitOrTimerCallback {
-        let func: WaitOrTimerCallback = unsafe { transmute(self.timeout_handler()) };
+        let func: WaitOrTimerCallback = unsafe { transmute(self.handlers.timeout_handler) };
         func
     }
 }
