@@ -8,13 +8,14 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedback_and,
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::StdMapObserver,
+    observers::{StacktraceObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -39,17 +40,17 @@ pub fn main() {
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
                 if buf.len() > 2 && buf[2] == b'c' {
+                    // removed the windows panic for simplicity, will add later
                     #[cfg(unix)]
-                    panic!("=(");
-
-                    // panic!() raises a STATUS_STACK_BUFFER_OVERRUN exception which cannot be caught by the exception handler.
-                    // Here we make it raise STATUS_ACCESS_VIOLATION instead.
-                    // Extending the windows exception handler is a TODO. Maybe we can refer to what winafl code does.
-                    // https://github.com/googleprojectzero/winafl/blob/ea5f6b85572980bb2cf636910f622f36906940aa/winafl.c#L728
-                    #[cfg(windows)]
-                    unsafe {
-                        write_volatile(0 as *mut u32, 0);
-                    }
+                    panic!("panic 1");
+                }
+                if buf.len() > 2 && buf[2] == b'd' {
+                    #[cfg(unix)]
+                    panic!("panic 2");
+                }
+                if buf.len() > 2 && buf[2] == b'e' {
+                    #[cfg(unix)]
+                    panic!("panic 1");
                 }
             }
         }
@@ -58,12 +59,20 @@ pub fn main() {
 
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    // Create a stacktrace observer to add the observers tuple
+    let another_observer = StacktraceObserver::new("StacktraceObserver".to_string());
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
 
-    // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
+    let feedback = feedback_and!(
+        MaxMapFeedback::new(&feedback_state, &observer),
+        NewHashFeedback::new(
+            "NewHashFeedback".to_string(),
+            "StacktraceObserver".to_string()
+        )
+    );
 
     // A feedback to choose if an input is a solution or not
     let objective = CrashFeedback::new();
@@ -98,7 +107,7 @@ pub fn main() {
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(observer),
+        tuple_list!(observer, another_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
