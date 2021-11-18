@@ -44,8 +44,8 @@ use std::{
 
 use libafl_frida::{
     coverage_rt::MAP_SIZE,
-    helper::{FridaHelper, FridaInstrumentationHelper},
     executor::FridaInProcessExecutor,
+    helper::{FridaHelper, FridaInstrumentationHelper},
     FridaOptions,
 };
 

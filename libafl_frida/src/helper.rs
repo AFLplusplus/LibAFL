@@ -64,13 +64,12 @@ enum CmplogOperandType {
     Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 enum SpecialCmpLogCase {
     Tbz,
     Tbnz,
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(any(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;

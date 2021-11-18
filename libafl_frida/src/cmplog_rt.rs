@@ -52,15 +52,31 @@ impl CmpLogRuntime {
                 ; stp x10, x11, [sp, #-0x10]!
                 ; stp x12, x13, [sp, #-0x10]!
                 ; stp x14, x15, [sp, #-0x10]!
-                ; stp x29, x30, [sp, #-0x10]!
-              // jump to rust based population of the lists
+                ; stp x16, x17, [sp, #-0x10]!
+                ; stp x18, x19, [sp, #-0x10]!
+                ; stp x20, x21, [sp, #-0x10]!
+                ; stp x22, x23, [sp, #-0x10]!
+                ; stp x24, x25, [sp, #-0x10]!
+                ; stp x26, x27, [sp, #-0x10]!
+                ; stp x28, x29, [sp, #-0x10]!
+                ; stp x30, xzr, [sp, #-0x10]!
+                ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
+                // jump to rust based population of the lists
                 ; mov x2, x0
                 ; adr x3, >done
                 ; ldr x4, >populate_lists
                 ; ldr x0, >self_addr
                 ; blr x4
                 // restore the reg state before returning to the caller
-                ; ldp x29, x30, [sp], #0x10
+                ; .dword 0xd51b4218u32 as i32 // msr nzcv, x24
+                ; ldp x30, xzr, [sp], #0x10
+                ; ldp x28, x29, [sp], #0x10
+                ; ldp x26, x27, [sp], #0x10
+                ; ldp x24, x25, [sp], #0x10
+                ; ldp x22, x23, [sp], #0x10
+                ; ldp x20, x21, [sp], #0x10
+                ; ldp x18, x19, [sp], #0x10
+                ; ldp x16, x17, [sp], #0x10
                 ; ldp x14, x15, [sp], #0x10
                 ; ldp x12, x13, [sp], #0x10
                 ; ldp x10, x11, [sp], #0x10
