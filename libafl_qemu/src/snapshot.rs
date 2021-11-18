@@ -1,13 +1,12 @@
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
 use std::collections::HashMap;
 
-#[cfg(cpu_target = "x86_64")]
-use crate::TARGET_NR_mmap;
 use crate::{
     emu,
     emu::{GuestMaps, SyscallHookResult},
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple},
+    SYS_mmap,
 };
 
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
@@ -143,10 +142,7 @@ where
         executor.hook_write1_execution(trace_write1_snapshot::<I, QT, S>);
         executor.hook_write_n_execution(trace_write_n_snapshot::<I, QT, S>);
 
-        #[cfg(cpu_target = "x86_64")]
-        {
-            executor.hook_syscalls(trace_mmap_snapshot::<I, QT, S>);
-        }
+        executor.hook_syscalls(trace_mmap_snapshot::<I, QT, S>);
     }
 
     fn pre_exec(&mut self, _input: &I) {
@@ -218,7 +214,7 @@ pub fn trace_write_n_snapshot<I, QT, S>(
     h.access(addr, size);
 }
 
-#[cfg(cpu_target = "x86_64")]
+#[allow(clippy::too_many_arguments)]
 pub fn trace_mmap_snapshot<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,
@@ -236,7 +232,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if sys_num == TARGET_NR_mmap {
+    if i64::from(sys_num) == SYS_mmap {
         let h = helpers
             .match_first_type_mut::<QemuSnapshotHelper>()
             .unwrap();

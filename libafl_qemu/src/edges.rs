@@ -147,7 +147,7 @@ where
 
 pub extern "C" fn trace_edge_hitcount(id: u64) {
     unsafe {
-        EDGES_MAP[id as usize] += 1;
+        EDGES_MAP[id as usize] = EDGES_MAP[id as usize].wrapping_add(1);
     }
 }
 
@@ -169,7 +169,7 @@ pub extern "C" fn trace_block_transition_hitcount(id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
             let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE - 1);
-            EDGES_MAP[x] += 1;
+            EDGES_MAP[x] = EDGES_MAP[x].wrapping_add(1);
             *prev_loc.get() = id.overflowing_shr(1).0;
         });
     }

@@ -4,6 +4,8 @@ use strum_macros::EnumIter;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+pub use syscall_numbers::x86::*;
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {

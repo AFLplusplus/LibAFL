@@ -1,4 +1,4 @@
-use hashbrown::{hash_map::Entry, HashMap};
+use hashbrown::HashMap;
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
