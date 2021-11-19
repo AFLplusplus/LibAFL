@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "c74c7db5adc1896bfef4eab7841545a39eb26fe6";
+const QEMU_REVISION: &str = "a6b44da636a6baab71c79c715f23c0306744631b";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
