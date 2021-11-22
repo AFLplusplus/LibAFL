@@ -294,7 +294,6 @@ unsafe fn fuzz(
                 &mut mgr,
             )?,
             &mut frida_helper,
-            Duration::new(30, 0),
         );
 
         // In case the corpus is empty (on first run), reset
