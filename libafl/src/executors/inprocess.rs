@@ -555,6 +555,32 @@ mod unix_signal_handler {
             }
 
             #[allow(clippy::non_ascii_literal)]
+            #[cfg(all(
+                feature = "std",
+                target_os = "linux",
+                target_arch = "x86_64"
+            ))]
+            {
+                println!("{:━^100}", " CRASH ");
+                println!(
+                    "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
+                    signal, _context.uc_mcontext.gregs[16], _context.uc_mcontext.gregs[15]
+                );
+
+                println!("{:━^100}", " REGISTERS ");
+                for reg in 0..15 {
+                    print!(
+                        "x{:02}: 0x{:016x} ",
+                        reg, _context.uc_mcontext.gregs[reg as usize]
+                    );
+                    if reg % 4 == 3 {
+                        println!();
+                    }
+                }
+                println!("pc : 0x{:016x} ", _context.uc_mcontext.gregs[16]);
+            }
+
+            #[allow(clippy::non_ascii_literal)]
             #[cfg(all(feature = "std", target_vendor = "apple", target_arch = "aarch64"))]
             {
                 let mcontext = *_context.uc_mcontext;
