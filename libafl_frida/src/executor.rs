@@ -14,6 +14,7 @@ use libafl::{
     Error,
 };
 
+#[cfg(unix)]
 use crate::asan_errors::ASAN_ERRORS;
 
 pub struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
