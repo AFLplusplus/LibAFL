@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[cfg(all(windows, feature = "std"))]
-use crate::executors::inprocess::{HasTimeoutHandler, GLOBAL_STATE};
+use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
@@ -19,11 +19,12 @@ use core::{mem::zeroed, ptr::null_mut};
 use libc::c_int;
 
 #[cfg(all(windows, feature = "std"))]
-use crate::bolts::bindings::Windows::Win32::{
-    Foundation::HANDLE,
+use windows::Win32::{
+    Foundation::FILETIME,
     System::Threading::{
-        CreateTimerQueue, CreateTimerQueueTimer, DeleteTimerQueueEx, DeleteTimerQueueTimer,
-        WORKER_THREAD_FLAGS,
+        CloseThreadpoolTimer, CreateThreadpoolTimer, EnterCriticalSection,
+        InitializeCriticalSection, LeaveCriticalSection, SetThreadpoolTimer, RTL_CRITICAL_SECTION,
+        TP_CALLBACK_ENVIRON_V3, TP_TIMER,
     },
 };
 
@@ -62,9 +63,9 @@ pub fn unix_remove_timeout() {
 }
 
 #[cfg(all(windows, feature = "std"))]
-pub fn windows_delete_timer_queue(timer_queue: HANDLE) {
+pub fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
     unsafe {
-        DeleteTimerQueueEx(timer_queue, HANDLE::NULL);
+        CloseThreadpoolTimer(tp_timer);
     }
 }
 
@@ -74,14 +75,22 @@ pub struct TimeoutExecutor<E> {
     #[cfg(unix)]
     itimerval: Itimerval,
     #[cfg(windows)]
-    milli_sec: u32,
+    milli_sec: i64,
     #[cfg(windows)]
-    ph_new_timer: HANDLE,
+    tp_timer: *mut TP_TIMER,
     #[cfg(windows)]
-    timer_queue: HANDLE,
+    critical: RTL_CRITICAL_SECTION,
 }
 
-impl<E> TimeoutExecutor<E> {
+#[cfg(windows)]
+#[allow(non_camel_case_types)]
+type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
+    param0: *mut windows::Win32::System::Threading::TP_CALLBACK_INSTANCE,
+    param1: *mut c_void,
+    param2: *mut windows::Win32::System::Threading::TP_TIMER,
+);
+
+impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     #[cfg(unix)]
@@ -107,14 +116,27 @@ impl<E> TimeoutExecutor<E> {
 
     #[cfg(windows)]
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
-        let milli_sec = exec_tmout.as_millis() as u32;
-        let timer_queue = unsafe { CreateTimerQueue() };
-        let ph_new_timer = HANDLE::NULL;
+        let milli_sec = exec_tmout.as_millis() as i64;
+        let timeout_handler: PTP_TIMER_CALLBACK =
+            unsafe { std::mem::transmute(executor.inprocess_handlers().timeout_handler) };
+        let tp_timer = unsafe {
+            CreateThreadpoolTimer(
+                Some(timeout_handler),
+                &mut GLOBAL_STATE as *mut _ as *mut c_void,
+                &TP_CALLBACK_ENVIRON_V3::default(),
+            )
+        };
+        let mut critical = RTL_CRITICAL_SECTION::default();
+
+        unsafe {
+            InitializeCriticalSection(&mut critical);
+        }
+
         Self {
             executor,
             milli_sec,
-            ph_new_timer,
-            timer_queue,
+            tp_timer,
+            critical,
         }
     }
 
@@ -126,10 +148,7 @@ impl<E> TimeoutExecutor<E> {
     #[cfg(windows)]
     pub fn windows_reset_timeout(&self) -> Result<(), Error> {
         unsafe {
-            let code = DeleteTimerQueueTimer(self.timer_queue, self.ph_new_timer, HANDLE::NULL);
-            if !code.as_bool() {
-                return Err(Error::Unknown("DeleteTimerQueueTimer failed.".to_string()));
-            }
+            SetThreadpoolTimer(self.tp_timer, core::ptr::null(), 0, 0);
         }
         Ok(())
     }
@@ -138,7 +157,7 @@ impl<E> TimeoutExecutor<E> {
 #[cfg(windows)]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasTimeoutHandler,
+    E: Executor<EM, I, S, Z> + HasInProcessHandlers,
     I: Input,
 {
     fn run_target(
@@ -151,22 +170,38 @@ where
         unsafe {
             let data = &mut GLOBAL_STATE;
             write_volatile(
-                &mut data.timer_queue,
-                &mut self.timer_queue as *mut _ as *mut c_void,
+                &mut data.tp_timer,
+                &mut self.tp_timer as *mut _ as *mut c_void,
             );
-            let code = CreateTimerQueueTimer(
-                &mut self.ph_new_timer,
-                &self.timer_queue,
-                Some(self.executor.timeout_handler()),
-                &mut GLOBAL_STATE as *mut _ as *mut c_void,
-                self.milli_sec,
-                0,
-                WORKER_THREAD_FLAGS::default(),
+            write_volatile(
+                &mut data.critical,
+                &mut self.critical as *mut _ as *mut c_void,
             );
-            if !code.as_bool() {
-                return Err(Error::Unknown("CreateTimerQueue failed.".to_string()));
-            }
+            write_volatile(
+                &mut data.timeout_input_ptr,
+                &mut data.current_input_ptr as *mut _ as *mut c_void,
+            );
+            let tm: i64 = -1 * self.milli_sec * 10 * 1000;
+            let mut ft = FILETIME::default();
+            ft.dwLowDateTime = (tm & 0xffffffff) as u32;
+            ft.dwHighDateTime = (tm >> 32) as u32;
+
+            EnterCriticalSection(&mut self.critical);
+            write_volatile(&mut data.in_target, 1);
+            LeaveCriticalSection(&mut self.critical);
+
+            SetThreadpoolTimer(self.tp_timer, &ft, 0, 0);
+
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
+
+            EnterCriticalSection(&mut self.critical);
+            // Timeout handler will do nothing after we increment in_target value.
+            // We call post_run_target() after this.
+            write_volatile(&mut data.in_target, 0);
+            LeaveCriticalSection(&mut self.critical);
+
+            write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
+
             self.windows_reset_timeout()?;
             ret
         }
@@ -215,6 +250,6 @@ where
 #[cfg(windows)]
 impl<E> Drop for TimeoutExecutor<E> {
     fn drop(&mut self) {
-        windows_delete_timer_queue(self.timer_queue);
+        windows_delete_timer_queue(self.tp_timer);
     }
 }
