@@ -60,7 +60,26 @@ where
                 .unwrap()
                 .generate_name(current_nanos() as usize);
 
-            let filename = self.dir_path.join(file_orig);
+            let mut file = file_orig.clone();
+
+            let mut ctr = 2;
+
+            let filename = loop {
+                let lockfile = format!(".{}.lafl_lock", file);
+                // try to create lockfile.
+
+                if OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(self.dir_path.join(lockfile))
+                    .is_ok()
+                {
+                    break self.dir_path.join(file);
+                }
+
+                file = format!("{}-{}", &file_orig, ctr);
+                ctr += 1;
+            };
 
             let filename_str = filename.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into());
