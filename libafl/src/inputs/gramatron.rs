@@ -34,12 +34,12 @@ pub struct GramatronInput {
 impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, _idx: usize) -> String {
+    fn generate_name(&self, timestamp: usize) -> String {
         let mut hasher = AHasher::new_with_keys(0, 0);
         for term in &self.terms {
             hasher.write(term.symbol.as_bytes());
         }
-        format!("{:016x}", hasher.finish())
+        format!("{}{:016x}", timestamp, hasher.finish())
     }
 }
 

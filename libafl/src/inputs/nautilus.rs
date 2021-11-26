@@ -1,5 +1,5 @@
-//use ahash::AHasher;
-//use core::hash::Hasher;
+use ahash::AHasher;
+use core::hash::Hasher;
 
 use alloc::{rc::Rc, string::String};
 use core::{cell::RefCell, convert::From};
@@ -10,6 +10,7 @@ use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input}
 use grammartec::{
     newtypes::NodeID,
     tree::{Tree, TreeLike},
+    rule::RuleIDOrCustom,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -21,13 +22,21 @@ pub struct NautilusInput {
 impl Input for NautilusInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, idx: usize) -> String {
-        /*let mut hasher = AHasher::new_with_keys(0, 0);
-        for term in &self.terms {
-            hasher.write(term.symbol.as_bytes());
+    fn generate_name(&self, timestamp: usize) -> String {
+        let mut hasher = AHasher::new_with_keys(0, 0);
+
+        for term in &self.tree.rules {
+            match term {
+                RuleIDOrCustom::Rule(rule_id) => {
+                    hasher.write_usize(rule_id.to_i());
+                }
+                RuleIDOrCustom::Custom(rule_id, _) => {
+                    hasher.write_usize(rule_id.to_i());
+                }
+            }
         }
-        format!("{:016x}", hasher.finish())*/
-        format!("id:{}", idx)
+
+        format!("{}{:016x}", timestamp, hasher.finish())
     }
 }
 

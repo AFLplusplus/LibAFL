@@ -8,7 +8,10 @@ use std::{fs::OpenOptions, path::PathBuf};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 
-use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, state::HasMetadata, Error};
+use crate::{
+    bolts::current_nanos, corpus::Corpus, corpus::Testcase, inputs::Input, state::HasMetadata,
+    Error,
+};
 
 /// Options for the the format of the on-disk metadata
 #[cfg(feature = "std")]
@@ -55,26 +58,9 @@ where
                 .input()
                 .as_ref()
                 .unwrap()
-                .generate_name(self.entries.len());
-            let mut file = file_orig.clone();
+                .generate_name(current_nanos() as usize);
 
-            let mut ctr = 2;
-            let filename = loop {
-                let lockfile = format!(".{}.lafl_lock", file);
-                // try to create lockfile.
-
-                if OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(self.dir_path.join(lockfile))
-                    .is_ok()
-                {
-                    break self.dir_path.join(file);
-                }
-
-                file = format!("{}-{}", &file_orig, ctr);
-                ctr += 1;
-            };
+            let filename = self.dir_path.join(file_orig);
 
             let filename_str = filename.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into());
