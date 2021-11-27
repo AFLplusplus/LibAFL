@@ -9,8 +9,8 @@ use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input}
 
 use grammartec::{
     newtypes::NodeID,
-    tree::{Tree, TreeLike},
     rule::RuleIDOrCustom,
+    tree::{Tree, TreeLike},
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -27,10 +27,7 @@ impl Input for NautilusInput {
 
         for term in &self.tree.rules {
             match term {
-                RuleIDOrCustom::Rule(rule_id) => {
-                    hasher.write_usize(rule_id.to_i());
-                }
-                RuleIDOrCustom::Custom(rule_id, _) => {
+                RuleIDOrCustom::Rule(rule_id) | RuleIDOrCustom::Custom(rule_id, _) => {
                     hasher.write_usize(rule_id.to_i());
                 }
             }

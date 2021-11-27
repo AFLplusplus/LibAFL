@@ -107,16 +107,19 @@ mod tests {
     static TEST_INPUT: &str = "I'm a test case";
 
     #[test]
-    /// test that current_nanos increment; basis of uniqueness assertion in generate_name methods
+    /// test that `current_nanos` increment; basis of uniqueness assertion in `generate_name` methods
     fn test_current_nanos_increment_on_each_call() {
         // no appreciable time spent here, even tho iterations seem high
         for _ in 1..1000000 {
-            assert!(current_nanos() < current_nanos());
+            let first = current_nanos();
+            let second = current_nanos();
+
+            assert!(first < second);
         }
     }
 
     #[test]
-    /// create a BytesInput ensuring filename is created as expected
+    /// create a `BytesInput` ensuring filename is created as expected
     fn test_bytesinput_generate_name() {
         let nanos = current_nanos();
         let str_nanos = nanos.to_string();
@@ -131,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    /// create an EncodedInput ensuring filename is created as expected
+    /// create an `EncodedInput` ensuring filename is created as expected
     fn test_encodedinput_generate_name() {
         let nanos = current_nanos();
         let str_nanos = nanos.to_string();
@@ -154,13 +157,13 @@ mod tests {
     }
 
     #[test]
-    /// create a GramatronInput ensuring filename is created as expected
+    /// create a `GramatronInput` ensuring filename is created as expected
     fn test_gramatroninput_generate_name() {
         let nanos = current_nanos();
         let str_nanos = nanos.to_string();
         let expected = "eea01212d2afb28c";
 
-        let term = Terminal::new(0, 0,String::from("terminal"));
+        let term = Terminal::new(0, 0, String::from("terminal"));
 
         let gramatron_input = GramatronInput::new(vec![term]);
 
@@ -173,10 +176,10 @@ mod tests {
 
     #[test]
     #[cfg(feature = "nautilus")]
-    /// create a NautilusInput ensuring filename is created as expected
+    /// create a `NautilusInput` ensuring filename is created as expected
     ///
     /// invoked via
-    ///   cargo +nightly test test_nautilusinput_generate_name --features nautilus
+    ///   `cargo +nightly test test_nautilusinput_generate_name --features nautilus`
     fn test_nautilusinput_generate_name() {
         let nanos = current_nanos();
         let str_nanos = nanos.to_string();
@@ -197,5 +200,4 @@ mod tests {
         assert!(name.ends_with(expected));
         assert_eq!(name.len(), str_nanos.len() + expected.len());
     }
-
 }
