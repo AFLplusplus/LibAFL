@@ -138,6 +138,18 @@ where
         self.exec_time = Some(time);
     }
 
+    /// Get the executions
+    #[inline]
+    pub fn executions(&self) -> &usize {
+        &self.executions
+    }
+
+    /// Get the executions (mut)
+    #[inline]
+    pub fn executions_mut(&mut self) -> &mut usize {
+        &mut self.executions
+    }
+
     /// Create a new Testcase instace given an input
     #[inline]
     pub fn new<T>(input: T) -> Self
