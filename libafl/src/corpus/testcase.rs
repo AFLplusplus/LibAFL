@@ -29,6 +29,8 @@ where
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
     cached_len: Option<usize>,
+    /// Number of executions done at discovery time
+    executions: usize,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -148,6 +150,7 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            executions: 0,
         }
     }
 
@@ -160,6 +163,20 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            executions: 0,
+        }
+    }
+
+    /// Create a new Testcase instance given an [`Input`] and the number of executions
+    #[inline]
+    pub fn with_executions(input: I, executions: usize) -> Self {
+        Testcase {
+            input: Some(input),
+            filename: None,
+            metadata: SerdeAnyMap::new(),
+            exec_time: None,
+            cached_len: None,
+            executions,
         }
     }
 
@@ -173,6 +190,7 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            executions: 0,
         }
     }
 }

@@ -24,6 +24,15 @@ pub enum OnDiskMetadataFormat {
 
 /// A corpus able to store testcases to disk, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
+#[derive(Serialize)]
+pub struct OnDiskMetadata<'a> {
+    metadata: &'a SerdeAnyMap,
+    exec_time: &'a Option<Duration>,
+    executions: &'a usize,
+}
+
+/// A corpus able to store testcases to disk, and load them from disk, when they are being used.
+#[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct OnDiskCorpus<I>
@@ -90,6 +99,12 @@ where
                 ".{}.tmp",
                 tmpfile_name.file_name().unwrap().to_string_lossy()
             ));
+
+            let ondisk_meta = OnDiskMetadata {
+                metadata: testcase.metadata(),
+                exec_time: testcase.exec_time(),
+                executions: testcase.executions(),
+            };
 
             let mut tmpfile = File::create(&tmpfile_name)?;
 
