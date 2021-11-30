@@ -208,7 +208,7 @@ fn write_crash<W: Write>(
     signal: Signal,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-        writeln!(
+    writeln!(
         writer,
         "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
         signal, ucontext.uc_mcontext.arm_pc, ucontext.uc_mcontext.fault_address
