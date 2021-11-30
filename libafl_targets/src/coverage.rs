@@ -20,6 +20,7 @@ pub use __afl_area_ptr as EDGES_MAP_PTR;
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
 pub use __afl_map_size as EDGES_MAP_PTR_SIZE;
 
+#[must_use]
 pub fn edges_map_from_ptr<'a>() -> &'a mut [u8] {
     unsafe {
         assert!(!EDGES_MAP_PTR.is_null());
@@ -27,6 +28,7 @@ pub fn edges_map_from_ptr<'a>() -> &'a mut [u8] {
     }
 }
 
+#[must_use]
 pub fn edges_max_num() -> usize {
     unsafe {
         if MAX_EDGES_NUM > 0 {
