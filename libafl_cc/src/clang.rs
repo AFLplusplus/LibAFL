@@ -26,6 +26,7 @@ include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 pub enum LLVMPasses {
     //CmpLogIns,
     CmpLogRtn,
+    AFLCoverage,
 }
 
 impl LLVMPasses {
@@ -34,6 +35,8 @@ impl LLVMPasses {
         match self {
             LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-routines-pass.{}", dll_extension())),
+            LLVMPasses::AFLCoverage => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("afl-coverage-pass.{}", dll_extension())),
         }
     }
 }

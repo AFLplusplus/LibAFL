@@ -90,6 +90,12 @@ pub const CMPLOG_MAP_H: usize = {};
         .file(src_dir.join("common.c"))
         .compile("common");
 
+    println!("cargo:rerun-if-changed=src/coverage.c");
+
+    cc::Build::new()
+        .file(src_dir.join("coverage.c"))
+        .compile("coverage");
+
     println!("cargo:rerun-if-changed=src/cmplog.h");
     println!("cargo:rerun-if-changed=src/cmplog.c");
 

@@ -86,8 +86,6 @@ fn main() {
         )
         .expect("Could not write file");
 
-        println!("cargo:rerun-if-changed=src/cmplog-routines-pass.cc");
-
         let output = Command::new(&llvm_config)
             .args(&["--cxxflags"])
             .output()
@@ -110,6 +108,9 @@ fn main() {
             ldflags.push("dynamic_lookup");
         };
 
+        println!("cargo:rerun-if-changed=src/cmplog-routines-pass.cc");
+        println!("cargo:rerun-if-changed=src/afl-coverage-pass.cc");
+
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
             .arg(src_dir.join("cmplog-routines-pass.cc"))
@@ -118,6 +119,15 @@ fn main() {
             .arg(out_dir.join(format!("cmplog-routines-pass.{}", dll_extension())))
             .status()
             .expect("Failed to compile cmplog-routines-pass.cc");
+
+        let _ = Command::new(llvm_bindir.join("clang++"))
+            .args(&cxxflags)
+            .arg(src_dir.join("afl-coverage-pass.cc"))
+            .args(&ldflags)
+            .args(&["-fPIC", "-shared", "-o"])
+            .arg(out_dir.join(format!("afl-coverage-pass.{}", dll_extension())))
+            .status()
+            .expect("Failed to compile afl-coverage-pass.cc");
     } else {
         write!(
             &mut clang_constants_file,
