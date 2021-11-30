@@ -28,7 +28,7 @@
   #define MAYBE_THREAD_LOCAL THREAD_LOCAL
 #else
   #define MAYBE_THREAD_LOCAL
-#else
+#endif
 
 #ifdef _WIN32
   #define RETADDR (uintptr_t)_ReturnAddress()
