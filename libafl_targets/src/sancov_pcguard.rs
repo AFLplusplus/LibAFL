@@ -2,7 +2,7 @@
 
 use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
 #[cfg(feature = "pointer_maps")]
-use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_LEN};
+use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -54,6 +54,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     #[cfg(feature = "pointer_maps")]
     if EDGES_MAP_PTR.is_null() {
         EDGES_MAP_PTR = EDGES_MAP.as_mut_ptr();
+        EDGES_MAP_PTR_SIZE = EDGES_MAP.len();
     }
 
     if start == stop || *start != 0 {
@@ -66,7 +67,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
 
         #[cfg(feature = "pointer_maps")]
         {
-            MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1) % EDGES_MAP_PTR_LEN;
+            MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1) % EDGES_MAP_PTR_SIZE;
         }
         #[cfg(not(feature = "pointer_maps"))]
         {

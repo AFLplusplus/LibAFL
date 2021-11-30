@@ -213,6 +213,11 @@ impl CompilerWrapper for ClangWrapper {
             }
 
             args.extend_from_slice(self.link_args.as_slice());
+
+            if cfg!(unix) {
+                args.push("-pthread".into());
+                args.push("-ldl".into());
+            }
         } else {
             args.extend_from_slice(self.cc_args.as_slice());
         }

@@ -11,7 +11,8 @@ keywords = ["fuzzing", "testing"]
 edition = "2021"
 
 [features]
-default = []
+default = ["std"]
+std = []
 libfuzzer = []
 pointer_maps = []
 sancov_pcguard_edges = []

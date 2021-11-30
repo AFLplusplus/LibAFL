@@ -34,4 +34,5 @@ pub use value_profile::*;
 pub mod cmplog;
 pub use cmplog::*;
 
+#[cfg(feature = "std")]
 pub mod drcov;

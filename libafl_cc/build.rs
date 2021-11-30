@@ -62,8 +62,16 @@ fn main() {
     let out_dir = Path::new(&out_dir);
     let src_dir = Path::new("src");
 
+    let mut custom_flags = vec![];
+
     let dest_path = Path::new(&out_dir).join("clang_constants.rs");
     let mut clang_constants_file = File::create(&dest_path).expect("Could not create file");
+
+    let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
+        .map_or(Ok(65536), str::parse)
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
+    custom_flags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={}", edges_map_size));
 
     let llvm_config = find_llvm_config();
 
@@ -80,9 +88,13 @@ fn main() {
 
             pub const CLANG_PATH: &str = {:?};
             pub const CLANGXX_PATH: &str = {:?};
+            
+            /// The size of the edges map
+            pub const EDGES_MAP_SIZE: usize = {};
             ",
             llvm_bindir.join("clang"),
-            llvm_bindir.join("clang++")
+            llvm_bindir.join("clang++"),
+            edges_map_size
         )
         .expect("Could not write file");
 
@@ -113,6 +125,7 @@ fn main() {
 
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
+            .args(&custom_flags)
             .arg(src_dir.join("cmplog-routines-pass.cc"))
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
@@ -122,6 +135,7 @@ fn main() {
 
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
+            .args(&custom_flags)
             .arg(src_dir.join("afl-coverage-pass.cc"))
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])

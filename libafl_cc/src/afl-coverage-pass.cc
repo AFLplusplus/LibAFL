@@ -39,9 +39,13 @@
 typedef long double max_align_t;
 #endif
 
+#if LLVM_VERSION_MAJOR >= 7 /* use new pass manager */
+//#define USE_NEW_PM 1
+#endif
+
 #include "llvm/Support/CommandLine.h"
 #include "llvm/IR/IRBuilder.h"
-#if LLVM_VERSION_MAJOR >= 7 /* use new pass manager */
+#ifdef USE_NEW_PM
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/PassManager.h"
@@ -71,23 +75,23 @@ typedef uint32_t prev_loc_t;
 /* Maximum K for top-K context sensitivity */
 #define CTX_MAX_K 32U
 
-#define MAP_SIZE 65536
+#define MAP_SIZE LIBAFL_EDGES_MAP_SIZE
 
 #define FATAL(...) do { fprintf(stderr, "FATAL: " __VA_ARGS__); exit(1); } while (0)
 
 using namespace llvm;
 
 static cl::opt<bool> Debug("debug", cl::desc("Debug prints"), cl::init(false), cl::NotHidden);
-static cl::opt<uint32_t> InstRatio("InstRatio", cl::desc("Instrumentation ratio in percentage"), cl::init(100), cl::NotHidden);
+static cl::opt<uint32_t> InstRatio("inst_ratio", cl::desc("Instrumentation ratio in percentage"), cl::init(100), cl::NotHidden);
 static cl::opt<bool> NotZero("not_zero", cl::desc("Never hit 0 again in the hitcount"), cl::init(true), cl::NotHidden);
 static cl::opt<uint32_t> Ngram("ngram", cl::desc("Size of the Ngram instrumentation (0 to disable)"), cl::init(0), cl::NotHidden);
-static cl::opt<uint32_t> CtxK("CtxK", cl::desc("Size of the context for K-Ctx context sensitivity (0 to disable)"), cl::init(0), cl::NotHidden);
-static cl::opt<bool> Ctx("Ctx", cl::desc("Enable full context sensitive coverage"), cl::init(false), cl::NotHidden);
+static cl::opt<uint32_t> CtxK("ctx_k", cl::desc("Size of the context for K-Ctx context sensitivity (0 to disable)"), cl::init(0), cl::NotHidden);
+static cl::opt<bool> Ctx("ctx", cl::desc("Enable full context sensitive coverage"), cl::init(false), cl::NotHidden);
 static cl::opt<bool> ThreadSafe("thread_safe", cl::desc("Use the thread safe instrumentation"), cl::init(false), cl::NotHidden);
 
 namespace {
 
-#if LLVM_VERSION_MAJOR >= 7 /* Use new pass manager */
+#ifdef USE_NEW_PM
 class AFLCoverage : public PassInfoMixin<AFLCoverage> {
  public:
   AFLCoverage() {
@@ -102,7 +106,7 @@ class AFLCoverage : public ModulePass {
 
   }
 
-#if LLVM_VERSION_MAJOR >= 7 /* Use new pass manager */
+#ifdef USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 #else
   bool runOnModule(Module &M) override;
@@ -116,7 +120,7 @@ class AFLCoverage : public ModulePass {
 
 }  // namespace
 
-#if LLVM_VERSION_MAJOR >= 7 /* Use new pass manager */
+#ifdef USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {
@@ -182,7 +186,7 @@ static uint64_t PowerOf2Ceil(unsigned in) {
 #endif
 
 
-#if LLVM_VERSION_MAJOR >= 7 /* use new pass manager */
+#ifdef USE_NEW_PM
 PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool AFLCoverage::runOnModule(Module &M) {
@@ -199,7 +203,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   uint32_t rand_seed;
   unsigned int cur_loc = 0;
 
-#if LLVM_VERSION_MAJOR >= 7 /* use new pass manager */
+#ifdef USE_NEW_PM
   auto PA = PreservedAnalyses::all();
 #endif
 
@@ -331,10 +335,10 @@ bool AFLCoverage::runOnModule(Module &M) {
   if (Ctx || instrument_caller)
 #if defined(__ANDROID__) || defined(__HAIKU__)
     AFLContext = new GlobalVariable(
-        M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_Ctx");
+        M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_ctx");
 #else
     AFLContext = new GlobalVariable(
-        M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_Ctx", 0,
+        M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_ctx", 0,
         GlobalVariable::GeneralDynamicTLSModel, 0, false);
 #endif
 
@@ -804,8 +808,17 @@ bool AFLCoverage::runOnModule(Module &M) {
     }
 
   }*/
+  
+  if (Debug) {
 
-#if LLVM_VERSION_MAJOR >= 7 /* use new pass manager */
+    if (!inst_blocks)
+      fprintf(stderr, "No instrumentation targets found.\n");
+    else
+      fprintf(stderr, "Instrumented %d locations (ratio %u%%).\n", inst_blocks, (unsigned)InstRatio);
+
+  }
+
+#ifdef USE_NEW_PM
   return PA;
 #else
   return true;
@@ -813,7 +826,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
 }
 
-#if LLVM_VERSION_MAJOR < 7 /* use old pass manager */
+#ifndef USE_NEW_PM
 static void registerAFLPass(const PassManagerBuilder &,
                             legacy::PassManagerBase &PM) {
 
