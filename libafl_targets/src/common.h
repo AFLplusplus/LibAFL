@@ -8,6 +8,28 @@
 
 #define STATIC_ASSERT(pred) switch(0){case 0:case pred:;}
 
+// From https://stackoverflow.com/a/18298965
+#if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__
+  #define THREAD_LOCAL _Thread_local
+#elif defined _WIN32 && ( \
+      defined _MSC_VER || \
+      defined __ICL || \
+      defined __DMC__ || \
+      defined __BORLANDC__ )
+  #define THREAD_LOCAL __declspec(thread) 
+/* note that ICC (linux) and Clang are covered by __GNUC__ */
+#elif defined __GNUC__ || \
+      defined __SUNPRO_C || \
+      defined __xlC__
+  #define THREAD_LOCAL __thread
+#endif
+
+#ifdef THREAD_LOCAL
+  #define MAYBE_THREAD_LOCAL THREAD_LOCAL
+#else
+  #define MAYBE_THREAD_LOCAL
+#else
+
 #ifdef _WIN32
   #define RETADDR (uintptr_t)_ReturnAddress()
   #define EXPORT_FN __declspec(dllexport)
