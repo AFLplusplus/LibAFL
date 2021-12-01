@@ -24,6 +24,15 @@
   #define THREAD_LOCAL __thread
 #endif
 
+#if defined(__ANDROID__) || defined(__HAIKU__)
+  #undef THREAD_LOCAL
+#elif defined(__APPLE__)
+  #include <TargetConditionals.h>
+  #if TARGET_OS_IPHONE
+    #undef THREAD_LOCAL
+  #endif
+#endif
+
 #ifdef THREAD_LOCAL
   #define MAYBE_THREAD_LOCAL THREAD_LOCAL
 #else
