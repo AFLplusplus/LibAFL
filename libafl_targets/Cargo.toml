@@ -1,6 +1,6 @@
 [package]
 name = "libafl_targets"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Common code for target instrumentation that can be used combined with LibAFL"
 documentation = "https://docs.rs/libafl_targets"
@@ -28,6 +28,6 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 rangemap = "0.1.10"
-libafl = { path = "../libafl", version = "0.6.1", features = [] }
+libafl = { path = "../libafl", version = "0.7.0", features = [] }
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 # serde-big-array = "0.3.2"
