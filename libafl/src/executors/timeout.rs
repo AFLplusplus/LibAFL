@@ -90,10 +90,10 @@ type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param2: *mut windows::Win32::System::Threading::TP_TIMER,
 );
 
-impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
+#[cfg(unix)]
+impl<E> TimeoutExecutor<E> {
     /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
-    #[cfg(unix)]
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
         let it_value = Timeval {
@@ -113,8 +113,10 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
             itimerval,
         }
     }
+}
 
-    #[cfg(windows)]
+#[cfg(windows)]
+impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout_handler: PTP_TIMER_CALLBACK =
