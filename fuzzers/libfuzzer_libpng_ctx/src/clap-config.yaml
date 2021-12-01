@@ -1,0 +1,12 @@
+name: libfuzzer libpng
+version: "0.1.0"
+author: "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+about: A clone of libfuzzer using libafl for a libpng harness.
+args:
+    - cores:
+        short: c
+        long: cores
+        about: "spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6." 
+        value_name: CORES
+        required: true
+        takes_value: true
