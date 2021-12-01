@@ -55,18 +55,14 @@ const ITIMER_REAL: c_int = 0;
 
 /// Reset and remove the timeout
 #[cfg(unix)]
-pub fn unix_remove_timeout() {
-    unsafe {
-        let mut itimerval_zero: Itimerval = zeroed();
-        setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
-    }
+pub unsafe fn unix_remove_timeout() {
+    let mut itimerval_zero: Itimerval = zeroed();
+    setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
 }
 
 #[cfg(all(windows, feature = "std"))]
-pub fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
-    unsafe {
-        CloseThreadpoolTimer(tp_timer);
-    }
+pub unsafe fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
+    CloseThreadpoolTimer(tp_timer);
 }
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
