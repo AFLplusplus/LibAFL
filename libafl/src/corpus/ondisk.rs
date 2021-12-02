@@ -1,14 +1,17 @@
 //! The ondisk corpus stores unused testcases to disk.
 
 use alloc::vec::Vec;
-use core::cell::RefCell;
+use core::{cell::RefCell, time::Duration};
 use serde::{Deserialize, Serialize};
 use std::{fs::OpenOptions, path::PathBuf};
 
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 
-use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, state::HasMetadata, Error};
+use crate::{
+    bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase, inputs::Input,
+    state::HasMetadata, Error,
+};
 
 /// Options for the the format of the on-disk metadata
 #[cfg(feature = "std")]
@@ -20,6 +23,15 @@ pub enum OnDiskMetadataFormat {
     Json,
     /// JSON formatted for readability
     JsonPretty,
+}
+
+/// A corpus able to store testcases to disk, and load them from disk, when they are being used.
+#[cfg(feature = "std")]
+#[derive(Serialize)]
+pub struct OnDiskMetadata<'a> {
+    metadata: &'a SerdeAnyMap,
+    exec_time: &'a Option<Duration>,
+    executions: &'a usize,
 }
 
 /// A corpus able to store testcases to disk, and load them from disk, when they are being used.
@@ -91,12 +103,18 @@ where
                 tmpfile_name.file_name().unwrap().to_string_lossy()
             ));
 
+            let ondisk_meta = OnDiskMetadata {
+                metadata: testcase.metadata(),
+                exec_time: testcase.exec_time(),
+                executions: testcase.executions(),
+            };
+
             let mut tmpfile = File::create(&tmpfile_name)?;
 
             let serialized = match self.meta_format.as_ref().unwrap() {
-                OnDiskMetadataFormat::Postcard => postcard::to_allocvec(testcase.metadata())?,
-                OnDiskMetadataFormat::Json => serde_json::to_vec(testcase.metadata())?,
-                OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(testcase.metadata())?,
+                OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
+                OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
+                OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
             };
             tmpfile.write_all(&serialized)?;
             fs::rename(&tmpfile_name, &filename)?;

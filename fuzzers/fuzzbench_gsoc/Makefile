@@ -37,12 +37,12 @@ short_test: all
 	echo a > in/a
 	# Allow sigterm as exit code 
 	(timeout 11s ./$(FUZZER_NAME) out in || [ $$? -eq 124 ])
-	rm -rf out
-	rm -rf in
+	rm -rf out || true
+	rm -rf in || true
 
 test: all
 	mkdir in || true
 	echo a > in/a
 	(timeout 60s ./$(FUZZER_NAME) out in || [ $$? -eq 124 ])
-	rm -rf out
-	rm -rf in
+	rm -rf out || true
+	rm -rf in || true

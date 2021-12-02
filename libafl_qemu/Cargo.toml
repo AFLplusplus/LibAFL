@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
@@ -15,8 +15,8 @@ python = ["pyo3", "pyo3-build-config"]
 default = []
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.6.1" }
-libafl_targets = { path = "../libafl_targets", version = "0.6.1" }
+libafl = { path = "../libafl", version = "0.7.0" }
+libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.9", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
 num-traits = "0.2"
