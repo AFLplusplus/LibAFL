@@ -248,6 +248,8 @@ where
 #[cfg(windows)]
 impl<E> Drop for TimeoutExecutor<E> {
     fn drop(&mut self) {
-        windows_delete_timer_queue(self.tp_timer);
+        unsafe {
+            windows_delete_timer_queue(self.tp_timer);
+        }
     }
 }
