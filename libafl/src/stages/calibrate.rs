@@ -15,14 +15,14 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{marker::PhantomData, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub struct CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
@@ -42,7 +42,7 @@ const CAL_STAGE_MAX: usize = 8;
 impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
     for CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
@@ -210,7 +210,7 @@ crate::impl_serdeany!(PowerScheduleMetadata);
 
 impl<C, E, I, EM, O, OT, S, T, Z> CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,

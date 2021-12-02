@@ -6,6 +6,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{
+    fmt::Debug,
     hash::Hasher,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
@@ -26,7 +27,7 @@ use crate::{
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver<T>: HasLen + Named + serde::Serialize + serde::de::DeserializeOwned
 where
-    T: PrimInt + Default + Copy,
+    T: PrimInt + Default + Copy + Debug,
 {
     /// Get the map if the observer can be represented with a slice
     fn map(&self) -> Option<&[T]>;
@@ -117,7 +118,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -148,7 +149,7 @@ where
 
 impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn map(&self) -> Option<&[T]> {
@@ -232,7 +233,7 @@ where
 
 impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -263,7 +264,7 @@ where
 
 impl<'a, T, const N: usize> MapObserver<T> for ConstMapObserver<'a, T, N>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn usable_count(&self) -> usize {
@@ -354,7 +355,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -385,7 +386,7 @@ where
 
 impl<'a, T> MapObserver<T> for VariableMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn map(&self) -> Option<&[T]> {
@@ -579,7 +580,7 @@ where
 
 impl<'a, I, S, T> Observer<I, S> for MultiMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
 {
     #[inline]
@@ -610,7 +611,7 @@ where
 
 impl<'a, T> MapObserver<T> for MultiMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn map(&self) -> Option<&[T]> {
