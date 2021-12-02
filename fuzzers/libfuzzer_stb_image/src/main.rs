@@ -10,17 +10,17 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::{setup_restarting_mgr_std, EventConfig},
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, timeout::TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     mutators::token_mutations::I2SRandReplace,
     observers::{StdMapObserver, TimeObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
-    stats::MultiStats,
     Error,
 };
 
@@ -49,11 +49,11 @@ pub fn main() {
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, EventConfig::from_name("default")) {
+        match setup_restarting_mgr_std(monitor, broker_port, EventConfig::from_name("default")) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
@@ -124,15 +124,17 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     };
 
     // Create the executor for an in-process function with just one observer for edge coverage
-    let mut executor = 
+    let mut executor = ShadowExecutor::new(
         InProcessExecutor::new(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
             &mut state,
             &mut restarting_mgr,
-        )?;
-    
+        )?,
+        tuple_list!(cmplog_observer),
+    );
+
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
@@ -148,6 +150,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
+    // Setup a tracing stage in which we log comparisons
+    let tracing = ShadowTracingStage::new(&mut executor);
+
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
@@ -156,7 +161,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutational = StdMutationalStage::new(mutator);
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(i2s, mutational);
+    let mut stages = tuple_list!(tracing, i2s, mutational);
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
 
