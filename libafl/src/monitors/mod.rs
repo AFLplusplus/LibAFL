@@ -291,7 +291,7 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {},{} exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, {} exec/sec: {}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
