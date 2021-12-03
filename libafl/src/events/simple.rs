@@ -187,7 +187,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                let client = monitor.client_stats_mut()[0];
+                let client = &mut monitor.client_stats_mut()[0];
                 client.update_executions(*executions as u64, *time);
                 client.update_introspection_monitor((**introspection_monitor).clone());
                 if let Some(stability) = stability {
