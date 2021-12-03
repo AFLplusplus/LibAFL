@@ -194,6 +194,12 @@ where
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
+            Event::Stability { stability } => {
+                monitor.client_stats_mut_for(0).update_stability(*stability);
+                #[cfg(feature = "std")]
+                println!("[Stability] Current Stability {:.2}%", *stability * 100_f64);
+                Ok(BrokerEventResult::Handled)
+            }
             Event::Log {
                 severity_level,
                 message,

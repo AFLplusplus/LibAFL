@@ -212,6 +212,11 @@ where
         /// Objective corpus size
         objective_size: usize,
     },
+    /// Inform the eventmgr about the current stability
+    Stability {
+        /// Stability of the testcases
+        stability: f64,
+    },
     /// Write a new log
     Log {
         /// the severity level
@@ -261,6 +266,7 @@ where
                 phantom: _,
             } => "PerfMonitor",
             Event::Objective { objective_size: _ } => "Objective",
+            Event::Stability { stability: _ } => "Stability",
             Event::Log {
                 severity_level: _,
                 message: _,

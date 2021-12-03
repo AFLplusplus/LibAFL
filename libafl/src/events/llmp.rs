@@ -228,6 +228,12 @@ where
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
+            Event::Stability { stability } => {
+                let client = monitor.client_stats_mut_for(client_id);
+                client.update_stability(*stability);
+                monitor.display(event.name().to_string(), client_id);
+                Ok(BrokerEventResult::Handled)
+            }
             Event::Log {
                 severity_level,
                 message,

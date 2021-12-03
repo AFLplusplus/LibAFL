@@ -3,6 +3,7 @@
 use crate::{
     bolts::current_time,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{FeedbackStatesTuple, MapFeedbackState},
     fuzzer::Evaluator,
@@ -26,6 +27,7 @@ where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    EM: EventFirer<I>,
     FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
@@ -48,6 +50,7 @@ where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    EM: EventFirer<I>,
     FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
@@ -62,7 +65,7 @@ where
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut S,
-        manager: &mut EM,
+        mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let mut iter = self.stage_max;
@@ -81,7 +84,7 @@ where
         // Run once to get the initial calibration map
         executor.observers_mut().pre_exec_all(state, &input)?;
         let mut start = current_time();
-        let _ = executor.run_target(fuzzer, state, manager, &input)?;
+        let _ = executor.run_target(fuzzer, state, mgr, &input)?;
         let mut total_time = current_time() - start;
         let map_first = &executor
             .observers()
@@ -106,11 +109,17 @@ where
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
 
-            if executor.run_target(fuzzer, state, manager, &input)? != ExitKind::Ok {
+            if executor.run_target(fuzzer, state, mgr, &input)? != ExitKind::Ok {
                 if !has_errors {
                     // Likely msg cannot be seen ...
-                    #[cfg(feature = "std")]
-                    println!("Corpus entry errors on execution!");
+                    mgr.fire(
+                        state,
+                        Event::Log {
+                            severity_level: LogSeverity::Warn,
+                            message: "Corpus entry errored on execution!".into(),
+                            phantom: PhantomData,
+                        },
+                    )?;
                     has_errors = true;
                     if iter < CAL_STAGE_MAX {
                         iter += 2;
@@ -147,11 +156,17 @@ where
             if unstable_entries != 0 {
                 // Likely msg cannot be seen ...
                 // TODO: Report to the event mgr
-                #[cfg(feature = "std")]
-                println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
+                //#[cfg(feature = "std")]
+                //println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
                 // println!("HISTORY  : {:#?}", serde_json::to_string(&history_map));
                 // println!("FIRST RUN: {:#?}", serde_json::to_string(&map_first));
                 // println!("THIS RUN : {:#?}", serde_json::to_string(&map));
+                mgr.fire(
+                    state,
+                    Event::Stability {
+                        stability: unstable_entries as f64 / (map_len as f64),
+                    },
+                )?;
                 if iter < CAL_STAGE_MAX {
                     iter += 2;
                 }
@@ -290,6 +305,7 @@ where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    EM: EventFirer<I>,
     FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
