@@ -4,7 +4,7 @@ use crate::{
     bolts::current_time,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     executors::{Executor, HasObservers},
-    feedbacks::MapFeedbackState,
+    feedbacks::{FeedbackStatesTuple, MapFeedbackState},
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
@@ -16,16 +16,17 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{marker::PhantomData, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
+pub struct CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
@@ -35,20 +36,21 @@ where
     map_observer_name: String,
     stage_max: usize,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
+    phantom: PhantomData<(C, E, EM, FT, I, O, OT, S, T, Z)>,
 }
 
 const CAL_STAGE_START: usize = 4;
 const CAL_STAGE_MAX: usize = 16;
 
-impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
-    for CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
+impl<C, E, EM, FT, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
+    for CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
-    O: MapObserver<T>, /*+ std::fmt::Debug*/
+    O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I> + HasMetadata + HasFeedbackStates<FT>,
     Z: Evaluator<E, EM, I, S>,
@@ -119,10 +121,10 @@ where
             //          println!("FIRST: {:#?}", serde_json::to_string(&map_first));
             println!("DATA: {:#?}", serde_json::to_string(&map.map()));
             //          println!("SECOND: {:#?}", serde_json::to_string(&map_first.map()));
-            let mut is_unstable: u32 = 0;
+            let mut unstable_entries: usize = 0;
 
-            if is_unstable {
-                println!("UNSTABLE! {:#?} entries", is_unstable);
+            if unstable_entries != 0 {
+                println!("UNSTABLE! {:#?} entries", unstable_entries);
                 if iter < CAL_STAGE_MAX {
                     iter += 2;
                 }
@@ -258,11 +260,12 @@ impl PowerScheduleMetadata {
 
 crate::impl_serdeany!(PowerScheduleMetadata);
 
-impl<C, E, I, EM, O, OT, S, T, Z> CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
+impl<C, E, EM, FT, I, O, OT, S, T, Z> CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
