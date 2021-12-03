@@ -98,6 +98,8 @@ where
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
+        let mut unstable_entries: usize = 0;
+        let map_len: usize = map_first.len() as usize;
         while i < iter {
             let input = state
                 .corpus()
@@ -111,7 +113,6 @@ where
 
             if executor.run_target(fuzzer, state, mgr, &input)? != ExitKind::Ok {
                 if !has_errors {
-                    // Likely msg cannot be seen ...
                     mgr.fire(
                         state,
                         Event::Log {
@@ -130,7 +131,6 @@ where
 
             total_time += current_time() - start;
 
-            let mut unstable_entries: usize = 0;
             let map = &executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
@@ -144,7 +144,6 @@ where
                 .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
                 .unwrap()
                 .history_map;
-            let map_len = history_map.len() as usize;
 
             for j in 0..map_len {
                 if map_first[j] != map[j] && history_map[j] != T::max_value() {
@@ -153,27 +152,20 @@ where
                 };
             }
 
-            if unstable_entries != 0 {
-                // Likely msg cannot be seen ...
-                // TODO: Report to the event mgr
-                //#[cfg(feature = "std")]
-                //println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
-                // println!("HISTORY  : {:#?}", serde_json::to_string(&history_map));
-                // println!("FIRST RUN: {:#?}", serde_json::to_string(&map_first));
-                // println!("THIS RUN : {:#?}", serde_json::to_string(&map));
-                mgr.fire(
-                    state,
-                    Event::Stability {
-                        stability: (map_len - unstable_entries) as f64 / (map_len as f64),
-                    },
-                )?;
-                if iter < CAL_STAGE_MAX {
-                    iter += 2;
-                }
-            };
-
             i += 1;
         }
+
+        if unstable_entries != 0 {
+            mgr.fire(
+                state,
+                Event::Stability {
+                    stability: (map_len - unstable_entries) as f64 / (map_len as f64),
+                },
+            )?;
+            if iter < CAL_STAGE_MAX {
+                iter += 2;
+            }
+        };
 
         let psmeta = state
             .metadata_mut()
