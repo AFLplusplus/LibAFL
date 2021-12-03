@@ -59,7 +59,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
+    #[allow(clippy::let_and_return, clippy::too_many_lines)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -156,6 +156,7 @@ where
         }
 
         if unstable_entries != 0 {
+            #[allow(clippy::cast_precision_loss)]
             mgr.fire(
                 state,
                 Event::Stability {

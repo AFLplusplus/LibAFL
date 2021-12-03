@@ -165,9 +165,11 @@ pub trait Monitor {
             }
         }
         if num == 0 {
-            return None;
+            None
+        } else {
+            #[allow(clippy::cast_precision_loss)]
+            Some(stability_total / num as f64)
         }
-        return Some(stability_total / num as f64);
     }
 
     /// Amount of elements in the corpus (combined for all children)
