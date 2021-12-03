@@ -3,7 +3,7 @@
 use crate::{
     bolts::current_time,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
-    executors::{Executor, HasObservers},
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::{FeedbackStatesTuple, MapFeedbackState},
     fuzzer::Evaluator,
     inputs::Input,
@@ -93,8 +93,9 @@ where
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
-        let mut _i = 1;
-        while _i < iter {
+        let mut i = 1;
+        let mut errors = 0;
+        while i < iter {
             let input = state
                 .corpus()
                 .get(corpus_idx)?
@@ -104,43 +105,58 @@ where
 
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
-            let _ = executor.run_target(fuzzer, state, manager, &input)?;
-            total_time += current_time() - start;
 
-            let mut unstable_entries: usize = 0;
-            let map = &executor
-                .observers()
-                .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-                .map()
-                .unwrap()
-                .to_vec();
+            match executor.run_target(fuzzer, state, manager, &input)? {
+                ExitKind::Ok => {
+                    total_time += current_time() - start;
 
-            let history_map = &mut state
-                .feedback_states_mut()
-                .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
-                .unwrap()
-                .history_map;
-            let map_len = history_map.len() as usize;
+                    let mut unstable_entries: usize = 0;
+                    let map = &executor
+                        .observers()
+                        .match_name::<O>(&self.map_observer_name)
+                        .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+                        .map()
+                        .unwrap()
+                        .to_vec();
 
-            for _j in 0..map_len {
-                if map_first[_j] != map[_j] && history_map[_j] != T::max_value() {
-                    history_map[_j] = T::max_value();
-                    unstable_entries += 1;
-                };
-            }
+                    let history_map = &mut state
+                        .feedback_states_mut()
+                        .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
+                        .unwrap()
+                        .history_map;
+                    let map_len = history_map.len() as usize;
 
-            if unstable_entries != 0 {
-                println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
-                println!("HISTORY  : {:#?}", serde_json::to_string(&history_map));
-                println!("FIRST RUN: {:#?}", serde_json::to_string(&map_first));
-                println!("THIS RUN : {:#?}", serde_json::to_string(&map));
-                if iter < CAL_STAGE_MAX {
-                    iter += 2;
+                    for j in 0..map_len {
+                        if map_first[j] != map[j] && history_map[j] != T::max_value() {
+                            history_map[j] = T::max_value();
+                            unstable_entries += 1;
+                        };
+                    }
+
+                    if unstable_entries != 0 {
+                        // Likely msg cannot be seen ...
+                        println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
+                        // println!("HISTORY  : {:#?}", serde_json::to_string(&history_map));
+                        // println!("FIRST RUN: {:#?}", serde_json::to_string(&map_first));
+                        // println!("THIS RUN : {:#?}", serde_json::to_string(&map));
+                        if iter < CAL_STAGE_MAX {
+                            iter += 2;
+                        }
+                    };
+                }
+                _ => {
+                    if errors == 0 {
+                        // Likely msg cannot be seen ...
+                        println!("Corpus entry errors on execution!");
+                        errors = 1;
+                        if iter < CAL_STAGE_MAX {
+                            iter += 2;
+                        };
+                    };
                 }
             };
 
-            _i += 1;
+            i += 1;
         }
 
         let psmeta = state

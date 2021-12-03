@@ -170,7 +170,7 @@ fn fuzz(
         File::from_raw_fd(new_fd)
     };
     #[cfg(unix)]
-    //let file_null = File::open("/dev/null")?;
+    let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
@@ -325,7 +325,6 @@ fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-/*
     // Remove target ouput (logs still survive)
     #[cfg(unix)]
     {
@@ -333,7 +332,7 @@ fn fuzz(
         dup2(null_fd, io::stdout().as_raw_fd())?;
         dup2(null_fd, io::stderr().as_raw_fd())?;
     }
-*/
+
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()
