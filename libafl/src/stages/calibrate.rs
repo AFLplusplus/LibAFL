@@ -3,14 +3,14 @@
 use crate::{
     bolts::current_time,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
-    events::{Event, EventFirer, LogSeverity},
+    events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{FeedbackStatesTuple, MapFeedbackState},
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
-    state::{HasCorpus, HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
     Error,
 };
 use alloc::{
@@ -55,7 +55,7 @@ where
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata + HasFeedbackStates<FT>,
+    S: HasCorpus<C, I> + HasMetadata + HasFeedbackStates<FT> + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -164,14 +164,10 @@ where
             i += 1;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         if unstable_entries != 0 {
-            #[allow(clippy::cast_precision_loss)]
-            mgr.fire(
-                state,
-                Event::Stability {
-                    stability: (map_len - unstable_entries) as f64 / (map_len as f64),
-                },
-            )?;
+            *state.stability_mut() = Some((map_len - unstable_entries) as f32 / (map_len as f32));
+
             if iter < CAL_STAGE_MAX {
                 iter += 2;
             }

@@ -58,7 +58,7 @@ pub struct ClientStats {
     /// User-defined monitor
     pub user_monitor: HashMap<String, UserStats>,
     /// Stability, and if we ever received a stability value
-    pub stability: Option<f64>,
+    pub stability: Option<f32>,
     /// Client performance statistics
     #[cfg(feature = "introspection")]
     pub introspection_monitor: ClientPerfMonitor,
@@ -89,7 +89,7 @@ impl ClientStats {
     }
 
     /// we got a new information about stability for this client, insert it.
-    pub fn update_stability(&mut self, stability: f64) {
+    pub fn update_stability(&mut self, stability: f32) {
         self.stability = Some(stability);
     }
 
@@ -155,8 +155,8 @@ pub trait Monitor {
     fn display(&mut self, event_msg: String, sender_id: u32);
 
     /// Show the Stabiliity
-    fn stability(&self) -> Option<f64> {
-        let mut stability_total = 0_f64;
+    fn stability(&self) -> Option<f32> {
+        let mut stability_total = 0_f32;
         let mut num = 0_usize;
         for stat in self.client_stats() {
             if let Some(stability) = stat.stability {
@@ -168,7 +168,7 @@ pub trait Monitor {
             None
         } else {
             #[allow(clippy::cast_precision_loss)]
-            Some(stability_total / num as f64)
+            Some(stability_total / num as f32)
         }
     }
 

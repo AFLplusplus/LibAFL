@@ -176,9 +176,11 @@ where
         executions: usize,
     },
     /// New stats event to monitor.
-    UpdateExecutions {
+    UpdateExecStats {
         /// The time of generation of the [`Event`]
         time: Duration,
+        /// The stability of this fuzzer node, if known
+        stability: Option<f32>,
         /// The executions of this client
         executions: usize,
         /// [`PhantomData`]
@@ -198,10 +200,10 @@ where
     UpdatePerfMonitor {
         /// The time of generation of the event
         time: Duration,
-
         /// The executions of this client
         executions: usize,
-
+        /// The stability of this fuzzer node, if known
+        stability: Option<f32>,
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 
@@ -211,11 +213,6 @@ where
     Objective {
         /// Objective corpus size
         objective_size: usize,
-    },
-    /// Inform the eventmgr about the current stability
-    Stability {
-        /// Stability of the testcases
-        stability: f64,
     },
     /// Write a new log
     Log {
@@ -248,8 +245,9 @@ where
                 time: _,
                 executions: _,
             } => "Testcase",
-            Event::UpdateExecutions {
+            Event::UpdateExecStats {
                 time: _,
+                stability: _,
                 executions: _,
                 phantom: _,
             }
@@ -262,11 +260,11 @@ where
             Event::UpdatePerfMonitor {
                 time: _,
                 executions: _,
+                stability: _,
                 introspection_monitor: _,
                 phantom: _,
             } => "PerfMonitor",
             Event::Objective { objective_size: _ } => "Objective",
-            Event::Stability { stability: _ } => "Stability",
             Event::Log {
                 severity_level: _,
                 message: _,
@@ -344,6 +342,7 @@ where
         S: HasExecutions + HasClientPerfMonitor,
     {
         let executions = *state.executions();
+        let stability = *state.stability();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
@@ -351,8 +350,9 @@ where
             #[cfg(not(feature = "introspection"))]
             self.fire(
                 state,
-                Event::UpdateExecutions {
+                Event::UpdateExecStats {
                     executions,
+                    stability,
                     time: cur,
                     phantom: PhantomData,
                 },
@@ -372,6 +372,7 @@ where
                     Event::UpdatePerfMonitor {
                         executions,
                         time: cur,
+                        stability,
                         introspection_monitor: Box::new(state.introspection_monitor().clone()),
                         phantom: PhantomData,
                     },
