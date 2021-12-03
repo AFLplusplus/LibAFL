@@ -84,8 +84,19 @@ where
         // Run once to get the initial calibration map
         executor.observers_mut().pre_exec_all(state, &input)?;
         let mut start = current_time();
-        let _ = executor.run_target(fuzzer, state, mgr, &input)?;
-        let mut total_time = current_time() - start;
+
+        let mut total_time = if executor.run_target(fuzzer, state, mgr, &input)? == ExitKind::Ok {
+            current_time() - start
+        } else {
+            mgr.log(
+                state,
+                LogSeverity::Warn,
+                "Corpus entry errored on execution!".into(),
+            )?;
+            // assume one second as default time
+            Duration::from_secs(1)
+        };
+
         let map_first = &executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
@@ -113,14 +124,12 @@ where
 
             if executor.run_target(fuzzer, state, mgr, &input)? != ExitKind::Ok {
                 if !has_errors {
-                    mgr.fire(
+                    mgr.log(
                         state,
-                        Event::Log {
-                            severity_level: LogSeverity::Warn,
-                            message: "Corpus entry errored on execution!".into(),
-                            phantom: PhantomData,
-                        },
+                        LogSeverity::Warn,
+                        "Corpus entry errored on execution!".into(),
                     )?;
+
                     has_errors = true;
                     if iter < CAL_STAGE_MAX {
                         iter += 2;

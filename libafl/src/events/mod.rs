@@ -294,6 +294,24 @@ where
     /// This should not happen for a normal use-cases.
     fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
+    /// Send off an [`Event::LOG`] event to the broker
+    /// This is a shortcut for [`EventFirer::fire`] with [`Event::LOG`] as argument.
+    fn log<S>(
+        &mut self,
+        state: &mut S,
+        severity_level: LogSeverity,
+        message: String,
+    ) -> Result<(), Error> {
+        self.fire(
+            state,
+            Event::Log {
+                severity_level,
+                message,
+                phantom: PhantomData,
+            },
+        )
+    }
+
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
