@@ -3,18 +3,13 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
-use serde::{Deserialize, Serialize};
-
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{fmt, time, time::Duration};
-
 use hashbrown::HashMap;
-
-#[cfg(feature = "introspection")]
-use alloc::string::ToString;
+use serde::{Deserialize, Serialize};
 
 use crate::bolts::{current_time, format_duration_hms};
 
