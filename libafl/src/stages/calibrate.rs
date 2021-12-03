@@ -48,7 +48,7 @@ where
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    O: MapObserver<T> /*+ std::fmt::Debug*/,
+    O: MapObserver<T>, /*+ std::fmt::Debug*/
     OT: ObserversTuple<I, S>,
     S: HasCorpus<C, I> + HasMetadata + HasFeedbackStates<FT>,
     Z: Evaluator<E, EM, I, S>,
@@ -116,21 +116,19 @@ where
                 .match_name::<O>(&self.map_observer_name)
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
 
-//          println!("FIRST: {:#?}", serde_json::to_string(&map_first));
-          println!("DATA: {:#?}", serde_json::to_string(&map.map()));
-//          println!("SECOND: {:#?}", serde_json::to_string(&map_first.map()));
-         let mut is_unstable : u32 = 0;
-         
-         
-         if is_unstable {
-             println!("UNSTABLE! {:#?} entries", is_unstable);
-             if iter < CAL_STAGE_MAX {
-                 iter += 2;
-             }
-         }
+            //          println!("FIRST: {:#?}", serde_json::to_string(&map_first));
+            println!("DATA: {:#?}", serde_json::to_string(&map.map()));
+            //          println!("SECOND: {:#?}", serde_json::to_string(&map_first.map()));
+            let mut is_unstable: u32 = 0;
 
-          _i += 1;
+            if is_unstable {
+                println!("UNSTABLE! {:#?} entries", is_unstable);
+                if iter < CAL_STAGE_MAX {
+                    iter += 2;
+                }
+            }
 
+            _i += 1;
         }
 
         println!("END");
