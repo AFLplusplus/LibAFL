@@ -78,24 +78,18 @@ where
             .load_input()?
             .clone();
 
-        let map_state = state
-            .feedback_states_mut()
-            .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
-            .unwrap();
-        println!("MAP: {:#?}", serde_json::to_string(&map_state));
-
         // Run once to get the initial calibration map
-        println!("START");
         executor.observers_mut().pre_exec_all(state, &input)?;
         let mut start = current_time();
         let _ = executor.run_target(fuzzer, state, manager, &input)?;
         let mut total_time = current_time() - start;
-        let m = &executor
+        let map_first = &executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
-        let map_first = m.map().unwrap().to_vec();
-        println!("FIRST: {:#?}", serde_json::to_string(&map_first));
+            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+            .map()
+            .unwrap()
+            .to_vec();
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
@@ -113,27 +107,41 @@ where
             let _ = executor.run_target(fuzzer, state, manager, &input)?;
             total_time += current_time() - start;
 
-            let map = executor
+            let mut unstable_entries: usize = 0;
+            let map = &executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+                .map()
+                .unwrap()
+                .to_vec();
 
-            //          println!("FIRST: {:#?}", serde_json::to_string(&map_first));
-            println!("DATA: {:#?}", serde_json::to_string(&map.map()));
-            //          println!("SECOND: {:#?}", serde_json::to_string(&map_first.map()));
-            let mut unstable_entries: usize = 0;
+            let history_map = &mut state
+                .feedback_states_mut()
+                .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
+                .unwrap()
+                .history_map;
+            let map_len = history_map.len() as usize;
+
+            for _j in 0..map_len {
+                if map_first[_j] != map[_j] && history_map[_j] != T::max_value() {
+                    history_map[_j] = T::max_value();
+                    unstable_entries += 1;
+                };
+            }
 
             if unstable_entries != 0 {
-                println!("UNSTABLE! {:#?} entries", unstable_entries);
+                println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
+                println!("HISTORY  : {:#?}", serde_json::to_string(&history_map));
+                println!("FIRST RUN: {:#?}", serde_json::to_string(&map_first));
+                println!("THIS RUN : {:#?}", serde_json::to_string(&map));
                 if iter < CAL_STAGE_MAX {
                     iter += 2;
                 }
-            }
+            };
 
             _i += 1;
         }
-
-        println!("END");
 
         let psmeta = state
             .metadata_mut()
