@@ -5,7 +5,10 @@ pub use multi::MultiMonitor;
 
 use serde::{Deserialize, Serialize};
 
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt, time, time::Duration};
 
 use hashbrown::HashMap;
