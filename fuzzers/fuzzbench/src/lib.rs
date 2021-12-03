@@ -22,7 +22,9 @@ use libafl::{
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
-    corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler},
+    corpus::{
+        Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
+    },
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
@@ -36,9 +38,11 @@ use libafl::{
         tokens_mutations, Tokens,
     },
     observers::{StdMapObserver, TimeObserver},
-    stages::{calibrate::CalibrationStage,
-       power::{PowerMutationalStage, PowerSchedule},
-       StdMutationalStage, TracingStage},
+    stages::{
+        calibrate::CalibrationStage,
+        power::{PowerMutationalStage, PowerSchedule},
+        StdMutationalStage, TracingStage,
+    },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
