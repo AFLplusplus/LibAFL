@@ -94,7 +94,7 @@ where
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
         let mut i = 1;
-        let mut errors = 0;
+        let mut has_errors = false;
         while i < iter {
             let input = state
                 .corpus()
@@ -106,53 +106,54 @@ where
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
 
-            match executor.run_target(fuzzer, state, manager, &input)? {
-                ExitKind::Ok => {
-                    total_time += current_time() - start;
-
-                    let mut unstable_entries: usize = 0;
-                    let map = &executor
-                        .observers()
-                        .match_name::<O>(&self.map_observer_name)
-                        .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-                        .map()
-                        .unwrap()
-                        .to_vec();
-
-                    let history_map = &mut state
-                        .feedback_states_mut()
-                        .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
-                        .unwrap()
-                        .history_map;
-                    let map_len = history_map.len() as usize;
-
-                    for j in 0..map_len {
-                        if map_first[j] != map[j] && history_map[j] != T::max_value() {
-                            history_map[j] = T::max_value();
-                            unstable_entries += 1;
-                        };
-                    }
-
-                    if unstable_entries != 0 {
-                        // Likely msg cannot be seen ...
-                        println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
-                        // println!("HISTORY  : {:#?}", serde_json::to_string(&history_map));
-                        // println!("FIRST RUN: {:#?}", serde_json::to_string(&map_first));
-                        // println!("THIS RUN : {:#?}", serde_json::to_string(&map));
-                        if iter < CAL_STAGE_MAX {
-                            iter += 2;
-                        }
+            if executor.run_target(fuzzer, state, manager, &input)? != ExitKind::Ok {
+                if !has_errors {
+                    // Likely msg cannot be seen ...
+                    #[cfg(feature = "std")]
+                    println!("Corpus entry errors on execution!");
+                    has_errors = true;
+                    if iter < CAL_STAGE_MAX {
+                        iter += 2;
                     };
                 }
-                _ => {
-                    if errors == 0 {
-                        // Likely msg cannot be seen ...
-                        println!("Corpus entry errors on execution!");
-                        errors = 1;
-                        if iter < CAL_STAGE_MAX {
-                            iter += 2;
-                        };
-                    };
+                continue;
+            };
+
+            total_time += current_time() - start;
+
+            let mut unstable_entries: usize = 0;
+            let map = &executor
+                .observers()
+                .match_name::<O>(&self.map_observer_name)
+                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+                .map()
+                .unwrap()
+                .to_vec();
+
+            let history_map = &mut state
+                .feedback_states_mut()
+                .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
+                .unwrap()
+                .history_map;
+            let map_len = history_map.len() as usize;
+
+            for j in 0..map_len {
+                if map_first[j] != map[j] && history_map[j] != T::max_value() {
+                    history_map[j] = T::max_value();
+                    unstable_entries += 1;
+                };
+            }
+
+            if unstable_entries != 0 {
+                // Likely msg cannot be seen ...
+                // TODO: Report to the event mgr
+                #[cfg(feature = "std")]
+                println!("UNSTABLE : {:#?} edge(s)", unstable_entries);
+                // println!("HISTORY  : {:#?}", serde_json::to_string(&history_map));
+                // println!("FIRST RUN: {:#?}", serde_json::to_string(&map_first));
+                // println!("THIS RUN : {:#?}", serde_json::to_string(&map));
+                if iter < CAL_STAGE_MAX {
+                    iter += 2;
                 }
             };
 
