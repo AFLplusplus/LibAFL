@@ -292,8 +292,8 @@ where
     /// This should not happen for a normal use-cases.
     fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
-    /// Send off an [`Event::LOG`] event to the broker
-    /// This is a shortcut for [`EventFirer::fire`] with [`Event::LOG`] as argument.
+    /// Send off an [`Event::Log`] event to the broker
+    /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
     fn log<S>(
         &mut self,
         state: &mut S,
