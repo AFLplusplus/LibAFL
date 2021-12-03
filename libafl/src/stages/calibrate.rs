@@ -164,7 +164,7 @@ where
                 mgr.fire(
                     state,
                     Event::Stability {
-                        stability: unstable_entries as f64 / (map_len as f64),
+                        stability: (map_len - unstable_entries) as f64 / (map_len as f64),
                     },
                 )?;
                 if iter < CAL_STAGE_MAX {
